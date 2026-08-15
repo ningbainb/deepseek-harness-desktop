@@ -1,0 +1,49 @@
+# DeepSeek Harness Desktop base aggregate.
+# Upstream packages remain separate dependencies published by their owners.
+
+# @linxin666/dsh-web-ui-all
+- insert:
+    - id: ui-web-ui-compat
+      name: '@linxin666/dsh-web-ui-all'
+    - id: ui-web-ui-settings
+      name: '@linxin666/dsh-client-ui-web-ui-settings'
+    - id: ui-dsh-aionui-panel
+      name: '@linxin666/dsh-client-ui-aionui-panel'
+    - id: ui-task-board
+      name: '@linxin666/dsh-client-ui-task-board'
+    - id: ui-git-graph
+      name: '@linxin666/dsh-client-ui-git-graph'
+    - id: ui-mode-switcher
+      name: '@linxin666/dsh-client-ui-mode-switcher'
+    - id: pet
+      name: '@linxin666/dsh-pet'
+    - id: remote-web-ui
+      name: '@linxin666/dsh-remote-web-ui'
+    - id: live-stats
+      name: '@linxin666/dsh-live-stats'
+    - id: ssh
+      name: '@linxin666/dsh-ssh'
+    - id: describe-image
+      name: '@linxin666/dsh-tool-describe-image'
+    - id: liangshen
+      name: '@linxin666/dsh-liangshen'
+    - id: ui-skin-center
+      name: '@linxin666/dsh-client-ui-skin-center'
+
+# dshmarket
+- insert:
+    - id: dsh-market
+      name: 'dshmarket'
+
+# dsh-codex-connect
+- insert:
+    - id: llm-openai-codex
+      name: 'dsh-codex-connect'
+      config:
+        enableSearch: false
+        enableImageTool: false
+
+# reasoning-slider
+- insert:
+    - id: reasoning-slider
+      name: 'reasoning-slider'

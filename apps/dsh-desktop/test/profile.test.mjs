@@ -80,15 +80,22 @@ test('profile manifest removes bundles already supplied by the web UI aggregate'
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@linxin666/dsh-client-ui-skin-qq2006'), false)
 })
 
-test('desktop profile includes one plugin store plus Codex login and reasoning controls', () => {
-  assert.equal(BUILTIN_BUNDLES.includes('dshmarket'), true)
+test('desktop profile uses the base aggregate for the store, Codex login, and reasoning controls', () => {
+  assert.equal(BUILTIN_BUNDLES.includes('dsh-desktop-base'), true)
+  assert.equal(BUILTIN_BUNDLES.includes('@linxin666/dsh-web-ui-all'), false)
+  assert.equal(BUILTIN_BUNDLES.includes('dshmarket'), false)
   assert.equal(BUILTIN_BUNDLES.includes('dsh-plugin-hub'), false)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-desktop-base'), true)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dshmarket'), true)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-plugin-hub'), false)
-  assert.equal(BUILTIN_BUNDLES.includes('dsh-codex-connect'), true)
-  assert.equal(BUILTIN_BUNDLES.includes('reasoning-slider'), true)
+  assert.equal(BUILTIN_BUNDLES.includes('dsh-codex-connect'), false)
+  assert.equal(BUILTIN_BUNDLES.includes('reasoning-slider'), false)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-codex-connect'), true)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('reasoning-slider'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('@linxin666/dsh-web-ui-all'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('dshmarket'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('dsh-codex-connect'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('reasoning-slider'), true)
   assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*profile: desktop/)
   assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*allowRestart: false/)
 })
@@ -130,11 +137,12 @@ test('profile manifest keeps an existing Codex provider without double-owning th
     dsh: { profile: { bundles: ['dsh-codex'] } },
   })
   assert.equal(manifest.dsh.profile.bundles.includes('dsh-codex'), true)
+  assert.equal(manifest.dsh.profile.bundles.includes('dsh-desktop-base'), true)
   assert.equal(manifest.dsh.profile.bundles.includes('dsh-codex-connect'), false)
   assert.equal(manifest.dependencies['dsh-codex-connect'], undefined)
 })
 
-test('profile bootstrap retires its managed Codex Connect link when another provider owns the route', async () => {
+test('profile bootstrap disables aggregate Codex Connect when another provider owns the route', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-codex-conflict-'))
   const dshHome = join(root, 'home')
   const profileDir = join(dshHome, 'profiles', 'desktop')
@@ -152,13 +160,16 @@ test('profile bootstrap retires its managed Codex Connect link when another prov
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
     const result = await ensureDesktopProfile({ dshHome, packageRoots })
+    const patch = await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')
+    assert.equal(result.manifest.dsh.profile.bundles.includes('dsh-desktop-base'), true)
     assert.equal(result.manifest.dsh.profile.bundles.includes('dsh-codex-connect'), false)
-    assert.equal(result.manifest.dependencies['dsh-codex-connect'], undefined)
-    await assert.rejects(
-      realpath(join(profileDir, 'node_modules', 'dsh-codex-connect')),
-      (error) => error?.code === 'ENOENT',
+    assert.match(result.manifest.dependencies['dsh-codex-connect'], /^link:/u)
+    assert.equal(
+      await realpath(join(profileDir, 'node_modules', 'dsh-codex-connect')),
+      await realpath(packageRoot),
     )
-    assert.equal((await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8')).includes('dsh-codex-connect'), false)
+    assert.match(patch, /- id: llm-openai-codex\n  disabled: true/u)
+    assert.equal((await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8')).includes('dsh-codex-connect'), true)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
