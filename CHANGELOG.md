@@ -4,12 +4,18 @@
 
 中文：
 
+- 扩展坞新增插件实际版本、三态兼容性和社区更新检查；内置插件随 Desktop 更新，已知不兼容版本会被拦截，未知适配需明确确认。
+- 社区插件升级改为运行中预取、离线精确切换和启动失败自动回滚；启动时只做本地兼容隔离，不访问注册表。
+- 缓存运行包解析并并行检查 profile 链接，同机未变化配置中位耗时从约 54.9 ms 降至 13.2 ms。
 - 将内置 dsh-web-ui 插件套件同步到 0.1.15，新增图像描述、量身 Agent、Harbor 与 QQ2006 皮肤，并吸收各插件的性能、设置和稳定性改进。
 - 将腾讯 QQ Bot 升级到 0.3.0、扩展坞升级到 0.1.1、插件市场升级到 1.3.0；市场重启仍由 Electron 桌面宿主统一管理。
 - 补齐 Windows 兼容：SFTP 路径规范化、更新超时测试、POSIX 权限测试隔离、共享路径测试和生成器路径识别。
 
 English:
 
+- Added actual plugin versions, three-state compatibility, and community update checks to Extension Dock; built-ins follow Desktop releases, known-incompatible candidates are blocked, and unknown compatibility requires confirmation.
+- Changed community upgrades to online prefetch, exact offline switching, and automatic rollback after a failed start; launch performs only local compatibility quarantine and no registry access.
+- Cached runtime package resolution and parallelized profile-link checks, reducing median unchanged-profile preparation on the reference machine from about 54.9 ms to 13.2 ms.
 - Synced the bundled dsh-web-ui plugin suite to 0.1.15, adding Describe Image, the Liangshen agent, Harbor, and QQ2006 while incorporating the suite's performance, settings, and reliability improvements.
 - Upgraded Tencent QQ Bot to 0.3.0, Extension Dock to 0.1.1, and the plugin market to 1.3.0; Electron remains the sole runtime-restart supervisor.
 - Completed Windows adaptation for SFTP path normalization, update-timeout tests, POSIX permission-test isolation, shared path tests, and generator path detection.

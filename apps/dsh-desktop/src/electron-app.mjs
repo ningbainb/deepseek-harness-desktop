@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 
@@ -8,21 +9,27 @@ import { startQrConnect } from '@tencent-connect/qqbot-connector'
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
 import { createCommunityQrImage } from './community.mjs'
-import { GITHUB_FEEDBACK_URL } from './community-links.mjs'
+import { GITHUB_FEEDBACK_URL, GITHUB_PROJECT_URL } from './community-links.mjs'
 import { BoundedLogStore } from './log-store.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
+import {
+  createHostCompatibilityProvider,
+  resolvePackageVersion,
+} from './extensions/plugin-compatibility.mjs'
 import { PluginManager, resolvePnpmCliPath } from './extensions/plugins.mjs'
 import {
   QqBotBindingService,
   QqBotCredentialStore,
   setQqBotProfileEnabled,
 } from './extensions/qqbot.mjs'
-import { registerDesktopIpc } from './ipc.mjs'
+import { publicUpdateStatus, registerDesktopIpc } from './ipc.mjs'
 import { installApplicationMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
-import { ensureDesktopProfile, resolveDshCliPath } from './profile.mjs'
+import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from './profile.mjs'
+import { installRendererPermissions } from './renderer-permissions.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
+import { installUpdateSurface } from './update-surface.mjs'
 import { installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
 import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
 
@@ -56,6 +63,7 @@ export async function ensurePnpmCommandShim({ directory, executable, pnpmCli }) 
 }
 
 export async function startElectronApp(metadata) {
+  const applicationStartedAt = performance.now()
   const electron = await import('electron')
   const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, screen, shell } = electron
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
@@ -67,6 +75,7 @@ export async function startElectronApp(metadata) {
   app.setName(metadata.productName)
   app.setAppUserModelId(metadata.appId)
   await app.whenReady()
+  const applicationReadyAt = performance.now()
 
   const appIconPath = resolveAppIconPath({
     isPackaged: app.isPackaged,
@@ -86,14 +95,17 @@ export async function startElectronApp(metadata) {
   const logsDirectory = join(userData, 'logs')
   await mkdir(logsDirectory, { recursive: true })
   const logStore = new BoundedLogStore({ directory: logsDirectory })
+  await logStore.append(`[startup] application-ready=${Math.round(applicationReadyAt - applicationStartedAt)}ms`)
   const dshHome = runtimeHome()
+  const profileStartedAt = performance.now()
+  const runtimePackages = resolveRuntimePackages()
   let qqBotCredentials
   const ensureProfile = async () => {
-    const result = await ensureDesktopProfile({ dshHome })
+    const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages })
     await setQqBotProfileEnabled({ profileDir: result.profileDir, enabled: Boolean(qqBotCredentials) })
     return result
   }
-  const profile = await ensureDesktopProfile({ dshHome })
+  const profile = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages })
   const qqBotCredentialStore = new QqBotCredentialStore({
     path: join(userData, 'qqbot-credentials.json'),
     safeStorage,
@@ -104,6 +116,9 @@ export async function startElectronApp(metadata) {
     await logStore.append(`[qqbot] failed to load credentials: ${error.message}`)
   }
   await setQqBotProfileEnabled({ profileDir: profile.profileDir, enabled: Boolean(qqBotCredentials) })
+  await logStore.append(
+    `[startup] profile-ready=${Math.round(performance.now() - profileStartedAt)}ms packages=${runtimePackages.size}`,
+  )
   const qqBotEnvironment = () => qqBotCredentials
     ? { QQBOT_APPID: qqBotCredentials.appId, QQBOT_SECRET: qqBotCredentials.appSecret }
     : { QQBOT_APPID: '', QQBOT_SECRET: '' }
@@ -113,6 +128,25 @@ export async function startElectronApp(metadata) {
     executable: process.execPath,
     pnpmCli: resolvePnpmCliPath(),
   })
+  const runtimeVersion = resolvePackageVersion('@deepseek-ai/dsh', {
+    profileDir: profile.profileDir,
+    anchors: [import.meta.url],
+  })
+  if (runtimeVersion === undefined) throw new Error('the installed DSH runtime version is unavailable')
+  const hostCompatibility = createHostCompatibilityProvider({
+    desktopVersion,
+    nodeVersion: process.versions.node,
+    runtimeVersion,
+    resolvePackageVersion: (name) => resolvePackageVersion(name, {
+      profileDir: profile.profileDir,
+      anchors: [import.meta.url],
+    }),
+  })
+  const pluginManager = new PluginManager({ profileDir: profile.profileDir, hostCompatibility })
+  const compatibilityReconciliation = await pluginManager.reconcileCompatibility()
+  for (const plugin of compatibilityReconciliation.disabled) {
+    await logStore.append(`[plugins] disabled incompatible community bundle: ${plugin.name}`)
+  }
 
   const controller = new DshRuntimeController({
     cliPath: resolveDshCliPath(),
@@ -158,21 +192,29 @@ export async function startElectronApp(metadata) {
   const removeMainWindowChrome = installWindowChrome({
     browserWindow: mainWindow,
     iconDataUrl: windowChromeIconDataUrl,
+    showHelpMenu: true,
     onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
+  })
+  const removeUpdateSurface = installUpdateSurface({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[update-surface] ${error.message}`),
   })
   if (state.maximized) mainWindow.maximize()
   const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
   let activeOrigin
   let extensionWindow
   let communityWindow
+  let updateController
 
   installNavigationPolicy({
     webContents: mainWindow.webContents,
     getRuntimeOrigin: () => activeOrigin,
     openExternal: (url) => shell.openExternal(url),
   })
-  mainWindow.webContents.session.setPermissionCheckHandler(() => false)
-  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false))
+  installRendererPermissions({
+    session: mainWindow.webContents.session,
+    getActiveOrigin: () => activeOrigin,
+  })
   mainWindow.webContents.session.on('will-download', async (_event, item) => {
     const result = await dialog.showSaveDialog(mainWindow, {
       defaultPath: join(app.getPath('downloads'), item.getFilename()),
@@ -191,11 +233,18 @@ export async function startElectronApp(metadata) {
     ensureProfile,
     openLogs: () => shell.openPath(logsDirectory),
     exitApp: () => app.quit(),
+    handleHelpAction: (action) => {
+      if (action === 'community') return createCommunityWindow()
+      if (action === 'feedback') return shell.openExternal(GITHUB_FEEDBACK_URL)
+      if (action === 'project') return shell.openExternal(GITHUB_PROJECT_URL)
+      return updateController?.check({ manual: true })
+    },
     setWindowChromeTheme: (sender, theme) => {
       const target = BrowserWindow.fromWebContents(sender)
       if (!target || target.isDestroyed()) return undefined
       return setWindowChromeTheme(target, theme)
     },
+    getUpdateController: () => updateController,
   })
 
   const createExtensionWindow = async () => {
@@ -293,7 +342,6 @@ export async function startElectronApp(metadata) {
     return communityWindow
   }
 
-  const pluginManager = new PluginManager({ profileDir: profile.profileDir })
   const unregisterExtensionIpc = registerExtensionIpc({
     ipcMain,
     dialog,
@@ -314,11 +362,18 @@ export async function startElectronApp(metadata) {
       await mainWindow.loadFile(STARTUP_PATH, preview ? { query: { preview } } : undefined)
     }
   }
+  let runtimeStartedAt
   controller.on('status', (status) => {
+    if (status.state === 'starting') runtimeStartedAt = performance.now()
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (status.state === 'ready' && status.url) {
+      const runtimeReadyAt = performance.now()
+      if (runtimeStartedAt !== undefined) {
+        void logStore.append(`[startup] runtime-ready=${Math.round(runtimeReadyAt - runtimeStartedAt)}ms`)
+      }
       activeOrigin = new URL(status.url).origin
       void mainWindow.loadURL(status.url).then(() => {
+        void logStore.append(`[startup] renderer-loaded=${Math.round(performance.now() - runtimeReadyAt)}ms`)
         if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
           console.log(`desktop smoke ready: ${activeOrigin}`)
           app.quit()
@@ -349,7 +404,6 @@ export async function startElectronApp(metadata) {
   let quitInProgress = false
   let runtimeStopped = false
   let shutdownPromise
-  let updateController
   const shutdownRuntime = () => {
     if (runtimeStopped) return Promise.resolve()
     if (shutdownPromise) return shutdownPromise
@@ -360,6 +414,8 @@ export async function startElectronApp(metadata) {
       .finally(() => {
         runtimeStopped = true
         updateController?.dispose()
+        updateController?.off('status', publishUpdateStatus)
+        removeUpdateSurface()
         removeMainWindowChrome()
         unregisterIpc()
         unregisterExtensionIpc()
@@ -381,7 +437,6 @@ export async function startElectronApp(metadata) {
   }
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
-    dialog,
     getWindow: () => mainWindow,
     currentVersion: app.getVersion(),
     enabled: Boolean(autoUpdater),
@@ -391,6 +446,12 @@ export async function startElectronApp(metadata) {
       await shutdownRuntime()
     },
   })
+  const publishUpdateStatus = (status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('desktop:update-status', publicUpdateStatus(status))
+    }
+  }
+  updateController.on('status', publishUpdateStatus)
   const openLogs = () => shell.openPath(logsDirectory)
   installApplicationMenu({
     Menu,

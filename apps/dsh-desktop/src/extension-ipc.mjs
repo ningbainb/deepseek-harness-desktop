@@ -5,7 +5,9 @@ import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/ski
 
 const CHANNELS = [
   'extensions:list',
+  'extensions:plugin-check',
   'extensions:plugin-install',
+  'extensions:plugin-update',
   'extensions:plugin-remove',
   'extensions:skill-import',
   'extensions:skill-open',
@@ -72,8 +74,59 @@ export function registerExtensionIpc({
     }
   }
 
+  const installPlugin = async (payload) => {
+    const request = typeof payload === 'string'
+      ? { spec: payload, allowUnknown: false }
+      : payload
+    if (
+      request === null
+      || typeof request !== 'object'
+      || typeof request.spec !== 'string'
+      || typeof request.allowUnknown !== 'boolean'
+    ) {
+      throw new TypeError('invalid plugin install request')
+    }
+
+    // Registry inspection and package-store warming happen while the current
+    // DSH process remains available. Only the exact offline switch is downtime.
+    const prepared = await pluginManager.prepare(request.spec, { allowUnknown: request.allowUnknown })
+    await controller.stop()
+    let transaction
+    try {
+      transaction = await pluginManager.applyPrepared(prepared)
+      await ensureProfile()
+      await controller.start()
+      transaction.commit()
+      return transaction.result
+    } catch (error) {
+      try {
+        if (transaction) await transaction.rollback()
+        await ensureProfile()
+        await controller.start()
+      } catch (recoveryError) {
+        throw new Error(
+          `plugin change failed and the previous runtime could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
+          { cause: new AggregateError([error, recoveryError]) },
+        )
+      }
+      throw error
+    }
+  }
+
   ipcMain.handle('extensions:list', scan)
-  ipcMain.handle('extensions:plugin-install', (_event, spec) => mutatePlugin(() => pluginManager.install(spec)))
+  ipcMain.handle('extensions:plugin-check', () => pluginManager.checkUpdates())
+  ipcMain.handle('extensions:plugin-install', (_event, request) => installPlugin(request))
+  ipcMain.handle('extensions:plugin-update', (_event, request) => {
+    if (
+      request === null
+      || typeof request !== 'object'
+      || typeof request.name !== 'string'
+      || typeof request.allowUnknown !== 'boolean'
+    ) {
+      throw new TypeError('invalid plugin update request')
+    }
+    return installPlugin({ spec: `${request.name}@latest`, allowUnknown: request.allowUnknown })
+  })
   ipcMain.handle('extensions:plugin-remove', (_event, name) => mutatePlugin(() => pluginManager.remove(name)))
   ipcMain.handle('extensions:skill-import', async () => {
     const result = await dialog.showOpenDialog(getWindow(), {

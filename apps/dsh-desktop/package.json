@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Lossless desktop shell for DeepSeek Harness and the complete dsh-web-ui plugin collection",
   "author": "DeepSeek Harness Desktop contributors",
@@ -13,6 +13,7 @@
     "capture:community": "node scripts/capture-startup.mjs --community",
     "capture:extensions": "node scripts/capture-startup.mjs --extensions",
     "capture:qqbot": "node scripts/capture-startup.mjs --qqbot-qr",
+    "measure:profile": "node scripts/measure-profile.mjs",
     "test:window-chrome:e2e": "node scripts/verify-window-chrome.mjs",
     "test:directory-picker:e2e": "node scripts/verify-directory-picker.mjs",
     "test:profile-migration:e2e": "node scripts/verify-profile-migration.mjs",
@@ -55,6 +56,8 @@
     "electron-updater": "6.8.9",
     "pnpm": "11.21.0",
     "qrcode": "1.5.4",
+    "reasoning-slider": "0.0.2",
+    "semver": "7.8.5",
     "yaml": "2.9.0"
   },
   "devDependencies": {

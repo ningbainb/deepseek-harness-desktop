@@ -13,26 +13,27 @@ The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~
 | Runtime | Official DSH host, random loopback port, HTTP readiness probe, graceful stop, bounded automatic restart |
 | Web surface | Original DSH Web application and complete dsh-web-ui plugin/skin aggregate |
 | Recovery | Startup status, sanitized recent error, retry, profile repair, logs, exit |
-| Plugins | Registry package syntax only, protected built-ins, serialized pnpm changes, DSH bundle validation, rollback |
+| Plugins | Actual version inventory, Desktop-managed built-ins, lazy community update checks, three-state compatibility, offline exact switch, rollback |
 | Skills | Project/DSH/Agents root discovery, official precedence, shadow reporting, safe folder import |
 | Window | Single instance, persisted visible geometry, native menu, download destination prompt |
 | Community | Help-menu QQ group QR and one-click join, direct GitHub issue feedback |
-| Updates | Stable GitHub Releases, release notes, user-confirmed download/install, taskbar progress |
+| Updates | Stable GitHub Releases, background download, user-confirmed restart/install, release notes, taskbar progress |
 | Security | Sandbox, context isolation, no Node integration, loopback navigation allowlist, denied permissions |
 
 ## Performance and size
 
-Reference measurements on the Windows 11 development machine for version 0.1.0:
+Reference measurements on the Windows 11 development machine for version 0.1.9:
 
 | Measurement | Result |
 | --- | ---: |
-| Test suite | 26 passing tests |
-| Installer | 187.5 MiB |
-| Installed/unpacked runtime | about 603 MiB |
-| Fresh profile and cold file scan | about 30.5 seconds |
-| Warm application start | about 7.1 seconds |
+| Desktop test suite | 106 passing tests |
+| Managed runtime packages | 20 |
+| Fresh profile preparation, median | 22.3 ms |
+| Unchanged profile preparation, median | 13.2 ms |
+| Warm DSH readiness | about 2.8–3.0 seconds |
+| First cold Windows file scan | about 25.2 seconds |
 
-The large installed size is intentional: the release keeps the official DSH runtime, Chromium, terminal/native modules, SSH, remote UI, all plugin packages, and all skins. The first start may be slower while Windows scans newly installed files and the desktop profile is created. Later starts reuse both the installed files and profile links.
+The release keeps the official DSH runtime, Chromium, terminal/native modules, SSH, remote UI, all built-in plugin packages, and all skins. The first start may be slower while Windows scans newly installed files. Later starts reuse both the installed files and profile links. Run `pnpm --filter @deepseek-ai/dsh-desktop measure:profile` to reproduce the profile-only benchmark without network access.
 
 ## Installation
 
@@ -40,13 +41,15 @@ Download the x64 installer from GitHub Releases and verify its SHA-256 against `
 
 No separate Node.js or pnpm installation is required for release users.
 
-Starting with version 0.1.3, the installed app checks stable GitHub Releases after startup and every six hours. Open `Help > Check for Updates` to check immediately. The app never downloads or installs an update without confirmation. Automatic check failures remain in the desktop log; manual check failures are shown to the user.
+Starting with version 0.1.9, the installed app checks stable GitHub Releases after startup and every six hours, then downloads a discovered release in the background. Open `Help > Check for Updates` to check immediately. Installation still requires an explicit `Restart and install` action. Automatic check failures remain in the desktop log; manual check failures are shown to the user.
 
 ## Extension Dock
 
 Open `Tools > Extension Dock` from the native menu.
 
-Plugin installation accepts an npm registry package such as `@scope/dsh-bundle@1.2.3`. URL, path, whitespace, shell metacharacter, and option-like input is rejected. The package must declare a DSH bundle patch. Built-in packages cannot be removed.
+Plugin installation accepts an npm registry package such as `@scope/dsh-bundle@1.2.3`. URL, path, whitespace, shell metacharacter, and option-like input is rejected. The package must declare a DSH bundle patch. Built-in package versions are displayed but can change only with a tested Desktop release.
+
+Opening Extension Dock checks only community packages for updates; normal application startup performs no registry requests. A candidate is assessed against the current Desktop, DSH runtime, Electron Node.js, and installed peer versions. Compatible versions can update directly, incompatible versions are blocked with a reason, and versions without enough metadata require explicit confirmation. The package is prefetched while DSH remains available, then switched to an exact version offline. If validation or restart fails, the previous manifest and lockfile are restored and the old runtime is restarted.
 
 The built-in Tencent QQ Bot integration is disabled until it is bound from Extension Dock. Binding uses the official QR connector inside the desktop main process. The AppSecret is encrypted with the operating-system credential store, is never sent to renderer code, and is supplied to the DSH child process only through its environment. Unbinding deletes the encrypted credential, disables the profile row, and restarts DSH.
 

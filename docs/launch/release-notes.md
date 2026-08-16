@@ -1,55 +1,65 @@
-# DeepSeek Harness Desktop 0.1.8
+# DeepSeek Harness Desktop 0.1.9
 
 ## 中文
 
 ### 本次亮点
 
-- 修复早期 0.1.8 构建的皮肤迁移可能把 `~/.dsh/cordis.patch.yml` 留成空文件、导致下次启动报“must be a top-level YAML array”并退出的问题。新版构建会把空补丁自动恢复为合法的 `[]`，且不会覆盖任何非空用户配置。
-- 顶部“帮助 / Help”菜单新增“加入社群”和“提建议”：社群弹窗同时提供 QQ 群二维码与一键跳转，GitHub 建议入口直接打开新建 Issue 页面，所有外链继续交由系统浏览器处理。
-- 桌面版只保留 `dshmarket` 作为默认插件市场，移除重复加载的 `dsh-plugin-hub`，避免两套市场同时改写同一个 desktop profile。
-- 启动迁移会清除旧版桌面托管的 Hub、兼容层、单独皮肤依赖和历史 managed 皮肤段。为避免保留一个指向旧安装目录的失效链接，受影响的升级会安全恢复一次官方外观；启动后重新选择 QQ98 等皮肤即可由新版皮肤中心建立唯一链接，不再因双重加载导致 `runtime exited with code 1`。
-- 内置 `dsh-codex-connect@0.1.0-alpha.4.5`，可在设置页使用 ChatGPT OAuth 登录并启用 OpenAI Codex 模型。它默认不替换当前模型、不接管全局搜索，也不启用远程图片工具；检测到已有 Codex provider 时会保留现有 provider，避免重复路由。
-- 内置 `reasoning-slider@0.0.2`，在模型选择器中平滑切换模型实际支持的推理强度，并在切换模型时自动回退到有效档位。
-- 全家桶、皮肤中心与内置皮肤继续使用 0.1.15 聚合结构；社区 bundle、会话、凭据和用户补丁在迁移中保持不变。
+- 修复桌面版对话气泡、整段回复与代码块复制按钮点击无效的问题。应用只对当前本地 DSH 页面开放安全的剪贴板写入权限，剪贴板读取及其他敏感权限仍保持关闭。
+- 自动更新调整为发现新版后直接在后台下载，不再用下载前系统弹窗打断对话。下载完成后会显示新的蓝黑毛玻璃更新面板，由用户选择立即重启安装或稍后处理。
+- 侧边栏“检查更新”在桌面环境中改为检查 DeepSeek Harness Desktop，不再误触发 Web UI 插件自更新；普通浏览器部署仍保留原插件更新能力。
+- 启动页改为简洁的“探索未至之境”界面，只保留当前状态和单条进度条。原有大圆球、轨道与阶段列表已移除，替换为完全本地绘制的原创蓝黑粒子鲸鱼。
+- 粒子鲸鱼只在启动页面运行，进入 DSH 主界面后随页面导航自动释放；系统开启“减少动态效果”时会显示静态版本。
+- 更新面板统一展示当前版本、目标版本、发行说明、下载进度、错误重试与重启安装状态，并继续在安装前安全停止内置 DSH 运行时。
+- 修复 Windows 升级时偶发的“应用仍在运行”或文件占用提示。桌面端退出时会结束完整 DSH 进程树；安装器还会在覆盖旧版本前，仅清理旧安装目录主程序和 `resources` 内的残留进程。
+- 扩展坞现在展示每个插件的实际版本与适配状态，只在打开扩展坞时检查社区插件更新。兼容版本可一键升级，已知不兼容版本会说明原因并拦截，未声明适配的版本需用户明确确认。
+- 社区插件升级会先在后台预取包，再短暂停止 DSH 完成离线精确版本切换；安装校验或重启失败时自动恢复旧清单、锁文件和运行时。内置插件继续只随经过验证的 Desktop 版本更新。
+- 桌面 profile 复用运行包解析结果并并行检查独立链接；同机基准中，未变化配置的中位耗时由约 54.9 ms 降至 13.2 ms，新配置由约 64.9 ms 降至 22.3 ms。
 
 ### 验证
 
-- 桌面 UI 回归覆盖帮助菜单动作、固定目标链接、沙箱化社群页、二维码渲染与常见窗口高度下的完整布局。
-- Profile 单元测试覆盖单市场清单、旧托管依赖清理、皮肤段单向迁移、连续启动幂等性和 Codex provider 冲突避让。
-- 真实 DSH Host 回归验证插件市场接口与页面、Codex 设置命名空间、思考强度滑块、全部内置皮肤资源以及 QQ98 应用流程。
-- 安装包门禁校验固定版本、完整运行时依赖、客户端 bundle、皮肤与桌宠资源，并执行根级类型检查、测试、官网和生成文件一致性检查。
+- 桌面测试覆盖后台自动下载、进度状态、下载完成后的显式安装、手动检查及更新错误。
+- IPC 测试验证更新状态只向渲染层暴露版本、说明、进度和错误等安全字段。
+- 剪贴板权限测试覆盖本地运行时源校验、端口隔离以及其他权限的默认拒绝行为。
+- 启动页使用 1440×900 桌面窗口完成视觉回归，验证粒子鲸鱼、毛玻璃进度条和紧凑布局。
+- 安装器测试验证清理逻辑按旧安装路径限定范围，不会按通用进程名结束其他软件；运行时测试验证 Windows 使用 `taskkill /T /F` 回收完整子进程树。
+- 插件回归覆盖三态 semver 适配、固定 npm 源、四路并发限制、精确离线安装、启动隔离和失败回滚；可复现 profile 基准不访问网络。
 
 ### 下载与校验
 
-下载 `DeepSeek-Harness-Desktop-Setup-0.1.8-x64.exe`，并使用同一 GitHub Release 中的 `SHA256SUMS.txt` 校验安装包。应用内更新只会在用户确认后下载，安装与重启也会再次请求确认。
+下载 `DeepSeek-Harness-Desktop-Setup-0.1.9-x64.exe`，并使用同一 GitHub Release 中的 `SHA256SUMS.txt` 校验安装包。应用发现新版后会自动后台下载，但只有用户点击“重启并安装”后才会退出并安装。
 
 ### 说明
 
-这是社区构建版本，并非 DeepSeek、OpenAI 或腾讯官方发行版。Codex Connect 使用 ChatGPT Codex 的非公开服务接口，资格、额度和协议可能变化；OAuth 凭据仅保存在本机 DSH home，登录接口限制为本机回环访问。当前安装包未使用商业代码签名证书，Windows SmartScreen 可能显示“未知发布者”。请只从本项目的 GitHub Release 页面下载并核对 SHA-256。
+这是社区构建版本，并非 DeepSeek、OpenAI 或腾讯官方发行版。当前安装包未使用商业代码签名证书，Windows SmartScreen 可能显示“未知发布者”。请只从本项目的 GitHub Release 页面下载并核对 SHA-256。
 
 ## English
 
 ### Highlights
 
-- Fixes a skin migration bug in earlier 0.1.8 builds that could leave `~/.dsh/cordis.patch.yml` empty, causing the next launch to reject it because the YAML root was not an array. This updated build repairs blank patches to a valid `[]` without overwriting any non-empty user configuration.
-- Adds `Join QQ Group` and `Suggest an Idea` to the top Help menu. The community window offers both a QR code and one-click QQ join, while feedback opens the GitHub new-issue page; every external destination remains delegated to the system browser.
-- Keeps `dshmarket` as the only default plugin marketplace and removes the concurrently loaded `dsh-plugin-hub`, so two stores no longer rewrite the same desktop profile.
-- Startup migration removes the Hub, compatibility layer, standalone skin dependencies, and historical managed skin sections left by older desktop builds. Affected upgrades safely return to the official look once instead of retaining a stale link into the previous installation; selecting QQ98 or another skin after startup creates the single current link and avoids duplicate-load crashes.
-- Bundles `dsh-codex-connect@0.1.0-alpha.4.5` for ChatGPT OAuth and OpenAI Codex models in Settings. It does not replace the current model, take over global search, or enable the remote image tool by default; an existing Codex provider remains authoritative to prevent duplicate routes.
-- Bundles `reasoning-slider@0.0.2` for smooth model-supported reasoning-effort changes, with automatic fallback when switching to a model that does not support the current level.
-- Keeps the all-in-one UI, Skin Center, and built-in skins on the 0.1.15 aggregate layout while preserving community bundles, sessions, credentials, and user-owned patch rows during migration.
+- Fixes inactive copy buttons for message bubbles, complete responses, and code blocks in the desktop app. Only sanitized clipboard writes from the active local DSH origin are allowed; clipboard reads and other sensitive permissions remain denied.
+- Starts downloading a discovered desktop release in the background instead of interrupting the conversation with a pre-download system prompt. A new blue-black glass panel appears after the download and lets the user restart and install or defer it.
+- Routes the sidebar update trigger to DeepSeek Harness Desktop when hosted by Electron instead of updating the Web UI plugin. Browser-only deployments retain the existing plugin updater.
+- Simplifies startup to “探索未至之境”, one status line, and one progress meter. The previous sphere, orbits, and phase list are replaced with an original locally rendered blue-black particle whale.
+- Runs the particle whale only on the startup document and releases it when navigation enters the DSH surface. Reduced-motion systems receive a static rendering.
+- Unifies current version, target version, release notes, download progress, retry, and restart-install states in the desktop update surface while preserving the safe runtime shutdown before installation.
+- Fixes intermittent “application is still running” and file-in-use errors during Windows upgrades. Desktop shutdown now terminates the complete DSH process tree, while installer preflight removes only stale processes whose executables belong to the previous app installation.
+- Extension Dock now shows actual plugin versions and compatibility states and checks community updates only when opened. Compatible releases can update directly, known-incompatible releases are blocked with an explanation, and undeclared compatibility requires explicit confirmation.
+- Community updates prefetch packages while DSH is available, then perform an exact offline switch during brief downtime. Failed validation or restart restores the old manifest, lockfile, and runtime. Built-ins continue to update only with a tested Desktop release.
+- Desktop profile preparation now reuses runtime resolution and checks independent links concurrently. On the reference machine, median unchanged-profile time fell from about 54.9 ms to 13.2 ms and fresh-profile time from about 64.9 ms to 22.3 ms.
 
 ### Verification
 
-- Desktop UI regression covers Help-menu actions, fixed destinations, the sandboxed community page, QR rendering, and a complete no-scroll layout at the normal window height.
-- Profile tests cover the single-store roster, retired managed dependency cleanup, one-way skin-section migration, restart idempotency, and Codex provider conflict avoidance.
-- Real DSH Host regression checks cover marketplace routes and UI, the Codex settings namespace, reasoning slider, every built-in skin asset, and the QQ98 apply flow.
-- Packaging gates audit pinned versions, the complete runtime dependency set, client bundles, skins, and pet assets, then run repository typechecking, tests, website validation, and generated-file consistency checks.
+- Desktop tests cover automatic background download, progress state, explicit installation after download, manual checks, and update errors.
+- IPC tests ensure that renderer update state contains only safe version, notes, progress, and error fields.
+- Clipboard permission tests cover active loopback-origin matching, port isolation, and deny-by-default behavior for every other permission.
+- The startup page was visually checked at 1440×900 for the particle whale, glass progress surface, and compact layout.
+- Installer tests verify that stale-process cleanup is restricted to the previous installation paths rather than generic process names; runtime tests verify complete Windows child-tree termination with `taskkill /T /F`.
+- Plugin regression covers three-state semver assessment, the fixed npm origin, four-request concurrency, exact offline installation, startup quarantine, and failed-update rollback; the reproducible profile benchmark performs no network access.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-0.1.8-x64.exe` and verify it with `SHA256SUMS.txt` from the same GitHub Release. The built-in updater downloads only after user confirmation and asks again before installation and restart.
+Download `DeepSeek-Harness-Desktop-Setup-0.1.9-x64.exe` and verify it with `SHA256SUMS.txt` from the same GitHub Release. The app downloads discovered releases in the background, but exits and installs only after the user chooses “Restart and install”.
 
 ### Notice
 
-This is a community build and not an official DeepSeek, OpenAI, or Tencent distribution. Codex Connect uses non-public ChatGPT Codex service endpoints whose eligibility, quotas, and protocol may change; OAuth credentials stay in the local DSH home and login routes accept loopback access only. The installer is not signed with a commercial code-signing certificate, so Windows SmartScreen may report an unknown publisher. Download only from this project's GitHub Release page and verify the SHA-256 checksum.
+This is a community build and not an official DeepSeek, OpenAI, or Tencent distribution. The installer is not signed with a commercial code-signing certificate, so Windows SmartScreen may report an unknown publisher. Download only from this project's GitHub Release page and verify the SHA-256 checksum.

@@ -114,6 +114,10 @@ function buildOutput(entries) {
   ].join('\n')
 }
 
+function generatedOutputMatches(current, expected) {
+  return current.replace(/\r\n/gu, '\n') === expected.replace(/\r\n/gu, '\n')
+}
+
 function main() {
   const raw = JSON.parse(fs.readFileSync(JSON_FILE, 'utf8'))
   validateEntries(raw)
@@ -121,7 +125,7 @@ function main() {
   const CHECK = process.argv.includes('--check')
   if (CHECK) {
     const current = fs.readFileSync(OUT_FILE, 'utf8')
-    if (current === out) {
+    if (generatedOutputMatches(current, out)) {
       console.log('community-index: check OK (' + raw.length + ' entries, generated file in sync)')
       return
     }
@@ -136,4 +140,4 @@ function main() {
 
 if (require.main === module) main()
 
-module.exports = { validateEntries, buildOutput }
+module.exports = { validateEntries, buildOutput, generatedOutputMatches }

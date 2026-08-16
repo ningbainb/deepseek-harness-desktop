@@ -19,6 +19,14 @@ test('header/strip round-trips every file kind', () => {
   }
 })
 
+test('stripHeader accepts a Windows CRLF separator', () => {
+  const file = 'settings-form.ts'
+  const sourceRel = 'shared/client/settings/settings-form.ts'
+  const source = 'export const x = 1\r\n'
+  const rendered = `${headerFor(file, sourceRel)}\r\n${source}`
+  assert.equal(stripHeader(rendered, file, sourceRel), source)
+})
+
 test('copies cover the settings trio for five consumers plus host helpers', () => {
   const entries = copyEntries()
   assert.equal(entries.length, 19)

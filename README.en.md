@@ -16,12 +16,16 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 [Explore the product site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download the Windows x64 installer](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Desktop technical guide](docs/desktop.md) · [Maintainer release workflow](docs/launch/desktop-release-workflow.md) · [Changelog](CHANGELOG.md)
 
-### Latest release: 0.1.7
+If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-`desktop-v0.1.7` is the current stable release: [read the full release notes](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v0.1.7) · [download the installer directly](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.7/DeepSeek-Harness-Desktop-Setup-0.1.7-x64.exe) · [download the SHA-256 checksum file](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.7/SHA256SUMS.txt)
+### Latest release: 0.1.9
+
+`desktop-v0.1.9` is the current stable release: [read the full release notes](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v0.1.9) · [download the installer directly](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.9/DeepSeek-Harness-Desktop-Setup-0.1.9-x64.exe) · [download the SHA-256 checksum file](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.9/SHA256SUMS.txt)
 
 | Version | Highlights |
 | --- | --- |
+| **0.1.9** | Fixes conversation-bubble and full-response copying; downloads updates in the background; refreshes the startup and update surfaces with a particle whale and frosted glass; and adds guarded community-plugin compatibility checks, offline switching, rollback, and performance limits. |
+| **0.1.8** | Bundles ChatGPT OAuth, OpenAI Codex models, a model-aware reasoning-effort slider, and Help-menu community and feedback actions; keeps `dshmarket` as the only default store and repairs blank patches plus stale store and skin links during migration. |
 | **0.1.7** | Introduces a deep-ocean startup experience with state-driven progress and a 32px macOS-inspired frosted-glass window bar; bounds large-file preview memory, Git polling, and SSH transfer work; and strengthens first-install cold-start tolerance plus release gates. |
 | **0.1.6** | Bundles Tencent's official QQ Bot and QR Connector. Bind, refresh, cancel, rebind, or unbind from Extension Dock, then connect QQ direct messages and group chats to the desktop Harness. AppSecret is protected by Windows credential encryption and supplied only to the DSH child process. |
 | **0.1.5** | Synchronizes native title-bar colors with light/dark mode, keeps full-screen dialogs inside the safe viewport, fixes packaged skin discovery and switching, and bundles `dshmarket` plus `dsh-plugin-hub`. |
@@ -34,13 +38,14 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 - Bundles the dsh-web-ui 0.1.15 suite with the task board, Git graph, right panel, SSH, mobile remote, live stats, pet, plus Describe Image and the Liangshen agent;
 - Bundles Tencent's official QQ Bot, with in-dock QR binding for QQ direct messages and group chats — no YAML editing or background terminal required;
+- Bundles ChatGPT OAuth, OpenAI Codex models, and a reasoning-effort slider; sign-in uses the system browser and credentials stay local;
 - Uses an isolated `desktop` profile without overwriting an existing DSH setup, and binds only to loopback;
 - Adds crash recovery, sanitized rotating logs, window-state restore, strict navigation, and denied-by-default permissions;
 - Checks stable GitHub Releases, shows bilingual release notes, and asks before downloading or restarting to install;
 - Adds a dock for transactional community DSH bundle management, built-in plugin stores, and safe discovery/import of project, DSH, and Agents skills;
 - Bundles official DSH, pnpm, and native dependencies, so users do not need a separate Node.js installation.
 
-The desktop app already includes the task board, Git graph, right panel, mobile remote control, remote connection, whale-girl pet, live token statistics, plugin stores, and Skin Center. Install the EXE and start working — no separate DSH or Node.js setup and no plugin commands are required.
+The desktop app already includes the task board, Git graph, right panel, mobile remote control, remote connection, whale-girl pet, live token statistics, Codex Connect, the reasoning-effort slider, plugin market, and Skin Center. Install the EXE and start working — no separate DSH or Node.js setup and no plugin commands are required.
 
 ![DSH Web UI main screen](docs/screenshots/13-hero-main.png)
 
@@ -51,6 +56,12 @@ The desktop app already includes the task board, Git graph, right panel, mobile 
 The desktop app bundles Tencent's official `@tencent-connect/dsh-qqbot` 0.3.0 and `@tencent-connect/qqbot-connector` 1.2.0. Open the QQ Bot card in Extension Dock to request an auto-refreshing QR code; scan it with mobile QQ to connect direct messages and group chats to the local Harness. The same card supports cancellation, rebinding, and complete unbinding.
 
 The plugin remains disabled until credentials exist, so a hidden background process never waits for terminal QR setup or delays Web UI readiness. Successful binding enables the plugin and restarts DSH automatically. AppSecret is encrypted by Electron `safeStorage` with Windows credential protection; it is never sent to renderer code, written to logs, or stored in plaintext in `cordis.patch.yml`, and is supplied only through the DSH child environment at runtime.
+
+### Codex Models and Reasoning Effort (Desktop 0.1.8)
+
+The desktop app bundles `dsh-codex-connect` 0.1.0-alpha.4.5 for ChatGPT OAuth through the system browser and OpenAI Codex models in Settings. It does not replace the active model, take over global search, or enable the remote image tool by default; an existing Codex Provider stays authoritative, and OAuth credentials remain in the local DSH home.
+
+The bundled `reasoning-slider` 0.0.2 exposes only the reasoning-effort levels a model actually supports and falls back automatically after model switches. The top Help menu also provides a QQ group QR code, one-click community access, and a GitHub suggestion action, with every external link delegated to the system browser.
 
 ### Task Board
 
@@ -122,7 +133,7 @@ All family plugins' toggles and parameters live under "Settings > Plugin config"
 
 ### Plugin Stores and Extension Dock
 
-The desktop profile bundles `dshmarket` 1.3.0 and `dsh-plugin-hub` 0.1.1. Marketplace installs target the isolated `desktop` profile and support community DSH bundle discovery, installation, transactional rollback, and upgrade preservation. Runtime restarts remain owned by the desktop host so the market cannot launch a second DSH process. Project, DSH, and Agents skills can also be discovered in Extension Dock and imported after safety checks.
+The desktop profile bundles only `dshmarket` 1.3.0 as its default plugin market. Marketplace installs target the isolated `desktop` profile and support community DSH bundle discovery, installation, transactional rollback, and upgrade preservation. Runtime restarts remain owned by the desktop host so the market cannot launch a second DSH process. Project, DSH, and Agents skills can also be discovered in Extension Dock and imported after safety checks.
 
 ## Skins
 

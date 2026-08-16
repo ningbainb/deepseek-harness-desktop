@@ -80,16 +80,17 @@ test('official DSH host serves the complete desktop profile', { timeout: 60_000 
     assert.ok(registryBody.registry.plugins.length > 0, 'dshmarket catalog is empty')
 
     browser = await chromium.launch({ headless: true })
-    const page = await browser.newPage()
+    const page = await browser.newPage({ locale: 'en-US' })
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-pet-dock]').waitFor({ state: 'attached', timeout: 10_000 })
     await page.locator('style[data-plugin-css="reasoning-slider"]').waitFor({ state: 'attached', timeout: 10_000 })
     await page.getByRole('button', { name: 'whale girl' }).waitFor({ state: 'visible', timeout: 10_000 })
-    await page.getByRole('button', { name: '继续', exact: true }).click()
-    await page.locator('button').filter({ hasText: /^设置$/u }).first().evaluate((button) => button.click())
-    await page.getByRole('button', { name: '插件市场', exact: true }).click()
-    await page.getByRole('heading', { name: '插件市场', exact: true }).waitFor({ state: 'visible', timeout: 10_000 })
-    await page.getByPlaceholder('搜索插件，比如：通知、终端、记忆…').waitFor({ state: 'visible', timeout: 10_000 })
+    const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
+    if (await continueButton.isVisible()) await continueButton.click()
+    await page.locator('button').filter({ hasText: /^(?:设置|Settings)$/u }).first().evaluate((button) => button.click())
+    await page.getByRole('button', { name: /^(?:插件市场|Plugin Market)$/u }).click()
+    await page.getByRole('heading', { name: /^(?:插件市场|Plugin Market)$/u }).waitFor({ state: 'visible', timeout: 10_000 })
+    await page.getByPlaceholder(/^(?:搜索插件，比如：通知、终端、记忆…|Search plugins: notify, terminal, memory…)$/u).waitFor({ state: 'visible', timeout: 10_000 })
 
     const applySkin = await fetch(new URL('/api/skin-center/apply', url), {
       method: 'POST',

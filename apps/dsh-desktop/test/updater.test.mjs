@@ -30,21 +30,14 @@ class FakeUpdater extends EventEmitter {
 
 function createHarness({ responses = [], enabled = true } = {}) {
   const updater = new FakeUpdater()
-  const messages = []
   const progress = []
   const logs = []
+  const states = []
   let beforeInstallCalls = 0
   const controller = new DesktopUpdateController({
     updater,
     enabled,
     currentVersion: '1.0.0',
-    dialog: {
-      async showMessageBox(...args) {
-        const options = args.at(-1)
-        messages.push(options)
-        return { response: responses.shift() ?? 0 }
-      },
-    },
     getWindow: () => ({
       isDestroyed: () => false,
       setProgressBar: (value) => progress.push(value),
@@ -56,8 +49,9 @@ function createHarness({ responses = [], enabled = true } = {}) {
     clearTimeoutFn: () => {},
     clearIntervalFn: () => {},
   })
+  controller.on('status', (status) => states.push(status))
   controller.start()
-  return { controller, updater, messages, progress, logs, beforeInstallCalls: () => beforeInstallCalls }
+  return { controller, updater, progress, logs, states, beforeInstallCalls: () => beforeInstallCalls }
 }
 
 test('release notes are converted to safe readable text', () => {
@@ -77,48 +71,41 @@ test('release notes are converted to safe readable text', () => {
   assert.match(details, /版本 \/ Version 1\.1\.0\nChanges\n- Faster updates/)
 })
 
-test('available update shows notes and respects Later', async () => {
-  const harness = createHarness({ responses: [1] })
-  await harness.controller.check({ manual: true })
+test('available update starts downloading in the background without prompting', async () => {
+  const harness = createHarness()
+  await harness.controller.check()
   harness.updater.emit('update-available', {
     version: '1.1.0',
     releaseName: 'Taskbar icon and updater',
     releaseNotes: 'Complete release notes.',
   })
   await tick()
-  assert.equal(harness.messages.length, 1)
-  assert.match(harness.messages[0].title, /发现新版本 \/ Update available/)
-  assert.deepEqual(harness.messages[0].buttons, ['下载更新 / Download update', '稍后 / Later'])
-  assert.match(harness.messages[0].detail, /Complete release notes/)
-  assert.equal(harness.updater.downloads, 0)
-})
-
-test('duplicate checks are suppressed while an update decision is open', async () => {
-  let resolveDialog
-  const updater = new FakeUpdater()
-  const controller = new DesktopUpdateController({
-    updater,
-    enabled: true,
+  assert.equal(harness.updater.downloads, 1)
+  assert.deepEqual(harness.controller.getStatus(), {
+    phase: 'downloading',
     currentVersion: '1.0.0',
-    dialog: { showMessageBox: () => new Promise((resolve) => { resolveDialog = resolve }) },
-    getWindow: () => undefined,
-    setTimeoutFn: () => ({ unref() {} }),
-    setIntervalFn: () => ({ unref() {} }),
-    clearTimeoutFn: () => {},
-    clearIntervalFn: () => {},
+    version: '1.1.0',
+    releaseName: 'Taskbar icon and updater',
+    releaseNotes: 'Complete release notes.',
+    percent: 0,
+    visible: false,
   })
-  controller.start()
-  await controller.check()
-  updater.emit('update-available', { version: '1.1.0', releaseNotes: 'Ready.' })
-  await tick()
-  assert.equal(await controller.check(), false)
-  assert.equal(updater.checks, 1)
-  resolveDialog({ response: 1 })
-  await tick()
 })
 
-test('accepted update downloads, reports progress, and installs after confirmation', async () => {
-  const harness = createHarness({ responses: [0, 0] })
+test('manual check during a background download reveals the current progress', async () => {
+  const harness = createHarness()
+  await harness.controller.check()
+  harness.updater.emit('update-available', { version: '1.1.0', releaseNotes: 'Ready.' })
+  await tick()
+  harness.updater.emit('download-progress', { percent: 42.5 })
+  assert.equal(await harness.controller.check({ manual: true }), false)
+  assert.equal(harness.updater.checks, 1)
+  assert.equal(harness.controller.getStatus().visible, true)
+  assert.equal(harness.controller.getStatus().percent, 42.5)
+})
+
+test('downloaded update waits for an explicit renderer install action', async () => {
+  const harness = createHarness()
   await harness.controller.check()
   harness.updater.emit('update-available', { version: '1.1.0', releaseNotes: 'Ready.' })
   await tick()
@@ -127,31 +114,49 @@ test('accepted update downloads, reports progress, and installs after confirmati
   harness.updater.emit('update-downloaded', { version: '1.1.0' })
   await tick()
   assert.ok(harness.progress.includes(0.425))
+  assert.equal(harness.controller.getStatus().phase, 'ready')
+  assert.equal(harness.controller.getStatus().visible, true)
+  assert.equal(harness.beforeInstallCalls(), 0)
+  assert.equal(harness.updater.installs, 0)
+
+  assert.equal(await harness.controller.install(), true)
   assert.equal(harness.beforeInstallCalls(), 1)
   assert.equal(harness.updater.installs, 1)
 })
 
-test('manual no-update result is visible while automatic errors stay silent', async () => {
+test('manual no-update result is visible while automatic errors stay hidden', async () => {
   const harness = createHarness()
   await harness.controller.check({ manual: true })
   harness.updater.emit('update-not-available')
   await tick()
-  assert.match(harness.messages[0].message, /已是最新版本.*up to date/s)
+  assert.equal(harness.controller.getStatus().phase, 'current')
+  assert.equal(harness.controller.getStatus().visible, true)
 
   await harness.controller.check()
   harness.updater.emit('error', new Error('network unavailable'))
   await tick()
-  assert.equal(harness.messages.length, 1)
+  assert.equal(harness.controller.getStatus().phase, 'error')
+  assert.equal(harness.controller.getStatus().visible, false)
   assert.ok(harness.logs.some((line) => line.includes('network unavailable')))
 })
 
-test('manual update errors are shown and clear taskbar progress', async () => {
+test('manual update errors are visible and clear taskbar progress', async () => {
   const harness = createHarness()
   await harness.controller.check({ manual: true })
   harness.updater.emit('error', new Error('metadata missing'))
   await tick()
-  assert.equal(harness.messages.at(-1).type, 'error')
-  assert.match(harness.messages.at(-1).title, /更新失败 \/ Update failed/)
-  assert.match(harness.messages.at(-1).detail, /metadata missing/)
+  assert.equal(harness.controller.getStatus().phase, 'error')
+  assert.equal(harness.controller.getStatus().visible, true)
+  assert.match(harness.controller.getStatus().message, /metadata missing/)
   assert.equal(harness.progress.at(-1), -1)
+})
+
+test('manual checks explain when updates are unavailable in development', async () => {
+  const harness = createHarness({ enabled: false })
+  assert.equal(await harness.controller.check({ manual: true }), false)
+  assert.deepEqual(harness.controller.getStatus(), {
+    phase: 'unavailable',
+    currentVersion: '1.0.0',
+    visible: true,
+  })
 })

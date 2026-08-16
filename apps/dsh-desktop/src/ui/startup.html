@@ -8,72 +8,44 @@
     <link rel="stylesheet" href="./startup.css">
   </head>
   <body>
-    <main class="shell">
+    <main class="launch-screen">
       <div class="atmosphere" aria-hidden="true">
-        <span class="aurora aurora-one"></span>
-        <span class="aurora aurora-two"></span>
+        <canvas id="whale-canvas"></canvas>
+        <span class="deep-glow"></span>
         <span class="grain"></span>
       </div>
 
       <header class="brand" aria-label="DeepSeek Harness Desktop">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
-        <span class="brand-name">DeepSeek Harness</span>
-        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-mark" aria-hidden="true"><i></i></span>
+        <span>DeepSeek Harness</span>
         <span class="brand-edition">Desktop</span>
       </header>
 
       <section class="hero">
-        <p class="eyebrow"><span></span> LOCAL-FIRST INTELLIGENCE</p>
-        <h1><span>探索</span><span class="accent">未至之境</span></h1>
-        <p class="lede">让完整的 Harness，在你的桌面优雅启程。</p>
-        <ul class="principles" aria-label="桌面版特性">
-          <li>本地运行</li>
-          <li>完整插件</li>
-          <li>隐私优先</li>
-        </ul>
-      </section>
+        <p class="eyebrow">LOCAL INTELLIGENCE / DESKTOP</p>
+        <h1>探索未至之境</h1>
 
-      <div class="discovery" aria-hidden="true">
-        <span class="orbit orbit-one"></span>
-        <span class="orbit orbit-two"></span>
-        <span class="orbit orbit-three"></span>
-        <span class="horizon"></span>
-        <span class="signal signal-one"></span>
-        <span class="signal signal-two"></span>
-        <span class="signal signal-three"></span>
-        <span class="deep-core"><i></i></span>
-      </div>
-
-      <section class="launch">
-        <div class="launch-heading">
-          <div>
-            <p class="sequence" id="sequence">BOOT / 01</p>
-            <h2 id="status-title" aria-live="polite" aria-atomic="true">正在校准本地环境</h2>
+        <div class="launch-status">
+          <div class="status-line">
+            <span id="status-title" aria-live="polite" aria-atomic="true">正在准备本地环境</span>
+            <output id="progress-value" for="startup-progress">08%</output>
           </div>
-          <output class="progress-value" id="progress-value" for="startup-progress">08%</output>
+          <div class="meter" id="startup-progress" role="progressbar" aria-label="启动进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+            <span class="meter-fill" id="meter-fill"><i></i></span>
+          </div>
+          <p class="status-detail" id="status-detail">完整 Harness 正在本地启动</p>
         </div>
-        <p class="status-detail" id="status-detail">Preparing the isolated desktop profile and secure local runtime.</p>
-        <div class="meter" id="startup-progress" role="progressbar" aria-label="启动进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
-          <span class="meter-fill" id="meter-fill"><i></i></span>
-        </div>
-        <ol class="phases" aria-label="启动阶段">
-          <li data-phase="0"><i></i><span>环境校准<small>Environment</small></span></li>
-          <li data-phase="1"><i></i><span>服务唤醒<small>Runtime</small></span></li>
-          <li data-phase="2"><i></i><span>界面载入<small>Surface</small></span></li>
-        </ol>
+
         <pre id="error-log" hidden></pre>
         <div class="actions" id="actions" hidden>
-          <button type="button" data-action="retry">重新探索 / Retry</button>
+          <button type="button" data-action="retry">重新尝试</button>
           <button type="button" data-action="repair">修复 Profile</button>
           <button type="button" class="quiet" data-action="open-logs">打开日志</button>
           <button type="button" class="quiet" data-action="exit">退出</button>
         </div>
       </section>
 
-      <footer>
-        <span id="version">DESKTOP</span>
-        <span class="secure"><i></i> SECURE LOCAL SURFACE</span>
-      </footer>
+      <footer id="version">DESKTOP</footer>
     </main>
     <script type="module" src="./startup.mjs"></script>
   </body>

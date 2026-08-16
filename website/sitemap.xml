@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc>
+    <lastmod>2026-08-16</lastmod>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 开源 Windows 桌面版</image:title>
+    </image:image>
+  </url>
+</urlset>

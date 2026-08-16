@@ -72,11 +72,27 @@ function mount(status: UpdateStatus, runResult?: { ok: boolean; exitCode?: numbe
 
 afterEach(() => {
   cleanup()
+  Reflect.deleteProperty(window, 'dshDesktop')
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
 describe("UpdateEntry", () => {
+  it("delegates to the desktop updater when the Electron bridge is present", async () => {
+    const checkForUpdates = vi.fn(async () => true)
+    Object.defineProperty(window, 'dshDesktop', {
+      configurable: true,
+      value: { checkForUpdates },
+    })
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    render(<UpdateEntry wide={true} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }))
+    await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce())
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it("opens the panel and reports up to date", async () => {
     const { fetch } = mount(upToDateStatus())
     fireEvent.click(screen.getByRole('button', { name: 'Check for updates' }))

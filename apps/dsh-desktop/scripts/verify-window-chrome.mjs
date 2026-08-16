@@ -48,15 +48,52 @@ try {
     backdropFilter: getComputedStyle(document.querySelector('#dsh-desktop-window-chrome')).backdropFilter,
     iconWidth: getComputedStyle(document.querySelector('.dsh-window-chrome-icon')).width,
     iconSource: document.querySelector('.dsh-window-chrome-icon')?.getAttribute('src'),
+    helpRight: document.querySelector('.dsh-window-chrome-help')?.getBoundingClientRect().right,
     paddingTop: getComputedStyle(document.body).paddingTop,
     url: location.origin,
   }))
-  assert.equal(state.chromeText, '')
+  assert.equal(state.chromeText, '帮助 / Help加入社群 / Join QQ Group提建议 / Suggest an IdeaGitHub 项目检查更新 / Check for Updates')
   assert.match(state.backdropFilter, /blur\(26px\)/u)
   assert.equal(state.iconWidth, '18px')
   assert.match(state.iconSource, /^data:image\/png;base64,/u)
+  const viewportWidth = await page.evaluate(() => innerWidth)
+  assert.ok(
+    Number(state.helpRight) <= viewportWidth - 139,
+    `Help control overlaps the native caption area: ${JSON.stringify({ helpRight: state.helpRight, viewportWidth })}`,
+  )
   assert.equal(state.paddingTop, '32px')
   assert.equal(state.chromeCount, 1)
+  assert.equal(await page.evaluate(() => {
+    const popup = window.open('about:blank', '_blank')
+    const allowed = popup !== null
+    if (popup) popup.opener = null
+    popup?.close()
+    return allowed
+  }), true)
+  const helpButton = page.getByRole('button', { name: '帮助 / Help' })
+  await helpButton.click()
+  assert.equal(await helpButton.getAttribute('aria-expanded'), 'true')
+  const helpMenu = page.getByRole('menu')
+  await helpMenu.waitFor({ state: 'visible' })
+  assert.deepEqual(await helpMenu.getByRole('menuitem').allTextContents(), [
+    '加入社群 / Join QQ Group',
+    '提建议 / Suggest an Idea',
+    'GitHub 项目',
+    '检查更新 / Check for Updates',
+  ])
+  const helpMenuBounds = await helpMenu.boundingBox()
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+  assert.ok(helpMenuBounds && helpMenuBounds.x >= 0 && helpMenuBounds.y >= 32)
+  assert.ok(helpMenuBounds.x + helpMenuBounds.width <= viewport.width)
+  assert.ok(helpMenuBounds.y + helpMenuBounds.height <= viewport.height)
+  if (screenshot) await page.screenshot({ path: screenshot })
+  const communityPagePromise = electronApp.waitForEvent('window')
+  await helpMenu.getByRole('menuitem', { name: '加入社群 / Join QQ Group' }).click()
+  const communityPage = await communityPagePromise
+  await communityPage.waitForURL(/community\.html/u)
+  await communityPage.locator('#community-qr[src^="data:image/png;base64,"]').waitFor({ state: 'visible' })
+  assert.equal(await communityPage.getByRole('button', { name: '帮助 / Help' }).count(), 0)
+  await communityPage.close()
   await page.evaluate(() => {
     document.body.removeAttribute('data-ds-dark-theme')
     document.documentElement.style.colorScheme = 'light'
@@ -114,7 +151,6 @@ try {
   const pnpmShim = await readFile(resolve(temporary, 'user-data', 'runtime-bin', 'pnpm.cmd'), 'utf8')
   assert.match(pnpmShim, /ELECTRON_RUN_AS_NODE=1/u)
   assert.match(pnpmShim, /pnpm\.(?:mjs|cjs)/u)
-  if (screenshot) await page.screenshot({ path: screenshot })
   console.log(`verified runtime window chrome at ${state.url}`)
 } finally {
   await electronApp?.close()

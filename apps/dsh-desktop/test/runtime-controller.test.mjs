@@ -9,6 +9,7 @@ import {
   computeRestartDelay,
   parseDshReadyUrl,
   probeHttpReady,
+  terminateChildProcessTree,
   validateLoopbackUrl,
 } from '../src/runtime-controller.mjs'
 
@@ -42,6 +43,28 @@ test('restart schedule is bounded and exponential', () => {
   assert.equal(computeRestartDelay(1), 1_500)
   assert.equal(computeRestartDelay(2), 4_500)
   assert.equal(computeRestartDelay(3), undefined)
+})
+
+test('Windows shutdown terminates the complete runtime process tree', async () => {
+  const calls = []
+  const child = {
+    pid: 43125,
+    exitCode: null,
+    kill: (signal) => calls.push({ fallback: signal }),
+  }
+  await terminateChildProcessTree(child, {
+    platform: 'win32',
+    systemRoot: 'C:\\Windows',
+    execFileFn: (executable, args, options, callback) => {
+      calls.push({ executable, args, options })
+      callback(null)
+    },
+  })
+  assert.deepEqual(calls, [{
+    executable: 'C:\\Windows\\System32\\taskkill.exe',
+    args: ['/PID', '43125', '/T', '/F'],
+    options: { windowsHide: true, timeout: 5_000 },
+  }])
 })
 
 test('default startup budget tolerates first-run Windows scanning', () => {

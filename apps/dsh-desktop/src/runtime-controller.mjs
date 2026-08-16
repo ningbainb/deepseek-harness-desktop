@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { delimiter } from 'node:path'
+import { delimiter, join } from 'node:path'
 
 const READY_LINE = /^dsh web:\s+(http:\/\/\S+)/u
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
@@ -31,6 +31,30 @@ export function computeRestartDelay(attempt, maxAttempts = 3) {
   if (!Number.isInteger(attempt) || attempt < 0) throw new TypeError('restart attempt must be non-negative')
   if (attempt >= maxAttempts) return undefined
   return Math.min(15_000, 500 * 3 ** attempt)
+}
+
+export function terminateChildProcessTree(
+  child,
+  {
+    platform = process.platform,
+    systemRoot = process.env.SystemRoot,
+    execFileFn = execFile,
+  } = {},
+) {
+  if (!child || child.exitCode !== null) return Promise.resolve()
+  if (platform !== 'win32' || !Number.isInteger(child.pid) || child.pid <= 0) {
+    child.kill('SIGTERM')
+    return Promise.resolve()
+  }
+  const executable = systemRoot ? join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill.exe'
+  return new Promise((resolve, reject) => {
+    execFileFn(
+      executable,
+      ['/PID', String(child.pid), '/T', '/F'],
+      { windowsHide: true, timeout: 5_000 },
+      (error) => error ? reject(error) : resolve(),
+    )
+  })
 }
 
 export async function probeHttpReady(
@@ -81,6 +105,7 @@ export class DshRuntimeController extends EventEmitter {
     probeReady = probeHttpReady,
     schedule = setTimeout,
     cancelSchedule = clearTimeout,
+    terminateProcessTree = terminateChildProcessTree,
     pathEntries = [],
     environmentProvider = () => ({}),
   }) {
@@ -98,6 +123,7 @@ export class DshRuntimeController extends EventEmitter {
     this.probeReady = probeReady
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
+    this.terminateProcessTree = terminateProcessTree
     this.pathEntries = pathEntries
     if (typeof environmentProvider !== 'function') throw new TypeError('environmentProvider must be a function')
     this.environmentProvider = environmentProvider
@@ -280,8 +306,13 @@ export class DshRuntimeController extends EventEmitter {
     const exited = new Promise((resolve) => {
       this.stopResolver = resolve
     })
-    child.kill('SIGTERM')
     const forceTimer = this.schedule(() => child.kill('SIGKILL'), this.shutdownTimeoutMs)
+    try {
+      await this.terminateProcessTree(child)
+    } catch (error) {
+      await this.logStore.append(`[process] process-tree shutdown failed: ${error.message}`)
+      child.kill('SIGKILL')
+    }
     await exited
     this.cancelSchedule(forceTimer)
   }

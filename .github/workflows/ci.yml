@@ -29,8 +29,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -63,7 +61,10 @@ jobs:
         run: pnpm build
 
       - name: Tests
-        run: pnpm test
+        # Desktop integration tests require node-pty's install scripts and run
+        # in the dedicated Windows Desktop CI job. Keep this scriptless Ubuntu
+        # job focused on every other workspace package.
+        run: pnpm -r --workspace-concurrency=2 --filter '!@deepseek-ai/dsh-desktop' test
 
       - name: Script tests
         run: pnpm test:scripts

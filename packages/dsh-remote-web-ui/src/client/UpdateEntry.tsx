@@ -21,6 +21,14 @@ export interface UpdateEntryProps {
   t: TranslateNS<'remote'>
 }
 
+/** Return the Desktop shell updater when this Web UI is hosted by Electron. */
+function desktopUpdateCheck(): (() => Promise<unknown>) | undefined {
+  const desktopWindow = window as typeof window & {
+    dshDesktop?: { checkForUpdates?: () => Promise<unknown> }
+  }
+  return desktopWindow.dshDesktop?.checkForUpdates
+}
+
 /**
  * Render the update trigger and panel.
  * @param props - column state and locale seat.
@@ -69,6 +77,11 @@ export function UpdateEntry({ wide, t }: UpdateEntryProps) {
   }, [t])
 
   const openPanel = useCallback((): void => {
+    const checkDesktop = desktopUpdateCheck()
+    if (checkDesktop !== undefined) {
+      void checkDesktop()
+      return
+    }
     setOpen(true)
     void check()
   }, [check])

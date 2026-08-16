@@ -2,27 +2,26 @@ import {
   advanceStartupProgress,
   clampProgress,
   initialProgressForState,
-  phaseIndexForProgress,
 } from './startup-progress.mjs'
+import { mountParticleWhale } from './whale-particles.mjs'
 
 const title = document.querySelector('#status-title')
 const detail = document.querySelector('#status-detail')
-const sequence = document.querySelector('#sequence')
 const errorLog = document.querySelector('#error-log')
 const actions = document.querySelector('#actions')
 const version = document.querySelector('#version')
 const meter = document.querySelector('#startup-progress')
 const meterFill = document.querySelector('#meter-fill')
 const progressValue = document.querySelector('#progress-value')
-const phases = [...document.querySelectorAll('[data-phase]')]
+const whaleCanvas = document.querySelector('#whale-canvas')
 
 const copy = {
-  stopped: ['准备探索未至之境', 'Securing the local workspace before launch.', 'STANDBY / 00'],
-  starting: ['正在唤醒完整 Harness', 'Loading the official runtime, plugins, skins, and skill catalog.', 'LAUNCH / 02'],
-  ready: ['探索界面已经就绪', 'Handing control to the original DSH Web surface.', 'ARRIVAL / 03'],
-  stopping: ['正在安全收束旅程', 'Waiting for sessions and background work to settle.', 'RETURN / 01'],
-  restarting: ['正在重新连接深处', 'Recovering the secure local runtime without losing your workspace.', 'RECOVERY / AUTO'],
-  crashed: ['本地运行时未能抵达', 'Use Retry first. Repair only rebuilds the managed desktop profile links.', 'RECOVERY / MANUAL'],
+  stopped: ['正在准备本地环境', '完整 Harness 正在本地启动'],
+  starting: ['正在唤醒 Harness', '正在载入运行时、插件与技能'],
+  ready: ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
+  stopping: ['正在安全停止服务', '请稍候，本地任务正在收束'],
+  restarting: ['正在重新连接', '正在恢复本地运行时'],
+  crashed: ['本地运行时启动失败', '请先重试；修复只会重建桌面版 Profile'],
 }
 
 let currentState = 'stopped'
@@ -37,23 +36,16 @@ function renderProgress(value) {
   progressValue.value = `${String(rounded).padStart(2, '0')}%`
   progressValue.textContent = progressValue.value
 
-  const activePhase = phaseIndexForProgress(progress)
-  phases.forEach((phase, index) => {
-    phase.dataset.complete = String(index < activePhase || progress >= 100)
-    if (index === activePhase && progress < 100) phase.setAttribute('aria-current', 'step')
-    else phase.removeAttribute('aria-current')
-  })
 }
 
 function render(status) {
   const state = copy[status?.state] ? status.state : 'crashed'
-  const [heading, message, code] = copy[state]
+  const [heading, message] = copy[state]
   const stateChanged = currentState !== state
   currentState = state
   document.body.dataset.state = state
   title.textContent = heading
   detail.textContent = message
-  sequence.textContent = code
 
   const failed = state === 'crashed'
   errorLog.hidden = !failed
@@ -63,6 +55,8 @@ function render(status) {
   if (Number.isFinite(status?.previewProgress)) renderProgress(status.previewProgress)
   else if (stateChanged || progress === 0) renderProgress(initialProgressForState(state, progress))
 }
+
+mountParticleWhale(whaleCanvas)
 
 window.setInterval(() => {
   if (currentState !== 'starting' && currentState !== 'restarting') return

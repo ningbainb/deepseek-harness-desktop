@@ -119,6 +119,12 @@ importers:
       qrcode:
         specifier: 1.5.4
         version: 1.5.4
+      reasoning-slider:
+        specifier: 0.0.2
+        version: 0.0.2
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
       yaml:
         specifier: 2.9.0
         version: 2.9.0

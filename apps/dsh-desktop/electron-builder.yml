@@ -31,6 +31,7 @@ win:
   requestedExecutionLevel: asInvoker
 
 nsis:
+  include: build/installer.nsh
   artifactName: DeepSeek-Harness-Desktop-Setup-${version}-${arch}.${ext}
   oneClick: false
   perMachine: false

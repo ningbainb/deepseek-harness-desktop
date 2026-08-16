@@ -89,7 +89,9 @@ ${sourceText}`
 export function stripHeader(rendered, file, sourceRel) {
   const header = headerFor(file, sourceRel)
   if (!rendered.startsWith(header)) return undefined
-  return rendered.slice(header.length + 1)
+  const separator = rendered.slice(header.length).match(/^\r?\n/u)?.[0]
+  if (separator === undefined) return undefined
+  return rendered.slice(header.length + separator.length)
 }
 
 /** Apply every copy step. Returns the number of rewritten files. */

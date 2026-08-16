@@ -61,10 +61,15 @@
         <form id="plugin-form">
           <label for="plugin-spec">NPM PACKAGE SPEC</label>
           <div class="field-row">
-            <input id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0" autocomplete="off" spellcheck="false" required>
+            <input type="text" id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0" autocomplete="off" spellcheck="false" required>
             <button type="submit">安装并重启</button>
           </div>
+          <label class="risk-check"><input type="checkbox" name="allowUnknown">允许安装未声明 Desktop/DSH 适配范围的插件</label>
         </form>
+        <div class="plugin-tools">
+          <p id="plugin-update-state">内置插件随桌面版更新；社区插件仅在此处检查。</p>
+          <button type="button" class="secondary" id="check-plugin-updates">检查插件更新</button>
+        </div>
         <div class="list" id="plugin-list" aria-live="polite"></div>
       </section>
 

@@ -96,6 +96,9 @@ test('desktop profile uses the base aggregate for the store, Codex login, and re
   assert.equal(AGGREGATED_BUNDLES.includes('dshmarket'), true)
   assert.equal(AGGREGATED_BUNDLES.includes('dsh-codex-connect'), true)
   assert.equal(AGGREGATED_BUNDLES.includes('reasoning-slider'), true)
+  assert.equal(BUILTIN_BUNDLES.includes('@vectorize-io/hindsight-coding-agents'), false)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@vectorize-io/hindsight-coding-agents'), false)
+  assert.equal(RETIRED_MANAGED_PACKAGES.includes('@vectorize-io/hindsight-coding-agents'), true)
   assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*profile: desktop/)
   assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*allowRestart: false/)
 })
@@ -115,17 +118,28 @@ test('desktop patch refresh removes the legacy profile skin section and preserve
   assert.equal(mergeDesktopPatch(merged), merged)
 })
 
-test('profile manifest retires duplicate market and direct skin packages', () => {
+test('profile manifest retires obsolete managed packages', () => {
   const manifest = createDesktopProfileManifest({
     dependencies: {
       'dsh-plugin-hub': '0.1.0',
       '@linxin666/dsh-client-ui-skin-qq98': '0.1.2',
+      '@vectorize-io/hindsight-coding-agents': '0.3.4',
       '@community/example': '1.0.0',
     },
-    dsh: { profile: { bundles: ['dsh-plugin-hub', '@linxin666/dsh-client-ui-skin-qq98', '@community/example'] } },
+    dsh: {
+      profile: {
+        bundles: [
+          'dsh-plugin-hub',
+          '@linxin666/dsh-client-ui-skin-qq98',
+          '@vectorize-io/hindsight-coding-agents',
+          '@community/example',
+        ],
+      },
+    },
   })
   assert.equal(manifest.dependencies['dsh-plugin-hub'], undefined)
   assert.equal(manifest.dependencies['@linxin666/dsh-client-ui-skin-qq98'], undefined)
+  assert.equal(manifest.dependencies['@vectorize-io/hindsight-coding-agents'], undefined)
   assert.equal(manifest.dependencies['@community/example'], '1.0.0')
   assert.deepEqual(manifest.dsh.profile.bundles, [...BUILTIN_BUNDLES, '@community/example'])
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('dsh-plugin-hub'), true)
@@ -170,6 +184,35 @@ test('profile bootstrap disables aggregate Codex Connect when another provider o
     )
     assert.match(patch, /- id: llm-openai-codex\n  disabled: true/u)
     assert.equal((await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8')).includes('dsh-codex-connect'), true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap removes Hindsight from profiles created by an earlier desktop build', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-hindsight-retirement-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const packageName = '@vectorize-io/hindsight-coding-agents'
+  const packageRoot = join(root, 'hindsight-coding-agents')
+  try {
+    await mkdir(packageRoot, { recursive: true })
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: packageName }))
+    await ensureDesktopProfile({ dshHome, packageRoots: new Map([[packageName, packageRoot]]) })
+
+    const manifestPath = join(profileDir, 'package.json')
+    const legacyManifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    legacyManifest.dsh.profile.bundles.push(packageName)
+    await writeFile(manifestPath, `${JSON.stringify(legacyManifest, null, 2)}\n`)
+
+    const result = await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    assert.equal(result.manifest.dsh.profile.bundles.includes(packageName), false)
+    assert.equal(result.manifest.dependencies[packageName], undefined)
+    await assert.rejects(
+      realpath(join(profileDir, 'node_modules', ...packagePathSegments(packageName))),
+      (error) => error?.code === 'ENOENT',
+    )
+    assert.equal((await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8')).includes(packageName), false)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { buildOutput, validateEntries } from './community-index'
+import { buildOutput, generatedOutputMatches, validateEntries } from './community-index'
 
 const VALID = [
   {
@@ -75,6 +75,12 @@ test('buildOutput embeds every entry and marks the module auto-generated', () =>
     if (VALID[1][key] !== undefined) bare[key] = VALID[1][key]
   }
   assert.ok(!JSON.stringify(bare).includes('"npm"'), 'npm key must not appear for entries without one')
+})
+
+test('generated output comparison accepts Windows line endings', () => {
+  const expected = buildOutput(VALID)
+  assert.equal(generatedOutputMatches(expected.replaceAll('\n', '\r\n'), expected), true)
+  assert.equal(generatedOutputMatches(expected + 'changed', expected), false)
 })
 
 test('--check gate passes against the committed generated file', () => {

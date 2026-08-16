@@ -5,7 +5,13 @@ import process from 'node:process'
 const root = path.resolve(import.meta.dirname, '..')
 const websiteRoot = path.join(root, 'website')
 const htmlPath = path.join(websiteRoot, 'index.html')
+const sitemapPath = path.join(websiteRoot, 'sitemap.xml')
+const robotsPath = path.join(websiteRoot, 'robots.txt')
+const llmsPath = path.join(websiteRoot, 'llms.txt')
+const indexNowKey = 'f99946a1f6864579a8d2f96040502784'
+const indexNowKeyPath = path.join(websiteRoot, `${indexNowKey}.txt`)
 const desktopPackagePath = path.join(root, 'apps', 'dsh-desktop', 'package.json')
+const canonicalUrl = 'https://ningbainb.github.io/deepseek-harness-desktop/'
 
 function collectAttributeValues(html, attribute) {
   const pattern = new RegExp(`\\b${attribute}\\s*=\\s*["']([^"']+)["']`, 'gi')
@@ -29,6 +35,18 @@ export async function collectWebsiteErrors(html, expectedVersion) {
     ['download link', /\bclass=["'][^"']*\bdownload-link\b[^"']*["']/i],
     ['release page link', /\bclass=["'][^"']*\brelease-page-link\b[^"']*["']/i],
     ['checksum link', /\bclass=["'][^"']*\bchecksum-link\b[^"']*["']/i],
+    ['canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/["']/i],
+    ['robots index directive', /<meta\b[^>]*\bname=["']robots["'][^>]*\bcontent=["'][^"']*\bindex\b/i],
+    ['Google site verification', /<meta\b[^>]*\bname=["']google-site-verification["'][^>]*\bcontent=["']QMzFv4LC5XXFJJf5L3_yoCaHIr2MVIxUm9S5qG9MiwE["']/i],
+    ['Open Graph URL', /<meta\b[^>]*\bproperty=["']og:url["'][^>]*\bcontent=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/["']/i],
+    ['Twitter summary card', /<meta\b[^>]*\bname=["']twitter:card["'][^>]*\bcontent=["']summary_large_image["']/i],
+    ['structured data', /<script\b[^>]*\btype=["']application\/ld\+json["']/i],
+    ['FAQ section', /\bid=["']faq["']/i],
+    ['latest features section', /\bid=["']latest-features["']/i],
+    ['GitHub Star CTA', /\bdata-star-cta\b/i],
+    ['GitHub Star count', /\bdata-star-count\b/i],
+    ['release download count', /\bdata-download-count\b/i],
+    ['cumulative download label', /累计安装包下载/],
   ]
 
   for (const [label, pattern] of requiredMarkers) {
@@ -37,6 +55,23 @@ export async function collectWebsiteErrors(html, expectedVersion) {
 
   if (/\b(?:href|src)\s*=\s*["']javascript:/i.test(html)) {
     errors.push('javascript: URLs are not allowed')
+  }
+
+  if (/\b(?:noindex|nofollow)\b/i.test(html.match(/<meta\b[^>]*\bname=["']robots["'][^>]*>/i)?.[0] || '')) {
+    errors.push('robots meta must not block indexing or following')
+  }
+
+  const structuredDataMatch = html.match(/<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i)
+  if (structuredDataMatch) {
+    try {
+      const structuredData = JSON.parse(structuredDataMatch[1])
+      const types = (structuredData['@graph'] || []).map(item => item['@type'])
+      for (const type of ['WebSite', 'SoftwareApplication', 'FAQPage']) {
+        if (!types.includes(type)) errors.push(`structured data is missing ${type}`)
+      }
+    } catch {
+      errors.push('structured data must contain valid JSON')
+    }
   }
 
   if (expectedVersion) {
@@ -78,13 +113,33 @@ export async function collectWebsiteErrors(html, expectedVersion) {
   return errors
 }
 
+export function collectDiscoveryErrors(sitemap, robots, llms, keyFile, expectedVersion) {
+  const errors = []
+  if (!sitemap.includes(`<loc>${canonicalUrl}</loc>`)) errors.push('sitemap must include the canonical homepage')
+  if (!sitemap.includes('<lastmod>')) errors.push('sitemap must include lastmod')
+  if (!robots.includes('User-agent: OAI-SearchBot') || !robots.includes('Allow: /')) errors.push('robots.txt must allow OAI-SearchBot')
+  if (!robots.includes(`Sitemap: ${canonicalUrl}sitemap.xml`)) errors.push('robots.txt must identify the sitemap')
+  if (!llms.includes(canonicalUrl)) errors.push('llms.txt must include the canonical homepage')
+  if (!llms.includes('https://github.com/ningbainb/deepseek-harness-desktop')) errors.push('llms.txt must include the source repository')
+  if (expectedVersion && !llms.includes(`Setup-${expectedVersion}-x64.exe`)) errors.push(`llms.txt must target installer ${expectedVersion}`)
+  if (keyFile.trim() !== indexNowKey) errors.push('IndexNow key file must match its filename')
+  return errors
+}
+
 export async function validateWebsite() {
-  const [html, desktopPackage] = await Promise.all([
+  const [html, sitemap, robots, llms, keyFile, desktopPackage] = await Promise.all([
     readFile(htmlPath, 'utf8'),
+    readFile(sitemapPath, 'utf8'),
+    readFile(robotsPath, 'utf8'),
+    readFile(llmsPath, 'utf8'),
+    readFile(indexNowKeyPath, 'utf8'),
     readFile(desktopPackagePath, 'utf8'),
   ])
   const version = JSON.parse(desktopPackage).version
-  const errors = await collectWebsiteErrors(html, version)
+  const errors = [
+    ...await collectWebsiteErrors(html, version),
+    ...collectDiscoveryErrors(sitemap, robots, llms, keyFile, version),
+  ]
   if (errors.length > 0) {
     throw new Error(`website validation failed:\n- ${errors.join('\n- ')}`)
   }

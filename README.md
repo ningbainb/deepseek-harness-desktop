@@ -16,12 +16,16 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 [浏览产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载 Windows x64 安装器](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [桌面版技术说明](docs/desktop.md) · [发布与交接工作流](docs/launch/desktop-release-workflow.md) · [更新日志](CHANGELOG.md)
 
-### 最新版：0.1.7
+如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/ningbainb/deepseek-harness-desktop) 点 Star，帮助更多桌面版用户发现它。
 
-`desktop-v0.1.7` 是当前稳定版：[查看完整发布说明](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v0.1.7) · [直接下载安装包](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.7/DeepSeek-Harness-Desktop-Setup-0.1.7-x64.exe) · [下载 SHA-256 校验文件](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.7/SHA256SUMS.txt)
+### 最新版：0.1.9
+
+`desktop-v0.1.9` 是当前稳定版：[查看完整发布说明](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v0.1.9) · [直接下载安装包](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.9/DeepSeek-Harness-Desktop-Setup-0.1.9-x64.exe) · [下载 SHA-256 校验文件](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v0.1.9/SHA256SUMS.txt)
 
 | 版本 | 主要更新 |
 | --- | --- |
+| **0.1.9** | 修复对话气泡与整段内容复制；更新改为后台下载并加入毛玻璃更新面板与粒子鲸鱼启动页；新增社区插件适配检测、离线切换、失败回滚与性能保护。 |
+| **0.1.8** | 内置 ChatGPT OAuth 与 OpenAI Codex 模型、模型推理强度滑块、帮助菜单社群与建议入口；默认只保留 `dshmarket`，并修复空补丁、旧市场和皮肤链接迁移。 |
 | **0.1.7** | 全新深海启动界面与状态驱动进度；32px macOS 风格磨砂玻璃窗口栏；收紧大文件预览内存、Git 轮询和 SSH 传输边界，并提升首次安装后的冷启动容错与发布门禁。 |
 | **0.1.6** | 内置腾讯官方 QQ Bot 与扫码 Connector；在扩展坞完成二维码绑定、刷新、取消、重新绑定和解绑，QQ 私聊与群聊可直接接入桌面版 Harness。AppSecret 使用 Windows 凭据保护加密，只注入 DSH 子进程。 |
 | **0.1.5** | 原生标题栏跟随亮色/暗色主题；全屏弹窗避开标题栏安全区；修复安装版皮肤发现与切换，并内置 `dshmarket` 和 `dsh-plugin-hub`。 |
@@ -34,13 +38,14 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 - 内置 dsh-web-ui 0.1.15 套件，保留任务看板、Git 图谱、右侧面板、SSH、移动端远程、实时统计、宠物，并新增图像描述与量身 Agent；
 - 内置腾讯官方 QQ Bot，可在扩展坞扫码绑定 QQ 私聊与群聊，无需编辑 YAML 或打开后台终端；
+- 内置 ChatGPT OAuth、OpenAI Codex 模型与推理强度滑块，登录使用系统浏览器，凭据保存在本机；
 - 独立 `desktop` profile，不覆盖既有 DSH 配置，运行时仅监听回环地址；
 - 内置崩溃恢复、日志脱敏与轮转、窗口状态恢复、严格导航与权限策略；
-- 内置 GitHub Release 更新检查，先展示中英双语更新内容，再由用户确认下载和重启安装；
+- 内置 GitHub Release 更新检查，发现新版后在后台下载，完成后再由用户阅读说明并确认重启安装；
 - 扩展坞支持社区 DSH bundle 安装/回滚、内置插件市场，以及项目、DSH、Agents 技能发现与安全导入；
 - 安装包自带官方 DSH、pnpm 与原生依赖，无需另外安装 Node.js。
 
-桌面版已预装任务看板、Git 图谱、右侧面板、移动端远程、远程连接、鲸鱼娘宠物、实时令牌统计、插件市场和皮肤中心。下载安装 EXE 即可使用，不需要另外安装 DSH、Node.js 或执行插件命令。
+桌面版已预装任务看板、Git 图谱、右侧面板、移动端远程、远程连接、鲸鱼娘宠物、实时令牌统计、Codex Connect、推理强度滑块、插件市场和皮肤中心。下载安装 EXE 即可使用，不需要另外安装 DSH、Node.js 或执行插件命令。
 
 ![DSH Web UI 主界面](docs/screenshots/13-hero-main.png)
 
@@ -51,6 +56,12 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 桌面版内置腾讯官方 `@tencent-connect/dsh-qqbot` 0.3.0 和 `@tencent-connect/qqbot-connector` 1.2.0。在扩展坞打开 QQ Bot 卡片即可获取自动刷新的二维码，使用手机 QQ 扫码后，QQ 私聊与群聊便可连接到本机 Harness；同时支持取消、重新绑定和彻底解绑。
 
 未绑定时插件保持禁用，不会让隐藏的后台进程等待终端扫码，也不会拖慢 Web UI 启动。绑定成功后桌面端会自动启用插件并重启 DSH。AppSecret 由 Electron `safeStorage` 结合 Windows 系统凭据保护加密保存，不会发送到渲染页面、写入日志或明文进入 `cordis.patch.yml`；运行时只通过子进程环境注入。
+
+### Codex 模型与推理强度（桌面版 0.1.8）
+
+桌面版内置 `dsh-codex-connect` 0.1.0-alpha.4.5，可在设置页通过系统浏览器完成 ChatGPT OAuth，并启用 OpenAI Codex 模型。它不会默认替换当前模型、接管全局搜索或启用远程图片工具；检测到已有 Codex Provider 时会保留现有配置，OAuth 凭据只保存在本机 DSH home。
+
+内置 `reasoning-slider` 0.0.2，在模型选择器中只展示模型实际支持的推理强度，切换模型时会自动回退到有效档位。顶部帮助菜单同时提供 QQ 群二维码、一键加群与 GitHub 建议入口，所有外链均交由系统浏览器打开。
 
 ### 任务看板
 
@@ -122,7 +133,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 ### 插件市场与扩展坞
 
-桌面 profile 内置 `dshmarket` 1.3.0 与 `dsh-plugin-hub` 0.1.1。市场安装目标固定为隔离的 `desktop` profile，支持社区 DSH bundle 的发现、安装、事务回滚和保留升级；运行时重启由桌面宿主统一管理，避免市场自行启动第二个 DSH 进程。项目技能、DSH 技能与 Agents 技能也可在扩展坞中发现并经过安全检查后导入。
+桌面 profile 只内置 `dshmarket` 1.3.0 作为默认插件市场。市场安装目标固定为隔离的 `desktop` profile，支持社区 DSH bundle 的发现、安装、事务回滚和保留升级；运行时重启由桌面宿主统一管理，避免市场自行启动第二个 DSH 进程。项目技能、DSH 技能与 Agents 技能也可在扩展坞中发现并经过安全检查后导入。
 
 ## 皮肤
 

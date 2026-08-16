@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events'
+
 export const UPDATE_STARTUP_DELAY_MS = 15_000
 export const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 
@@ -56,10 +58,9 @@ function asErrorMessage(error) {
   return error instanceof Error ? error.message : String(error || 'Unknown update error')
 }
 
-export class DesktopUpdateController {
+export class DesktopUpdateController extends EventEmitter {
   constructor({
     updater,
-    dialog,
     getWindow,
     currentVersion,
     enabled,
@@ -70,8 +71,8 @@ export class DesktopUpdateController {
     clearTimeoutFn = clearTimeout,
     clearIntervalFn = clearInterval,
   }) {
+    super()
     this.updater = updater
-    this.dialog = dialog
     this.getWindow = getWindow
     this.currentVersion = currentVersion
     this.enabled = Boolean(enabled && updater)
@@ -83,12 +84,12 @@ export class DesktopUpdateController {
     this.clearIntervalFn = clearIntervalFn
     this.checking = false
     this.downloading = false
-    this.prompting = false
     this.manualCheck = false
     this.started = false
     this.startupTimer = undefined
     this.intervalTimer = undefined
     this.listeners = []
+    this.status = Object.freeze({ phase: 'idle', currentVersion, visible: false })
   }
 
   start() {
@@ -120,29 +121,16 @@ export class DesktopUpdateController {
 
   async check({ manual = false } = {}) {
     if (!this.enabled) {
-      if (manual) await this.#showMessage({
-        type: 'info',
-        title: '更新 / Updates',
-        message: '更新检查仅在已安装的 Windows 应用中可用。\nUpdate checks are available in the installed Windows app.',
-        buttons: ['确定 / OK'],
-      })
+      if (manual) this.#publish({ phase: 'unavailable', visible: true })
       return false
     }
-    if (this.checking || this.downloading || this.prompting) {
-      if (manual) await this.#showMessage({
-        type: 'info',
-        title: '更新 / Updates',
-        message: this.downloading
-          ? '更新正在下载。\nAn update is already downloading.'
-          : this.prompting
-            ? '更新确认窗口已经打开。\nAn update decision is already open.'
-            : '更新检查正在进行。\nAn update check is already running.',
-        buttons: ['确定 / OK'],
-      })
+    if (this.checking || this.downloading) {
+      if (manual) this.#publish({ ...this.status, visible: true })
       return false
     }
     this.checking = true
     this.manualCheck = manual
+    this.#publish({ phase: 'checking', visible: manual })
     this.log(`[updater] checking from ${this.currentVersion}`)
     try {
       await this.updater.checkForUpdates()
@@ -159,31 +147,19 @@ export class DesktopUpdateController {
   }
 
   async #handleAvailable(info) {
-    if (this.prompting || this.downloading) return
+    if (this.downloading) return
     this.checking = false
     this.manualCheck = false
     this.log(`[updater] version ${info?.version || 'unknown'} is available`)
-    this.prompting = true
-    let result
-    try {
-      result = await this.#showMessage({
-        type: 'info',
-        title: `发现新版本 / Update available: ${info?.version || 'new version'}`,
-        message: `DeepSeek Harness Desktop ${info?.version || ''} 已发布。\nA new version is available.`,
-        detail: formatUpdateDetails(info, this.currentVersion),
-        buttons: ['下载更新 / Download update', '稍后 / Later'],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true,
-      })
-    } finally {
-      this.prompting = false
-    }
-    if (result.response !== 0) {
-      this.log('[updater] download deferred by user')
-      return
-    }
     this.downloading = true
+    this.#publish({
+      phase: 'downloading',
+      version: info?.version,
+      releaseName: normalizeNoteText(info?.releaseName),
+      releaseNotes: normalizeReleaseNotes(info?.releaseNotes),
+      percent: 0,
+      visible: false,
+    })
     this.#setProgress(0)
     try {
       await this.updater.downloadUpdate()
@@ -197,43 +173,38 @@ export class DesktopUpdateController {
     this.checking = false
     this.manualCheck = false
     this.log(`[updater] ${this.currentVersion} is up to date`)
-    if (manual) await this.#showMessage({
-      type: 'info',
-      title: '暂无更新 / No updates available',
-      message: `DeepSeek Harness Desktop ${this.currentVersion} 已是最新版本。\nThe app is up to date.`,
-      buttons: ['确定 / OK'],
-    })
+    this.#publish({ phase: 'current', visible: manual })
   }
 
   #handleProgress(progress) {
     const percent = Number(progress?.percent)
     if (!Number.isFinite(percent)) return
-    this.#setProgress(Math.max(0, Math.min(1, percent / 100)))
+    const bounded = Math.max(0, Math.min(100, percent))
+    this.#publish({ ...this.status, phase: 'downloading', percent: bounded })
+    this.#setProgress(bounded / 100)
   }
 
   async #handleDownloaded(info) {
     this.downloading = false
     this.#setProgress(-1)
     this.log(`[updater] version ${info?.version || 'unknown'} downloaded`)
-    const result = await this.#showMessage({
-      type: 'info',
-      title: '更新可以安装 / Update ready to install',
-      message: `DeepSeek Harness Desktop ${info?.version || ''} 已下载完成。\nThe update has been downloaded.`,
-      detail: '重启应用即可安装更新。内置 DSH 运行时会先安全停止。\nRestart the app to install the update. The embedded DSH runtime will be stopped cleanly first.',
-      buttons: ['重启并安装 / Restart and install', '稍后 / Later'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
+    this.#publish({
+      ...this.status,
+      phase: 'ready',
+      version: info?.version || this.status.version,
+      visible: true,
     })
-    if (result.response !== 0) {
-      this.log('[updater] installation deferred by user')
-      return
-    }
+  }
+
+  async install() {
+    if (!this.enabled || this.status.phase !== 'ready') return false
     try {
       await this.beforeInstall()
       this.updater.quitAndInstall(false, true)
+      return true
     } catch (error) {
       await this.#handleError(error, true)
+      return false
     }
   }
 
@@ -245,13 +216,16 @@ export class DesktopUpdateController {
     this.#setProgress(-1)
     const message = asErrorMessage(error)
     this.log(`[updater] ${message}`)
-    if (shouldShow) await this.#showMessage({
-      type: 'error',
-      title: '更新失败 / Update failed',
-      message: 'DeepSeek Harness Desktop 未能完成更新。\nThe app could not complete the update.',
-      detail: message,
-      buttons: ['确定 / OK'],
-    })
+    this.#publish({ phase: 'error', message, visible: shouldShow })
+  }
+
+  getStatus() {
+    return { ...this.status }
+  }
+
+  #publish(status) {
+    this.status = Object.freeze({ currentVersion: this.currentVersion, ...status })
+    this.emit('status', this.getStatus())
   }
 
   #setProgress(value) {
@@ -259,12 +233,6 @@ export class DesktopUpdateController {
     if (window && !window.isDestroyed?.()) window.setProgressBar?.(value)
   }
 
-  #showMessage(options) {
-    const window = this.getWindow?.()
-    return window && !window.isDestroyed?.()
-      ? this.dialog.showMessageBox(window, options)
-      : this.dialog.showMessageBox(options)
-  }
 }
 
 export async function loadElectronAutoUpdater() {
