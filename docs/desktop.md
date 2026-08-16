@@ -4,7 +4,7 @@
 
 The desktop application is a thin lifecycle and security layer around the official DSH host. Electron starts `@deepseek-ai/dsh` with `--profile desktop --port 0`, waits for the official loopback URL line, probes HTTP readiness, and then loads that URL into the main window. The Web application, protocols, data paths, tools, and plugin system remain DSH implementations.
 
-The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, `dshmarket`, `dsh-codex-connect`, and `reasoning-slider` while preserving community bundles already added to that profile. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
+The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `dsh-desktop-base`, and the separately managed `@tencent-connect/dsh-qqbot` while preserving community bundles already added to that profile. `dsh-desktop-base` expands the Web UI collection, `dshmarket`, `dsh-codex-connect`, and `reasoning-slider`; QQ Bot stays outside the public aggregate because its connector requires separate redistribution approval. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
 
 ## Included desktop capabilities
 
