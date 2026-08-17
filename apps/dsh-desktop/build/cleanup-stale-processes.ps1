@@ -37,6 +37,7 @@ try {
   if (-not ('DshInstaller.ProcessPath' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -45,12 +46,40 @@ namespace DshInstaller
     public static class ProcessPath
     {
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+        private const uint TH32CS_SNAPPROCESS = 0x00000002;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct PROCESSENTRY32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr OpenProcess(
             uint processAccess,
             bool inheritHandle,
             uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool Process32First(IntPtr snapshot, ref PROCESSENTRY32 entry);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool Process32Next(IntPtr snapshot, ref PROCESSENTRY32 entry);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -119,6 +148,37 @@ namespace DshInstaller
                 CloseHandle(process);
             }
         }
+
+        public static Dictionary<uint, uint> GetParentProcessIds()
+        {
+            Dictionary<uint, uint> parents = new Dictionary<uint, uint>();
+            IntPtr snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if (snapshot == new IntPtr(-1))
+            {
+                return parents;
+            }
+
+            try
+            {
+                PROCESSENTRY32 entry = new PROCESSENTRY32();
+                entry.dwSize = (uint) Marshal.SizeOf<PROCESSENTRY32>();
+                if (!Process32First(snapshot, ref entry))
+                {
+                    return parents;
+                }
+                do
+                {
+                    parents[entry.th32ProcessID] = entry.th32ParentProcessID;
+                    entry.dwSize = (uint) Marshal.SizeOf<PROCESSENTRY32>();
+                }
+                while (Process32Next(snapshot, ref entry));
+                return parents;
+            }
+            finally
+            {
+                CloseHandle(snapshot);
+            }
+        }
     }
 }
 '@
@@ -126,6 +186,8 @@ namespace DshInstaller
 
   $canonicalResourceRoot = [DshInstaller.ProcessPath]::Canonicalize($resourceRoot).TrimEnd([char[]]@('\', '/'))
   $canonicalResourcePrefix = "$canonicalResourceRoot\"
+  $canonicalResourceInputRoot = [DshInstaller.ProcessPath]::Canonicalize($resourceInputRoot).TrimEnd([char[]]@('\', '/'))
+  $canonicalResourceInputPrefix = "$canonicalResourceInputRoot\"
   $candidatePathSet = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase
   )
@@ -147,32 +209,81 @@ namespace DshInstaller
   function Get-OwnedProcesses {
     # QueryFullProcessImageName uses a bounded native call and avoids both WMI
     # enumeration and the blocking MainModule/Path property on protected tasks.
-    @(foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
+    $parents = [DshInstaller.ProcessPath]::GetParentProcessIds()
+    $inventory = @(foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
       $path = [DshInstaller.ProcessPath]::TryGet([uint32] $process.Id)
       if (-not $path) {
         continue
       }
       $canonicalPath = [DshInstaller.ProcessPath]::Canonicalize($path)
-      if ($candidatePathSet.Contains($path) -or $candidatePathSet.Contains($canonicalPath)) {
-        $resourceChild = (
-          $path.StartsWith($resourcePrefix, $comparison) -or
-          $path.StartsWith($resourceInputPrefix, $comparison) -or
-          $canonicalPath.StartsWith($canonicalResourcePrefix, $comparison)
-        )
-        [pscustomobject]@{
-          ProcessId = $process.Id
-          ExecutablePath = $path
-          ResourceChild = $resourceChild
+      $resourceChild = (
+        $path.StartsWith($resourcePrefix, $comparison) -or
+        $path.StartsWith($resourceInputPrefix, $comparison) -or
+        $canonicalPath.StartsWith($canonicalResourcePrefix, $comparison) -or
+        $canonicalPath.StartsWith($canonicalResourceInputPrefix, $comparison)
+      )
+      $knownExecutable = $candidatePathSet.Contains($path) -or $candidatePathSet.Contains($canonicalPath)
+      [pscustomobject]@{
+        ProcessId = [uint32] $process.Id
+        ParentProcessId = if ($parents.ContainsKey([uint32] $process.Id)) {
+          $parents[[uint32] $process.Id]
+        } else {
+          [uint32] 0
         }
+        ExecutablePath = $path
+        ResourceChild = $resourceChild
+        DirectlyOwned = $knownExecutable -or $resourceChild
+      }
+    })
+
+    $ownedProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+    foreach ($row in $inventory) {
+      if ($row.DirectlyOwned) {
+        [void] $ownedProcessIds.Add($row.ProcessId)
+      }
+    }
+
+    # Community plugins can launch system cmd, PowerShell, Node, package-manager
+    # prepare hooks, or other helpers outside the install directory. Attribute
+    # those processes by ancestry from a verified Desktop/runtime root instead
+    # of matching broad process names.
+    do {
+      $addedDescendant = $false
+      foreach ($row in $inventory) {
+        if (
+          -not $ownedProcessIds.Contains($row.ProcessId) -and
+          $ownedProcessIds.Contains($row.ParentProcessId)
+        ) {
+          [void] $ownedProcessIds.Add($row.ProcessId)
+          $addedDescendant = $true
+        }
+      }
+    } while ($addedDescendant)
+
+    @(foreach ($row in $inventory) {
+      if (-not $ownedProcessIds.Contains($row.ProcessId)) {
+        continue
+      }
+      $depth = 0
+      $cursor = $row
+      while ($depth -lt 128 -and $ownedProcessIds.Contains($cursor.ParentProcessId)) {
+        $depth += 1
+        $parentId = $cursor.ParentProcessId
+        $cursor = $inventory | Where-Object { $_.ProcessId -eq $parentId } | Select-Object -First 1
+        if (-not $cursor) {
+          break
+        }
+      }
+      [pscustomobject]@{
+        ProcessId = $row.ProcessId
+        ExecutablePath = $row.ExecutablePath
+        Priority = ($depth * 2) + [int] $row.ResourceChild
       }
     })
   }
 
   function Get-OwnedProcessPriority($process) {
-    if ($process.ResourceChild) {
-      return 1
-    }
-    0
+    $process.Priority
   }
 
   for ($attempt = 0; $attempt -lt $maxAttempts; $attempt += 1) {

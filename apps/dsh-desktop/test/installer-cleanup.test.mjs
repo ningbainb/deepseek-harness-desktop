@@ -68,10 +68,14 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(cleanup, /PROCESS_QUERY_LIMITED_INFORMATION/u)
   assert.match(cleanup, /QueryFullProcessImageName/u)
   assert.match(cleanup, /GetLongPathNameW/u)
+  assert.match(cleanup, /CreateToolhelp32Snapshot/u)
+  assert.match(cleanup, /GetParentProcessIds/u)
   assert.match(cleanup, /\[DshInstaller\.ProcessPath\]::TryGet/u)
   assert.match(cleanup, /\[DshInstaller\.ProcessPath\]::Canonicalize/u)
   assert.match(cleanup, /\$candidatePathSet\.Contains\(\$path\)/u)
   assert.match(cleanup, /\$candidatePathSet\.Contains\(\$canonicalPath\)/u)
+  assert.match(cleanup, /\$knownExecutable -or \$resourceChild/u)
+  assert.match(cleanup, /StartsWith\(\$canonicalResourceInputPrefix, \$comparison\)/u)
   assert.doesNotMatch(cleanup, /Get-CimInstance|\.MainModule|\$process\.Path/u)
   assert.match(cleanup, /Sort-Object[\s\S]*Descending/u)
   assert.match(cleanup, /for \(\$attempt = 0; \$attempt -lt \$maxAttempts/u)
@@ -82,7 +86,7 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.doesNotMatch(cleanup, /taskkill|\/IM\s|ProcessName/u)
 })
 
-test('Windows installer preflight terminates exact-path app and resource processes', {
+test('Windows installer preflight terminates the old app, resources, and plugin descendants', {
   skip: process.platform !== 'win32',
   timeout: 20_000,
 }, async () => {
@@ -90,12 +94,15 @@ test('Windows installer preflight terminates exact-path app and resource process
   const installDirectory = join(temporary, "用户's Desktop")
   const executable = join(installDirectory, 'DeepSeek Harness Desktop.exe')
   const resourceExecutable = join(installDirectory, 'resources', 'bin', 'dsh-runtime-helper.exe')
+  const pluginHostExecutable = join(installDirectory, 'resources', 'bin', 'plugin-prepare-host.exe')
   const systemPing = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'PING.EXE')
   const ownedProcesses = []
+  let pluginDescendantPid
   try {
     await mkdir(join(installDirectory, 'resources', 'bin'), { recursive: true })
     await copyFile(systemPing, executable)
     await copyFile(systemPing, resourceExecutable)
+    await copyFile(process.execPath, pluginHostExecutable)
     for (const target of [executable, resourceExecutable]) {
       const child = spawn(target, ['-t', '127.0.0.1'], {
         windowsHide: true,
@@ -106,6 +113,20 @@ test('Windows installer preflight terminates exact-path app and resource process
       await once(child, 'spawn')
       assert.equal(child.exitCode, null)
     }
+    const pluginHost = spawn(pluginHostExecutable, [
+      '-e',
+      "const { spawn } = require('node:child_process'); const child = spawn(process.env.SystemRoot + '\\\\System32\\\\PING.EXE', ['-t', '127.0.0.1'], { stdio: 'ignore', windowsHide: true }); process.stdout.write(String(child.pid) + '\\n'); setInterval(() => {}, 1000)",
+    ], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const pluginHostExit = once(pluginHost, 'exit')
+    ownedProcesses.push({ child: pluginHost, exit: pluginHostExit })
+    await once(pluginHost, 'spawn')
+    const [pidChunk] = await once(pluginHost.stdout, 'data')
+    pluginDescendantPid = Number.parseInt(pidChunk.toString('utf8').trim(), 10)
+    assert.equal(Number.isInteger(pluginDescendantPid), true)
+    assert.doesNotThrow(() => process.kill(pluginDescendantPid, 0))
     await execFileAsync(
       'powershell.exe',
       [
@@ -135,6 +156,11 @@ test('Windows installer preflight terminates exact-path app and resource process
     for (const [ownedExitCode] of ownedExits) {
       assert.notEqual(ownedExitCode, 0)
     }
+    assert.throws(
+      () => process.kill(pluginDescendantPid, 0),
+      (error) => error?.code === 'ESRCH',
+      'plugin prepare descendant survived installer cleanup',
+    )
   } finally {
     for (const { child } of ownedProcesses) {
       if (child.exitCode === null) child.kill('SIGKILL')
@@ -146,6 +172,9 @@ test('Windows installer preflight terminates exact-path app and resource process
         'owned process teardown did not settle',
       )
     } catch {}
+    if (Number.isInteger(pluginDescendantPid)) {
+      try { process.kill(pluginDescendantPid, 'SIGKILL') } catch {}
+    }
     await rm(temporary, { recursive: true, force: true })
   }
 })

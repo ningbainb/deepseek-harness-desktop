@@ -350,6 +350,85 @@ test('profile bootstrap never replaces an unrecorded package target', async () =
   }
 })
 
+test('profile bootstrap adopts a version-matching package left by an older Desktop', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-schemastery-upgrade-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const target = join(profileDir, 'node_modules', 'schemastery')
+  const source = join(root, 'packaged', 'schemastery')
+  try {
+    await mkdir(target, { recursive: true })
+    await mkdir(source, { recursive: true })
+    await writeFile(join(target, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.18.0' }))
+    await writeFile(join(target, 'legacy-marker.txt'), 'materialized by Desktop 2.1')
+    await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.18.0' }))
+
+    const result = await ensureDesktopProfile({
+      dshHome,
+      packageRoots: new Map([['schemastery', source]]),
+    })
+
+    assert.equal(await realpath(target), await realpath(source))
+    const records = JSON.parse(await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8'))
+    assert.deepEqual(records.schemastery, { mode: 'link', source })
+    assert.equal(result.changed, true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap upgrades an older package declared by the legacy Desktop profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-declared-upgrade-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const target = join(profileDir, 'node_modules', 'schemastery')
+  const source = join(root, 'packaged', 'schemastery')
+  try {
+    await mkdir(target, { recursive: true })
+    await mkdir(source, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { schemastery: '3.17.0' },
+    }, null, 2)}\n`)
+    await writeFile(join(target, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.17.0' }))
+    await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.18.0' }))
+
+    await ensureDesktopProfile({
+      dshHome,
+      packageRoots: new Map([['schemastery', source]]),
+    })
+
+    assert.equal(await realpath(target), await realpath(source))
+    const records = JSON.parse(await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8'))
+    assert.deepEqual(records.schemastery, { mode: 'link', source })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap preserves an incompatible unrecorded schemastery package', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-schemastery-incompatible-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const target = join(profileDir, 'node_modules', 'schemastery')
+  const source = join(root, 'packaged', 'schemastery')
+  try {
+    await mkdir(target, { recursive: true })
+    await mkdir(source, { recursive: true })
+    await writeFile(join(target, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.17.0' }))
+    await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'schemastery', version: '3.18.0' }))
+
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome, packageRoots: new Map([['schemastery', source]]) }),
+      /refusing to replace unmanaged package/u,
+    )
+    assert.equal(JSON.parse(await readFile(join(target, 'package.json'), 'utf8')).version, '3.17.0')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('profile bootstrap moves a legacy profile skin section to the authoritative home patch', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-skin-migration-'))
   const dshHome = join(root, 'home')

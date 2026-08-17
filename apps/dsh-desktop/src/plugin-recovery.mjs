@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const STATE_VERSION = 1
+const RECOVERY_POLICY_VERSION = 2
 const MAX_INCIDENTS = 20
 const MAX_TECHNICAL_DETAILS = 8_000
 
@@ -18,17 +19,20 @@ function packagePattern(name) {
     .join('[\\\\/]')
 }
 
-function mentionedActivePlugin(text, activePlugins) {
+function attributedActivePlugin(text, activePlugins) {
   return [...activePlugins]
     .sort((left, right) => right.length - left.length)
-    .find((name) => new RegExp(`(?:^|[^a-z0-9_.-])${packagePattern(name)}(?:[^a-z0-9_.-]|$)`, 'iu').test(text))
+    .find((name) => new RegExp(
+      `(?:imported from|\\bat\\s+)[^\\r\\n]*node_modules[\\\\/]${packagePattern(name)}(?:[\\\\/]|$)`,
+      'iu',
+    ).test(text))
 }
 
 function explicitPlugin(text) {
   const patterns = [
     /failed to import loader entry\s+[^\s(]+\s+\((@?[a-z0-9_.-]+\/[a-z0-9_.-]+|[a-z0-9_.-]+)\)/iu,
     /failed to load (?:plugin|bundle)\s+["']?(@?[a-z0-9_.-]+\/[a-z0-9_.-]+|[a-z0-9_.-]+)/iu,
-    /plugin\s+["'](@?[a-z0-9_.-]+\/[a-z0-9_.-]+|[a-z0-9_.-]+)["']/iu,
+    /(?:failed|error|unable|could not)[^\r\n]{0,80}\bplugin\s+["'](@?[a-z0-9_.-]+\/[a-z0-9_.-]+|[a-z0-9_.-]+)["']/iu,
   ]
   for (const pattern of patterns) {
     const match = pattern.exec(text)
@@ -56,7 +60,7 @@ export function classifyPluginFailure(rawText, {
   const explicit = explicitPlugin(technicalDetails)
   const pluginName = explicit && active.has(explicit)
     ? explicit
-    : mentionedActivePlugin(technicalDetails, active)
+    : attributedActivePlugin(technicalDetails, active)
   if (!pluginName || protectedSet.has(pluginName)) {
     return Object.freeze({
       identified: false,
@@ -97,6 +101,7 @@ export function classifyPluginFailure(rawText, {
 function defaultState() {
   return {
     version: STATE_VERSION,
+    policyVersion: RECOVERY_POLICY_VERSION,
     safeMode: false,
     snapshots: [],
     incidents: [],
@@ -195,7 +200,11 @@ export class PluginRecoveryStore extends EventEmitter {
         if (parsed?.version !== STATE_VERSION || !Array.isArray(parsed.snapshots) || !Array.isArray(parsed.incidents)) {
           throw new Error('unsupported plugin recovery state')
         }
-        this.state = { ...defaultState(), ...parsed }
+        this.state = {
+          ...defaultState(),
+          ...parsed,
+          policyVersion: Number.isInteger(parsed.policyVersion) ? parsed.policyVersion : 1,
+        }
       } catch {
         const preserved = join(this.stateDir, `state.corrupt-${Date.now()}.json`)
         await rename(this.statePath, preserved).catch(() => {})
@@ -230,6 +239,69 @@ export class PluginRecoveryStore extends EventEmitter {
     return this.#enqueue(async () => {
       await this.#initialize()
       return this.publicState()
+    })
+  }
+
+  getLegacyAutoSafeModeRepair() {
+    return this.#enqueue(async () => {
+      await this.#initialize()
+      if (this.state.policyVersion >= RECOVERY_POLICY_VERSION) return undefined
+      const incident = this.state.incidents.find((item) => item.id === this.state.currentIncidentId)
+      const legacyUnknownTimeout = this.state.safeMode === true
+        && incident?.identified !== true
+        && incident?.resolution === 'safe-mode-auto'
+        && /(?:did not become ready within\s*120000\s*ms|runtime\s*120\s*(?:s|秒)[^\r\n]*(?:not ready|未就绪))/iu.test(
+          String(incident?.technicalDetails ?? ''),
+        )
+      if (!legacyUnknownTimeout) {
+        this.state.policyVersion = RECOVERY_POLICY_VERSION
+        await this.#save()
+        return undefined
+      }
+      return Object.freeze({
+        incidentId: incident.id,
+        disabledDependencies: Object.freeze({ ...(this.state.disabledDependencies ?? {}) }),
+      })
+    })
+  }
+
+  completeLegacyAutoSafeModeRepair({ success, restoredPlugins = [], error } = {}) {
+    return this.#enqueue(async () => {
+      await this.#initialize()
+      this.state.policyVersion = RECOVERY_POLICY_VERSION
+      const incident = this.state.incidents.find((item) => item.id === this.state.currentIncidentId)
+      if (success === true) {
+        this.state.safeMode = false
+        this.state.disabledDependencies = {}
+        if (incident) incident.resolution = 'legacy-false-positive-repaired'
+      }
+      this.state.lastRepair = {
+        at: this.now().toISOString(),
+        success: success === true,
+        restoredPlugins: [...new Set(restoredPlugins.filter((name) => typeof name === 'string'))].toSorted(),
+        ...(success === true ? {} : { error: asMessage(error) }),
+      }
+      await this.#save()
+      return success === true
+    })
+  }
+
+  getDisabledDependencies() {
+    return this.#enqueue(async () => {
+      await this.#initialize()
+      return Object.freeze({ ...(this.state.disabledDependencies ?? {}) })
+    })
+  }
+
+  clearRecoveryMode(resolution = 'restored-by-user') {
+    return this.#enqueue(async () => {
+      await this.#initialize()
+      this.state.safeMode = false
+      this.state.disabledDependencies = {}
+      const incident = this.state.incidents.find((item) => item.id === this.state.currentIncidentId)
+      if (incident) incident.resolution = String(resolution).slice(0, 80)
+      await this.#save()
+      return true
     })
   }
 
@@ -416,10 +488,53 @@ export class DesktopPluginRecovery extends EventEmitter {
 
   async initialize() {
     await this.store.getState()
+    const legacyRepair = await this.store.getLegacyAutoSafeModeRepair()
+    if (legacyRepair) {
+      let prepared
+      try {
+        prepared = await this.#prepareDisabledDependencyRestore(legacyRepair.disabledDependencies)
+        await this.ensureProfile()
+        for (const transaction of prepared.transactions) transaction.commit()
+        await this.store.completeLegacyAutoSafeModeRepair({
+          success: true,
+          restoredPlugins: prepared.restoredPlugins,
+        })
+        await this.#log(`[plugin-recovery] repaired legacy unknown-timeout safe mode; restored=${prepared.restoredPlugins.join(',') || 'none'}`)
+      } catch (error) {
+        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+          await transaction.rollback().catch(() => {})
+        }
+        await this.ensureProfile().catch(() => {})
+        await this.store.completeLegacyAutoSafeModeRepair({ success: false, error })
+        await this.#log(`[plugin-recovery] legacy safe-mode repair needs user action: ${asMessage(error instanceof Error ? error.message : error)}`)
+      }
+    }
     this.controller.on('line', this.onLine)
     this.controller.on('status', this.onStatus)
     this.store.on('change', this.onStoreChange)
     return this.getState()
+  }
+
+  async #prepareDisabledDependencyRestore(disabledDependencies) {
+    const inventory = await this.pluginManager.inventory()
+    const builtIn = new Set(inventory.filter((item) => item.builtIn).map((item) => item.name))
+    const transactions = []
+    const restoredPlugins = []
+    try {
+      for (const [name, dependencySpec] of Object.entries(disabledDependencies ?? {}).toSorted()) {
+        if (builtIn.has(name)) {
+          restoredPlugins.push(name)
+          continue
+        }
+        const transaction = await this.pluginManager.setEnabled(name, true, { dependencySpec })
+        transactions.push(transaction)
+        restoredPlugins.push(name)
+      }
+      return { transactions, restoredPlugins }
+    } catch (error) {
+      for (const transaction of [...transactions].reverse()) await transaction.rollback().catch(() => {})
+      throw error
+    }
   }
 
   #enqueue(operation) {
@@ -511,8 +626,8 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
     const incident = await this.store.recordIncident(analysis)
     if (!analysis.identified) {
-      await this.#log('[plugin-recovery] culprit was not reliable; entering safe mode')
-      return this.#enterSafeMode({ automatic: true, incident })
+      await this.#log('[plugin-recovery] culprit was not reliable; preserving all plugins')
+      return false
     }
 
     this.recoveryStage = 1
@@ -585,6 +700,30 @@ export class DesktopPluginRecovery extends EventEmitter {
 
   enterSafeModeAndRestart() {
     return this.#enqueue(() => this.#enterSafeMode())
+  }
+
+  restoreDisabledAndRestart() {
+    return this.#enqueue(async () => {
+      const disabledDependencies = await this.store.getDisabledDependencies()
+      await this.controller.stop()
+      let prepared
+      try {
+        prepared = await this.#prepareDisabledDependencyRestore(disabledDependencies)
+        await this.ensureProfile()
+        await this.controller.start()
+        for (const transaction of prepared.transactions) transaction.commit()
+        await this.store.clearRecoveryMode('restored-by-user')
+        await this.#log(`[plugin-recovery] user restored disabled plugins: ${prepared.restoredPlugins.join(',') || 'none'}`)
+        return Object.freeze({ restored: Object.freeze([...prepared.restoredPlugins]) })
+      } catch (error) {
+        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+          await transaction.rollback().catch(() => {})
+        }
+        await this.ensureProfile()
+        await this.controller.start().catch(() => {})
+        throw error
+      }
+    })
   }
 
   prepareSafeMode() {

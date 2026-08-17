@@ -134,6 +134,9 @@ export const DESKTOP_PLUGIN_COMPAT_PACKAGES = Object.freeze([
   'schemastery',
 ].toSorted())
 
+// Desktop 2.1 first claimed this package as a managed compatibility link, but
+// a 2.0 profile can already contain pnpm's ordinary materialized copy. Adopt
+// only the exact release known to have been left by that upgrade path.
 export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   ...BUILTIN_RUNTIME_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
@@ -361,7 +364,13 @@ async function linkTargetsSource(target, source) {
   }
 }
 
-async function linkManagedPackage({ packageName, profileDir, sourceDir, previous }) {
+async function linkManagedPackage({
+  packageName,
+  profileDir,
+  sourceDir,
+  previous,
+  legacyDependencySpec,
+}) {
   const target = join(profileDir, 'node_modules', ...packagePathSegments(packageName))
   await mkdir(dirname(target), { recursive: true })
   if (await pathExists(target)) {
@@ -380,7 +389,19 @@ async function linkManagedPackage({ packageName, profileDir, sourceDir, previous
       && metadata.isDirectory()
       && typeof previous.source === 'string'
       && installed?.name === packageName
-    if (!ownedLink && !ownedCopy) throw new Error(`refusing to replace unmanaged package at ${target}`)
+    const packaged = await readJsonIfPresent(join(sourceDir, 'package.json'))
+    const matchingLegacyVersion = typeof installed?.version === 'string'
+      && installed.version.length > 0
+      && installed.version === packaged?.version
+    const declaredByLegacyProfile = typeof legacyDependencySpec === 'string'
+      && legacyDependencySpec.length > 0
+    const migratableLegacyCopy = metadata.isDirectory()
+      && installed?.name === packageName
+      && packaged?.name === packageName
+      && (matchingLegacyVersion || declaredByLegacyProfile)
+    if (!ownedLink && !ownedCopy && !migratableLegacyCopy) {
+      throw new Error(`refusing to replace unmanaged package at ${target}`)
+    }
     await rm(target, { recursive: true, force: true })
   }
 
@@ -555,6 +576,7 @@ export async function ensureDesktopProfile({
           profileDir,
           sourceDir,
           previous: previousRecords[packageName],
+          legacyDependencySpec: existing?.dependencies?.[packageName],
         }),
       })),
   )

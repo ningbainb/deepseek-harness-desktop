@@ -6,6 +6,26 @@
 
 English: No changes yet.
 
+## 2.2.0 - 2026-08-17
+
+中文：
+
+- Windows 运行时改由隐藏 PowerShell 控制台承载，使终端、PowerShell、CMD 和第三方子进程继承隐藏窗口，不再因遗漏单个 `windowsHide` 而弹出命令框；进程树清理继续显式隐藏。
+- 新增旧 profile 托管识别：包身份与随 2.2 提供的版本一致，或旧 profile 曾明确声明该依赖时，自动接管为 Desktop 托管链接；未知用户目录仍保留并拒绝覆盖。
+- 升级安装器按真实可执行路径识别旧安装主程序及旧 `resources` 内的后台进程并自动结束，无需用户按进程名手工清理；新增真实 Windows 清理、隐藏运行时和 2.1→2.2 profile 升级回归。
+- 旧应用根进程确认后继续沿父子关系清理社区插件启动的 CMD、PowerShell、Node 与 `prepare` 后代；运行时端口持久化并在可用时跨重启复用，被占用才回退到自动分配。
+- 插件恢复只接受明确加载失败或导入栈指向社区插件的强证据；端口占用、宿主失败及普通日志中出现插件名不再触发自动隔离或安全模式。
+- 首次启动会识别并撤销 2.1 因“运行时 120 秒未就绪”写入的未知故障安全模式，同时保留用户插件文件；用户主动安全模式会显示明确提示，并可在插件恢复页一键恢复全部插件和重启。
+
+English:
+
+- Hosted the Windows runtime inside a hidden PowerShell console so terminal, PowerShell, CMD, and third-party descendants inherit a hidden window even when an individual dependency omits `windowsHide`; process-tree cleanup remains explicitly hidden.
+- Added legacy-profile ownership recognition: Desktop adopts an unrecorded package when its identity and bundled version match, or when the previous profile explicitly declared that dependency. Unknown user-owned directories remain protected.
+- The upgrade installer now identifies the previous app and background executables under its `resources` tree by their real executable paths and stops them automatically, with real Windows cleanup, hidden-runtime, and 2.1-to-2.2 migration regressions.
+- After verifying an old app root, cleanup follows parent-child relationships to include CMD, PowerShell, Node, and `prepare` descendants launched by community plugins. The runtime port is persisted and reused across restarts while available, falling back to automatic allocation only on a real conflict.
+- Plugin recovery now requires an explicit load failure or an importer stack attributed to a community package. Port conflicts, host failures, and incidental plugin-name mentions no longer trigger automatic isolation or safe mode.
+- First launch repairs 2.1 safe-mode state caused by an unattributed 120-second readiness timeout without deleting plugin files. User-requested safe mode remains explicit and now offers a visible notice plus one-click restore-and-restart.
+
 ## 2.1.0 - 2026-08-17
 
 中文：

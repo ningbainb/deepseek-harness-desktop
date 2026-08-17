@@ -20,6 +20,7 @@ const refreshButton = document.querySelector('#refresh')
 const recoveryCount = document.querySelector('#recovery-count')
 const recoveryMode = document.querySelector('#recovery-mode')
 const recoveryModeLabel = document.querySelector('#recovery-mode-label')
+const restoreSafeMode = document.querySelector('#restore-safe-mode')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
 
@@ -117,6 +118,8 @@ const recoveryResolutionLabels = Object.freeze({
   'disabled-by-user': '已手动停用',
   'safe-mode-auto': '已自动进入安全模式',
   'safe-mode': '已进入安全模式',
+  'legacy-false-positive-repaired': '2.2 已自动修复误判',
+  'restored-by-user': '已由用户恢复',
 })
 
 function incidentMarkup(incident) {
@@ -140,6 +143,10 @@ async function refreshRecovery() {
   recoveryCount.textContent = state.incidents.length
   recoveryMode.dataset.safe = String(state.safeMode)
   recoveryModeLabel.textContent = state.safeMode ? '安全模式，只加载内置插件' : '正常模式'
+  restoreSafeMode.hidden = !state.safeMode
+  restoreSafeMode.textContent = state.disabledPlugins.length > 0
+    ? `恢复全部（${state.disabledPlugins.length}）并重启`
+    : '退出安全模式并重启'
   recoveryIncidents.innerHTML = state.incidents.length
     ? state.incidents.map(incidentMarkup).join('')
     : '<p class="empty">没有记录到插件启动故障</p>'
@@ -392,6 +399,21 @@ recoverySnapshots.addEventListener('click', async (event) => {
       await refresh()
     } catch (error) {
       notify(error.message, true)
+    }
+  })
+})
+
+restoreSafeMode.addEventListener('click', async () => {
+  if (!window.confirm('恢复安全模式停用的全部插件并重启 DSH？如果插件本身仍有故障，可再次进入安全模式。')) return
+  await extensionOperations.run(async () => {
+    try {
+      const result = await window.dshDesktop.restoreDisabledPlugins()
+      const count = result.restored?.length ?? 0
+      notify(count > 0 ? `已恢复 ${count} 个插件，DSH 已重启` : '已退出安全模式，DSH 已重启')
+      await refresh()
+    } catch (error) {
+      notify(error.message, true)
+      await refresh()
     }
   })
 })

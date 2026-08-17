@@ -43,6 +43,218 @@ test('plugin failure classifier reports conflicts and never isolates protected b
   assert.equal(protectedFailure.identified, false)
 })
 
+test('plugin failure classifier ignores incidental plugin names in host or port failures', () => {
+  const result = classifyPluginFailure([
+    "plugin '@community/example' initialized successfully",
+    'runtime startup failed: listen EADDRINUSE 127.0.0.1:43125',
+  ].join('\n'), {
+    activePlugins: ['@community/example'],
+  })
+
+  assert.equal(result.identified, false)
+  assert.equal(result.reasonCode, 'unknown')
+})
+
+test('unknown host failures preserve community plugins instead of entering automatic safe mode', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-unattributed-'))
+  try {
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    controller.stop = async () => {}
+    controller.start = async () => {}
+    let safeModeCalls = 0
+    const pluginManager = {
+      inventory: async () => [{ name: '@community/example', builtIn: false }],
+      enterSafeMode: async () => {
+        safeModeCalls += 1
+        throw new Error('safe mode must not run for an unattributed host failure')
+      },
+    }
+    const store = new PluginRecoveryStore({
+      profileDir: join(root, 'profile'),
+      stateDir: join(root, 'recovery'),
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager,
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+    await recovery.initialize()
+    controller.emit('line', {
+      stream: 'stdout',
+      line: "plugin '@community/example' initialized successfully",
+    })
+    controller.status = { state: 'crashed', error: 'listen EADDRINUSE 127.0.0.1:43125' }
+    controller.emit('status', controller.status)
+
+    let state
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      state = await recovery.getState()
+      if (state.currentIncident) break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    assert.equal(safeModeCalls, 0)
+    assert.equal(state.safeMode, false)
+    assert.equal(state.currentIncident.pluginName, undefined)
+    assert.deepEqual(state.disabledPlugins, [])
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('2.2 repairs the legacy unknown-timeout safe mode without touching plugin files', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-legacy-timeout-'))
+  const profileDir = join(root, 'profile')
+  const stateDir = join(root, 'recovery')
+  const packageName = '@community/taffy-pet'
+  try {
+    const packageRoot = join(profileDir, 'node_modules', ...packageName.split('/'))
+    await mkdir(packageRoot, { recursive: true })
+    await mkdir(stateDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }, null, 2)}\n`)
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+      name: packageName,
+      version: '1.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }))
+    await writeFile(join(stateDir, 'state.json'), `${JSON.stringify({
+      version: 1,
+      safeMode: true,
+      snapshots: [],
+      incidents: [{
+        id: 'legacy-timeout',
+        createdAt: '2026-08-17T00:00:00.000Z',
+        identified: false,
+        reasonCode: 'unknown',
+        summary: '未能可靠定位故障插件',
+        technicalDetails: '[taffy-pet] host loaded\nruntime 120s 未就绪',
+        resolution: 'safe-mode-auto',
+      }],
+      disabledDependencies: { [packageName]: '1.0.0' },
+      currentIncidentId: 'legacy-timeout',
+    }, null, 2)}\n`)
+    const store = new PluginRecoveryStore({ profileDir, stateDir, builtInBundles: BUILTIN_BUNDLES })
+    const pluginManager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async () => {},
+      beforeMutation: async () => {},
+    })
+    const controller = new EventEmitter()
+    controller.status = { state: 'stopped' }
+    controller.stop = async () => {}
+    controller.start = async () => {}
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager,
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+
+    await recovery.initialize()
+
+    const state = await recovery.getState()
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(state.safeMode, false)
+    assert.deepEqual(state.disabledPlugins, [])
+    assert.equal(state.currentIncident.resolution, 'legacy-false-positive-repaired')
+    assert.equal(manifest.dependencies[packageName], '1.0.0')
+    assert.equal(manifest.dsh.profile.bundles.includes(packageName), true)
+    assert.equal(JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')).name, packageName)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('2.2 preserves a user-requested safe mode for one-click recovery', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-user-safe-mode-'))
+  const profileDir = join(root, 'profile')
+  const stateDir = join(root, 'recovery')
+  const packageName = '@community/example'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(stateDir, { recursive: true })
+    const packageRoot = join(profileDir, 'node_modules', ...packageName.split('/'))
+    await mkdir(packageRoot, { recursive: true })
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+      name: packageName,
+      version: '1.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }))
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }, null, 2)}\n`)
+    await writeFile(join(stateDir, 'state.json'), `${JSON.stringify({
+      version: 1,
+      safeMode: true,
+      snapshots: [],
+      incidents: [{
+        id: 'user-safe-mode',
+        createdAt: '2026-08-17T00:00:00.000Z',
+        identified: false,
+        reasonCode: 'unknown',
+        summary: '用户请求安全模式',
+        technicalDetails: 'manual recovery',
+        resolution: 'safe-mode',
+      }],
+      disabledDependencies: { [packageName]: '1.0.0' },
+      currentIncidentId: 'user-safe-mode',
+    }, null, 2)}\n`)
+    const store = new PluginRecoveryStore({ profileDir, stateDir, builtInBundles: BUILTIN_BUNDLES })
+    const controller = new EventEmitter()
+    controller.status = { state: 'stopped' }
+    let stops = 0
+    let starts = 0
+    controller.stop = async () => { stops += 1 }
+    controller.start = async () => { starts += 1 }
+    const pluginManager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async () => {},
+      beforeMutation: async () => {},
+    })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager,
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+
+    await recovery.initialize()
+    const state = await recovery.getState()
+    assert.equal(state.safeMode, true)
+    assert.deepEqual(state.disabledPlugins, [packageName])
+
+    assert.deepEqual(await recovery.restoreDisabledAndRestart(), { restored: [packageName] })
+    const restoredState = await recovery.getState()
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(stops, 1)
+    assert.equal(starts, 1)
+    assert.equal(restoredState.safeMode, false)
+    assert.deepEqual(restoredState.disabledPlugins, [])
+    assert.equal(restoredState.currentIncident.resolution, 'restored-by-user')
+    assert.equal(manifest.dependencies[packageName], '1.0.0')
+    assert.equal(manifest.dsh.profile.bundles.includes(packageName), true)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('plugin recovery store deduplicates snapshots and retains only the latest three', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-'))
   const profileDir = join(root, 'profile')

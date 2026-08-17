@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { delimiter, join } from 'node:path'
+import { delimiter, join, win32 } from 'node:path'
 
 import { emitBestEffort } from './best-effort-events.mjs'
 
@@ -9,6 +9,57 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 export const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
 export const DESKTOP_PROFILE_NAME = 'desktop'
 const STABLE_RUNTIME_RESET_MS = 60_000
+
+function runtimeArguments(cliPath, preferredPort) {
+  return ['--expose-internals', cliPath, '--profile', DESKTOP_PROFILE_NAME, '--port', String(preferredPort)]
+}
+
+function quotePowerShellLiteral(value) {
+  return `'${String(value).replaceAll("'", "''")}'`
+}
+
+export function createRuntimeInvocation({
+  executable,
+  cliPath,
+  preferredPort = 0,
+  platform = process.platform,
+  systemRoot = process.env.SystemRoot,
+} = {}) {
+  if (typeof executable !== 'string' || executable.length === 0) {
+    throw new TypeError('runtime executable must be a non-empty path')
+  }
+  if (typeof cliPath !== 'string' || cliPath.length === 0) {
+    throw new TypeError('runtime CLI path must be a non-empty path')
+  }
+  if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
+    throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
+  }
+  const args = runtimeArguments(cliPath, preferredPort)
+  if (platform !== 'win32') return { executable, args }
+
+  // Electron is a GUI-subsystem executable and therefore gives its Node-mode
+  // DSH child no console to inherit. A hidden PowerShell host supplies one so
+  // nested cmd/pwsh/PTY helpers cannot create a visible console window even
+  // when a third-party package omits its own windowsHide option.
+  const command = [
+    `& ${[executable, ...args].map(quotePowerShellLiteral).join(' ')} | ForEach-Object { [Console]::Out.WriteLine($_) }`,
+    'exit $LASTEXITCODE',
+  ].join('\n')
+  return {
+    executable: systemRoot
+      ? win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+      : 'powershell.exe',
+    args: [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-WindowStyle',
+      'Hidden',
+      '-EncodedCommand',
+      Buffer.from(command, 'utf16le').toString('base64'),
+    ],
+  }
+}
 
 export function validateLoopbackUrl(value) {
   let url
@@ -125,6 +176,10 @@ export class DshRuntimeController extends EventEmitter {
     cancelSchedule = clearTimeout,
     terminateProcessTree = terminateChildProcessTree,
     pathEntries = [],
+    platform = process.platform,
+    systemRoot = process.env.SystemRoot,
+    preferredPort = 0,
+    onReadyPort = () => {},
     environmentProvider = () => ({}),
     preflight = () => {},
     now = Date.now,
@@ -145,6 +200,14 @@ export class DshRuntimeController extends EventEmitter {
     this.cancelSchedule = cancelSchedule
     this.terminateProcessTree = terminateProcessTree
     this.pathEntries = pathEntries
+    this.platform = platform
+    this.systemRoot = systemRoot
+    if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
+      throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
+    }
+    if (typeof onReadyPort !== 'function') throw new TypeError('runtime ready-port observer must be a function')
+    this.preferredPort = preferredPort
+    this.onReadyPort = onReadyPort
     if (typeof environmentProvider !== 'function') throw new TypeError('environmentProvider must be a function')
     if (typeof preflight !== 'function') throw new TypeError('runtime preflight must be a function')
     if (typeof now !== 'function') throw new TypeError('runtime clock must be a function')
@@ -250,9 +313,16 @@ export class DshRuntimeController extends EventEmitter {
       PATH: [...this.pathEntries, process.env.PATH].filter(Boolean).join(delimiter),
     }
     try {
+      const invocation = createRuntimeInvocation({
+        executable: this.executable,
+        cliPath: this.cliPath,
+        platform: this.platform,
+        systemRoot: this.systemRoot,
+        preferredPort: this.preferredPort,
+      })
       const child = this.spawnProcess(
-        this.executable,
-        ['--expose-internals', this.cliPath, '--profile', DESKTOP_PROFILE_NAME, '--port', '0'],
+        invocation.executable,
+        invocation.args,
         {
           cwd: this.cwd,
           env: environment,
@@ -309,6 +379,15 @@ export class DshRuntimeController extends EventEmitter {
     if (this.status.state !== 'starting') return
     this.cancelSchedule(this.startupTimer)
     this.startupTimer = undefined
+    const readyPort = Number.parseInt(new URL(url).port, 10)
+    this.preferredPort = readyPort
+    try {
+      void Promise.resolve(this.onReadyPort(readyPort)).catch((error) => {
+        this.#appendDiagnostic(`[port] failed to persist preferred port: ${this.#errorMessage(error)}`)
+      })
+    } catch (error) {
+      this.#appendDiagnostic(`[port] failed to persist preferred port: ${this.#errorMessage(error)}`)
+    }
     this.#setStatus('ready', { url })
     this.readySince = this.now()
     this.resolveReady?.(url)

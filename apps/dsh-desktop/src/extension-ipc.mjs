@@ -12,6 +12,7 @@ const CHANNELS = [
   'extensions:plugin-remove',
   'extensions:plugin-enable',
   'extensions:recovery-state',
+  'extensions:recovery-restore-all',
   'extensions:recovery-restore',
   'extensions:diagnostics-export',
   'extensions:community-open',
@@ -198,6 +199,9 @@ export function registerExtensionIpc({
     return enqueuePluginMutation(() => pluginRecovery.setPluginEnabledAndRestart(request.name, request.enabled))
   })
   ipcMain.handle('extensions:recovery-state', () => pluginRecovery.getState())
+  ipcMain.handle('extensions:recovery-restore-all', () => {
+    return enqueuePluginMutation(() => pluginRecovery.restoreDisabledAndRestart())
+  })
   ipcMain.handle('extensions:recovery-restore', (_event, id) => {
     if (typeof id !== 'string' || id.length === 0 || id.length > 120) {
       throw new TypeError('invalid recovery snapshot identifier')

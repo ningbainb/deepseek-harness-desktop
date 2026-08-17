@@ -17,6 +17,7 @@ const api = Object.freeze({
   removePlugin: (name) => ipcRenderer.invoke('extensions:plugin-remove', name),
   setPluginEnabled: (name, enabled) => ipcRenderer.invoke('extensions:plugin-enable', { name, enabled }),
   getPluginRecoveryState: () => ipcRenderer.invoke('extensions:recovery-state'),
+  restoreDisabledPlugins: () => ipcRenderer.invoke('extensions:recovery-restore-all'),
   restorePluginSnapshot: (id) => ipcRenderer.invoke('extensions:recovery-restore', id),
   exportPluginDiagnostics: () => ipcRenderer.invoke('extensions:diagnostics-export'),
   openCommunityPlugin: (id) => ipcRenderer.invoke('extensions:community-open', id),

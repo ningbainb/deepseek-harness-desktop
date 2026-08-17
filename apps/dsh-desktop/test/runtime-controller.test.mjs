@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   DEFAULT_STARTUP_TIMEOUT_MS,
   DESKTOP_PROFILE_NAME,
   DshRuntimeController,
   computeRestartDelay,
+  createRuntimeInvocation,
   formatRuntimeExit,
   parseDshReadyUrl,
   probeHttpReady,
@@ -80,6 +83,65 @@ test('default startup budget tolerates first-run Windows scanning', () => {
   assert.equal(controller.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS)
 })
 
+test('hidden Windows runtime wrapper gives terminal descendants an inherited hidden console', () => {
+  const invocation = createRuntimeInvocation({
+    platform: 'win32',
+    systemRoot: 'C:\\Windows',
+    executable: "C:\\Program Files\\DeepSeek's Harness\\DeepSeek Harness Desktop.exe",
+    cliPath: 'C:\\Program Files\\DeepSeek Harness\\resources\\app.asar.unpacked\\dsh\\bin.js',
+  })
+
+  assert.equal(
+    invocation.executable,
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+  )
+  assert.deepEqual(invocation.args.slice(0, 6), [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-WindowStyle',
+    'Hidden',
+    '-EncodedCommand',
+  ])
+  const script = Buffer.from(invocation.args[6], 'base64').toString('utf16le')
+  assert.match(script, /DeepSeek''s Harness/u)
+  assert.match(script, /'--expose-internals'/u)
+  assert.match(script, /'--profile' 'desktop'/u)
+  assert.match(script, /'--port' '0'/u)
+  assert.match(script, /ForEach-Object \{ \[Console\]::Out\.WriteLine\(\$_\) \}/u)
+  assert.match(script, /exit \$LASTEXITCODE/u)
+})
+
+test('non-Windows runtime launch remains a direct argv spawn', () => {
+  assert.deepEqual(createRuntimeInvocation({
+    platform: 'linux',
+    executable: '/opt/deepseek-harness',
+    cliPath: '/opt/dsh/bin.js',
+    preferredPort: 43_125,
+  }), {
+    executable: '/opt/deepseek-harness',
+    args: ['--expose-internals', '/opt/dsh/bin.js', '--profile', 'desktop', '--port', '43125'],
+  })
+})
+
+test('hidden Windows runtime wrapper preserves runtime output and exit status', {
+  skip: process.platform !== 'win32',
+}, () => {
+  const invocation = createRuntimeInvocation({
+    executable: process.execPath,
+    cliPath: fileURLToPath(new URL('./fixtures/runtime-child.mjs', import.meta.url)),
+  })
+  const result = spawnSync(invocation.executable, invocation.args, {
+    encoding: 'utf8',
+    env: { ...process.env, DSH_TEST_RUNTIME_EXIT_CODE: '23' },
+    timeout: 10_000,
+    windowsHide: true,
+  })
+
+  assert.equal(result.status, 23, result.stderr)
+  assert.match(result.stdout, /dsh web: http:\/\/127\.0\.0\.1:43125/u)
+})
+
 test('HTTP readiness probe waits through a short bind race', async () => {
   let calls = 0
   await probeHttpReady('http://127.0.0.1:43125/', {
@@ -101,6 +163,7 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   const states = []
   let childArguments
   let childEnvironment
+  const readyPorts = []
   const controller = new DshRuntimeController({
     cliPath: 'dsh-bin.js',
     cwd: process.cwd(),
@@ -115,6 +178,9 @@ test('controller reaches ready state from streamed output and stops cleanly', as
     startupTimeoutMs: 2_000,
     pathEntries: ['C:\\desktop-runtime-bin'],
     environmentProvider: () => ({ QQBOT_APPID: 'desktop-app', QQBOT_SECRET: 'runtime-only' }),
+    platform: 'linux',
+    preferredPort: 43_124,
+    onReadyPort: (port) => readyPorts.push(port),
   })
   controller.on('status', (status) => states.push(status.state))
 
@@ -127,6 +193,8 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   assert.equal(childEnvironment.DSH_PROFILE, DESKTOP_PROFILE_NAME)
   assert.equal(childEnvironment.DSH_SKIN_PROFILE, DESKTOP_PROFILE_NAME)
   assert.equal(childArguments[childArguments.indexOf('--profile') + 1], DESKTOP_PROFILE_NAME)
+  assert.equal(childArguments[childArguments.indexOf('--port') + 1], '43124')
+  assert.deepEqual(readyPorts, [43_125])
   assert.equal(
     childEnvironment.DSH_SKINS_DIR,
     join('C:\\isolated-home', 'profiles', DESKTOP_PROFILE_NAME, 'node_modules', '@linxin666'),

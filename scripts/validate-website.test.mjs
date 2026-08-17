@@ -10,19 +10,19 @@ const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
 
 test('website fallback installer matches the desktop release version', async () => {
   const html = await readFile(websitePath, 'utf8')
-  assert.deepEqual(await collectWebsiteErrors(html, '2.1.0'), [])
+  assert.deepEqual(await collectWebsiteErrors(html, '2.2.0'), [])
 })
 
 test('website validation rejects stale fallback installers', async () => {
-  const html = (await readFile(websitePath, 'utf8')).replaceAll('2.1.0', '0.1.9')
-  const errors = await collectWebsiteErrors(html, '2.1.0')
+  const html = (await readFile(websitePath, 'utf8')).replaceAll('2.2.0', '0.1.9')
+  const errors = await collectWebsiteErrors(html, '2.2.0')
   assert.ok(errors.some(error => error.includes('stale installer version 0.1.9')))
   assert.ok(errors.some(error => error.includes('fallback label')))
 })
 
 test('website exposes canonical SEO and structured data markers', async () => {
   const html = await readFile(websitePath, 'utf8')
-  const errors = await collectWebsiteErrors(html, '2.1.0')
+  const errors = await collectWebsiteErrors(html, '2.2.0')
   assert.deepEqual(errors, [])
 })
 
@@ -30,7 +30,7 @@ test('website validation rejects missing GitHub Star guidance', async () => {
   const html = (await readFile(websitePath, 'utf8'))
     .replaceAll('data-star-cta', 'data-removed-star-cta')
     .replaceAll('data-star-count', 'data-removed-star-count')
-  const errors = await collectWebsiteErrors(html, '2.1.0')
+  const errors = await collectWebsiteErrors(html, '2.2.0')
   assert.ok(errors.some(error => error.includes('GitHub Star CTA')))
   assert.ok(errors.some(error => error.includes('GitHub Star count')))
 })

@@ -29,6 +29,7 @@ import { installNavigationPolicy } from './navigation-policy.mjs'
 import { startQqBotConnector } from './optional-integrations.mjs'
 import { DesktopPluginRecovery, PluginRecoveryStore } from './plugin-recovery.mjs'
 import { BUILTIN_BUNDLES, ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from './profile.mjs'
+import { persistRuntimePort, selectPreferredRuntimePort } from './runtime-port.mjs'
 import { installRendererPermissions } from './renderer-permissions.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
 import { assertRuntimeIntegrity, resolveRuntimeCriticalFiles } from './runtime-integrity.mjs'
@@ -337,6 +338,12 @@ export async function startElectronApp(metadata) {
     await logStore.append(`[plugins] disabled incompatible community bundle: ${plugin.name}`)
   }
 
+  const runtimePortStatePath = join(profile.profileDir, '.dsh-desktop-runtime.json')
+  const preferredRuntimePort = await selectPreferredRuntimePort(runtimePortStatePath).catch(async (error) => {
+    await logStore.append(`[port] failed to read preferred port: ${error instanceof Error ? error.message : String(error)}`)
+    return 0
+  })
+
   const controller = new DshRuntimeController({
     cliPath: resolveDshCliPath(),
     cwd: projectRoot,
@@ -346,6 +353,8 @@ export async function startElectronApp(metadata) {
     autoRestart: false,
     startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
     pathEntries: [runtimeBin],
+    preferredPort: preferredRuntimePort,
+    onReadyPort: (port) => persistRuntimePort(runtimePortStatePath, port),
     environmentProvider: qqBotEnvironment,
     preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
   })
@@ -415,6 +424,7 @@ export async function startElectronApp(metadata) {
   let communityWindow
   let communityWindowPromise
   let updateController
+  let safeModeNoticeShown = false
 
   installNavigationPolicy({
     webContents: mainWindow.webContents,
@@ -599,6 +609,25 @@ export async function startElectronApp(metadata) {
       const rendererLoadedAt = performance.now()
       void logStore.append(`[startup] renderer-loaded=${Math.round(rendererLoadedAt - runtimeReadyAt)}ms`)
       void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
+      try {
+        const recoveryState = await pluginRecovery.getState()
+        if (recoveryState.safeMode && !safeModeNoticeShown && process.env.DSH_DESKTOP_SMOKE_EXIT !== '1') {
+          safeModeNoticeShown = true
+          const notice = await dialog.showMessageBox(mainWindow, {
+            type: 'warning',
+            title: '插件安全模式',
+            message: '当前仅加载内置插件',
+            detail: `有 ${recoveryState.disabledPlugins.length} 个插件处于停用状态。你可以打开“插件恢复”查看原因并一键恢复；聊天记录和个人设置不会受影响。`,
+            buttons: ['打开插件恢复', '稍后'],
+            defaultId: 0,
+            cancelId: 1,
+            noLink: true,
+          })
+          if (notice.response === 0) await createExtensionWindow()
+        }
+      } catch (error) {
+        void logStore.append(`[plugin-recovery] failed to show safe-mode notice: ${error instanceof Error ? error.message : String(error)}`)
+      }
       if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
         console.log(`desktop smoke ready: ${activeOrigin}`)
         app.quit()

@@ -8,7 +8,7 @@
 
 ## Download
 
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe
 - Latest release notes and checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest
 
 ## Source and documentation
@@ -21,8 +21,8 @@
 ## Key facts
 
 - Supported systems: Windows 10 and Windows 11, x64
-- Current release: v2.1.0
-- v2.1.0 adds measured mainland-China update mirrors, snapshot and safe-mode plugin recovery, unified skin persistence, reliable installer cleanup, hidden background subprocesses, and Unicode-workspace restart-loop protection
+- Current release: v2.2.0
+- v2.2.0 hides terminal descendants, cleans up attributed old app/plugin processes, migrates recognized legacy dependencies, reuses the runtime port, and requires strong evidence before isolating a plugin
 - The bundled Skin Center includes 11 selectable skins
 - Node.js is bundled; end users do not need to install it separately
 - The project is a community edition and is not an official DeepSeek release

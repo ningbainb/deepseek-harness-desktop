@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@deepseek-ai/dsh-host-apiproxy@0.1.0-rc.6': 5315b1a2ae59b7dd822dde639513a529c2ae89c087645229725acb19a69d6d42
-  '@deepseek-ai/dsh-subprocess-local@0.1.0-rc.6': 34dffb3a7766054dd074442aa26fe54a4dad35bd561ce4bc6982d2557e9485ba
+  '@deepseek-ai/dsh-subprocess-local@0.1.0-rc.6': 3c66a863301e168c83421e416f9881971002a70b7a015aa2e6dc7876543dc5cc
   '@linxin666/dsh-client-ui-skin-center@0.1.18': 9120dfc9c21b6af8926ab2278bac772ba27dd5f1030491ac551de3da01abc39a
   '@linxin666/dsh-web-ui-all@0.1.18': c8b28bc28d1f66d37cc1bc829443e2748d372834bb315f1f6880eb6e6fd51ca5
   dshmarket@1.9.0: c30de697fc62830359dff91b8be39fe5471450b4b3b6196fb0a8c7c29f67b479
@@ -8110,7 +8110,7 @@ snapshots:
       '@deepseek-ai/dsh-subagent': 0.1.0-rc.6(ce92e437d8fcda20065545068c53080c)
       '@deepseek-ai/dsh-subagent-fork-in-process': 0.1.0-rc.6(2a68a1d05aa09929a612739ac9c55071)
       '@deepseek-ai/dsh-subagent-spawn-in-process': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subagent-in-process-driver@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subagent@0.1.0-rc.6(052b74b053985f081eac3fa39ae0acd6))(@deepseek-ai/dsh-system-prompt@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-scope@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))))(@deepseek-ai/dsh-subagent@0.1.0-rc.6(052b74b053985f081eac3fa39ae0acd6))
-      '@deepseek-ai/dsh-subprocess-local': 0.1.0-rc.6(patch_hash=34dffb3a7766054dd074442aa26fe54a4dad35bd561ce4bc6982d2557e9485ba)(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subprocess@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-subprocess-local': 0.1.0-rc.6(patch_hash=3c66a863301e168c83421e416f9881971002a70b7a015aa2e6dc7876543dc5cc)(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subprocess@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-system-prompt': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-llm@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-attachment@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-scope@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-token-meter': 0.1.0-rc.6(2389bf25558f753874b1e8511c5bc2b8)
       '@deepseek-ai/dsh-tool-bash': 0.1.0-rc.6(7020500f9397677133a6a4c05fa30bb9)
@@ -10079,7 +10079,7 @@ snapshots:
       '@deepseek-ai/dsh-session-projection-cache': 0.1.0-rc.6(ed8cd3af16423b0617878e5ddde49e42)
       '@deepseek-ai/dsh-user-approval': 0.1.0-rc.6(416af3fc322295ea7a2afefd6c38ce94)
 
-  '@deepseek-ai/dsh-subprocess-local@0.1.0-rc.6(patch_hash=34dffb3a7766054dd074442aa26fe54a4dad35bd561ce4bc6982d2557e9485ba)(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subprocess@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))':
+  '@deepseek-ai/dsh-subprocess-local@0.1.0-rc.6(patch_hash=3c66a863301e168c83421e416f9881971002a70b7a015aa2e6dc7876543dc5cc)(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-subprocess@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))':
     dependencies:
       '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
       '@deepseek-ai/dsh-subprocess': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))

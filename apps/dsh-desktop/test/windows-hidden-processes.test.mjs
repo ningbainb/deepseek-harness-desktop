@@ -13,4 +13,5 @@ test('official background subprocesses hide their console window on Windows', as
   const source = await readFile(join(dirname(subprocessManifest), 'lib', 'index.js'), 'utf8')
 
   assert.match(source, /windowsHide:\s*platform === ["']win32["']/u)
+  assert.match(source, /spawnSync\(["']taskkill["'][\s\S]*?windowsHide:\s*true/u)
 })

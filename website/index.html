@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 2.1 是社区维护的开源 Windows 桌面客户端，新增国内更新镜像自动择优、插件三层容灾、安全模式、统一皮肤持久化与更可靠的 Windows 更新安装。免费下载 Windows x64 安装包，无需另装 Node.js。">
+    <meta name="description" content="DeepSeek Harness Desktop 2.2 是社区维护的开源 Windows 桌面客户端，修复终端弹窗、旧插件升级冲突、后台进程占用、重启换端口与插件误隔离。免费下载 Windows x64 安装包，无需另装 Node.js。">
     <meta name="keywords" content="DeepSeek Harness Desktop,DeepSeek Harness 桌面版,DeepSeek Windows 客户端,开源 AI 编程助手,Harness 下载">
     <meta name="author" content="DeepSeek Harness Desktop Community">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -14,7 +14,7 @@
     <link rel="canonical" href="https://ningbainb.github.io/deepseek-harness-desktop/">
     <link rel="sitemap" type="application/xml" href="https://ningbainb.github.io/deepseek-harness-desktop/sitemap.xml">
     <meta property="og:title" content="DeepSeek Harness Desktop 开源 Windows 桌面版">
-    <meta property="og:description" content="2.1 新增国内更新加速、插件三层容灾、安全模式、统一皮肤持久化与更可靠的 Windows 更新安装。">
+    <meta property="og:description" content="2.2 修复终端弹窗与旧插件升级冲突，自动清理可归因后台，稳定复用端口并减少插件误隔离。">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://ningbainb.github.io/deepseek-harness-desktop/">
     <meta property="og:site_name" content="DeepSeek Harness Desktop">
@@ -23,7 +23,7 @@
     <meta property="og:image:alt" content="DeepSeek Harness Desktop 开源 Windows 桌面客户端界面">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="DeepSeek Harness Desktop 开源 Windows 桌面版">
-    <meta name="twitter:description" content="2.1 新增国内更新加速、插件三层容灾、安全模式、统一皮肤持久化与更可靠的 Windows 更新安装。">
+    <meta name="twitter:description" content="2.2 修复终端弹窗与旧插件升级冲突，自动清理可归因后台，稳定复用端口并减少插件误隔离。">
     <meta name="twitter:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png">
     <title>DeepSeek Harness Desktop 开源桌面版 - Windows 一键下载</title>
     <script type="application/ld+json">
@@ -44,13 +44,13 @@
             "name": "DeepSeek Harness Desktop",
             "alternateName": "DeepSeek Harness 桌面版",
             "url": "https://ningbainb.github.io/deepseek-harness-desktop/",
-            "description": "完整保留 Harness Web 能力的开源 Windows 桌面客户端，2.1 新增国内更新加速、插件三层容灾、安全模式、统一皮肤持久化与可靠更新安装。",
+            "description": "完整保留 Harness Web 能力的开源 Windows 桌面客户端，2.2 修复终端弹窗、升级后台占用、旧插件冲突、重启换端口与插件误隔离。",
             "applicationCategory": "DeveloperApplication",
             "applicationSubCategory": "AI coding assistant",
             "operatingSystem": "Windows 10, Windows 11",
-            "softwareVersion": "2.1.0",
+            "softwareVersion": "2.2.0",
             "isAccessibleForFree": true,
-            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe",
+            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe",
             "installUrl": "https://ningbainb.github.io/deepseek-harness-desktop/#download",
             "releaseNotes": "https://github.com/ningbainb/deepseek-harness-desktop/releases/latest",
             "codeRepository": "https://github.com/ningbainb/deepseek-harness-desktop",
@@ -163,9 +163,9 @@
           <span data-site-theme-label>动感亮色</span>
         </button>
         <a class="nav-community" href="https://qm.qq.com/q/vehlNjaeye" target="_blank" rel="noreferrer"><span>Q</span> 加群</a>
-        <a class="nav-download download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe">
+        <a class="nav-download download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 15v2h14v-2"/></svg>
-          下载 <span class="release-version">v2.1.0</span>
+          下载 <span class="release-version">v2.2.0</span>
         </a>
       </nav>
     </header>
@@ -180,7 +180,7 @@
             <p class="hero-summary">完整 Harness 进入桌面：国内更新自动加速、插件故障自动隔离与安全模式、统一皮肤管理，以及更可靠的 Windows 生命周期。</p>
             <p class="hero-summary">无需另外安装 Node.js。下载、启动，然后直接开始工作。</p>
             <div class="hero-buttons">
-              <a class="btn btn-primary download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe">
+              <a class="btn btn-primary download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2h7v7H2V2Zm9 0h7v7h-7V2ZM2 11h7v7H2v-7Zm9 0h7v7h-7v-7Z"/></svg>
                 下载 Windows x64
               </a>
@@ -215,8 +215,8 @@
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6V3h10v10h-3M3 7h10v10H3V7Z"/></svg><span>复制</span>
                 </button>
               </div>
-              <a id="terminal-action" class="terminal-command" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
-                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v2.1.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v2.1.0</code>
+              <a id="terminal-action" class="terminal-command" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
+                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v2.2.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v2.2.0</code>
                 <span class="terminal-cta">立即下载</span>
               </a>
               <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">约 135 MB</span></div>
@@ -382,7 +382,7 @@
           <div class="install-grid">
             <article class="install-card reveal">
               <h3>Windows 一键安装</h3><p>下载 x64 安装包，应用会自动检查后续更新。</p>
-              <a class="code-line download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v2.1.0</span></code><span class="code-action">下载</span></a>
+              <a class="code-line download-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.2.0-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v2.2.0</span></code><span class="code-action">下载</span></a>
             </article>
             <article class="install-card reveal">
               <h3>源码构建</h3><p>克隆完整项目，安装依赖后打包 Windows 桌面应用。</p>
@@ -399,9 +399,9 @@
             <div class="release-copy">
               <div class="release-heading">
                 <span class="release-state">STABLE / 稳定通道</span>
-                <strong class="release-version">v2.1.0</strong>
+                <strong class="release-version">v2.2.0</strong>
               </div>
-              <p>v2.1.0 新增国内更新镜像自动择优、插件快照与安全模式，统一皮肤持久化，并修复升级文件占用、隐藏命令框和中文工作区重启循环。</p>
+              <p>v2.2.0 隐藏 Windows 终端后代，按旧应用进程树清理插件后台，自动迁移旧依赖与安全模式误判；重启优先复用端口，安全模式可见且支持一键恢复。</p>
               <div class="release-facts">
                 <span><small>发布日期</small><time class="release-date" datetime="2026-08-17">2026-08-17</time></span>
                 <span><small>安装包</small><strong class="release-size">约 135 MB</strong></span>

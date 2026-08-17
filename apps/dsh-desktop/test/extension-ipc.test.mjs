@@ -192,6 +192,41 @@ test('plugin update checks stay online and exact updates use the guarded transac
   unregister()
 })
 
+test('extension IPC exposes one-click safe-mode recovery through the serialized mutation queue', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const calls = []
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {},
+    controller: {},
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    pluginRecovery: {
+      restoreDisabledAndRestart: async () => {
+        calls.push('restore')
+        return { restored: ['@community/example'] }
+      },
+    },
+  })
+
+  assert.deepEqual(await ipcMain.handlers.get('extensions:recovery-restore-all')(), {
+    restored: ['@community/example'],
+  })
+  assert.deepEqual(calls, ['restore'])
+  unregister()
+  assert.equal(ipcMain.handlers.has('extensions:recovery-restore-all'), false)
+})
+
 test('plugin mutations serialize the complete runtime downtime transaction', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
