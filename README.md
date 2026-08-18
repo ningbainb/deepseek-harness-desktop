@@ -4,6 +4,8 @@
 
 ![dsh-web-ui](docs/dsh-web-ui-banner.png)
 
+DeepSeek Harness Desktop 是社区维护的开源 Windows AI 编程桌面客户端：它把完整的 DeepSeek Harness Web Surface、官方 DSH 本地主机、插件、Skills、主题和自动更新打包进一个 Windows x64 安装器。支持 Windows 10/11，免费采用 BSD-3-Clause 许可证，安装后无需另配 Node.js。
+
 ## 社区用户交流群
 
 QQ 群：**1105158177** · **[点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
@@ -24,7 +26,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 | 版本 | 主要更新 |
 | --- | --- |
-| **2.3.0** | 新增只出现一次的 GitHub Star 动画引导与“加入社群”反馈入口；重构单一安装检查，兼容 0.1.9 直接升级，修复旧目录误报并避免同名进程和外部插件后代误阻塞。 |
+| **2.3.0** | 新增只出现一次的 GitHub Star 动画引导与“加入社群”反馈入口；安装预检可识别外部 PowerShell/CMD/Node 宿主、EncodedCommand 与 Windows 短路径，兼容 0.1.9 直接升级，并通过独立 profile 与端口回退和官方 Web 端共存。 |
 | **2.2.0** | 隐藏 Windows 终端及其后代窗口；升级时自动清理旧应用和插件后台、迁移可识别旧依赖与旧安全模式误判；重启复用端口，安全模式支持可见提示与一键恢复。 |
 | **2.1.0** | 新增国内更新镜像自动测速与回退、插件快照/自动隔离/安全模式三层容灾；统一皮肤持久化，修复升级文件占用、隐藏命令框、中文工作区重启循环，并从工具菜单直接打开扩展坞。 |
 | **2.0.0** | 修复取消后排队消息滞留与运行时损坏循环；新增 Skills 菜单、模型 API 有界重试、思考区吸顶和 SSH 实时监控；统一 Harness 原生视觉并完善粒子鲸鱼启动页。 |
@@ -36,7 +38,16 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 | **0.1.4** | 桌宠迁移到全局 Shell Overlay，首页和设置页均可见；恢复五张 Web UI 插件配置卡；皮肤中心完整展示安装版随附的九套皮肤。 |
 | **0.1.3** | 加入稳定版 GitHub Release 更新检查、双语更新说明、用户确认下载、任务栏进度和二次确认安装。 |
 
-### 2.0 核心新功能
+### 2.3.0 功能亮点
+
+- **可靠覆盖升级**：安装预检按旧安装根路径归因并清理外部 PowerShell、CMD、Node 后代，解码 `-EncodedCommand` 负载，同时识别 Windows 8.3 短路径与规范化长路径；句柄访问受限时回退 WMI，力杀后等待退出并退避重试。
+- **严格清理边界**：只有命令行明确引用旧安装根路径的外部进程才会被归因；官方 Web 端、安装目录外的同名程序和无路径引用的独立进程不会被误杀。
+- **与官方 Web 端共存**：桌面版固定使用隔离的 `profiles/desktop` profile，首选端口被占用时自动回退到系统分配端口，两端可以同时运行。
+- **一次性社区引导**：2.3.0 首次启动可选择前往 GitHub 点 Star、加入 QQ 社群反馈问题或继续使用；展示状态由主进程原子记录，刷新和后续启动不会重复弹出。
+
+![DeepSeek Harness Desktop 2.3.0 GitHub Star 与社群反馈引导](docs/screenshots/desktop-2.3.0-star-community-prompt.png)
+
+### 完整桌面能力
 
 - **排队消息可靠续传**：智能体工作时发送的消息继续按 FIFO 顺序排队；取消当前执行后，队列会自动恢复，不丢失、不重复、不乱序。
 - **对话栏 Skills 技能库**：输入框左下角直接搜索已安装技能，支持最近使用、来源与描述展示、方向键导航、Enter 插入和 Esc 关闭。
@@ -47,15 +58,15 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 - **更新与安装更可靠**：发现新版后后台下载，完成后再确认重启安装；退出时完整回收 DSH 子进程，减少安装程序误报文件占用。
 - **Harness 原生视觉统一**：标题栏、扩展坞和启动页使用一致的系统视觉，启动页换为具有游动、摆尾与呼吸节奏的粒子鲸鱼。
 
-#### 2.0 系统界面
+#### Harness 主界面
 
-![DeepSeek Harness Desktop 2.0 主界面与 Skills 技能库](docs/screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop 主界面与 Skills 技能库](docs/screenshots/13-hero-main.png)
 
-#### 2.0 桌面界面
+#### 2.3.0 桌面界面
 
 | 粒子鲸鱼启动界面 | 插件与技能扩展坞 |
 | --- | --- |
-| ![桌面启动界面](docs/screenshots/desktop-startup.png) | ![插件与技能扩展坞](docs/screenshots/desktop-extension-dock.png) |
+| ![DeepSeek Harness Desktop 2.3.0 粒子鲸鱼启动界面](docs/screenshots/desktop-2.3.0-startup.png) | ![DeepSeek Harness Desktop 2.3.0 插件与技能扩展坞](docs/screenshots/desktop-2.3.0-extension-dock.png) |
 
 - 内置 dsh-web-ui 0.1.15 套件，保留任务看板、Git 图谱、右侧面板、SSH、移动端远程、实时统计、宠物，并新增图像描述与量身 Agent；
 - 内置腾讯官方 QQ Bot，可在扩展坞扫码绑定 QQ 私聊与群聊，无需编辑 YAML 或打开后台终端；

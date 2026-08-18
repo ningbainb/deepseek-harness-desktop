@@ -65,9 +65,20 @@ export async function collectWebsiteErrors(html, expectedVersion) {
   if (structuredDataMatch) {
     try {
       const structuredData = JSON.parse(structuredDataMatch[1])
-      const types = (structuredData['@graph'] || []).map(item => item['@type'])
+      const graph = structuredData['@graph'] || []
+      const types = graph.map(item => item['@type'])
       for (const type of ['WebSite', 'SoftwareApplication', 'FAQPage']) {
         if (!types.includes(type)) errors.push(`structured data is missing ${type}`)
+      }
+      const software = graph.find(item => item['@type'] === 'SoftwareApplication')
+      if (expectedVersion && software?.softwareVersion !== expectedVersion) {
+        errors.push(`structured data softwareVersion must be ${expectedVersion}`)
+      }
+      const faq = graph.find(item => item['@type'] === 'FAQPage')
+      for (const entity of faq?.mainEntity || []) {
+        if (typeof entity?.name === 'string' && !html.includes(`<h3>${entity.name}</h3>`)) {
+          errors.push(`structured FAQ question is not visible: ${entity.name}`)
+        }
       }
     } catch {
       errors.push('structured data must contain valid JSON')
@@ -83,6 +94,20 @@ export async function collectWebsiteErrors(html, expectedVersion) {
       if (version !== expectedVersion) errors.push(`website contains stale installer version ${version}; expected ${expectedVersion}`)
     }
     if (!html.includes(`v${expectedVersion}`)) errors.push(`website fallback label must include v${expectedVersion}`)
+    const escapedVersion = expectedVersion.replaceAll('.', '\\.')
+    const presentationMarkers = [
+      ['page title', new RegExp(`<title>[^<]*${escapedVersion}[^<]*<\\/title>`, 'i')],
+      ['meta description', new RegExp(`<meta\\b[^>]*name=["']description["'][^>]*content=["'][^"']*${escapedVersion}`, 'i')],
+      ['page heading', new RegExp(`<h1\\b[^>]*>[\\s\\S]*?${escapedVersion}[\\s\\S]*?<\\/h1>`, 'i')],
+      ['versioned interface screenshot', new RegExp(`assets/desktop-${escapedVersion}-[^"']+\\.webp`, 'i')],
+    ]
+    for (const [label, pattern] of presentationMarkers) {
+      if (!pattern.test(html)) errors.push(`${label} must identify ${expectedVersion}`)
+    }
+  }
+
+  for (const image of html.matchAll(/<img\b[^>]*>/gi)) {
+    if (!/\balt=["'][^"']*["']/i.test(image[0])) errors.push(`image is missing alt text: ${image[0]}`)
   }
 
   const blankLinks = [...html.matchAll(/<a\b[^>]*\btarget=["']_blank["'][^>]*>/gi)]

@@ -1,6 +1,13 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 2.3 is a community-maintained, open-source Windows desktop distribution for DeepSeek Harness. It preserves the complete Harness Web Surface and adds measured mainland-China update mirrors, three-layer plugin recovery, safe mode, unified skin persistence, reliable Windows lifecycle management, plugins, 11 skins, and mobile remote access.
+> DeepSeek Harness Desktop 2.3.0 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface and bundles the official local DSH host, plugins, Skills, 11 skins, mobile remote access, SSH operations, QQ Bot connectivity, lifecycle recovery, and automatic updates in one Windows x64 installer.
+
+## What it is
+
+- A Windows 10/11 x64 desktop distribution for DeepSeek Harness
+- A complete Harness interface hosted in a hardened Electron window, not a reduced rewrite
+- A community edition, not an official DeepSeek release
+- Free under BSD-3-Clause, with no separate Node.js installation required
 
 ## Canonical website
 
@@ -9,7 +16,7 @@
 ## Download
 
 - Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.3.0-x64.exe
-- Latest release notes and checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest
+- v2.3.0 release notes and four release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v2.3.0
 
 ## Source and documentation
 
@@ -22,11 +29,31 @@
 
 - Supported systems: Windows 10 and Windows 11, x64
 - Current release: v2.3.0
-- v2.3.0 adds a one-time GitHub Star prompt with a community feedback action and consolidates legacy installer checks for reliable direct upgrades from 0.1.9
+- v2.3.0 adds a one-time GitHub Star prompt with a QQ community feedback action; its display state is persisted so it does not repeat after reloads or later launches
+- Installer preflight supports direct upgrades from 0.1.9 through 2.2 and attributes external PowerShell, CMD, and Node hosts only when their executable path or command line references a legacy install root
+- Preflight decodes PowerShell EncodedCommand payloads, preserves Windows 8.3 short-path references, falls back to WMI paths when process handles are unavailable, and waits with backoff after forced termination
+- The cleanup boundary preserves the official web runtime, same-name applications outside the install directory, and detached processes without an install-root reference
+- Desktop uses the isolated profiles/desktop profile and selects an available port when the preferred port is occupied, allowing it to coexist with the official web client
 - The bundled Skin Center includes 11 selectable skins
 - Node.js is bundled; end users do not need to install it separately
-- The project is a community edition and is not an official DeepSeek release
 - QQ user community: 1105158177
+
+## Core capabilities
+
+- Complete Harness conversations, tool calls, model selection, permissions, and plugin surfaces
+- ChatGPT OAuth, OpenAI Codex models, and model-aware reasoning effort
+- Extension Dock for plugins, community bundles, project Skills, DSH Skills, and Agents Skills
+- Task board, Git graph, file and change preview, live token statistics, pet, and 11 skins
+- Mobile pairing for workspaces, conversations, models, reasoning, and permissions
+- SSH terminal, SFTP, port forwarding, cluster execution, and live system monitoring
+- Stable GitHub Release checks, background downloads, bilingual release notes, checksums, and user-confirmed installation
+
+## Interface screenshots
+
+- v2.3.0 Star and community prompt: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-star-community-prompt.png
+- v2.3.0 Extension Dock: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-extension-dock.png
+- v2.3.0 particle-whale startup: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-startup.png
+- Harness Skills interface: https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png
 
 ## Preferred citation
 

@@ -3,10 +3,22 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc>
-    <lastmod>2026-08-16</lastmod>
+    <lastmod>2026-08-18</lastmod>
     <image:image>
       <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png</image:loc>
-      <image:title>DeepSeek Harness Desktop 2.0 Skills 技能库界面</image:title>
+      <image:title>DeepSeek Harness Desktop Skills 技能库界面</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-star-community-prompt.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 2.3.0 GitHub Star 与社群反馈引导</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-extension-dock.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 2.3.0 插件与技能扩展坞</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-startup.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 2.3.0 粒子鲸鱼启动界面</image:title>
     </image:image>
   </url>
 </urlset>

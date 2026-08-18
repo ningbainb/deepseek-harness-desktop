@@ -26,6 +26,22 @@ test('website exposes canonical SEO and structured data markers', async () => {
   assert.deepEqual(errors, [])
 })
 
+test('website validation rejects stale presentation versions', async () => {
+  const html = (await readFile(websitePath, 'utf8'))
+    .replace('<title>DeepSeek Harness Desktop 2.3.0', '<title>DeepSeek Harness Desktop 2.2.0')
+    .replace('<h1>DeepSeek Harness<br>Desktop 2.3.0</h1>', '<h1>DeepSeek Harness<br>Desktop 2.1</h1>')
+  const errors = await collectWebsiteErrors(html, '2.3.0')
+  assert.ok(errors.some(error => error.includes('page title')))
+  assert.ok(errors.some(error => error.includes('page heading')))
+})
+
+test('website structured FAQ questions remain visible', async () => {
+  const html = (await readFile(websitePath, 'utf8'))
+    .replace('<h3>桌面版能和官方 Web 端同时运行吗？</h3>', '<h3>已移除的问题</h3>')
+  const errors = await collectWebsiteErrors(html, '2.3.0')
+  assert.ok(errors.some(error => error.includes('structured FAQ question is not visible')))
+})
+
 test('website validation rejects missing GitHub Star guidance', async () => {
   const html = (await readFile(websitePath, 'utf8'))
     .replaceAll('data-star-cta', 'data-removed-star-cta')

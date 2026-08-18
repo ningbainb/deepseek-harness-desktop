@@ -4,6 +4,8 @@
 
 ![dsh-web-ui](docs/dsh-web-ui-banner.png)
 
+DeepSeek Harness Desktop is a community-maintained, open-source Windows AI coding client. One Windows x64 installer bundles the complete DeepSeek Harness Web Surface, the official local DSH host, plugins, Skills, themes, and automatic updates. It supports Windows 10/11, uses the BSD-3-Clause license, and requires no separate Node.js setup.
+
 ## Community QQ Group
 
 Group number: **1105158177** · **[Join the QQ group](https://qm.qq.com/q/vehlNjaeye)**
@@ -24,7 +26,7 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 
 | Version | Highlights |
 | --- | --- |
-| **2.3.0** | Adds a one-time GitHub Star prompt with a community feedback action, consolidates installer checks for direct 0.1.9 upgrades, fixes missing-directory false positives, and prevents same-name apps or external plugin descendants from blocking installation. |
+| **2.3.0** | Adds a one-time GitHub Star and community prompt; recognizes external PowerShell/CMD/Node hosts, EncodedCommand payloads, and Windows short paths during preflight; supports direct 0.1.9 upgrades; and coexists with the official web client through an isolated profile and port fallback. |
 | **2.2.0** | Hides Windows terminal descendants, cleans up attributed app/plugin background processes, migrates recognized dependencies and legacy safe-mode false positives, reuses the runtime port, and adds visible one-click safe-mode recovery. |
 | **2.1.0** | Adds measured mainland-China update mirrors, snapshot/isolation/safe-mode plugin recovery, unified skin persistence, reliable update-process cleanup, quiet background commands, Unicode-workspace restart protection, and a visible Tools menu entry for Extension Dock. |
 | **2.0.0** | Restores queued messages after cancellation, bounds incomplete-runtime failures, adds the Skills menu, model API recovery, sticky reasoning controls, and live SSH monitoring, and aligns Desktop-owned surfaces with the native Harness visual system. |
@@ -36,7 +38,16 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 2.0 Core Features
+### 2.3.0 Highlights
+
+- **Reliable in-place upgrades**: installer preflight attributes external PowerShell, CMD, and Node descendants by the legacy install-root reference, decodes `-EncodedCommand`, matches both Windows 8.3 short paths and canonical long paths, falls back to WMI when process handles are unavailable, and waits with backoff after forced termination.
+- **Strict cleanup boundaries**: an external process is attributed only when its command line explicitly references a legacy install root. The official web runtime, same-name applications outside the install directory, and detached processes without that path reference are preserved.
+- **Official web-client coexistence**: Desktop always uses the isolated `profiles/desktop` profile and automatically selects a system-assigned port when its preferred port is occupied, so both clients can run together.
+- **One-time community guidance**: on the first 2.3.0 launch, users can open GitHub to Star the project, join the QQ community to report an issue, or continue working. The main process records the display atomically so reloads and later launches do not repeat it.
+
+![DeepSeek Harness Desktop 2.3.0 GitHub Star and community feedback prompt](docs/screenshots/desktop-2.3.0-star-community-prompt.png)
+
+### Complete Desktop Capabilities
 
 - **Reliable queued-message continuation**: messages sent while an agent is working remain in FIFO order; cancelling the active turn re-arms the queue without loss, duplication, or reordering.
 - **Conversation Skills library**: search installed skills beside the input box, inspect their source and description, navigate with the keyboard, insert with Enter, and close with Esc.
@@ -47,15 +58,15 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 - **More reliable updates and installation**: new releases download in the background, installation waits for confirmation, and Desktop fully reaps the DSH child process before exit to reduce false file-in-use reports.
 - **Native Harness visual system**: the title bar, Extension Dock, and startup surface share one restrained system style, with a particle whale that swims, breathes, and moves its tail.
 
-#### 2.0 System Interface
+#### Harness Interface
 
-![DeepSeek Harness Desktop 2.0 main interface and Skills library](docs/screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop main interface and Skills library](docs/screenshots/13-hero-main.png)
 
-#### 2.0 Desktop Surfaces
+#### 2.3.0 Desktop Surfaces
 
 | Particle-whale startup | Plugin and skill Extension Dock |
 | --- | --- |
-| ![Desktop startup](docs/screenshots/desktop-startup.png) | ![Plugin and skill Extension Dock](docs/screenshots/desktop-extension-dock.png) |
+| ![DeepSeek Harness Desktop 2.3.0 particle-whale startup](docs/screenshots/desktop-2.3.0-startup.png) | ![DeepSeek Harness Desktop 2.3.0 plugin and skill Extension Dock](docs/screenshots/desktop-2.3.0-extension-dock.png) |
 
 - Bundles the dsh-web-ui 0.1.15 suite with the task board, Git graph, right panel, SSH, mobile remote, live stats, pet, plus Describe Image and the Liangshen agent;
 - Bundles Tencent's official QQ Bot, with in-dock QR binding for QQ direct messages and group chats — no YAML editing or background terminal required;
