@@ -151,6 +151,14 @@ form,
 }
 .recovery-item + .recovery-item { border-top: 1px solid var(--harness-border); }
 .recovery-safety { margin-bottom: 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--harness-success) 28%, transparent); border-radius: 14px; color: var(--harness-success); background: color-mix(in srgb, var(--harness-success) 8%, transparent); font-size: 11px; line-height: 1.6; }
+.recovery-preference { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 8px; padding: 14px 16px; border: 1px solid var(--harness-border-strong); border-radius: 16px; background: var(--harness-bg-elevated); cursor: pointer; }
+.recovery-preference > span { display: grid; gap: 4px; }
+.recovery-preference strong { font-size: 13px; font-weight: 560; }
+.recovery-preference small { color: var(--harness-text-secondary); font-size: 11px; line-height: 1.55; }
+.recovery-preference input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--harness-accent); }
+.recovery-preference input:focus-visible { outline: 2px solid var(--harness-accent); outline-offset: 3px; }
+.recovery-preference:has(input:disabled) { cursor: wait; opacity: .65; }
+.recovery-preference-note { margin: 0 14px 16px; color: var(--harness-text-secondary); font-size: 11px; line-height: 1.55; }
 .preset-trust-note { margin-bottom: 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--harness-warning) 35%, transparent); border-radius: 14px; color: var(--harness-warning); background: color-mix(in srgb, var(--harness-warning) 7%, transparent); font-size: 11px; line-height: 1.6; }
 .preset-plan,
 .preset-progress { margin-bottom: 16px; padding: 16px; border: 1px solid var(--harness-border-strong); border-radius: 16px; background: var(--harness-bg); }

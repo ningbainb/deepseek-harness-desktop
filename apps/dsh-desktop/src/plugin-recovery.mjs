@@ -530,6 +530,7 @@ export async function recoverProfileAfterPluginInspectionFailure({
   store,
   ensureProfile,
   error,
+  automaticSafeMode = true,
   log = async () => {},
 } = {}) {
   if (
@@ -567,10 +568,21 @@ export async function recoverProfileAfterPluginInspectionFailure({
   const incident = await store.recordIncident({
     identified: false,
     reasonCode: 'plugin-inspection-failed',
-    summary: `无法读取用户插件清单，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`,
+    summary: automaticSafeMode === false
+      ? '无法读取用户插件清单；自动安全模式已关闭，已保留插件配置'
+      : `无法读取用户插件清单，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`,
     technicalDetails,
     candidatePlugins,
   })
+  if (automaticSafeMode === false) {
+    await appendRecoveryLog(log, '[plugin-recovery] package inspection fallback skipped because automatic safe mode is disabled')
+    return Object.freeze({
+      recovered: false,
+      automaticSafeModeDisabled: true,
+      candidatePlugins: Object.freeze(candidatePlugins),
+      incident,
+    })
+  }
   let transaction
   try {
     transaction = await pluginManager.enterSafeMode()
@@ -613,6 +625,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     cancelSchedule = clearTimeout,
     log = async () => {},
     baselineQuarantine,
+    getAutomaticSafeMode = () => true,
   }) {
     super()
     if (!controller || !pluginManager || !store || typeof ensureProfile !== 'function') {
@@ -627,6 +640,10 @@ export class DesktopPluginRecovery extends EventEmitter {
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
     this.log = log
+    if (typeof getAutomaticSafeMode !== 'function') {
+      throw new TypeError('getAutomaticSafeMode must be a function')
+    }
+    this.getAutomaticSafeMode = getAutomaticSafeMode
     if (
       baselineQuarantine !== undefined
       && (
@@ -799,6 +816,14 @@ export class DesktopPluginRecovery extends EventEmitter {
     }
   }
 
+  #automaticSafeModeEnabled() {
+    try {
+      return this.getAutomaticSafeMode() !== false
+    } catch {
+      return true
+    }
+  }
+
   async #baselineQuarantineAvailable() {
     if (!this.baselineQuarantine) return false
     try {
@@ -909,6 +934,18 @@ export class DesktopPluginRecovery extends EventEmitter {
         await this.#log('[plugin-recovery] second startup failure is host-or-non-plugin; preserving remaining plugins')
         return false
       }
+      if (!this.#automaticSafeModeEnabled()) {
+        const candidatePlugins = await this.#profileRecoveryCandidates()
+        await this.store.recordIncident({
+          identified: false,
+          reasonCode: 'unattributed-plugin-startup',
+          summary: '隔离故障插件后启动仍然失败；自动安全模式已关闭，已保留其余插件配置',
+          technicalDetails,
+          candidatePlugins,
+        })
+        await this.#log('[plugin-recovery] second plugin startup failure; automatic safe mode is disabled; preserving remaining plugins')
+        return false
+      }
       await this.#log('[plugin-recovery] second startup failure; entering safe mode')
       return this.#enterSafeMode({ automatic: true })
     }
@@ -928,6 +965,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
     const automaticSafeModeEligible = !analysis.identified
       && shouldAutomaticallyEnterSafeMode(technicalDetails, { candidatePlugins })
+    const automaticSafeModeEnabled = this.#automaticSafeModeEnabled()
     const baselineQuarantineEligible = !analysis.identified
       && isPluginBootstrapFailure(technicalDetails)
       && await this.#hasUntrustedProfileActivation()
@@ -936,7 +974,7 @@ export class DesktopPluginRecovery extends EventEmitter {
       : Object.freeze({
         ...analysis,
         candidatePlugins,
-        ...(automaticSafeModeEligible
+        ...(automaticSafeModeEligible && automaticSafeModeEnabled
           ? {
               reasonCode: 'unattributed-plugin-startup',
               summary: `未能定位单个插件，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`,
@@ -946,7 +984,12 @@ export class DesktopPluginRecovery extends EventEmitter {
                 reasonCode: 'untrusted-profile-loader',
                 summary: '检测到无法识别的用户加载配置，已暂时切换到桌面基线以恢复启动',
               }
-          : {}),
+            : automaticSafeModeEligible
+              ? {
+                  reasonCode: 'unattributed-plugin-startup',
+                  summary: '未能定位单个插件；自动安全模式已关闭，已保留插件配置',
+                }
+              : {}),
       })
     const incident = await this.store.recordIncident(enrichedAnalysis)
     if (!enrichedAnalysis.identified) {
@@ -956,15 +999,18 @@ export class DesktopPluginRecovery extends EventEmitter {
         )
         return false
       }
-      this.recoveryStage = 2
-      if (automaticSafeModeEligible) {
+      if (automaticSafeModeEligible && automaticSafeModeEnabled) {
+        this.recoveryStage = 2
         await this.#log(
           `[plugin-recovery] culprit was not individually identifiable; entering reversible safe mode for ${candidatePlugins.length} user plugin candidate(s)`,
         )
         const safeModeResult = await this.#enterSafeMode({ automatic: true, incident, requireChanges: true })
         if (safeModeResult !== false) return safeModeResult
+      } else if (automaticSafeModeEligible) {
+        await this.#log('[plugin-recovery] culprit was not individually identifiable; automatic safe mode is disabled; preserving community plugins')
       }
       if (!baselineQuarantineEligible) return false
+      this.recoveryStage = 2
       await this.#log('[plugin-recovery] no trusted mutable plugin candidate remains; trying a reversible Desktop baseline')
       return this.#quarantineUntrustedProfile({ incident })
     }
@@ -989,6 +1035,10 @@ export class DesktopPluginRecovery extends EventEmitter {
   }
 
   async #enterSafeMode({ automatic = false, incident, requireChanges = false } = {}) {
+    if (automatic && !this.#automaticSafeModeEnabled()) {
+      await this.#log('[plugin-recovery] automatic safe mode is disabled; preserving community plugins')
+      return false
+    }
     this.recoveryStage = 2
     await this.controller.stop()
     const transaction = await this.pluginManager.enterSafeMode()
@@ -1014,6 +1064,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     const state = await this.store.getState()
     return Object.freeze({
       ...state,
+      automaticSafeMode: this.#automaticSafeModeEnabled(),
       baselineQuarantineAvailable: await this.#baselineQuarantineAvailable(),
       busy: this.busy,
       recoveryStage: this.recoveryStage,

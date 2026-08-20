@@ -5,12 +5,15 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import {
+  assertAutomaticSafeMode,
   assertCloseBehavior,
   CLOSE_BEHAVIORS,
   createCloseBehaviorController,
   DEFAULT_CLOSE_BEHAVIOR,
+  DEFAULT_AUTOMATIC_SAFE_MODE,
   DesktopClosePreferencesStore,
   isBackgroundAutomationEnabled,
+  normalizeAutomaticSafeMode,
   normalizeCloseBehavior,
   normalizeDesktopClosePreferences,
 } from '../src/close-behavior.mjs'
@@ -30,8 +33,14 @@ test('close behavior preserves the historical quit default for missing and malfo
   for (const value of [undefined, null, '', 'minimize', {}, 1]) {
     assert.equal(normalizeCloseBehavior(value), CLOSE_BEHAVIORS.QUIT)
   }
-  assert.deepEqual(normalizeDesktopClosePreferences(), { closeBehavior: 'quit' })
-  assert.deepEqual(normalizeDesktopClosePreferences({ closeBehavior: 'ask' }), { closeBehavior: 'ask' })
+  assert.equal(DEFAULT_AUTOMATIC_SAFE_MODE, true)
+  assert.deepEqual(normalizeDesktopClosePreferences(), { closeBehavior: 'quit', automaticSafeMode: true })
+  assert.deepEqual(normalizeDesktopClosePreferences({ closeBehavior: 'ask' }), { closeBehavior: 'ask', automaticSafeMode: true })
+  assert.deepEqual(normalizeDesktopClosePreferences({ automaticSafeMode: false }), { closeBehavior: 'quit', automaticSafeMode: false })
+  for (const value of [undefined, null, '', 0, {}, []]) assert.equal(normalizeAutomaticSafeMode(value), true)
+  assert.equal(normalizeAutomaticSafeMode(false), false)
+  assert.equal(assertAutomaticSafeMode(true), true)
+  assert.throws(() => assertAutomaticSafeMode('false'), /invalid automatic safe mode preference/u)
   assert.equal(assertCloseBehavior('minimize-to-tray'), 'minimize-to-tray')
   assert.equal(isBackgroundAutomationEnabled('minimize-to-tray'), true)
   assert.equal(isBackgroundAutomationEnabled('ask'), false)
@@ -39,17 +48,27 @@ test('close behavior preserves the historical quit default for missing and malfo
   assert.throws(() => assertCloseBehavior('background-forever'), /invalid close behavior/u)
 })
 
-test('close preference store survives missing/corrupt legacy files and persists only an explicit opt-in', async () => {
+test('desktop preference store survives missing/corrupt legacy files and persists scoped settings', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-close-behavior-'))
   const path = join(directory, 'desktop-preferences.json')
   const store = new DesktopClosePreferencesStore(path)
   try {
-    assert.deepEqual(await store.load(), { closeBehavior: 'quit' })
+    assert.deepEqual(await store.load(), { closeBehavior: 'quit', automaticSafeMode: true })
     await writeFile(path, JSON.stringify({ closeBehavior: 'legacy-minimize' }), 'utf8')
-    assert.deepEqual(await store.load(), { closeBehavior: 'quit' })
+    assert.deepEqual(await store.load(), { closeBehavior: 'quit', automaticSafeMode: true })
+    await writeFile(path, JSON.stringify({ closeBehavior: 'ask', automaticSafeMode: 'no' }), 'utf8')
+    assert.deepEqual(await store.load(), { closeBehavior: 'ask', automaticSafeMode: true })
+    assert.equal(await store.saveAutomaticSafeMode(false), false)
+    assert.deepEqual(await new DesktopClosePreferencesStore(path).load(), {
+      closeBehavior: 'ask',
+      automaticSafeMode: false,
+    })
     assert.equal(await store.saveCloseBehavior('minimize-to-tray'), 'minimize-to-tray')
-    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), { closeBehavior: 'minimize-to-tray' })
-    assert.deepEqual(await store.load(), { closeBehavior: 'minimize-to-tray' })
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
+      closeBehavior: 'minimize-to-tray',
+      automaticSafeMode: false,
+    })
+    assert.deepEqual(await store.load(), { closeBehavior: 'minimize-to-tray', automaticSafeMode: false })
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

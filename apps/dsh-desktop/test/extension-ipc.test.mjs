@@ -522,18 +522,30 @@ test('extension IPC exposes one-click safe-mode recovery through the serialized 
     dshHome: 'C:\\dsh',
     qqBotBinding,
     pluginRecovery: {
+      getState: async () => ({ automaticSafeMode: true }),
       restoreDisabledAndRestart: async () => {
         calls.push('restore')
         return { restored: ['@community/example'] }
       },
     },
+    setAutomaticSafeMode: async (value) => {
+      calls.push(['automatic-safe-mode', value])
+      return value
+    },
   })
 
+  assert.deepEqual(await ipcMain.handlers.get('extensions:recovery-state')(), { automaticSafeMode: true })
+  assert.equal(await ipcMain.handlers.get('extensions:recovery-automatic-safe-mode-set')(undefined, false), false)
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:recovery-automatic-safe-mode-set')(undefined, 'false'),
+    /invalid automatic safe mode preference/u,
+  )
   assert.deepEqual(await ipcMain.handlers.get('extensions:recovery-restore-all')(), {
     restored: ['@community/example'],
   })
-  assert.deepEqual(calls, ['restore'])
+  assert.deepEqual(calls, [['automatic-safe-mode', false], 'restore'])
   unregister()
+  assert.equal(ipcMain.handlers.has('extensions:recovery-automatic-safe-mode-set'), false)
   assert.equal(ipcMain.handlers.has('extensions:recovery-restore-all'), false)
 })
 

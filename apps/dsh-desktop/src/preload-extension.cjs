@@ -30,6 +30,7 @@ const api = Object.freeze({
   removePlugin: (name) => ipcRenderer.invoke('extensions:plugin-remove', name),
   setPluginEnabled: (name, enabled) => ipcRenderer.invoke('extensions:plugin-enable', { name, enabled }),
   getPluginRecoveryState: () => ipcRenderer.invoke('extensions:recovery-state'),
+  setAutomaticSafeMode: (enabled) => ipcRenderer.invoke('extensions:recovery-automatic-safe-mode-set', enabled),
   restoreDisabledPlugins: () => ipcRenderer.invoke('extensions:recovery-restore-all'),
   restorePluginSnapshot: (id) => ipcRenderer.invoke('extensions:recovery-restore', id),
   exportPluginDiagnostics: () => ipcRenderer.invoke('extensions:diagnostics-export'),

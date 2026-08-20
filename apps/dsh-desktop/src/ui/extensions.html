@@ -99,6 +99,14 @@
         <div class="recovery-safety">
           这些操作只改变桌面版插件配置。聊天记录、模型设置、账号信息和个人设置不会受影响。
         </div>
+        <label class="recovery-preference" for="automatic-safe-mode">
+          <span>
+            <strong>自动安全模式</strong>
+            <small>启动失败且无法定位故障插件时，自动暂时停用社区插件以尝试恢复运行。</small>
+          </span>
+          <input type="checkbox" id="automatic-safe-mode" checked aria-describedby="automatic-safe-mode-note">
+        </label>
+        <p class="recovery-preference-note" id="automatic-safe-mode-note" hidden>关闭后，无法定位插件的启动故障不会自动停用全部社区插件；你仍可在恢复中心手动进入安全模式。</p>
         <article class="recovery-mode" id="recovery-mode">
           <div>
             <span class="meta">当前启动模式</span>

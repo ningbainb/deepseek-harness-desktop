@@ -94,6 +94,10 @@ test('unknown plugin startup recovery excludes port and Windows launcher failure
     { candidatePlugins },
   ), false)
   assert.equal(shouldAutomaticallyEnterSafeMode(
+    'spawn git.exe ENOENT while starting runtime tools',
+    { candidatePlugins },
+  ), false)
+  assert.equal(shouldAutomaticallyEnterSafeMode(
     'DSH runtime did not become ready within 120000ms',
     { candidatePlugins: [] },
   ), false)
@@ -238,6 +242,7 @@ test('opaque user loader startup failure reaches readiness through a reversible 
       ensureProfile: async () => { ensured += 1 },
       builtInBundles: BUILTIN_BUNDLES,
       baselineQuarantine,
+      getAutomaticSafeMode: () => false,
       schedule: () => ({ unref() {} }),
       cancelSchedule: () => {},
     })
@@ -560,6 +565,47 @@ test('package inspection recovery quarantines user dependencies without reading 
   }
 })
 
+test('disabled automatic safe mode records package inspection failure without mutating the profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-inspection-opt-out-'))
+  const profileDir = join(root, 'profile')
+  const stateDir = join(root, 'recovery')
+  const packageName = '@community/broken-manifest'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    const manifest = `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [packageName]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, packageName] } },
+    }, null, 2)}\n`
+    await writeFile(join(profileDir, 'package.json'), manifest)
+    const store = new PluginRecoveryStore({ profileDir, stateDir, builtInBundles: BUILTIN_BUNDLES })
+    let safeModeCalls = 0
+    const result = await recoverProfileAfterPluginInspectionFailure({
+      pluginManager: {
+        recoveryCandidates: async () => [packageName],
+        enterSafeMode: async () => { safeModeCalls += 1 },
+      },
+      store,
+      ensureProfile: async () => {},
+      automaticSafeMode: false,
+      error: Object.assign(new Error('invalid package manifest while checking compatibility'), {
+        code: PLUGIN_PACKAGE_MANIFEST_READ_ERROR,
+      }),
+    })
+    const state = await store.getState()
+    assert.equal(result.recovered, false)
+    assert.equal(result.automaticSafeModeDisabled, true)
+    assert.equal(safeModeCalls, 0)
+    assert.equal(state.safeMode, false)
+    assert.equal(state.currentIncident.reasonCode, 'plugin-inspection-failed')
+    assert.match(state.currentIncident.summary, /已保留插件配置/u)
+    assert.equal(await readFile(join(profileDir, 'package.json'), 'utf8'), manifest)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('generic compatibility provider failures preserve every user plugin', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-provider-'))
   const profileDir = join(root, 'profile')
@@ -682,6 +728,64 @@ test('unattributed timeout uses lightweight profile candidates when normal inven
     assert.equal(state.currentIncident.reasonCode, 'unattributed-plugin-startup')
     assert.deepEqual(state.currentIncident.candidatePlugins, [packageName])
     assert.deepEqual(state.disabledPlugins, [packageName])
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('disabled automatic safe mode preserves an unattributed community profile and records the incident', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-unattributed-opt-out-'))
+  const profileDir = join(root, 'profile')
+  const packageName = '@community/opaque'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    const manifest = `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      dependencies: { [packageName]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, packageName] } },
+    }, null, 2)}\n`
+    await writeFile(join(profileDir, 'package.json'), manifest)
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    let stops = 0
+    let starts = 0
+    controller.stop = async () => { stops += 1 }
+    controller.start = async () => { starts += 1 }
+    let safeModeCalls = 0
+    const store = new PluginRecoveryStore({ profileDir, stateDir: join(root, 'recovery'), builtInBundles: BUILTIN_BUNDLES })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: {
+        inventory: async () => [{ name: packageName, builtIn: false }],
+        recoveryCandidates: async () => [packageName],
+        enterSafeMode: async () => { safeModeCalls += 1 },
+      },
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      getAutomaticSafeMode: () => false,
+    })
+    await recovery.initialize()
+    controller.status = { state: 'crashed', error: 'DSH runtime did not become ready within 120000ms' }
+    controller.emit('status', controller.status)
+
+    let state
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      state = await recovery.getState()
+      if (state.currentIncident) break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    assert.equal(state.automaticSafeMode, false)
+    assert.equal(state.safeMode, false)
+    assert.equal(state.currentIncident.reasonCode, 'unattributed-plugin-startup')
+    assert.match(state.currentIncident.summary, /已保留插件配置/u)
+    assert.deepEqual(state.currentIncident.candidatePlugins, [packageName])
+    assert.deepEqual(state.disabledPlugins, [])
+    assert.equal(safeModeCalls, 0)
+    assert.equal(stops, 0)
+    assert.equal(starts, 0)
+    assert.equal(await readFile(join(profileDir, 'package.json'), 'utf8'), manifest)
     await recovery.dispose()
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -1043,6 +1147,131 @@ test('a host failure after one isolated plugin does not disable the remaining pl
     assert.deepEqual(disabled, [firstPlugin])
     assert.equal(safeModeCalls, 0)
     assert.equal((await recovery.getState()).safeMode, false)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('disabled automatic safe mode keeps targeted isolation but skips the later global fallback', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-targeted-opt-out-'))
+  const profileDir = join(root, 'profile')
+  const firstPlugin = '@community/first'
+  const secondPlugin = '@community/second'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dependencies: {} }))
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    controller.stop = async () => {
+      controller.status = { state: 'stopped' }
+      controller.emit('status', controller.status)
+    }
+    let starts = 0
+    controller.start = async () => {
+      starts += 1
+      controller.status = { state: 'starting' }
+      controller.emit('status', controller.status)
+      controller.status = { state: 'crashed', error: 'failed to load plugin bootstrap after targeted isolation' }
+      controller.emit('status', controller.status)
+      throw new Error(controller.status.error)
+    }
+    const disabled = []
+    let safeModeCalls = 0
+    const store = new PluginRecoveryStore({ profileDir, stateDir: join(root, 'recovery'), builtInBundles: BUILTIN_BUNDLES })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: {
+        inventory: async () => [
+          { name: firstPlugin, builtIn: false },
+          { name: secondPlugin, builtIn: false },
+        ],
+        recoveryCandidates: async () => [firstPlugin, secondPlugin],
+        setEnabled: async (name, enabled) => {
+          assert.equal(name, firstPlugin)
+          assert.equal(enabled, false)
+          return {
+            result: { dependencySpec: '1.0.0' },
+            commit: () => disabled.push(name),
+            rollback: async () => {},
+          }
+        },
+        enterSafeMode: async () => { safeModeCalls += 1 },
+      },
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      getAutomaticSafeMode: () => false,
+    })
+    await recovery.initialize()
+    controller.emit('line', { stream: 'stderr', line: `failed to load plugin '${firstPlugin}'` })
+    controller.status = { state: 'crashed', error: `failed to load plugin '${firstPlugin}'` }
+    controller.emit('status', controller.status)
+
+    let state
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      state = await recovery.getState()
+      if (state.currentIncident?.identified === false) break
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    assert.deepEqual(disabled, [firstPlugin])
+    assert.equal(starts, 1)
+    assert.equal(safeModeCalls, 0)
+    assert.equal(state.safeMode, false)
+    assert.equal(state.currentIncident.reasonCode, 'unattributed-plugin-startup')
+    assert.match(state.currentIncident.summary, /已保留其余插件配置/u)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('disabled automatic safe mode does not block a manual safe-mode restart', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-manual-safe-mode-'))
+  const profileDir = join(root, 'profile')
+  const packageName = '@community/manual'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dependencies: {} }))
+    const controller = new EventEmitter()
+    controller.status = { state: 'ready' }
+    let stops = 0
+    let starts = 0
+    controller.stop = async () => { stops += 1 }
+    controller.start = async () => { starts += 1 }
+    let safeModeCalls = 0
+    const store = new PluginRecoveryStore({ profileDir, stateDir: join(root, 'recovery'), builtInBundles: BUILTIN_BUNDLES })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: {
+        inventory: async () => [{ name: packageName, builtIn: false }],
+        enterSafeMode: async () => {
+          safeModeCalls += 1
+          return {
+            result: {
+              changed: true,
+              disabled: [packageName],
+              disabledDependencies: { [packageName]: '1.0.0' },
+            },
+            commit: () => {},
+            rollback: async () => {},
+          }
+        },
+      },
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      getAutomaticSafeMode: () => false,
+    })
+    await recovery.initialize()
+    const result = await recovery.enterSafeModeAndRestart()
+    const state = await recovery.getState()
+    assert.deepEqual(result.disabled, [packageName])
+    assert.equal(safeModeCalls, 1)
+    assert.equal(stops, 1)
+    assert.equal(starts, 1)
+    assert.equal(state.safeMode, true)
+    assert.equal(state.automaticSafeMode, false)
     await recovery.dispose()
   } finally {
     await rm(root, { recursive: true, force: true })
