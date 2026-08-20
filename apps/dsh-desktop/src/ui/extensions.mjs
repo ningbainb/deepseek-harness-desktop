@@ -26,6 +26,8 @@ const recoveryCount = document.querySelector('#recovery-count')
 const recoveryMode = document.querySelector('#recovery-mode')
 const recoveryModeLabel = document.querySelector('#recovery-mode-label')
 const restoreSafeMode = document.querySelector('#restore-safe-mode')
+const automaticSafeMode = document.querySelector('#automatic-safe-mode')
+const automaticSafeModeNote = document.querySelector('#automatic-safe-mode-note')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
 const activationBanner = document.querySelector('#activation-banner')
@@ -296,6 +298,9 @@ function snapshotMarkup(snapshot) {
 async function refreshRecovery() {
   const state = await window.dshDesktop.getPluginRecoveryState()
   recoveryCount.textContent = state.incidents.length
+  automaticSafeMode.checked = state.automaticSafeMode !== false
+  automaticSafeMode.disabled = state.busy === true
+  automaticSafeModeNote.hidden = automaticSafeMode.checked
   recoveryMode.dataset.safe = String(state.safeMode)
   const baselineQuarantineAvailable = state.baselineQuarantineAvailable === true
   recoveryModeLabel.textContent = !state.safeMode
@@ -597,6 +602,22 @@ restoreSafeMode.addEventListener('click', async () => {
       await refresh()
     }
   })
+})
+
+automaticSafeMode.addEventListener('change', async () => {
+  const enabled = automaticSafeMode.checked
+  automaticSafeMode.disabled = true
+  automaticSafeModeNote.hidden = enabled
+  try {
+    await window.dshDesktop.setAutomaticSafeMode(enabled)
+    notify(enabled ? '已开启自动安全模式' : '已关闭自动安全模式')
+    await refreshRecovery()
+  } catch (error) {
+    automaticSafeMode.checked = !enabled
+    automaticSafeModeNote.hidden = automaticSafeMode.checked
+    automaticSafeMode.disabled = false
+    notify(error.message, true)
+  }
 })
 
 document.querySelector('#export-diagnostics').addEventListener('click', () => {

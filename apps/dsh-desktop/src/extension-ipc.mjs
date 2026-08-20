@@ -14,6 +14,7 @@ const CHANNELS = [
   'extensions:plugin-remove',
   'extensions:plugin-enable',
   'extensions:recovery-state',
+  'extensions:recovery-automatic-safe-mode-set',
   'extensions:recovery-restore-all',
   'extensions:recovery-restore',
   'extensions:diagnostics-export',
@@ -47,6 +48,7 @@ export function registerExtensionIpc({
   agentsHome,
   qqBotBinding,
   pluginRecovery,
+  setAutomaticSafeMode = async () => { throw new Error('automatic safe mode preference is unavailable') },
   presetService,
   migrationService,
   notificationService,
@@ -383,6 +385,10 @@ export function registerExtensionIpc({
     ))
   })
   handleExtension('extensions:recovery-state', () => pluginRecovery.getState())
+  handleExtension('extensions:recovery-automatic-safe-mode-set', (_event, value) => {
+    if (typeof value !== 'boolean') throw new TypeError('invalid automatic safe mode preference')
+    return setAutomaticSafeMode(value)
+  })
   handleExtension('extensions:recovery-restore-all', () => {
     return enqueuePluginMutation(() => pluginRecovery.restoreDisabledAndRestart())
   })

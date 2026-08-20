@@ -24,6 +24,7 @@ test('extension preload exposes extension operations without product update acti
   assert.match(source, /desktop:contract/u)
   assert.doesNotMatch(source, /require\(['"]\.\/preload-common\.cjs['"]\)/u)
   assert.match(source, /extensions:plugin-install/u)
+  assert.match(source, /extensions:recovery-automatic-safe-mode-set/u)
   assert.match(source, /extensions:skill-import/u)
   assert.match(source, /extensions:qqbot-bind/u)
   assert.doesNotMatch(source, /desktop:update-install/u)

@@ -451,8 +451,10 @@ export async function startElectronApp(metadata) {
   const logsDirectory = join(userData, 'logs')
   const logStore = new BoundedLogStore({ directory: logsDirectory })
   const starPromptStore = new StarPromptStore({ path: join(userData, 'star-prompt-state.json') })
-  const closePreferencesStore = new DesktopClosePreferencesStore(join(userData, 'desktop-preferences.json'))
-  let closeBehavior = (await closePreferencesStore.load()).closeBehavior
+  const desktopPreferencesStore = new DesktopClosePreferencesStore(join(userData, 'desktop-preferences.json'))
+  const desktopPreferences = await desktopPreferencesStore.load()
+  let closeBehavior = desktopPreferences.closeBehavior
+  let automaticSafeMode = desktopPreferences.automaticSafeMode
   let trayLifecycle
   let closeBehaviorController
   let runtimeProvider
@@ -467,7 +469,7 @@ export async function startElectronApp(metadata) {
   }
   const setCloseBehavior = async (value) => {
     const hadBackgroundAutomation = isBackgroundAutomationEnabled(closeBehavior)
-    closeBehavior = await closePreferencesStore.saveCloseBehavior(value)
+    closeBehavior = await desktopPreferencesStore.saveCloseBehavior(value)
     synchronizeBackgroundMode()
     refreshApplicationMenu()
     if (hadBackgroundAutomation !== isBackgroundAutomationEnabled(closeBehavior) && runtimeProvider?.status?.state === 'ready') {
@@ -478,6 +480,10 @@ export async function startElectronApp(metadata) {
       }
     }
     return closeBehavior
+  }
+  const setAutomaticSafeMode = async (value) => {
+    automaticSafeMode = await desktopPreferencesStore.saveAutomaticSafeMode(value)
+    return automaticSafeMode
   }
   await logStore.append(`[startup] application-ready=${Math.round(applicationReadyAt - applicationStartedAt)}ms`)
   const launchSafeModeRequested = await launchRequestsSafeMode()
@@ -608,10 +614,16 @@ export async function startElectronApp(metadata) {
       store: pluginRecoveryStore,
       ensureProfile,
       error,
+      automaticSafeMode,
       log: (line) => logStore.append(line),
     })
-    if (!recovered.recovered) throw error
-    compatibilityReconciliation = await pluginManager.reconcileCompatibility()
+    if (recovered.recovered) {
+      compatibilityReconciliation = await pluginManager.reconcileCompatibility()
+    } else if (recovered.automaticSafeModeDisabled) {
+      compatibilityReconciliation = { disabled: [] }
+    } else {
+      throw error
+    }
   }
   try {
     await pluginManager.writeCompatibilityLock()
@@ -681,6 +693,7 @@ export async function startElectronApp(metadata) {
     builtInBundles: BUILTIN_BUNDLES,
     log: (line) => logStore.append(line),
     baselineQuarantine,
+    getAutomaticSafeMode: () => automaticSafeMode,
   })
   const initialRecoveryState = await pluginRecovery.initialize()
   pluginSafeModeActive = initialRecoveryState.safeMode === true
@@ -1038,6 +1051,7 @@ export async function startElectronApp(metadata) {
     agentsHome: process.env.DSH_AGENTS_HOME,
     qqBotBinding,
     pluginRecovery,
+    setAutomaticSafeMode,
     presetService,
     migrationService,
     notificationService,

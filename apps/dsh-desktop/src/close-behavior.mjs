@@ -8,6 +8,7 @@ export const CLOSE_BEHAVIORS = Object.freeze({
 })
 
 export const DEFAULT_CLOSE_BEHAVIOR = CLOSE_BEHAVIORS.QUIT
+export const DEFAULT_AUTOMATIC_SAFE_MODE = true
 
 const CLOSE_BEHAVIOR_VALUES = new Set(Object.values(CLOSE_BEHAVIORS))
 
@@ -39,9 +40,21 @@ export function assertCloseBehavior(value) {
   return value
 }
 
+export function normalizeAutomaticSafeMode(value) {
+  return typeof value === 'boolean' ? value : DEFAULT_AUTOMATIC_SAFE_MODE
+}
+
+export function assertAutomaticSafeMode(value) {
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`invalid automatic safe mode preference: ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
 export function normalizeDesktopClosePreferences(input) {
   return Object.freeze({
     closeBehavior: normalizeCloseBehavior(input?.closeBehavior),
+    automaticSafeMode: normalizeAutomaticSafeMode(input?.automaticSafeMode),
   })
 }
 
@@ -72,9 +85,9 @@ async function atomicWrite(path, content) {
 }
 
 /**
- * Small, Desktop-owned preference store. It intentionally owns only the
- * close behavior so renderer and plugin preferences cannot affect process
- * lifecycle without a scoped IPC call.
+ * Small, Desktop-owned preference store. Each process-lifecycle preference
+ * has a dedicated validator and save method so renderers cannot write
+ * arbitrary keys or files.
  */
 export class DesktopClosePreferencesStore {
   constructor(path) {
@@ -91,14 +104,27 @@ export class DesktopClosePreferencesStore {
     }
   }
 
+  #save(patch) {
+    const operation = this.writeQueue.then(async () => {
+      const preferences = normalizeDesktopClosePreferences({
+        ...await this.load(),
+        ...patch,
+      })
+      await atomicWrite(this.path, `${JSON.stringify(preferences, null, 2)}\n`)
+      return preferences
+    })
+    this.writeQueue = operation.catch(() => {})
+    return operation
+  }
+
   saveCloseBehavior(value) {
     const closeBehavior = assertCloseBehavior(value)
-    const operation = this.writeQueue.then(() => atomicWrite(
-      this.path,
-      `${JSON.stringify({ closeBehavior }, null, 2)}\n`,
-    ))
-    this.writeQueue = operation.catch(() => {})
-    return operation.then(() => closeBehavior)
+    return this.#save({ closeBehavior }).then(() => closeBehavior)
+  }
+
+  saveAutomaticSafeMode(value) {
+    const automaticSafeMode = assertAutomaticSafeMode(value)
+    return this.#save({ automaticSafeMode }).then(() => automaticSafeMode)
   }
 }
 
