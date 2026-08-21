@@ -10,15 +10,19 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "2.7.0",
-    "rootVersion": "2.7.0",
+    "version": "3.0.0",
+    "rootVersion": "3.0.0",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
   "runtime": {
     "packageName": "@deepseek-ai/dsh",
-    "version": "0.1.0-rc.7",
-    "integrity": "sha512-ZceDCJ8FAywih+USW/OMk9jEhunlvJBGEz4kqrhau23hPzbciOazZrywH0nBRsaalSeAJ1JGBmjtw4OSjToStw==",
+    "version": "0.1.1-rc.1",
+    "integrity": "sha512-HVauMT0F7MWUctkxzBcu5PMFc8j0lm0kX+4IbcUsA7Oh+/xv7xhigEDP0SaSOM/kR48U/BldHbZru116DcZz0w==",
+    "files": {
+      "package.json": "43bf5ec5af6b63539a72da01d35c5232d23c3f023336839374c8467d542cd916",
+      "lib/bin.js": "c0226687bb20f45c603ec6fe50f3de16d1c3510c3a803304ec575ef9bc366c62"
+    },
     "bin": {
       "dsh": "lib/bin.js"
     },
@@ -26,12 +30,13 @@
     "peerDependencies": {}
   },
   "lockfile": {
-    "sha256": "8d190e3ef5a5ca394b23673acda0c66b7de06432cd1dfc6c324cf0392a1745a9"
+    "path": "pnpm-lock.yaml",
+    "sha256": "4cc9d609514f88ae5ac585be1a0e2da57b7add629122a1ffa8afd403211fa751"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
     "supportStatus": "known-good",
-    "upstreamVersion": "0.1.0-rc.7",
+    "upstreamVersion": "0.1.1-rc.1",
     "capabilities": [
       {
         "id": "runtime.lifecycle",
@@ -61,12 +66,12 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "56459061af4b45f848cda3faf13916f5301ad158272022169a18413a7981efc9",
+    "sha256": "de3d81e33a478eb6e8444b9c23a96f7a1c617db9c347f8223c9f2d7046fe9a36",
     "ids": [
-      "queued-turn-continuation",
       "cancellation-presentation",
-      "tool-call-arguments-envelope",
-      "desktop-skin-profile-isolation"
+      "desktop-skin-profile-isolation",
+      "queued-turn-continuation",
+      "tool-call-arguments-envelope"
     ]
   },
   "clientSlots": {

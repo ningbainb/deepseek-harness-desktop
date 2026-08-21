@@ -200,16 +200,20 @@ export function inspectPresetZip(raw, limits = PRESET_LIMITS) {
 }
 
 function validateManifest(value) {
-  assertExactKeys(value, new Set([
-    'formatVersion', 'name', 'description', 'createdAt', 'source', 'requiredCapabilities', 'requiredSecrets',
-  ]), 'dsh-preset.json')
-  if (value.formatVersion !== PRESET_FORMAT_VERSION) throw new TypeError('unsupported preset formatVersion')
+  if (!isPlainObject(value)) throw new TypeError('dsh-preset.json must be an object')
+  if (!Number.isInteger(value.formatVersion) || value.formatVersion < 1) throw new TypeError('preset formatVersion is invalid')
+  if (value.formatVersion !== PRESET_FORMAT_VERSION) {
+    const direction = value.formatVersion > PRESET_FORMAT_VERSION
+      ? 'Upgrade DeepSeek Harness Desktop to import this preset.'
+      : 'Use the Desktop migration assistant before importing this preset.'
+    throw new TypeError(`preset format major ${value.formatVersion} is unsupported. ${direction}`)
+  }
   if (typeof value.name !== 'string' || value.name.length === 0 || value.name.length > 100) throw new TypeError('preset name is invalid')
   if (value.description !== undefined && (typeof value.description !== 'string' || value.description.length > 500)) {
     throw new TypeError('preset description is invalid')
   }
   if (typeof value.createdAt !== 'string' || Number.isNaN(Date.parse(value.createdAt))) throw new TypeError('preset createdAt is invalid')
-  assertExactKeys(value.source, new Set(['desktopVersion', 'runtimeVersion']), 'preset source')
+  if (!isPlainObject(value.source)) throw new TypeError('preset source must be an object')
   if (semver.valid(value.source.desktopVersion) === null || semver.valid(value.source.runtimeVersion) === null) {
     throw new TypeError('preset source versions must be exact semantic versions')
   }
@@ -221,9 +225,24 @@ function validateManifest(value) {
   }
   if (new Set(value.requiredSecrets).size !== value.requiredSecrets.length) throw new TypeError('preset requiredSecrets contain duplicates')
   if (new Set(value.requiredCapabilities).size !== value.requiredCapabilities.length) throw new TypeError('preset requiredCapabilities contain duplicates')
-  const { requiredSecrets: _requiredSecrets, ...safeManifest } = value
+  // v1 intentionally ignores unknown optional fields. This keeps a newer
+  // writer's additive metadata from breaking a compatible v1 import while
+  // ensuring those fields never enter the trusted import plan.
+  const normalized = {
+    formatVersion: value.formatVersion,
+    name: value.name,
+    ...(value.description === undefined ? {} : { description: value.description }),
+    createdAt: value.createdAt,
+    source: {
+      desktopVersion: value.source.desktopVersion,
+      runtimeVersion: value.source.runtimeVersion,
+    },
+    requiredCapabilities: [...value.requiredCapabilities],
+    requiredSecrets: [...value.requiredSecrets],
+  }
+  const { requiredSecrets: _requiredSecrets, ...safeManifest } = normalized
   assertNoSecretsOrUnsafeValues(safeManifest, 'preset manifest')
-  return value
+  return Object.freeze(normalized)
 }
 
 function validatePackages(value) {

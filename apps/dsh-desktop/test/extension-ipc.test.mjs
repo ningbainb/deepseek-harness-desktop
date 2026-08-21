@@ -5,6 +5,7 @@ import test from 'node:test'
 import { registerExtensionIpc } from '../src/extension-ipc.mjs'
 import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
+import { resolveExternalPluginSource } from '../src/external-plugin-source.mjs'
 
 class FakeIpcMain {
   handlers = new Map()
@@ -236,6 +237,390 @@ test('plugin update checks stay online and exact updates use the guarded transac
     ipcMain.handlers.get('extensions:plugin-update')(undefined, { name: '@community/example' }),
     /invalid plugin update request/u,
   )
+  unregister()
+})
+
+test('Extension Dock can revoke durable full-user trust only through a zero-argument main-process action', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false, binding: false, pending: false })
+  let revokeCalls = 0
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {},
+    controller: {},
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    revokeFullUserTrust: async () => {
+      revokeCalls += 1
+      return true
+    },
+  })
+
+  assert.equal(await ipcMain.handlers.get('extensions:full-user-trust-revoke')(), true)
+  assert.equal(revokeCalls, 1)
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:full-user-trust-revoke')(undefined, 'renderer-grant-id'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
+  assert.equal(revokeCalls, 1)
+  await unregister()
+})
+
+test('full access plugin installation confirms a private descriptor and commits the persistent Desktop profile', async () => {
+  const ipcMain = new FakeIpcMain()
+  const events = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const descriptor = {
+    schemaVersion: 1,
+    sourceId: `sha256:${'a'.repeat(64)}`,
+    candidateId: `sha256:${'b'.repeat(64)}`,
+    sourceType: 'directory',
+    referenceType: 'path',
+    canonicalPath: 'C:\\plugins\\free-plugin',
+    installSpec: 'file:///C:/plugins/free-plugin',
+    contentFingerprint: `sha256:${'c'.repeat(64)}`,
+    package: { name: '@external/free-plugin', version: '1.0.0' },
+    loader: { sourceType: 'directory', installSpec: 'file:///C:/plugins/free-plugin', packageName: '@external/free-plugin', declaredDshBundle: false },
+  }
+  const transaction = {
+    result: { name: '@external/free-plugin', version: '1.0.0', fullAccess: true, restartRequired: true },
+    commit: async () => events.push('commit'),
+    rollback: async () => events.push('rollback'),
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      installFullAccessExternal: async (value) => {
+        events.push(['install-persistent', value])
+        return transaction
+      },
+    },
+    controller: {
+      stop: async () => events.push('stop'),
+      start: async () => events.push('start'),
+    },
+    ensureProfile: async () => events.push('ensure'),
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    resolveFullAccessPlugin: async (request) => {
+      events.push(['resolve', request])
+      return descriptor
+    },
+    confirmFullAccessPlugin: async (value) => {
+      events.push(['confirm', value])
+      return true
+    },
+    revalidateFullAccessPlugin: async (value) => {
+      events.push(['revalidate', value])
+      return descriptor
+    },
+    completeFullAccessPlugin: async (value) => events.push(['complete', value]),
+  })
+
+  const result = await ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+    spec: 'C:\\plugins\\free-plugin',
+    allowUnknown: false,
+    fullAccess: true,
+  })
+
+  assert.deepEqual(result, { ...transaction.result, isolated: false })
+  assert.deepEqual(events, [
+    ['resolve', { spec: 'C:\\plugins\\free-plugin' }],
+    ['confirm', descriptor],
+    ['revalidate', descriptor],
+    'stop',
+    ['install-persistent', descriptor],
+    'ensure',
+    'start',
+    'commit',
+    ['complete', descriptor],
+  ])
+  unregister()
+})
+
+test('community market resolves an opaque catalog ID and uses one native-confirmed full-access transaction', async () => {
+  const ipcMain = new FakeIpcMain()
+  const events = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const descriptor = await resolveExternalPluginSource('github:owner/plugin')
+  const publicCatalog = { updated: '2026-08-21', count: 1, categories: [], plugins: [] }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      prepare: async () => assert.fail('market install must not use the registry-only compatibility path'),
+      installFullAccessExternal: async (value) => {
+        events.push(['install', value])
+        return {
+          result: { name: '@community/plugin', fullAccess: true },
+          commit: async () => events.push('commit'),
+          rollback: async () => events.push('rollback'),
+        }
+      },
+    },
+    controller: {
+      stop: async () => events.push('stop'),
+      start: async () => events.push('start'),
+    },
+    ensureProfile: async () => events.push('ensure'),
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    communityMarket: {
+      list: async () => { events.push('list'); return publicCatalog },
+      resolveInstall: async (id) => { events.push(['catalog-resolve', id]); return 'github:owner/plugin' },
+    },
+    resolveFullAccessPlugin: async (request) => { events.push(['resolve', request]); return descriptor },
+    confirmFullAccessPlugin: async (value, context) => { events.push(['confirm', value, context]); return true },
+    revalidateFullAccessPlugin: async (value) => { events.push(['revalidate', value]); return descriptor },
+    completeFullAccessPlugin: async (value) => events.push(['complete', value]),
+  })
+
+  assert.equal(await ipcMain.handlers.get('extensions:market-list')(), publicCatalog)
+  assert.deepEqual(
+    await ipcMain.handlers.get('extensions:market-install')(undefined, 'opaque-market-id'),
+    { name: '@community/plugin', fullAccess: true, isolated: false },
+  )
+  assert.deepEqual(events, [
+    'list',
+    ['catalog-resolve', 'opaque-market-id'],
+    ['resolve', { spec: 'github:owner/plugin' }],
+    ['confirm', descriptor, { mode: 'market' }],
+    ['revalidate', descriptor],
+    'stop',
+    ['install', descriptor],
+    'ensure',
+    'start',
+    'commit',
+    ['complete', descriptor],
+  ])
+
+  unregister()
+  assert.equal(ipcMain.handlers.has('extensions:market-list'), false)
+  assert.equal(ipcMain.handlers.has('extensions:market-install'), false)
+})
+
+test('a failed full-access source revalidation leaves Runtime and the profile untouched', async () => {
+  const ipcMain = new FakeIpcMain()
+  const events = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const descriptor = {
+    schemaVersion: 1,
+    sourceId: `sha256:${'a'.repeat(64)}`,
+    candidateId: `sha256:${'b'.repeat(64)}`,
+    sourceType: 'directory',
+    referenceType: 'path',
+    canonicalPath: 'C:\\plugins\\changed-plugin',
+    installSpec: 'file:///C:/plugins/changed-plugin',
+    contentFingerprint: `sha256:${'c'.repeat(64)}`,
+    package: { name: '@external/changed-plugin', version: '1.0.0' },
+    loader: { sourceType: 'directory', installSpec: 'file:///C:/plugins/changed-plugin', packageName: '@external/changed-plugin', declaredDshBundle: false },
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: { installFullAccessExternal: async () => events.push('install') },
+    controller: { stop: async () => events.push('stop'), start: async () => events.push('start') },
+    ensureProfile: async () => events.push('ensure'),
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    resolveFullAccessPlugin: async () => { events.push('resolve'); return descriptor },
+    confirmFullAccessPlugin: async () => { events.push('confirm'); return true },
+    revalidateFullAccessPlugin: async () => {
+      events.push('revalidate')
+      throw new Error('source changed after native confirmation')
+    },
+  })
+
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+      spec: 'C:\\plugins\\changed-plugin',
+      allowUnknown: false,
+      fullAccess: true,
+    }),
+    /source changed after native confirmation/u,
+  )
+  assert.deepEqual(events, ['resolve', 'confirm', 'revalidate'])
+  unregister()
+})
+
+test('a failed persistent full-access activation rolls back the profile before restoring Runtime', async () => {
+  const ipcMain = new FakeIpcMain()
+  const events = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const descriptor = {
+    schemaVersion: 1,
+    sourceId: `sha256:${'a'.repeat(64)}`,
+    candidateId: `sha256:${'b'.repeat(64)}`,
+    sourceType: 'directory',
+    referenceType: 'path',
+    canonicalPath: 'C:\\plugins\\free-plugin',
+    installSpec: 'file:///C:/plugins/free-plugin',
+    contentFingerprint: `sha256:${'c'.repeat(64)}`,
+    package: { name: '@external/free-plugin' },
+    loader: { sourceType: 'directory', installSpec: 'file:///C:/plugins/free-plugin', packageName: '@external/free-plugin', declaredDshBundle: false },
+  }
+  let starts = 0
+  const transaction = {
+    result: { name: '@external/free-plugin', fullAccess: true, restartRequired: true },
+    commit: async () => events.push('commit'),
+    rollback: async () => events.push('rollback'),
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      installFullAccessExternal: async () => { events.push('install'); return transaction },
+    },
+    controller: {
+      stop: async () => events.push('stop'),
+      start: async () => {
+        events.push('start')
+        starts += 1
+        if (starts === 1) throw new Error('persistent Runtime rejected plugin')
+      },
+    },
+    ensureProfile: async () => events.push('ensure'),
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    resolveFullAccessPlugin: async () => descriptor,
+    confirmFullAccessPlugin: async () => true,
+    completeFullAccessPlugin: async () => events.push('complete'),
+  })
+
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+      spec: 'C:\\plugins\\free-plugin',
+      allowUnknown: false,
+      fullAccess: true,
+    }),
+    /persistent Runtime rejected plugin/u,
+  )
+  assert.deepEqual(events, ['stop', 'install', 'ensure', 'start', 'rollback', 'ensure', 'start', 'complete'])
+  unregister()
+})
+
+test('full access plugin confirmation refusal leaves the runtime and plugin manager untouched', async () => {
+  const ipcMain = new FakeIpcMain()
+  const events = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const descriptor = {
+    schemaVersion: 1,
+    sourceId: `sha256:${'d'.repeat(64)}`,
+    candidateId: `sha256:${'e'.repeat(64)}`,
+    sourceType: 'tarball',
+    referenceType: 'file',
+    canonicalPath: 'C:\\plugins\\free-plugin.tgz',
+    installSpec: 'file:///C:/plugins/free-plugin.tgz',
+    contentFingerprint: `sha256:${'f'.repeat(64)}`,
+    package: { name: '@external/free-plugin', version: '1.0.0' },
+    loader: { sourceType: 'tarball', installSpec: 'file:///C:/plugins/free-plugin.tgz', packageName: '@external/free-plugin', declaredDshBundle: false },
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      installFullAccessExternal: async () => events.push('install'),
+    },
+    controller: {
+      stop: async () => events.push('stop'),
+      start: async () => events.push('start'),
+    },
+    ensureProfile: async () => events.push('ensure'),
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    resolveFullAccessPlugin: async () => {
+      events.push('resolve')
+      return descriptor
+    },
+    confirmFullAccessPlugin: async () => {
+      events.push('confirm')
+      return false
+    },
+  })
+
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+      spec: 'C:\\plugins\\free-plugin.tgz',
+      allowUnknown: false,
+      fullAccess: true,
+    }),
+    /not approved/u,
+  )
+  assert.deepEqual(events, ['resolve', 'confirm'])
+  unregister()
+})
+
+test('extension diagnostic export delegates to the centralized redacted exporter', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  let exports = 0
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: { showSaveDialog: async () => assert.fail('extension IPC must not write raw diagnostics') },
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {},
+    controller: {},
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+    exportDiagnostics: async () => {
+      exports += 1
+      return { canceled: false, exported: true }
+    },
+  })
+  assert.deepEqual(await ipcMain.handlers.get('extensions:diagnostics-export')(), {
+    canceled: false,
+    exported: true,
+  })
+  assert.equal(exports, 1)
   unregister()
 })
 

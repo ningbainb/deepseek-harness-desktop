@@ -4,12 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { resolveExternalPluginSource } from '../src/external-plugin-source.mjs'
 import { BUILTIN_BUNDLES, DESKTOP_PLUGIN_COMPAT_PACKAGES } from '../src/profile.mjs'
 import { createHostCompatibility } from '../src/extensions/plugin-compatibility.mjs'
 import {
   DESKTOP_PLUGINS_LOCK_SCHEMA_VERSION,
   PLUGIN_PACKAGE_MANIFEST_READ_ERROR,
   PluginManager,
+  createPnpmEnvironment,
   createDesktopPluginsLock,
   createProfileRecoveryCandidates,
   createPluginInventory,
@@ -32,6 +34,55 @@ test('plugin spec validation accepts registry packages and rejects command or UR
   for (const value of ['--global', 'https://example.com/plugin.tgz', 'example;calc', '../plugin', '']) {
     assert.throws(() => validatePluginSpec(value), /plugin package spec/)
   }
+})
+
+test('PluginManager forwards validated child-only PATH entries without changing the parent environment', async () => {
+  const parentEnvironment = Object.freeze({
+    Path: 'C:\\Windows\\System32',
+    PATH: 'C:\\discarded-case-alias',
+    ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+  })
+  const windowsChildEnvironment = createPnpmEnvironment({
+    environment: parentEnvironment,
+    platform: 'win32',
+    pathEntries: ['C:\\dsh-managed-git\\cmd'],
+  })
+  assert.deepEqual(parentEnvironment, {
+    Path: 'C:\\Windows\\System32',
+    PATH: 'C:\\discarded-case-alias',
+    ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+  })
+  assert.equal(windowsChildEnvironment.Path, 'C:\\dsh-managed-git\\cmd;C:\\Windows\\System32')
+  assert.equal(Object.hasOwn(windowsChildEnvironment, 'PATH'), false)
+  assert.equal(windowsChildEnvironment.ELECTRON_RUN_AS_NODE, '1')
+
+  const managedGitDirectory = process.platform === 'win32'
+    ? 'C:\\dsh-managed-git\\cmd'
+    : '/opt/dsh-managed-git/cmd'
+  const requestedEntries = [managedGitDirectory]
+  const calls = []
+  const manager = new PluginManager({
+    profileDir: 'profile',
+    pnpmCli: 'pnpm.mjs',
+    pathEntries: requestedEntries,
+    registry: {
+      fetchManifest: async () => ({ name: '@community/example', version: '1.0.0' }),
+    },
+    runner: async (options) => { calls.push(options) },
+  })
+  requestedEntries[0] = process.platform === 'win32' ? 'C:\\mutated' : '/mutated'
+  await manager.prepare('@community/example@1.0.0', { allowUnknown: true })
+  assert.deepEqual(calls[0].pathEntries, [managedGitDirectory])
+  assert.equal(Object.isFrozen(calls[0].pathEntries), true)
+
+  assert.throws(
+    () => new PluginManager({ profileDir: 'profile', pnpmCli: 'pnpm.mjs', pathEntries: ['relative'] }),
+    /pnpm PATH entry/u,
+  )
+  assert.throws(
+    () => new PluginManager({ profileDir: 'profile', pnpmCli: 'pnpm.mjs', pathEntries: Array(65).fill(managedGitDirectory) }),
+    /bounded array/u,
+  )
 })
 
 test('plugin inventory distinguishes protected built-ins from community bundles', () => {
@@ -742,6 +793,81 @@ test('startup reconciliation disables explicit incompatibilities and preserves u
   }
 })
 
+test('startup reconciliation preserves only explicit full-access package names supplied by Electron main', async () => {
+  const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-reconcile-full-access-'))
+  const approved = '@external/approved-incompatible'
+  const unapproved = '@external/unapproved-incompatible'
+  try {
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [approved]: '1.0.0', [unapproved]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, approved, unapproved] } },
+    }))
+    for (const name of [approved, unapproved]) {
+      const packageRoot = join(profileDir, 'node_modules', ...name.split('/'))
+      await mkdir(packageRoot, { recursive: true })
+      await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+        name,
+        version: '1.0.0',
+        dsh: {
+          bundle: { patch: './cordis.patch.yml' },
+          compatibility: { desktop: '>=9.0.0' },
+        },
+      }))
+    }
+    const manager = new PluginManager({ profileDir, pnpmCli: 'pnpm.mjs', hostCompatibility })
+    const approvedNames = new Set([approved])
+    const reconciliation = manager.reconcileCompatibility({ preserveEnabledNames: approvedNames })
+    approvedNames.clear()
+    const result = await reconciliation
+    assert.equal(result.changed, true)
+    assert.deepEqual(result.disabled.map((item) => item.name), [unapproved])
+    assert.deepEqual(result.preserved.map((item) => item.name), [approved])
+
+    let manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(manifest.dsh.profile.bundles.includes(approved), true)
+    assert.equal(manifest.dsh.profile.bundles.includes(unapproved), false)
+
+    // Without a fresh main-process authorization Set, normal reconciliation
+    // remains unchanged and disables the previously preserved incompatibility.
+    const normalResult = await manager.reconcileCompatibility()
+    assert.equal(normalResult.changed, true)
+    assert.deepEqual(normalResult.disabled.map((item) => item.name), [approved])
+    manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(manifest.dsh.profile.bundles.includes(approved), false)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+  }
+})
+
+test('startup reconciliation rejects non-Set, versioned, and non-string full-access preservation inputs', async () => {
+  const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-reconcile-full-access-input-'))
+  try {
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }))
+    const manager = new PluginManager({ profileDir, pnpmCli: 'pnpm.mjs', hostCompatibility })
+    assert.throws(
+      () => manager.reconcileCompatibility({ preserveEnabledNames: ['@external/plugin'] }),
+      /must be a Set/u,
+    )
+    assert.throws(
+      () => manager.reconcileCompatibility({ preserveEnabledNames: new Set(['@external/plugin@1.0.0']) }),
+      /without a version/u,
+    )
+    assert.throws(
+      () => manager.reconcileCompatibility({ preserveEnabledNames: new Set([{}]) }),
+      /plugin package spec/u,
+    )
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+  }
+})
+
 test('plugin manager disables community bundles without uninstalling and can enter safe mode', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-safe-mode-'))
   const first = '@community/first'
@@ -865,5 +991,236 @@ test('plugin manager serializes installs and protects built-ins', async () => {
     assert.ok(manifest.dsh.profile.bundles.includes('@community/second'))
   } finally {
     await rm(profileDir, { recursive: true, force: true })
+  }
+})
+
+test('full-access external install accepts an incompatible local package without a DSH bundle while normal install remains restricted', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-external-'))
+  const profileDir = join(root, 'profile')
+  const sourceDir = join(root, 'external-plugin')
+  const packageName = '@external/incompatible-no-bundle'
+  const manifestPath = join(profileDir, 'package.json')
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const oldManifest = {
+    name: 'dsh-profile-desktop',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+  }
+  const calls = []
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(manifestPath, `${JSON.stringify(oldManifest, null, 2)}\n`)
+    await writeFile(lockPath, 'old-lock\n')
+    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({
+      name: packageName,
+      version: '9.9.9',
+      dsh: { compatibility: { desktop: '>=9.0.0' } },
+    }))
+    const descriptor = await resolveExternalPluginSource(sourceDir, { baseDir: root })
+    assert.equal(descriptor.loader.declaredDshBundle, false)
+
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      hostCompatibility,
+      registry: {
+        fetchManifest: async () => { throw new Error('registry must not be queried for full-access external installs') },
+      },
+      runner: async ({ args }) => {
+        calls.push(args)
+        if (args[0] !== 'add') return
+        assert.deepEqual(args, ['add', descriptor.installSpec, '--save-exact'])
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        manifest.dependencies[packageName] = descriptor.installSpec
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        await writeFile(lockPath, 'new-lock\n')
+        const installedRoot = join(profileDir, 'node_modules', ...packageName.split('/'))
+        await mkdir(installedRoot, { recursive: true })
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: packageName, version: '9.9.9' }))
+      },
+    })
+
+    assert.throws(() => manager.install(descriptor.installSpec), /plugin package spec/u)
+    const transaction = await manager.installFullAccessExternal(descriptor)
+    assert.deepEqual(transaction.result, {
+      name: packageName,
+      version: '9.9.9',
+      fullAccess: true,
+      restartRequired: true,
+    })
+    const changed = JSON.parse(await readFile(manifestPath, 'utf8'))
+    assert.equal(changed.dependencies[packageName], descriptor.installSpec)
+    assert.equal(changed.dsh.profile.bundles.includes(packageName), true)
+    assert.equal(await transaction.rollback(), true)
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), oldManifest)
+    assert.equal(await readFile(lockPath, 'utf8'), 'old-lock\n')
+    assert.equal(await transaction.rollback(), false)
+    assert.deepEqual(calls, [
+      ['add', descriptor.installSpec, '--save-exact'],
+      ['install', '--offline', '--frozen-lockfile'],
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('full-access external install restores its profile snapshot after a post-install failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-external-rollback-'))
+  const profileDir = join(root, 'profile')
+  const sourceDir = join(root, 'external-plugin')
+  const packageName = '@external/post-install-failure'
+  const manifestPath = join(profileDir, 'package.json')
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const oldManifest = {
+    name: 'dsh-profile-desktop',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+  }
+  const calls = []
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(manifestPath, `${JSON.stringify(oldManifest, null, 2)}\n`)
+    await writeFile(lockPath, 'old-lock\n')
+    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({
+      name: packageName,
+      version: '1.0.0',
+    }))
+    const descriptor = await resolveExternalPluginSource(sourceDir, { baseDir: root })
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async ({ args }) => {
+        calls.push(args)
+        if (args[0] !== 'add') return
+        await writeFile(manifestPath, '{ invalid package manifest')
+        await writeFile(lockPath, 'partial-lock\n')
+      },
+    })
+
+    await assert.rejects(manager.installFullAccessExternal(descriptor), /was rolled back/u)
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), oldManifest)
+    assert.equal(await readFile(lockPath, 'utf8'), 'old-lock\n')
+    assert.deepEqual(calls, [
+      ['add', descriptor.installSpec, '--save-exact'],
+      ['install', '--offline', '--frozen-lockfile'],
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('full-access external install rolls back an opaque source that resolves to a Desktop-managed package', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-protected-rollback-'))
+  const profileDir = join(root, 'profile')
+  const manifestPath = join(profileDir, 'package.json')
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const protectedName = BUILTIN_BUNDLES[0]
+  const source = await resolveExternalPluginSource('https://plugins.example.invalid/looks-external.tgz')
+  const originalManifest = {
+    name: 'dsh-profile-desktop',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+  }
+  const calls = []
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(manifestPath, `${JSON.stringify(originalManifest, null, 2)}\n`)
+    await writeFile(lockPath, 'original-lock\n')
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async ({ args }) => {
+        calls.push(args)
+        if (args[0] !== 'add') return
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        manifest.dependencies[protectedName] = source.installSpec
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        await writeFile(lockPath, 'mutated-lock\n')
+        const installedRoot = join(profileDir, 'node_modules', ...protectedName.split('/'))
+        await mkdir(installedRoot, { recursive: true })
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: protectedName, version: '99.0.0' }))
+      },
+    })
+
+    await assert.rejects(
+      manager.installFullAccessExternal(source),
+      /built-in desktop plugin and cannot be replaced/u,
+    )
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), originalManifest)
+    assert.equal(await readFile(lockPath, 'utf8'), 'original-lock\n')
+    assert.deepEqual(calls, [
+      ['add', source.installSpec, '--save-exact'],
+      ['install', '--offline', '--frozen-lockfile'],
+    ])
+
+    const isolatedManager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      profileScope: 'isolated-free-mode',
+      runner: async ({ args }) => {
+        calls.push(['isolated', ...args])
+        if (args[0] !== 'add') return
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        manifest.dependencies[protectedName] = source.installSpec
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        const installedRoot = join(profileDir, 'node_modules', ...protectedName.split('/'))
+        await mkdir(installedRoot, { recursive: true })
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: protectedName, version: '99.0.0' }))
+      },
+    })
+    const isolated = await isolatedManager.installFullAccessExternal(source)
+    assert.equal(isolated.result.name, protectedName)
+    assert.equal(await isolated.rollback(), true)
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), originalManifest)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('full-access external install derives the actual package name after a confirmed opaque HTTPS source', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-remote-'))
+  const profileDir = join(root, 'profile')
+  const manifestPath = join(profileDir, 'package.json')
+  const actualName = '@external/installed-from-https'
+  const source = await resolveExternalPluginSource('https://plugins.example.invalid/external-plugin.tgz')
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(manifestPath, JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }))
+    await writeFile(join(profileDir, 'pnpm-lock.yaml'), 'old-lock\n')
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async ({ args }) => {
+        assert.deepEqual(args, ['add', source.installSpec, '--save-exact'])
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        manifest.dependencies[actualName] = source.installSpec
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        const installedRoot = join(profileDir, 'node_modules', ...actualName.split('/'))
+        await mkdir(installedRoot, { recursive: true })
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: actualName, version: '4.5.6' }))
+      },
+    })
+    const transaction = await manager.installFullAccessExternal(source)
+    assert.deepEqual(transaction.result, {
+      name: actualName,
+      version: '4.5.6',
+      fullAccess: true,
+      restartRequired: true,
+    })
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    assert.equal(manifest.dsh.profile.bundles.includes(actualName), true)
+    assert.equal(manifest.dsh.profile.bundles.includes(source.package.name), false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
   }
 })

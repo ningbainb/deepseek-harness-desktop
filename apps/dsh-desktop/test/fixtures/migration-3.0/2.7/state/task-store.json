@@ -1,0 +1,55 @@
+{
+  "desktopVersion": "2.7.0",
+  "schemaVersion": 3,
+  "revision": 27,
+  "updatedAt": 1700002701000,
+  "storage": "host-task-store",
+  "projects": [],
+  "tasks": [
+    {
+      "id": "task-27",
+      "title": "2.7 Scheduler task",
+      "description": "Representative durable scheduler task; migration starts it with automation disabled.",
+      "prompt": "Do not execute this Task during migration.",
+      "status": "todo",
+      "createdAt": 1700002700000,
+      "updatedAt": 1700002701000,
+      "isolationMode": "shared-workspace",
+      "executions": [
+        {
+          "id": "run-27",
+          "runId": "run-27",
+          "workspaceId": "workspace-27",
+          "sessionId": "session-27",
+          "startedAt": 1700002700100,
+          "finishedAt": 1700002700200,
+          "result": "succeeded"
+        }
+      ],
+      "runs": [
+        {
+          "runId": "run-27",
+          "sessionId": "session-27",
+          "workspaceId": "workspace-27",
+          "startedAt": 1700002700100,
+          "finishedAt": 1700002700200,
+          "resultStatus": "accepted",
+          "runtimeProviderEvidence": {
+            "providerId": "dsh-cli-provider-v1",
+            "supportStatus": "known-good"
+          }
+        }
+      ],
+      "schedule": {
+        "enabled": true,
+        "cron": "0 9 * * *",
+        "nextRunAt": 4102444800000,
+        "lastTriggeredAt": 1700002600000,
+        "timezone": "UTC",
+        "misfirePolicy": "skip",
+        "runningPolicy": "skip"
+      }
+    }
+  ],
+  "evidences": []
+}

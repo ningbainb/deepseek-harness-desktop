@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/supported-runtime-matrix-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Supported Runtime Matrix v1",
+  "$comment": "Matrix v1 accepts additive optional fields. Every 3.0 entry carries evidence.lockfile provenance and SHA-256 hashes for the Runtime package manifest and CLI entrypoint.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "derived", "authority", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "derived": { "const": true },
+    "authority": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["stableEvidence", "source", "packageManifest", "lockfile"],
+      "properties": {
+        "stableEvidence": { "$ref": "#/$defs/repositoryPath" },
+        "source": { "$ref": "#/$defs/repositoryPath" },
+        "packageManifest": { "$ref": "#/$defs/repositoryPath" },
+        "lockfile": { "$ref": "#/$defs/repositoryPath" }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "supportStatus": {
+      "enum": ["known-good", "supported", "candidate", "blocked"]
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "status": {
+          "enum": ["available", "unavailable", "unsupported"]
+        }
+      }
+    },
+    "lockfileEvidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "runtimeFileHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package.json", "lib/bin.js"],
+      "properties": {
+        "package.json": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "lib/bin.js": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "upstreamVersion",
+        "providerId",
+        "desktopRange",
+        "capabilities",
+        "verifiedAt",
+        "matrixArtifact",
+        "knownIssues",
+        "evidence"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/supportStatus" },
+        "upstreamVersion": { "$ref": "#/$defs/version" },
+        "providerId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+        },
+        "desktopRange": { "type": "string", "minLength": 1 },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capability" }
+        },
+        "verifiedAt": { "type": "string", "format": "date" },
+        "matrixArtifact": { "$ref": "#/$defs/repositoryPath" },
+        "knownIssues": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["package", "peers", "slots", "patches", "packagedRuntime", "lockfile"],
+          "properties": {
+            "package": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["name", "version", "integrity", "files"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "version": { "$ref": "#/$defs/version" },
+                "integrity": { "type": "string", "pattern": "^sha(?:256|384|512)-" },
+                "files": { "$ref": "#/$defs/runtimeFileHashes" }
+              }
+            },
+            "peers": { "type": "object", "additionalProperties": true },
+            "slots": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "patches": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["registry", "sha256", "ids"],
+              "properties": {
+                "registry": { "$ref": "#/$defs/repositoryPath" },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                }
+              }
+            },
+            "packagedRuntime": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["packageRoot", "cli", "profileName", "executionMode", "requiredFiles"],
+              "properties": {
+                "packageRoot": { "type": "string", "minLength": 1 },
+                "cli": { "type": "string", "minLength": 1 },
+                "profileName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+                "executionMode": { "type": "string", "minLength": 1 },
+                "requiredFiles": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "lockfile": { "$ref": "#/$defs/lockfileEvidence" }
+          }
+        }
+      }
+    }
+  }
+}

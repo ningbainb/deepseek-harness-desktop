@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 
-import { strToU8, unzipSync, zipSync } from 'fflate'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 
 import {
   createPresetBuffer,
@@ -64,6 +65,26 @@ test('preset v1 round-trips exact packages, allowlisted settings, skills, and tr
     executableContent: false,
     secretValues: false,
   })
+})
+
+test('preset v1 ignores additive optional manifest metadata but explains unsupported required majors', () => {
+  const parsed = readPresetBuffer(createPresetBuffer(validPreset({
+    manifest: {
+      ...manifest,
+      futureOptionalMetadata: { displayHint: 'not part of the v1 import plan' },
+      source: { ...manifest.source, futureRuntimeMetadata: 'ignored' },
+    },
+  })))
+  assert.equal(Object.hasOwn(parsed.manifest, 'futureOptionalMetadata'), false)
+  assert.equal(Object.hasOwn(parsed.manifest.source, 'futureRuntimeMetadata'), false)
+  const futureMajor = rewriteArchive(createPresetBuffer(validPreset()), (files) => {
+    const nextManifest = { ...JSON.parse(strFromU8(files['dsh-preset.json'])), formatVersion: 2 }
+    files['dsh-preset.json'] = strToU8(`${JSON.stringify(nextManifest, null, 2)}\n`)
+    const integrity = JSON.parse(strFromU8(files['integrity.json']))
+    integrity.files['dsh-preset.json'] = createHash('sha256').update(files['dsh-preset.json']).digest('hex')
+    files['integrity.json'] = strToU8(`${JSON.stringify(integrity, null, 2)}\n`)
+  })
+  assert.throws(() => readPresetBuffer(futureMajor), /Upgrade DeepSeek Harness Desktop/u)
 })
 
 test('preset integrity is verified before content is returned', () => {

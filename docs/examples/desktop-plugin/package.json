@@ -1,0 +1,32 @@
+{
+  "name": "@example/dsh-desktop-compat-example",
+  "version": "0.1.0",
+  "private": true,
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "desktop": {
+        "range": ">=3.0.0 <4.0.0",
+        "api": "^1.2.0"
+      },
+      "runtime": {
+        "range": ">=0.1.1-rc.1 <0.2.0",
+        "evidence": {
+          "providerId": "dsh-cli-provider-v1",
+          "runtime": "0.1.1-rc.1",
+          "desktop": "3.0.0",
+          "verifiedAt": "2026-08-21",
+          "matrixArtifact": "apps/dsh-desktop/runtime-support/supported-runtimes.json"
+        }
+      },
+      "capabilities": [
+        "notifications.show"
+      ],
+      "surfaces": [
+        "main"
+      ]
+    }
+  }
+}

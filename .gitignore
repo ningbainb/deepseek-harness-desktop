@@ -20,6 +20,12 @@ output/
 .tmp-dsh-home/
 .tmp-user-data/
 apps/dsh-desktop/dist/
+apps/dsh-desktop/build/bundled-managed-git/
+apps/dsh-desktop/artifacts/
+/artifacts/
+
+# Local website poster exports
+/website/assets/deepseek-harness-desktop-*-poster*.png
 
 # Temporary package-patch rebase workspaces (generated locally, never product source)
 /.tmp-dshmarket-restore-guard/

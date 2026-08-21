@@ -18,6 +18,9 @@ const zh = {
   'explorer.expand': '展开面板',
   'explorer.openPreview': '打开预览',
   'explorer.drag.dropHint': '松手插入文件路径',
+  'explorer.addToConversation': '添加到对话框',
+  'explorer.addedToConversation': '已添加到对话框',
+  'explorer.noActiveConversation': '没有可用的对话输入框',
   'scm.repositories': '存储库',
   'scm.changes': '变更',
   'scm.staged': '已暂存',
@@ -71,6 +74,7 @@ const zh = {
   'common.delete': '删除',
   'common.copyPath': '复制路径',
   'common.copied': '已复制',
+  'common.copyFailed': '复制失败',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
@@ -86,6 +90,9 @@ const en: Record<keyof typeof zh, string> = {
   'explorer.expand': 'Expand panel',
   'explorer.openPreview': 'Open preview',
   'explorer.drag.dropHint': 'Release to insert the file path',
+  'explorer.addToConversation': 'Add to conversation',
+  'explorer.addedToConversation': 'Added to conversation',
+  'explorer.noActiveConversation': 'No active conversation input',
   'scm.repositories': 'Repositories',
   'scm.changes': 'Changes',
   'scm.staged': 'Staged',
@@ -139,6 +146,7 @@ const en: Record<keyof typeof zh, string> = {
   'common.delete': 'Delete',
   'common.copyPath': 'Copy path',
   'common.copied': 'Copied',
+  'common.copyFailed': 'Copy failed',
 }
 
 export type AionUiPanelKey = keyof typeof zh

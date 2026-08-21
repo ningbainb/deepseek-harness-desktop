@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
 
-test('only the official release workflow injects a required anonymous metrics endpoint', async () => {
+test('3.0 release builds retain an inert telemetry configuration and do not inject an endpoint', async () => {
   const [configuration, workflow, packaging] = await Promise.all([
     readFile(resolve(import.meta.dirname, '..', 'build', 'telemetry-config.json'), 'utf8'),
     readFile(resolve(repositoryRoot, '.github', 'workflows', 'desktop-release.yml'), 'utf8'),
@@ -13,9 +13,7 @@ test('only the official release workflow injects a required anonymous metrics en
   ])
 
   assert.deepEqual(JSON.parse(configuration), { endpoint: '' })
-  assert.match(workflow, /vars\.DSH_TELEMETRY_ENDPOINT/u)
-  assert.match(workflow, /Repository variable DSH_TELEMETRY_ENDPOINT is required/u)
-  assert.match(workflow, /AbsolutePath -ne '\/v1\/events'/u)
+  assert.doesNotMatch(workflow, /DSH_TELEMETRY_ENDPOINT|Configure official anonymous product metrics/u)
   assert.match(workflow, /telemetry-config\.json/u)
   assert.match(packaging, /from: build\/telemetry-config\.json[\s\S]*to: telemetry-config\.json/u)
 })

@@ -4,11 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { strFromU8, unzipSync } from 'fflate'
+
 import {
   collectStartupDiagnostics,
+  createDiagnosticBundle,
+  diagnosticBundleFilename,
   exportStartupDiagnostics,
   redactDiagnosticText,
   redactDiagnosticValue,
+  serializeDiagnosticBundle,
   startupDiagnosticsFilename,
   writeStartupDiagnostics,
 } from '../src/startup-diagnostics.mjs'
@@ -37,6 +42,52 @@ test('startup diagnostic redaction removes credentials and account paths from te
   assert.deepEqual(value.apiKey, '[redacted]')
   assert.deepEqual(value.nested.qqbotSecret, '[redacted]')
   assert.match(value.nested.path, /<dsh-home>/u)
+})
+
+test('diagnostic archive excludes user content and carries a local-only manifest with hashes', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    controller: { status: { state: 'crashed', error: 'PRIVATE_KEY=private-value' } },
+    pluginRecovery: {
+      getDiagnostics: async () => ({
+        recovery: {
+          currentIncident: {
+            technicalDetails: 'tool result: do not export this tool output',
+            summary: 'prompt: do not export this prompt',
+          },
+          incidents: [],
+          snapshots: [],
+          disabledPlugins: [],
+        },
+        profile: {
+          dependencies: { '@community/example': 'file:C:\\Users\\Alice\\prompt=do-not-export' },
+          enabledBundles: ['@community/example'],
+        },
+        sessionHistory: ['do not export this session'],
+        nested: { authorization: 'Bearer no-export' },
+      }),
+    },
+    pluginManager: { inventory: async () => [{ name: '@community/example' }] },
+    logStore: { tail: async () => 'tool result: do not export this log payload\nruntime state=crashed' },
+  })
+  const bundle = createDiagnosticBundle({
+    diagnostics,
+    now: () => new Date('2026-08-20T01:02:03.000Z'),
+  })
+  assert.equal(bundle.manifest.kind, 'dsh-diagnostic-bundle')
+  assert.equal(bundle.manifest.userInitiated, true)
+  assert.equal(bundle.manifest.automaticUpload, false)
+  assert.equal(bundle.manifest.files.length, 1)
+  assert.match(bundle.manifest.files[0].sha256, /^[a-f0-9]{64}$/u)
+  const serialized = JSON.stringify(bundle)
+  assert.doesNotMatch(serialized, /private-value|do not export this prompt|do not export this session|do not export this tool output|no-export|do not export this log payload/u)
+  assert.match(serialized, /technicalDetailsPresent/u)
+
+  const zip = serializeDiagnosticBundle(bundle, { format: 'zip' })
+  const entries = unzipSync(zip)
+  const manifest = JSON.parse(strFromU8(entries['manifest.json']))
+  const exported = strFromU8(entries['diagnostics.json'])
+  assert.equal(manifest.files[0].sha256, bundle.manifest.files[0].sha256)
+  assert.doesNotMatch(exported, /private-value|do not export/u)
 })
 
 test('startup diagnostic package combines runtime, startup log, recovery, and plugin inventory without raw private data', async () => {
@@ -87,10 +138,52 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
   assert.equal(diagnostics.runtime.state, 'starting')
   assert.equal(diagnostics.runtime.restartAttempt, 2)
   assert.equal(diagnostics.plugins[0].name, '@community/broken')
-  assert.match(diagnostics.startup.recentRuntimeLog, /Authorization: Bearer \[redacted\]/u)
+  assert.match(diagnostics.startup.recentRuntimeLog, /\[unclassified\] 1 local event/u)
   const serialized = JSON.stringify(diagnostics)
   assert.doesNotMatch(serialized, /openai-secret|plugin-token|log-secret|Alice|43125/u)
-  assert.match(serialized, /<dsh-home>/u)
+  assert.doesNotMatch(serialized, /<dsh-home>|file:/u)
+})
+
+test('diagnostic projections never serialize plugin-recovery raw error, prompt, session, or tool data', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    controller: { status: { state: 'crashed', error: 'session: RUNTIME_PRIVATE_SESSION' } },
+    pluginRecovery: {
+      getDiagnostics: async () => ({
+        recovery: {
+          safeMode: true,
+          currentIncident: {
+            identified: true,
+            pluginName: '@community/example',
+            reasonCode: 'load-failed',
+            summary: 'prompt: RECOVERY_PRIVATE_PROMPT',
+            technicalDetails: 'tool result: RECOVERY_PRIVATE_TOOL_OUTPUT\nsession: RECOVERY_PRIVATE_SESSION',
+          },
+          incidents: [{ technicalDetails: 'RECOVERY_PRIVATE_INCIDENT' }],
+          snapshots: [{ id: 'snapshot-private' }],
+          disabledPlugins: ['@community/example'],
+        },
+        profile: {
+          dependencies: { '@community/example': 'file:C:\\Users\\Alice\\RECOVERY_PRIVATE_PATH' },
+          enabledBundles: ['@community/example'],
+        },
+      }),
+    },
+    pluginManager: {
+      inventory: async () => [{
+        name: '@community/example',
+        requested: 'file:C:\\Users\\Alice\\RECOVERY_PRIVATE_REQUEST',
+        version: '1.2.3',
+        compatibility: { status: 'unknown', reasons: [{ code: 'compatibility-undeclared', detail: 'RECOVERY_PRIVATE_REASON' }] },
+      }],
+    },
+    logStore: { tail: async () => '[stderr] RECOVERY_PRIVATE_LOG\n[startup] prompt: RECOVERY_PRIVATE_LOG_PROMPT' },
+  })
+  const serialized = JSON.stringify(diagnostics)
+  assert.match(serialized, /technicalDetailsPresent/u)
+  assert.match(serialized, /errorFingerprint/u)
+  assert.match(serialized, /compatibility-undeclared/u)
+  assert.doesNotMatch(serialized, /RECOVERY_PRIVATE_(?:PROMPT|TOOL_OUTPUT|SESSION|INCIDENT|PATH|REQUEST|REASON|LOG)/u)
+  assert.doesNotMatch(serialized, /C:\\Users\\Alice/u)
 })
 
 test('a stalled recovery or inventory collector is recorded instead of blocking startup diagnostic export', async () => {
@@ -103,7 +196,7 @@ test('a stalled recovery or inventory collector is recorded instead of blocking 
   })
   assert.equal(diagnostics.runtime.state, 'starting')
   assert.equal(diagnostics.plugins[0].name, '@community/available')
-  assert.ok(diagnostics.collectionIssues.some((item) => item.source === 'plugin-recovery' && /timed out/u.test(item.message)))
+  assert.ok(diagnostics.collectionIssues.some((item) => item.source === 'plugin-recovery' && /timed out/u.test(item.summary)))
 })
 
 test('export asks for a user destination and writes an atomic shareable package without exposing its path to the renderer', async () => {
@@ -135,15 +228,37 @@ test('export asks for a user destination and writes an atomic shareable package 
     assert.equal(Object.hasOwn(result, 'filePath'), false)
     assert.equal(saveCalls.length, 1)
     assert.equal(saveCalls[0].title, '导出启动诊断日志')
-    assert.equal(saveCalls[0].defaultPath, join(directory, startupDiagnosticsFilename(new Date('2026-08-20T01:02:03.000Z'))))
+    assert.equal(saveCalls[0].defaultPath, join(directory, diagnosticBundleFilename(new Date('2026-08-20T01:02:03.000Z'))))
     assert.equal(saveCalls[0].showOverwriteConfirmation, true)
     assert.ok(logLines.some((line) => line.includes('startup diagnostic package exported')))
     const written = await readFile(target, 'utf8')
     assert.doesNotMatch(written, /not-for-export/u)
-    assert.match(written, /\[redacted\]/u)
+    assert.match(written, /errorFingerprint/u)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('diagnostic export presents the manifest for confirmation and leaves the selected path untouched on cancellation', async () => {
+  let writes = 0
+  const result = await exportStartupDiagnostics({
+    dialog: {
+      showSaveDialog: async () => ({ canceled: false, filePath: 'C:\\Users\\Alice\\Downloads\\report.zip' }),
+      showMessageBox: async (_window, options) => {
+        assert.match(options.detail, /diagnostics\.json/u)
+        assert.match(options.detail, /不会包含/u)
+        return { response: 0 }
+      },
+    },
+    controller: { status: { state: 'crashed' } },
+    pluginRecovery: { getDiagnostics: async () => ({}) },
+    pluginManager: { inventory: async () => [] },
+    logStore: { tail: async () => '' },
+    writeDiagnostics: async () => { writes += 1 },
+  })
+  assert.deepEqual(result, { canceled: true })
+  assert.equal(writes, 0)
+  assert.match(diagnosticBundleFilename(new Date('2026-08-20T01:02:03.000Z')), /\.zip$/u)
 })
 
 test('canceling the save dialog returns promptly without waiting for unavailable runtime collectors', async () => {

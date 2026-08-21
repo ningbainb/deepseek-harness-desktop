@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
@@ -6,6 +7,8 @@ import { resolve } from 'node:path'
 import { _electron as electron } from 'playwright'
 
 import { AGGREGATED_BUNDLES, BUILTIN_BUNDLES, RETIRED_MANAGED_PACKAGES } from '../src/profile.mjs'
+import { MIGRATION_COMPLETION_SCHEMA_VERSION, MIGRATION_SCHEMA_VERSION } from '../src/migration-assistant.mjs'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const executablePath = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 if (!executablePath) throw new Error('DSH_DESKTOP_E2E_EXECUTABLE is required')
@@ -23,16 +26,43 @@ function legacySkinSection(skinId) {
   return `${legacySkinStart}\n- insert:\n    - id: ui-skin-${skinId}\n      name: '${legacySkinPackage(skinId)}'\n${legacySkinEnd}`
 }
 
+async function waitForRuntimeWindow(app, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const page = app.windows().find((candidate) => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+    if (page) return page
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+  }
+  throw new Error('runtime window did not appear before the profile migration E2E timeout')
+}
+
+async function seedCurrentApplicationMigration({ profileDir, userData }) {
+  const migrationDirectory = resolve(userData, 'migration-assistant')
+  await mkdir(migrationDirectory, { recursive: true })
+  await writeFile(resolve(migrationDirectory, 'completion.json'), `${JSON.stringify({
+    schemaVersion: MIGRATION_COMPLETION_SCHEMA_VERSION,
+    migrationSchemaVersion: MIGRATION_SCHEMA_VERSION,
+    state: 'complete',
+    targetVersion: '3.0.0',
+    sourceVersion: '3.0.0',
+    journalId: 'profile-migration-e2e-current',
+    profileIdentitySha256: createHash('sha256').update(profileDir).digest('hex'),
+    completedAt: '2026-08-21T00:00:00.000Z',
+  }, null, 2)}\n`)
+}
+
 async function launchOnce({ dshHome, userData }) {
+  await seedPrimaryRuntimePermissionForTest({ userData })
   const app = await electron.launch({
     executablePath,
     env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData },
   })
   let port
   try {
-    const page = await app.firstWindow()
+    await app.firstWindow()
+    let page
     try {
-      await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: 120_000 })
+      page = await waitForRuntimeWindow(app, 120_000)
     } catch (error) {
       const log = await readFile(resolve(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
       console.error(`runtime did not become ready; recent log:\n${log.slice(-4_000) || '(no runtime log)'}`)
@@ -116,6 +146,11 @@ async function createLegacyFixture(root, skinId) {
     disabledDependencies: { [legacyCommunityPlugin]: '1.0.0' },
     currentIncidentId: 'legacy-unknown-timeout',
   }, null, 2)}\n`)
+  // This E2E isolates legacy plugin/skin cleanup from the separately covered
+  // 2.3-2.7 application migration matrix. Mark the app-level 3.0 schema as
+  // already complete so the old plugin fixture is not misclassified as an
+  // unsupported pre-2.3 Desktop installation.
+  await seedCurrentApplicationMigration({ profileDir, userData })
 
   return {
     dshHome,
@@ -156,7 +191,7 @@ async function verifyInvalidLegacySkinFallsBack() {
   assertRetiredPackagesAreGone(migrated, fixture.skinPackage)
 
   const repairedRecovery = JSON.parse(await readFile(fixture.recoveryStatePath, 'utf8'))
-  assert.equal(repairedRecovery.policyVersion, 2)
+  assert.equal(repairedRecovery.policyVersion, 4)
   assert.equal(repairedRecovery.safeMode, false)
   assert.deepEqual(repairedRecovery.disabledDependencies, {})
   assert.equal(repairedRecovery.incidents[0].resolution, 'legacy-false-positive-repaired')

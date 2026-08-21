@@ -1,0 +1,5 @@
+{
+  "status": "known-good",
+  "providerId": "dsh-cli-provider-v1",
+  "matrixArtifact": "supported-runtimes.json"
+}

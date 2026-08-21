@@ -3,6 +3,10 @@ main = "src/index.mjs"
 compatibility_date = "2026-08-19"
 workers_dev = true
 
+[[routes]]
+pattern = "guanli.1521003.xyz"
+custom_domain = true
+
 [[d1_databases]]
 binding = "METRICS"
 database_name = "dsh-desktop-telemetry"

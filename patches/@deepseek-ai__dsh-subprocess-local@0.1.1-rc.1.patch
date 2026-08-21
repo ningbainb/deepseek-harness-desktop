@@ -1,8 +1,19 @@
 diff --git a/lib/index.js b/lib/index.js
-index 75fae74961306a992cde304e7311812c6e712de8..22da8e4ae6def4465f0f3a23039e0c0f366c5639 100644
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -497,7 +497,10 @@ function taskkillProcessTree(pid) {
+@@ -105,7 +105,10 @@ function taskkillTree(pid, force) {
+ 		String(pid),
+ 		"/T",
+ 		...force ? ["/F"] : []
+-	], { stdio: "ignore" });
++	], {
++		stdio: "ignore",
++		windowsHide: true
++	});
+ }
+ /**
+ * True for NULL and INVALID_HANDLE_VALUE returns from Win32 handle APIs.
+@@ -745,7 +748,10 @@ function taskkillProcessTree(pid) {
  		String(pid),
  		"/T",
  		"/F"
@@ -14,7 +25,7 @@ index 75fae74961306a992cde304e7311812c6e712de8..22da8e4ae6def4465f0f3a23039e0c0f
  }
  /**
  * Signal a detached process tree with platform-correct semantics: POSIX
-@@ -553,7 +556,8 @@ function spawnSubprocess(spec, internals = {}) {
+@@ -805,7 +811,8 @@ function spawnSubprocess(spec, internals = {}) {
  			outMode === "inherit" ? "inherit" : "pipe",
  			errMode === "inherit" ? "inherit" : "pipe"
  		],

@@ -6,6 +6,7 @@ const root = path.resolve(import.meta.dirname, '..')
 const websiteRoot = path.join(root, 'website')
 const htmlPath = path.join(websiteRoot, 'index.html')
 const privacyPath = path.join(websiteRoot, 'privacy.html')
+const siteScriptPath = path.join(websiteRoot, 'script.js')
 const sitemapPath = path.join(websiteRoot, 'sitemap.xml')
 const robotsPath = path.join(websiteRoot, 'robots.txt')
 const llmsPath = path.join(websiteRoot, 'llms.txt')
@@ -153,16 +154,16 @@ export function collectPrivacyErrors(html) {
   const errors = []
   const requiredMarkers = [
     ['privacy canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/privacy\.html["']/i],
-    ['default-on disclosure', /默认开启，不提供应用内关闭开关/u],
-    ['use disclosure', /使用官方正式版即表示/u],
-    ['source build boundary', /普通源码构建、开发构建、测试构建和 Fork 构建/u],
+    ['default-off disclosure', /默认关闭，不自动上传/u],
+    ['user-confirmed export', /仅在用户主动确认后导出/u],
+    ['user-selected destination', /用户选择的位置/u],
+    ['diagnostic archive format', /JSON\/ZIP/u],
+    ['diagnostic manifest and hashes', /清单和哈希/u],
     ['conversation exclusion', /对话、提示词、AI 回复/u],
-    ['connection identifier exclusion', /IP 地址、User-Agent/u],
-    ['aggregate retention', /365 天/u],
-    ['infrastructure processor', /Cloudflare/u],
-    ['country aggregate disclosure', /两位国家代码/u],
-    ['download click boundary', /下载点击而不是完整下载成功/u],
-    ['non-blocking direct download', /不会取消、替换或延迟 GitHub 安装包直链/u],
+    ['credential exclusion', /API Key、Token、Cookie/u],
+    ['user-content exclusion', /完整 Prompt、完整 Session History、Tool Result/u],
+    ['SSH private-key exclusion', /SSH 私钥/u],
+    ['website no-upload disclosure', /官网不自动上报安装包点击/u],
   ]
   for (const [label, pattern] of requiredMarkers) {
     if (!pattern.test(html)) errors.push(`privacy page is missing required marker: ${label}`)
@@ -174,6 +175,19 @@ export function collectPrivacyErrors(html) {
     if (!/\brel=["'][^"']*\bnoreferrer\b[^"']*["']/i.test(match[0])) {
       errors.push(`privacy target=_blank link is missing rel=noreferrer: ${match[0]}`)
     }
+  }
+  return errors
+}
+
+export function collectWebsiteScriptErrors(script) {
+  const errors = []
+  const prohibitedMarkers = [
+    ['installer telemetry module', /download-telemetry\.mjs/u],
+    ['installer telemetry reporter', /reportInstallerDownloadClick/u],
+    ['Beacon upload', /\bsendBeacon\s*\(/u],
+  ]
+  for (const [label, pattern] of prohibitedMarkers) {
+    if (pattern.test(script)) errors.push(`website script must not contain ${label}`)
   }
   return errors
 }
@@ -194,9 +208,10 @@ export function collectDiscoveryErrors(sitemap, robots, llms, keyFile, expectedV
 }
 
 export async function validateWebsite() {
-  const [html, privacy, sitemap, robots, llms, keyFile, desktopPackage] = await Promise.all([
+  const [html, privacy, siteScript, sitemap, robots, llms, keyFile, desktopPackage] = await Promise.all([
     readFile(htmlPath, 'utf8'),
     readFile(privacyPath, 'utf8'),
+    readFile(siteScriptPath, 'utf8'),
     readFile(sitemapPath, 'utf8'),
     readFile(robotsPath, 'utf8'),
     readFile(llmsPath, 'utf8'),
@@ -207,6 +222,7 @@ export async function validateWebsite() {
   const errors = [
     ...await collectWebsiteErrors(html, version),
     ...collectPrivacyErrors(privacy),
+    ...collectWebsiteScriptErrors(siteScript),
     ...collectDiscoveryErrors(sitemap, robots, llms, keyFile, version),
   ]
   if (errors.length > 0) {

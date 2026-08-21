@@ -9,8 +9,11 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { GitService, gitSpawnArgv, type GitRunResult, type WorkspaceGate } from '../src/host/git-service.ts'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  GitService, gitSpawnArgv, subprocessRunner,
+  type GitRunResult, type WorkspaceGate,
+} from '../src/host/git-service.ts'
 
 const execFileAsync = promisify(execFile)
 
@@ -286,5 +289,81 @@ describe('gitSpawnArgv', () => {
     // spawn resolution that Node cannot launch directly. Naming git.exe
     // always reaches the native executable.
     expect(gitSpawnArgv('win32', ['status', '--porcelain'])).toEqual(['git.exe', 'status', '--porcelain'])
+  })
+})
+
+describe('subprocessRunner no-Git degradation', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('treats a missing Windows git.exe as unavailable instead of crashing the service', async () => {
+    const spawnError = Object.assign(new Error('spawn git.exe ENOENT'), { code: 'ENOENT' })
+    const ctx = {
+      subprocess: {
+        spawn: vi.fn(() => {
+          throw spawnError
+        }),
+      },
+    }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const workspace = 'C:\\workspace'
+    const service = new GitService(subprocessRunner(ctx as never, 'win32'), allowGate(workspace))
+
+    await expect(service.status(workspace)).resolves.toBeNull()
+
+    expect(ctx.subprocess.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      argv: ['git.exe', 'rev-parse', '--show-toplevel'],
+      cwd: workspace,
+    }))
+    expect(log).toHaveBeenCalledWith('[dsh-git-graph] git spawn failed:', spawnError)
+  })
+
+  it('returns collected output unchanged for a completed subprocess', async () => {
+    const ctx = {
+      subprocess: {
+        spawn: vi.fn(() => ({
+          done: Promise.resolve({ exitCode: 0 }),
+          collected: {
+            stdout: { readFrom: () => ({ text: 'main\n' }) },
+            stderr: { readFrom: () => ({ text: '' }) },
+          },
+        })),
+      },
+    }
+    const processRunner = subprocessRunner(ctx as never, 'win32')
+
+    await expect(processRunner.run(['branch', '--show-current'], 'C:\\workspace')).resolves.toEqual({
+      exitCode: 0,
+      stdout: 'main\n',
+      stderr: '',
+    })
+    expect(ctx.subprocess.spawn).toHaveBeenCalledWith(expect.objectContaining({
+      argv: ['git.exe', 'branch', '--show-current'],
+    }))
+  })
+
+  it('turns an asynchronous subprocess failure into a failed git result', async () => {
+    const runError = new Error('subprocess startup failed')
+    const ctx = {
+      subprocess: {
+        spawn: vi.fn(() => ({
+          done: Promise.reject(runError),
+          collected: {
+            stdout: { readFrom: () => ({ text: '' }) },
+            stderr: { readFrom: () => ({ text: '' }) },
+          },
+        })),
+      },
+    }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const processRunner = subprocessRunner(ctx as never)
+
+    await expect(processRunner.run(['status'], '/workspace')).resolves.toEqual({
+      exitCode: 127,
+      stdout: '',
+      stderr: 'git: run failed: subprocess startup failed',
+    })
+    expect(log).toHaveBeenCalledWith('[dsh-git-graph] git run failed:', runError)
   })
 })

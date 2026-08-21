@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/compat-patch-registry-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Compatibility Patch Registry v1",
+  "$comment": "The canonical 3.0 fields are required after normalization. The legacy aliases remain additive for 2.x readers.",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": true,
+    "required": ["id", "appliesTo", "upstreamReference", "owner", "tests", "removeWhen", "lastVerified"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      },
+      "appliesTo": { "$ref": "#/$defs/exactVersions" },
+      "upstreamReference": { "type": "string", "minLength": 8 },
+      "owner": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._/@-]{1,127}$"
+      },
+      "tests": { "$ref": "#/$defs/testPaths" },
+      "removeWhen": { "type": "string", "minLength": 8 },
+      "lastVerified": { "type": "string", "format": "date" },
+      "reason": { "type": "string", "minLength": 8 },
+      "applicableVersions": { "$ref": "#/$defs/exactVersions" },
+      "test": {
+        "type": "string",
+        "pattern": "^(?:(?:apps|packages)/[a-z0-9][a-z0-9._-]*/(?:test|tests)/|scripts/)[a-z0-9][a-z0-9._/-]*\\.(?:spec|test)\\.(?:[cm]?[jt]s|tsx)$"
+      }
+    }
+  },
+  "$defs": {
+    "exactVersions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+      }
+    },
+    "testPaths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:(?:apps|packages)/[a-z0-9][a-z0-9._-]*/(?:test|tests)/|scripts/)[a-z0-9][a-z0-9._/-]*\\.(?:spec|test)\\.(?:[cm]?[jt]s|tsx)$"
+      }
+    }
+  }
+}

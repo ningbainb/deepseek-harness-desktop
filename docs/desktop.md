@@ -4,13 +4,25 @@
 
 The desktop application is a thin lifecycle and security layer around the official DSH host. Electron starts `@deepseek-ai/dsh` with `--profile desktop --port 0`, waits for the official loopback URL line, probes HTTP readiness, and then loads that URL into the main window. The Web application, protocols, data paths, tools, and plugin system remain DSH implementations.
 
-The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, `dshmarket`, `dsh-codex-connect`, and `reasoning-slider` while preserving community bundles already added to that profile. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
+The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, `dsh-codex-connect`, and `reasoning-slider` while preserving community bundles already added to that profile. The native Extension Dock market fetches the public awesome-dsh-plugin index and sends confirmed installs through Desktop's transactional plugin manager; it is not a Runtime bundle. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
+
+## Desktop 3.0 platform policy
+
+Desktop 3.0.0 is the platform-stability release. The 2.x behavior documented below remains the compatibility foundation; new public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
+
+The Desktop Client SDK and Desktop Contract remain 1.x. Runtime Provider, Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility, Runtime matrix, and compat-patch inputs have machine-readable definitions. The applicable additive-change, deprecation, and major-version rules are in the [compatibility policy](compatibility-policy.md) and [schema versioning guide](schema-versioning.md).
+
+Stable Runtime selection is evidence-led: a Stable build and startup accept only `known-good` or `supported` matrix entries that satisfy the documented provider, Desktop range, integrity, lockfile, and patch conditions. `candidate` creates evidence only, and `blocked` cannot become a fallback. See the [Runtime support policy](runtime-support-policy.md) for the matrix fields, support windows, and upstream-change process.
+
+The Migration Assistant service covers the 2.3–2.7 migration matrix and produces a `safe`, `needs-confirmation`, or `blocked` plan. Recognized Task Store v2/v3 state is detected, validated, and included in the allowlisted snapshot/journal boundary. Legacy 2.3 browser-localStorage task state is deliberately `needs-confirmation`, and the scan does not expose its contents or counts. After explicit confirmation, supported preserved-origin v1 data is read only from the same-origin `dsh.taskBoard.v1` key through a hidden probe with a restrictive CSP, no scheduler, and no permissions; it is copied only into an empty v3 Host ledger and verified by task count and fingerprint while the original browser value remains intact. An unknown, missing, or changed origin blocks that copy and retains recovery/rollback guidance. The service journals a bounded global-state snapshot for resume or rollback and does not copy project content. The recovery contract and limitations are documented in [upgrade and rollback](upgrade-and-rollback.md).
+
+Desktop does not configure a telemetry endpoint by default and does not automatically upload diagnostics. A diagnostic JSON/ZIP is created only after user confirmation to a user-selected location; it contains a manifest and hashes and uses centralized redaction. The content boundary and non-goals are in [security boundaries](security-boundaries.md).
 
 ## Included desktop capabilities
 
 | Area | Behavior |
 | --- | --- |
-| Runtime | Official DSH host, random loopback port, HTTP readiness probe, graceful stop, bounded automatic restart; Windows window suppression stays at spawn level rather than the PowerShell command payload |
+| Runtime | One persistent official DSH host using the real `DSH_HOME` and `profiles/desktop`, random loopback port, HTTP readiness probe, graceful stop, bounded automatic restart, and an explicit `--no-open`; Windows window suppression stays at spawn level rather than the PowerShell command payload |
 | Web surface | Original DSH Web application and complete dsh-web-ui plugin/skin aggregate |
 | Conversation continuity | FIFO next-turn queue, automatic continuation after cancellation, normalized user-cancellation feedback |
 | Model recovery | Bounded backoff for rate limits, timeouts, network loss, and retryable server errors; immediate manual cancellation |
@@ -22,7 +34,8 @@ The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~
 | SSH operations | Three-second Linux telemetry for CPU, memory, disk, load, processes, and failed services, plus confirmed process and systemd actions |
 | Window | Single instance, persisted visible main geometry, native menu, download destination prompt; movable/resizable settings panel with minimum and persisted bounds; explicit quit/minimize-to-tray/ask close behavior |
 | Community | Help-menu QQ group QR and one-click join, direct GitHub issue feedback |
-| Updates | GitHub Releases first and by default, background download, user-confirmed restart/install, release notes, taskbar progress, QR-backed user-group installer fallback |
+| Updates | Stable is the default update channel; Beta is an explicit prerelease channel. GitHub Releases remain first and default, downloads remain backgrounded, and installation still needs user confirmation; neither channel automatically downgrades |
+| Migration and diagnostics | Migration Assistant covers the 2.3–2.7 matrix: recognized v2/v3 state is detected, validated, and snapshotted; the legacy browser-localStorage scan exposes no contents/counts. After confirmation, supported preserved-origin v1 data can be copied only into an empty v3 Host ledger and count/fingerprint verified without removing the original browser value; unknown/missing/changed origins block with recovery guidance. Snapshots/journals never copy project content. Diagnostics are user-initiated, redacted JSON/ZIP exports only |
 | Update handoff | Token-bound shutdown receipt v2, verified runtime/extension quiescence, constrained legacy cleanup fallback |
 | Renderer bridge | Contract v1.2 capability discovery, structured notifications, browser-safe Desktop client SDK, split main/extension preloads, sender-identity enforcement |
 | OS integration | Strict `dsh://` route allowlist, `.dshpreset` preview association, deduplicated foreground-aware notifications, and main-window-only workspace file opening |
@@ -35,6 +48,10 @@ The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~
 The Windows invocation retains the PowerShell wrapper where it is needed for streaming Runtime output, but it does not pass `-WindowStyle Hidden`. On Windows PowerShell 5.1, that flag combined with Electron Node mode and no console handle can cause the Runtime (including `--version`) to exit silently with `0xFFFFFFFF`; Electron's spawn-level `windowsHide` is the single window-suppression mechanism.
 
 Startup also normalizes legacy empty-object, empty-list, and comment-only patch files before profile resolution. A status-subscription or startup IPC failure is converted to a recoverable startup state rather than leaving the renderer at its initial 8% progress. The sanitized Runtime log remains the diagnostic source when readiness does not arrive.
+
+After a one-time native confirmation, the single primary Runtime runs with `danger-full-access` and approval policy `never` under the current Windows user. This does not request administrator rights or change PATH, the registry, or system permissions. The authorization is durable until revoked, but official Runtime support and file integrity are rechecked on every launch. Healthy startup never creates or enters `free-mode-sessions`; the former Free Mode is available only as an explicit isolated recovery session after the primary Runtime, Profile, or migration cannot start, and the primary Runtime is stopped before it launches.
+
+Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. Both primary and isolated recovery invocations contain exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
 ## Desktop 2.0 screenshots
 
@@ -62,11 +79,11 @@ The release keeps the official DSH runtime, Chromium, terminal/native modules, S
 
 ## Installation
 
-Download the x64 installer from GitHub Releases and verify its SHA-256 against `SHA256SUMS.txt`. The build is currently unsigned, so SmartScreen may display an unknown publisher. The default per-user location is recommended. Custom installation roots should be kept short because some transitive native tooling still depends on the legacy Win32 260-character path limit.
+Download the x64 installer from GitHub Releases and verify its SHA-256 against `SHA256SUMS.txt`. Each published Release also provides `release-manifest.json`, which records the actual signature state for every artifact. A local or source build may be unsigned; it does not establish the signing status of a published asset. When a release build sets `REQUIRE_SIGNING=true`, missing certificate material or a valid timestamp fails the release gate. The default per-user location is recommended. Custom installation roots should be kept short because some transitive native tooling still depends on the legacy Win32 260-character path limit.
 
-No separate Node.js or pnpm installation is required for release users.
+No separate Node.js or pnpm installation is required for release users. Desktop creates the stable `<userData>/runtime-bin/pnpm.cmd` shim and places that directory first only in the child PATH for the primary Runtime, persistent plugin installer, and built-in terminal. The terminal and installer use `~/.dsh/profiles/desktop` as cwd and never depend on a temporary recovery Profile.
 
-The installed app checks stable GitHub Releases after startup and every six hours, then downloads a discovered release in the background. Open `Help > Check for Updates` to check immediately. The update surface offers **Download from GitHub**, **Join user group**, and **Update later**. GitHub Releases is the only built-in/default transport. If GitHub is slow, the QR-backed QQ group `1105158177` provides a synchronized installer; the app does not enable or advertise third-party mirrors as a faster route. Administrators may explicitly opt in trusted HTTPS fallbacks through `DSH_DESKTOP_UPDATE_MIRRORS`, but those sources remain secondary to GitHub.
+The installed app defaults to the Stable channel, checks its GitHub Release feed after startup and every six hours, then downloads a discovered release in the background. Beta is selected explicitly and may accept prereleases; Stable rejects prereleases. Switching channels never authorizes an automatic downgrade. Open `Help > Check for Updates` to check immediately. The update surface offers **Download from GitHub**, **Join user group**, and **Update later**. GitHub Releases is the only built-in/default transport. If GitHub is slow, the QR-backed QQ group `1105158177` provides a synchronized installer; the app does not enable or advertise third-party mirrors as a faster route. Administrators may explicitly opt in trusted HTTPS fallbacks through `DSH_DESKTOP_UPDATE_MIRRORS`, but those sources remain secondary to GitHub.
 
 Installation still requires an explicit **Restart and install** action. Desktop stops and reaps the DSH child process before handing control to the installer. Automatic check failures remain in the desktop log; manual check failures are shown to the user.
 
@@ -78,7 +95,7 @@ Desktop persists one of **Quit**, **Minimize to tray and enable background autom
 
 Only the persistent **Minimize to tray and enable background automation** choice keeps the process and Runtime alive after the main window hides. The tray can restore the window, expose task/runtime status, open Extension Dock, check updates, or explicitly quit. Explicit quit, update installation, safe mode, and crash handling bypass tray hiding and stop the Runtime. Desktop does not claim to execute schedules after the application has fully exited.
 
-When that opt-in is active, the Runtime receives `DSH_DESKTOP_BACKGROUND_AUTOMATION=1`. The Task Board Host Scheduler can claim due slots and run them through the Desktop Runtime Provider; a missing, malformed, or unavailable adapter leaves browser scheduling as the safe fallback. See [Task Board v3](task-board-v3.md) for task state and review behavior.
+The persistent primary Runtime receives `DSH_DESKTOP_BACKGROUND_AUTOMATION=1` while Desktop is running, so the Task Board Host Scheduler can claim due slots through the Desktop Runtime Provider. The close preference decides whether Desktop and that Runtime remain alive after the main window hides; Quit still stops both and no schedule runs after process exit. A missing, malformed, or unavailable adapter leaves browser scheduling as the safe fallback. See [Task Board v3](task-board-v3.md) for task state and review behavior.
 
 ## Settings window and particle theme
 
@@ -93,6 +110,8 @@ Open `Tools > Extension Dock` from the native menu.
 Plugin installation accepts an npm registry package such as `@scope/dsh-bundle@1.2.3`. URL, path, whitespace, shell metacharacter, and option-like input is rejected. The package must declare a DSH bundle patch. Built-in package versions are displayed but can change only with a tested Desktop release.
 
 Opening Extension Dock checks only community packages for updates; normal application startup performs no registry requests. A candidate is assessed against the current Desktop, DSH runtime, Electron Node.js, and installed peer versions. Compatible versions can update directly, incompatible versions are blocked with a reason, and versions without enough metadata require explicit confirmation. The package is prefetched while DSH remains available, then switched to an exact version offline. If validation or restart fails, the previous manifest and lockfile are restored and the old runtime is restarted.
+
+Existing user plugins in the persistent Desktop Profile are preserved even when registry, publisher, or compatibility metadata is absent. A new external plugin still requires native source and code-execution confirmation. After revalidation it is installed into `profiles/desktop`, with a recoverable archive of package manifests, lockfiles, patches, and `node_modules` created before writes; installation or activation failure restores the archive and the previous Runtime.
 
 A community bundle can declare `dsh.compatibility` for Desktop and Runtime ranges, Desktop API range, required capabilities, allowed renderer Surfaces, and bounded runtime-test evidence. Extension Dock displays the requirement and evidence, blocks mismatches, and writes the diagnostic profile record `~/.dsh/profiles/desktop/desktop-plugins.lock.json` atomically after inventory or startup reconciliation. The lock is derived evidence, not a package manager lockfile and not an authority that can promote an untested version.
 

@@ -38,11 +38,38 @@ function normalizeContract(value) {
     if (!record || typeof record.apiVersion !== 'string' || typeof record.surface !== 'string' || !Array.isArray(record.capabilities)
         || !record.capabilities.every(item => typeof item === 'string'))
         return undefined;
+    const runtimeRecord = asRecord(record.runtime);
+    const runtime = runtimeRecord === undefined
+        ? undefined
+        : normalizeRuntimeContract(runtimeRecord);
     return Object.freeze({
         apiVersion: record.apiVersion,
         surface: record.surface,
         capabilities: Object.freeze([...record.capabilities]),
-        ...(asRecord(record.runtime) === undefined ? {} : { runtime: record.runtime }),
+        ...(runtime === undefined ? {} : { runtime }),
+    });
+}
+function normalizeRuntimeContract(value) {
+    const supportStatuses = new Set(['known-good', 'supported', 'candidate', 'blocked', 'degraded', 'unsupported']);
+    const capabilityStatuses = new Set(['available', 'unavailable', 'unsupported']);
+    if (typeof value.providerId !== 'string' || value.providerId.length === 0 || value.providerId.length > 128
+        || typeof value.upstreamVersion !== 'string' || value.upstreamVersion.length === 0 || value.upstreamVersion.length > 128
+        || !supportStatuses.has(value.supportStatus) || !Array.isArray(value.capabilities))
+        return undefined;
+    const capabilities = value.capabilities.map((entry) => {
+        const item = asRecord(entry);
+        if (!item || typeof item.id !== 'string' || item.id.length === 0 || item.id.length > 128
+            || !capabilityStatuses.has(item.status))
+            return undefined;
+        return Object.freeze({ id: item.id, status: item.status });
+    });
+    if (capabilities.some((entry) => entry === undefined))
+        return undefined;
+    return Object.freeze({
+        providerId: value.providerId,
+        upstreamVersion: value.upstreamVersion,
+        supportStatus: value.supportStatus,
+        capabilities: Object.freeze(capabilities),
     });
 }
 function normalizeStatus(value) {
@@ -87,6 +114,13 @@ function normalizeWorkspaceFileRequest(value) {
     }
     return Object.freeze({ root, path });
 }
+function requireSafeDeepLinkId(value, label) {
+    const id = requireNonEmptyString(value, label);
+    if (!/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(id)) {
+        throw new DesktopClientError('desktop-invalid-argument', `${label} must be a safe Desktop identifier`);
+    }
+    return id;
+}
 function normalizeNotificationResult(value) {
     const record = asRecord(value);
     if (!record || typeof record.shown !== 'boolean')
@@ -105,6 +139,10 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         if (typeof bridge?.getContract !== 'function')
             return unavailable();
         return normalizeContract(await bridge.getContract()) ?? unavailable();
+    };
+    const hasBridgeCapability = async (name) => {
+        const contract = await getContract();
+        return !('available' in contract) && contract.capabilities.includes(name);
     };
     return Object.freeze({
         getDesktopInfo,
@@ -134,6 +172,8 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         async showNotification(request) {
             if (typeof bridge?.showNotification !== 'function')
                 return unavailable();
+            if (!await hasBridgeCapability('notifications.show'))
+                return unavailable();
             return normalizeNotificationResult(await bridge.showNotification(request));
         },
         subscribeDeepLinks(handler) {
@@ -147,22 +187,43 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         },
         async openDesktopSurface(surface) {
             if (surface === 'extensions' && typeof bridge?.toolAction === 'function') {
+                if (!await hasBridgeCapability('extensions.manage'))
+                    return false;
                 await bridge.toolAction('extensions');
                 return true;
             }
             if (surface === 'updates' && typeof bridge?.helpAction === 'function') {
+                if (!await hasBridgeCapability('updates.read'))
+                    return false;
                 await bridge.helpAction('updates');
                 return true;
             }
             return false;
         },
         async openWorkspaceFile(request) {
+            const normalizedRequest = normalizeWorkspaceFileRequest(request);
             if (typeof bridge?.openWorkspaceFile !== 'function')
                 return unavailable();
-            const result = asRecord(await bridge.openWorkspaceFile(normalizeWorkspaceFileRequest(request)));
+            if (!await hasBridgeCapability('workspace-files.open'))
+                return unavailable();
+            const result = asRecord(await bridge.openWorkspaceFile(normalizedRequest));
             if (!result || typeof result.opened !== 'boolean')
                 return Object.freeze({ opened: false, reason: 'unavailable' });
             return Object.freeze({ opened: result.opened, ...(typeof result.reason === 'string' ? { reason: result.reason } : {}) });
+        },
+        async requestPluginInstall(request) {
+            const source = request?.source;
+            if (typeof source !== 'string' || source.length === 0 || source.length > 2_048) {
+                throw new DesktopClientError('desktop-invalid-argument', 'plugin install source must be a bounded non-empty string');
+            }
+            if (typeof bridge?.requestPluginInstall !== 'function')
+                return unavailable();
+            if (!await hasBridgeCapability('plugins.install.request'))
+                return unavailable();
+            const result = asRecord(await bridge.requestPluginInstall(source));
+            if (!result || typeof result.accepted !== 'boolean')
+                return unavailable();
+            return Object.freeze({ accepted: result.accepted });
         },
     });
 }
@@ -176,9 +237,10 @@ export const showNotification = defaultClient.showNotification;
 export const subscribeDeepLinks = defaultClient.subscribeDeepLinks;
 export const openDesktopSurface = defaultClient.openDesktopSurface;
 export const openWorkspaceFile = defaultClient.openWorkspaceFile;
+export const requestPluginInstall = defaultClient.requestPluginInstall;
 export function taskDeepLink(taskId) {
-    return `dsh://task/${requireNonEmptyString(taskId, 'task id')}`;
+    return `dsh://task/${requireSafeDeepLinkId(taskId, 'task id')}`;
 }
 export function runDeepLink(runId) {
-    return `dsh://run/${requireNonEmptyString(runId, 'run id')}`;
+    return `dsh://run/${requireSafeDeepLinkId(runId, 'run id')}`;
 }

@@ -42,6 +42,32 @@ html[data-dsh-desktop-window-chrome="true"] body {
   padding-top: var(--dsh-desktop-window-chrome-height) !important;
 }
 
+/* The DSH web shell may pin #root to the viewport with fixed/absolute
+   positioning, which ignores body padding. Bound the application root to the
+   physical area below the native caption overlay in both positioned and
+   normal-flow layouts. */
+html[data-dsh-desktop-window-chrome="true"] body > #root {
+  box-sizing: border-box !important;
+  height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+}
+
+html[data-dsh-desktop-window-chrome="true"] body > #root.dsh-desktop-viewport-root {
+  top: var(--dsh-desktop-window-chrome-height) !important;
+}
+
+html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+/* Optional skins render their own decorative fixed title bar outside #root.
+   Keep it visible, but never underneath the native Desktop controls. */
+html[data-dsh-desktop-window-chrome="true"] body > [data-skin-chrome="titlebar"] {
+  transform: translateY(var(--dsh-desktop-window-chrome-height)) !important;
+}
+
 #${WINDOW_CHROME_ID} {
   -webkit-app-region: drag;
   box-sizing: border-box;
@@ -220,6 +246,7 @@ export function windowChromeBrowserOptions(rawTheme = 'dark') {
 export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu = false } = {}) {
   const data = JSON.stringify({
     id: WINDOW_CHROME_ID,
+    chromeHeight: WINDOW_CHROME_HEIGHT,
     showHelpMenu: Boolean(showHelpMenu),
     showToolsMenu: Boolean(showToolsMenu),
   })
@@ -293,7 +320,10 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
       if (canShowTools) addMenu({
         kind: 'tools',
         label: '工具 / Tools',
-        entries: [{ label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: 'Ctrl+Shift+X' }],
+        entries: [
+          { label: '内置终端 / Built-in Terminal', action: 'terminal', shortcut: 'Ctrl+Alt+T' },
+          { label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: 'Ctrl+Shift+X' },
+        ],
         invoke: (action) => window.dshDesktop.toolAction(action),
       });
       if (canShowHelp) addMenu({
@@ -352,7 +382,15 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         }
       });
     };
-    const sync = () => { syncTheme(); markModalLayers(); };
+    const markViewportRoot = () => {
+      const root = document.body.querySelector(':scope > #root');
+      if (!root) return;
+      const position = getComputedStyle(root).position;
+      const overlapsChrome = (position === 'fixed' || position === 'absolute')
+        && root.getBoundingClientRect().top < data.chromeHeight;
+      root.classList.toggle('dsh-desktop-viewport-root', overlapsChrome);
+    };
+    const sync = () => { syncTheme(); markViewportRoot(); markModalLayers(); };
     new MutationObserver(sync).observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class', 'style', 'data-ds-dark-theme'],

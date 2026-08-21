@@ -1,0 +1,3 @@
+- insert:
+    - id: desktop-compat-example
+      name: '@example/dsh-desktop-compat-example'

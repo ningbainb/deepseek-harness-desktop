@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, win32 } from 'node:path'
 import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import semver from 'semver'
 import { parse as parseYaml } from 'yaml'
@@ -14,6 +14,7 @@ import {
   materializeFilesystemPath,
   packagePathSegments,
 } from '../profile.mjs'
+import { assertExternalPluginDescriptor } from '../external-plugin-source.mjs'
 import { assessPluginCompatibility } from './plugin-compatibility.mjs'
 import { PluginRegistry } from './plugin-registry.mjs'
 
@@ -23,6 +24,9 @@ const PROTECTED_PACKAGES = new Set([
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
 ])
+const PLUGIN_PROFILE_SCOPES = new Set(['desktop', 'isolated-free-mode'])
+const MAX_PNPM_PATH_ENTRIES = 64
+const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i
 const SHA512_INTEGRITY_PATTERN = /^sha512-[a-z0-9+/]+={0,2}$/iu
 const UNKNOWN_COMPATIBILITY = Object.freeze({
@@ -239,6 +243,47 @@ function compatibilityError(message, code, compatibility) {
   return error
 }
 
+function normalizePreserveEnabledNames(value) {
+  if (value === undefined) return new Set()
+  if (!(value instanceof Set)) {
+    throw new TypeError('preserveEnabledNames must be a Set of package names')
+  }
+  const names = new Set()
+  for (const name of value) {
+    const parsed = validatePluginSpec(name)
+    if (parsed.name !== name || parsed.spec !== name) {
+      throw new TypeError('preserveEnabledNames must contain package names without a version')
+    }
+    names.add(name)
+  }
+  return names
+}
+
+/**
+ * A git/HTTPS source cannot truthfully name its package before pnpm fetches
+ * it. After the confirmed install, the profile manifest is the authority: it
+ * must contain exactly one changed dependency key. This is not a compatibility
+ * gate; it merely avoids putting an opaque renderer placeholder into the DSH
+ * bundle list or node_modules path.
+ */
+function installedExternalPackageName(beforeManifest, afterManifest, descriptor) {
+  const beforeDependencies = beforeManifest?.dependencies ?? {}
+  const afterDependencies = afterManifest?.dependencies ?? {}
+  const declaredName = descriptor.package.identity === 'opaque'
+    ? undefined
+    : descriptor.package.name
+  if (declaredName !== undefined && typeof afterDependencies[declaredName] === 'string') {
+    return declaredName
+  }
+  const changedNames = Object.keys(afterDependencies)
+    .filter((name) => afterDependencies[name] !== beforeDependencies[name])
+    .toSorted()
+  if (changedNames.length !== 1) {
+    throw new Error('full-access external install did not produce one identifiable profile dependency')
+  }
+  return validatePluginSpec(changedNames[0]).name
+}
+
 async function writeTextFile(path, content) {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`
   await writeFile(temporary, content, { flag: 'wx' })
@@ -279,11 +324,76 @@ export function resolvePnpmCliPath(anchor = import.meta.url) {
   return materializeFilesystemPath(join(dirname(require.resolve('pnpm')), 'bin', 'pnpm.mjs'))
 }
 
-export function runPnpm({ pnpmCli, profileDir, args, executable = process.execPath }) {
+function pnpmPathDelimiter(platform) {
+  return platform === 'win32' ? win32.delimiter : ':'
+}
+
+function normalizePnpmPathEntries(value, { platform = process.platform } = {}) {
+  if (!Array.isArray(value) || value.length > MAX_PNPM_PATH_ENTRIES) {
+    throw new TypeError('pnpm PATH entries must be a bounded array')
+  }
+  const entryDelimiter = pnpmPathDelimiter(platform)
+  const isAbsolutePath = platform === 'win32' ? win32.isAbsolute : isAbsolute
+  return Object.freeze(value.map((entry) => {
+    if (
+      typeof entry !== 'string'
+      || entry.length === 0
+      || entry.length > MAX_PNPM_PATH_ENTRY_LENGTH
+      || /[\0\r\n]/u.test(entry)
+      || entry.includes(entryDelimiter)
+      || !isAbsolutePath(entry)
+    ) {
+      throw new TypeError('pnpm PATH entry is invalid')
+    }
+    return entry
+  }))
+}
+
+/**
+ * Build a child-only pnpm environment. On Windows the conventional `Path`
+ * spelling is preserved and all case aliases are collapsed before prepending
+ * verified entries, avoiding duplicate case-insensitive environment keys.
+ */
+export function createPnpmEnvironment({
+  pathEntries = [],
+  environment = process.env,
+  platform = process.platform,
+} = {}) {
+  if (environment === null || typeof environment !== 'object' || Array.isArray(environment)) {
+    throw new TypeError('pnpm environment must be an object')
+  }
+  if (typeof platform !== 'string' || platform.length === 0) {
+    throw new TypeError('pnpm platform is invalid')
+  }
+  const entries = normalizePnpmPathEntries(pathEntries, { platform })
+  const childEnvironment = { ...environment, ELECTRON_RUN_AS_NODE: '1' }
+  // With no injected entry, preserve legacy child-environment behavior
+  // exactly, including the parent platform's original PATH key casing.
+  if (entries.length === 0) return childEnvironment
+
+  const pathKeys = platform === 'win32'
+    ? Object.keys(childEnvironment).filter((key) => key.toUpperCase() === 'PATH')
+    : ['PATH']
+  const pathKey = platform === 'win32' ? pathKeys[0] ?? 'Path' : 'PATH'
+  const inheritedPath = childEnvironment[pathKey]
+  if (inheritedPath !== undefined && typeof inheritedPath !== 'string') {
+    throw new TypeError('pnpm inherited PATH is invalid')
+  }
+  if (platform === 'win32') {
+    for (const key of pathKeys) delete childEnvironment[key]
+  }
+  childEnvironment[pathKey] = [...entries, inheritedPath]
+    .filter((entry) => typeof entry === 'string' && entry.length > 0)
+    .join(pnpmPathDelimiter(platform))
+  return childEnvironment
+}
+
+export function runPnpm({ pnpmCli, profileDir, args, executable = process.execPath, pathEntries = [] }) {
   return new Promise((resolve, reject) => {
+    const environment = createPnpmEnvironment({ pathEntries })
     const child = spawn(executable, [pnpmCli, ...args], {
       cwd: profileDir,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      env: environment,
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -308,7 +418,10 @@ export class PluginManager {
     executable = process.execPath,
     registry = new PluginRegistry(),
     hostCompatibility,
+    profileScope = 'desktop',
+    pathEntries = [],
     beforeMutation = async () => {},
+    profileArchive,
   }) {
     this.profileDir = profileDir
     this.pnpmCli = pnpmCli
@@ -316,8 +429,15 @@ export class PluginManager {
     this.executable = executable
     this.registry = registry
     this.hostCompatibility = hostCompatibility
+    if (!PLUGIN_PROFILE_SCOPES.has(profileScope)) throw new TypeError('plugin profile scope is invalid')
+    this.profileScope = profileScope
+    this.pathEntries = normalizePnpmPathEntries(pathEntries)
     if (typeof beforeMutation !== 'function') throw new TypeError('beforeMutation must be a function')
     this.beforeMutation = beforeMutation
+    if (profileArchive !== undefined && typeof profileArchive.begin !== 'function') {
+      throw new TypeError('profileArchive must provide begin()')
+    }
+    this.profileArchive = profileArchive
     this.updateStates = new Map()
     this.queue = Promise.resolve()
   }
@@ -326,6 +446,18 @@ export class PluginManager {
     const result = this.queue.then(operation, operation)
     this.queue = result.catch(() => {})
     return result
+  }
+
+  #runPnpm(args) {
+    return this.runner({
+      pnpmCli: this.pnpmCli,
+      profileDir: this.profileDir,
+      executable: this.executable,
+      args,
+      // Preserve the runner's historical input shape unless Electron main
+      // explicitly supplied a child-only PATH prefix.
+      ...(this.pathEntries.length === 0 ? {} : { pathEntries: this.pathEntries }),
+    })
   }
 
   async inventory() {
@@ -476,12 +608,7 @@ export class PluginManager {
         )
       }
       const spec = `${parsed.name}@${candidate.version}`
-      await this.runner({
-        pnpmCli: this.pnpmCli,
-        profileDir: this.profileDir,
-        executable: this.executable,
-        args: ['store', 'add', spec],
-      })
+      await this.#runPnpm(['store', 'add', spec])
       return Object.freeze({
         name: parsed.name,
         version: candidate.version,
@@ -558,12 +685,7 @@ export class PluginManager {
         })
       }))
 
-      await this.runner({
-        pnpmCli: this.pnpmCli,
-        profileDir: this.profileDir,
-        executable: this.executable,
-        args: ['store', 'add', ...candidates.map((candidate) => candidate.spec)],
-      })
+      await this.#runPnpm(['store', 'add', ...candidates.map((candidate) => candidate.spec)])
       return Object.freeze({ items: Object.freeze(candidates) })
     })
   }
@@ -599,14 +721,9 @@ export class PluginManager {
     await writeTextFile(manifestPath, snapshot.manifest)
     if (snapshot.lock === undefined) await rm(lockPath, { force: true })
     else await writeTextFile(lockPath, snapshot.lock)
-    await this.runner({
-      pnpmCli: this.pnpmCli,
-      profileDir: this.profileDir,
-      executable: this.executable,
-      args: snapshot.lock === undefined
-        ? ['install', '--offline', '--lockfile=false']
-        : ['install', '--offline', '--frozen-lockfile'],
-    })
+    await this.#runPnpm(snapshot.lock === undefined
+      ? ['install', '--offline', '--lockfile=false']
+      : ['install', '--offline', '--frozen-lockfile'])
     // pnpm should leave both inputs unchanged, but restore them once more so
     // a future pnpm release cannot widen the rollback snapshot implicitly.
     await writeTextFile(manifestPath, snapshot.manifest)
@@ -629,12 +746,7 @@ export class PluginManager {
       const snapshot = await captureProfileSnapshot(this.profileDir)
       const previous = await readInstalledManifest(this.profileDir, prepared.name)
       try {
-        await this.runner({
-          pnpmCli: this.pnpmCli,
-          profileDir: this.profileDir,
-          executable: this.executable,
-          args: ['add', prepared.spec, '--save-exact', '--offline'],
-        })
+        await this.#runPnpm(['add', prepared.spec, '--save-exact', '--offline'])
         const installed = await readInstalledManifest(this.profileDir, prepared.name)
         if (installed?.name !== prepared.name || installed?.version !== prepared.version) {
           throw new Error(`installed package identity does not match ${prepared.spec}`)
@@ -710,12 +822,7 @@ export class PluginManager {
       const snapshot = await captureProfileSnapshot(this.profileDir)
       const previous = await readInstalledManifests(this.profileDir, names)
       try {
-        await this.runner({
-          pnpmCli: this.pnpmCli,
-          profileDir: this.profileDir,
-          executable: this.executable,
-          args: ['add', ...items.map((item) => item.spec), '--save-exact', '--offline'],
-        })
+        await this.#runPnpm(['add', ...items.map((item) => item.spec), '--save-exact', '--offline'])
         const lock = await readOptionalFile(join(this.profileDir, 'pnpm-lock.yaml'))
         if (lock === undefined) throw new Error('installed lockfile is missing')
         for (const item of items) {
@@ -793,7 +900,15 @@ export class PluginManager {
     })
   }
 
-  reconcileCompatibility() {
+  /**
+   * Disable incompatible community bundles unless Electron main explicitly
+   * supplies their already-approved full-access package names. The manager
+   * never reads authorization state itself, so normal startup policy remains
+   * fail-closed when no trusted name set is supplied.
+   */
+  reconcileCompatibility({ preserveEnabledNames, preserveAllEnabled = false } = {}) {
+    const preservedNames = normalizePreserveEnabledNames(preserveEnabledNames)
+    if (typeof preserveAllEnabled !== 'boolean') throw new TypeError('preserveAllEnabled must be a boolean')
     return this.#enqueue(async () => {
       const manifest = await readManifest(this.profileDir)
       const bundles = new Set(manifest.dsh?.profile?.bundles ?? [])
@@ -802,18 +917,28 @@ export class PluginManager {
         .toSorted()
       const installedManifests = await readInstalledManifests(this.profileDir, communityNames)
       const disabled = []
+      const preserved = []
       for (const name of communityNames) {
         if (!bundles.has(name)) continue
         const compatibility = await this.#assess(installedManifests.get(name))
         if (compatibility.status !== 'incompatible') continue
+        if (preserveAllEnabled || preservedNames.has(name)) {
+          preserved.push(Object.freeze({ name, reasons: compatibility.reasons }))
+          continue
+        }
         bundles.delete(name)
         disabled.push(Object.freeze({ name, reasons: compatibility.reasons }))
       }
-      if (disabled.length === 0) return Object.freeze({ changed: false, disabled: Object.freeze([]) })
+      const reconciliation = {
+        changed: disabled.length > 0,
+        disabled: Object.freeze(disabled),
+        ...(preserved.length === 0 ? {} : { preserved: Object.freeze(preserved) }),
+      }
+      if (disabled.length === 0) return Object.freeze(reconciliation)
       await this.beforeMutation({ type: 'compatibility-disable', names: disabled.map((item) => item.name) })
       manifest.dsh = { ...(manifest.dsh ?? {}), profile: { bundles: [...bundles] } }
       await writeManifest(this.profileDir, manifest)
-      return Object.freeze({ changed: true, disabled: Object.freeze(disabled) })
+      return Object.freeze(reconciliation)
     })
   }
 
@@ -825,12 +950,7 @@ export class PluginManager {
       const previous = await readFile(join(this.profileDir, 'package.json'), 'utf8')
       let added = false
       try {
-        await this.runner({
-          pnpmCli: this.pnpmCli,
-          profileDir: this.profileDir,
-          executable: this.executable,
-          args: ['add', parsed.spec, '--save-exact'],
-        })
+        await this.#runPnpm(['add', parsed.spec, '--save-exact'])
         added = true
         const packageManifest = JSON.parse(await readFile(
           join(this.profileDir, 'node_modules', ...packagePathSegments(parsed.name), 'package.json'),
@@ -848,15 +968,113 @@ export class PluginManager {
         return { name: parsed.name, version: packageManifest.version, restartRequired: true }
       } catch (error) {
         if (added) {
-          await this.runner({
-            pnpmCli: this.pnpmCli,
-            profileDir: this.profileDir,
-            executable: this.executable,
-            args: ['remove', parsed.name],
-          }).catch(() => {})
+          await this.#runPnpm(['remove', parsed.name]).catch(() => {})
         }
         await writeFile(join(this.profileDir, 'package.json'), previous)
         throw error
+      }
+    })
+  }
+
+  /**
+   * Install an already-resolved local plugin after the main process has
+   * obtained an explicit full-access user grant. This is deliberately a
+   * separate API from `install()`: it accepts only a resolver descriptor and
+   * does not apply registry, integrity, compatibility, or DSH-bundle policy
+   * checks. It still refuses Desktop-managed package identities: user consent
+   * authorizes the external Runtime code, not replacing the Desktop recovery
+   * surface or the reviewed Runtime dependency graph in the normal profile.
+  */
+  installFullAccessExternal(descriptor) {
+    const external = assertExternalPluginDescriptor(descriptor)
+    const mayReplaceManagedIdentity = this.profileScope === 'isolated-free-mode'
+    if (!mayReplaceManagedIdentity && external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
+      throw new Error(`${external.package.name} is a built-in desktop plugin and cannot be replaced by an external source`)
+    }
+    const installSpec = external.installSpec
+    const sourceId = external.sourceId
+    const candidateId = external.candidateId
+    return this.#enqueue(async () => {
+      await this.beforeMutation({
+        type: 'full-access-external-install',
+        name: external.package.name,
+        sourceId,
+        candidateId,
+      })
+      const archiveTransaction = await this.profileArchive?.begin({
+        operation: 'full-access-external-plugin-install',
+        nodeModulesTransfer: 'auto',
+      })
+      let snapshot
+      try {
+        snapshot = await captureProfileSnapshot(this.profileDir)
+        const beforeManifest = await readManifest(this.profileDir)
+        await this.#runPnpm(['add', installSpec, '--save-exact'])
+        const manifest = await readManifest(this.profileDir)
+        const name = installedExternalPackageName(beforeManifest, manifest, external)
+        // Opaque remote sources declare their package identity only after pnpm
+        // materializes them. Check again here, inside the snapshot-backed
+        // transaction, so a same-name core package is restored rather than
+        // persisted into the normal Desktop profile.
+        if (!mayReplaceManagedIdentity && PROTECTED_PACKAGES.has(name)) {
+          throw new Error(`${name} is a built-in desktop plugin and cannot be replaced by an external source`)
+        }
+        const installed = await readInstalledManifest(this.profileDir, name)
+        if (installed === undefined) {
+          throw new Error(`full-access external install did not materialize ${name}`)
+        }
+        const version = typeof installed.version === 'string'
+          ? installed.version
+          : external.package.version
+        const profile = manifest.dsh?.profile ?? {}
+        const bundles = new Set(profile.bundles ?? [])
+        bundles.add(name)
+        manifest.dsh = {
+          ...(manifest.dsh ?? {}),
+          profile: { ...profile, bundles: [...bundles] },
+        }
+        await writeManifest(this.profileDir, manifest)
+        this.updateStates.delete(name)
+        await archiveTransaction?.markApplied()
+
+        let active = true
+        const rollback = () => this.#enqueue(async () => {
+          if (!active) return false
+          active = false
+          if (archiveTransaction) await archiveTransaction.rollback()
+          else if (snapshot) await this.#restoreProfileSnapshot(snapshot)
+          this.updateStates.delete(name)
+          return true
+        })
+        return Object.freeze({
+          result: Object.freeze({
+            name,
+            ...(typeof version === 'string' ? { version } : {}),
+            fullAccess: true,
+            restartRequired: true,
+          }),
+          async commit() {
+            if (!active) return false
+            await archiveTransaction?.commit()
+            active = false
+            return true
+          },
+          rollback,
+        })
+      } catch (error) {
+        try {
+          if (archiveTransaction) await archiveTransaction.rollback()
+          else if (snapshot) await this.#restoreProfileSnapshot(snapshot)
+        } catch (rollbackError) {
+          throw new Error(
+            `full-access external plugin mutation failed and rollback failed: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(rollbackError?.message ?? rollbackError).slice(0, 1_000)}`,
+            { cause: new AggregateError([error, rollbackError]) },
+          )
+        }
+        throw new Error(
+          `full-access external plugin mutation failed and was rolled back: ${String(error?.message ?? error).slice(0, 1_000)}`,
+          { cause: error },
+        )
       }
     })
   }
@@ -869,12 +1087,7 @@ export class PluginManager {
       await this.beforeMutation({ type: 'remove', name })
       const snapshot = await captureProfileSnapshot(this.profileDir)
       try {
-        await this.runner({
-          pnpmCli: this.pnpmCli,
-          profileDir: this.profileDir,
-          executable: this.executable,
-          args: ['remove', name],
-        })
+        await this.#runPnpm(['remove', name])
         const manifest = await readManifest(this.profileDir)
         if (manifest.dependencies) delete manifest.dependencies[name]
         const profile = manifest.dsh?.profile ?? {}

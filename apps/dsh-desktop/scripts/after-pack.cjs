@@ -1,5 +1,7 @@
-const { cp, mkdir, readdir, rm, stat, writeFile } = require('node:fs/promises')
-const { dirname, join, relative } = require('node:path')
+const { cp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node:fs/promises')
+const { dirname, extname, isAbsolute, join, relative, resolve } = require('node:path')
+
+const sharp = require('sharp')
 
 // electron-builder cannot always disambiguate pnpm packages that have several
 // peer-dependency snapshots. These are required by the DSH boot graph, so copy
@@ -29,6 +31,8 @@ const SOURCE_ROOTS = new Map([
 const DEVELOPMENT_DIRECTORIES = new Set([
   '__tests__',
   'coverage',
+  'demo',
+  'demos',
   'example',
   'examples',
   'test',
@@ -42,6 +46,9 @@ const FIRST_PARTY_SOURCE_DIRECTORIES = new Set([
 ])
 
 const FIRST_PARTY_BUILD_FILES = /^(?:tsconfig(?:\.[^.]+)?\.json|tsdown\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s)$/u
+const RETIRED_SKIN_CARRIER_ASSETS = ['@linxin666', 'dsh-skins', 'skins']
+const SKIN_CENTER_ROOT = ['@linxin666', 'dsh-client-ui-skin-center', 'skins']
+const SKIN_PREVIEW_BOUNDS = Object.freeze({ width: 1440, height: 900 })
 
 function splitPackagePath(relativePath) {
   const parts = relativePath.split(/[\\/]/u)
@@ -101,13 +108,161 @@ async function listFiles(root) {
   return files
 }
 
-async function prunePackagedRuntime(nodeModulesRoot) {
-  const files = await listFiles(nodeModulesRoot)
+function constraintAllowsTarget(values, target) {
+  if (!Array.isArray(values) || values.length === 0) return true
+  const normalized = values
+    .filter(value => typeof value === 'string')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+  const wanted = String(target).trim().toLowerCase()
+  if (normalized.includes(`!${wanted}`)) return false
+  const positive = normalized.filter(value => !value.startsWith('!'))
+  return positive.length === 0 || positive.includes(wanted)
+}
+
+function packageSupportsPlatform(manifest, { platform = 'win32', arch = 'x64' } = {}) {
+  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) return true
+  return constraintAllowsTarget(manifest.os, platform)
+    && constraintAllowsTarget(manifest.cpu, arch)
+}
+
+async function listTopLevelPackageDirectories(nodeModulesRoot) {
+  const directories = []
+  const entries = await readdir(nodeModulesRoot, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const entryPath = join(nodeModulesRoot, entry.name)
+    if (!entry.name.startsWith('@')) {
+      directories.push(entryPath)
+      continue
+    }
+    for (const child of await readdir(entryPath, { withFileTypes: true })) {
+      if (child.isDirectory()) directories.push(join(entryPath, child.name))
+    }
+  }
+  return directories
+}
+
+async function pruneForeignPlatformPackages(nodeModulesRoot, report, target) {
+  const packageDirectories = await listTopLevelPackageDirectories(nodeModulesRoot)
+  for (const packageRoot of packageDirectories) {
+    let manifest
+    try {
+      manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error instanceof SyntaxError) continue
+      throw error
+    }
+    if (packageSupportsPlatform(manifest, target)) continue
+    const files = await listFiles(packageRoot)
+    let removedBytes = 0
+    for (const path of files) removedBytes += (await stat(path)).size
+    await rm(packageRoot, { recursive: true, force: true })
+    report.removedFiles += files.length
+    report.removedBytes += removedBytes
+    report.categories['foreign-platform-package'] = (
+      report.categories['foreign-platform-package'] ?? 0
+    ) + files.length
+  }
+}
+
+async function optimizePackagedSkinPreviews(nodeModulesRoot, report) {
+  const catalogRoot = join(nodeModulesRoot, ...SKIN_CENTER_ROOT)
+  let skins
+  try {
+    skins = await readdir(catalogRoot, { withFileTypes: true })
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  for (const skin of skins) {
+    if (!skin.isDirectory()) continue
+    const skinRoot = join(catalogRoot, skin.name)
+    let manifest
+    try {
+      manifest = JSON.parse(await readFile(join(skinRoot, 'skin.json'), 'utf8'))
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error instanceof SyntaxError) continue
+      throw error
+    }
+    const previews = new Set([manifest.preview?.light, manifest.preview?.dark].filter(
+      value => typeof value === 'string' && value.length > 0,
+    ))
+    for (const preview of previews) {
+      const previewPath = resolve(skinRoot, preview)
+      const difference = relative(skinRoot, previewPath)
+      if (
+        difference.length === 0
+        || difference.startsWith('..')
+        || isAbsolute(difference)
+        || extname(previewPath).toLowerCase() !== '.png'
+      ) {
+        continue
+      }
+      let source
+      try {
+        source = await readFile(previewPath)
+      } catch (error) {
+        if (error?.code === 'ENOENT') continue
+        throw error
+      }
+      const metadata = await sharp(source).metadata()
+      if (
+        (metadata.width ?? 0) <= SKIN_PREVIEW_BOUNDS.width
+        && (metadata.height ?? 0) <= SKIN_PREVIEW_BOUNDS.height
+      ) {
+        continue
+      }
+      const optimized = await sharp(source)
+        .resize({ ...SKIN_PREVIEW_BOUNDS, fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 7 })
+        .toBuffer()
+      if (optimized.length >= source.length) continue
+      await writeFile(previewPath, optimized)
+      report.optimizedFiles += 1
+      report.optimizedBytes += source.length - optimized.length
+      report.optimizations['skin-preview'] = (report.optimizations['skin-preview'] ?? 0) + 1
+    }
+  }
+}
+
+async function pruneRetiredSkinCarrierAssets(nodeModulesRoot, report) {
+  // dsh-skins 0.2.5 remains as a compatibility carrier whose only runtime
+  // role is to depend on Skin Center v2. Skin Center owns the live catalog;
+  // the carrier's nested legacy skin tree is neither loaded nor needed in a
+  // Desktop profile, and duplicates every shipped asset in the package.
+  const assetRoot = join(nodeModulesRoot, ...RETIRED_SKIN_CARRIER_ASSETS)
+  let files
+  try {
+    files = await listFiles(assetRoot)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+
+  let removedBytes = 0
+  for (const path of files) removedBytes += (await stat(path)).size
+  await rm(assetRoot, { recursive: true, force: true })
+  report.removedFiles += files.length
+  report.removedBytes += removedBytes
+  report.categories['retired-skin-assets'] = (report.categories['retired-skin-assets'] ?? 0) + files.length
+}
+
+async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32', arch: 'x64' }) {
   const report = {
     removedBytes: 0,
     removedFiles: 0,
     categories: {},
+    optimizedBytes: 0,
+    optimizedFiles: 0,
+    optimizations: {},
   }
+
+  // pnpm retains optional binaries for every published platform. A Windows
+  // x64 artifact cannot execute those packages, so remove their complete
+  // directories before inspecting individual runtime files.
+  await pruneForeignPlatformPackages(nodeModulesRoot, report, target)
+  const files = await listFiles(nodeModulesRoot)
 
   for (const path of files) {
     const relativePath = relative(nodeModulesRoot, path)
@@ -119,6 +274,9 @@ async function prunePackagedRuntime(nodeModulesRoot) {
     report.removedFiles += 1
     report.categories[category] = (report.categories[category] ?? 0) + 1
   }
+
+  await pruneRetiredSkinCarrierAssets(nodeModulesRoot, report)
+  await optimizePackagedSkinPreviews(nodeModulesRoot, report)
 
   return report
 }
@@ -155,11 +313,12 @@ async function afterPack(context) {
   const outputPath = join(context.outDir, 'runtime-prune-report.json')
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(
-    `  - pruned desktop runtime  files=${report.removedFiles} bytes=${report.removedBytes}\n`,
+    `  - pruned desktop runtime  files=${report.removedFiles} bytes=${report.removedBytes} optimizedFiles=${report.optimizedFiles} optimizedBytes=${report.optimizedBytes}\n`,
   )
 }
 
 module.exports = afterPack
 module.exports.classifyPrunableFile = classifyPrunableFile
+module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers

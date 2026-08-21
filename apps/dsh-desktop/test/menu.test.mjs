@@ -26,7 +26,7 @@ test('community QR is generated from the fixed join destination', async () => {
   assert.ok(image.length > 500)
 })
 
-test('Tools and Help menus expose Extension Dock and community actions', () => {
+test('Tools and Help menus expose built-in terminal, Extension Dock, and community actions', () => {
   const calls = []
   const template = createApplicationMenuTemplate({
     app: { getVersion: () => '0.1.8' },
@@ -35,6 +35,7 @@ test('Tools and Help menus expose Extension Dock and community actions', () => {
     openCommunity: () => calls.push(['community']),
     openFeedback: () => calls.push(['feedback']),
     openExtensions: () => calls.push(['extensions']),
+    openTerminal: () => calls.push(['terminal']),
     openLogs: () => calls.push(['logs']),
     openPrivacy: () => calls.push(['privacy']),
     openProject: () => calls.push(['project', GITHUB_PROJECT_URL]),
@@ -42,6 +43,7 @@ test('Tools and Help menus expose Extension Dock and community actions', () => {
   })
   const tools = template.find((entry) => entry.label === '工具 / Tools')
   const extensions = tools.submenu.find((entry) => entry.label === '扩展坞 / Extension Dock')
+  const terminal = tools.submenu.find((entry) => entry.label === '内置终端 / Built-in Terminal')
   const help = template.find((entry) => entry.label === '帮助 / Help')
   const community = help.submenu.find((entry) => entry.label === '加入社群 / Join QQ Group')
   const feedback = help.submenu.find((entry) => entry.label === '提建议 / Suggest an Idea')
@@ -49,12 +51,15 @@ test('Tools and Help menus expose Extension Dock and community actions', () => {
   const privacy = help.submenu.find((entry) => entry.label === '隐私政策 / Privacy')
 
   assert.equal(extensions.accelerator, 'CmdOrCtrl+Shift+X')
+  assert.equal(terminal.accelerator, 'CmdOrCtrl+Alt+T')
+  terminal.click()
   extensions.click()
   community.click()
   feedback.click()
   project.click()
   privacy.click()
   assert.deepEqual(calls, [
+    ['terminal'],
     ['extensions'],
     ['community'],
     ['feedback'],

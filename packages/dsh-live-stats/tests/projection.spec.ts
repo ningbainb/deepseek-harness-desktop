@@ -577,7 +577,7 @@ describe('liveTokenUsage projection', () => {
     expect(state).toBe(beforeNoop)
 
 
-    // Every mutating delta rewrites its slot in place: the blocks array is
+    // Every mutating delta rewrites its slot in place: the blocks table is
     // allocated once at step/start and never reallocated within the step, and
     // the active step object is reused rather than rebuilt per chunk. This is
     // the coalescing guard: streaming deltas stop allocating a fresh active
@@ -611,8 +611,7 @@ describe('liveTokenUsage projection', () => {
     if (final === null) throw new Error('active step is absent')
     const rescan = (): number => {
       const tokens: number[] = []
-      for (const block of final.blocks) {
-        if (block === undefined) continue
+      for (const block of Object.values(final.blocks)) {
         tokens.push(block.kind === 'text' || block.kind === 'reasoning'
           ? estimateTextBlockTokens(block.characters, spec)
           : block.kind === 'tool-call'
@@ -639,9 +638,9 @@ describe('liveTokenUsage projection', () => {
     state = definition.apply(state, surfaceEvent(1, 'one', 'append'))
     state = definition.apply(state, surfaceEvent(2, 'two', 'append'))
     state = definition.apply(state, surfaceEvent(3, 'three', { op: 'replace', start: 1, end: 2 }))
-    expect(state.surface.has(1)).toBe(false)
-    expect(state.surface.has(2)).toBe(false)
-    expect(state.surface.has(3)).toBe(true)
+    expect(Object.hasOwn(state.surface, 1)).toBe(false)
+    expect(Object.hasOwn(state.surface, 2)).toBe(false)
+    expect(Object.hasOwn(state.surface, 3)).toBe(true)
     expect(state.surfaceTokens).toBe(estimateMessageTokens(
       createUserMessage({ content: [{ type: 'text', text: 'three' }], source: { kind: 'user' } }),
       spec,
@@ -650,5 +649,7 @@ describe('liveTokenUsage projection', () => {
       .toThrow('invalid current range')
     expect(() => definition.apply(state, surfaceEvent(4, 'bad', { op: 'replace', start: 3, end: 99 })))
       .toThrow('invalid current range')
+    expect(JSON.parse(JSON.stringify(state))).toEqual(state)
+    expect(() => definition.stateSchema.parse(state)).not.toThrow()
   })
 })

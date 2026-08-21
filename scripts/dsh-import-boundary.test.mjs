@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+import { promisify } from 'node:util'
 import test from 'node:test'
 
 import {
   checkImportBoundary,
   compareImportBoundary,
   createBoundaryBaseline,
+  listRepositoryFiles,
   scanSourceText,
 } from './dsh-import-boundary.mjs'
+
+const execFileAsync = promisify(execFile)
 
 test('DSH import scanner recognizes static, dynamic, require, and type-only imports', () => {
   const prefix = '@deepseek-ai/'
@@ -45,6 +53,22 @@ test('boundary rejects a new import and permits controlled adapter imports', () 
     ...existing[0],
     path: 'apps/dsh-desktop/src/runtime-provider.mjs',
   }], baseline), [])
+})
+
+test('repository file listing omits tracked files deleted from the working tree', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'dsh-import-files-'))
+  try {
+    await execFileAsync('git', ['init'], { cwd: root, windowsHide: true })
+    await writeFile(resolve(root, 'kept.mjs'), 'export const kept = true\n')
+    await writeFile(resolve(root, 'deleted.mjs'), 'export const deleted = true\n')
+    await execFileAsync('git', ['add', '--', 'kept.mjs', 'deleted.mjs'], { cwd: root, windowsHide: true })
+    await unlink(resolve(root, 'deleted.mjs'))
+    await writeFile(resolve(root, 'untracked.mjs'), 'export const untracked = true\n')
+
+    assert.deepEqual((await listRepositoryFiles(root)).toSorted(), ['kept.mjs', 'untracked.mjs'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('repository matches the committed direct-import baseline', async () => {

@@ -175,6 +175,17 @@ for (const button of document.querySelectorAll('[data-action]')) {
   })
 }
 
+for (const button of document.querySelectorAll('[data-tool-action="terminal"]')) {
+  button.addEventListener('click', async () => {
+    button.disabled = true
+    try {
+      await window.dshDesktop.toolAction('terminal')
+    } finally {
+      button.disabled = false
+    }
+  })
+}
+
 technicalDetails.addEventListener('click', () => {
   errorLog.hidden = !errorLog.hidden
   technicalDetails.textContent = errorLog.hidden ? '查看技术详情' : '收起技术详情'

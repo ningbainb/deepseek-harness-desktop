@@ -24,7 +24,7 @@ const api = Object.freeze({
   ...baseApi,
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   checkPluginUpdates: () => ipcRenderer.invoke('extensions:plugin-check'),
-  installPlugin: (spec, allowUnknown = false) => ipcRenderer.invoke('extensions:plugin-install', { spec, allowUnknown }),
+  installPlugin: (spec, allowUnknown = false, fullAccess = false) => ipcRenderer.invoke('extensions:plugin-install', { spec, allowUnknown, fullAccess }),
   installPluginBatch: (specs, allowUnknown = false) => ipcRenderer.invoke('extensions:plugin-install-batch', { specs, allowUnknown }),
   updatePlugin: (name, allowUnknown = false) => ipcRenderer.invoke('extensions:plugin-update', { name, allowUnknown }),
   removePlugin: (name) => ipcRenderer.invoke('extensions:plugin-remove', name),
@@ -32,8 +32,11 @@ const api = Object.freeze({
   getPluginRecoveryState: () => ipcRenderer.invoke('extensions:recovery-state'),
   restoreDisabledPlugins: () => ipcRenderer.invoke('extensions:recovery-restore-all'),
   restorePluginSnapshot: (id) => ipcRenderer.invoke('extensions:recovery-restore', id),
+  revokeFullUserTrust: () => ipcRenderer.invoke('extensions:full-user-trust-revoke'),
   exportPluginDiagnostics: () => ipcRenderer.invoke('extensions:diagnostics-export'),
   openCommunityPlugin: (id) => ipcRenderer.invoke('extensions:community-open', id),
+  listCommunityMarket: () => ipcRenderer.invoke('extensions:market-list'),
+  installMarketPlugin: (id) => ipcRenderer.invoke('extensions:market-install', id),
   importSkill: () => ipcRenderer.invoke('extensions:skill-import'),
   openSkill: (id) => ipcRenderer.invoke('extensions:skill-open', id),
   openSkillRoot: () => ipcRenderer.invoke('extensions:skill-root'),
@@ -51,6 +54,7 @@ const api = Object.freeze({
   onExtensionProgress: createSubscription('extensions:operation-progress', 'extension progress'),
   onExtensionNavigate: createSubscription('extensions:navigate', 'extension navigation'),
   onPresetPreview: createSubscription('extensions:preset-preview', 'preset preview'),
+  onPluginInstallPrefill: createSubscription('extensions:plugin-install-prefill', 'plugin install prefill'),
 })
 
 contextBridge.exposeInMainWorld('dshDesktop', api)

@@ -8,6 +8,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { parseStartupTimings } from './startup-metrics.mjs'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { SECONDARY_WINDOW_PARTITION } from '../src/electron-app.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -16,28 +17,53 @@ const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const runtimeReadyTimeoutMs = packagedExecutable || process.env.CI ? 120_000 : 60_000
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-window-chrome-e2e-'))
+const userData = resolve(temporary, 'user-data')
+const dshHome = resolve(temporary, 'dsh-home')
 let electronApp
 
+async function waitForRuntimeWindow(application, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const page = application.windows().find((candidate) => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+    if (page !== undefined) return page
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+  }
+  throw new Error('runtime window did not appear before the E2E timeout')
+}
+
 try {
+  await seedPrimaryRuntimePermissionForTest({ userData })
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
     cwd: appDir,
     env: {
       ...process.env,
-      DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
-      DSH_HOME: resolve(temporary, 'dsh-home'),
-      DSH_DESKTOP_VERIFY_UPDATER: packagedExecutable ? '1' : '0',
+      DSH_DESKTOP_USER_DATA: userData,
+      DSH_HOME: dshHome,
+      // Window geometry is independent of the network updater. Keep this E2E
+      // deterministic and leave packaged updater integrity to pack:verify.
+      DSH_DESKTOP_DISABLE_UPDATES: '1',
+      DSH_DESKTOP_VERIFY_UPDATER: '0',
+      DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
   })
-  const page = await electronApp.firstWindow()
-  page.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+  electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
+  electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
+  const startupPage = await electronApp.firstWindow()
+  for (const window of electronApp.windows()) {
+    window.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+  }
+  electronApp.on('window', (window) => {
+    window.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+  })
+  let page
   try {
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: runtimeReadyTimeoutMs })
+    page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
   } catch (error) {
     const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => '')
     console.error(`runtime did not become ready; recent log:\n${runtimeLog.slice(-4_000) || '(no runtime log)'}`)
-    console.error(`startup surface:\n${(await page.locator('body').innerText().catch(() => '')).slice(-2_000) || '(unavailable)'}`)
+    console.error(`startup surface:\n${(await startupPage.locator('body').innerText().catch(() => '')).slice(-2_000) || '(unavailable)'}`)
     throw error
   }
   try {
@@ -57,19 +83,32 @@ try {
     iconCount: document.querySelectorAll('.dsh-window-chrome-icon').length,
     menusRight: document.querySelector('.dsh-window-chrome-menus')?.getBoundingClientRect().right,
     paddingTop: getComputedStyle(document.body).paddingTop,
+    rootBounds: (() => {
+      const bounds = document.querySelector('body > #root')?.getBoundingClientRect()
+      return bounds ? { top: bounds.top, bottom: bounds.bottom, height: bounds.height } : undefined
+    })(),
+    frameBounds: (() => {
+      const bounds = document.querySelector('[data-dsh-frame]')?.getBoundingClientRect()
+      return bounds ? { top: bounds.top, bottom: bounds.bottom, height: bounds.height } : undefined
+    })(),
     theme: document.documentElement.dataset.dshDesktopChromeTheme,
     url: location.origin,
   }))
-  assert.equal(state.chromeText, '工具 / Tools扩展坞 / Extension DockCtrl+Shift+X帮助 / Help加入社群提交建议GitHub 项目隐私政策检查更新')
+  assert.equal(state.chromeText, '工具 / Tools内置终端 / Built-in TerminalCtrl+Alt+T扩展坞 / Extension DockCtrl+Shift+X帮助 / Help加入社群提交建议GitHub 项目隐私政策检查更新')
   assert.equal(state.theme, 'light')
   assert.equal(state.backdropFilter, 'none')
   assert.equal(state.iconCount, 0)
   const viewportWidth = await page.evaluate(() => innerWidth)
+  const viewportHeight = await page.evaluate(() => innerHeight)
   assert.ok(
     Number(state.menusRight) <= viewportWidth - 139,
     `Top menus overlap the native caption area: ${JSON.stringify({ menusRight: state.menusRight, viewportWidth })}`,
   )
   assert.equal(state.paddingTop, '32px')
+  assert.ok(state.rootBounds && state.rootBounds.top >= 31, `root overlaps title bar: ${JSON.stringify(state.rootBounds)}`)
+  assert.ok(state.rootBounds.bottom <= viewportHeight + 1, `root exceeds safe viewport: ${JSON.stringify(state.rootBounds)}`)
+  assert.ok(state.frameBounds && state.frameBounds.top >= 31, `frame overlaps title bar: ${JSON.stringify(state.frameBounds)}`)
+  assert.ok(state.frameBounds.bottom <= viewportHeight + 1, `frame exceeds safe viewport: ${JSON.stringify(state.frameBounds)}`)
   assert.equal(state.chromeCount, 1)
   const stickyReasoningState = await page.evaluate(() => {
     const scrollport = document.createElement('div')
@@ -111,6 +150,7 @@ try {
   const toolsMenu = page.getByRole('menu', { name: '工具 / Tools' })
   await toolsMenu.waitFor({ state: 'visible' })
   assert.deepEqual(await toolsMenu.getByRole('menuitem').allTextContents(), [
+    '内置终端 / Built-in TerminalCtrl+Alt+T',
     '扩展坞 / Extension DockCtrl+Shift+X',
   ])
   if (screenshot) await page.screenshot({ path: screenshot })

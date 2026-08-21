@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/dsh-deep-link-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Deep Link v1",
+  "$comment": "This schema describes canonical, normalized dsh:// routes only. Query strings, fragments, credentials, ports, traversal, and non-allowlisted routes are rejected by ingress validation.",
+  "type": "string",
+  "maxLength": 4096,
+  "oneOf": [
+    { "pattern": "^dsh://(?:extensions|updates)$" },
+    { "pattern": "^dsh://preset/preview$" },
+    { "pattern": "^dsh://(?:task|session|run)/[a-z0-9][a-z0-9._-]{0,127}$" }
+  ]
+}

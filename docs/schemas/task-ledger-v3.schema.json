@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/task-ledger-v3.schema.json",
+  "title": "DeepSeek Harness Desktop Task Ledger v3",
+  "$comment": "The profile-local Task Ledger v3 records Projects, Tasks, Runs, and derived Evidence. schemaVersion 3 is the only supported major. Unknown optional fields are permitted for forward compatibility, but consumers must normalize only the documented fields before a privileged operation. Ledger contents are local profile data and must not be included in diagnostic uploads.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "revision",
+    "updatedAt",
+    "projects",
+    "tasks",
+    "evidences"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 3 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "updatedAt": { "$ref": "#/$defs/timestamp" },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "evidences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "migration": { "$ref": "#/$defs/migration" }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "number"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "safeId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "taskStatus": {
+      "enum": ["backlog", "todo", "running", "done", "failed"]
+    },
+    "isolationMode": {
+      "enum": ["inherit", "shared-workspace", "git-worktree"]
+    },
+    "taskRunResultStatus": {
+      "enum": ["running", "awaiting-review", "accepted", "kept", "discarded", "failed", "cancelled"]
+    },
+    "runtimeSupportStatus": {
+      "enum": ["known-good", "supported", "candidate", "blocked", "degraded", "unsupported"]
+    },
+    "runtimeCapability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "enum": ["available", "unsupported", "degraded"] }
+      }
+    },
+    "runtimeProviderEvidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "providerId": { "type": "string", "maxLength": 128 },
+        "upstreamVersion": { "type": "string", "maxLength": 64 },
+        "supportStatus": { "$ref": "#/$defs/runtimeSupportStatus" },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/runtimeCapability" }
+        },
+        "registerWorkspace": { "enum": ["available", "unsupported", "failed"] },
+        "createSession": { "enum": ["available", "unsupported", "failed"] },
+        "sessionObserve": { "enum": ["available", "unsupported", "failed"] },
+        "sessionCwdVerified": { "type": "boolean" },
+        "note": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "workspaceId", "defaultIsolation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "name": { "type": "string", "maxLength": 160 },
+        "workspaceId": { "$ref": "#/$defs/nonEmptyString" },
+        "rootRef": { "type": "string" },
+        "repoIdentity": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "rootHash": { "type": "string" },
+            "head": { "type": "string" },
+            "remoteHash": { "type": "string" }
+          }
+        },
+        "defaultIsolation": { "enum": ["shared-workspace", "git-worktree"] },
+        "permissionPolicyRef": { "type": "string" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "startedAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "runId": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "endedAt": { "$ref": "#/$defs/timestamp" },
+        "finishedAt": { "$ref": "#/$defs/timestamp" },
+        "result": { "enum": ["succeeded", "failed", "cancelled"] },
+        "error": { "type": "string", "maxLength": 4000 }
+      }
+    },
+    "taskRun": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["runId", "workspaceId", "startedAt", "resultStatus", "runtimeProviderEvidence"],
+      "properties": {
+        "runId": { "$ref": "#/$defs/safeId" },
+        "sessionId": { "type": "string" },
+        "workspaceId": { "$ref": "#/$defs/nonEmptyString" },
+        "worktreeId": { "type": "string" },
+        "baseRevision": { "type": "string" },
+        "finalRevision": { "type": "string" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "finishedAt": { "$ref": "#/$defs/timestamp" },
+        "resultStatus": { "$ref": "#/$defs/taskRunResultStatus" },
+        "evidenceId": { "type": "string" },
+        "fallbackReason": { "type": "string", "maxLength": 500 },
+        "runtimeProviderEvidence": { "$ref": "#/$defs/runtimeProviderEvidence" }
+      }
+    },
+    "scheduleLease": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["ownerId", "acquiredAt", "renewedAt", "expiresAt"],
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "acquiredAt": { "$ref": "#/$defs/timestamp" },
+        "renewedAt": { "$ref": "#/$defs/timestamp" },
+        "expiresAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "scheduleFailure": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["at", "executionKey", "message"],
+      "properties": {
+        "at": { "$ref": "#/$defs/timestamp" },
+        "executionKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "scheduleRule": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "cron"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "cron": { "type": "string", "minLength": 1 },
+        "nextRunAt": { "$ref": "#/$defs/timestamp" },
+        "lastTriggeredAt": { "$ref": "#/$defs/timestamp" },
+        "timezone": { "type": "string" },
+        "misfirePolicy": { "enum": ["skip", "run-once"] },
+        "runningPolicy": { "enum": ["skip", "queue-next"] },
+        "lastRunId": { "type": "string", "maxLength": 128 },
+        "lastScheduledAt": { "$ref": "#/$defs/timestamp" },
+        "queuedAt": { "$ref": "#/$defs/timestamp" },
+        "lease": { "$ref": "#/$defs/scheduleLease" },
+        "providerEvidence": { "$ref": "#/$defs/runtimeProviderEvidence" },
+        "lastFailure": { "$ref": "#/$defs/scheduleFailure" }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "title", "description", "prompt", "status", "createdAt", "updatedAt", "executions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "prompt": { "type": "string" },
+        "status": { "$ref": "#/$defs/taskStatus" },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "updatedAt": { "$ref": "#/$defs/timestamp" },
+        "executions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/execution" }
+        },
+        "projectId": { "type": "string" },
+        "isolationMode": { "$ref": "#/$defs/isolationMode" },
+        "runs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/taskRun" }
+        },
+        "schedule": { "$ref": "#/$defs/scheduleRule" }
+      }
+    },
+    "evidenceFile": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["path", "status"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "status": { "enum": ["added", "modified", "deleted", "renamed", "binary", "unknown"] },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "binary": { "type": "boolean" }
+      }
+    },
+    "diffCache": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["source", "generatedAt", "bytes", "truncated"],
+      "properties": {
+        "source": { "const": "git-graph" },
+        "generatedAt": { "$ref": "#/$defs/timestamp" },
+        "baseRevision": { "type": "string", "maxLength": 256 },
+        "finalRevision": { "type": "string", "maxLength": 256 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "maxLength": 128 },
+        "truncated": { "type": "boolean" },
+        "expiresAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "auditEntry": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["action", "at", "status", "summary"],
+      "properties": {
+        "action": { "enum": ["commit", "merge", "keep", "discard", "fallback", "reconcile", "evidence"] },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "status": { "enum": ["ok", "blocked", "failed"] },
+        "summary": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "evidenceId",
+        "runId",
+        "workspaceId",
+        "changedFiles",
+        "additions",
+        "deletions",
+        "clean",
+        "dirty",
+        "resultStatus",
+        "startedAt",
+        "diffSource",
+        "runtimeProviderEvidence",
+        "audit"
+      ],
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/safeId" },
+        "runId": { "$ref": "#/$defs/safeId" },
+        "sessionId": { "type": "string", "maxLength": 256 },
+        "projectId": { "type": "string", "maxLength": 128 },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "worktreeId": { "type": "string", "maxLength": 256 },
+        "baseRevision": { "type": "string", "maxLength": 256 },
+        "finalRevision": { "type": "string", "maxLength": 256 },
+        "changedFiles": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/evidenceFile" }
+        },
+        "additions": { "type": "integer", "minimum": 0 },
+        "deletions": { "type": "integer", "minimum": 0 },
+        "clean": { "type": "boolean" },
+        "dirty": { "type": "boolean" },
+        "resultStatus": { "$ref": "#/$defs/taskRunResultStatus" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "finishedAt": { "$ref": "#/$defs/timestamp" },
+        "sessionDeepLink": { "type": "string", "maxLength": 512 },
+        "worktreeDeepLink": { "type": "string", "maxLength": 512 },
+        "diffSource": { "enum": ["git-graph", "unavailable"] },
+        "diffCache": { "$ref": "#/$defs/diffCache" },
+        "preview": { "type": "string", "maxLength": 65536 },
+        "runtimeProviderEvidence": { "$ref": "#/$defs/runtimeProviderEvidence" },
+        "audit": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/auditEntry" }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["from", "status", "at", "marker"],
+      "properties": {
+        "from": { "const": 2 },
+        "status": { "enum": ["complete", "failed", "not-needed"] },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "marker": { "const": "dsh.taskBoard.v3.migrated" },
+        "v2Backup": { "type": "string" },
+        "reason": { "type": "string", "maxLength": 500 }
+      }
+    }
+  }
+}

@@ -16,18 +16,19 @@ Group number: **1105158177** · **[Join the QQ group](https://qm.qq.com/q/vehlNj
 
 DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. It does not rewrite the interface: a hardened Electron window launches the official `@deepseek-ai/dsh` host locally and loads every plugin and skin from this repository unchanged.
 
-[Explore the product site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download the Windows x64 installer](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Desktop technical guide](docs/desktop.md) · [Task Board v3 guide](docs/task-board-v3.md) · [Maintainer release workflow](docs/launch/desktop-release-workflow.md) · [Changelog](CHANGELOG.md)
+[Explore the product site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download the Windows x64 installer](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Desktop technical guide](docs/desktop.md) · [Compatibility policy](docs/compatibility-policy.md) · [Runtime support policy](docs/runtime-support-policy.md) · [Upgrade and rollback](docs/upgrade-and-rollback.md) · [Maintainer release workflow](docs/launch/desktop-release-workflow.md) · [Changelog](CHANGELOG.md)
 
 If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-### Latest release: 2.7.0
+### Latest release: 3.0.0
 
-`desktop-v2.7.0` is the current stable release: [read the full release notes](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v2.7.0) · [download the installer directly](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v2.7.0/DeepSeek-Harness-Desktop-Setup-2.7.0-x64.exe) · [download the SHA-256 checksum file](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v2.7.0/SHA256SUMS.txt)
+`desktop-v3.0.0` is the platform Stable release: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade, rollback, and known limitations](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
 
 | Version | Highlights |
 | --- | --- |
+| **3.0.0** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, migration/rollback assistant, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
 | **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
-| **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, Candidate execution fixtures, and bounded anonymous product metrics. |
+| **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, and Candidate execution fixtures. Its historical anonymous-metrics behavior is replaced by the 3.0 default-off policy. |
 | **2.5.0** | Adds the Runtime Adapter and upstream compatibility defenses, secure `.dshpreset` and Web Profile migration, atomic plugin batches, strict deep-link/file ingress, and structured notifications. |
 | **2.4.0** | Added reliable update-shutdown receipt v2, split Main/Extension Dock permissions, Desktop Contract v1, and Task Board Host-file storage v2. |
 | **2.3.0** | Adds a one-time GitHub Star and community prompt; recognizes external PowerShell/CMD/Node hosts, EncodedCommand payloads, and Windows short paths during preflight; supports direct 0.1.9 upgrades; and coexists with the official web client through an isolated profile and port fallback. |
@@ -42,7 +43,15 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 2.7.0 Highlights
+### 3.0.0 Platform-Stability Highlights
+
+- **Stable public boundaries**: Desktop Contract and SDK remain on 1.x. Runtime Provider, Preset, Task/Run/Evidence, Deep Link, Runtime matrix, and patch registry have machine-readable schemas, version rules, and compatibility fixtures. Plugins enhance through capability detection while remaining usable in ordinary DSH Web.
+- **Stable Runtime is deliberate**: Stable accepts only exact `known-good` or `supported` matrix entries after provider, Desktop range, package integrity, lockfile, and patch evidence agree. Candidate and blocked Runtime entries cannot be silently selected.
+- **Reviewable upgrade and rollback**: the Migration Assistant scans only allowed global state, produces `safe`, `needs-confirmation`, or `blocked` plans, and uses private snapshots plus an atomic journal to resume or roll back without copying project content.
+- **Verifiable releases**: Stable and Beta are separate channels; Stable rejects prereleases and no channel automatically downgrades. A local build may be unsigned. When signing is required, a missing certificate fails the gate, and published artifacts state their actual signature status in `release-manifest.json`.
+- **No default telemetry upload**: diagnostics are exported only after user confirmation to a chosen location. JSON/ZIP bundles carry a manifest and hashes and redact keys, tokens, cookies, paths, URL queries, prompts, complete sessions, tool results, project content, and SSH private keys.
+
+### Historical 2.7.0 Highlights
 
 - **Reliable Windows startup**: removes the PowerShell 5.1 `-WindowStyle Hidden` conflict with Electron Node mode while retaining spawn-level `windowsHide`; legacy empty patches, status-subscription races, and IPC errors cannot strand the startup surface at 8%.
 - **Verified Runtime composition**: bundles `@deepseek-ai/dsh` `0.1.0-rc.7`, `dshmarket` `1.15.0`, the `0.2.3` Web UI aggregate, rc.7-compatible Codex Connect, and `dsh-live-stats` `0.1.20`; Stable remains exactly pinned rather than following `latest`.
@@ -58,7 +67,7 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 - **Controlled Git Worktrees**: Host routes accept opaque ids only and enforce a controlled root, branch naming, realpath, clean/conflict/operation preflights, and explicit Commit, Merge, Keep, or confirmed Discard actions.
 - **Safe compatibility fallback**: Stable may expose only lifecycle and profile capabilities. Missing Worktree capabilities are recorded and use the existing shared-workspace executor instead of claiming isolation.
 - **Candidate execution gates**: a real temporary Git repository fixture checks Session CWD, lifecycle events, cancellation, and restart reconciliation. A failing Candidate is blocked without changing Stable metadata.
-- **Anonymous metrics boundary**: official releases enable bounded anonymous product metrics by default without an in-app off switch, solely for product improvement. They collect no identity, conversation, file, path, credential, or log, retain no raw events, and source or Fork builds contain no official endpoint. See the complete [privacy policy](PRIVACY.md).
+- **Historical metrics boundary**: this describes the 2.6 release behavior only. Desktop 3.0 disables telemetry by default and provides only user-initiated, privacy-redacted diagnostic export.
 
 ### 2.5.0 Highlights
 
@@ -108,9 +117,9 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 - Adds crash recovery, sanitized rotating logs, window-state restore, strict navigation, and denied-by-default permissions;
 - Checks stable GitHub Releases, downloads discovered updates in the background, shows bilingual release notes, and asks before restarting to install;
 - Adds a dock for transactional community DSH bundle management, built-in plugin stores, and safe discovery/import of project, DSH, and Agents skills;
-- Bundles official DSH, pnpm, and native dependencies, so users do not need a separate Node.js installation.
+- Bundles official DSH, pnpm, a pinned and verified MinGit, and native dependencies, so users do not need separate Node.js or Git installations. The bundled Git is injected only into Desktop child processes and never changes the system PATH, registry, or privileges.
 
-The desktop app already includes the task board, Git graph, right panel, mobile remote control, remote connection, whale-girl pet, full-page particle theme, live token statistics, Codex Connect, the reasoning-effort slider, plugin market, and Skin Center. Install the EXE and start working — no separate DSH or Node.js setup and no plugin commands are required.
+The desktop app already includes the task board, Git graph, right panel, mobile remote control, remote connection, whale-girl pet, full-page particle theme, live token statistics, Codex Connect, the reasoning-effort slider, plugin market, and Skin Center. Install the EXE and start working — no separate DSH, Node.js, or Git setup and no plugin commands are required.
 
 ## Feature Plugins
 
@@ -246,11 +255,11 @@ Three more: QQ2008 Retro (crystal blue with penguin motifs), Tonghuashun Trading
 2. Run `DeepSeek-Harness-Desktop-Setup-<version>-x64.exe`. DSH, plugins, skins, pnpm, and native dependencies are all included in the installer.
 3. To verify file integrity, download `SHA256SUMS.txt` from the same Release and compare the installer's SHA-256 digest.
 
-GitHub Releases is the only download source built in and enabled by default. If GitHub is slow, use **Join user group** in the update window and obtain the synchronized latest installer from QQ group `1105158177`. The app does not enable or market third-party mirrors as a “faster” route by default.
+GitHub Releases is the only download source built in and enabled by default. Stable is the default channel; Beta accepts prereleases only after the user explicitly selects it, and changing channels never authorizes an automatic downgrade. If GitHub is slow, use **Join user group** in the update window and obtain the synchronized latest installer from QQ group `1105158177`. The app does not enable or market third-party mirrors as a “faster” route by default.
 
 The app checks stable GitHub Releases, displays bilingual update notes, and offers **Download from GitHub**, **Join user group**, and **Update later**. Installation still requires explicit confirmation. In-place upgrades preserve the existing `DSH_HOME`, desktop profile, community bundles, pet state, skin configuration, and encrypted QQ Bot credentials.
 
-The installer is not commercially code-signed, so Windows SmartScreen may report an unknown publisher. Use only the installer linked from this project's Release page. The default install path is recommended to avoid legacy Win32 path-length limits.
+Download `SHA256SUMS.txt` and `release-manifest.json` from the same GitHub Release to verify the installer hash and inspect the recorded signature state. Local or source builds may be unsigned and do not imply that a published asset is unsigned; when a release requires signing, missing certificate material or a valid timestamp fails the release gate. Use only the installer linked from this project's Release page. The default install path is recommended to avoid legacy Win32 path-length limits.
 
 ## Sources & Licensing
 

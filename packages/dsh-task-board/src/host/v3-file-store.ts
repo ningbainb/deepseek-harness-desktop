@@ -8,6 +8,7 @@ import {
   createLedgerDocumentV3,
   ledgerDocumentV3Hash,
   migrateV2DocumentToV3,
+  inspectLedgerDocumentV3,
   parseLedgerDocumentV3,
   TASK_BOARD_V3_MIGRATION_MARKER,
   type TaskLedgerDocumentV3,
@@ -59,6 +60,16 @@ export class TaskLedgerRevisionConflictError extends Error {
   }
 }
 
+/** A newer persisted major is preserved exactly until the user upgrades or restores. */
+export class TaskLedgerUnsupportedMajorError extends Error {
+  readonly code = 'task-board-schema-major-unsupported'
+
+  constructor(readonly schemaVersion: number) {
+    super(`task-board ledger schema major ${schemaVersion} requires a newer DeepSeek Harness Desktop; the existing ledger was preserved`)
+    this.name = 'TaskLedgerUnsupportedMajorError'
+  }
+}
+
 function cloneSnapshot(value: TaskStoreV3Snapshot): TaskStoreV3Snapshot {
   return structuredClone(value)
 }
@@ -66,6 +77,8 @@ function cloneSnapshot(value: TaskStoreV3Snapshot): TaskStoreV3Snapshot {
 /**
  * Host-owned v3 ledger. The first v3 write copies v2, verifies the copy by
  * parsing and hashing it, writes a marker, and leaves the v2 source untouched.
+ * An unreadable v3 file is preserved beside the ledger; once the migration
+ * marker exists, the stale v2 snapshot is never re-copied over it.
  */
 export class HostTaskStoreV3 {
   private document: TaskLedgerDocumentV3 | undefined
@@ -193,12 +206,56 @@ export class HostTaskStoreV3 {
   private async loadWithoutQueue(): Promise<TaskLedgerDocumentV3> {
     if (this.document !== undefined) return this.document
     const raw = await readText(this.options.path)
-    const parsed = raw === undefined ? undefined : parseLedgerDocumentV3(raw)
+    const inspection = raw === undefined ? undefined : inspectLedgerDocumentV3(raw)
+    if (inspection?.kind === 'future-major') throw new TaskLedgerUnsupportedMajorError(inspection.schemaVersion)
+    const parsed = inspection?.kind === 'valid' ? inspection.document : undefined
     if (parsed !== undefined) {
       this.document = parsed
       return parsed
     }
+    if (raw !== undefined) {
+      // Preserve the unreadable bytes beside the ledger before any migration
+      // or later publish can replace them, mirroring the v2 store's handling.
+      await rename(this.options.path, `${this.options.path}.corrupt-${this.now()}-${this.randomId()}`)
+    }
+    if (await this.hasCompletedMigrationMarker()) {
+      // The marker proves the v2→v3 copy already ran, so the remaining v2
+      // source is a stale pre-migration snapshot. Re-copying it over a
+      // damaged or missing post-migration ledger would silently lose every
+      // task created since; start from an empty, recoverable ledger instead.
+      return this.emptyLedgerAfterMigration(raw === undefined ? 'v3-missing-after-migration' : 'invalid-v3-after-migration')
+    }
     return this.migrateFromV2(raw === undefined ? undefined : 'invalid-v3')
+  }
+
+  /**
+   * The marker is written only after a v3 candidate has been published and
+   * verified. Any readable file at its path therefore proves the copy-first
+   * migration completed; only a missing marker (or a fixture directory that
+   * intentionally blocks the write) leaves the retry path open.
+   */
+  private async hasCompletedMigrationMarker(): Promise<boolean> {
+    try {
+      await readFile(`${this.options.path}.migration.json`, 'utf8')
+      return true
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code
+      if (code === 'ENOENT' || code === 'EISDIR') return false
+      // Unreadable for other reasons (for example permissions): fail closed
+      // rather than risk re-copying a stale v2 over a completed migration.
+      return true
+    }
+  }
+
+  private emptyLedgerAfterMigration(reason: string): TaskLedgerDocumentV3 {
+    const at = this.now()
+    const fallback = migrateV2DocumentToV3(
+      { schemaVersion: 2, revision: 0, updatedAt: at, tasks: [] },
+      at,
+      { status: 'failed', at, marker: TASK_BOARD_V3_MIGRATION_MARKER, reason: reason.slice(0, 500) },
+    )
+    this.document = fallback
+    return structuredClone(fallback)
   }
 
   private async migrateFromV2(reason: string | undefined): Promise<TaskLedgerDocumentV3> {

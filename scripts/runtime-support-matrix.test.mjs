@@ -22,7 +22,15 @@ const supportEvidence = {
     packageName: '@deepseek-ai/dsh',
     version: '0.1.0-rc.7',
     integrity: 'sha512-YWJjZA==',
+    files: {
+      'package.json': 'b'.repeat(64),
+      'lib/bin.js': 'c'.repeat(64),
+    },
     peerDependencies: { '@deepseek-ai/cordis': '^4.0.1' },
+  },
+  lockfile: {
+    path: 'pnpm-lock.yaml',
+    sha256: 'a'.repeat(64),
   },
   provider: {
     providerId: 'dsh-cli-provider-v1',
@@ -34,7 +42,7 @@ const supportEvidence = {
   clientSlots: { ids: ['conversation.input.dock'] },
   compatPatches: {
     registry: 'packages/dsh-desktop-compat/src/patch-registry.ts',
-    sha256: 'abc123',
+    sha256: 'd'.repeat(64),
     ids: ['queued-turn-continuation'],
   },
   packagedRuntimeIdentity: {
@@ -62,6 +70,11 @@ test('supported-runtime matrix derives a stable entry with package, peer, slot, 
   assert.equal(entry.status, 'known-good')
   assert.equal(entry.desktopRange, '=2.7.0')
   assert.deepEqual(entry.evidence.peers, { '@deepseek-ai/cordis': '^4.0.1' })
+  assert.deepEqual(entry.evidence.lockfile, { path: 'pnpm-lock.yaml', sha256: 'a'.repeat(64) })
+  assert.deepEqual(entry.evidence.package.files, {
+    'package.json': 'b'.repeat(64),
+    'lib/bin.js': 'c'.repeat(64),
+  })
   assert.deepEqual(entry.evidence.slots, ['conversation.input.dock'])
   assert.equal(entry.evidence.patches.ids[0], 'queued-turn-continuation')
   assert.match(renderRuntimeSupportMatrix(matrix), /resources\/app\.asar\.unpacked/u)
@@ -131,4 +144,38 @@ test('matrix rejects non-calendar verification dates before writing evidence', a
     }),
     /ISO calendar date/u,
   )
+})
+
+test('matrix requires per-entry lockfile evidence', async () => {
+  const withoutLockfile = structuredClone(supportEvidence)
+  delete withoutLockfile.lockfile
+  await assert.rejects(
+    createSupportedRuntimeMatrix({ supportEvidence: withoutLockfile, source }),
+    /runtime support evidence is incomplete/u,
+  )
+})
+
+test('matrix requires exact Runtime entrypoint byte evidence', async () => {
+  const withoutCliHash = structuredClone(supportEvidence)
+  delete withoutCliHash.runtime.files['lib/bin.js']
+  await assert.rejects(
+    createSupportedRuntimeMatrix({ supportEvidence: withoutCliHash, source }),
+    /runtime file evidence/u,
+  )
+})
+
+test('matrix requires complete canonical compatibility patch evidence', async () => {
+  for (const compatPatches of [
+    { ...supportEvidence.compatPatches, ids: [] },
+    { ...supportEvidence.compatPatches, ids: ['not a patch id'] },
+    { ...supportEvidence.compatPatches, sha256: 'not-a-digest' },
+    { ...supportEvidence.compatPatches, registry: '../outside/patch-registry.ts' },
+  ]) {
+    const invalid = structuredClone(supportEvidence)
+    invalid.compatPatches = compatPatches
+    await assert.rejects(
+      createSupportedRuntimeMatrix({ supportEvidence: invalid, source }),
+      /patch/u,
+    )
+  }
 })

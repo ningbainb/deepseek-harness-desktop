@@ -208,6 +208,20 @@ describe('connection pool', () => {
     expect(result.success).toBe(true)
     expect(server.connectCount).toBe(before + 1)
   })
+
+  it('contains repeated ProxyJump client errors and marks the pooled chain broken', async () => {
+    addHost('pool-jump')
+    addHost('pool-via-jump', { proxyJump: ['pool-jump'] })
+    await engine.exec('pool-via-jump', 'true')
+    const record = engine.pool.get('pool-via-jump')
+    expect(record?.hops).toHaveLength(1)
+    const hop = record!.hops[0]!
+    expect(() => {
+      hop.emit('error', new Error('first simulated hop failure'))
+      hop.emit('error', new Error('second simulated hop failure'))
+    }).not.toThrow()
+    expect(record?.broken).toBe(true)
+  })
 })
 
 describe('key auth', () => {

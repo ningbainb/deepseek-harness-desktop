@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { renderInline, renderMarkdown, resolveMarkdownImage } from '../src/client/preview/markdown.ts'
-import { parseCsv, normalizeUrl } from '../src/client/preview/content.tsx'
+import { parseCsv, normalizeUrl, URL_PREVIEW_SANDBOX } from '../src/client/preview/content.tsx'
 import { parseGridTracks, trackPx } from '../src/client/layout.ts'
 import { detectContentType } from '../src/client/fileType.ts'
 
@@ -58,6 +58,13 @@ describe('normalizeUrl', () => {
     expect(normalizeUrl('https://example.com')).toBe('https://example.com')
     expect(normalizeUrl('hello world')).toContain('https://www.bing.com/search?q=')
     expect(normalizeUrl('')).toBe('about:blank')
+  })
+})
+
+describe('URL preview sandbox', () => {
+  it('never grants embedded sites popup authority', () => {
+    expect(URL_PREVIEW_SANDBOX).toBe('allow-scripts allow-forms')
+    expect(URL_PREVIEW_SANDBOX).not.toContain('allow-popups')
   })
 })
 

@@ -155,6 +155,43 @@ html[data-dsh-desktop-chrome-theme="dark"] #${UPDATE_SURFACE_ID} {
 
 #${UPDATE_SURFACE_ID} .dsh-update-fallback[hidden] { display: none; }
 
+#${UPDATE_SURFACE_ID} .dsh-update-channel {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l1, var(--dsh-update-border));
+  border-radius: 10px;
+  color: var(--dsw-alias-label-secondary, var(--dsh-update-muted));
+  background: var(--dsw-alias-bg-layer-2, var(--dsh-update-layer));
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+#${UPDATE_SURFACE_ID} .dsh-update-channel[hidden] { display: none; }
+
+#${UPDATE_SURFACE_ID} .dsh-update-channel label {
+  color: var(--dsw-alias-label-primary, var(--dsh-update-fg));
+  font-weight: 600;
+}
+
+#${UPDATE_SURFACE_ID} .dsh-update-channel select {
+  width: max-content;
+  min-width: 150px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, var(--dsh-update-border));
+  border-radius: 7px;
+  color: var(--dsw-alias-label-primary, var(--dsh-update-fg));
+  background: var(--dsw-alias-bg-base, var(--dsh-update-panel-bg));
+  font: inherit;
+}
+
+#${UPDATE_SURFACE_ID} .dsh-update-channel select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 #${UPDATE_SURFACE_ID} .dsh-update-actions {
   display: flex;
   flex-wrap: wrap;
@@ -276,9 +313,27 @@ export function createUpdateSurfaceScript() {
     fallback.className = 'dsh-update-fallback';
     fallback.textContent = '如果 GitHub 下载速度较慢，可以加入用户交流群。群内会同步提供最新版本安装包，可直接下载安装。';
     fallback.hidden = true;
+    const channelSection = document.createElement('section');
+    channelSection.className = 'dsh-update-channel';
+    channelSection.hidden = true;
+    const channelLabel = document.createElement('label');
+    channelLabel.htmlFor = 'dsh-update-channel';
+    channelLabel.textContent = '更新通道';
+    const channel = document.createElement('select');
+    channel.id = 'dsh-update-channel';
+    const stableChannel = document.createElement('option');
+    stableChannel.value = 'stable';
+    stableChannel.textContent = '稳定版 Stable';
+    const betaChannel = document.createElement('option');
+    betaChannel.value = 'beta';
+    betaChannel.textContent = '测试版 Beta';
+    channel.append(stableChannel, betaChannel);
+    const channelHint = document.createElement('p');
+    channelHint.className = 'dsh-update-channel-hint';
+    channelSection.append(channelLabel, channel, channelHint);
     const actions = document.createElement('div');
     actions.className = 'dsh-update-actions';
-    panel.append(header, status, versions, notes, progress, fallback, actions);
+    panel.append(header, status, versions, notes, progress, fallback, channelSection, actions);
     root.append(mask, panel);
     document.body.append(root);
 
@@ -297,10 +352,22 @@ export function createUpdateSurfaceScript() {
     const recheck = button('重新检查', 'check');
     const install = button('重启并安装', 'install', true);
 
+    let currentPhase = 'idle';
     const hide = () => { root.hidden = true; };
     const show = () => { root.hidden = false; close.focus(); };
+    const renderChannel = (value = {}) => {
+      const selected = value.channel === 'beta' ? 'beta' : 'stable';
+      channel.value = selected;
+      channelSection.hidden = false;
+      const updateInProgress = ['downloading', 'ready', 'installing'].includes(currentPhase);
+      channel.disabled = updateInProgress;
+      channelHint.textContent = updateInProgress
+        ? '正在处理已发现的更新，完成后可切换通道。'
+        : '切换到稳定通道不会自动降级：已安装的较高 Beta 将保留，直到有更高的稳定版可用。';
+    };
     const render = (value = {}) => {
       const phase = value.phase || 'idle';
+      currentPhase = phase;
       const percent = Math.max(0, Math.min(100, Number(value.percent) || 0));
       progress.style.setProperty('--dsh-update-progress', percent + '%');
       progress.setAttribute('aria-valuenow', String(Math.round(percent)));
@@ -354,6 +421,7 @@ export function createUpdateSurfaceScript() {
         status.textContent = '点击检查以获取最新桌面版本。';
         actions.append(later, recheck);
       }
+      if (!channelSection.hidden) renderChannel({ channel: channel.value });
       if (phase === 'checking' || phase === 'installing') status.prepend(spinner);
       else spinner.remove();
       if (value.visible || phase === 'ready') show();
@@ -366,6 +434,16 @@ export function createUpdateSurfaceScript() {
     community.addEventListener('click', () => { void api.helpAction('community').catch(() => {}); });
     recheck.addEventListener('click', () => { void api.checkForUpdates().catch(() => {}); });
     install.addEventListener('click', () => { install.disabled = true; void api.installUpdate().catch(() => {}).finally(() => { install.disabled = false; }); });
+    channel.addEventListener('change', () => {
+      const selected = channel.value;
+      channel.disabled = true;
+      void api.setUpdateChannel(selected).then(renderChannel).catch(() => {
+        channelHint.textContent = '更新通道未保存，请稍后重试。';
+        void api.getUpdateChannel().then(renderChannel).catch(() => {
+          channel.disabled = ['downloading', 'ready', 'installing'].includes(currentPhase);
+        });
+      });
+    });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !root.hidden) hide(); });
     api.onUpdateStatus?.(render);
     api.onDeepLink?.((link) => {
@@ -374,6 +452,12 @@ export function createUpdateSurfaceScript() {
       void api.checkForUpdates().catch(() => {});
     });
     void api.getUpdateStatus().then(render).catch(() => {});
+    void api.getContract?.().then((contract) => {
+      const hasChannelControl = Array.isArray(contract?.capabilities)
+        && contract.capabilities.includes('updates.channel.manage');
+      if (!hasChannelControl || typeof api.getUpdateChannel !== 'function' || typeof api.setUpdateChannel !== 'function') return;
+      void api.getUpdateChannel().then(renderChannel).catch(() => {});
+    }).catch(() => {});
     return true;
   })()`
 }

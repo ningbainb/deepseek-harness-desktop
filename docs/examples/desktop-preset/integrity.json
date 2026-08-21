@@ -1,0 +1,10 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "1f31bb1f92b238bcdd1d3012163a74df5d623058ed68cbe24f013329c3d71f3e",
+    "dsh-preset.json": "853ba33a4ab1d9c208e265d827c4e8884d6797070a7003cabfcd6f2a5e4a83ff",
+    "packages.lock.json": "ae1124f15b341ed11f6f3bb736e89ac6237f9c18b914c7c3b82b83791b66b67a",
+    "settings.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "task-templates.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  }
+}

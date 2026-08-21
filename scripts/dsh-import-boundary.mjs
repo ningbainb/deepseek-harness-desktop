@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -77,7 +78,12 @@ export function listRepositoryFiles(root) {
     // an empty or truncated file list under concurrent Linux CI scans.
     child.once('close', (code) => {
       if (code !== 0) reject(new Error(`git ls-files failed: ${stderr.trim()}`))
-      else resolvePromise(stdout.split(/\r?\n/u).filter(Boolean))
+      else resolvePromise(
+        stdout
+          .split(/\r?\n/u)
+          .filter(Boolean)
+          .filter((path) => existsSync(resolve(root, path))),
+      )
     })
   })
 }

@@ -15,6 +15,8 @@ test('Known Good manifest derives exact runtime, integrity, capabilities, and pa
   assert.equal(manifest.runtime.packageName, '@deepseek-ai/dsh')
   assert.match(manifest.runtime.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u)
   assert.match(manifest.runtime.integrity, /^sha512-[A-Za-z0-9+/]+=*$/u)
+  assert.deepEqual(Object.keys(manifest.runtime.files).toSorted(), ['lib/bin.js', 'package.json'])
+  for (const digest of Object.values(manifest.runtime.files)) assert.match(digest, /^[a-f0-9]{64}$/u)
   assert.match(manifest.lockfile.sha256, /^[a-f0-9]{64}$/u)
   assert.equal(manifest.provider.providerId, 'dsh-cli-provider-v1')
   assert.deepEqual(manifest.provider.capabilities.map((item) => item.id), [
@@ -26,11 +28,13 @@ test('Known Good manifest derives exact runtime, integrity, capabilities, and pa
     'host-service.register',
   ])
   assert.deepEqual(manifest.compatPatches.ids, [
-    'queued-turn-continuation',
     'cancellation-presentation',
-    'tool-call-arguments-envelope',
     'desktop-skin-profile-isolation',
+    'queued-turn-continuation',
+    'tool-call-arguments-envelope',
   ])
+  assert.equal(manifest.compatPatches.registry, 'packages/dsh-desktop-compat/src/patch-registry.ts')
+  assert.match(manifest.compatPatches.sha256, /^[a-f0-9]{64}$/u)
   assert.equal(manifest.clientSlots.source, 'scripts/audit-dsh-coupling.mjs')
   assert.equal(manifest.clientSlots.ids.includes('conversation.input.dock'), true)
 })

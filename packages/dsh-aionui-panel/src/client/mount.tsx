@@ -41,14 +41,24 @@ function waitForElement(selector: string, onFound: (el: HTMLElement) => void): (
  * @param onToggleExplorer - collapse toggle (owned by the layout controller).
  * @returns a disposer unmounting both trees.
  */
-export function mountPanels(stores: PanelStores, onToggleExplorer: () => void): () => void {
+export function mountPanels(
+  stores: PanelStores,
+  onToggleExplorer: () => void,
+  onAddToConversation: (path: string) => boolean,
+): () => void {
   let explorerRoot: Root | undefined
   let previewRoot: Root | undefined
   const disposers: Array<() => void> = []
 
   disposers.push(waitForElement(EXPLORER_COL_SELECTOR, (el) => {
     explorerRoot = createRoot(el)
-    explorerRoot.render(<ExplorerPanel stores={stores} onToggleCollapse={onToggleExplorer} />)
+    explorerRoot.render(
+      <ExplorerPanel
+        stores={stores}
+        onToggleCollapse={onToggleExplorer}
+        onAddToConversation={onAddToConversation}
+      />,
+    )
   }))
   disposers.push(waitForElement(PREVIEW_COL_SELECTOR, (el) => {
     previewRoot = createRoot(el)

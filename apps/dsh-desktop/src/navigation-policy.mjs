@@ -42,7 +42,6 @@ export function installNavigationPolicy({ webContents, getRuntimeOrigin, openExt
     const decision = classifyNavigation(target, getRuntimeOrigin())
     if (decision === 'allow') return
     event.preventDefault()
-    if (decision === 'external') runBestEffort(() => openExternal(target), onError)
   })
   webContents.on('will-attach-webview', (event) => event.preventDefault())
   webContents.setWindowOpenHandler(({ url }) => {
@@ -60,7 +59,10 @@ export function installNavigationPolicy({ webContents, getRuntimeOrigin, openExt
         },
       }
     }
-    if (classifyNavigation(url, getRuntimeOrigin()) === 'external') runBestEffort(() => openExternal(url), onError)
+    // Renderer-owned popups are never promoted to the system browser. The
+    // main process exposes explicit Help/community actions for intentional
+    // external navigation, while the hidden about:blank bootstrap below is
+    // reserved for the Codex OAuth handoff.
     return { action: 'deny' }
   })
   webContents.on('did-create-window', (browserWindow, details) => {

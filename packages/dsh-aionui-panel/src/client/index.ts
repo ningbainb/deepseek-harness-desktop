@@ -39,6 +39,7 @@ export const inject = ['sessions', 'locale']
 /** Apply the browser half. */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, dictionaries), 'dsh-aionui-panel: dictionaries')
+  let insertPathIntoCurrentDraft: (path: string) => boolean = () => false
 
   // The composer drop target for explorer file drags: mounted in the
   // official `conversation.input.dock` band (declared by the shipped
@@ -48,6 +49,21 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['slots', 'conversation', 'sessions'], (scope: ClientContext) => {
     const sessions = scope.sessions
     const conversation = scope.conversation
+    const insertPath = (sessionId: SessionId | undefined, path: string): boolean => {
+      if (sessionId === undefined) return false
+      const actx = sessions.scope(sessionId)
+      if (actx === undefined) return false
+      const input = conversation.input
+      if (input === undefined) return false
+      const shell = input.for(actx)
+      const draft = shell.state.getSnapshot().draft
+      shell.setDraft(insertPathIntoDraft(draft, path))
+      return true
+    }
+    insertPathIntoCurrentDraft = (path: string): boolean => {
+      const sessionId = sessions.list.getSnapshot().current as SessionId | undefined
+      return insertPath(sessionId, path)
+    }
     scope.slots.inject('conversation.input.dock', () =>
       scope.slots.register({
         name: 'conversation.input.dock',
@@ -56,15 +72,7 @@ export function apply(ctx: ClientContext): void {
         locale: NS,
         inject: (sessionId: SessionId | undefined): DragFileInjected => ({
           insertPath: (path: string): boolean => {
-            if (sessionId === undefined) return false
-            const actx = sessions.scope(sessionId)
-            if (actx === undefined) return false
-            const input = conversation.input
-            if (input === undefined) return false
-            const shell = input.for(actx)
-            const draft = shell.state.getSnapshot().draft
-            shell.setDraft(insertPathIntoDraft(draft, path))
-            return true
+            return insertPath(sessionId, path)
           },
         }),
       }, DragFileInlay))
@@ -147,7 +155,11 @@ export function apply(ctx: ClientContext): void {
     // Mount everything. DOM failures degrade the panels, never the GUI.
     try {
       layout.mount()
-      mountPanels(stores, () => layout.toggleExplorer())
+      mountPanels(
+        stores,
+        () => layout.toggleExplorer(),
+        (path) => insertPathIntoCurrentDraft(path),
+      )
     } catch (error) {
       console.error('[dsh-aionui-panel] mount failed:', error)
     }

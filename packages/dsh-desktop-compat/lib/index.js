@@ -846,67 +846,146 @@ function createDesktopWorkspaceFileOpenRoute(workspaceRegistry, { capabilityToke
 function registerDesktopWorkspaceFileOpenRoute(ctx) {
 	return ctx.webServer.register(createDesktopWorkspaceFileOpenRoute(ctx.workspaceRegistry, { capabilityToken: process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] }));
 }
-//#endregion
-//#region src/patch-registry.ts
 const PATCH_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
-function validateCompatPatchRegistry(entries) {
+const OWNER = /^[a-z0-9][a-z0-9._/@-]{1,127}$/u;
+const TEST_PATH = /^(?:(?:apps|packages)\/[a-z0-9][a-z0-9._-]*\/(?:test|tests)\/|scripts\/)[a-z0-9][a-z0-9._/-]*\.(?:spec|test)\.(?:[cm]?[jt]s|tsx)$/iu;
+function nonEmptyString(value, entryId, field, minimumLength = 8) {
+	if (typeof value !== "string" || value.trim().length < minimumLength) throw new TypeError(`compat patch ${entryId} has an invalid ${field}`);
+	return value;
+}
+function calendarDate(value, entryId, field) {
+	if (typeof value !== "string" || !ISO_DATE.test(value)) throw new TypeError(`compat patch ${entryId} has an invalid ${field} date`);
+	const parsed = /* @__PURE__ */ new Date(`${value}T00:00:00.000Z`);
+	if (Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value) throw new TypeError(`compat patch ${entryId} has an invalid ${field} date`);
+	return parsed;
+}
+function normalizedVersions(entry) {
+	const appliesTo = entry.appliesTo;
+	const legacy = entry.applicableVersions;
+	const valid = (versions) => Array.isArray(versions) && versions.length > 0 && versions.every((version) => typeof version === "string" && EXACT_VERSION.test(version));
+	if (appliesTo !== void 0 && !valid(appliesTo)) throw new TypeError(`compat patch ${entry.id} must use exact appliesTo versions`);
+	if (legacy !== void 0 && !valid(legacy)) throw new TypeError(`compat patch ${entry.id} must use exact applicable versions`);
+	if (appliesTo === void 0 && legacy === void 0) throw new TypeError(`compat patch ${entry.id} must declare appliesTo versions`);
+	if (appliesTo !== void 0 && legacy !== void 0) {
+		const canonical = [...appliesTo].sort();
+		const legacyNormalized = [...legacy].sort();
+		if (canonical.length !== legacyNormalized.length || canonical.some((version, index) => version !== legacyNormalized[index])) throw new TypeError(`compat patch ${entry.id} has conflicting appliesTo and applicableVersions`);
+	}
+	return Object.freeze([...appliesTo ?? legacy]);
+}
+function normalizedTests(entry) {
+	const tests = entry.tests;
+	const legacy = entry.test;
+	const valid = (value) => Array.isArray(value) && value.length > 0 && value.every((testPath) => typeof testPath === "string" && TEST_PATH.test(testPath));
+	if (tests !== void 0 && !valid(tests)) throw new TypeError(`compat patch ${entry.id} has invalid tests`);
+	if (legacy !== void 0 && (typeof legacy !== "string" || !TEST_PATH.test(legacy))) throw new TypeError(`compat patch ${entry.id} has an invalid test`);
+	if (tests === void 0 && legacy === void 0) throw new TypeError(`compat patch ${entry.id} must declare tests`);
+	if (tests !== void 0 && legacy !== void 0 && !tests.includes(legacy)) throw new TypeError(`compat patch ${entry.id} must include legacy test in tests`);
+	return Object.freeze([...tests ?? [legacy]]);
+}
+function normalizedOwner(entry) {
+	if (typeof entry.owner !== "string" || !OWNER.test(entry.owner)) throw new TypeError(`compat patch ${entry.id} has an invalid owner`);
+	return entry.owner;
+}
+function validationPolicy(options) {
+	const maxAgeDays = options.maxAgeDays ?? 90;
+	if (!Number.isInteger(maxAgeDays) || maxAgeDays < 0 || maxAgeDays > 366) throw new TypeError("compat patch registry maxAgeDays must be an integer from 0 through 366");
+	if (options.enforceFreshness === false) return { maxAgeDays };
+	return {
+		maxAgeDays,
+		today: calendarDate(options.today ?? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), "registry", "today")
+	};
+}
+/**
+* Validates and normalizes canonical 3.0 fields plus legacy 2.x aliases.
+* Freshness is enforced against the current UTC date unless a caller supplies
+* a fixed date or explicitly bypasses it for static package initialization.
+* CI supplies a repository-aware test-file predicate through the public schema
+* validator.
+*/
+function validateCompatPatchRegistry(entries, options = {}) {
 	if (!Array.isArray(entries) || entries.length === 0) throw new TypeError("compat patch registry must contain at least one entry");
+	const policy = validationPolicy(options);
 	const ids = /* @__PURE__ */ new Set();
+	const normalizedEntries = [];
 	for (const entry of entries) {
 		if (entry === null || typeof entry !== "object" || !PATCH_ID.test(entry.id)) throw new TypeError("compat patch registry id is invalid");
 		if (ids.has(entry.id)) throw new TypeError(`duplicate compat patch id: ${entry.id}`);
 		ids.add(entry.id);
-		if (!Array.isArray(entry.applicableVersions) || entry.applicableVersions.length === 0 || entry.applicableVersions.some((version) => typeof version !== "string" || !EXACT_VERSION.test(version))) throw new TypeError(`compat patch ${entry.id} must use exact applicable versions`);
-		for (const field of [
-			"reason",
-			"upstreamReference",
-			"test",
-			"removeWhen"
-		]) if (typeof entry[field] !== "string" || entry[field].trim().length < 8) throw new TypeError(`compat patch ${entry.id} has an invalid ${field}`);
-		if (!ISO_DATE.test(entry.lastVerified)) throw new TypeError(`compat patch ${entry.id} has an invalid lastVerified date`);
+		const appliesTo = normalizedVersions(entry);
+		const tests = normalizedTests(entry);
+		const owner = normalizedOwner(entry);
+		const upstreamReference = nonEmptyString(entry.upstreamReference, entry.id, "upstreamReference");
+		const removeWhen = nonEmptyString(entry.removeWhen, entry.id, "removeWhen");
+		const reason = entry.reason === void 0 ? void 0 : nonEmptyString(entry.reason, entry.id, "reason");
+		const lastVerified = calendarDate(entry.lastVerified, entry.id, "lastVerified");
+		if (policy.today !== void 0) {
+			const ageDays = Math.floor((policy.today.valueOf() - lastVerified.valueOf()) / 864e5);
+			if (ageDays < 0 || ageDays > policy.maxAgeDays) throw new TypeError(`compat patch ${entry.id} is stale: lastVerified ${entry.lastVerified} exceeds ${policy.maxAgeDays} days`);
+		}
+		if (options.testExists !== void 0) {
+			for (const testPath of tests) if (!options.testExists(testPath)) throw new TypeError(`compat patch ${entry.id} references missing test: ${testPath}`);
+		}
+		const normalized = {
+			id: entry.id,
+			appliesTo,
+			applicableVersions: appliesTo,
+			upstreamReference,
+			owner,
+			tests,
+			test: tests[0],
+			removeWhen,
+			lastVerified: entry.lastVerified,
+			...reason === void 0 ? {} : { reason }
+		};
+		normalizedEntries.push(Object.freeze(normalized));
 	}
-	return entries;
+	return Object.freeze(normalizedEntries);
 }
-const DESKTOP_COMPAT_PATCHES = Object.freeze(validateCompatPatchRegistry([
-	Object.freeze({
+const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
+	{
 		id: "queued-turn-continuation",
-		applicableVersions: Object.freeze(["0.1.0-rc.7"]),
+		appliesTo: ["0.1.1-rc.1"],
+		upstreamReference: "@deepseek-ai/dsh-agent 0.1.1-rc.1 agent/status public hook behavior",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/recovery.spec.ts"],
 		reason: "Resume a queued user turn after the active turn reaches a terminal status.",
-		upstreamReference: "@deepseek-ai/dsh-agent 0.1.0-rc.7 agent/status public hook behavior",
-		test: "packages/dsh-desktop-compat/tests/recovery.spec.ts",
 		removeWhen: "The upstream agent loop natively and deterministically resumes queued turns.",
-		lastVerified: "2026-08-19"
-	}),
-	Object.freeze({
+		lastVerified: "2026-08-21"
+	},
+	{
 		id: "cancellation-presentation",
-		applicableVersions: Object.freeze(["0.1.0-rc.7"]),
+		appliesTo: ["0.1.1-rc.1"],
+		upstreamReference: "@deepseek-ai/dsh-tools 0.1.1-rc.1 tools/post-execute public hook behavior",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/recovery.spec.ts"],
 		reason: "Translate the known object-shaped cancellation result into a stable user-facing message.",
-		upstreamReference: "@deepseek-ai/dsh-tools 0.1.0-rc.7 tools/post-execute public hook behavior",
-		test: "packages/dsh-desktop-compat/tests/recovery.spec.ts",
 		removeWhen: "The upstream tool runtime returns a stable cancellation presentation contract.",
-		lastVerified: "2026-08-19"
-	}),
-	Object.freeze({
+		lastVerified: "2026-08-21"
+	},
+	{
 		id: "tool-call-arguments-envelope",
-		applicableVersions: Object.freeze(["0.1.0-rc.7"]),
+		appliesTo: ["0.1.1-rc.1"],
+		upstreamReference: "@deepseek-ai/dsh-llm 0.1.1-rc.1 llm/stream waterfall plus dsh-tools schema validation",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts"],
 		reason: "Recover only a schema-proven single-key arguments envelope before the agent loop parses tool JSON.",
-		upstreamReference: "@deepseek-ai/dsh-llm 0.1.0-rc.7 llm/stream waterfall plus dsh-tools schema validation",
-		test: "packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts",
 		removeWhen: "The upstream adapter or agent loop normalizes this malformed transport envelope with the same ambiguity guard.",
-		lastVerified: "2026-08-20"
-	}),
-	Object.freeze({
+		lastVerified: "2026-08-21"
+	},
+	{
 		id: "desktop-skin-profile-isolation",
-		applicableVersions: Object.freeze(["0.1.0-rc.7"]),
+		appliesTo: ["0.1.1-rc.1"],
+		upstreamReference: "@deepseek-ai/dsh 0.1.1-rc.1 profile-scoped runtime behavior and Skin Center v2 state isolation",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/skin-state.spec.ts"],
 		reason: "Keep Desktop skin selection inside the isolated desktop profile patch.",
-		upstreamReference: "@deepseek-ai/dsh 0.1.0-rc.7 profile-scoped runtime behavior and Skin Center v2 state isolation",
-		test: "packages/dsh-desktop-compat/tests/skin-state.spec.ts",
 		removeWhen: "The upstream skin service exposes a profile-scoped public persistence contract.",
-		lastVerified: "2026-08-19"
-	})
-]));
+		lastVerified: "2026-08-21"
+	}
+], { enforceFreshness: false });
 //#endregion
 //#region src/index.ts
 const name = "desktop-compat";

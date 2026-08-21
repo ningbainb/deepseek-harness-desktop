@@ -13,7 +13,6 @@ import {
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import {
   DEFAULT_STARTUP_TIMEOUT_MS,
-  DESKTOP_PROFILE_NAME,
   DshRuntimeController,
   computeRestartDelay,
   createRuntimeInvocation,
@@ -116,20 +115,69 @@ test('Windows runtime wrapper avoids the PowerShell WindowStyle crash and preser
   assert.match(script, /'--require' '[^']*windows-console-preload\.cjs'/u)
   assert.match(script, /'--profile' 'desktop'/u)
   assert.match(script, /'--port' '0'/u)
+  assert.match(script, /'--no-open'/u)
   assert.match(script, /ForEach-Object \{ \[Console\]::Out\.WriteLine\(\$_\) \}/u)
   assert.match(script, /exit \$LASTEXITCODE/u)
 })
 
 test('non-Windows runtime launch remains a direct argv spawn', () => {
-  assert.deepEqual(createRuntimeInvocation({
+  const invocation = createRuntimeInvocation({
     platform: 'linux',
     executable: '/opt/deepseek-harness',
     cliPath: '/opt/dsh/bin.js',
     preferredPort: 43_125,
+  })
+  assert.deepEqual(invocation, {
+    executable: '/opt/deepseek-harness',
+    args: ['--expose-internals', '/opt/dsh/bin.js', '--profile', 'desktop', '--port', '43125', '--no-open'],
+  })
+  assert.equal(invocation.args.filter((argument) => argument === '--no-open').length, 1)
+})
+
+test('runtime invocation passes only validated main-process patch overlays after the selected profile', () => {
+  const invocation = createRuntimeInvocation({
+    executable: 'node',
+    cliPath: 'dsh-bin.js',
+    profileName: 'free-session-001',
+    patchFiles: ['C:\\isolated-home\\.desktop-free-full-user-overlay.yml'],
+    platform: 'linux',
+  })
+  const profileAt = invocation.args.indexOf('--profile')
+  const patchAt = invocation.args.indexOf('--patch')
+  assert.ok(patchAt > profileAt)
+  assert.equal(invocation.args[patchAt + 1], 'C:\\isolated-home\\.desktop-free-full-user-overlay.yml')
+  assert.throws(
+    () => createRuntimeInvocation({
+      executable: 'node',
+      cliPath: 'dsh-bin.js',
+      patchFiles: ['unsafe\npath'],
+      platform: 'linux',
+    }),
+    /patch file path is invalid/u,
+  )
+})
+
+test('runtime launch accepts a validated session profile without changing the desktop default', () => {
+  assert.deepEqual(createRuntimeInvocation({
+    platform: 'linux',
+    executable: '/opt/deepseek-harness',
+    cliPath: '/opt/dsh/bin.js',
+    profileName: 'free-session-001',
   }), {
     executable: '/opt/deepseek-harness',
-    args: ['--expose-internals', '/opt/dsh/bin.js', '--profile', 'desktop', '--port', '43125'],
+    args: ['--expose-internals', '/opt/dsh/bin.js', '--profile', 'free-session-001', '--port', '0', '--no-open'],
   })
+  for (const profileName of ['', '../desktop', 'desktop/profile', 'desktop profile', 'x'.repeat(65)]) {
+    assert.throws(
+      () => createRuntimeInvocation({
+        platform: 'linux',
+        executable: '/opt/deepseek-harness',
+        cliPath: '/opt/dsh/bin.js',
+        profileName,
+      }),
+      /runtime profile name/u,
+    )
+  }
 })
 
 test('hidden Windows runtime wrapper preserves runtime output and exit status', {
@@ -201,10 +249,12 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   let childArguments
   let childEnvironment
   const readyPorts = []
+  const profileName = 'free-session-001'
   const controller = new DshRuntimeController({
     cliPath: 'dsh-bin.js',
     cwd: process.cwd(),
     dshHome: 'C:\\isolated-home',
+    profileName,
     spawnProcess: (_executable, arguments_, options) => {
       childArguments = arguments_
       childEnvironment = options.env
@@ -214,7 +264,15 @@ test('controller reaches ready state from streamed output and stops cleanly', as
     probeReady: async () => {},
     startupTimeoutMs: 2_000,
     pathEntries: ['C:\\desktop-runtime-bin'],
-    environmentProvider: () => ({ QQBOT_APPID: 'desktop-app', QQBOT_SECRET: 'runtime-only' }),
+    environmentProvider: () => ({
+      QQBOT_APPID: 'desktop-app',
+      QQBOT_SECRET: 'runtime-only',
+      // This is the exact additional environment supplied by the native-
+      // confirmed, isolated Free Mode launch path.  It must survive the
+      // controller's child-environment construction rather than merely being
+      // recorded in Desktop state.
+      DSH_PERMISSION_MODE: 'danger-full-access',
+    }),
     platform: 'linux',
     preferredPort: 43_124,
     onReadyPort: (port) => readyPorts.push(port),
@@ -227,17 +285,18 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   assert.equal(controller.status.state, 'ready')
   assert.deepEqual(states.slice(0, 2), ['starting', 'ready'])
   assert.ok(logLines.some((line) => line.includes('booting')))
-  assert.equal(childEnvironment.DSH_PROFILE, DESKTOP_PROFILE_NAME)
-  assert.equal(childEnvironment.DSH_SKIN_PROFILE, DESKTOP_PROFILE_NAME)
-  assert.equal(childArguments[childArguments.indexOf('--profile') + 1], DESKTOP_PROFILE_NAME)
+  assert.equal(childEnvironment.DSH_PROFILE, profileName)
+  assert.equal(childEnvironment.DSH_SKIN_PROFILE, profileName)
+  assert.equal(childArguments[childArguments.indexOf('--profile') + 1], profileName)
   assert.equal(childArguments[childArguments.indexOf('--port') + 1], '43124')
   assert.deepEqual(readyPorts, [43_125])
   assert.equal(
     childEnvironment.DSH_SKINS_DIR,
-    join('C:\\isolated-home', 'profiles', DESKTOP_PROFILE_NAME, 'node_modules', '@linxin666'),
+    join('C:\\isolated-home', 'profiles', profileName, 'node_modules', '@linxin666'),
   )
   assert.equal(childEnvironment.QQBOT_APPID, 'desktop-app')
   assert.equal(childEnvironment.QQBOT_SECRET, 'runtime-only')
+  assert.equal(childEnvironment.DSH_PERMISSION_MODE, 'danger-full-access')
   assert.equal(isDesktopWorkspaceFileOpenToken(childEnvironment[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV]), true)
   assert.equal(controller.getWorkspaceFileOpenToken(), childEnvironment[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV])
   assert.equal(logLines.some((line) => line.includes(childEnvironment[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV])), false)
@@ -247,6 +306,20 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   assert.equal(controller.status.state, 'stopped')
   assert.equal(controller.getWorkspaceFileOpenToken(), undefined)
   assert.equal(child.killed, true)
+})
+
+test('controller rejects an invalid runtime profile name before spawning', () => {
+  for (const profileName of ['', '../desktop', 'desktop/profile', 'desktop profile', 'x'.repeat(65)]) {
+    assert.throws(
+      () => new DshRuntimeController({
+        cliPath: 'dsh-bin.js',
+        cwd: process.cwd(),
+        dshHome: 'C:\\isolated-home',
+        profileName,
+      }),
+      /runtime profile name/u,
+    )
+  }
 })
 
 test('runtime capability is redacted from child logs, errors, status, and line observers', async () => {

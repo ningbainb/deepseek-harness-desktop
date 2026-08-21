@@ -7,7 +7,7 @@ import type { ExecutionRecord, TaskRecord } from './tasks.ts'
 export interface ProviderCapabilitySnapshot {
   providerId?: string
   upstreamVersion?: string
-  supportStatus?: 'known-good' | 'degraded' | 'unsupported'
+  supportStatus?: 'known-good' | 'supported' | 'candidate' | 'blocked' | 'degraded' | 'unsupported'
   capabilities: ReadonlyArray<{ id: string; status: 'available' | 'unsupported' | 'degraded' }>
 }
 
@@ -156,6 +156,8 @@ async function inspectWorktree(worktrees: WorktreeExecutionFace, worktreeId: str
 export class WorktreeExecutionCoordinator {
   private readonly active = new Map<string, ActiveRun>()
   private readonly pendingCancels = new Set<string>()
+  /** Bounded insertion-ordered memory of recently settled run ids. */
+  private readonly settledRuns = new Map<string, true>()
   private readonly now: () => number
 
   constructor(
@@ -434,6 +436,7 @@ export class WorktreeExecutionCoordinator {
     const active = this.active.get(input.runId)
     if (active !== undefined) active.evidence = response
     this.active.delete(input.runId)
+    this.markSettled(input.runId)
     return response
   }
 
@@ -466,6 +469,9 @@ export class WorktreeExecutionCoordinator {
   async cancel(runId: string): Promise<boolean> {
     const active = this.active.get(runId)
     if (active === undefined) {
+      if (this.settledRuns.has(runId)) return false
+      // The run may still be starting (Worktree/Session setup happens before
+      // it registers as active); queue the cancellation for that handoff.
       this.pendingCancels.add(runId)
       return true
     }
@@ -473,6 +479,20 @@ export class WorktreeExecutionCoordinator {
     await active.session.cancel()
     // Cancellation deliberately does not call removeWorktree; review owns it.
     return true
+  }
+
+  /**
+   * Record a settled run: drop any queued cancellation that arrived too late
+   * (it must never cancel a later retry of the same run id) and remember the
+   * id in a bounded window so cancel() can answer false honestly.
+   */
+  private markSettled(runId: string): void {
+    this.pendingCancels.delete(runId)
+    this.settledRuns.set(runId, true)
+    if (this.settledRuns.size > 512) {
+      const oldest = this.settledRuns.keys().next().value
+      if (oldest !== undefined) this.settledRuns.delete(oldest)
+    }
   }
 
   /** Persist a failed Evidence record whenever isolation already owns a Worktree. */
@@ -517,6 +537,7 @@ export class WorktreeExecutionCoordinator {
       evidenceId: evidence.evidenceId,
       fallbackReason: reason.slice(0, 500),
     }
+    this.markSettled(input.runId)
     return { mode: 'blocked', run, evidenceId: evidence.evidenceId, fallbackReason: reason, capabilityEvidence: providerEvidence, ...(sessionId === undefined ? {} : { sessionId }), resultStatus: 'failed' }
   }
 
@@ -556,6 +577,7 @@ export class WorktreeExecutionCoordinator {
       runtimeProviderEvidence: providerEvidence,
     }
     this.active.delete(run.runId)
+    this.markSettled(run.runId)
     return {
       mode: 'blocked',
       run: completedRun,

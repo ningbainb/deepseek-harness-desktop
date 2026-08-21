@@ -7,7 +7,7 @@ The dsh web UI plugin group for the DSH settings page: it adds a first-level set
 ## What it is
 
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.
-- **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's Plugin Market (`dshmarket`) for discovery, installation, recovery, and rollback. This package deliberately does not restore the obsolete in-group community card.
+- **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
 
 ## Install
 

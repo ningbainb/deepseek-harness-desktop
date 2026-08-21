@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
-import type { SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import {
   checkRefFormatArgv, classifySwitchFailure, createBranchArgv, forEachRefArgv,
   gitPathArgv, graphLogArgv, headBranchArgv, headShortArgv, operationMarkersArgv,
@@ -71,11 +71,11 @@ export type WorkspaceGate = (path: string) => Promise<WorkspaceVerdict>
  * @param ctx - context carrying the subprocess service.
  * @returns the runner.
  */
-export function subprocessRunner(ctx: Context): GitRunner {
+export function subprocessRunner(ctx: Context, platform: NodeJS.Platform = process.platform): GitRunner {
   return {
     async run(argv, cwd) {
       const spec: SubprocessSpawnSpec = {
-        argv: gitSpawnArgv(process.platform, argv),
+        argv: gitSpawnArgv(platform, argv),
         cwd,
         stdio: {
           stdin: 'ignore',
@@ -84,11 +84,34 @@ export function subprocessRunner(ctx: Context): GitRunner {
         },
         graceMs: 10_000,
       }
-      const handle = ctx.subprocess.spawn(spec)
-      const outcome = await handle.done
-      const stdout = handle.collected.stdout?.readFrom(0).text ?? ''
-      const stderr = handle.collected.stderr?.readFrom(0).text ?? ''
-      return { exitCode: outcome.exitCode, stdout, stderr }
+      // Git is an optional integration. In particular, a fresh Windows
+      // Desktop installation may not have git.exe on PATH. A spawn failure
+      // must be represented as a normal failed git command instead of
+      // escaping through DSH's plugin loader and terminating the Runtime.
+      let handle: SubprocessHandle
+      try {
+        handle = ctx.subprocess.spawn(spec)
+      } catch (error) {
+        console.error('[dsh-git-graph] git spawn failed:', error)
+        return {
+          exitCode: 127,
+          stdout: '',
+          stderr: 'git: spawn failed: ' + (error instanceof Error ? error.message : String(error)),
+        }
+      }
+      try {
+        const outcome = await handle.done
+        const stdout = handle.collected.stdout?.readFrom(0).text ?? ''
+        const stderr = handle.collected.stderr?.readFrom(0).text ?? ''
+        return { exitCode: outcome.exitCode, stdout, stderr }
+      } catch (error) {
+        console.error('[dsh-git-graph] git run failed:', error)
+        return {
+          exitCode: 127,
+          stdout: '',
+          stderr: 'git: run failed: ' + (error instanceof Error ? error.message : String(error)),
+        }
+      }
     },
   }
 }

@@ -10,7 +10,7 @@
  */
 import { isValidCron, isValidTimeZone } from './schedule.ts'
 import { isIsolationMode, normalizeRuntimeProviderEvidence, normalizeTaskRun } from './runs.ts'
-import type { ScheduleLease, ScheduleRule, TaskRecord, TaskStatus } from './tasks.ts'
+import type { ExecutionRecord, ScheduleLease, ScheduleRule, TaskRecord, TaskStatus } from './tasks.ts'
 import { isTaskStatus } from './tasks.ts'
 
 /** Persistence seam for the task ledger. */
@@ -101,6 +101,64 @@ function normalizeStatus(status: unknown): TaskStatus {
   return isTaskStatus(status) ? status : 'todo'
 }
 
+function normalizeExecutionRecord(value: unknown): ExecutionRecord | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const entry = value as Record<string, unknown>
+  if (typeof entry.id !== 'string'
+    || (entry.runId !== undefined && typeof entry.runId !== 'string')
+    || (entry.workspaceId !== undefined && typeof entry.workspaceId !== 'string')
+    || (entry.sessionId !== undefined && typeof entry.sessionId !== 'string')
+    || typeof entry.startedAt !== 'number'
+    || (entry.endedAt !== undefined && typeof entry.endedAt !== 'number')
+    || (entry.finishedAt !== undefined && typeof entry.finishedAt !== 'number')
+    || (entry.result !== undefined && entry.result !== 'succeeded' && entry.result !== 'failed' && entry.result !== 'cancelled')
+    || (entry.error !== undefined && typeof entry.error !== 'string')) return undefined
+  return {
+    id: entry.id,
+    ...(entry.runId === undefined ? {} : { runId: entry.runId }),
+    ...(entry.workspaceId === undefined ? {} : { workspaceId: entry.workspaceId }),
+    sessionId: entry.sessionId as string | undefined,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt as number | undefined,
+    ...(entry.finishedAt === undefined ? {} : { finishedAt: entry.finishedAt as number }),
+    result: entry.result as ExecutionRecord['result'],
+    error: entry.error === undefined ? undefined : (entry.error as string).slice(0, 4_000),
+  }
+}
+
+/**
+ * Pick only the published task fields when reading or writing persistence.
+ * This deliberately ignores additive/unknown fields from newer builds: a
+ * board ledger must never become a side channel for session or tool content.
+ */
+export function normalizeTaskRecord(value: unknown): TaskRecord | undefined {
+  if (!isTaskRecordShape(value)) return undefined
+  const record = value as Record<string, unknown>
+  const executions = (record.executions as unknown[]).map(normalizeExecutionRecord)
+  if (executions.some((entry) => entry === undefined)) return undefined
+  const runs = Array.isArray(record.runs)
+    ? record.runs.flatMap(run => {
+      const normalized = normalizeTaskRun(run)
+      return normalized === undefined ? [] : [normalized]
+    })
+    : undefined
+  if (Array.isArray(record.runs) && runs?.length !== record.runs.length) return undefined
+  return {
+    id: record.id as string,
+    title: record.title as string,
+    description: record.description as string,
+    prompt: record.prompt as string,
+    status: normalizeStatus(record.status),
+    createdAt: record.createdAt as number,
+    updatedAt: record.updatedAt as number,
+    executions: executions as ExecutionRecord[],
+    ...(record.projectId === undefined ? {} : { projectId: record.projectId as string }),
+    ...(record.isolationMode === undefined ? {} : { isolationMode: record.isolationMode as TaskRecord['isolationMode'] }),
+    ...(runs === undefined ? {} : { runs }),
+    ...(normalizeSchedule(record.schedule) === undefined ? {} : { schedule: normalizeSchedule(record.schedule) }),
+  }
+}
+
 /**
  * Repair a persisted schedule rule: drop rules without a usable cron string,
  * coerce booleans/numbers, and leave `nextRunAt`/`lastTriggeredAt` undefined
@@ -180,18 +238,8 @@ export function parseLedger(raw: string | null): TaskRecord[] {
       console.warn('[dsh-task-board] dropping invalid task row from persisted ledger', row)
       continue
     }
-    // Always (re)assign the schedule: a repair that returns undefined must
-    // clear a malformed persisted rule rather than leave it in the row.
-    const task: TaskRecord = {
-      ...row,
-      status: normalizeStatus(row.status),
-      ...(Array.isArray(row.runs) ? { runs: row.runs.flatMap(run => {
-        const normalized = normalizeTaskRun(run)
-        return normalized === undefined ? [] : [normalized]
-      }) } : {}),
-    }
-    task.schedule = normalizeSchedule(row.schedule)
-    tasks.push(task)
+    const task = normalizeTaskRecord(row)
+    if (task !== undefined) tasks.push(task)
   }
   return tasks
 }
@@ -230,7 +278,10 @@ export function createLedgerDocumentV2(
     schemaVersion: TASK_LEDGER_SCHEMA_VERSION,
     revision,
     updatedAt,
-    tasks: tasks.map(task => ({ ...task, executions: task.executions.map(execution => ({ ...execution })) })),
+    tasks: tasks.flatMap(task => {
+      const normalized = normalizeTaskRecord(task)
+      return normalized === undefined ? [] : [normalized]
+    }),
   }
 }
 

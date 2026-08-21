@@ -1,0 +1,11 @@
+{
+  "name": "dsh-profile-desktop",
+  "version": "2.7.0",
+  "desktopVersion": "2.7.0",
+  "dsh": {
+    "profile": { "owner": "desktop", "bundles": [] },
+    "plugins": [
+      { "name": "@community/scheduler", "compatibility": { "status": "compatible" } }
+    ]
+  }
+}

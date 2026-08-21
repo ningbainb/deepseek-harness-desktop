@@ -11,8 +11,8 @@
  * @module dsh-aionui-panel/client/components/ExplorerPanel
  */
 
-import { memo, useRef, useState } from 'react'
-import type { DragEvent, JSX } from 'react'
+import { memo, useCallback, useRef, useState } from 'react'
+import type { DragEvent, JSX, MouseEvent } from 'react'
 import type { FsEntry } from '../../core/types.ts'
 import { parentRel } from '../fileType.ts'
 import { t } from '../locales.ts'
@@ -23,11 +23,48 @@ import { ChevronRightIcon, CloseIcon, ExpandRightIcon, SearchIcon } from './icon
 import { ScmPanel } from './ScmPanel.tsx'
 import { activateOnKey } from './a11y.ts'
 import { FILE_DRAG_MIME } from '../drag/file-drag.ts'
+import { ContextMenu, toast, type MenuState } from './overlay.tsx'
 import explorerCss from '../styles/explorer.module.css'
 import '../styles/tokens.module.css'
 
 /** Row indent step per tree depth (px). */
 const INDENT_STEP = 16
+
+type OpenEntryMenu = (event: MouseEvent, entry: FsEntry, root: string) => void
+
+/** Join a session root and workspace-relative entry using the root's style. */
+export function workspaceAbsolutePath(root: string, relativePath: string): string {
+  const separator = root.includes('\\') ? '\\' : '/'
+  const base = root.replace(/[\\/]+$/u, '')
+  const relative = relativePath.replace(/[\\/]+/gu, separator).replace(/^[\\/]+/u, '')
+  return relative === '' ? base : `${base}${separator}${relative}`
+}
+
+/** Clipboard write with a legacy fallback for restricted loopback contexts. */
+export async function copyExplorerPath(path: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText !== undefined) {
+      await navigator.clipboard.writeText(path)
+      return true
+    }
+  } catch {
+    // Fall through to the in-document copy path.
+  }
+  try {
+    const input = document.createElement('textarea')
+    input.value = path
+    input.setAttribute('readonly', '')
+    input.style.position = 'fixed'
+    input.style.opacity = '0'
+    document.body.append(input)
+    input.select()
+    const copied = document.execCommand('copy')
+    input.remove()
+    return copied
+  } catch {
+    return false
+  }
+}
 
 /**
  * The whole explorer column content.
@@ -37,12 +74,40 @@ const INDENT_STEP = 16
 export function ExplorerPanel({
   stores,
   onToggleCollapse,
+  onAddToConversation,
 }: {
   stores: PanelStores
   onToggleCollapse: () => void
+  onAddToConversation: (path: string) => boolean
 }): JSX.Element {
   const state = useStore(stores.explorer)
   const [searchFocus, setSearchFocus] = useState(false)
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const openEntryMenu = useCallback<OpenEntryMenu>((event, entry, root) => {
+    event.preventDefault()
+    event.stopPropagation()
+    stores.explorer.select(entry.path)
+    const entries: MenuState['entries'] = [{
+      key: 'copy-path',
+      label: t('common.copyPath'),
+      onSelect: () => {
+        void copyExplorerPath(workspaceAbsolutePath(root, entry.path)).then((copied) => {
+          toast(t(copied ? 'common.copied' : 'common.copyFailed'))
+        })
+      },
+    }]
+    if (!entry.isDir) {
+      entries.push({
+        key: 'add-to-conversation',
+        label: t('explorer.addToConversation'),
+        onSelect: () => {
+          const inserted = onAddToConversation(entry.path)
+          toast(t(inserted ? 'explorer.addedToConversation' : 'explorer.noActiveConversation'))
+        },
+      })
+    }
+    setMenu({ x: event.clientX, y: event.clientY, entries })
+  }, [onAddToConversation, stores.explorer])
 
   return (
     <div className="aionui-root" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -81,11 +146,12 @@ export function ExplorerPanel({
           searchFocus={searchFocus}
           onFocusChange={setSearchFocus}
         />
-        <FileTree stores={stores} />
+        <FileTree stores={stores} onOpenEntryMenu={openEntryMenu} />
       </div>
 
       {/* Changes tab: SCM (mounted on demand; its store outlives the tab). */}
       {state.activeTab === 'changes' && <ScmPanel stores={stores} />}
+      {menu !== null && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     </div>
   )
 }
@@ -186,7 +252,7 @@ function SearchResults({ stores }: { stores: PanelStores }): JSX.Element {
 }
 
 /** The lazy file tree. */
-function FileTree({ stores }: { stores: PanelStores }): JSX.Element {
+function FileTree({ stores, onOpenEntryMenu }: { stores: PanelStores; onOpenEntryMenu: OpenEntryMenu }): JSX.Element {
   const explorer = stores.explorer
   const preview = stores.preview
   const state = useStore(explorer)
@@ -211,6 +277,7 @@ function FileTree({ stores }: { stores: PanelStores }): JSX.Element {
           dirs={state.dirs}
           root={state.root}
           stores={stores}
+          onOpenEntryMenu={onOpenEntryMenu}
         />
       ))}
     </div>
@@ -226,6 +293,7 @@ function TreeRowBase({
   dirs,
   root,
   stores,
+  onOpenEntryMenu,
 }: {
   entry: FsEntry
   depth: number
@@ -234,6 +302,7 @@ function TreeRowBase({
   dirs: Record<string, FsEntry[]>
   root: string
   stores: PanelStores
+  onOpenEntryMenu: OpenEntryMenu
 }): JSX.Element {
   const explorer = stores.explorer
   const preview = stores.preview
@@ -272,6 +341,7 @@ function TreeRowBase({
         className={`${explorerCss.treeRow}${isSelected ? ` ${explorerCss.treeRowSelected}` : ''}${draggingRow ? ` ${explorerCss.treeRowDragging}` : ''}`}
         style={{ paddingLeft: 12 + 8 + depth * INDENT_STEP }}
         onClick={handleClick}
+        onContextMenu={(event) => onOpenEntryMenu(event, entry, root)}
         onKeyDown={activateOnKey(handleClick)}
         onDoubleClick={(event) => {
           // Double-click on a file: same as click (open). Folders: keep toggle.
@@ -307,6 +377,7 @@ function TreeRowBase({
               dirs={dirs}
               root={root}
               stores={stores}
+              onOpenEntryMenu={onOpenEntryMenu}
             />
           ))}
         </div>

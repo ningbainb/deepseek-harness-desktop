@@ -1,8 +1,9 @@
 /** Desktop 2.6 HostTaskStore envelope and copy-first v2 migration. */
 
 import type { Evidence, Project, TaskRunReference } from './runs.ts'
-import { isSafeRunId, isTaskRunResultStatus, normalizeProject, normalizeTaskRun } from './runs.ts'
+import { normalizeEvidence, normalizeProject, normalizeTaskRun } from './runs.ts'
 import {
+  normalizeTaskRecord,
   parseLedger,
   parseLedgerDocumentV2,
   type TaskLedgerDocumentV2,
@@ -30,6 +31,11 @@ export interface TaskLedgerDocumentV3 {
   evidences: Evidence[]
   migration?: TaskLedgerMigrationState
 }
+
+export type TaskLedgerV3Inspection =
+  | { kind: 'valid'; document: TaskLedgerDocumentV3 }
+  | { kind: 'future-major'; schemaVersion: number }
+  | { kind: 'invalid' }
 
 function resultStatus(execution: TaskRecord['executions'][number]): TaskRunReference['resultStatus'] {
   if (execution.result === 'failed') return 'failed'
@@ -87,80 +93,64 @@ export function createLedgerDocumentV3(input: {
   updatedAt: number
   migration?: TaskLedgerMigrationState
 }): TaskLedgerDocumentV3 {
+  // Write the canonical form the read-back verification in the Host store
+  // produces. Raw clones (for example an execution error longer than the
+  // 4 000-character bound or an unknown status) would re-parse differently
+  // and make every publish of this ledger fail its own verification.
   return {
     schemaVersion: TASK_LEDGER_SCHEMA_VERSION_V3,
     revision: input.revision,
     updatedAt: input.updatedAt,
-    projects: input.projects?.map(project => structuredClone(project)) ?? [],
-    tasks: input.tasks.map(task => structuredClone(task)),
-    evidences: input.evidences?.map(evidence => structuredClone(evidence)) ?? [],
+    projects: input.projects?.flatMap(project => {
+      const normalized = normalizeProject(project)
+      if (normalized === undefined) console.warn('[dsh-task-board] dropping invalid project row from v3 ledger', project)
+      return normalized === undefined ? [] : [normalized]
+    }) ?? [],
+    tasks: input.tasks.flatMap(task => {
+      const normalized = normalizeTaskRecord(task)
+      if (normalized === undefined) console.warn('[dsh-task-board] dropping invalid task row from v3 ledger', task)
+      return normalized === undefined ? [] : [normalized]
+    }),
+    evidences: input.evidences?.flatMap(evidence => {
+      const normalized = normalizeEvidence(evidence)
+      return normalized === undefined ? [] : [normalized]
+    }) ?? [],
     ...(input.migration === undefined ? {} : { migration: structuredClone(input.migration) }),
   }
 }
 
-function isEvidence(value: unknown): value is Evidence {
-  if (typeof value !== 'object' || value === null) return false
-  const row = value as Record<string, unknown>
-  const fileStatus = new Set(['added', 'modified', 'deleted', 'renamed', 'binary', 'unknown'])
-  const filesValid = Array.isArray(row.changedFiles) && row.changedFiles.length <= 500 && row.changedFiles.every(file => {
-    if (typeof file !== 'object' || file === null) return false
-    const item = file as Record<string, unknown>
-    return typeof item.path === 'string' && item.path.length <= 1024
-      && (item.status === undefined || fileStatus.has(item.status as string))
-      && (item.additions === undefined || (typeof item.additions === 'number' && Number.isFinite(item.additions)))
-      && (item.deletions === undefined || (typeof item.deletions === 'number' && Number.isFinite(item.deletions)))
-      && (item.binary === undefined || typeof item.binary === 'boolean')
-  })
-  const auditValid = Array.isArray(row.audit) && row.audit.length <= 100 && row.audit.every(entry => {
-    if (typeof entry !== 'object' || entry === null) return false
-    const item = entry as Record<string, unknown>
-    return (item.action === 'commit' || item.action === 'merge' || item.action === 'keep' || item.action === 'discard' || item.action === 'fallback' || item.action === 'reconcile' || item.action === 'evidence')
-      && (item.status === 'ok' || item.status === 'blocked' || item.status === 'failed')
-      && typeof item.at === 'number' && Number.isFinite(item.at)
-      && typeof item.summary === 'string' && item.summary.length <= 500
-  })
-  return isSafeRunId(row.evidenceId)
-    && isSafeRunId(row.runId)
-    && typeof row.workspaceId === 'string'
-    && row.workspaceId.length <= 256
-    && filesValid
-    && typeof row.additions === 'number' && Number.isFinite(row.additions)
-    && typeof row.deletions === 'number' && Number.isFinite(row.deletions)
-    && typeof row.clean === 'boolean'
-    && typeof row.dirty === 'boolean'
-    && isTaskRunResultStatus(row.resultStatus)
-    && typeof row.startedAt === 'number' && Number.isFinite(row.startedAt)
-    && (row.finishedAt === undefined || (typeof row.finishedAt === 'number' && Number.isFinite(row.finishedAt)))
-    && (row.preview === undefined || (typeof row.preview === 'string' && row.preview.length <= 64 * 1024))
-    && typeof row.runtimeProviderEvidence === 'object'
-    && row.runtimeProviderEvidence !== null
-    && auditValid
-}
-
-/** Strict v3 envelope parser: a malformed v3 file never overwrites v2. */
-export function parseLedgerDocumentV3(raw: string): TaskLedgerDocumentV3 | undefined {
+/** Distinguish a corrupted ledger from a newer required major before any write. */
+export function inspectLedgerDocumentV3(raw: string): TaskLedgerV3Inspection {
   let value: unknown
   try {
     value = JSON.parse(raw)
   } catch {
-    return undefined
+    return { kind: 'invalid' }
   }
-  if (typeof value !== 'object' || value === null) return undefined
+  if (typeof value !== 'object' || value === null) return { kind: 'invalid' }
   const row = value as Record<string, unknown>
+  if (Number.isSafeInteger(row.schemaVersion) && (row.schemaVersion as number) > TASK_LEDGER_SCHEMA_VERSION_V3) {
+    return { kind: 'future-major', schemaVersion: row.schemaVersion as number }
+  }
   if (row.schemaVersion !== TASK_LEDGER_SCHEMA_VERSION_V3
     || !Number.isSafeInteger(row.revision) || (row.revision as number) < 0
     || typeof row.updatedAt !== 'number' || !Number.isFinite(row.updatedAt)
-    || !Array.isArray(row.projects) || !Array.isArray(row.tasks) || !Array.isArray(row.evidences)) return undefined
+    || !Array.isArray(row.projects) || !Array.isArray(row.tasks) || !Array.isArray(row.evidences)) return { kind: 'invalid' }
   const projects = row.projects.flatMap(project => {
     const normalized = normalizeProject(project)
     return normalized === undefined ? [] : [normalized]
   })
-  if (projects.length !== row.projects.length) return undefined
+  if (projects.length !== row.projects.length) return { kind: 'invalid' }
   const tasks = parseLedger(JSON.stringify(row.tasks))
-  if (tasks.length !== row.tasks.length) return undefined
-  const evidences = row.evidences.filter(isEvidence) as Evidence[]
-  if (evidences.length !== row.evidences.length) return undefined
+  if (tasks.length !== row.tasks.length) return { kind: 'invalid' }
+  const evidences = row.evidences.flatMap(evidence => {
+    const normalized = normalizeEvidence(evidence)
+    return normalized === undefined ? [] : [normalized]
+  })
+  if (evidences.length !== row.evidences.length) return { kind: 'invalid' }
   return {
+    kind: 'valid',
+    document: {
     schemaVersion: TASK_LEDGER_SCHEMA_VERSION_V3,
     revision: row.revision as number,
     updatedAt: row.updatedAt as number,
@@ -168,7 +158,14 @@ export function parseLedgerDocumentV3(raw: string): TaskLedgerDocumentV3 | undef
     tasks,
     evidences,
     ...(typeof row.migration === 'object' && row.migration !== null ? { migration: row.migration as TaskLedgerMigrationState } : {}),
+    },
   }
+}
+
+/** Strict v3 envelope parser: a malformed or future-major file is not writable as v3. */
+export function parseLedgerDocumentV3(raw: string): TaskLedgerDocumentV3 | undefined {
+  const inspection = inspectLedgerDocumentV3(raw)
+  return inspection.kind === 'valid' ? inspection.document : undefined
 }
 
 /** Parse v2 JSON and return a safe v3 copy or undefined. */

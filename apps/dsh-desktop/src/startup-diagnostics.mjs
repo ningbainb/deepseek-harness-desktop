@@ -1,10 +1,13 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+
+import { strToU8, zipSync } from 'fflate'
 
 import { sanitizeLogLine } from './log-store.mjs'
 
 export const STARTUP_DIAGNOSTICS_SCHEMA_VERSION = 1
+export const DIAGNOSTIC_BUNDLE_SCHEMA_VERSION = 1
 
 const MAX_DIAGNOSTIC_STRING_LENGTH = 16_000
 const MAX_LOG_LENGTH = 160_000
@@ -20,6 +23,17 @@ const URL_CREDENTIALS = /([a-z][a-z0-9+.-]*:\/\/)([^\s/@:]+)(?::[^\s/@]+)?@/giu
 const SENSITIVE_QUERY = /([?&](?:token|access_token|auth_token|api_key|apikey|key|secret|password)=)[^&#\s]+/giu
 const WINDOWS_USER_PATH = /[a-z]:[\\/]+users[\\/]+[^\\/\s"'`]+/giu
 const POSIX_USER_PATH = /(?:\/users|\/home)\/[^/\s"'`]+/giu
+const USER_CONTENT_FIELD = /(?:^|[-_.])(prompt|prompts|conversation|conversations|session|sessions|sessionhistory|session_history|toolresult|tool_result|tooloutput|tool_output|assistantresponse|assistant_response|completion|answer|answers)(?:$|[-_.])/iu
+const USER_CONTENT_LOG_LINE = /(?:\b(?:prompt|session(?:\s+history)?|tool\s*(?:result|output)|conversation|assistant\s*(?:response|message)|messages?)\b\s*[:=]|"(?:prompt|messages|session(?:History)?|toolResult)"\s*:)/iu
+const PRIVATE_DIAGNOSTIC_FIELD = /(?:^|[-_.])(technicaldetails|stack|stacktrace|raw|stderr|stdout|error|message|detail|cause)(?:$|[-_.])/iu
+const SAFE_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/iu
+const SAFE_VERSION = /^v?[0-9]+(?:\.[0-9]+){0,3}(?:[-+][0-9a-z.-]+)?$/iu
+const SAFE_DIAGNOSTIC_CODE = /^[a-z0-9][a-z0-9._-]{0,127}$/iu
+const DIAGNOSTIC_EXCLUSIONS = Object.freeze([
+  'API keys, tokens, cookies, passwords, private keys, and authorization values',
+  'project files, complete prompts, complete sessions, answers, and tool results',
+  'usernames, real home paths, and URL credentials or sensitive query values',
+])
 
 function asErrorMessage(error) {
   return error instanceof Error ? error.message : String(error ?? 'unknown error')
@@ -80,6 +94,120 @@ function sensitiveFieldName(key) {
   ].some((part) => normalized.includes(part))
 }
 
+function excludedUserContentFieldName(key) {
+  return USER_CONTENT_FIELD.test(String(key))
+}
+
+function privateDiagnosticFieldName(key) {
+  return PRIVATE_DIAGNOSTIC_FIELD.test(String(key))
+}
+
+function safeIdentifier(value, pattern, limit = 128) {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return pattern.test(normalized) ? normalized.slice(0, limit) : undefined
+}
+
+function stableErrorFingerprint(value) {
+  return createHash('sha256').update(String(value)).digest('hex').slice(0, 16)
+}
+
+/**
+ * Raw DSH output and recovery messages are intentionally never exported. Even
+ * an ordinary-looking error can contain prompt, session, or tool content.
+ * Preserve only the category/count so support can correlate it with the
+ * user's local log without receiving that log's content.
+ */
+export function summarizeDiagnosticLog(value, { limit = MAX_LOG_LENGTH } = {}) {
+  const categories = new Map()
+  for (const line of String(value ?? '').replaceAll('\u0000', '').split(/\r?\n/u)) {
+    const category = /^\[([a-z0-9-]{1,64})\]/iu.exec(line)?.[1]?.toLowerCase()
+    const key = category ?? 'unclassified'
+    categories.set(key, (categories.get(key) ?? 0) + 1)
+  }
+  const rows = [...categories.entries()]
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .slice(0, 48)
+    .map(([category, count]) => `[${category}] ${count} local event(s) recorded`)
+  return boundedText(rows.join('\n'), limit)
+}
+
+/** Return a data-free recovery summary; raw incident text never crosses this boundary. */
+export function projectRecoveryDiagnostics(value) {
+  const recovery = value?.recovery
+  if (recovery === null || typeof recovery !== 'object' || Array.isArray(recovery)) return undefined
+  const current = recovery.currentIncident
+  const incident = current !== null && typeof current === 'object' && !Array.isArray(current)
+    ? {
+        identified: current.identified === true,
+        ...(safeIdentifier(current.pluginName, SAFE_PLUGIN_NAME, 256) === undefined
+          ? {}
+          : { pluginName: safeIdentifier(current.pluginName, SAFE_PLUGIN_NAME, 256) }),
+        ...(safeIdentifier(current.loaderId, SAFE_DIAGNOSTIC_CODE, 128) === undefined
+          ? {}
+          : { loaderId: safeIdentifier(current.loaderId, SAFE_DIAGNOSTIC_CODE, 128) }),
+        ...(safeIdentifier(current.reasonCode, SAFE_DIAGNOSTIC_CODE, 128) === undefined
+          ? {}
+          : { reasonCode: safeIdentifier(current.reasonCode, SAFE_DIAGNOSTIC_CODE, 128) }),
+        technicalDetailsPresent: typeof current.technicalDetails === 'string' && current.technicalDetails.length > 0,
+      }
+    : undefined
+  const dependencies = value?.profile?.dependencies
+  const enabledBundles = value?.profile?.enabledBundles
+  const dependencyNames = dependencies !== null && typeof dependencies === 'object' && !Array.isArray(dependencies)
+    ? Object.keys(dependencies).filter((name) => SAFE_PLUGIN_NAME.test(name)).toSorted().slice(0, MAX_ARRAY_ITEMS)
+    : []
+  const bundleNames = Array.isArray(enabledBundles)
+    ? enabledBundles.filter((name) => SAFE_PLUGIN_NAME.test(name)).toSorted().slice(0, MAX_ARRAY_ITEMS)
+    : []
+  return Object.freeze({
+    safeMode: recovery.safeMode === true,
+    ...(incident === undefined ? {} : { currentIncident: Object.freeze(incident) }),
+    incidentCount: Array.isArray(recovery.incidents) ? Math.min(recovery.incidents.length, MAX_ARRAY_ITEMS) : 0,
+    snapshotCount: Array.isArray(recovery.snapshots) ? Math.min(recovery.snapshots.length, MAX_ARRAY_ITEMS) : 0,
+    disabledPluginCount: Array.isArray(recovery.disabledPlugins) ? Math.min(recovery.disabledPlugins.length, MAX_ARRAY_ITEMS) : 0,
+    profile: Object.freeze({ dependencyNames: Object.freeze(dependencyNames), enabledBundles: Object.freeze(bundleNames) }),
+  })
+}
+
+/** Project third-party inventory onto names, exact versions, and assessed compatibility only. */
+export function projectPluginInventory(value) {
+  if (!Array.isArray(value)) return undefined
+  const plugins = value.slice(0, MAX_ARRAY_ITEMS).flatMap((entry) => {
+    const name = safeIdentifier(entry?.name, SAFE_PLUGIN_NAME, 256)
+    if (name === undefined) return []
+    const compatibility = entry?.compatibility
+    const status = ['compatible', 'unknown', 'incompatible', 'blocked'].includes(compatibility?.status)
+      ? compatibility.status
+      : 'unknown'
+    const reasons = Array.isArray(compatibility?.reasons)
+      ? compatibility.reasons
+        .map((reason) => safeIdentifier(reason?.code, SAFE_DIAGNOSTIC_CODE, 128))
+        .filter(Boolean)
+        .slice(0, 16)
+      : []
+    const version = safeIdentifier(entry?.version, SAFE_VERSION, 128)
+    return [Object.freeze({
+      name,
+      ...(version === undefined ? {} : { version }),
+      builtIn: entry?.builtIn === true,
+      managedByDesktop: entry?.managedByDesktop === true,
+      enabled: entry?.enabled === true,
+      compatibility: Object.freeze({ status, reasons: Object.freeze(reasons) }),
+    })]
+  })
+  return Object.freeze(plugins)
+}
+
+/** Redact bounded logs and omit lines that can carry user conversation content. */
+export function redactDiagnosticLog(value, options = {}) {
+  const lines = String(value ?? '').replaceAll('\u0000', '').split(/\r?\n/u)
+  const safe = lines
+    .filter((line) => !USER_CONTENT_LOG_LINE.test(line))
+    .map((line) => redactDiagnosticText(line, options))
+  return boundedText(safe.join('\n'), options.limit ?? MAX_LOG_LENGTH)
+}
+
 /** Remove credentials and local-account identifiers before a diagnostic leaves the device. */
 export function redactDiagnosticText(value, { redactionRoots = [], limit = MAX_DIAGNOSTIC_STRING_LENGTH } = {}) {
   let text = String(value ?? '').replaceAll('\u0000', '')
@@ -109,10 +237,7 @@ export function redactDiagnosticValue(value, options = {}, state = { seen: new W
   if (typeof value === 'undefined') return undefined
   if (typeof value === 'function' || typeof value === 'symbol') return `[${typeof value}]`
   if (value instanceof Error) {
-    return Object.freeze({
-      name: redactDiagnosticText(value.name || 'Error', options),
-      message: redactDiagnosticText(value.message, options),
-    })
+    return Object.freeze({ name: 'Error', detail: '[excluded error detail]' })
   }
   if (state.depth >= 10) return '[truncated: nested diagnostic value]'
   if (typeof value !== 'object') return redactDiagnosticText(value, options)
@@ -139,9 +264,12 @@ export function redactDiagnosticValue(value, options = {}, state = { seen: new W
       output.__truncated = `${entries.length - MAX_OBJECT_ENTRIES} entries omitted`
       break
     }
-    output[redactDiagnosticText(key, { ...options, limit: 256 })] = sensitiveFieldName(key)
+    const safeKey = redactDiagnosticText(key, { ...options, limit: 256 })
+    output[safeKey] = sensitiveFieldName(key)
       ? '[redacted]'
-      : redactDiagnosticValue(item, options, { ...state, depth: state.depth + 1 })
+      : excludedUserContentFieldName(key) || privateDiagnosticFieldName(key)
+        ? '[excluded user content]'
+        : redactDiagnosticValue(item, options, { ...state, depth: state.depth + 1 })
   }
   return output
 }
@@ -150,7 +278,9 @@ function currentRuntimeSummary(controller) {
   const status = controller?.status
   return {
     state: typeof status?.state === 'string' ? status.state : 'unknown',
-    error: typeof status?.error === 'string' ? status.error : undefined,
+    ...(typeof status?.error === 'string' && status.error.length > 0
+      ? { errorPresent: true, errorFingerprint: stableErrorFingerprint(status.error) }
+      : {}),
     restartAttempt: Number.isInteger(status?.restartAttempt) ? Math.max(0, status.restartAttempt) : 0,
     ...(status?.restartBlocked === 'repeated-crash' ? { restartBlocked: status.restartBlocked } : {}),
   }
@@ -178,11 +308,11 @@ function boundedTimeout(operation, source, {
   ]).then((result) => {
     cancelSchedule(timer)
     if (result.timedOut) {
-      issues.push({ source, message: `collection timed out after ${timeoutMs}ms` })
+      issues.push({ source, summary: `collection timed out after ${timeoutMs}ms` })
       return undefined
     }
     if (result.error !== undefined) {
-      issues.push({ source, message: redactDiagnosticText(asErrorMessage(result.error), redactionOptions) })
+      issues.push({ source, summary: 'collection failed; inspect the local log for details' })
       return undefined
     }
     return result.value
@@ -201,6 +331,13 @@ export async function collectStartupDiagnostics({
   collectionTimeoutMs = DEFAULT_COLLECTION_TIMEOUT_MS,
   schedule = setTimeout,
   cancelSchedule = clearTimeout,
+  taskSummary,
+  schedulerSummary,
+  updateChannel,
+  installation,
+  runtimeSupport,
+  patchAssessment,
+  migration,
 } = {}) {
   const timeoutMs = Number.isInteger(collectionTimeoutMs) && collectionTimeoutMs > 0
     ? collectionTimeoutMs
@@ -210,7 +347,7 @@ export async function collectStartupDiagnostics({
   const [recovery, inventory, recentRuntimeLog] = await Promise.all([
     boundedTimeout(
       typeof pluginRecovery?.getDiagnostics === 'function'
-        ? () => pluginRecovery.getDiagnostics({ runtime: currentRuntimeSummary(controller) })
+        ? () => pluginRecovery.getDiagnostics()
         : undefined,
       'plugin-recovery',
       { timeoutMs, schedule, cancelSchedule, issues: collectionIssues, redactionOptions },
@@ -243,19 +380,25 @@ export async function collectStartupDiagnostics({
     runtime: currentRuntimeSummary(controller),
     startup: {
       recentRuntimeLog: typeof recentRuntimeLog === 'string'
-        ? redactDiagnosticText(recentRuntimeLog, { ...redactionOptions, limit: MAX_LOG_LENGTH })
+        ? summarizeDiagnosticLog(recentRuntimeLog, { limit: MAX_LOG_LENGTH })
         : undefined,
     },
-    recovery,
-    plugins: inventory,
+    recovery: projectRecoveryDiagnostics(recovery),
+    plugins: projectPluginInventory(inventory),
+    taskScheduler: {
+      tasks: taskSummary,
+      scheduler: schedulerSummary,
+    },
+    update: { channel: updateChannel },
+    installation,
+    runtimeSupport,
+    patchAssessment,
+    migration,
     collectionIssues,
   }
   const redacted = redactDiagnosticValue(document, redactionOptions)
   if (typeof recentRuntimeLog === 'string' && redacted?.startup && typeof redacted.startup === 'object') {
-    redacted.startup.recentRuntimeLog = redactDiagnosticText(recentRuntimeLog, {
-      ...redactionOptions,
-      limit: MAX_LOG_LENGTH,
-    })
+    redacted.startup.recentRuntimeLog = summarizeDiagnosticLog(recentRuntimeLog, { limit: MAX_LOG_LENGTH })
   }
   return redacted
 }
@@ -264,6 +407,62 @@ export function startupDiagnosticsFilename(now = new Date()) {
   const date = now instanceof Date && Number.isFinite(now.valueOf()) ? now : new Date()
   const stamp = date.toISOString().slice(0, 19).replace('T', '_').replaceAll(':', '-')
   return `dsh-startup-diagnostics-${stamp}.json`
+}
+
+export function diagnosticBundleFilename(now = new Date()) {
+  const date = now instanceof Date && Number.isFinite(now.valueOf()) ? now : new Date()
+  const stamp = date.toISOString().slice(0, 19).replace('T', '_').replaceAll(':', '-')
+  return `dsh-diagnostics-${stamp}.zip`
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+/** Build a user-initiated, local-only diagnostic archive without serializing raw collectors. */
+export function createDiagnosticBundle({ diagnostics, now = () => new Date() } = {}) {
+  if (diagnostics === null || typeof diagnostics !== 'object' || Array.isArray(diagnostics)) {
+    throw new TypeError('diagnostic bundle requires a diagnostic object')
+  }
+  const generatedAt = now()
+  const generatedAtIso = generatedAt instanceof Date && Number.isFinite(generatedAt.valueOf())
+    ? generatedAt.toISOString()
+    : new Date().toISOString()
+  const redacted = redactDiagnosticValue(diagnostics)
+  const diagnosticsText = `${JSON.stringify(redacted, null, 2)}\n`
+  const files = Object.freeze({ 'diagnostics.json': diagnosticsText })
+  const manifest = Object.freeze({
+    schemaVersion: DIAGNOSTIC_BUNDLE_SCHEMA_VERSION,
+    kind: 'dsh-diagnostic-bundle',
+    generatedAt: generatedAtIso,
+    userInitiated: true,
+    automaticUpload: false,
+    files: Object.freeze(Object.entries(files).map(([name, content]) => Object.freeze({
+      name,
+      size: Buffer.byteLength(content),
+      sha256: sha256(content),
+    }))),
+    exclusions: [...DIAGNOSTIC_EXCLUSIONS],
+  })
+  return Object.freeze({ diagnostics: redacted, manifest, files })
+}
+
+/** Serialize the bounded bundle either as a portable JSON envelope or a ZIP with manifest and hashes. */
+export function serializeDiagnosticBundle(bundle, { format = 'json' } = {}) {
+  if (!bundle || typeof bundle !== 'object' || !bundle.manifest || !bundle.files) {
+    throw new TypeError('diagnostic bundle is invalid')
+  }
+  const manifestText = `${JSON.stringify(bundle.manifest, null, 2)}\n`
+  if (format === 'json') {
+    return `${JSON.stringify({ manifest: bundle.manifest, diagnostics: bundle.diagnostics }, null, 2)}\n`
+  }
+  if (format === 'zip') {
+    return Buffer.from(zipSync({
+      'manifest.json': strToU8(manifestText),
+      ...Object.fromEntries(Object.entries(bundle.files).map(([name, content]) => [name, strToU8(content)])),
+    }, { level: 6 }))
+  }
+  throw new TypeError('diagnostic bundle format is invalid')
 }
 
 /** Atomically replace an explicitly selected export path, preserving it on failure. */
@@ -302,6 +501,27 @@ export async function writeStartupDiagnostics(path, content, {
   }
 }
 
+export async function writeDiagnosticBundle(path, bundle, options = {}) {
+  const format = /\.zip$/iu.test(path) ? 'zip' : 'json'
+  return writeStartupDiagnostics(path, serializeDiagnosticBundle(bundle, { format }), options)
+}
+
+async function confirmDiagnosticContents(dialog, getWindow, manifest) {
+  if (typeof dialog?.showMessageBox !== 'function') return true
+  const summary = manifest.files.map((file) => `${file.name} (${file.size} bytes)`).join('\n')
+  const result = await dialog.showMessageBox(getWindow(), {
+    type: 'info',
+    title: '确认导出脱敏诊断包',
+    message: '将仅保存以下脱敏诊断信息到你选择的位置。不会自动上传。',
+    detail: `${summary}\n\n不会包含：${manifest.exclusions.join('；')}`,
+    buttons: ['取消', '导出'],
+    defaultId: 1,
+    cancelId: 0,
+    noLink: true,
+  })
+  return result?.response === 1
+}
+
 /** Ask the user for a destination, then export a privacy-redacted startup diagnostic package. */
 export async function exportStartupDiagnostics({
   dialog,
@@ -315,7 +535,7 @@ export async function exportStartupDiagnostics({
   if (typeof dialog?.showSaveDialog !== 'function') {
     throw new Error('diagnostic export is unavailable')
   }
-  const defaultName = startupDiagnosticsFilename(now())
+  const defaultName = diagnosticBundleFilename(now())
   let result
   try {
     result = await dialog.showSaveDialog(getWindow(), {
@@ -324,7 +544,10 @@ export async function exportStartupDiagnostics({
       defaultPath: typeof downloadsDirectory === 'string' && downloadsDirectory.length > 0
         ? join(downloadsDirectory, defaultName)
         : defaultName,
-      filters: [{ name: 'DSH startup diagnostics', extensions: ['json'] }],
+      filters: [
+        { name: 'DSH diagnostic archive', extensions: ['zip'] },
+        { name: 'DSH diagnostic JSON', extensions: ['json'] },
+      ],
       showOverwriteConfirmation: true,
     })
   } catch (error) {
@@ -337,7 +560,12 @@ export async function exportStartupDiagnostics({
   }
   try {
     const diagnostics = await collectStartupDiagnostics({ ...collectOptions, logStore, now })
-    await writeDiagnostics(result.filePath, `${JSON.stringify(diagnostics, null, 2)}\n`)
+    const bundle = createDiagnosticBundle({ diagnostics, now })
+    if (!await confirmDiagnosticContents(dialog, getWindow, bundle.manifest)) {
+      return Object.freeze({ canceled: true })
+    }
+    const format = /\.zip$/iu.test(result.filePath) ? 'zip' : 'json'
+    await writeDiagnostics(result.filePath, serializeDiagnosticBundle(bundle, { format }))
     await appendExportDiagnostic(logStore, '[diagnostics] startup diagnostic package exported')
     return Object.freeze({ canceled: false, exported: true })
   } catch (error) {

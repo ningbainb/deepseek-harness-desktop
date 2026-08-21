@@ -23,6 +23,8 @@ class StubEngine {
   uploadError: Error | undefined
   openShellSession: ShellSession | undefined
   shellInputs: string[] = []
+  shellResizes: Array<{ cols: number; rows: number }> = []
+  shellCloses = 0
 
   list(): SshHostSummary[] {
     return this.hosts
@@ -63,8 +65,8 @@ class StubEngine {
   async openShell(_alias: string): Promise<ShellSession> {
     const session: ShellSession = {
       send: (data) => { this.shellInputs.push(data) },
-      resize: () => undefined,
-      close: () => undefined,
+      resize: (cols, rows) => { this.shellResizes.push({ cols, rows }) },
+      close: () => { this.shellCloses += 1 },
       pause: () => undefined,
       resume: () => undefined,
     }
@@ -107,6 +109,7 @@ beforeAll(async () => {
     store,
     engine: engine(stub),
     stagingDir: join(dir, 'staging'),
+    maxUploadBytes: 16,
     vendorFiles: {
       xterm: join(vendorDir, 'xterm.js'),
       fitAddon: join(vendorDir, 'addon-fit.js'),
@@ -262,6 +265,30 @@ describe('upload', () => {
     expect(result?.ok).toBe(false)
     expect(String(result?.error)).toContain('remote rejected')
   })
+
+  it('enforces the byte cap on a chunked upload without content-length', async () => {
+    stub.uploadError = undefined
+    const text = await new Promise<string>((resolve, reject) => {
+      const req = httpRequest({
+        host: '127.0.0.1',
+        port,
+        path: SSH_API.upload + '?alias=web-01&remotePath=/tmp/x.txt',
+        method: 'POST',
+        headers: { 'transfer-encoding': 'chunked' },
+      }, (res) => {
+        let body = ''
+        res.on('data', (chunk: Buffer) => { body += chunk.toString('utf8') })
+        res.on('end', () => resolve(body))
+      })
+      req.on('error', reject)
+      req.write('x'.repeat(40))
+      req.end()
+    })
+    const lines = text.split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, unknown>)
+    const result = lines.find(line => line.type === 'result')
+    expect(result?.ok).toBe(false)
+    expect(String(result?.error)).toContain('too large')
+  })
 })
 
 describe('download', () => {
@@ -295,8 +322,10 @@ describe('terminal upgrade', () => {
 
     // Client -> server input must reach the shell session.
     ws.send(JSON.stringify({ type: 'input', data: 'ls\r' }))
+    ws.send(JSON.stringify({ type: 'resize', cols: 120, rows: 40 }))
     await new Promise<void>((resolve) => setTimeout(resolve, 50))
     expect(stub.shellInputs).toContain('ls\r')
+    expect(stub.shellResizes).toContainEqual({ cols: 120, rows: 40 })
 
     // Server -> client output must arrive as decodable frames.
     stub.openShellSession?.onData?.(Buffer.from('hello from remote'))
@@ -320,5 +349,31 @@ describe('terminal upgrade', () => {
     })
     expect(code).toBe(1000)
     ws.terminate()
+  })
+
+  it('rejects malformed terminal frames before they reach the shell', async () => {
+    const ws = new WebSocket('ws://127.0.0.1:' + port + SSH_API.terminal + '?alias=web-01')
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', () => resolve())
+      ws.on('error', reject)
+    })
+    const inputsBefore = stub.shellInputs.length
+    const closed = new Promise<number>((resolve) => { ws.on('close', resolve) })
+    ws.send(JSON.stringify({ type: 'resize', cols: 1, rows: 24 }))
+    expect(await closed).toBe(1008)
+    expect(stub.shellInputs).toHaveLength(inputsBefore)
+  })
+
+  it('closes oversized terminal frames without buffering unbounded input', async () => {
+    const ws = new WebSocket('ws://127.0.0.1:' + port + SSH_API.terminal + '?alias=web-01')
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', () => resolve())
+      ws.on('error', reject)
+    })
+    const inputsBefore = stub.shellInputs.length
+    const closed = new Promise<number>((resolve) => { ws.on('close', resolve) })
+    ws.send(JSON.stringify({ type: 'input', data: 'x'.repeat(64 * 1024) }))
+    expect(await closed).toBe(1009)
+    expect(stub.shellInputs).toHaveLength(inputsBefore)
   })
 })

@@ -101,7 +101,7 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 
 ### Desktop 社区插件入口
 
-桌面版不再由 `dsh-web-ui-settings` 挂载旧的「社区插件」组内卡片；发现、安装、恢复与回滚统一由扩展坞的 Plugin Market（`dshmarket`）负责。`community.json` 与 `scripts/community-index` 仍是仓库内受版本控制的贡献者元数据和一致性门禁，但它们不会创建桌面设置卡片，也不会授权自动安装第三方包。
+桌面版不再由 `dsh-web-ui-settings` 挂载旧的「社区插件」组内卡片。扩展坞原生市场读取 awesome-dsh-plugin 的公开目录数据，在本地完成搜索、分类和排序；用户点击安装后由主进程解析目录 ID，并通过扩展坞既有的确认、事务安装和失败回滚链路完成安装。市场不挂载第三方页面或执行目录中的命令。`community.json` 与 `scripts/community-index` 仍是仓库内受版本控制的贡献者元数据和一致性门禁，但它们不会创建桌面设置卡片，也不会授权自动安装第三方包。
 
 ### Desktop 兼容性声明
 
@@ -119,7 +119,7 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 ```
 
 - **类型来源（只能基于官方 NPM SDK）**：各包把用到的 `@deepseek-ai/*` 包声明为 `devDependencies`
-  （`^0.1.0-rc.7`；cordis 用 `^4.0.1`），TS 从 node_modules 自动解析类型
+  （`^0.1.0-rc.8`；cordis 用 `^4.0.1`），TS 从 node_modules 自动解析类型
   （SDK 包的 `exports["."].types` 统一指向 `lib/types/index.d.ts`，client 半区子路径
   `./client` 同理）。**禁止** tsconfig `extends` / `paths` / `references` 指向任何 DSH 源码
   checkout（历史形态：`../../../test-zhu1090093659` 相对路径、`~/.dsh/source/current` 绝对
@@ -139,7 +139,7 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
   处理 CSS）；client 半区闭包工厂在测试中不可直接 import——用 `vitest.setup.ts` 的最小
   `__ModuleLoader__` stub（`packages/dsh-live-stats/vitest.setup.ts`）或 `vi.mock` 替换
   （`packages/dsh-remote-web-ui/tests/remote-entry.spec.tsx` 的 `createSnapshotStore` mock）。
-- **设置页插件配置（rc.7 槽位契约）**：`settings.section` 是以 `id` 定位的 list 槽，适合注册一级设置页；`settings.plugin.item` 是 keyed 槽，注册者必须提供 `key`，不能用它承载全家桶根卡。`dsh-web-ui-settings` 在 `settings.section` 注册 `web-ui-plugins` 一级分区，并声明 list 形态的 `web-ui.plugin.item` 子槽；各功能插件把自己的卡片注册进该子槽，从而在设置页收拢为一个「Web UI 插件」分区。插件接入仍只需两步：
+- **设置页插件配置（rc.8 槽位契约）**：`settings.section` 是以 `id` 定位的 list 槽，适合注册一级设置页；`settings.plugin.item` 是 keyed 槽，注册者必须提供 `key`，不能用它承载全家桶根卡。`dsh-web-ui-settings` 在 `settings.section` 注册 `web-ui-plugins` 一级分区，并声明 list 形态的 `web-ui.plugin.item` 子槽；各功能插件把自己的卡片注册进该子槽，从而在设置页收拢为一个「Web UI 插件」分区。插件接入仍只需两步：
   1. **host 半区**：`installSettingsSection(ctx, settingsNamespace('<ns>'), <z-schema>, <composition entry>, { setSource, onChange })`（`@deepseek-ai/dsh-settings`）注册命名空间；`setSource` 注入动态读取器，`onChange` 让已派生的行为跟随已提交的修改，无需重启。
   2. **browser 半区**：注入 `settingsScope`（`@deepseek-ai/dsh-client-ui-settings` 提供 `ctx.settingsScope`；`bind()` 还要求调用方注入 `connection` 与 `remote`），`ctx.settingsScope.bind({ namespace })` 读写该命名空间，并注册 `web-ui.plugin.item` 卡片（自行 `declare module '@deepseek-ai/dsh-client-ui-slots'` 声明该槽，shape 与 `ui-plugin-config` 一致；slot `order` 用 100+ 避开内置卡片）。样板实现见 `packages/dsh-remote-web-ui`（`src/client/settings-form.ts` + `PluginSettingsCard.tsx` + `*SettingsCard.tsx`，自包含的 staged 表单，不依赖兄弟 UI 包）。
 - **皮肤类插件**：改用 `scripts/dsh-skin-new` 脚手架（皮肤规范见 skin-center / 各皮肤包 README），不经过本流程第 3-4 步的 `dsh-web-ui-all` 注册。皮肤中心的 GUI 卡片通过 `web-ui.plugin.item` 子槽接入「Web UI 插件」分区；不得把它注册到官方 keyed 的 `settings.plugin.item` 槽。

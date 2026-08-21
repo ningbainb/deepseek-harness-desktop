@@ -5,7 +5,12 @@ copyright: Copyright (c) 2026 DeepSeek Harness Desktop contributors
 asar: true
 asarUnpack:
   - node_modules/**
-compression: normal
+npmRebuild: false
+compression: maximum
+electronLanguages:
+  - en-US
+  - zh-CN
+  - zh-TW
 afterPack: scripts/after-pack.cjs
 
 extraResources:
@@ -19,6 +24,12 @@ extraResources:
     to: update-shutdown-v2
   - from: build/installer-upgrade-v3
     to: installer-upgrade-v3
+  - from: runtime-support/supported-runtimes.json
+    to: runtime-support/supported-runtimes.json
+  - from: runtime-support/known-good.json
+    to: runtime-support/known-good.json
+  - from: build/bundled-managed-git/managed-git/current
+    to: managed-git/current
 
 directories:
   output: dist
@@ -37,14 +48,19 @@ win:
       arch:
         - x64
   requestedExecutionLevel: asInvoker
+  # Certificates are supplied only through the release environment. `REQUIRE_SIGNING`
+  # is checked by the release scripts so unsigned developer builds remain usable.
+  signAndEditExecutable: true
+  verifyUpdateCodeSignature: true
 
 nsis:
   include: build/installer.nsh
   artifactName: DeepSeek-Harness-Desktop-Setup-${version}-${arch}.${ext}
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowElevation: true
-  allowToChangeInstallationDirectory: true
+  allowElevation: false
+  allowToChangeInstallationDirectory: false
+  packElevateHelper: false
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: DeepSeek Harness Desktop

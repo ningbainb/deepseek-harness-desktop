@@ -6,16 +6,18 @@ import {
   resolveCommunityPluginUrl,
 } from '../src/extensions/community-catalog.mjs'
 
-test('Taffy Pet is a disabled attributed community entry', () => {
-  assert.deepEqual(COMMUNITY_PLUGIN_CATALOG, [{
-    id: 'dsh-taffy-pet',
-    name: 'dsh-taffy-pet',
-    author: 'zq123123667',
-    description: '桌面宠物社区插件。请前往作者仓库查看功能、素材条款与安装说明。',
-    repository: 'https://github.com/zq123123667/dsh-taffy-pet',
-    enabled: false,
-    installable: false,
-  }])
+test('community highlights retain only repository links outside the native market', () => {
+  assert.deepEqual(COMMUNITY_PLUGIN_CATALOG, [
+    {
+      id: 'dsh-taffy-pet',
+      name: 'dsh-taffy-pet',
+      author: 'zq123123667',
+      description: '桌面宠物社区插件。请前往作者仓库查看功能、素材条款与安装说明。',
+      repository: 'https://github.com/zq123123667/dsh-taffy-pet',
+      enabled: false,
+      installable: false,
+    },
+  ])
 })
 
 test('community repository resolution accepts only catalog identifiers', () => {

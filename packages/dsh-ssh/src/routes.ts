@@ -26,12 +26,21 @@ const MAX_JSON_BODY_BYTES = 64 * 1024
 /** Cap on declared upload bodies (staged to disk before SFTP). */
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024 * 1024
 
+/** Cap one terminal client frame before JSON parsing. */
+const MAX_TERMINAL_FRAME_BYTES = 64 * 1024
+
+/** Keep PTY dimensions within a practical ssh2 range. */
+const MAX_TERMINAL_DIMENSION = 1_000
+
 /**
  * One noServer WebSocket server for terminal upgrades: the browser half uses
  * a standards-compliant WebSocket, so the host must speak real RFC 6455
  * frames (the webserver hands us the raw upgraded socket).
  */
-const terminalWss = new WebSocketServer({ noServer: true })
+const terminalWss = new WebSocketServer({
+  noServer: true,
+  maxPayload: MAX_TERMINAL_FRAME_BYTES,
+})
 
 /** Pause the shell when the socket's send buffer exceeds this… */
 const BACKPRESSURE_HIGH_WATER = 1024 * 1024
@@ -101,11 +110,34 @@ export interface SshRoutesDeps {
   engine: SshEngine
   /** Temp dir for upload/download staging (tests inject a sandbox). */
   stagingDir?: string
+  /** Upload byte cap override (tests inject a small bound). */
+  maxUploadBytes?: number
   /** Browser vendor entry paths (tests inject sandbox files). */
   vendorFiles?: {
     xterm: string
     fitAddon: string
   }
+}
+
+/** Decode one bounded, text-only terminal client frame. */
+function parseTerminalClientFrame(data: unknown): TerminalClientFrame | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(String(data))
+  } catch {
+    return undefined
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+  const frame = parsed as Record<string, unknown>
+  if (frame.type === 'input') {
+    return typeof frame.data === 'string' ? { type: 'input', data: frame.data } : undefined
+  }
+  if (frame.type !== 'resize') return undefined
+  if (!Number.isInteger(frame.cols) || !Number.isInteger(frame.rows)) return undefined
+  const cols = frame.cols as number
+  const rows = frame.rows as number
+  if (cols < 2 || cols > MAX_TERMINAL_DIMENSION || rows < 1 || rows > MAX_TERMINAL_DIMENSION) return undefined
+  return { type: 'resize', cols, rows }
 }
 
 interface CachedVendorAsset {
@@ -121,6 +153,7 @@ interface CachedVendorAsset {
 export function makeRoutes(deps: SshRoutesDeps): { routes: WebRoute[]; upgrade: WebUpgradeRoute } {
   const { store, engine } = deps
   const staging = deps.stagingDir ?? join(tmpdir(), 'dsh-ssh-uploads')
+  const maxUploadBytes = deps.maxUploadBytes ?? MAX_UPLOAD_BYTES
   const runtimeRequire = createRequire(import.meta.url)
   const vendorFiles = deps.vendorFiles ?? {
     xterm: runtimeRequire.resolve('@xterm/xterm/lib/xterm.js'),
@@ -413,7 +446,7 @@ export function makeRoutes(deps: SshRoutesDeps): { routes: WebRoute[]; upgrade: 
           return
         }
         const declared = Number(req.headers['content-length'])
-        if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES) {
+        if (Number.isFinite(declared) && declared > maxUploadBytes) {
           writeJson(res, 413, { error: 'upload body too large' })
           return
         }
@@ -449,6 +482,13 @@ export function makeRoutes(deps: SshRoutesDeps): { routes: WebRoute[]; upgrade: 
         req.on('aborted', () => fail('upload aborted by the client'))
         res.on('error', () => fail('response stream closed'))
         res.on('close', () => { if (!res.writableEnded) fail('connection closed') })
+        // Enforce the byte cap on the staged stream itself: a chunked request
+        // has no content-length, so the declared check above cannot cover it.
+        let staged = 0
+        req.on('data', (chunk: Buffer) => {
+          staged += chunk.length
+          if (staged > maxUploadBytes) fail(new Error('upload body too large'))
+        })
         req.pipe(sink)
         sink.on('finish', async () => {
           if (settled) return
@@ -573,11 +613,14 @@ export function makeRoutes(deps: SshRoutesDeps): { routes: WebRoute[]; upgrade: 
           closed = true
           try { ws.close(1000) } catch { /* already closed */ }
         })
-        ws.on('message', (data) => {
-          let frame: TerminalClientFrame
-          try {
-            frame = JSON.parse(String(data)) as TerminalClientFrame
-          } catch {
+        ws.on('message', (data, isBinary) => {
+          if (isBinary) {
+            ws.close(1003, 'terminal frames must be text')
+            return
+          }
+          const frame = parseTerminalClientFrame(data)
+          if (frame === undefined) {
+            ws.close(1008, 'invalid terminal frame')
             return
           }
           if (frame.type === 'input') {

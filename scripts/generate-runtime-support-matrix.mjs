@@ -6,6 +6,7 @@ import {
   REPOSITORY_ROOT,
 } from './generate-runtime-support.mjs'
 import { validateCandidateVersion } from './prepare-dsh-candidate.mjs'
+import { RUNTIME_PROVENANCE_FILES } from '../apps/dsh-desktop/src/runtime-support-policy.mjs'
 
 export const RUNTIME_SUPPORT_STATUSES = Object.freeze(['known-good', 'supported', 'candidate', 'blocked'])
 export const STABLE_RUNTIME_SUPPORT_STATUSES = Object.freeze(['known-good', 'supported'])
@@ -24,6 +25,7 @@ const CAPABILITY_STATUS = new Set(['available', 'unavailable', 'unsupported'])
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u
 const RELATIVE_ARTIFACT_PATTERN = /^(?![\\/])(?!(?:.*(?:^|[\\/])\.\.(?:[\\/]|$)))[A-Za-z0-9@._/\\-]+$/u
+const PATCH_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -92,6 +94,22 @@ function normalizedPeerDependencies(value) {
   return result
 }
 
+function normalizedRuntimeFileHashes(value) {
+  if (!isRecord(value)) throw new TypeError('runtime file evidence must be an object')
+  const expectedKeys = [...RUNTIME_PROVENANCE_FILES].toSorted()
+  const actualKeys = Object.keys(value).toSorted()
+  if (actualKeys.length !== expectedKeys.length || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+    throw new TypeError('runtime file evidence must contain exactly the Runtime entrypoint files')
+  }
+  const hashes = {}
+  for (const file of RUNTIME_PROVENANCE_FILES) {
+    const digest = nonEmptyString(value[file], `runtime file digest ${file}`)
+    if (!/^[a-f0-9]{64}$/u.test(digest)) throw new TypeError(`runtime file digest ${file} must be a lowercase SHA-256 digest`)
+    hashes[file] = digest
+  }
+  return hashes
+}
+
 function normalizedEvidence(evidence, { allowUnavailable = false } = {}) {
   if (!isRecord(evidence)) {
     if (allowUnavailable) return { available: false }
@@ -101,7 +119,8 @@ function normalizedEvidence(evidence, { allowUnavailable = false } = {}) {
   const provider = evidence.provider
   const compatPatches = evidence.compatPatches
   const packagedRuntime = evidence.packagedRuntimeIdentity
-  if (!isRecord(runtime) || !isRecord(provider) || !isRecord(compatPatches) || !isRecord(packagedRuntime)) {
+  const lockfile = evidence.lockfile
+  if (!isRecord(runtime) || !isRecord(provider) || !isRecord(compatPatches) || !isRecord(packagedRuntime) || !isRecord(lockfile)) {
     if (allowUnavailable) return { available: false }
     throw new TypeError('runtime support evidence is incomplete')
   }
@@ -109,22 +128,37 @@ function normalizedEvidence(evidence, { allowUnavailable = false } = {}) {
   const version = exactVersion(runtime.version, 'runtime version')
   const integrity = nonEmptyString(runtime.integrity, 'runtime integrity')
   if (!integrity.startsWith('sha512-')) throw new TypeError('runtime integrity must be sha512')
+  const files = normalizedRuntimeFileHashes(runtime.files)
   const providerId = nonEmptyString(provider.providerId, 'provider id')
   const capabilities = normalizedCapabilities(provider.capabilities)
   const slots = normalizedStringList(evidence.clientSlots?.ids ?? [], 'client slots')
   const patchIds = normalizedStringList(compatPatches.ids ?? [], 'compatibility patch ids')
+  if (patchIds.length === 0 || patchIds.some((id) => !PATCH_ID_PATTERN.test(id))) {
+    throw new TypeError('compatibility patch ids must be non-empty canonical patch identifiers')
+  }
+  const patchRegistry = normalizedArtifact(compatPatches.registry, 'patch registry')
+  const patchRegistrySha256 = nonEmptyString(compatPatches.sha256, 'patch registry sha256')
+  if (!/^[a-f0-9]{64}$/u.test(patchRegistrySha256)) {
+    throw new TypeError('patch registry sha256 must be a lowercase SHA-256 digest')
+  }
+  const lockfileSha256 = nonEmptyString(lockfile.sha256, 'lockfile sha256')
+  if (!/^[a-f0-9]{64}$/u.test(lockfileSha256)) throw new TypeError('lockfile sha256 must be a lowercase SHA-256 digest')
   return {
     available: true,
     upstreamVersion: version,
     providerId,
     capabilities,
     evidence: {
-      package: { name: packageName, version, integrity },
+      package: { name: packageName, version, integrity, files },
       peers: normalizedPeerDependencies(runtime.peerDependencies ?? {}),
+      lockfile: {
+        path: normalizedArtifact(lockfile.path ?? 'pnpm-lock.yaml', 'lockfile path'),
+        sha256: lockfileSha256,
+      },
       slots,
       patches: {
-        registry: normalizedArtifact(compatPatches.registry, 'patch registry'),
-        sha256: nonEmptyString(compatPatches.sha256, 'patch registry sha256'),
+        registry: patchRegistry,
+        sha256: patchRegistrySha256,
         ids: patchIds,
       },
       packagedRuntime: {
@@ -217,6 +251,7 @@ export function validateRuntimeSupportMatrix(matrix, { stableOnly = false } = {}
         packageName: entry.evidence?.package?.name,
         version: entry.evidence?.package?.version,
         integrity: entry.evidence?.package?.integrity,
+        files: entry.evidence?.package?.files,
         peerDependencies: entry.evidence?.peers,
       },
       provider: {
@@ -230,6 +265,7 @@ export function validateRuntimeSupportMatrix(matrix, { stableOnly = false } = {}
       },
       clientSlots: { ids: entry.evidence?.slots },
       packagedRuntimeIdentity: entry.evidence?.packagedRuntime,
+      lockfile: entry.evidence?.lockfile,
     }, { allowUnavailable: status === 'blocked' })
     if (normalized.available && normalized.upstreamVersion !== upstreamVersion) {
       throw new TypeError('runtime support matrix evidence version differs from upstreamVersion')
@@ -242,8 +278,10 @@ export function validateRuntimeSupportMatrix(matrix, { stableOnly = false } = {}
           packageName: normalized.evidence.package.name,
           version: normalized.evidence.package.version,
           integrity: normalized.evidence.package.integrity,
+          files: normalized.evidence.package.files,
           peerDependencies: normalized.evidence.peers,
         },
+        lockfile: normalized.evidence.lockfile,
         provider: { providerId: normalized.providerId, capabilities: normalized.capabilities },
         clientSlots: { ids: normalized.evidence.slots },
         compatPatches: normalized.evidence.patches,

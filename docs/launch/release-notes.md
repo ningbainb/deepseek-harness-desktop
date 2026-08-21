@@ -1,57 +1,65 @@
-# DeepSeek Harness Desktop 2.7.0
+# DeepSeek Harness Desktop 3.0.0
 
 ## 中文
 
 ### 本次亮点
 
-- Windows 启动链路不再把 Runtime 包在 PowerShell 5.1 的 `-WindowStyle Hidden` 中；该组合在 Electron Node 模式下可能零输出并以 `0xFFFFFFFF` 退出。窗口隐藏继续由 `spawn` 的 `windowsHide` 处理，旧的空补丁、状态订阅和 IPC 失败也不会把启动页永久留在 8%。
-- 内置 Runtime 统一到 `@deepseek-ai/dsh` `0.1.0-rc.7`；同步带入 `dshmarket` `1.15.0`、Web UI 聚合 `0.2.3`、rc.7 兼容的 Codex Connect 与 `dsh-live-stats` `0.1.20`。升级只使用经过验证的精确依赖图，不跟随 `latest`。
-- 关闭行为可在“退出”“最小化到托盘并启用后台自动化”“每次询问”之间选择并持久化。默认仍是退出；只有明确选择常驻托盘时，关闭主窗口才保留 Runtime，更新、显式退出、安全模式和崩溃恢复仍走完整关停。
-- Task Board Host Scheduler 将 cron 槽位、IANA 时区、misfire/running 策略、租约和确定性运行键持久化。已启用后台自动化的 Desktop 通过真实 DSH Session 执行到期任务并回写 Task Run；未提供或失效的 Host adapter 始终退回浏览器调度，完全退出应用后不承诺继续运行。
-- Extension Dock 展示并校验插件声明的 Desktop/DSH/Desktop API 范围、能力、Surface 与运行时证据，在 profile 写入原子 `desktop-plugins.lock.json` 诊断记录。`@linxin666/dsh-desktop-client` 向浏览器插件提供窄且可探测的 Desktop API；预览的“外部打开”只接受工作区根与相对路径，Host 验证已注册工作区后才把路径交给操作系统。
-- 用户自行加入但无法从依赖树可靠识别的插件、游离 loader、损坏 profile 配置或链接，不再只能靠重装依赖解决：Desktop 会把非受管启动输入可逆隔离到私有快照，以内置基线重试；Runtime 基线正常时可进入应用，并可在扩展中心恢复原始配置。启动页同时提供始终可用的“导出诊断日志”，导出的诊断包会脱敏。
-- 针对部分模型把工具 JSON 又包成 `{"arguments": {...}}` 的问题，Desktop 只会在内层参数通过当前工具 schema、外层不通过时展开一层；歧义、未知工具或无效参数不会被猜测性改写，仍返回准确的原始校验错误。
-- Candidate Matrix 以受审查的精确候选版本和临时 worktree 运行兼容性矩阵，生成本地 Stable 支持矩阵与社区插件质量报告。候选报告只提供证据，不能修改 Stable manifest、lockfile、更新元数据或发布。
+- 3.0.0 是平台稳定版。Desktop Client SDK、Desktop Contract 和 Runtime Provider 继续维持 1.x；Preset、Project/Task/Run/Evidence、Deep Link、插件兼容元数据、supported-runtime matrix 与 compat patch registry 都有可机器校验的定义、兼容夹具和同 major 的增量演进规则。
+- Stable Runtime 不跟随 `latest`。只有状态为 `known-good` 或 `supported`，并且 provider、Desktop 范围、完整性、lockfile 与 patch 证据都匹配的矩阵项可以进入 Stable；`candidate` 只生成证据，`blocked` 不会被当成回退路径。
+- Migration Assistant 覆盖 2.3.0–2.7.0 升级矩阵并生成 `safe`、`needs-confirmation` 或 `blocked` 计划。识别出的 Task Store v2/v3 状态会被检测、校验并纳入白名单 snapshot/journal 边界；2.3 legacy browser-localStorage task state 必须先确认，扫描不会暴露其内容或 task/run 计数。确认后，受支持的保留同源 v1 数据只会通过 CSP、无调度、无权限的隐藏 probe 读取其键，且只会复制到空的 v3 Host ledger，再以 task count/fingerprint 验证，原浏览器值会保留。未知、缺失或已变化的 origin 会阻断复制并保留恢复/回滚指引。原子 journal 和有限期全局状态 snapshot 支持继续和回滚，且不复制项目文件或用户内容。
+- Desktop 默认不配置遥测端点，也不会自动上传诊断。用户确认后才会在自选位置导出经集中脱敏的 JSON/ZIP 诊断包，包内带清单和哈希；密钥、Token、Cookie、路径、完整 Prompt、完整 Session、Tool Result、项目内容和 SSH 私钥被排除。
+- 扩展坞新增原生社区插件市场，直接使用 `awesome-dsh-plugin.com/plugins.json` 作为索引并在本地完成搜索、分类、排序与分页，不嵌入第三方市场页面，也不再显示其沙箱边界栏。安装时 Renderer 只提交不透明目录 ID，主进程重新解析安装源，经一次原生确认后复用完整权限的事务安装、Runtime 重启与失败回滚；旧 `dshmarket` 运行时依赖已退役。
+- 新增独立嵌入式终端、受校验的 Managed Git 修复路径，以及不依赖主 Runtime 的恢复界面和隔离恢复会话。迁移完成标记缺失时可从已提交 journal 自愈，存在中断 journal 时仍保留严格的恢复流程。
+- 修复 Task Ledger v3 写入被过长错误文本永久阻断、损坏 v3 被过期 v2 覆盖、SSH 断线重试失效、连接替换泄漏并拆错隧道、取消请求误报成功和分块上传绕过大小限制等问题，并加入对应回归测试。
+- 既有 Task Board、Scheduler、Worktree、Evidence、Preset、插件和完整 Harness Web Surface 继续工作；第三方应通过 capability detection 和公开 Schema 集成，而不是依赖私有实现细节。
+
+### 频道、升级与回滚
+
+- 更新频道为 `stable` 与 `beta`。现有用户与新安装默认使用 Stable；Stable 只接收正式版本，Beta 只有在明确选择后才接收 prerelease。任何频道切换都不会自动降级。
+- 升级矩阵覆盖 Desktop 2.3.0–2.7.0。迁移前应阅读计划与兼容性结果：识别出的 v2/v3 状态会被检测、校验和快照；legacy browser-localStorage state 需要确认且扫描不展示内容或 task/run 计数。确认后，受支持的保留同源 v1 数据可复制到空 v3 Host ledger 并以 task count/fingerprint 验证，原浏览器值保持不变；未知、缺失或已变化的 origin 会阻断复制并进入恢复/回滚指引。升级或 Runtime 变更出现问题时，使用 Migration Assistant 的 journal/snapshot 恢复流程，并参考 [升级与回滚](../upgrade-and-rollback.md) 与 [运行时支持政策](../runtime-support-policy.md)。
 
 ### 验证
 
-- 覆盖 Windows Runtime invocation、旧 patch 兼容、启动状态、托盘关闭决策、插件兼容性与 lock、主窗口 IPC、工作区路径验证和 Renderer Surface 边界的回归测试。
-- Host Scheduler 测试覆盖 lease、到期槽位、misfire/running 策略、确定性执行键、失效 owner 接管、Host 状态路由、浏览器回退和真实 Runtime adapter。调度执行使用真实 DSH Agent/Session 事件来结束成功、取消或失败的 Task Run。
-- Candidate/Stable 生成器测试验证精确版本输入、矩阵状态、导出/peer/slot/Provider 证据与离线社区质量报告；Stable 守卫拒绝由 Candidate 改写正式依赖图。
-- 发布门禁继续执行类型检查、全仓与脚本测试、文档配对/链接检查、运行时支持生成校验、安装包内容校验、Windows 打包 E2E 和真实 Runtime 烟测。
+- 发布门禁覆盖公共 Schema、SDK/Contract/Provider 兼容性、Preset 恶意输入、Deep Link、Scheduler fake clock、Worktree 生命周期、Evidence、迁移矩阵、Runtime matrix 和 Candidate guard。
+- 打包与发布验证覆盖 Stable/Beta 频道隔离、安装器哈希、`release-manifest.json`、无签名开发构建，以及启用强制签名时的证书和时间戳要求。缺少所需签名材料的强制签名构建必须失败。
+- 发布前还会运行文档、发布说明和网站一致性检查；诊断导出测试验证脱敏、清单、哈希和用户确认边界。
 
 ### 下载与校验
 
-下载 `DeepSeek-Harness-Desktop-Setup-2.7.0-x64.exe`，并使用同一 GitHub Release 中的 `SHA256SUMS.txt` 校验安装包。安装器 SHA-256 以发布页相邻校验文件为准。
+从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`、`SHA256SUMS.txt` 与 `release-manifest.json`。先用 `SHA256SUMS.txt` 比对安装包 SHA-256，再查看 manifest 中该资产的大小、哈希、频道、Runtime/Schema 信息和实际签名状态。安装器的 updater 哈希仍是基础完整性校验，签名是额外信任层。
 
 ### 说明
 
-这是社区构建版本，并非 DeepSeek、OpenAI 或腾讯官方发行版。安装包当前未使用商业代码签名证书，Windows SmartScreen 可能显示“未知发布者”，请仅从项目 GitHub Release 下载并核对 SHA-256。已有用户不会被静默改为后台常驻：保持默认“退出”或选择“每次询问”时，关闭窗口会停止应用；只有明确选择“最小化到托盘并启用后台自动化”才会让后台调度保留。下载安装、启动或继续使用官方正式版，即表示已阅读并在适用法律允许的范围内同意仓库及官网公开的隐私政策；统计数据仅用于产品改进。
+本项目是社区维护的发行版，并非 DeepSeek、OpenAI 或腾讯官方产品。本地或源码构建可以未签名；不要据此推断 GitHub Release 资产是否签名。需要签名的发布会由发布门禁验证证书和有效时间戳，最终以 `release-manifest.json` 的资产记录为准。Desktop 3.0 不默认收集或上传遥测，官网也不自动上报安装包点击。更多公开承诺见 [兼容性政策](../compatibility-policy.md)、[Schema 版本政策](../schema-versioning.md) 和 [安全边界](../security-boundaries.md)。
 
 ## English
 
 ### Highlights
 
-- The Windows startup path no longer wraps Runtime in PowerShell 5.1 `-WindowStyle Hidden`, which could exit with no output and `0xFFFFFFFF` in Electron Node mode. Spawn-level `windowsHide` still owns window suppression, while legacy empty patches, status subscriptions, and IPC failures cannot strand the startup page at 8%.
-- The embedded Runtime is aligned on `@deepseek-ai/dsh` `0.1.0-rc.7`, alongside `dshmarket` `1.15.0`, the `0.2.3` Web UI aggregate, rc.7-compatible Codex Connect, and `dsh-live-stats` `0.1.20`. Upgrades use the verified exact dependency graph rather than `latest`.
-- Persisted close behavior offers **quit**, **minimize to tray and enable background automation**, and **ask every time**. Quit remains the default; only an explicit persistent-tray choice keeps the Runtime after the main window closes. Update, explicit quit, safe-mode, and crash recovery still use full shutdown.
-- Task Board Host Scheduler persists cron slots, IANA time zones, misfire/running policies, leases, and deterministic run keys. A Desktop with enabled background automation executes due work through real DSH Sessions and writes Task Runs back; absent or unhealthy Host adapters always fall back to browser scheduling, and no execution is promised after the application fully exits.
-- Extension Dock displays and evaluates declared Desktop/DSH/Desktop API ranges, capabilities, Surfaces, and runtime evidence, then records an atomic `desktop-plugins.lock.json` diagnostic in the profile. `@linxin666/dsh-desktop-client` provides a narrow, discoverable Desktop API to browser plugins; preview **Open externally** accepts only a workspace root plus relative path and reaches the OS only after Host validates the registered workspace.
-- User-added plugins, detached loaders, broken profile configuration, or links that cannot be identified reliably from the dependency tree no longer require reinstalling dependencies as the only escape. Desktop reversibly quarantines unmanaged startup input into a private snapshot and retries from the embedded baseline; when that Runtime baseline is healthy, the app opens and the original configuration can be restored from Extension Dock. The startup screen also offers an always-available, redacted **Export diagnostic log** bundle.
-- For model output that accidentally wraps a tool JSON value in `{"arguments": {...}}`, Desktop unwraps exactly one layer only when the inner value satisfies the current tool schema and the outer value does not. Ambiguous, unknown-tool, and invalid inputs are never guessed or rewritten and retain their precise upstream validation error.
-- Candidate Matrix runs a reviewed exact candidate in a temporary worktree and produces a local Stable support matrix plus community-plugin quality report. Candidate reports provide evidence only and cannot modify a Stable manifest, lockfile, updater metadata, or release.
+- 3.0.0 is the platform-stability release. The Desktop Client SDK, Desktop Contract, and Runtime Provider stay on 1.x. Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility metadata, the supported-runtime matrix, and the compat-patch registry have machine-verifiable definitions, compatibility fixtures, and additive same-major evolution rules.
+- Stable Runtime does not follow `latest`. Only a `known-good` or `supported` matrix entry whose provider, Desktop range, integrity, lockfile, and patch evidence agree can enter Stable. A `candidate` produces evidence only, and a `blocked` entry is never a fallback.
+- Migration Assistant covers the 2.3.0 through 2.7.0 upgrade matrix and produces a `safe`, `needs-confirmation`, or `blocked` plan. Recognized Task Store v2/v3 state is detected, validated, and included in the allowlisted snapshot/journal boundary. The 2.3 legacy browser-localStorage task path deliberately requires confirmation, and the scan does not expose its contents or task/run counts. After confirmation, supported preserved-origin v1 data is read only through a hidden CSP/no-scheduler/no-permission probe, copied only into an empty v3 Host ledger, and verified by task count/fingerprint while preserving the original browser value. An unknown, missing, or changed origin blocks the copy and retains recovery/rollback guidance. Its atomic journal and bounded global-state snapshot support resume and rollback without copying project files or user content.
+- Desktop configures no telemetry endpoint by default and never uploads diagnostics automatically. After user confirmation, a centralized-redaction JSON/ZIP diagnostic bundle can be written to a chosen location with a manifest and hashes. Keys, tokens, cookies, paths, complete prompts, complete sessions, tool results, project content, and SSH private keys are excluded.
+- Extension Dock now includes a native community plugin market backed directly by the `awesome-dsh-plugin.com/plugins.json` index, with local search, category filtering, sorting, and pagination. It does not embed the third-party market page or show its sandbox boundary banner. The renderer submits only an opaque catalog ID; the main process resolves the install source again and reuses the full-permission transactional installer, Runtime restart, and rollback after one native confirmation. The old `dshmarket` runtime dependency is retired.
+- Added a standalone embedded terminal, a validated Managed Git repair path, and recovery surfaces and isolated recovery sessions that do not depend on the primary Runtime. A missing migration completion marker can self-heal from a committed journal, while an interrupted journal keeps the strict recovery path.
+- Fixed Task Ledger v3 writes being permanently poisoned by oversized error text, stale v2 data replacing a damaged v3 ledger, ineffective SSH disconnect retries, connection replacement leaks and wrong-tunnel teardown, cancellation falsely reporting success, and chunked uploads bypassing the size limit, with regression coverage for each class.
+- Existing Task Board, Scheduler, Worktree, Evidence, Preset, plugin, and complete Harness Web Surface behavior remains available. Third parties should integrate through capability detection and public schemas instead of private implementation details.
+
+### Channels, upgrade, and rollback
+
+- The update channels are `stable` and `beta`. Existing users and new installations default to Stable. Stable accepts final releases only, while Beta accepts prereleases only after explicit selection. A channel change never authorizes an automatic downgrade.
+- The upgrade matrix covers Desktop 2.3.0 through 2.7.0. Review the migration plan and compatibility result first: recognized v2/v3 state is detected, validated, and snapshotted; legacy browser-localStorage state requires confirmation, but the scan does not expose content or task/run counts. After confirmation, supported preserved-origin v1 data can be copied into an empty v3 Host ledger and verified by task count/fingerprint without removing the original browser value; an unknown, missing, or changed origin blocks the copy and retains recovery/rollback guidance. For an upgrade or Runtime issue, use the Migration Assistant journal/snapshot recovery flow and the [upgrade and rollback guide](../upgrade-and-rollback.md) together with the [Runtime support policy](../runtime-support-policy.md).
 
 ### Verification
 
-- Regression coverage includes Windows Runtime invocation, legacy patch compatibility, startup status, tray-close decisions, plugin compatibility and lock state, main-window IPC, workspace-path validation, and renderer-Surface boundaries.
-- Host Scheduler tests cover leases, due slots, misfire/running policies, deterministic execution keys, expired-owner takeover, the Host status route, browser fallback, and the real Runtime adapter. Scheduler execution resolves Task Runs from real DSH Agent/Session events as succeeded, cancelled, or failed.
-- Candidate/Stable generator tests verify exact-version input, matrix state, export/peer/slot/Provider evidence, and the offline community quality report. Stable guards reject any Candidate attempt to rewrite the release dependency graph.
-- Release gates retain type checks, repository and script tests, documentation pairing/link checks, runtime-support generation checks, packaged-payload verification, Windows packaged E2E, and a real Runtime smoke test.
+- Release gates cover public schemas, SDK/Contract/Provider compatibility, malicious Preset input, Deep Link routing, Scheduler fake-clock behavior, Worktree lifecycle, Evidence, the migration matrix, the Runtime matrix, and the Candidate guard.
+- Packaging and release verification cover Stable/Beta separation, installer hashes, `release-manifest.json`, unsigned developer builds, and certificate/timestamp requirements when signing is required. A required-signing build without the necessary signing material must fail.
+- Documentation, release-note, and website consistency checks run before release. Diagnostic-export tests cover redaction, manifest, hashes, and the user-confirmation boundary.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-2.7.0-x64.exe` and verify it with `SHA256SUMS.txt` from the same GitHub Release. Treat the adjacent checksum file as authoritative for the installer SHA-256.
+Download `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Compare the installer SHA-256 with `SHA256SUMS.txt`, then inspect the manifest record for its size, hash, channel, Runtime/Schema information, and actual signature state. The updater hash remains the baseline integrity check; signing is an additional trust layer.
 
 ### Notice
 
-This is a community build, not an official DeepSeek, OpenAI, or Tencent distribution. The installer is not currently signed with a commercial code-signing certificate, so Windows SmartScreen may display an unknown publisher. Download only from the project GitHub Release and verify SHA-256. Existing users are never silently changed to a background-resident mode: keeping the default **quit** behavior or choosing **ask every time** stops the app on close; only an explicit **minimize to tray and enable background automation** choice retains scheduling. Installing, launching, or continuing to use an official release means that you have read and, where applicable law permits, agree to the privacy policy published in the repository and on the website; metrics are used only to improve the product.
+This is a community-maintained distribution, not an official DeepSeek, OpenAI, or Tencent product. A local or source build may be unsigned and says nothing about a GitHub Release asset. A release that requires signing validates certificate material and a valid timestamp at its gate; the asset record in `release-manifest.json` is authoritative. Desktop 3.0 does not collect or upload telemetry by default, and the website does not automatically report installer clicks. See the [compatibility policy](../compatibility-policy.md), [schema versioning guide](../schema-versioning.md), and [security boundaries](../security-boundaries.md) for the public commitments.
