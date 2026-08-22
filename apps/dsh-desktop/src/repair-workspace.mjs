@@ -26,6 +26,7 @@ const PROFILE_REPAIR_FILES = Object.freeze([
   'pnpm-workspace.yml',
 ])
 const EXCLUDED_DIRECTORIES = new Set(['.git'])
+const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u
 
 function immutable(value) {
   if (Array.isArray(value)) return Object.freeze(value.map(immutable))
@@ -64,6 +65,66 @@ async function pathState(path) {
     if (error?.code === 'ENOENT') return undefined
     throw error
   }
+}
+
+async function installedBundleVersion(profileDir, packageName) {
+  if (!PACKAGE_NAME_PATTERN.test(packageName)) return 'unknown'
+  try {
+    const manifest = JSON.parse(await readFile(
+      join(profileDir, 'node_modules', ...packageName.split('/'), 'package.json'),
+      'utf8',
+    ))
+    return typeof manifest?.version === 'string' && manifest.version.length <= 64
+      ? manifest.version
+      : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+export async function resolveEnabledRepairRoots({ profileDir, builtInBundles = [] } = {}) {
+  if (typeof profileDir !== 'string' || !isAbsolute(profileDir)) {
+    throw new TypeError('repair profile directory must be absolute')
+  }
+  if (!Array.isArray(builtInBundles) || builtInBundles.some(name => typeof name !== 'string')) {
+    throw new TypeError('repair built-in bundle list is invalid')
+  }
+  const resolvedProfile = resolve(profileDir)
+  let manifest
+  try {
+    manifest = JSON.parse(await readFile(join(resolvedProfile, 'package.json'), 'utf8'))
+  } catch (error) {
+    throw new Error('repair profile manifest is unreadable', { cause: error })
+  }
+  const enabled = [...new Set(
+    Array.isArray(manifest?.dsh?.profile?.bundles)
+      ? manifest.dsh.profile.bundles.filter(name => typeof name === 'string' && PACKAGE_NAME_PATTERN.test(name))
+      : [],
+  )].sort((left, right) => left.localeCompare(right, 'en'))
+  const builtIns = new Set(builtInBundles)
+  const roots = [{ id: 'profile', kind: 'profile', path: resolvedProfile }]
+  for (const packageName of enabled) {
+    if (builtIns.has(packageName)) continue
+    const installedPath = join(resolvedProfile, 'node_modules', ...packageName.split('/'))
+    try {
+      const installedReal = await realpath(installedPath)
+      if (!(await lstat(installedReal)).isDirectory()) continue
+      roots.push({
+        id: `plugin-${createHash('sha256').update(packageName).digest('hex').slice(0, 16)}`,
+        kind: 'plugin',
+        path: installedReal,
+        packageName,
+      })
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+  }
+  const bundles = await Promise.all(enabled.map(async name => ({
+    name,
+    version: await installedBundleVersion(resolvedProfile, name),
+    enabled: true,
+  })))
+  return immutable({ roots, bundles })
 }
 
 async function hashFile(path, budget) {

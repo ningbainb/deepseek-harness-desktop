@@ -63,6 +63,7 @@ test('full startup retries once then reaches same-home builtins without a model'
   assert.deepEqual(states, [
     'starting-full',
     'retrying-full',
+    'repairing',
     'starting-builtins',
     'ready-builtins',
   ])
@@ -99,4 +100,93 @@ test('fallback rejects a different Home instead of creating an isolated session'
 
   await assert.rejects(coordinator.start(), /same DSH Home/u)
   assert.equal(calls.some(([operation, profileName]) => operation === 'start' && profileName === 'desktop-builtins'), false)
+})
+
+test('applied repair commits only after the repaired full Runtime is ready', async () => {
+  const calls = []
+  const states = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 2, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  let repairInput
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    runRepair: async (input) => {
+      repairInput = input
+      calls.push(['repair'])
+      return {
+        status: 'applied',
+        async commit() { calls.push(['commit']) },
+        async rollback() { calls.push(['rollback']) },
+      }
+    },
+    publishState: (state) => states.push(state),
+  })
+
+  const result = await coordinator.start()
+
+  assert.equal(result.state, 'ready-full')
+  assert.equal(result.repaired, true)
+  assert.equal(repairInput.fullAttempts, 2)
+  assert.equal(repairInput.failures.length, 2)
+  assert.equal(repairInput.failures.every(error => error instanceof Error), true)
+  assert.deepEqual(calls.slice(-4), [
+    ['repair'],
+    ['ensure', 'desktop'],
+    ['start', 'desktop'],
+    ['commit'],
+  ])
+  assert.equal(calls.some(([operation]) => operation === 'rollback'), false)
+  assert.deepEqual(states, ['starting-full', 'retrying-full', 'repairing', 'ready-full'])
+})
+
+test('failed repaired full start rolls back before the same-home builtins fallback', async () => {
+  const calls = []
+  const states = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 3, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    runRepair: async () => ({
+      status: 'applied',
+      async commit() { calls.push(['commit']) },
+      async rollback() { calls.push(['rollback']) },
+    }),
+    publishState: (state) => states.push(state),
+  })
+
+  const result = await coordinator.start()
+
+  assert.equal(result.state, 'ready-builtins')
+  assert.equal(calls.some(([operation]) => operation === 'commit'), false)
+  assert.ok(calls.findIndex(([operation]) => operation === 'rollback')
+    < calls.findIndex(([operation, profileName]) => operation === 'start' && profileName === 'desktop-builtins'))
+  assert.deepEqual(states, [
+    'starting-full',
+    'retrying-full',
+    'repairing',
+    'rolling-back',
+    'starting-builtins',
+    'ready-builtins',
+  ])
+})
+
+test('rollback failure is contained and builtins still becomes ready', async () => {
+  const calls = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 3, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    runRepair: async () => ({
+      status: 'applied',
+      async rollback() {
+        calls.push(['rollback'])
+        throw new Error('bounded rollback failure')
+      },
+    }),
+  })
+
+  const result = await coordinator.start()
+
+  assert.equal(result.state, 'ready-builtins')
+  assert.equal(result.rollbackFailed, true)
 })

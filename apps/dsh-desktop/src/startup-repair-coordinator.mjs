@@ -104,17 +104,27 @@ export class StartupRepairCoordinator {
       }
     }
 
+    await this.#publish('repairing')
     const repair = await this.runRepair(Object.freeze({
       fullAttempts: 2,
       failureCount: failures.length,
+      failures: Object.freeze([...failures]),
     })).catch(() => ({ status: 'failed' }))
-    if (repair?.status === 'verified' || repair?.status === 'applied') {
+    let rollbackFailed = false
+    if (repair?.status === 'applied') {
       try {
         await this.#startProvider(full)
+        if (typeof repair.commit === 'function') await repair.commit()
         await this.#publish('ready-full')
         return Object.freeze({ state: 'ready-full', provider: full, fullAttempts: 3, repaired: true })
       } catch {
         await this.#stopProvider(full)
+        await this.#publish('rolling-back')
+        try {
+          if (typeof repair.rollback === 'function') await repair.rollback()
+        } catch {
+          rollbackFailed = true
+        }
       }
     }
 
@@ -125,6 +135,11 @@ export class StartupRepairCoordinator {
     await this.#publish('starting-builtins')
     await this.#startProvider(builtins)
     await this.#publish('ready-builtins')
-    return Object.freeze({ state: 'ready-builtins', provider: builtins, fullAttempts: 2 })
+    return Object.freeze({
+      state: 'ready-builtins',
+      provider: builtins,
+      fullAttempts: 2,
+      ...(rollbackFailed ? { rollbackFailed: true } : {}),
+    })
   }
 }

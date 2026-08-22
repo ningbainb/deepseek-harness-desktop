@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
@@ -76,6 +76,10 @@ import {
 } from './plugin-recovery.mjs'
 import { ensurePrimaryRuntimeFullUserPermission } from './primary-runtime-permission.mjs'
 import { ProductMetricsRecorder } from './product-metrics.mjs'
+import {
+  AutomaticRepairRunner,
+  discoverAutomaticRepairCommands,
+} from './automatic-repair-runner.mjs'
 import { projectDirectStartupState } from './repair-state.mjs'
 import {
   BUILTIN_BUNDLES,
@@ -113,6 +117,10 @@ import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
 import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
+import { RepairIncidentStore } from './repair-incident-store.mjs'
+import { RepairRuntimeController } from './repair-runtime-controller.mjs'
+import { RepairTransactionManager } from './repair-transaction.mjs'
+import { createRegisteredRepairChecks, RepairVerifier } from './repair-verifier.mjs'
 import { StartupRepairCoordinator } from './startup-repair-coordinator.mjs'
 import { assertRuntimeIntegrity, resolveRuntimeCriticalFiles } from './runtime-integrity.mjs'
 import {
@@ -3046,20 +3054,193 @@ export async function startElectronApp(metadata) {
     pluginSafeModeActive = true
   }
   const holdRuntime = process.env.DSH_DESKTOP_HOLD_STARTUP === '1'
+  const repairIncidentStore = new RepairIncidentStore({ userDataDir: userData })
+  const repairRuntime = new RepairRuntimeController({
+    ensureProfile: () => ensureDesktopProfile({
+      dshHome,
+      packageRoots: runtimePackages,
+      mode: 'repair',
+    }),
+    createController: ({ profileName, preferredPort: repairPort, patchFiles, environment }) => new DshRuntimeController({
+      cliPath: dshCliPath,
+      cwd: projectRoot,
+      dshHome,
+      profileName,
+      executable: process.execPath,
+      logStore: { append: async () => {} },
+      autoRestart: false,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
+      pathEntries: runtimePathEntries,
+      patchFiles,
+      preferredPort: repairPort,
+      environmentProvider: () => environment,
+      preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
+    }),
+  })
+  const createCandidateProbe = async ({ fingerprint, staged }) => {
+    const candidateProfileName = `desktop-candidate-${fingerprint.slice(0, 16)}`
+    if (!/^desktop-candidate-[a-f0-9]{16}$/u.test(candidateProfileName)) {
+      throw new Error('candidate profile name is invalid')
+    }
+    const candidateProfileDir = join(dshHome, 'profiles', candidateProfileName)
+    const cleanup = async () => rm(candidateProfileDir, { recursive: true, force: true })
+    await cleanup()
+    await ensureDesktopProfile({
+      dshHome,
+      packageRoots: runtimePackages,
+      mode: 'full',
+      profileName: candidateProfileName,
+    })
+    await cp(join(staged.workspace, 'profile'), candidateProfileDir, {
+      recursive: true,
+      force: true,
+    })
+    for (const root of staged.roots.filter(entry => entry.kind === 'plugin')) {
+      const target = join(candidateProfileDir, 'node_modules', ...root.packageName.split('/'))
+      await rm(target, { recursive: true, force: true })
+      await mkdir(dirname(target), { recursive: true })
+      await symlink(join(staged.workspace, root.relativePath), target, 'junction')
+    }
+    const controller = new DshRuntimeController({
+      cliPath: dshCliPath,
+      cwd: projectRoot,
+      dshHome,
+      profileName: candidateProfileName,
+      executable: process.execPath,
+      logStore: { append: async () => {} },
+      autoRestart: false,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
+      pathEntries: runtimePathEntries,
+      patchFiles: [primaryFullUserOverlay],
+      preferredPort: 0,
+      environmentProvider: () => desktopRuntimeEnvironmentFor({
+        qqBotCredentials: undefined,
+        backgroundAutomation: false,
+        migrationWorker: false,
+        fullUser: true,
+      }),
+      preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
+    })
+    const stop = controller.stop.bind(controller)
+    const forceStop = controller.forceStop.bind(controller)
+    let cleaned = false
+    const cleanupOnce = async () => {
+      if (cleaned) return
+      cleaned = true
+      await cleanup()
+    }
+    controller.stop = async () => {
+      try {
+        await stop()
+      } finally {
+        await cleanupOnce()
+      }
+    }
+    controller.forceStop = async () => {
+      try {
+        await forceStop()
+      } finally {
+        await cleanupOnce()
+      }
+    }
+    return controller
+  }
+  const automaticRepair = new AutomaticRepairRunner({
+    incidentStore: repairIncidentStore,
+    desktopVersion,
+    runtimeVersion,
+    profileDir: profile.profileDir,
+    builtInBundles: BUILTIN_BUNDLES,
+    createTransaction: async ({ incidentDir, fingerprint, roots }) => {
+      const manager = new RepairTransactionManager({
+        archive: userPluginArchive,
+        incidentDir,
+        profileDir: profile.profileDir,
+        roots,
+      })
+      return manager.begin({ incidentFingerprint: fingerprint })
+    },
+    createCommands: (staged) => discoverAutomaticRepairCommands({
+      staged,
+      pnpmCli: resolvePnpmCliPath(),
+    }),
+    repairRuntime,
+    publishState: showDirectStartupState,
+    createVerifier: ({ fingerprint, staged, commands }) => new RepairVerifier({
+      registeredChecks: createRegisteredRepairChecks({
+        commands,
+        workspace: staged.workspace,
+      }),
+      createProbe: () => createCandidateProbe({ fingerprint, staged }),
+    }),
+  })
+  let builtinsFallbackDetail = 'full-retry-failed'
+  const runAutomaticRepair = async (input) => {
+    const repairStartedAt = performance.now()
+    productMetrics.recordRepairAgentStarted('default-model')
+    const result = await automaticRepair.run(input)
+    if (result.status === 'applied') {
+      return Object.freeze({
+        ...result,
+        async commit() {
+          await result.commit()
+          productMetrics.recordRepairAgentSucceeded({
+            detail: result.modelDetail,
+            durationMs: performance.now() - repairStartedAt,
+          })
+        },
+        async rollback() {
+          try {
+            await result.rollback()
+            productMetrics.recordRepairAgentFailed({
+              detail: 'restart-failed',
+              durationMs: performance.now() - repairStartedAt,
+            })
+          } catch (error) {
+            productMetrics.recordRepairAgentFailed({
+              detail: 'rollback-failed',
+              durationMs: performance.now() - repairStartedAt,
+            })
+            throw error
+          }
+        },
+      })
+    }
+    builtinsFallbackDetail = result.reason === 'budget-exhausted'
+      ? 'budget-exhausted'
+      : result.reason === 'model-unavailable'
+        ? 'no-model'
+        : 'repair-failed'
+    productMetrics.recordRepairAgentFailed({
+      detail: result.reason === 'budget-exhausted'
+        ? 'budget-exhausted'
+        : result.reason === 'model-unavailable'
+          ? 'model-unavailable'
+          : result.reason === 'timed-out'
+            ? 'timeout'
+            : result.reason?.includes('verification') || result.reason === 'check-failed'
+              ? 'verification-failed'
+              : 'model-error',
+      durationMs: performance.now() - repairStartedAt,
+    })
+    return result
+  }
   const startupCoordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
+    runRepair: runAutomaticRepair,
     activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
     publishState: async (state) => {
       if (state === 'starting-builtins') {
         await showDirectStartupState('retrying-full')
         return
       }
-      if (['starting-full', 'retrying-full'].includes(state)) {
+      if (['starting-full', 'retrying-full', 'repairing'].includes(state)) {
         await showDirectStartupState(state)
       }
+      if (state === 'rolling-back') await showDirectStartupState('repairing')
       if (state === 'ready-builtins') {
         productMetrics.recordBuiltinsFallbackReady({
-          detail: 'repair-unavailable',
+          detail: builtinsFallbackDetail,
           durationMs: performance.now() - applicationStartedAt,
         })
       }

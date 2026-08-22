@@ -78,7 +78,7 @@ test('a damaged permission ledger affects recovery sessions but not normal plugi
   assert.match(initialization, /const resolveFullAccessPlugin = \(\{ spec \}\) => persistentPluginSourceResolver\.resolve\(spec\)/u)
 })
 
-test('Electron uses same-home full and builtins Runtime providers while keeping isolated Runtime creation behind recovery actions', async () => {
+test('Electron keeps full, builtins, repair, and candidate Runtimes on bounded same-home profiles', async () => {
   const source = await electronAppSource()
   const isolatedFreeModeAt = source.indexOf('const launchIsolatedFullUserFreeMode = async')
   const freeModeAt = source.indexOf('const enterFullUserFreeMode = async () =>')
@@ -144,7 +144,12 @@ test('Electron uses same-home full and builtins Runtime providers while keeping 
   assert.match(primaryRuntime, /const startupCoordinator = new StartupRepairCoordinator\(\{[\s\S]*startRuntime: \(\) => startupCoordinator\.start\(\)/u)
   assert.doesNotMatch(source, /free-mode-runtime-bin/u)
   assert.equal(source.match(/new FreeModeSessionManager\(/gu)?.length, 1)
-  assert.equal(source.match(/new DshRuntimeController\(/gu)?.length, 2)
+  assert.equal(source.match(/new DshRuntimeController\(/gu)?.length, 4)
+  assert.match(primaryRuntime, /const repairRuntime = new RepairRuntimeController/u)
+  assert.match(primaryRuntime, /mode: 'repair'/u)
+  assert.match(primaryRuntime, /preferredPort: 0/u)
+  assert.match(primaryRuntime, /desktop-candidate-\$\{fingerprint\.slice\(0, 16\)\}/u)
+  assert.match(primaryRuntime, /backgroundAutomation: false/u)
   assert.equal(source.match(/const launched = await enterFullUserFreeMode\(/gu)?.length ?? 0, 0)
 
   const bootstrap = source.slice(source.indexOf('export async function startElectronApp'))

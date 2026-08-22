@@ -27,6 +27,8 @@ export const BUILTIN_BUNDLES = Object.freeze([
   'reasoning-slider',
 ])
 
+export const DESKTOP_REPAIR_BUNDLE = '@linxin666/dsh-desktop-repair'
+
 // Packages expanded by @linxin666/dsh-web-ui-all. Older desktop profiles
 // listed some of these as top-level bundles as well, which makes Cordis
 // register their patch ids twice. Keep the packages installed for the
@@ -219,6 +221,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   ...BUILTIN_RUNTIME_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
+  DESKTOP_REPAIR_BUNDLE,
 ].toSorted())
 
 // DSH v0.1.1-rc.1 exposes these runtime modules as peers. Keep them explicit so the
@@ -340,6 +343,7 @@ export function createDesktopProfileManifest(existing = {}) {
     ...BUILTIN_BUNDLES,
     ...DEPENDENCY_ONLY_BUNDLES,
     ...AGGREGATED_BUNDLES,
+    DESKTOP_REPAIR_BUNDLE,
   ])
   const seenBundles = new Set(BUILTIN_BUNDLES)
   const communityBundles = []
@@ -364,6 +368,19 @@ export function createDesktopProfileManifest(existing = {}) {
       profile: {
         ...existingProfile,
         bundles: [...BUILTIN_BUNDLES, ...communityBundles],
+      },
+    },
+  }
+}
+
+export function createDesktopRepairProfileManifest() {
+  return {
+    name: 'dsh-profile-desktop-repair',
+    private: true,
+    dependencies: {},
+    dsh: {
+      profile: {
+        bundles: [DESKTOP_REPAIR_BUNDLE],
       },
     },
   }
@@ -970,7 +987,9 @@ export async function ensureDesktopProfile({
     await readDesktopProfileJson(manifestPath, 'manifest'),
     'manifest',
   )
-  const manifest = createDesktopProfileManifest(preserveUserProfile ? existing : {})
+  const manifest = mode === 'repair'
+    ? createDesktopRepairProfileManifest()
+    : createDesktopProfileManifest(preserveUserProfile ? existing : {})
   const activePackageRoots = new Map(packageRoots)
   for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
@@ -1020,12 +1039,14 @@ export async function ensureDesktopProfile({
   if (preserveUserProfile && homePatch !== originalHomePatch) {
     changed = (await writeIfChanged(homePatchPath, homePatch)) || changed
   }
-  let managedPatch
-  try {
-    const qqBotEnabled = readQqBotPatchEnabled(existingPatch) ?? false
-    managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch), qqBotEnabled)
-  } catch (error) {
-    throw profileBootstrapError('desktop profile patch is invalid', error)
+  let managedPatch = ROOT_CONFIG
+  if (mode !== 'repair') {
+    try {
+      const qqBotEnabled = readQqBotPatchEnabled(existingPatch) ?? false
+      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch), qqBotEnabled)
+    } catch (error) {
+      throw profileBootstrapError('desktop profile patch is invalid', error)
+    }
   }
   changed = (await writeIfChanged(patchPath, managedPatch)) || changed
   changed = (await writeIfChanged(join(profileDir, 'pnpm-workspace.yaml'), WORKSPACE_CONFIG)) || changed

@@ -153,6 +153,10 @@ export class RepairIncidentStore {
     return join(this.rootDir, assertFingerprint(fingerprint))
   }
 
+  incidentDirectory(fingerprint) {
+    return this.#directory(fingerprint)
+  }
+
   #path(fingerprint) {
     return join(this.#directory(fingerprint), 'incident.json')
   }

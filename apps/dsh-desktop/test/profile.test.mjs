@@ -164,6 +164,9 @@ test('profile mode names are bounded and repair mode has its own managed directo
   try {
     const repair = await ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'repair' })
     assert.equal(repair.profileDir, join(dshHome, 'profiles', 'desktop-repair'))
+    assert.deepEqual(repair.manifest.dependencies, {})
+    assert.deepEqual(repair.manifest.dsh.profile.bundles, ['@linxin666/dsh-desktop-repair'])
+    assert.equal(await readFile(join(repair.profileDir, 'cordis.patch.yml'), 'utf8'), '[]\n')
     await assert.rejects(
       ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'isolated' }),
       /profile mode/u,
@@ -171,6 +174,14 @@ test('profile mode names are bounded and repair mode has its own managed directo
   } finally {
     await rm(dshHome, { recursive: true, force: true })
   }
+})
+
+test('host-only repair bundle remains dormant in the normal full profile', () => {
+  const manifest = createDesktopProfileManifest({
+    dsh: { profile: { bundles: ['@linxin666/dsh-desktop-repair', '@user/plugin'] } },
+  })
+  assert.equal(manifest.dsh.profile.bundles.includes('@linxin666/dsh-desktop-repair'), false)
+  assert.equal(manifest.dsh.profile.bundles.includes('@user/plugin'), true)
 })
 
 test('profile manifest removes bundles already supplied by the web UI aggregate', () => {

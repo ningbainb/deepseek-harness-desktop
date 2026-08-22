@@ -4,7 +4,55 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { RepairWorkspace } from '../src/repair-workspace.mjs'
+import { RepairWorkspace, resolveEnabledRepairRoots } from '../src/repair-workspace.mjs'
+
+test('enabled repair roots include the original profile and every non-built-in bundle real root', async (context) => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-roots-'))
+  try {
+    const profileDir = join(root, 'profile')
+    const builtin = join(profileDir, 'node_modules', '@built-in', 'bundle')
+    const plugin = join(root, 'linked-plugin')
+    const pluginLink = join(profileDir, 'node_modules', '@user', 'plugin')
+    await mkdir(builtin, { recursive: true })
+    await mkdir(plugin, { recursive: true })
+    await mkdir(join(profileDir, 'node_modules', '@user'), { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      dependencies: {
+        '@built-in/bundle': '1.0.0',
+        '@user/plugin': 'link:C:/private/path',
+      },
+      dsh: { profile: { bundles: ['@built-in/bundle', '@user/plugin', '@missing/plugin'] } },
+    })}\n`)
+    try {
+      await symlink(plugin, pluginLink, 'junction')
+    } catch (error) {
+      if (['EPERM', 'EACCES', 'UNKNOWN'].includes(error?.code)) {
+        context.skip('the current account cannot create a directory link')
+        return
+      }
+      throw error
+    }
+
+    const resolved = await resolveEnabledRepairRoots({
+      profileDir,
+      builtInBundles: ['@built-in/bundle'],
+    })
+
+    assert.deepEqual(resolved.roots.map(rootEntry => [rootEntry.kind, rootEntry.packageName]), [
+      ['profile', undefined],
+      ['plugin', '@user/plugin'],
+    ])
+    assert.equal(resolved.roots[1].path, plugin)
+    assert.deepEqual(resolved.bundles.map(bundle => bundle.name), [
+      '@built-in/bundle',
+      '@missing/plugin',
+      '@user/plugin',
+    ])
+    assert.equal(JSON.stringify(resolved).includes('C:/private/path'), false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test('repair workspace materializes real plugin content and rewrites only candidate dependencies', async (context) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-repair-workspace-'))
