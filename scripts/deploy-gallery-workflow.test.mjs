@@ -2,27 +2,36 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import test from 'node:test'
-import { parse } from 'yaml'
+
+function stepBlock(workflow, name) {
+  const normalized = workflow.replace(/\r\n?/gu, '\n')
+  const escapedName = name.replace(/[.*+?^$\{\}()|[\]\\]/gu, '\\$&')
+  const match = new RegExp(
+    `      - name: ${escapedName}\\n[\\s\\S]*?(?=\\n      - name:|$)`,
+    'u',
+  ).exec(normalized)
+  assert.ok(match, `workflow is missing step: ${name}`)
+  return match[0]
+}
 
 test('gallery workflow always checks committed output and deploys only with complete Cloudflare credentials', async () => {
-  const workflow = parse(await readFile(
+  const workflow = await readFile(
     join(import.meta.dirname, '..', '.github', 'workflows', 'deploy-gallery.yml'),
     'utf8',
-  ))
-  const steps = workflow.jobs.deploy.steps
-  const consistency = steps.find((step) => step.name === 'Gallery consistency')
-  const credentials = steps.find((step) => step.name === 'Detect Cloudflare deployment credentials')
-  const install = steps.find((step) => step.name === 'Install wrangler')
-  const deploy = steps.find((step) => step.name === 'Deploy gallery')
+  )
+  const consistency = stepBlock(workflow, 'Gallery consistency')
+  const credentials = stepBlock(workflow, 'Detect Cloudflare deployment credentials')
+  const install = stepBlock(workflow, 'Install wrangler')
+  const deploy = stepBlock(workflow, 'Deploy gallery')
 
-  assert.equal(consistency.run, 'pnpm gallery:check')
-  assert.equal(consistency.if, undefined)
-  assert.equal(credentials.id, 'cloudflare')
-  assert.equal(credentials.env.CLOUDFLARE_API_TOKEN, '${{ secrets.CLOUDFLARE_API_TOKEN }}')
-  assert.equal(credentials.env.CLOUDFLARE_ACCOUNT_ID, '${{ secrets.CLOUDFLARE_ACCOUNT_ID }}')
-  assert.match(credentials.run, /configured=true/u)
-  assert.match(credentials.run, /configured=false/u)
-  assert.match(credentials.run, /::notice::/u)
-  assert.equal(install.if, "steps.cloudflare.outputs.configured == 'true'")
-  assert.equal(deploy.if, "steps.cloudflare.outputs.configured == 'true'")
+  assert.match(consistency, /run: pnpm gallery:check/u)
+  assert.doesNotMatch(consistency, /^\s*if:/mu)
+  assert.match(credentials, /^\s*id: cloudflare$/mu)
+  assert.match(credentials, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/u)
+  assert.match(credentials, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/u)
+  assert.match(credentials, /configured=true/u)
+  assert.match(credentials, /configured=false/u)
+  assert.match(credentials, /::notice::/u)
+  assert.match(install, /if: steps\.cloudflare\.outputs\.configured == 'true'/u)
+  assert.match(deploy, /if: steps\.cloudflare\.outputs\.configured == 'true'/u)
 })
