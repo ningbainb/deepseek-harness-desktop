@@ -78,7 +78,7 @@ test('a damaged permission ledger affects recovery sessions but not normal plugi
   assert.match(initialization, /const resolveFullAccessPlugin = \(\{ spec \}\) => persistentPluginSourceResolver\.resolve\(spec\)/u)
 })
 
-test('Electron uses one persistent full-user primary Runtime and keeps isolated Runtime creation behind recovery actions', async () => {
+test('Electron uses same-home full and builtins Runtime providers while keeping isolated Runtime creation behind recovery actions', async () => {
   const source = await electronAppSource()
   const isolatedFreeModeAt = source.indexOf('const launchIsolatedFullUserFreeMode = async')
   const freeModeAt = source.indexOf('const enterFullUserFreeMode = async () =>')
@@ -88,7 +88,7 @@ test('Electron uses one persistent full-user primary Runtime and keeps isolated 
   const primaryRuntimeEvidenceAt = source.indexOf('runtimeFileHashes = await verifyRuntimeFileEvidence', migrationAssistantAt)
   const runtimeUnavailableAt = source.indexOf('if (app.isPackaged && runtimeUnavailable)', primaryRuntimeEvidenceAt)
   const primaryPermissionAt = source.indexOf('primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission')
-  const primaryControllerAt = source.indexOf('const rawRuntimeController = new DshRuntimeController({')
+  const primaryControllerAt = source.indexOf('const createPrimaryRuntimeController = (profileName) => new DshRuntimeController({')
   const shutdownAt = source.indexOf('const shutdownLifecycle = createDesktopShutdownLifecycle')
 
   assert.match(source, /import \{ createFreeModeLauncher \} from '\.\/free-mode-launcher\.mjs'/u)
@@ -135,10 +135,13 @@ test('Electron uses one persistent full-user primary Runtime and keeps isolated 
   const primaryRuntime = source.slice(primaryPermissionAt, shutdownAt)
   assert.match(primaryRuntime, /primaryFullUserOverlay = await writePrimaryFullUserOverlay\(\{ userData \}\)/u)
   assert.match(primaryRuntime, /dshHome,/u)
-  assert.match(primaryRuntime, /profileName: 'desktop'/u)
+  assert.match(primaryRuntime, /const rawRuntimeController = createPrimaryRuntimeController\('desktop'\)/u)
+  assert.match(primaryRuntime, /const builtinsRuntimeController = createPrimaryRuntimeController\('desktop-builtins'\)/u)
+  assert.match(primaryRuntime, /ensureProfile: \(\) => ensureDesktopProfile\(\{[\s\S]*mode: 'builtins'/u)
+  assert.match(primaryRuntime, /runtimeProvider = new ActiveRuntimeProvider\(\{[\s\S]*activeProfileName: 'desktop'/u)
   assert.match(primaryRuntime, /patchFilesProvider: \(\) => migrationRuntimeWorker \? \[\] : \[primaryFullUserOverlay\]/u)
   assert.match(source, /const desktopRuntimeEnvironment = \(\) => desktopRuntimeEnvironmentFor\(\{[\s\S]*fullUser: !migrationRuntimeWorker/u)
-  assert.match(primaryRuntime, /const startup = beginDesktopStartup\(\{[\s\S]*startRuntime: \(\) => runtimeProvider\.start\(\)/u)
+  assert.match(primaryRuntime, /const startupCoordinator = new StartupRepairCoordinator\(\{[\s\S]*startRuntime: \(\) => startupCoordinator\.start\(\)/u)
   assert.doesNotMatch(source, /free-mode-runtime-bin/u)
   assert.equal(source.match(/new FreeModeSessionManager\(/gu)?.length, 1)
   assert.equal(source.match(/new DshRuntimeController\(/gu)?.length, 2)
@@ -251,7 +254,7 @@ test('Electron puts the stable Desktop runtime-bin first for Runtime, terminal, 
   const externalPluginGitAt = source.indexOf('const resolveManagedGitExternalPluginPathEntries = async')
   const normalBootstrapAt = source.indexOf('const starPromptStore =')
   const freeModeAt = source.indexOf('const launchIsolatedFullUserFreeMode = async')
-  const normalControllerAt = source.indexOf('const rawRuntimeController = new DshRuntimeController({')
+  const normalControllerAt = source.indexOf('const createPrimaryRuntimeController = (profileName) => new DshRuntimeController({')
   const repairAt = source.indexOf('const installManagedGitForRecovery = async () =>')
   const crashRecoveryAt = source.indexOf('const category = runtimeStartupRepairCategory(status)')
 
@@ -309,7 +312,9 @@ test('Electron puts the stable Desktop runtime-bin first for Runtime, terminal, 
 
   const repair = source.slice(repairAt, crashRecoveryAt)
   assert.match(repair, /managedGitRuntimeService\.repair\(\[runtimeBin\]\)/u)
-  assert.match(repair, /rawRuntimeController\.pathEntries = prioritizeRuntimeBinPathEntries\(runtimeBin, outcome\.pathEntries\)/u)
+  assert.match(repair, /const recoveredPathEntries = prioritizeRuntimeBinPathEntries\(runtimeBin, outcome\.pathEntries\)/u)
+  assert.match(repair, /rawRuntimeController\.pathEntries = recoveredPathEntries/u)
+  assert.match(repair, /builtinsRuntimeController\.pathEntries = recoveredPathEntries/u)
   assert.match(repair, /void runtimeProvider\.recover\(\)\.catch/u)
   assert.doesNotMatch(repair, /process\.env\.(?:PATH|Path)\s*=/u)
   assert.doesNotMatch(repair, /\b(?:setx|reg(?:\.exe)?)\b/iu)

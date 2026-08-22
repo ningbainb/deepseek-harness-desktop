@@ -308,6 +308,30 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   assert.equal(child.killed, true)
 })
 
+test('forceStop reclaims a partially started child without waiting for normal shutdown', async () => {
+  const child = new FakeChild()
+  let terminated = 0
+  const controller = new DshRuntimeController({
+    cliPath: 'dsh-bin.js',
+    cwd: process.cwd(),
+    dshHome: 'C:\\same-home',
+    spawnProcess: () => child,
+    terminateProcessTree: async target => {
+      terminated += 1
+      target.kill('SIGKILL')
+    },
+    startupTimeoutMs: 2_000,
+    platform: 'linux',
+  })
+
+  const starting = controller.start()
+  await controller.forceStop()
+  await assert.rejects(starting, /cancelled by force stop/u)
+  assert.equal(controller.status.state, 'stopped')
+  assert.equal(terminated, 1)
+  assert.equal(child.killed, true)
+})
+
 test('controller rejects an invalid runtime profile name before spawning', () => {
   for (const profileName of ['', '../desktop', 'desktop/profile', 'desktop profile', 'x'.repeat(65)]) {
     assert.throws(

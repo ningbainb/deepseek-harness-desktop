@@ -936,12 +936,29 @@ async function retireManagedPackage({ packageName, profileDir, previous }) {
 export async function ensureDesktopProfile({
   dshHome,
   packageRoots = resolveRuntimePackages(),
-  profileName = 'desktop',
+  profileName,
+  mode = 'full',
 } = {}) {
   if (typeof dshHome !== 'string' || dshHome.length === 0) {
     throw new TypeError('dshHome must be a non-empty absolute path')
   }
-  const profileDir = join(dshHome, 'profiles', profileName)
+  if (!['full', 'builtins', 'repair'].includes(mode)) {
+    throw new TypeError('desktop profile mode must be full, builtins, or repair')
+  }
+  const managedProfileName = {
+    full: 'desktop',
+    builtins: 'desktop-builtins',
+    repair: 'desktop-repair',
+  }[mode]
+  const selectedProfileName = profileName ?? managedProfileName
+  if (typeof selectedProfileName !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(selectedProfileName)) {
+    throw new TypeError('desktop profile name is invalid')
+  }
+  if (mode !== 'full' && profileName !== undefined && profileName !== managedProfileName) {
+    throw new TypeError('managed fallback profile name cannot be overridden')
+  }
+  const preserveUserProfile = mode === 'full'
+  const profileDir = join(dshHome, 'profiles', selectedProfileName)
   await mkdir(profileDir, { recursive: true })
   const manifestPath = join(profileDir, 'package.json')
   const recordPath = join(profileDir, '.dsh-desktop-links.json')
@@ -953,7 +970,7 @@ export async function ensureDesktopProfile({
     await readDesktopProfileJson(manifestPath, 'manifest'),
     'manifest',
   )
-  const manifest = createDesktopProfileManifest(existing)
+  const manifest = createDesktopProfileManifest(preserveUserProfile ? existing : {})
   const activePackageRoots = new Map(packageRoots)
   for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
@@ -975,6 +992,7 @@ export async function ensureDesktopProfile({
     if (error?.code === 'ENOENT') return ''
     throw error
   })
+  if (!preserveUserProfile) existingPatch = ''
   if (isSemanticallyEmptyPatch(existingPatch)) existingPatch = ''
   const homePatchPath = join(dshHome, 'cordis.patch.yml')
   let homePatch = await readFile(homePatchPath, 'utf8').catch((error) => {
@@ -982,22 +1000,24 @@ export async function ensureDesktopProfile({
     throw error
   })
   const originalHomePatch = homePatch
-  const legacySkinMigration = await migrateLegacySkinState({
-    profilePatch: existingPatch,
-    homePatch,
-    dshHome,
-    profileDir,
-  })
-  existingPatch = legacySkinMigration.profilePatch
-  homePatch = legacySkinMigration.homePatch
-  changed = legacySkinMigration.stateChanged || changed
+  if (preserveUserProfile) {
+    const legacySkinMigration = await migrateLegacySkinState({
+      profilePatch: existingPatch,
+      homePatch,
+      dshHome,
+      profileDir,
+    })
+    existingPatch = legacySkinMigration.profilePatch
+    homePatch = legacySkinMigration.homePatch
+    changed = legacySkinMigration.stateChanged || changed
+  }
   // DSH requires a top-level patch array. Repair only documents with no
   // semantic entries: blank/comment-only files, empty arrays, and legacy empty
   // mappings. Non-empty or malformed user configuration remains untouched.
   if (homePatch !== undefined && isSemanticallyEmptyPatch(homePatch) && homePatch !== ROOT_CONFIG) {
     homePatch = ROOT_CONFIG
   }
-  if (homePatch !== originalHomePatch) {
+  if (preserveUserProfile && homePatch !== originalHomePatch) {
     changed = (await writeIfChanged(homePatchPath, homePatch)) || changed
   }
   let managedPatch

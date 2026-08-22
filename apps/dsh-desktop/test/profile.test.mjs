@@ -135,6 +135,44 @@ test('profile manifest preserves versionless historical fields, dependency specs
   ])
 })
 
+test('builtins mode uses the same Home but a separate profile with no user bundles or dependencies', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-mode-'))
+  const fullProfileDir = join(dshHome, 'profiles', 'desktop')
+  try {
+    await mkdir(fullProfileDir, { recursive: true })
+    const original = {
+      name: 'historical-profile',
+      dependencies: { '@user/plugin': 'link:C:/user/plugin' },
+      dsh: { profile: { bundles: ['@user/plugin'] } },
+      userField: { preserved: true },
+    }
+    await writeFile(join(fullProfileDir, 'package.json'), `${JSON.stringify(original, null, 2)}\n`)
+
+    const builtins = await ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'builtins' })
+    assert.equal(builtins.profileDir, join(dshHome, 'profiles', 'desktop-builtins'))
+    assert.deepEqual(builtins.manifest.dependencies, {})
+    assert.deepEqual(builtins.manifest.dsh.profile.bundles, BUILTIN_BUNDLES)
+    assert.equal('userField' in builtins.manifest, false)
+    assert.deepEqual(JSON.parse(await readFile(join(fullProfileDir, 'package.json'), 'utf8')), original)
+  } finally {
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('profile mode names are bounded and repair mode has its own managed directory', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-repair-mode-'))
+  try {
+    const repair = await ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'repair' })
+    assert.equal(repair.profileDir, join(dshHome, 'profiles', 'desktop-repair'))
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'isolated' }),
+      /profile mode/u,
+    )
+  } finally {
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
 test('profile manifest removes bundles already supplied by the web UI aggregate', () => {
   const manifest = createDesktopProfileManifest({
     dependencies: {

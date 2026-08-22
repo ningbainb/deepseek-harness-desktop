@@ -665,6 +665,53 @@ export class DshRuntimeController extends EventEmitter {
     return operation
   }
 
+  async forceStop() {
+    this.manualStop = true
+    const redactionToken = this.workspaceFileOpenToken
+    this.workspaceFileOpenToken = undefined
+    if (this.restartTimer !== undefined) {
+      this.cancelSchedule(this.restartTimer)
+      this.restartTimer = undefined
+    }
+    this.cancelSchedule(this.startupTimer)
+    this.startupTimer = undefined
+    const rejectReady = this.rejectReady
+    this.resolveReady = undefined
+    this.rejectReady = undefined
+    this.readyPromise = undefined
+    rejectReady?.(new Error('runtime startup cancelled by force stop'))
+
+    const child = this.child
+    if (child !== undefined && child.exitCode === null) {
+      let timeout
+      const boundedTermination = new Promise((resolve) => {
+        timeout = this.schedule(resolve, this.shutdownTimeoutMs)
+        timeout?.unref?.()
+      })
+      try {
+        await Promise.race([
+          Promise.resolve().then(() => this.terminateProcessTree(child)),
+          boundedTermination,
+        ])
+      } catch (error) {
+        this.#appendDiagnostic(
+          `[process] forced process-tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,
+          redactionToken,
+        )
+      } finally {
+        this.cancelSchedule(timeout)
+      }
+      if (child.exitCode === null) child.kill('SIGKILL')
+      await Promise.resolve()
+    }
+
+    if (this.child === child) this.child = undefined
+    this.failedStartupCleanup = undefined
+    this.stopResolver?.()
+    this.stopResolver = undefined
+    this.#setStatus('stopped', {}, redactionToken)
+  }
+
   async #performStop() {
     this.manualStop = true
     // Do not retain an authority while shutdown is in progress. The child

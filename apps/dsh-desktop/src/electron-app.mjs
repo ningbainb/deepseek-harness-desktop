@@ -112,7 +112,8 @@ import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
-import { DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
+import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
+import { StartupRepairCoordinator } from './startup-repair-coordinator.mjs'
 import { assertRuntimeIntegrity, resolveRuntimeCriticalFiles } from './runtime-integrity.mjs'
 import {
   assessRuntimeSupport,
@@ -2151,11 +2152,11 @@ export async function startElectronApp(metadata) {
     }
   }
 
-  const rawRuntimeController = new DshRuntimeController({
+  const createPrimaryRuntimeController = (profileName) => new DshRuntimeController({
     cliPath: dshCliPath,
     cwd: projectRoot,
     dshHome,
-    profileName: 'desktop',
+    profileName,
     executable: process.execPath,
     logStore,
     autoRestart: false,
@@ -2167,19 +2168,12 @@ export async function startElectronApp(metadata) {
     environmentProvider: desktopRuntimeEnvironment,
     preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
   })
-  runtimeProvider = new DshRuntimeProvider({
-    controller: rawRuntimeController,
-    ensureProfile,
-    dshHome,
-    profileName: 'desktop',
-    upstreamVersion: runtimeVersion,
-    desktopVersion,
-    runtimeIdentity: {
+  const runtimeIdentity = {
       packageName: '@deepseek-ai/dsh',
       version: runtimeVersion,
       cliRelativePath: 'lib/bin.js',
-    },
-    supportEvidence: {
+    }
+  const runtimeSupportEvidence = {
       manifestSchemaVersion: 1,
       source: 'package-and-lockfile',
       matrix: runtimeSupportAssessment,
@@ -2191,8 +2185,38 @@ export async function startElectronApp(metadata) {
           lockfileSha256: knownGoodRuntimeEvidence.lockfile.sha256,
         },
       }),
-    },
+    }
+  const rawRuntimeController = createPrimaryRuntimeController('desktop')
+  const builtinsRuntimeController = createPrimaryRuntimeController('desktop-builtins')
+  const fullRuntimeProvider = new DshRuntimeProvider({
+    controller: rawRuntimeController,
+    ensureProfile,
+    dshHome,
+    profileName: 'desktop',
+    upstreamVersion: runtimeVersion,
+    desktopVersion,
+    runtimeIdentity,
+    supportEvidence: runtimeSupportEvidence,
     supportStatus: runtimeSupportAssessment.status,
+  })
+  const builtinsRuntimeProvider = new DshRuntimeProvider({
+    controller: builtinsRuntimeController,
+    ensureProfile: () => ensureDesktopProfile({
+      dshHome,
+      packageRoots: runtimePackages,
+      mode: 'builtins',
+    }),
+    dshHome,
+    profileName: 'desktop-builtins',
+    upstreamVersion: runtimeVersion,
+    desktopVersion,
+    runtimeIdentity,
+    supportEvidence: runtimeSupportEvidence,
+    supportStatus: runtimeSupportAssessment.status,
+  })
+  runtimeProvider = new ActiveRuntimeProvider({
+    providers: [fullRuntimeProvider, builtinsRuntimeProvider],
+    activeProfileName: 'desktop',
   })
   const installManagedGitForRecovery = async () => {
     const outcome = await managedGitRuntimeService.repair([runtimeBin])
@@ -2203,7 +2227,9 @@ export async function startElectronApp(metadata) {
     // a cmd directory whose archive, executable bytes, and Git identity were
     // validated by the main-process service. This remains controller-local;
     // neither process.env nor a Windows PATH/registry setting is changed.
-    rawRuntimeController.pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, outcome.pathEntries)
+    const recoveredPathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, outcome.pathEntries)
+    rawRuntimeController.pathEntries = recoveredPathEntries
+    builtinsRuntimeController.pathEntries = recoveredPathEntries
     await logStore.append(`[managed-git] recovery completed with ${outcome.status}`).catch(() => {})
     void runtimeProvider.recover().catch(async (error) => {
       await logStore.append(
@@ -2685,7 +2711,7 @@ export async function startElectronApp(metadata) {
     getRuntimeOrigin: () => activeOrigin,
     // This closes over Electron main's controller only. The opaque per-Host
     // capability never enters preload, the browser Contract, or status data.
-    getWorkspaceFileOpenToken: () => rawRuntimeController.getWorkspaceFileOpenToken(),
+    getWorkspaceFileOpenToken: () => runtimeProvider.getWorkspaceFileOpenToken(),
     getBackgroundStatus: () => ({
       enabled: isBackgroundAutomationEnabled(closeBehavior),
       closeBehavior,
@@ -3020,9 +3046,28 @@ export async function startElectronApp(metadata) {
     pluginSafeModeActive = true
   }
   const holdRuntime = process.env.DSH_DESKTOP_HOLD_STARTUP === '1'
+  const startupCoordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
+    activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
+    publishState: async (state) => {
+      if (state === 'starting-builtins') {
+        await showDirectStartupState('retrying-full')
+        return
+      }
+      if (['starting-full', 'retrying-full'].includes(state)) {
+        await showDirectStartupState(state)
+      }
+      if (state === 'ready-builtins') {
+        productMetrics.recordBuiltinsFallbackReady({
+          detail: 'repair-unavailable',
+          durationMs: performance.now() - applicationStartedAt,
+        })
+      }
+    },
+  })
   const startup = beginDesktopStartup({
     loadShell: loadStartup,
-    startRuntime: () => runtimeProvider.start(),
+    startRuntime: () => startupCoordinator.start(),
     holdRuntime,
   })
   void startup.runtimePromise?.catch(() => {})
