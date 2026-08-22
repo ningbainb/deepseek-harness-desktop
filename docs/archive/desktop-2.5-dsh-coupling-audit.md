@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 3.0.0.
+Authoritative Desktop version: 3.0.1.
 
 Stable DSH package version: 0.1.1-rc.1.
 
@@ -334,13 +334,13 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 44 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 50 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/measure-startup-fps.mjs | 23 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 115 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 116 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 120 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 143 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 154 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 118 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 119 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 123 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 146 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 157 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 193 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 160 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs | 196 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/packaged-smoke-runner.mjs | 57 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/preset-deep-link-runner.mjs | 63 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-skills.mjs | 27 | DSH_HOME |
@@ -371,7 +371,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 43 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-settings-window.mjs | 57 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-star-prompt.mjs | 25 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-terminal.mjs | 100 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-terminal.mjs | 105 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 71 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 134 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 43 | DSH_HOME |
@@ -651,8 +651,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/migration-runtime-matrix.test.mjs | 290 | profileDir |
 | profile-home | apps/dsh-desktop/test/migration-runtime-matrix.test.mjs | 290 | profileDir |
 | profile-home | apps/dsh-desktop/test/migration-runtime-matrix.test.mjs | 291 | profileDir |
-| profile-home | apps/dsh-desktop/test/packaged-migration-matrix.test.mjs | 35 | profileDir |
-| profile-home | apps/dsh-desktop/test/packaged-migration-matrix.test.mjs | 44 | profileDir |
+| profile-home | apps/dsh-desktop/test/packaged-migration-matrix.test.mjs | 43 | profileDir |
+| profile-home | apps/dsh-desktop/test/packaged-migration-matrix.test.mjs | 52 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugin-recovery.test.mjs | 19 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/plugin-recovery.test.mjs | 124 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugin-recovery.test.mjs | 131 | profileDir |

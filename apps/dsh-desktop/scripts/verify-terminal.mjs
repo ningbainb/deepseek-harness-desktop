@@ -10,6 +10,11 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import {
+  CWD_PROBE_MISMATCH,
+  CWD_PROBE_SUCCESS,
+  createPowerShellCwdProbe,
+} from './terminal-e2e-probe.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -162,14 +167,23 @@ try {
     return output.toLowerCase().includes(`__dsh_pnpm__${expected}`.toLowerCase())
   }, expectedPnpmShim, { timeout: 15_000 })
   const expectedProfileCwd = resolve(dshHome, 'profiles', 'desktop')
-  await terminal.keyboard.type('Write-Output ("__DSH_CWD__" + $PWD.Path)')
+  await terminal.keyboard.type(createPowerShellCwdProbe(expectedProfileCwd))
   await terminal.keyboard.press('Enter')
-  await terminal.waitForFunction((expected) => {
+  await terminal.waitForFunction(({ success, mismatch }) => {
     const output = document.querySelector('.xterm-rows')?.textContent ?? ''
-    return output.toLowerCase().includes(`__dsh_cwd__${expected}`.toLowerCase())
-  }, expectedProfileCwd, { timeout: 15_000 })
+    return output.includes(success) || output.includes(mismatch)
+  }, { success: CWD_PROBE_SUCCESS, mismatch: CWD_PROBE_MISMATCH }, { timeout: 15_000 })
+  const terminalOutput = await terminal.locator('.xterm-rows').textContent() ?? ''
+  assert.ok(
+    terminalOutput.includes(CWD_PROBE_SUCCESS),
+    `terminal shell cwd does not match the Desktop Profile: ${terminalOutput.slice(-2_000)}`,
+  )
   const context = await terminal.locator('#terminal-context').textContent()
   assert.match(context ?? '', /PowerShell/u)
+  assert.ok(
+    (context ?? '').toLowerCase().includes(expectedProfileCwd.toLowerCase()),
+    `terminal context does not identify the Desktop Profile cwd: ${context}`,
+  )
   await Promise.all([
     terminal.waitForEvent('close'),
     terminal.getByRole('button', { name: '收起内置终端', exact: true }).click(),

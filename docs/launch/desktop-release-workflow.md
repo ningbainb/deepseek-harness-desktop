@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop 3.0 release preparation and handoff
 
-This is the current 3.0.0 maintainer preparation and handoff guide. It describes the repository contracts and verification evidence for a possible release; it does not authorize a commit, push, tag, GitHub Release change, deployment, or external announcement. A maintainer with explicit authority must make each external-state decision separately.
+This is the current 3.0.1 maintainer preparation and handoff guide. It describes the repository contracts and verification evidence for a possible release; it does not authorize a commit, push, tag, GitHub Release change, deployment, or external announcement. A maintainer with explicit authority must make each external-state decision separately.
 
 ## Sources of truth
 

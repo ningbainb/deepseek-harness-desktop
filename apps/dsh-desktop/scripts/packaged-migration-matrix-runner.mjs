@@ -22,6 +22,9 @@ function requiredText(value, label) {
   return value
 }
 
+const desktopManifest = JSON.parse(await readFile(resolve(SCRIPT_DIRECTORY, '..', 'package.json'), 'utf8'))
+export const MIGRATION_MATRIX_DESKTOP_VERSION = requiredText(desktopManifest.version, 'Desktop package version')
+
 function fixtureVersion(value) {
   if (!MIGRATION_MATRIX_FIXTURE_VERSIONS.includes(value)) throw new TypeError('migration fixture version is unsupported')
   return value
@@ -229,7 +232,7 @@ async function verifyCommittedMigration(layout) {
   } catch (error) {
     throw new Error(`migrated Runtime support state is invalid: ${error instanceof Error ? error.message : String(error)}`)
   }
-  if (!isRecord(runtimeSupport) || runtimeSupport.desktopVersion !== '3.0.0' || !['known-good', 'supported'].includes(runtimeSupport.status)) {
+  if (!isRecord(runtimeSupport) || runtimeSupport.desktopVersion !== MIGRATION_MATRIX_DESKTOP_VERSION || !['known-good', 'supported'].includes(runtimeSupport.status)) {
     throw new Error(`migrated Runtime support state is not release-eligible for fixture ${layout.version}`)
   }
   let taskDocument

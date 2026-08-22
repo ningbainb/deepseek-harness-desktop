@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "3.0.0",
+  "desktopVersion": "3.0.1",
   "upstreamVersion": "0.1.1-rc.1",
   "lockfileSha256": "5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a",
   "policy": {
@@ -2692,31 +2692,25 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 115,
+      "line": 118,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 116,
+      "line": 119,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 120,
+      "line": 123,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 143,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 154,
+      "line": 146,
       "operation": "profileDir"
     },
     {
@@ -2728,7 +2722,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
-      "line": 193,
+      "line": 160,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/packaged-migration-matrix-runner.mjs",
+      "line": 196,
       "operation": "profileDir"
     },
     {
@@ -2914,7 +2914,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-terminal.mjs",
-      "line": 100,
+      "line": 105,
       "operation": "DSH_HOME"
     },
     {
@@ -4594,13 +4594,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/packaged-migration-matrix.test.mjs",
-      "line": 35,
+      "line": 43,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/packaged-migration-matrix.test.mjs",
-      "line": 44,
+      "line": 52,
       "operation": "profileDir"
     },
     {
