@@ -793,6 +793,45 @@ test('startup reconciliation disables explicit incompatibilities and preserves u
   }
 })
 
+test('startup compatibility inspection never changes enabled bundles and tolerates unreadable package manifests', async () => {
+  const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-inspect-only-'))
+  const incompatible = '@community/incompatible-enabled'
+  const unreadable = '@community/unreadable-enabled'
+  const manifestPath = join(profileDir, 'package.json')
+  try {
+    const original = {
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [incompatible]: '2.0.0', [unreadable]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, incompatible, unreadable] } },
+    }
+    await writeFile(manifestPath, `${JSON.stringify(original, null, 2)}\n`)
+    const incompatibleRoot = join(profileDir, 'node_modules', ...incompatible.split('/'))
+    const unreadableRoot = join(profileDir, 'node_modules', ...unreadable.split('/'))
+    await mkdir(incompatibleRoot, { recursive: true })
+    await mkdir(unreadableRoot, { recursive: true })
+    await writeFile(join(incompatibleRoot, 'package.json'), JSON.stringify({
+      name: incompatible,
+      version: '2.0.0',
+      dsh: {
+        bundle: { patch: './cordis.patch.yml' },
+        compatibility: { desktop: '>=9.0.0' },
+      },
+    }))
+    await writeFile(join(unreadableRoot, 'package.json'), '{not-json')
+
+    const manager = new PluginManager({ profileDir, pnpmCli: 'pnpm.mjs', hostCompatibility })
+    const diagnostic = await manager.inspectCompatibility()
+
+    assert.equal(diagnostic.changed, false)
+    assert.deepEqual(diagnostic.incompatible.map((item) => item.name), [incompatible])
+    assert.deepEqual(diagnostic.unavailable.map((item) => item.name), [unreadable])
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), original)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+  }
+})
+
 test('startup reconciliation preserves only explicit full-access package names supplied by Electron main', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-reconcile-full-access-'))
   const approved = '@external/approved-incompatible'

@@ -635,6 +635,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     cancelSchedule = clearTimeout,
     log = async () => {},
     baselineQuarantine,
+    automatic = true,
   }) {
     super()
     if (!controller || !pluginManager || !store || typeof ensureProfile !== 'function') {
@@ -649,6 +650,8 @@ export class DesktopPluginRecovery extends EventEmitter {
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
     this.log = log
+    if (typeof automatic !== 'boolean') throw new TypeError('automatic recovery policy must be a boolean')
+    this.automatic = automatic
     if (
       baselineQuarantine !== undefined
       && (
@@ -677,37 +680,39 @@ export class DesktopPluginRecovery extends EventEmitter {
 
   async initialize() {
     await this.store.getState()
-    const baselineActive = await this.#baselineQuarantineAvailable()
-    if (baselineActive) await this.#reconcilePersistedBaseline()
+    if (this.automatic) {
+      const baselineActive = await this.#baselineQuarantineAvailable()
+      if (baselineActive) await this.#reconcilePersistedBaseline()
 
-    // A persisted baseline intentionally keeps all user loaders isolated.
-    // Do not let the pre-v2 legacy repair put dependencies back into that
-    // profile before the user has explicitly chosen Restore.
-    const legacyRepair = baselineActive
-      ? undefined
-      : await this.store.getLegacyAutoSafeModeRepair()
-    if (legacyRepair) {
-      let prepared
-      try {
-        prepared = await this.#prepareDisabledDependencyRestore(legacyRepair.disabledDependencies)
-        await this.ensureProfile()
-        for (const transaction of prepared.transactions) transaction.commit()
-        await this.store.completeLegacyAutoSafeModeRepair({
-          success: true,
-          restoredPlugins: prepared.restoredPlugins,
-        })
-        await this.#log(`[plugin-recovery] repaired legacy unknown-timeout safe mode; restored=${prepared.restoredPlugins.join(',') || 'none'}`)
-      } catch (error) {
-        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
-          await transaction.rollback().catch(() => {})
+      // A persisted baseline intentionally keeps all user loaders isolated.
+      // Do not let the pre-v2 legacy repair put dependencies back into that
+      // profile before the user has explicitly chosen Restore.
+      const legacyRepair = baselineActive
+        ? undefined
+        : await this.store.getLegacyAutoSafeModeRepair()
+      if (legacyRepair) {
+        let prepared
+        try {
+          prepared = await this.#prepareDisabledDependencyRestore(legacyRepair.disabledDependencies)
+          await this.ensureProfile()
+          for (const transaction of prepared.transactions) transaction.commit()
+          await this.store.completeLegacyAutoSafeModeRepair({
+            success: true,
+            restoredPlugins: prepared.restoredPlugins,
+          })
+          await this.#log(`[plugin-recovery] repaired legacy unknown-timeout safe mode; restored=${prepared.restoredPlugins.join(',') || 'none'}`)
+        } catch (error) {
+          for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+            await transaction.rollback().catch(() => {})
+          }
+          await this.ensureProfile().catch(() => {})
+          await this.store.completeLegacyAutoSafeModeRepair({ success: false, error })
+          await this.#log(`[plugin-recovery] legacy safe-mode repair needs user action: ${asMessage(error instanceof Error ? error.message : error)}`)
         }
-        await this.ensureProfile().catch(() => {})
-        await this.store.completeLegacyAutoSafeModeRepair({ success: false, error })
-        await this.#log(`[plugin-recovery] legacy safe-mode repair needs user action: ${asMessage(error instanceof Error ? error.message : error)}`)
       }
+      this.controller.on('line', this.onLine)
+      this.controller.on('status', this.onStatus)
     }
-    this.controller.on('line', this.onLine)
-    this.controller.on('status', this.onStatus)
     this.store.on('change', this.onStoreChange)
     return this.getState()
   }

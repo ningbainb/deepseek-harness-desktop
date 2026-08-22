@@ -18,6 +18,44 @@ import {
 import { DesktopProfileBaselineQuarantine } from '../src/profile-baseline-quarantine.mjs'
 import { BUILTIN_BUNDLES, ensureDesktopProfile } from '../src/profile.mjs'
 
+test('diagnostic-only recovery observes no Runtime events and cannot auto-disable a plugin', async () => {
+  const controller = new EventEmitter()
+  controller.status = { state: 'starting' }
+  const store = new EventEmitter()
+  store.getState = async () => ({ safeMode: false, disabledPlugins: [] })
+  const recovery = new DesktopPluginRecovery({
+    controller,
+    pluginManager: {},
+    store,
+    ensureProfile: async () => {},
+    automatic: false,
+  })
+
+  await recovery.initialize()
+  assert.equal(controller.listenerCount('line'), 0)
+  assert.equal(controller.listenerCount('status'), 0)
+  controller.emit('status', { state: 'crashed', error: 'private plugin startup error' })
+  assert.deepEqual(await recovery.getState(), {
+    safeMode: false,
+    disabledPlugins: [],
+    baselineQuarantineAvailable: false,
+    busy: false,
+    recoveryStage: 0,
+  })
+  await recovery.dispose()
+})
+
+test('Electron startup leaves baseline quarantine and compatibility mutation out of the load path', async () => {
+  const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
+  const bootstrap = source.slice(source.indexOf('export async function startElectronApp'))
+
+  assert.doesNotMatch(bootstrap, /new DesktopProfileBaselineQuarantine\(/u)
+  assert.doesNotMatch(bootstrap, /recoverProfileAfterPluginInspectionFailure\(/u)
+  assert.doesNotMatch(bootstrap, /pluginManager\.reconcileCompatibility\(/u)
+  assert.match(bootstrap, /pluginManager\.inspectCompatibility\(/u)
+  assert.match(bootstrap, /automatic: false/u)
+})
+
 test('plugin failure classifier identifies a missing dependency through a Unicode Windows path', () => {
   const result = classifyPluginFailure([
     "Cannot find package 'schemastery'",

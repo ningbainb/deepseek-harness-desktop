@@ -73,10 +73,7 @@ import { startQqBotConnector } from './optional-integrations.mjs'
 import {
   DesktopPluginRecovery,
   PluginRecoveryStore,
-  isPluginPackageInspectionFailure,
-  recoverProfileAfterPluginInspectionFailure,
 } from './plugin-recovery.mjs'
-import { DesktopProfileBaselineQuarantine } from './profile-baseline-quarantine.mjs'
 import { ensurePrimaryRuntimeFullUserPermission } from './primary-runtime-permission.mjs'
 import { ProductMetricsRecorder } from './product-metrics.mjs'
 import { projectDirectStartupState } from './repair-state.mjs'
@@ -1937,11 +1934,6 @@ export async function startElectronApp(metadata) {
   // confirms, or resumes a migration journal.
   let preflightMigrationPlan
   let preflightMigrationJournal
-  const baselineQuarantine = new DesktopProfileBaselineQuarantine({
-    dshHome,
-    profileDir: desktopProfileDir,
-    stateDir: pluginRecoveryStateDir,
-  })
   const packageResolutionStartedAt = performance.now()
   const runtimePackages = resolveRuntimePackages()
   const runtimeCriticalFiles = resolveRuntimeCriticalFiles()
@@ -1972,15 +1964,13 @@ export async function startElectronApp(metadata) {
   }
   let prepared
   try {
-    prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine,
+    prepared = await prepareDesktopRuntimeInputs({
       prepareProfile: () => ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
       migrateSettings: ensureRetryPolicies,
       loadCredentials: () => qqBotCredentialStore.load(),
       onCredentialError: (error) => logStore.append(
         `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
       ),
-      onBaselineRecovery: () => logStore.append('[plugin-recovery] unreadable user profile configuration was isolated before runtime startup'),
     })
   } catch (error) {
     await logStore.append(`[profile] bootstrap failed before Runtime startup: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
@@ -2149,16 +2139,6 @@ export async function startElectronApp(metadata) {
     stateDir: pluginRecoveryStateDir,
     builtInBundles: BUILTIN_BUNDLES,
   })
-  if (prepared.baselineRecovered) {
-    const incident = await pluginRecoveryStore.recordIncident({
-      identified: false,
-      reasonCode: 'untrusted-profile-bootstrap',
-      summary: '检测到无法读取的用户配置，已暂时切换到桌面基线以恢复启动',
-      technicalDetails: 'Desktop isolated unreadable user profile configuration before runtime startup',
-    })
-    await pluginRecoveryStore.setSafeMode(true)
-    await pluginRecoveryStore.resolveIncident(incident.id, 'baseline-quarantine-bootstrap')
-  }
   const pluginManager = new PluginManager({
     profileDir: profile.profileDir,
     hostCompatibility,
@@ -2169,41 +2149,6 @@ export async function startElectronApp(metadata) {
       label: event?.name ? `${event.type}: ${event.name}` : event?.type ?? '插件变更前',
     }),
   })
-  const compatibilityStartedAt = performance.now()
-  let compatibilityReconciliation
-  try {
-    compatibilityReconciliation = await pluginManager.reconcileCompatibility({
-      preserveAllEnabled: true,
-    })
-  } catch (error) {
-    if (!isPluginPackageInspectionFailure(error)) throw error
-    await logStore.append(`[plugin-recovery] community package inspection failed before runtime startup: ${error instanceof Error ? error.message : String(error)}`)
-    const recovered = await recoverProfileAfterPluginInspectionFailure({
-      pluginManager,
-      store: pluginRecoveryStore,
-      ensureProfile,
-      error,
-      log: (line) => logStore.append(line),
-    })
-    if (!recovered.recovered) throw error
-    compatibilityReconciliation = await pluginManager.reconcileCompatibility({
-      preserveAllEnabled: true,
-    })
-  }
-  try {
-    await pluginManager.writeCompatibilityLock()
-  } catch (error) {
-    // This diagnostic is derived data. It must not turn a runnable Desktop
-    // profile into a permanent launch failure after recovery already succeeded.
-    await logStore.append(`[plugins] compatibility diagnostic refresh skipped: ${error instanceof Error ? error.message : String(error)}`)
-  }
-  await logStore.append(
-    `[startup] compatibility-ready=${Math.round(performance.now() - compatibilityStartedAt)}ms disabled=${compatibilityReconciliation.disabled.length}`,
-  )
-  for (const plugin of compatibilityReconciliation.disabled) {
-    await logStore.append(`[plugins] disabled incompatible community bundle: ${plugin.name}`)
-  }
-
   const preferredRuntimePort = await selectPreferredRuntimePort(runtimePortStatePath).catch(async (error) => {
     await logStore.append(`[port] failed to read preferred port: ${error instanceof Error ? error.message : String(error)}`)
     return 0
@@ -2310,7 +2255,7 @@ export async function startElectronApp(metadata) {
     ensureProfile,
     builtInBundles: BUILTIN_BUNDLES,
     log: (line) => logStore.append(line),
-    baselineQuarantine,
+    automatic: false,
   })
   const initialRecoveryState = await pluginRecovery.initialize()
   pluginSafeModeActive = initialRecoveryState.safeMode === true
@@ -2319,6 +2264,25 @@ export async function startElectronApp(metadata) {
     void trayLifecycle?.refresh()
   }
   pluginRecovery.on('status', onPluginRecoveryStatus)
+  let compatibilityInspection
+  const inspectCompatibilityAfterReady = () => {
+    if (compatibilityInspection !== undefined) return compatibilityInspection
+    compatibilityInspection = (async () => {
+      const startedAt = performance.now()
+      const diagnostic = await pluginManager.inspectCompatibility()
+      await logStore.append(
+        `[plugins] compatibility diagnostic ready=${Math.round(performance.now() - startedAt)}ms incompatible=${diagnostic.incompatible.length} unknown=${diagnostic.unknown.length} unavailable=${diagnostic.unavailable.length}`,
+      )
+      await pluginManager.writeCompatibilityLock().catch(async (error) => {
+        await logStore.append(`[plugins] compatibility lock refresh skipped: ${error instanceof Error ? error.name : 'unknown'}`)
+      })
+      return diagnostic
+    })().catch(async (error) => {
+      await logStore.append(`[plugins] compatibility inspection skipped: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
+      return undefined
+    })
+    return compatibilityInspection
+  }
   const migrationPlanSummary = (plan) => plan === undefined
     ? Object.freeze({ status: 'not-started' })
     : Object.freeze({
@@ -2992,6 +2956,7 @@ export async function startElectronApp(metadata) {
     await startupSurfaceReady
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
+    void inspectCompatibilityAfterReady()
     activeOrigin = new URL(status.url).origin
     try {
       await mainWindow.loadURL(status.url)

@@ -486,6 +486,56 @@ export class PluginManager {
     })
   }
 
+  /**
+   * Inspect the enabled community bundle set without changing the Profile.
+   * Missing, malformed, or unreadable third-party manifests become bounded
+   * diagnostic rows so the Runtime still gets the first real load attempt.
+   */
+  inspectCompatibility() {
+    return this.#enqueue(async () => {
+      const manifest = await readManifest(this.profileDir)
+      const enabledBundles = new Set(manifest.dsh?.profile?.bundles ?? [])
+      const communityNames = Object.keys(manifest.dependencies ?? {})
+        .filter((name) => !PROTECTED_PACKAGES.has(name) && enabledBundles.has(name))
+        .toSorted()
+      const diagnostic = {
+        changed: false,
+        compatible: [],
+        incompatible: [],
+        unknown: [],
+        unavailable: [],
+      }
+      for (const name of communityNames) {
+        let installed
+        try {
+          installed = await readInstalledManifest(this.profileDir, name)
+        } catch {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'manifest-unreadable' }))
+          continue
+        }
+        if (installed === undefined) {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'manifest-missing' }))
+          continue
+        }
+        let compatibility
+        try {
+          compatibility = await this.#assess(installed)
+        } catch {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'assessment-unavailable' }))
+          continue
+        }
+        diagnostic[compatibility.status].push(Object.freeze({
+          name,
+          reasons: compatibility.reasons,
+        }))
+      }
+      return Object.freeze(Object.fromEntries(Object.entries(diagnostic).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? Object.freeze(value) : value,
+      ])))
+    })
+  }
+
   async portablePackages() {
     await this.queue
     const manifest = await readManifest(this.profileDir)

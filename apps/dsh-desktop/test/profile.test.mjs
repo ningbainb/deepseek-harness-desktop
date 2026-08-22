@@ -74,6 +74,67 @@ test('profile manifest preserves community bundles after managed bundles', () =>
   assert.equal(manifest.name, 'dsh-profile-desktop')
 })
 
+test('profile manifest preserves versionless historical fields, dependency specs, and user bundle order', () => {
+  const existing = {
+    name: 'dsh-profile-desktop',
+    private: false,
+    type: 'module',
+    scripts: {
+      prepare: 'node user-prepare.mjs',
+      custom: 'node custom.mjs',
+    },
+    pnpm: {
+      overrides: {
+        react: '18.3.1',
+      },
+      onlyBuiltDependencies: ['sharp'],
+    },
+    dependencies: {
+      '@user/local-link': 'link:C:/plugins/local-link',
+      '@user/file-plugin': 'file:../file-plugin',
+      '@user/workspace-plugin': 'workspace:*',
+      '@user/git-plugin': 'git+https://example.invalid/user/plugin.git#main',
+      '@user/old-plugin': '1.4.2',
+    },
+    optionalDependencies: {
+      '@user/optional': '^2.0.0',
+    },
+    dsh: {
+      customRuntimeField: { enabled: true },
+      profile: {
+        label: '用户自己的桌面配置',
+        bundles: [
+          '@user/local-link',
+          '@user/old-plugin',
+          '@user/local-link',
+        ],
+      },
+    },
+    userMetadata: {
+      source: 'historical-versionless-profile',
+    },
+  }
+
+  const result = createDesktopProfileManifest(existing)
+
+  assert.equal(Object.hasOwn(result, 'version'), false)
+  assert.equal(result.name, 'dsh-profile-desktop')
+  assert.equal(result.private, true)
+  assert.equal(result.type, existing.type)
+  assert.deepEqual(result.scripts, existing.scripts)
+  assert.deepEqual(result.pnpm, existing.pnpm)
+  assert.deepEqual(result.optionalDependencies, existing.optionalDependencies)
+  assert.deepEqual(result.userMetadata, existing.userMetadata)
+  assert.deepEqual(result.dependencies, existing.dependencies)
+  assert.equal(result.dsh.customRuntimeField, existing.dsh.customRuntimeField)
+  assert.equal(result.dsh.profile.label, existing.dsh.profile.label)
+  assert.deepEqual(result.dsh.profile.bundles, [
+    ...BUILTIN_BUNDLES,
+    '@user/local-link',
+    '@user/old-plugin',
+  ])
+})
+
 test('profile manifest removes bundles already supplied by the web UI aggregate', () => {
   const manifest = createDesktopProfileManifest({
     dependencies: {

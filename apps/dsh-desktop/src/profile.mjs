@@ -326,15 +326,28 @@ export function materializeFilesystemPath(path) {
 }
 
 export function createDesktopProfileManifest(existing = {}) {
-  const existingBundles = existing.dsh?.profile?.bundles
+  const existingDsh = existing.dsh !== null && typeof existing.dsh === 'object' && !Array.isArray(existing.dsh)
+    ? existing.dsh
+    : {}
+  const existingProfile = existingDsh.profile !== null
+    && typeof existingDsh.profile === 'object'
+    && !Array.isArray(existingDsh.profile)
+    ? existingDsh.profile
+    : {}
+  const existingBundles = existingProfile.bundles
   const existingDependencies = existing.dependencies ?? {}
-  const communityBundles = Array.isArray(existingBundles)
-    ? existingBundles.filter((name) =>
-         !BUILTIN_BUNDLES.includes(name)
-         && !DEPENDENCY_ONLY_BUNDLES.includes(name)
-         && !AGGREGATED_BUNDLES.includes(name)
-         && !isRetiredManagedPackage(name))
-    : []
+  const managedBundles = new Set([
+    ...BUILTIN_BUNDLES,
+    ...DEPENDENCY_ONLY_BUNDLES,
+    ...AGGREGATED_BUNDLES,
+  ])
+  const seenBundles = new Set(BUILTIN_BUNDLES)
+  const communityBundles = []
+  for (const name of Array.isArray(existingBundles) ? existingBundles : []) {
+    if (managedBundles.has(name) || isRetiredManagedPackage(name) || seenBundles.has(name)) continue
+    seenBundles.add(name)
+    communityBundles.push(name)
+  }
   const dependencies = Object.fromEntries(
     Object.entries(existingDependencies)
       .filter(([name]) =>
@@ -342,11 +355,14 @@ export function createDesktopProfileManifest(existing = {}) {
   )
 
   return {
+    ...existing,
     name: 'dsh-profile-desktop',
     private: true,
     dependencies,
     dsh: {
+      ...existingDsh,
       profile: {
+        ...existingProfile,
         bundles: [...BUILTIN_BUNDLES, ...communityBundles],
       },
     },
