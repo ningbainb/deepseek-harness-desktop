@@ -125,6 +125,7 @@
   "devDependencies": {
     "electron": "43.4.0",
     "electron-builder": "26.15.3",
-    "playwright": "1.62.1"
+    "playwright": "1.62.1",
+    "sharp": "0.35.3"
   }
 }

@@ -281,6 +281,7 @@ test('record transitions are atomic: a failed replacement leaves the prior durab
     const stable = createManager()
     const session = await stable.create({ sessionId: 'atomic-001', source: SOURCE })
     const recordPath = join(appDataDir, 'free-mode-sessions', 'records', 'atomic-001.json')
+    const canonicalRecordPath = await realpath(recordPath)
     const before = await readFile(recordPath, 'utf8')
     let failedReplacement = false
     const failingFs = {
@@ -291,7 +292,7 @@ test('record transitions are atomic: a failed replacement leaves the prior durab
       readlink,
       realpath,
       rename: async (from, to) => {
-        if (!failedReplacement && from.includes('.tmp-') && to === recordPath) {
+        if (!failedReplacement && from.includes('.tmp-') && to === canonicalRecordPath) {
           failedReplacement = true
           const error = new Error('simulated atomic replacement failure')
           error.code = 'EIO'

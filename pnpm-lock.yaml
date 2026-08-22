@@ -265,6 +265,9 @@ importers:
       playwright:
         specifier: 1.62.1
         version: 1.62.1
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@24.13.3)
 
   apps/dsh-telemetry-worker: {}
 
