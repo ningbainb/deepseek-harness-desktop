@@ -195,6 +195,8 @@ test('official Desktop tag releases require signing only when certificate materi
   assert.match(workflow, /release-manifest\.json/u)
   assert.match(workflow, /\.signature\.status/u)
   assert.match(workflow, /body_path: apps\/dsh-desktop\/dist\/release-notes\.md/u)
+  assert.match(workflow, /apps\/dsh-desktop\/dist\/\$\{\{ steps\.release\.outputs\.updater_channel \}\}\.yml/u)
+  assert.doesNotMatch(workflow, /apps\/dsh-desktop\/dist\/\*\.yml/u)
   for (const releaseGate of [
     'test:directory-picker:e2e',
     'test:terminal:e2e',
