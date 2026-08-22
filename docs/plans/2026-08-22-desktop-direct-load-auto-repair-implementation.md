@@ -27,11 +27,15 @@ Repair Agent 的自动写入权限以已确认设计为准：可以自动修改�
 - Create: `apps/dsh-desktop/src/direct-startup-policy.mjs`
 - Create: `apps/dsh-desktop/test/direct-startup-policy.test.mjs`
 - Modify: `apps/dsh-desktop/src/repair-state.mjs`
+- Modify: `apps/dsh-desktop/src/product-metrics.mjs`
+- Modify: `apps/dsh-desktop/src/telemetry-events.mjs`
 - Modify: `apps/dsh-desktop/test/repair-state.test.mjs`
+- Modify: `apps/dsh-desktop/test/product-metrics.test.mjs`
+- Modify: `apps/dsh-desktop/test/telemetry-events.test.mjs`
 
 **Step 1: 写失败测试。**
 
-覆盖新 Home、已有 Home、完整启动失败、模型未配置、候选修复成功、候选修复失败、同指纹预算耗尽和安装损坏；断言健康路径只返回 `start-full`，插件故障链只能按 `retry-full -> repair -> verify -> start-full/start-builtins` 变化，安装损坏只能返回 `repair-installation`。
+覆盖新 Home、已有 Home、完整启动失败、模型未配置、候选修复成功、候选修复失败、同指纹预算耗尽和安装损坏；断言健康路径只返回 `start-full`，插件故障链只能按 `retry-full -> repair -> verify -> start-full/start-builtins` 变化，安装损坏只能返回 `repair-installation`。同时冻结 `direct_start_ready`、`full_start_failed`、`repair_agent_started`、`repair_agent_succeeded`、`repair_agent_failed`、`builtins_fallback_ready` 和 `installation_repair_required` 的固定 outcome/detail/bucket 维度。
 
 ```js
 test('a healthy launch has no migration or recovery decision', () => {
@@ -44,13 +48,13 @@ test('a healthy launch has no migration or recovery decision', () => {
 
 **Step 2: 运行测试并确认失败。**
 
-Run: `pnpm --filter @deepseek-ai/dsh-desktop exec node --test test/direct-startup-policy.test.mjs test/repair-state.test.mjs`
+Run: `pnpm --filter @deepseek-ai/dsh-desktop exec node --test test/direct-startup-policy.test.mjs test/repair-state.test.mjs test/product-metrics.test.mjs test/telemetry-events.test.mjs`
 
 Expected: FAIL，因为 `direct-startup-policy.mjs` 尚不存在，旧 Repair State 仍把迁移、Free Mode 和按钮动作作为主状态。
 
 **Step 3: 实现有限状态机。**
 
-导出固定 action 枚举、纯函数 `nextDirectStartupAction()` 和公开进度投影；公开投影只包含 `preparing`、`starting-full`、`retrying-full`、`repairing`、`verifying`、`ready-full`、`ready-builtins`、`installation-repair-required`，不包含迁移选择、safe mode 选择和 raw error。
+导出固定 action 枚举、纯函数 `nextDirectStartupAction()` 和公开进度投影；公开投影只包含 `preparing`、`starting-full`、`retrying-full`、`repairing`、`verifying`、`ready-full`、`ready-builtins`、`installation-repair-required`，不包含迁移选择、safe mode 选择和 raw error。`ProductMetricsRecorder` 增加对应的固定枚举方法，调用方只能传阶段类别、结果类别和耗时 bucket，不接收原始错误、插件名、模型提示、文件路径、会话内容、provider key 或源码。
 
 ```js
 export function nextDirectStartupAction(state) {
@@ -64,10 +68,10 @@ export function nextDirectStartupAction(state) {
 
 **Step 4: 运行测试并提交。**
 
-Run: `pnpm --filter @deepseek-ai/dsh-desktop exec node --test test/direct-startup-policy.test.mjs test/repair-state.test.mjs`
+Run: `pnpm --filter @deepseek-ai/dsh-desktop exec node --test test/direct-startup-policy.test.mjs test/repair-state.test.mjs test/product-metrics.test.mjs test/telemetry-events.test.mjs`
 
 ```bash
-git add apps/dsh-desktop/src/direct-startup-policy.mjs apps/dsh-desktop/src/repair-state.mjs apps/dsh-desktop/test/direct-startup-policy.test.mjs apps/dsh-desktop/test/repair-state.test.mjs
+git add apps/dsh-desktop/src/direct-startup-policy.mjs apps/dsh-desktop/src/repair-state.mjs apps/dsh-desktop/src/product-metrics.mjs apps/dsh-desktop/src/telemetry-events.mjs apps/dsh-desktop/test/direct-startup-policy.test.mjs apps/dsh-desktop/test/repair-state.test.mjs apps/dsh-desktop/test/product-metrics.test.mjs apps/dsh-desktop/test/telemetry-events.test.mjs
 git commit -m "feat(desktop): define zero-click startup policy"
 ```
 
