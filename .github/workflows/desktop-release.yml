@@ -69,13 +69,33 @@ jobs:
       - run: pnpm --filter @deepseek-ai/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:runtime-provider:e2e
-      - name: Verify default telemetry configuration is inert
+      - name: Configure official anonymous product metrics
         shell: pwsh
+        env:
+          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
         run: |
-          $configuration = Get-Content -Raw -Encoding utf8 'apps/dsh-desktop/build/telemetry-config.json' | ConvertFrom-Json
-          if ($configuration.endpoint -ne '') {
-            throw 'Release builds must keep the default telemetry endpoint empty.'
+          $endpointText = [string]$env:DSH_TELEMETRY_ENDPOINT
+          if ([string]::IsNullOrWhiteSpace($endpointText)) {
+            throw 'Repository variable DSH_TELEMETRY_ENDPOINT is required for an official Desktop release.'
           }
+          try {
+            $endpoint = [System.Uri]::new($endpointText.Trim(), [System.UriKind]::Absolute)
+          } catch {
+            throw 'DSH_TELEMETRY_ENDPOINT must be an absolute HTTPS URL.'
+          }
+          if ($endpoint.Scheme -ne 'https' -or
+              [string]::IsNullOrWhiteSpace($endpoint.Host) -or
+              $endpoint.AbsolutePath -ne '/v1/events' -or
+              $endpoint.Query -ne '' -or
+              $endpoint.Fragment -ne '' -or
+              $endpoint.UserInfo -ne '') {
+            throw 'DSH_TELEMETRY_ENDPOINT must be a credential-free HTTPS URL ending exactly in /v1/events.'
+          }
+          $configuration = [ordered]@{
+            endpoint = $endpoint.AbsoluteUri
+            officialBuild = $true
+          } | ConvertTo-Json -Compress
+          Set-Content -LiteralPath 'apps/dsh-desktop/build/telemetry-config.json' -Value $configuration -Encoding utf8NoBOM
       - name: Package unsigned direct-start candidate
         run: pnpm --filter @deepseek-ai/dsh-desktop pack:dir
         env:

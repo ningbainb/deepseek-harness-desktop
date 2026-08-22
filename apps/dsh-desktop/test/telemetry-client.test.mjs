@@ -11,6 +11,7 @@ const CONTEXT = Object.freeze({
 })
 
 const SURFACE_EVENT = Object.freeze({ outcome: 'opened', detail: 'settings', bucket: 'none' })
+const ACTORS = Object.freeze({ dailyActor: 'a'.repeat(64), monthlyActor: 'b'.repeat(64) })
 
 test('disabled clients drop events without scheduling or fetching', async () => {
   let fetched = 0
@@ -32,6 +33,7 @@ test('keeps events in memory and flushes one bounded JSON batch', async () => {
   const client = new ProductTelemetryClient({
     endpoint: 'https://telemetry.example/v1/events',
     context: CONTEXT,
+    actorProvider: () => ACTORS,
     fetchImpl: async (url, init) => {
       requests.push({ url, init })
       return new Response(null, { status: 204 })
@@ -49,8 +51,8 @@ test('keeps events in memory and flushes one bounded JSON batch', async () => {
   assert.equal(requests[0].url, 'https://telemetry.example/v1/events')
   assert.equal(requests[0].init.method, 'POST')
   assert.deepEqual(JSON.parse(requests[0].init.body), {
-    schema: 1,
-    events: [{ name: 'surface_opened', ...CONTEXT, ...SURFACE_EVENT }],
+    schema: 2,
+    events: [{ name: 'surface_opened', ...CONTEXT, ...ACTORS, ...SURFACE_EVENT }],
   })
   assert.equal(requests[0].init.headers.origin, undefined)
 })
@@ -60,6 +62,7 @@ test('flushes at twenty events and never retries failed delivery', async () => {
   const client = new ProductTelemetryClient({
     endpoint: 'https://telemetry.example/v1/events',
     context: CONTEXT,
+    actorProvider: () => ACTORS,
     fetchImpl: async () => {
       requests += 1
       return new Response('unavailable', { status: 503 })
@@ -78,6 +81,7 @@ test('aborts slow delivery and contains transport failures', async () => {
   const client = new ProductTelemetryClient({
     endpoint: 'https://telemetry.example/v1/events',
     context: CONTEXT,
+    actorProvider: () => ACTORS,
     timeoutMs: 5,
     fetchImpl: async (_url, init) => await new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => {
@@ -98,6 +102,7 @@ test('shutdown is best effort and never waits past its deadline', async () => {
   const client = new ProductTelemetryClient({
     endpoint: 'https://telemetry.example/v1/events',
     context: CONTEXT,
+    actorProvider: () => ACTORS,
     timeoutMs: 5_000,
     fetchImpl: async () => await new Promise(() => {}),
   })

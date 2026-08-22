@@ -16,7 +16,7 @@ Stable Runtime selection is evidence-led: a Stable build and startup accept only
 
 Startup reads the current Home and persistent Desktop Profile directly. It tries the complete plugin graph twice, may run a bounded model-backed repair in a private transaction workspace, verifies every candidate before applying it, and otherwise starts built-in plugins from the same Home. It does not require a startup migration, isolated recovery session, or safe-mode choice. The exact fallback and rollback boundaries are documented in [upgrade and rollback](upgrade-and-rollback.md).
 
-Desktop does not configure a telemetry endpoint by default and does not automatically upload diagnostics. A diagnostic JSON/ZIP is created only after user confirmation to a user-selected location; it contains a manifest and hashes and uses centralized redaction. The content boundary and non-goals are in [security boundaries](security-boundaries.md).
+Official packaged Desktop releases enable first-party anonymous product analysis for DAU, MAU, country-level adoption, version adoption, in-app updates, and feature funnels. Daily and monthly anonymous actors rotate at UTC boundaries and are independent from DSH identity, accounts, hardware, sessions, and credentials; development, source, test, and Fork builds stay disconnected. Desktop never automatically uploads diagnostics. A diagnostic JSON/ZIP is created only after user confirmation to a user-selected location; it contains a manifest and hashes and uses centralized redaction. The content boundary and non-goals are in [security boundaries](security-boundaries.md).
 
 ## Included desktop capabilities
 

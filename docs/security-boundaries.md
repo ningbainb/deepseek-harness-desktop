@@ -16,11 +16,11 @@ Desktop 3.0 treats compatibility, diagnostics, presets, runtime selection, and t
 | Plugin and preset integrity | Exact package and archive hashes detect unexpected bytes but do not establish publisher identity, trust, or broad code permission. |
 | Task data | Worktree evidence retains bounded review metadata, not prompts, session transcripts, tool output, credentials, or unbounded unknown fields. |
 | Diagnostics | Export is user initiated, destination chosen, confirmed, local only, and redacted before a ZIP or JSON package is written. |
-| Migration recovery | The migration assistant snapshots a fixed allowlist of private Desktop state and rejects project-content paths. |
+| Legacy credential compatibility | Desktop reads only app-owned old Free Mode credential files, fills missing reference values in the child environment, never overwrites current credentials, and never logs secret values. |
 
 ## Privacy defaults
 
-Product telemetry has no default endpoint or automatic upload. Diagnostic export records `userInitiated: true` and `automaticUpload: false`; its manifest lists excluded secret values, project files, prompts, sessions, answers, tool results, user names, real home paths, and URL credentials.
+Official packaged builds upload a fixed product-event vocabulary to the release-injected first-party endpoint. A Desktop-only local random secret derives rotating daily and monthly anonymous actors; the stable secret, IP, content, credentials, paths, and long-lived device identity are not persisted by the service. Development, source, test, and Fork builds have an inert committed configuration. Diagnostic export remains separately user initiated with `userInitiated: true` and `automaticUpload: false`; its manifest lists excluded secret values, project files, prompts, sessions, answers, tool results, user names, real home paths, and URL credentials.
 
 Diagnostic collectors are bounded and independently timed out so a damaged recovery subsystem does not force a broad data capture. Logs are redacted for credentials and account paths, and lines carrying conversation or tool content are excluded rather than summarized.
 

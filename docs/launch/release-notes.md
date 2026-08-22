@@ -44,4 +44,4 @@ Download `DeepSeek-Harness-Desktop-Setup-3.0.2-x64.exe`, `SHA256SUMS.txt`, and `
 
 ### Notice
 
-Desktop has no telemetry upload endpoint by default and does not automatically upload diagnostics. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.2 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.
+The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.2 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.

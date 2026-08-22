@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 3.0 隐私政策：默认关闭遥测，不自动上传；诊断仅在用户确认后导出到自选位置。">
+    <meta name="description" content="DeepSeek Harness Desktop 隐私政策：官方包使用周期轮换匿名值进行产品分析，诊断仅在用户确认后导出。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ningbainb.github.io/deepseek-harness-desktop/privacy.html">
     <link rel="icon" href="official-whale.svg" type="image/svg+xml">
@@ -30,14 +30,14 @@
         <header class="privacy-hero">
           <span class="section-pill">PRIVACY / LOCAL DIAGNOSTICS</span>
           <h1>隐私政策</h1>
-          <p class="privacy-lead">Desktop 3.0 默认关闭遥测，不自动上传；诊断只在你主动确认后导出。</p>
-          <p class="privacy-updated">最后更新：2026 年 8 月 20 日</p>
+          <p class="privacy-lead">官方包使用按日、按月轮换的匿名值统计产品使用；诊断只在你主动确认后导出。</p>
+          <p class="privacy-updated">最后更新：2026 年 8 月 22 日</p>
         </header>
 
         <div class="privacy-layout">
           <nav class="privacy-toc" aria-label="隐私政策目录">
             <a href="#local-first">本地优先</a>
-            <a href="#default-diagnostics">默认关闭</a>
+            <a href="#default-diagnostics">匿名产品分析</a>
             <a href="#diagnostics">诊断导出</a>
             <a href="#not-collected">明确不收集</a>
             <a href="#processing">处理方式</a>
@@ -46,16 +46,16 @@
 
           <article class="privacy-content">
             <section class="privacy-callout" id="default-diagnostics">
-              <p class="privacy-kicker">默认关闭，不自动上传</p>
-              <h2>诊断仅在用户主动确认后导出</h2>
-              <p>DeepSeek Harness Desktop 3.0 默认不配置遥测端点，不自动采集或上传产品事件、诊断日志或安装信息。仅在用户主动确认后导出时，Desktop 才会生成诊断包并写入用户选择的位置。</p>
-              <p>官网不自动上报安装包点击；安装链接保持直达 GitHub Release。官网可能从 GitHub 的公开 API 读取 Release、Star 和安装包下载计数来更新页面，这不是向本项目上传的遥测。</p>
+              <p class="privacy-kicker">周期匿名，不采集内容</p>
+              <h2>官方包默认进行匿名产品分析</h2>
+              <p>官方 Desktop 包发送固定词表的产品事件，用于统计日活、月活、国家或地区级用户数、版本采用、应用内更新、拓展坞使用和启动可靠性。开发、源码、测试和第三方重新打包版本保持断开。</p>
+              <p>Desktop 只上传由本地随机秘密按 UTC 日期和月份派生的匿名值，不上传该秘密或长期稳定安装 ID。服务端只获取国家级代码，不保存 IP，也不申请定位权限。</p>
             </section>
 
             <section id="local-first">
               <h2>本地优先</h2>
               <p>你的对话、提示词、AI 回复、API 密钥、账号配置、工作区、文件、插件配置和个人偏好保存在你的设备或你自行选择的服务中。Desktop 不会为了遥测或诊断自动上传这些内容。</p>
-              <p>当你主动配置并调用模型服务、远程连接、QQ Bot 或其他第三方服务时，相关数据会按照你的操作发送给对应服务商；这些传输不属于 Desktop 3.0 的自动遥测或诊断导出。</p>
+              <p>当你主动配置并调用模型服务、远程连接、QQ Bot 或其他第三方服务时，相关数据会按照你的操作发送给对应服务商；这些传输不属于 Desktop 产品分析或诊断导出。</p>
             </section>
 
             <section id="diagnostics">
@@ -77,13 +77,13 @@
 
             <section id="processing">
               <h2>处理方式与保留</h2>
-              <p>Desktop 和官网不向本项目遥测服务自动发送事件，因此项目不会因为正常使用、启动、更新或安装包点击而建立个人、设备或会话事件历史。GitHub 及用户主动选择的第三方服务会按各自政策处理连接请求。</p>
+              <p>产品分析服务保存固定事件的日聚合、每日匿名去重行和每月匿名去重行，不提供单个匿名值的行为时间线。每日匿名行保留 35 天，每月匿名行保留 13 个月，趋势聚合保留 400 天。</p>
               <p>用户导出的诊断包留在其选择的位置；项目不会自动接收、保存或保留该包。用户如果主动提交文件到 Issue、邮件或其他渠道，应先自行核对内容，并适用该渠道的公开规则。</p>
             </section>
 
             <section>
               <h2>可靠性、安全与政策更新</h2>
-              <p>关闭遥测不改变安装、更新、会话或 GitHub 下载路径。诊断导出失败不会阻止应用启动、使用、更新或退出。若未来考虑增加任何自动上传能力，项目会先重新评估产品交互、代码和政策；本页面不能被解释为允许收集上述明确排除的数据。</p>
+              <p>产品分析失败不改变安装、更新、会话或 GitHub 下载路径。诊断导出失败不会阻止应用启动、使用、更新或退出。本页面不能被解释为允许收集上述明确排除的数据。</p>
             </section>
 
             <section id="contact">

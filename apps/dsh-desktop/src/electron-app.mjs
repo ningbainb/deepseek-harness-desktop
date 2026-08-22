@@ -61,6 +61,7 @@ import {
 } from './plugin-recovery.mjs'
 import { ensurePrimaryRuntimeFullUserPermission } from './primary-runtime-permission.mjs'
 import { ProductMetricsRecorder } from './product-metrics.mjs'
+import { ProductAnalyticsIdentityStore } from './product-analytics-state.mjs'
 import {
   AutomaticRepairRunner,
   discoverAutomaticRepairCommands,
@@ -103,6 +104,7 @@ import {
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
 import { parseUpdateMirrors, probeUpdateSource, UpdateDownloadRouter } from './update-mirrors.mjs'
 import { parseUpdateShutdownRequest, writeUpdateShutdownReceipt } from './update-shutdown-receipt.mjs'
+import { UpdateAnalyticsReceiptStore } from './update-analytics-receipt.mjs'
 import { DesktopUpdateChannelStore } from './update-channel-preferences.mjs'
 import { hasExistingDesktopState, initialUpdateChannel } from './release-channel.mjs'
 import { installUpdateSurface } from './update-surface.mjs'
@@ -475,6 +477,10 @@ export async function startElectronApp(metadata) {
     appVersion: app.getVersion(),
     manifestPath: join(SOURCE_DIR, '..', 'package.json'),
   })
+  const userData = app.getPath('userData')
+  const dshHome = runtimeHome()
+  const logsDirectory = join(userData, 'logs')
+  const logStore = new BoundedLogStore({ directory: logsDirectory })
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -482,8 +488,23 @@ export async function startElectronApp(metadata) {
       ? process.env.DSH_DESKTOP_TELEMETRY_TEST_ENDPOINT
       : undefined,
   })
+  let productAnalyticsIdentity
+  if (telemetryEndpoint !== undefined) {
+    try {
+      productAnalyticsIdentity = await new ProductAnalyticsIdentityStore({
+        path: join(userData, 'product-analytics-state.json'),
+      }).loadOrCreate()
+    } catch (error) {
+      await logStore.append(
+        `[telemetry] anonymous identity unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      )
+    }
+  }
   const productTelemetry = new ProductTelemetryClient({
-    endpoint: telemetryEndpoint,
+    endpoint: productAnalyticsIdentity === undefined ? undefined : telemetryEndpoint,
+    actorProvider: productAnalyticsIdentity === undefined
+      ? undefined
+      : () => productAnalyticsIdentity.actorsAt(new Date()),
     context: normalizeProductContext({
       version: desktopVersion,
       platform: process.platform,
@@ -492,19 +513,29 @@ export async function startElectronApp(metadata) {
     }),
   })
   const productMetrics = new ProductMetricsRecorder({ client: productTelemetry })
-  productMetrics.recordLaunch(launchDetail)
+  const updateAnalyticsReceiptStore = new UpdateAnalyticsReceiptStore({
+    path: join(userData, 'update-analytics-receipt.json'),
+  })
+  let completedInAppUpdate = false
+  if (productTelemetry.enabled) {
+    try {
+      completedInAppUpdate = await updateAnalyticsReceiptStore.consumeCompleted(desktopVersion)
+    } catch (error) {
+      await logStore.append(
+        `[telemetry] update receipt unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      )
+    }
+  }
+  productMetrics.recordLaunch(completedInAppUpdate ? 'updated' : launchDetail)
+  if (completedInAppUpdate) productMetrics.recordUpdateCompleted()
 
-  const userData = app.getPath('userData')
-  const dshHome = runtimeHome()
   const desktopProfileDir = join(dshHome, 'profiles', 'desktop')
   const primaryRuntimeBinDirectory = join(userData, 'runtime-bin')
   let runtimeProvider
-  const logsDirectory = join(userData, 'logs')
   const desktopWindowStatePath = join(userData, 'window-state.json')
   const desktopPreferencesPath = join(userData, 'desktop-preferences.json')
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
-  const logStore = new BoundedLogStore({ directory: logsDirectory })
   let legacyCredentialEnvironment = Object.freeze({})
   try {
     const legacyCompatibility = await readLegacyCredentialCompatibility({
@@ -1987,6 +2018,14 @@ export async function startElectronApp(metadata) {
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
     beforeInstall: async () => {
+      if (productTelemetry.enabled && typeof updateController?.status?.version === 'string') {
+        await updateAnalyticsReceiptStore.recordInstallRequested({
+          sourceVersion: desktopVersion,
+          targetVersion: updateController.status.version,
+        }).catch((error) => logStore.append(
+          `[telemetry] update receipt write failed: ${error instanceof Error ? error.name : 'unknown'}`,
+        ))
+      }
       closeBehaviorController?.beginExplicitQuit()
       quitInProgress = true
       await shutdownLifecycle.stop()

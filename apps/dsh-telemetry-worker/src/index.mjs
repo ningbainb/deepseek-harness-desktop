@@ -15,6 +15,8 @@ const EVENT_FIELDS = Object.freeze([
   'channel',
   'os',
   'language',
+  'dailyActor',
+  'monthlyActor',
   'outcome',
   'detail',
   'bucket',
@@ -22,6 +24,7 @@ const EVENT_FIELDS = Object.freeze([
 const TOP_LEVEL_FIELDS = Object.freeze(['schema', 'events'])
 const DOWNLOAD_CLICK_FIELDS = Object.freeze(['schema', 'source', 'version'])
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
+const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const CHANNELS = new Set(['stable', 'prerelease'])
 const OPERATING_SYSTEMS = new Set(['windows-10', 'windows-11', 'windows-other'])
@@ -47,6 +50,60 @@ const EVENT_POLICY = Object.freeze({
     ]),
     buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
   }),
+  direct_start_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['fresh-home', 'existing-home', 'repaired', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  full_start_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'plugin-startup',
+      'profile-invalid',
+      'runtime-missing',
+      'port-conflict',
+      'integrity-failed',
+      'repeated-crash',
+      'startup-failed',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_started: Object.freeze({
+    outcomes: new Set(['started']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['none']),
+  }),
+  repair_agent_succeeded: Object.freeze({
+    outcomes: new Set(['succeeded']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'model-unavailable',
+      'model-error',
+      'timeout',
+      'invalid-result',
+      'verification-failed',
+      'restart-failed',
+      'rollback-failed',
+      'budget-exhausted',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  builtins_fallback_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['no-model', 'repair-failed', 'budget-exhausted', 'full-retry-failed', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  installation_repair_required: Object.freeze({
+    outcomes: new Set(['blocked']),
+    details: new Set(['runtime-missing', 'integrity-failed', 'unsupported', 'unknown']),
+    buckets: new Set(['none']),
+  }),
   runtime_recovery_action: Object.freeze({
     outcomes: new Set(['requested']),
     details: new Set(['retry', 'repair', 'safe-mode', 'disable-plugin']),
@@ -60,6 +117,56 @@ const EVENT_POLICY = Object.freeze({
   update_result: Object.freeze({
     outcomes: new Set(['current', 'available', 'downloaded', 'install-requested', 'error']),
     details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_available: Object.freeze({
+    outcomes: new Set(['available']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_downloaded: Object.freeze({
+    outcomes: new Set(['downloaded']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_install_requested: Object.freeze({
+    outcomes: new Set(['requested']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_completed: Object.freeze({
+    outcomes: new Set(['completed']),
+    details: new Set(['receipt']),
+    buckets: new Set(['none']),
+  }),
+  update_error: Object.freeze({
+    outcomes: new Set(['error']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_impression: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_shown: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['first-three-launches']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_dismissed: Object.freeze({
+    outcomes: new Set(['dismissed']),
+    details: new Set(['close', 'escape', 'clicked', 'limit']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_click: Object.freeze({
+    outcomes: new Set(['clicked']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_opened: Object.freeze({
+    outcomes: new Set(['opened', 'failed']),
+    details: new Set(['settings-adjacent']),
     buckets: new Set(['none']),
   }),
   extension_operation: Object.freeze({
@@ -116,8 +223,34 @@ ON CONFLICT (
 ) DO UPDATE SET count = count + excluded.count
 `
 
-const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-365 days')"
-const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-365 days')"
+const DAILY_ACTOR_INSERT_SQL = `
+INSERT OR IGNORE INTO product_actor_daily (
+  day,
+  daily_actor,
+  country_code,
+  app_version,
+  event,
+  outcome,
+  detail
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+const MONTHLY_ACTOR_INSERT_SQL = `
+INSERT OR IGNORE INTO product_actor_monthly (
+  month,
+  monthly_actor,
+  country_code,
+  app_version,
+  event,
+  outcome,
+  detail
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-400 days')"
+const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-400 days')"
+const DAILY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_daily WHERE day < date('now', '-35 days')"
+const MONTHLY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_monthly WHERE month < strftime('%Y-%m', date('now', '-13 months'))"
 
 function response(status, body = null, headers = {}) {
   return new Response(body, {
@@ -144,6 +277,7 @@ function exactSearchParams(params, fields) {
 function validEvent(event) {
   if (!exactFields(event, EVENT_FIELDS)) return false
   if (typeof event.appVersion !== 'string' || !APP_VERSION_PATTERN.test(event.appVersion)) return false
+  if (!ACTOR_PATTERN.test(event.dailyActor) || !ACTOR_PATTERN.test(event.monthlyActor)) return false
   if (!CHANNELS.has(event.channel) || !OPERATING_SYSTEMS.has(event.os) || !LANGUAGES.has(event.language)) return false
   const policy = EVENT_POLICY[event.name]
   return policy !== undefined
@@ -169,6 +303,22 @@ function aggregateEvents(events) {
     const current = groups.get(key)
     if (current) current.count += 1
     else groups.set(key, { dimensions, count: 1 })
+  }
+  return groups.values()
+}
+
+function uniqueActorEvents(events, country) {
+  const groups = new Map()
+  for (const event of events) {
+    const dimensions = [
+      country,
+      event.appVersion,
+      event.name,
+      event.outcome,
+      event.detail,
+    ]
+    const key = JSON.stringify([event.dailyActor, event.monthlyActor, ...dimensions])
+    if (!groups.has(key)) groups.set(key, Object.freeze({ event, dimensions }))
   }
   return groups.values()
 }
@@ -213,9 +363,9 @@ function downloadResponse(status, body = null, origin, headers = {}) {
   })
 }
 
-function countryCode(request, seams) {
+function countryCode(request, seams, fallback = 'XX') {
   const value = typeof seams.country === 'function' ? seams.country(request) : request.cf?.country
-  return typeof value === 'string' && /^[A-Z]{2}$/u.test(value) ? value : 'XX'
+  return typeof value === 'string' && /^[A-Z]{2}$/u.test(value) ? value : fallback
 }
 
 async function handleProductEvents(request, env, seams) {
@@ -229,7 +379,7 @@ async function handleProductEvents(request, env, seams) {
   const parsed = await parseBody(request)
   if (parsed.status) return response(parsed.status, parsed.status === 413 ? 'request too large' : 'invalid request')
   const body = parsed.value
-  if (!exactFields(body, TOP_LEVEL_FIELDS) || body.schema !== 1 || !Array.isArray(body.events)) {
+  if (!exactFields(body, TOP_LEVEL_FIELDS) || body.schema !== 2 || !Array.isArray(body.events)) {
     return response(400, 'invalid request')
   }
   if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event))) {
@@ -238,9 +388,17 @@ async function handleProductEvents(request, env, seams) {
 
   const now = typeof seams.now === 'function' ? seams.now() : new Date()
   const day = now.toISOString().slice(0, 10)
+  const month = day.slice(0, 7)
+  const country = countryCode(request, seams, 'ZZ')
   const statements = [...aggregateEvents(body.events)].map(({ dimensions, count }) => (
     env.METRICS.prepare(UPSERT_SQL).bind(day, ...dimensions, count)
   ))
+  for (const { event, dimensions } of uniqueActorEvents(body.events, country)) {
+    statements.push(
+      env.METRICS.prepare(DAILY_ACTOR_INSERT_SQL).bind(day, event.dailyActor, ...dimensions),
+      env.METRICS.prepare(MONTHLY_ACTOR_INSERT_SQL).bind(month, event.monthlyActor, ...dimensions),
+    )
+  }
   try {
     await env.METRICS.batch(statements)
     return response(204)
@@ -296,6 +454,8 @@ async function handleScheduled(_controller, env) {
   if (!env?.METRICS || typeof env.METRICS.prepare !== 'function') return
   await env.METRICS.prepare(RETENTION_SQL).run()
   await env.METRICS.prepare(DOWNLOAD_RETENTION_SQL).run()
+  await env.METRICS.prepare(DAILY_ACTOR_RETENTION_SQL).run()
+  await env.METRICS.prepare(MONTHLY_ACTOR_RETENTION_SQL).run()
 }
 
 export const __test = Object.freeze({
@@ -305,6 +465,10 @@ export const __test = Object.freeze({
   DOWNLOAD_CLICK_FIELDS,
   DOWNLOAD_CLICK_UPSERT_SQL,
   DOWNLOAD_RETENTION_SQL,
+  DAILY_ACTOR_INSERT_SQL,
+  MONTHLY_ACTOR_INSERT_SQL,
+  DAILY_ACTOR_RETENTION_SQL,
+  MONTHLY_ACTOR_RETENTION_SQL,
   DOWNLOAD_SOURCES,
   MAX_BATCH_EVENTS,
   MAX_DOWNLOAD_CLICK_BYTES,

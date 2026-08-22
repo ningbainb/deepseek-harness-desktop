@@ -59,9 +59,30 @@ test('update status transitions are deduplicated and retain manual origin', () =
   recorder.observeUpdateStatus({ phase: 'installing' })
 
   assert.deepEqual(events, [
-    { name: 'update_result', outcome: 'available', detail: 'manual', bucket: 'none' },
-    { name: 'update_result', outcome: 'downloaded', detail: 'manual', bucket: 'none' },
-    { name: 'update_result', outcome: 'install-requested', detail: 'manual', bucket: 'none' },
+    { name: 'update_available', outcome: 'available', detail: 'manual', bucket: 'none' },
+    { name: 'update_downloaded', outcome: 'downloaded', detail: 'manual', bucket: 'none' },
+    { name: 'update_install_requested', outcome: 'requested', detail: 'manual', bucket: 'none' },
+  ])
+})
+
+test('update completion and dock funnel actions stay fixed and bounded', () => {
+  const { events, recorder } = createRecorder()
+  recorder.recordUpdateCompleted()
+  recorder.recordDockImpression()
+  recorder.recordDockNudgeShown()
+  recorder.recordDockNudgeDismissed('escape')
+  recorder.recordDockClick()
+  recorder.recordDockOpened(true)
+  recorder.recordDockOpened(false)
+
+  assert.deepEqual(events, [
+    { name: 'update_completed', outcome: 'completed', detail: 'receipt', bucket: 'none' },
+    { name: 'dock_entry_impression', outcome: 'shown', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_nudge_shown', outcome: 'shown', detail: 'first-three-launches', bucket: 'none' },
+    { name: 'dock_nudge_dismissed', outcome: 'dismissed', detail: 'escape', bucket: 'none' },
+    { name: 'dock_entry_click', outcome: 'clicked', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_opened', outcome: 'opened', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_opened', outcome: 'failed', detail: 'settings-adjacent', bucket: 'none' },
   ])
 })
 

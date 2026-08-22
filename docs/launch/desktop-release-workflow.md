@@ -21,7 +21,7 @@ The direct-start matrix covers clean installs, real preserved Homes from Desktop
 
 The Desktop Release workflow then packages the selected updater channel, runs packaged directory-picker, terminal, window-chrome, profile, direct-start, smoke, shutdown, signature, checksum, and manifest checks. These gates verify a candidate; they do not make a local artifact published.
 
-Desktop telemetry has no endpoint by default. Diagnostics are user-initiated, locally exported, and redacted. Repair telemetry contains bounded categorical outcomes and never model prompts, credentials, conversation bodies, tool results, or absolute user paths.
+The committed telemetry resource is inert, while the official release job requires and injects the reviewed first-party endpoint plus the official-build marker. Product events contain rotating daily and monthly anonymous actors and bounded categorical outcomes, never model prompts, credentials, conversation bodies, tool results, plugin names, or absolute user paths. Diagnostics remain user-initiated, locally exported, and redacted.
 
 ## Signing and publication
 

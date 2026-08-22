@@ -1,6 +1,6 @@
 # Anonymous product metrics service
 
-This Cloudflare Worker accepts only the fixed Desktop product-event schema and official-site download-click schema, then writes daily aggregate counts to D1. It does not persist raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, package names, model names, or installation identifiers. Download clicks store only the UTC day, Cloudflare-provided two-letter country code, release version, fixed website position, and count.
+This Cloudflare Worker accepts only the fixed Desktop product-event schema and official-site download-click schema. It writes aggregate event counts plus rotating daily and monthly actor rows to D1 so the administration surface can report DAU, MAU, country-level users, version adoption, in-app update conversion, and Extension Dock conversion. It does not persist raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, package names, model names, local secrets, or stable installation identifiers. Download clicks store only the UTC day, Cloudflare-provided two-letter country code, release version, fixed website position, and count.
 
 ## One-time deployment
 
@@ -56,4 +56,4 @@ Emergency stop, followed by a normal deploy:
 pnpm dlx wrangler@latest deploy --var INGEST_ENABLED:0
 ```
 
-Re-enable ingestion only after resolving the incident. The scheduled Worker job deletes aggregate rows older than 365 days.
+Re-enable ingestion only after resolving the incident. The scheduled Worker job deletes daily actor rows after 35 days, monthly actor rows after 13 months, and aggregate trend rows after 400 days.

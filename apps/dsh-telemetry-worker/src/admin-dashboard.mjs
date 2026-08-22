@@ -74,6 +74,50 @@ const DESKTOP_EVENTS_SQL = [
   'GROUP BY event ORDER BY count DESC, event',
 ].join(' ')
 
+const ACTIVE_DAILY_TREND_SQL = [
+  'SELECT day, COUNT(DISTINCT daily_actor) AS count',
+  'FROM product_actor_daily',
+  "WHERE day >= date('now', ?) AND event = 'app_launch'",
+  'GROUP BY day ORDER BY day',
+].join(' ')
+
+const ACTIVE_MONTHLY_TREND_SQL = [
+  'SELECT month, COUNT(DISTINCT monthly_actor) AS count',
+  'FROM product_actor_monthly',
+  "WHERE month >= substr(date('now', ?), 1, 7) AND event = 'app_launch'",
+  'GROUP BY month ORDER BY month',
+].join(' ')
+
+const ACTIVE_COUNTRIES_SQL = [
+  'SELECT country_code AS countryCode, COUNT(DISTINCT monthly_actor) AS count',
+  'FROM product_actor_monthly',
+  "WHERE month >= substr(date('now', ?), 1, 7) AND event = 'app_launch'",
+  'GROUP BY country_code ORDER BY count DESC, country_code LIMIT 250',
+].join(' ')
+
+const ACTIVE_VERSIONS_SQL = [
+  'SELECT app_version AS version, COUNT(DISTINCT monthly_actor) AS count',
+  'FROM product_actor_monthly',
+  "WHERE month >= substr(date('now', ?), 1, 7) AND event = 'app_launch'",
+  'GROUP BY app_version ORDER BY count DESC, app_version LIMIT 30',
+].join(' ')
+
+const UPDATE_FUNNEL_SQL = [
+  'SELECT event, COUNT(DISTINCT monthly_actor) AS count',
+  'FROM product_actor_monthly',
+  "WHERE month >= substr(date('now', ?), 1, 7)",
+  "AND event IN ('update_available', 'update_downloaded', 'update_install_requested', 'update_completed', 'update_error')",
+  'GROUP BY event ORDER BY count DESC, event',
+].join(' ')
+
+const DOCK_FUNNEL_SQL = [
+  'SELECT event, COUNT(DISTINCT monthly_actor) AS count',
+  'FROM product_actor_monthly',
+  "WHERE month >= substr(date('now', ?), 1, 7)",
+  "AND event IN ('dock_entry_impression', 'dock_nudge_shown', 'dock_entry_click', 'dock_opened', 'extension_operation')",
+  'GROUP BY event ORDER BY count DESC, event',
+].join(' ')
+
 function currentDate(seams) {
   return typeof seams.now === 'function' ? seams.now() : new Date()
 }
@@ -557,14 +601,14 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="notice">
       <b>统计口径</b>
-      <span>地区数据表示官网安装包按钮的点击次数，不等同于 GitHub 实际下载完成数。桌面数据是事件次数，不是独立用户数；系统不保存 IP、设备标识、原始事件或用户行为轨迹。</span>
+      <span>DAU、MAU、国家和漏斗人数使用按日或按月变化的匿名标识去重。系统不保存 IP、长期设备标识、原始事件或个人行为轨迹。</span>
     </section>
 
     <section class="metrics" aria-label="核心指标">
       <article class="metric"><small>下载按钮点击</small><strong id="metric-downloads">--</strong></article>
-      <article class="metric"><small>桌面启动次数</small><strong id="metric-launches">--</strong></article>
-      <article class="metric"><small>有点击的国家或地区</small><strong id="metric-countries">--</strong></article>
-      <article class="metric"><small>当前统计窗口</small><strong id="metric-range">30D</strong></article>
+      <article class="metric"><small>日活用户</small><strong id="metric-dau">--</strong></article>
+      <article class="metric"><small>月活用户</small><strong id="metric-mau">--</strong></article>
+      <article class="metric"><small>活跃国家或地区</small><strong id="metric-countries">--</strong></article>
     </section>
 
     <section class="grid">
@@ -580,16 +624,16 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="grid equal">
       <article class="panel">
-        <div class="panel-head"><h2>国家与地区</h2><span>Cloudflare 两位国家代码</span></div>
+        <div class="panel-head"><h2>国家与地区用户</h2><span>月匿名用户去重</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>地区</th><th>点击次数</th></tr></thead>
+            <thead><tr><th>地区</th><th>用户数</th></tr></thead>
             <tbody id="country-rows"></tbody>
           </table>
         </div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>版本分布</h2><span>安装包版本</span></div>
+        <div class="panel-head"><h2>版本采用</h2><span>月匿名用户去重</span></div>
         <div class="panel-body"><div id="version-bars" class="bars"></div></div>
       </article>
     </section>
@@ -605,8 +649,19 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       </article>
     </section>
 
+    <section class="grid equal">
+      <article class="panel">
+        <div class="panel-head"><h2>应用内更新漏斗</h2><span>月匿名用户去重</span></div>
+        <div class="panel-body"><div id="update-funnel-bars" class="bars accent"></div></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>拓展坞漏斗</h2><span>曝光、点击、打开、操作</span></div>
+        <div class="panel-body"><div id="dock-funnel-bars" class="bars"></div></div>
+      </article>
+    </section>
+
     <footer class="foot">
-      <span>仅显示日聚合数据，保留期 365 天。看板请求不会写入产品统计表。</span>
+      <span>日匿名行保留 35 天，月匿名行保留 13 个月，趋势聚合保留 400 天。看板请求不会写入产品统计表。</span>
       <span><span id="load-state" class="load-state" data-state="loading">LOADING DATA</span><br><span id="generated-at"></span></span>
     </footer>
   </main>
@@ -641,6 +696,16 @@ const eventLabels = Object.freeze({
   runtime_recovery_action: '运行时恢复操作',
   surface_opened: '界面打开',
   update_result: '更新结果',
+  update_available: '发现更新',
+  update_downloaded: '更新已下载',
+  update_install_requested: '请求安装',
+  update_completed: '更新完成',
+  update_error: '更新失败',
+  dock_entry_impression: '拓展坞入口曝光',
+  dock_nudge_shown: '拓展坞提示曝光',
+  dock_nudge_dismissed: '拓展坞提示关闭',
+  dock_entry_click: '拓展坞入口点击',
+  dock_opened: '拓展坞打开',
   extension_operation: '扩展操作',
   app_session_end: '会话结束',
 })
@@ -766,7 +831,7 @@ function renderTrend(rows) {
 }
 
 function countryLabel(code) {
-  if (code === 'XX') return '未知地区'
+  if (code === 'XX' || code === 'ZZ') return '未知地区'
   try {
     return regionNames ? regionNames.of(code) || code : code
   } catch {
@@ -780,7 +845,7 @@ function renderCountries(rows) {
   if (!rows.length) {
     const cell = document.createElement('td')
     cell.colSpan = 2
-    cell.appendChild(emptyMessage('官网发布并产生点击后，这里会显示国家或地区'))
+    cell.appendChild(emptyMessage('官方桌面包产生匿名活跃后，这里会显示国家或地区'))
     const row = document.createElement('tr')
     row.appendChild(cell)
     body.appendChild(row)
@@ -802,15 +867,17 @@ function renderCountries(rows) {
 
 function render(data) {
   setText('metric-downloads', formatCount(data.downloads.totalClicks))
-  setText('metric-launches', formatCount(data.desktop.launches))
-  setText('metric-countries', formatCount(data.downloads.countries.length))
-  setText('metric-range', data.rangeDays === 365 ? '1Y' : data.rangeDays + 'D')
+  setText('metric-dau', formatCount(data.active.dau))
+  setText('metric-mau', formatCount(data.active.mau))
+  setText('metric-countries', formatCount(data.active.countries.length))
   renderTrend(data.downloads.trend)
-  renderCountries(data.downloads.countries)
+  renderCountries(data.active.countries)
   renderBars('source-bars', data.downloads.sources, (row) => sourceLabels[row.source] || row.source)
-  renderBars('version-bars', data.downloads.versions, (row) => 'v' + row.version)
+  renderBars('version-bars', data.active.versions, (row) => 'v' + row.version)
   renderBars('surface-bars', data.desktop.surfaces, (row) => surfaceLabels[row.surface] || row.surface)
   renderBars('event-bars', data.desktop.events, (row) => eventLabels[row.event] || row.event)
+  renderBars('update-funnel-bars', data.funnels.updates, (row) => eventLabels[row.event] || row.event)
+  renderBars('dock-funnel-bars', data.funnels.dock, (row) => eventLabels[row.event] || row.event)
   setText('generated-at', '更新于 ' + new Date(data.generatedAt).toLocaleString('zh-CN'))
 }
 
@@ -881,6 +948,12 @@ async function executeSummary(env, days, seams) {
     DESKTOP_LAUNCHES_SQL,
     DESKTOP_SURFACES_SQL,
     DESKTOP_EVENTS_SQL,
+    ACTIVE_DAILY_TREND_SQL,
+    ACTIVE_MONTHLY_TREND_SQL,
+    ACTIVE_COUNTRIES_SQL,
+    ACTIVE_VERSIONS_SQL,
+    UPDATE_FUNNEL_SQL,
+    DOCK_FUNNEL_SQL,
   ].map((sql) => env.METRICS.prepare(sql).bind(period).all())
   const [
     downloadTotal,
@@ -891,10 +964,19 @@ async function executeSummary(env, days, seams) {
     desktopLaunches,
     desktopSurfaces,
     desktopEvents,
+    activeDailyTrend,
+    activeMonthlyTrend,
+    activeCountries,
+    activeVersions,
+    updateFunnel,
+    dockFunnel,
   ] = await Promise.all(queries)
 
+  const normalizedDailyTrend = normalizeRows(activeDailyTrend, ['day', 'count'])
+  const normalizedMonthlyTrend = normalizeRows(activeMonthlyTrend, ['month', 'count'])
+
   return {
-    schema: 1,
+    schema: 2,
     rangeDays: days,
     generatedAt: currentDate(seams).toISOString(),
     downloads: {
@@ -908,6 +990,18 @@ async function executeSummary(env, days, seams) {
       launches: normalizedCount(desktopLaunches?.results?.[0]?.total),
       surfaces: normalizeRows(desktopSurfaces, ['surface', 'count']),
       events: normalizeRows(desktopEvents, ['event', 'count']),
+    },
+    active: {
+      dau: normalizedDailyTrend.at(-1)?.count ?? 0,
+      mau: normalizedMonthlyTrend.at(-1)?.count ?? 0,
+      dailyTrend: normalizedDailyTrend,
+      monthlyTrend: normalizedMonthlyTrend,
+      countries: normalizeRows(activeCountries, ['countryCode', 'count']),
+      versions: normalizeRows(activeVersions, ['version', 'count']),
+    },
+    funnels: {
+      updates: normalizeRows(updateFunnel, ['event', 'count']),
+      dock: normalizeRows(dockFunnel, ['event', 'count']),
     },
   }
 }

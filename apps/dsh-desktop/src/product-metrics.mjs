@@ -1,11 +1,10 @@
 import { sessionDurationBucket, startupDurationBucket } from './telemetry-events.mjs'
 
-const UPDATE_OUTCOMES = Object.freeze({
-  current: 'current',
-  downloading: 'available',
-  ready: 'downloaded',
-  installing: 'install-requested',
-  error: 'error',
+const UPDATE_EVENTS = Object.freeze({
+  downloading: Object.freeze({ name: 'update_available', outcome: 'available' }),
+  ready: Object.freeze({ name: 'update_downloaded', outcome: 'downloaded' }),
+  installing: Object.freeze({ name: 'update_install_requested', outcome: 'requested' }),
+  error: Object.freeze({ name: 'update_error', outcome: 'error' }),
 })
 
 export function classifyRuntimeStartFailure(status) {
@@ -148,11 +147,59 @@ export class ProductMetricsRecorder {
     }
     if (phase === this.lastUpdatePhase) return
     this.lastUpdatePhase = phase
-    const outcome = UPDATE_OUTCOMES[phase]
-    if (outcome === undefined) return
-    this.#record('update_result', {
-      outcome,
+    const event = UPDATE_EVENTS[phase]
+    if (event === undefined) return
+    this.#record(event.name, {
+      outcome: event.outcome,
       detail: this.updateDetail,
+      bucket: 'none',
+    })
+  }
+
+  recordUpdateCompleted() {
+    return this.#recordMilestone('update-completed', 'update_completed', {
+      outcome: 'completed',
+      detail: 'receipt',
+      bucket: 'none',
+    })
+  }
+
+  recordDockImpression() {
+    return this.#recordMilestone('dock-entry-impression', 'dock_entry_impression', {
+      outcome: 'shown',
+      detail: 'settings-adjacent',
+      bucket: 'none',
+    })
+  }
+
+  recordDockNudgeShown() {
+    return this.#record('dock_nudge_shown', {
+      outcome: 'shown',
+      detail: 'first-three-launches',
+      bucket: 'none',
+    })
+  }
+
+  recordDockNudgeDismissed(detail) {
+    return this.#record('dock_nudge_dismissed', {
+      outcome: 'dismissed',
+      detail,
+      bucket: 'none',
+    })
+  }
+
+  recordDockClick() {
+    return this.#record('dock_entry_click', {
+      outcome: 'clicked',
+      detail: 'settings-adjacent',
+      bucket: 'none',
+    })
+  }
+
+  recordDockOpened(succeeded) {
+    return this.#record('dock_opened', {
+      outcome: succeeded === true ? 'opened' : 'failed',
+      detail: 'settings-adjacent',
       bucket: 'none',
     })
   }
