@@ -11,6 +11,7 @@ name: Deploy Gallery
 # 需要的仓库 secrets：
 #   CLOUDFLARE_API_TOKEN   — 作用域：Account > Cloudflare Pages > Edit
 #   CLOUDFLARE_ACCOUNT_ID  — Cloudflare 账号 ID
+# 未配置完整凭据时仍执行产物一致性检查，但跳过外部部署。
 
 on:
   push:
@@ -56,10 +57,26 @@ jobs:
       - name: Gallery consistency
         run: pnpm gallery:check
 
+      - name: Detect Cloudflare deployment credentials
+        id: cloudflare
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [[ -n "${CLOUDFLARE_API_TOKEN:-}" && -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare credentials are not configured; gallery consistency passed and external deployment was skipped."
+          fi
+
       - name: Install wrangler
+        if: steps.cloudflare.outputs.configured == 'true'
         run: npm install -g wrangler@4
 
       - name: Deploy gallery
+        if: steps.cloudflare.outputs.configured == 'true'
         run: node scripts/deploy-gallery --project-name dsh-market-gallery
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
