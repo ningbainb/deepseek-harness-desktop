@@ -45,6 +45,21 @@ jobs:
             "prerelease=$prerelease"
             "version=$desktopVersion"
           ) | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Select Windows signing policy
+        id: signing
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
+        run: |
+          $certificateMaterial = @(
+            $env:CSC_LINK
+            $env:WIN_CSC_LINK
+            $env:CSC_NAME
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $required = if (@($certificateMaterial).Count -gt 0) { 'true' } else { 'false' }
+          "required=$required" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -65,7 +80,7 @@ jobs:
         run: pnpm --filter @deepseek-ai/dsh-desktop pack:win --config.publish.channel=${{ steps.release.outputs.updater_channel }}
         env:
           DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
-          REQUIRE_SIGNING: 'true'
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
@@ -106,7 +121,7 @@ jobs:
       - name: Verify Windows Authenticode signatures
         run: pnpm --filter @deepseek-ai/dsh-desktop release:signatures:verify
         env:
-          REQUIRE_SIGNING: 'true'
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_NAME: ${{ vars.CSC_NAME }}
@@ -124,20 +139,54 @@ jobs:
         run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:write
         env:
           DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
-          REQUIRE_SIGNING: 'true'
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_NAME: ${{ vars.CSC_NAME }}
       - name: Verify release manifest
         run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:verify
         env:
-          REQUIRE_SIGNING: 'true'
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_NAME: ${{ vars.CSC_NAME }}
+      - name: Write release notes with verified signing status
+        shell: pwsh
+        run: |
+          $manifest = Get-Content -Raw -Encoding utf8 'apps/dsh-desktop/dist/release-manifest.json' | ConvertFrom-Json
+          $executables = @($manifest.files | Where-Object { $_.file -match '\.exe$' })
+          if ($executables.Count -eq 0) {
+            throw 'Release manifest contains no Windows executable.'
+          }
+          $statuses = @($executables | ForEach-Object { $_.signature.status } | Sort-Object -Unique)
+          if ($statuses.Count -ne 1 -or $statuses[0] -notin @('valid', 'unsigned')) {
+            throw 'Release manifest contains an inconsistent or unsupported executable signature state.'
+          }
+          $statusSection = if ($statuses[0] -eq 'valid') {
+            @'
+          ## 已验证的签名状态 / Verified signing status
+
+          - 中文：本次发布的 Windows 安装器状态为 `valid`，已通过 Authenticode 签名和有效时间戳验证；每个资产的 signer 与 timestamp 以 `release-manifest.json` 为准。
+          - English: The Windows installer status for this release is `valid`. Its Authenticode signature and timestamp passed verification; use `release-manifest.json` for the signer and timestamp of each asset.
+          '@
+          } else {
+            @'
+          ## 已验证的签名状态 / Verified signing status
+
+          - 中文：本次发布的 Windows 安装器状态为 `unsigned`。Windows 可能显示未知发布者或 SmartScreen 提示；请只从本项目 GitHub Release 下载并核对同一 Release 的 SHA-256。
+          - English: The Windows installer status for this release is `unsigned`. Windows may show an unknown-publisher or SmartScreen prompt; download only from this project's GitHub Release and verify the SHA-256 from the same Release.
+          '@
+          }
+          $baseNotes = (Get-Content -Raw -Encoding utf8 'docs/launch/release-notes.md').TrimEnd()
+          $resolvedNotes = "$baseNotes`n`n---`n`n$($statusSection.Trim())`n"
+          [IO.File]::WriteAllText(
+            'apps/dsh-desktop/dist/release-notes.md',
+            $resolvedNotes,
+            [Text.UTF8Encoding]::new($false)
+          )
       - uses: softprops/action-gh-release@v2
         with:
-          body_path: docs/launch/release-notes.md
+          body_path: apps/dsh-desktop/dist/release-notes.md
           prerelease: ${{ steps.release.outputs.prerelease }}
           overwrite_files: false
           files: |

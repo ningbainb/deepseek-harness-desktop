@@ -38,7 +38,7 @@ pnpm test:scripts
 
 For a packaging candidate, the existing Desktop Release workflow additionally verifies the Runtime Provider end-to-end path, packages the selected updater channel, runs packaged directory-picker, embedded-terminal, window-chrome, cleared-profile, migration, and update-shutdown checks, verifies the package and smoke behavior, verifies Authenticode state, writes `SHA256SUMS.txt`, and writes then verifies `release-manifest.json`. These are release gates, not evidence that a local build is publishable.
 
-Official Desktop tag releases always require signing. Missing certificate material, an invalid signature, or a missing valid timestamp causes the release workflow to fail before publication. An unsigned local or source build remains allowed for development, but it must not be distributed as an official release. The manifest records the actual `valid`, `unsigned`, or `not-applicable` state per artifact.
+Official Desktop tag releases select signing policy automatically. If `CSC_LINK`, `WIN_CSC_LINK`, or `CSC_NAME` is configured, missing signing credentials, an invalid signature, or a missing valid timestamp causes the workflow to fail before publication. If no certificate material is configured, an unsigned community release is allowed. The manifest still records the actual `valid`, `unsigned`, or `not-applicable` state per artifact, and all checksum, updater-metadata, packaged-test, smoke, and manifest gates remain mandatory.
 
 ## Migration and recovery language
 
@@ -52,7 +52,7 @@ The bounded global-state snapshot and atomic journal can support resume and roll
 
 An authorized publication review must compare the intended channel with the actual updater metadata and confirm that the release body is the bilingual [release notes](release-notes.md). It must inspect the exact published installer, `SHA256SUMS.txt`, `release-manifest.json`, and the relevant updater metadata from the same Release.
 
-The installer hash is the baseline integrity check. The manifest must agree with the artifact names, sizes, hashes, channel, Runtime/Schema information, and actual signature state. A signature is an additional trust layer, so an installer must not be called signed solely because signing infrastructure exists.
+The installer hash is the baseline integrity check. The manifest must agree with the artifact names, sizes, hashes, channel, Runtime/Schema information, and actual signature state. After manifest verification, the workflow generates the GitHub Release body with a bilingual `valid` or `unsigned` status derived from that manifest. A signature is an additional trust layer, so an installer must not be called signed solely because signing infrastructure exists. An unsigned release must retain the unknown-publisher or SmartScreen warning and direct users to the same Release's SHA-256.
 
 If a gate fails, the version/channel facts disagree, or public assets already exist, stop and obtain an explicit maintainer decision. Do not overwrite, retag, force-push, delete, or otherwise mutate public history as a consequence of this document.
 
@@ -66,7 +66,7 @@ Version evidence: root package.json = <value>; apps/dsh-desktop/package.json = <
 Checks: <exact command> — <pass/fail>; <exact command> — <pass/fail>.
 Release-body review: bilingual 3.0 notes, Runtime policy, migration limitation, rollback guidance, default-off telemetry, and manifest/signature wording reviewed.
 Artifacts: <none produced locally | local candidate paths>; no local result is described as published or signed.
-Open risks: <dirty files, failed gate, legacy-data limitation, signing requirement, or none>.
+Open risks: <dirty files, failed gate, legacy-data limitation, actual signing mode/status, or none>.
 Required next authority: <explicit maintainer decision for any commit, push, tag, Release change, deployment, or announcement>.
 ```
 

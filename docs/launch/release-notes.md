@@ -21,16 +21,16 @@
 ### 验证
 
 - 发布门禁覆盖公共 Schema、SDK/Contract/Provider 兼容性、Preset 恶意输入、Deep Link、Scheduler fake clock、Worktree 生命周期、Evidence、迁移矩阵、Runtime matrix 和 Candidate guard。
-- 打包与发布验证覆盖 Stable/Beta 频道隔离、安装器哈希、`release-manifest.json`、无签名开发构建，以及启用强制签名时的证书和时间戳要求。缺少所需签名材料的强制签名构建必须失败。
+- 打包与发布验证覆盖 Stable/Beta 频道隔离、安装器哈希与 `release-manifest.json`。未配置证书时正式社区 Release 可保持未签名；配置 `CSC_LINK`、`WIN_CSC_LINK` 或 `CSC_NAME` 后会自动强制 Authenticode 签名和有效时间戳，配置不完整或验证失败时发布必须失败。
 - 发布前还会运行文档、发布说明和网站一致性检查；诊断导出测试验证脱敏、清单、哈希和用户确认边界。
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`、`SHA256SUMS.txt` 与 `release-manifest.json`。先用 `SHA256SUMS.txt` 比对安装包 SHA-256，再查看 manifest 中该资产的大小、哈希、频道、Runtime/Schema 信息和实际签名状态。安装器的 updater 哈希仍是基础完整性校验，签名是额外信任层。
+从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`、`SHA256SUMS.txt` 与 `release-manifest.json`。先用 `SHA256SUMS.txt` 比对安装包 SHA-256，再查看 manifest 中该资产的大小、哈希、频道、Runtime/Schema 信息和实际签名状态。安装器的 updater 哈希仍是基础完整性校验，签名是额外信任层；工作流会在正式 GitHub Release 正文末尾追加从已验证 manifest 得出的实际签名状态。
 
 ### 说明
 
-本项目是社区维护的发行版，并非 DeepSeek、OpenAI 或腾讯官方产品。本地或源码构建可以未签名；不要据此推断 GitHub Release 资产是否签名。需要签名的发布会由发布门禁验证证书和有效时间戳，最终以 `release-manifest.json` 的资产记录为准。Desktop 3.0 不默认收集或上传遥测，官网也不自动上报安装包点击。更多公开承诺见 [兼容性政策](../compatibility-policy.md)、[Schema 版本政策](../schema-versioning.md) 和 [安全边界](../security-boundaries.md)。
+本项目是社区维护的发行版，并非 DeepSeek、OpenAI 或腾讯官方产品。未配置证书的正式 Release 可以未签名，此时 Windows 可能显示未知发布者或 SmartScreen 提示；请只从本项目 GitHub Release 下载并核对同一 Release 的 SHA-256。配置证书后发布门禁会自动强制验证签名和有效时间戳。最终状态以 `release-manifest.json` 的资产记录和正式 Release 正文末尾的已验证签名状态为准。Desktop 3.0 不默认收集或上传遥测，官网也不自动上报安装包点击。更多公开承诺见 [兼容性政策](../compatibility-policy.md)、[Schema 版本政策](../schema-versioning.md) 和 [安全边界](../security-boundaries.md)。
 
 ## English
 
@@ -53,13 +53,13 @@
 ### Verification
 
 - Release gates cover public schemas, SDK/Contract/Provider compatibility, malicious Preset input, Deep Link routing, Scheduler fake-clock behavior, Worktree lifecycle, Evidence, the migration matrix, the Runtime matrix, and the Candidate guard.
-- Packaging and release verification cover Stable/Beta separation, installer hashes, `release-manifest.json`, unsigned developer builds, and certificate/timestamp requirements when signing is required. A required-signing build without the necessary signing material must fail.
+- Packaging and release verification cover Stable/Beta separation, installer hashes, and `release-manifest.json`. An official community Release may remain unsigned when no certificate is configured. Configuring `CSC_LINK`, `WIN_CSC_LINK`, or `CSC_NAME` automatically requires an Authenticode signature and valid timestamp; incomplete configuration or failed verification must stop publication.
 - Documentation, release-note, and website consistency checks run before release. Diagnostic-export tests cover redaction, manifest, hashes, and the user-confirmation boundary.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Compare the installer SHA-256 with `SHA256SUMS.txt`, then inspect the manifest record for its size, hash, channel, Runtime/Schema information, and actual signature state. The updater hash remains the baseline integrity check; signing is an additional trust layer.
+Download `DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Compare the installer SHA-256 with `SHA256SUMS.txt`, then inspect the manifest record for its size, hash, channel, Runtime/Schema information, and actual signature state. The updater hash remains the baseline integrity check; signing is an additional trust layer. The workflow appends the actual signing state derived from the verified manifest to the published GitHub Release body.
 
 ### Notice
 
-This is a community-maintained distribution, not an official DeepSeek, OpenAI, or Tencent product. A local or source build may be unsigned and says nothing about a GitHub Release asset. A release that requires signing validates certificate material and a valid timestamp at its gate; the asset record in `release-manifest.json` is authoritative. Desktop 3.0 does not collect or upload telemetry by default, and the website does not automatically report installer clicks. See the [compatibility policy](../compatibility-policy.md), [schema versioning guide](../schema-versioning.md), and [security boundaries](../security-boundaries.md) for the public commitments.
+This is a community-maintained distribution, not an official DeepSeek, OpenAI, or Tencent product. An official Release may be unsigned when no certificate is configured; Windows may then show an unknown-publisher or SmartScreen prompt, so download only from this project's GitHub Release and verify the same-Release SHA-256. Configuring certificate material automatically makes signing and a valid timestamp mandatory. The asset record in `release-manifest.json` and the verified signing-status section appended to the published Release body are authoritative. Desktop 3.0 does not collect or upload telemetry by default, and the website does not automatically report installer clicks. See the [compatibility policy](../compatibility-policy.md), [schema versioning guide](../schema-versioning.md), and [security boundaries](../security-boundaries.md) for the public commitments.

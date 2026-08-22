@@ -48,7 +48,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 - **可依赖的公开边界**：Desktop Contract 与 SDK 保持 1.x；Runtime Provider、Preset、Task/Run/Evidence、Deep Link、runtime matrix 和 patch registry 有机器 Schema、版本政策与兼容夹具。插件按 capability detection 增强，在普通 DSH Web 中保持可用。
 - **Stable Runtime 不是猜测**：Stable 只接受精确 `known-good` / `supported` 矩阵项，并核对 provider、Desktop 范围、包完整性、lockfile 和 patch 证据；候选或 blocked Runtime 不会被悄悄放行。
 - **升级前先给出可审查计划**：Migration Assistant 扫描允许的全局状态，生成 safe/needs-confirmation/blocked 计划；私有快照和原子 journal 支持继续、回滚和有限保留，不复制项目内容。
-- **可验证发布**：更新分为 Stable/Beta；Stable 不接收 prerelease，任何频道都不会自动降级。Release 同时提供校验、manifest 和签名验证基础设施；本地构建可能未签名，正式签名开关打开后缺证书会失败，发布资产以 manifest 记录的实际签名状态为准。
+- **可验证发布**：更新分为 Stable/Beta；Stable 不接收 prerelease，任何频道都不会自动降级。Release 同时提供校验、manifest 和签名验证基础设施；未配置证书时正式社区版本可未签名，配置证书后自动强制签名和有效时间戳，manifest 与正式发布说明记录实际状态。
 - **默认不上传任何遥测**：诊断只能由用户确认并导出到自选位置。JSON/ZIP 含清单和哈希，集中删除 key/token/cookie、路径、URL query、Prompt、完整 Session、Tool Result、项目内容和 SSH 私钥。
 
 ### 历史 2.7.0 功能亮点
@@ -259,7 +259,7 @@ GitHub Releases 是应用内置且默认使用的唯一下载源。Stable 是默
 
 应用会检查稳定版 GitHub Release，展示中英双语更新说明，并提供「前往 GitHub 下载」「加入用户群」「稍后更新」。安装仍需明确确认，覆盖升级不会删除既有 `DSH_HOME`、桌面 profile、社区 bundle、桌宠状态、皮肤配置或已加密的 QQ Bot 凭据。
 
-请从同一 GitHub Release 下载 `SHA256SUMS.txt` 和 `release-manifest.json`，分别核对安装包哈希及该资产记录的签名状态。本地或源码构建可能未签名，不能据此推断正式发布资产的签名状态；当正式发布启用强制签名时，缺少证书或有效时间戳会使发布门禁失败。请只使用本项目 Release 页面提供的安装包；推荐采用默认安装路径，避免过长路径触发传统 Win32 限制。
+请从同一 GitHub Release 下载 `SHA256SUMS.txt` 和 `release-manifest.json`，分别核对安装包哈希及该资产记录的签名状态。未配置证书时正式社区版本可以未签名，Windows 可能显示未知发布者或 SmartScreen 提示；配置证书后发布流程会自动强制签名和有效时间戳，配置或验证失败都会阻止发布。manifest 与正式 Release 正文记录实际状态。请只使用本项目 Release 页面提供的安装包；推荐采用默认安装路径，避免过长路径触发传统 Win32 限制。
 
 ## 来源与版权
 

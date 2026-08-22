@@ -176,13 +176,25 @@ test('signing configuration permits unsigned development but requires a certific
   )
 })
 
-test('official Desktop tag releases always require signed timestamped Windows executables', async () => {
+test('official Desktop tag releases require signing only when certificate material is configured', async () => {
   const workflow = await readFile(
     join(import.meta.dirname, '..', '..', '..', '.github', 'workflows', 'desktop-release.yml'),
     'utf8',
   )
-  assert.equal((workflow.match(/REQUIRE_SIGNING: 'true'/gu) ?? []).length, 4)
-  assert.doesNotMatch(workflow, /REQUIRE_SIGNING: \$\{\{/u)
+  assert.match(workflow, /- name: Select Windows signing policy\s+id: signing/u)
+  assert.match(workflow, /CSC_LINK: \$\{\{ secrets\.CSC_LINK \}\}/u)
+  assert.match(workflow, /WIN_CSC_LINK: \$\{\{ secrets\.WIN_CSC_LINK \}\}/u)
+  assert.match(workflow, /CSC_NAME: \$\{\{ vars\.CSC_NAME \}\}/u)
+  assert.match(workflow, /\$env:CSC_LINK/u)
+  assert.match(workflow, /\$env:WIN_CSC_LINK/u)
+  assert.match(workflow, /\$env:CSC_NAME/u)
+  assert.match(workflow, /"required=\$required"/u)
+  assert.equal((workflow.match(/REQUIRE_SIGNING: \$\{\{ steps\.signing\.outputs\.required \}\}/gu) ?? []).length, 4)
+  assert.doesNotMatch(workflow, /REQUIRE_SIGNING: 'true'/u)
+  assert.match(workflow, /- name: Write release notes with verified signing status/u)
+  assert.match(workflow, /release-manifest\.json/u)
+  assert.match(workflow, /\.signature\.status/u)
+  assert.match(workflow, /body_path: apps\/dsh-desktop\/dist\/release-notes\.md/u)
   for (const releaseGate of [
     'test:directory-picker:e2e',
     'test:terminal:e2e',
