@@ -192,6 +192,6 @@ jobs:
           files: |
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
-            apps/dsh-desktop/dist/*.yml
+            apps/dsh-desktop/dist/${{ steps.release.outputs.updater_channel }}.yml
             apps/dsh-desktop/dist/SHA256SUMS.txt
             apps/dsh-desktop/dist/release-manifest.json
