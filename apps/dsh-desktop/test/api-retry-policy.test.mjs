@@ -8,7 +8,6 @@ import { parse } from 'yaml'
 
 import {
   DEFAULT_API_RETRY_POLICY,
-  ensureApiRetryPolicies,
   withDefaultApiRetryPolicies,
 } from '../src/api-retry-policy.mjs'
 
@@ -54,23 +53,24 @@ test('retry defaults do not create dormant provider sections', () => {
   assert.equal(result.settings['llm-pi-ai'], undefined)
 })
 
-test('settings file migration is idempotent and keeps unrelated settings', async () => {
+test('startup retry normalization is read-only and leaves settings bytes untouched', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-api-retry-'))
   try {
     await mkdir(root, { recursive: true })
     const path = join(root, 'settings.yaml')
     await writeFile(path, '# user settings\nllm-pi-ai:\n  providers:\n    openai:\n      apiKeyEnv: OPENAI_API_KEY\npet:\n  visible: true\n')
-    const first = await ensureApiRetryPolicies({ dshHome: root })
-    const firstText = await readFile(path, 'utf8')
-    const second = await ensureApiRetryPolicies({ dshHome: root })
-
-    assert.equal(first.changed, true)
-    assert.equal(second.changed, false)
-    assert.equal(await readFile(path, 'utf8'), firstText)
-    assert.match(firstText, /# user settings/u)
-    const settings = parse(firstText)
+    const before = await readFile(path, 'utf8')
+    const result = withDefaultApiRetryPolicies(parse(before))
+    assert.equal(result.changed, true)
+    assert.equal(await readFile(path, 'utf8'), before)
+    assert.match(before, /# user settings/u)
+    const settings = result.settings
     assert.equal(settings.pet.visible, true)
     assert.equal(settings['llm-pi-ai'].providers.openai.retryPolicy.maxRetries, 4)
+
+    const electronSource = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
+    const bootstrap = electronSource.slice(electronSource.indexOf('export async function startElectronApp'))
+    assert.doesNotMatch(bootstrap, /ensureApiRetryPolicies|ensureRetryPolicies|migrateSettings:/u)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

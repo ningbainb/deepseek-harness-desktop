@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
-import { ensureApiRetryPolicies } from './api-retry-policy.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
 import { createCommunityQrImage } from './community.mjs'
 import {
@@ -1947,19 +1946,8 @@ export async function startElectronApp(metadata) {
     path: join(userData, 'qqbot-credentials.json'),
     safeStorage,
   })
-  const ensureRetryPolicies = async () => {
-    try {
-      const result = await ensureApiRetryPolicies({ dshHome })
-      if (result.changed) await logStore.append('[api-retry] added bounded retry defaults to configured providers')
-    } catch (error) {
-      await logStore.append(`[api-retry] settings migration skipped: ${error.message}`)
-    }
-  }
   const ensureProfile = async () => {
-    const [result] = await Promise.all([
-      ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
-      ensureRetryPolicies(),
-    ])
+    const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages })
     await setQqBotProfileEnabled({ profileDir: result.profileDir, enabled: Boolean(qqBotCredentials) })
     return result
   }
@@ -1967,7 +1955,6 @@ export async function startElectronApp(metadata) {
   try {
     prepared = await prepareDesktopRuntimeInputs({
       prepareProfile: () => ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
-      migrateSettings: ensureRetryPolicies,
       loadCredentials: () => qqBotCredentialStore.load(),
       onCredentialError: (error) => logStore.append(
         `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
