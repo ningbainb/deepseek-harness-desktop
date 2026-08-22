@@ -901,16 +901,15 @@ async function linkManagedPackage({
       && installed.version === packaged?.version
     const declaredByLegacyProfile = typeof legacyDependencySpec === 'string'
       && legacyDependencySpec.length > 0
-    const migratableLegacyCopy = metadata.isDirectory()
-      && installed?.name === packageName
+    const migratableLegacyInstall = (metadata.isDirectory() || metadata.isSymbolicLink())
       && packaged?.name === packageName
+      && (installed === undefined || installed.name === packageName)
       && (matchingLegacyVersion || declaredByLegacyProfile)
-    if (!ownedLink && !ownedCopy && !migratableLegacyCopy) {
+    if (!ownedLink && !ownedCopy && !migratableLegacyInstall) {
       // An unrecorded managed-package path is part of the Desktop profile
-      // bootstrap surface.  It can be left behind by a hand-installed or
-      // partially downloaded dependency tree, so let the caller take the
-      // reversible profile-baseline path rather than failing before runtime
-      // recovery is initialized.
+      // bootstrap surface. Adopt only an exact package identity or a dangling
+      // link already declared by the older Desktop manifest. Unrelated local
+      // packages remain untouched.
       throw profileBootstrapError(`refusing to replace unmanaged package at ${target}`)
     }
     await rm(target, { recursive: true, force: true })

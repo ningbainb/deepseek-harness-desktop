@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 import { _electron as electron } from 'playwright'
 
-import { AGGREGATED_BUNDLES, BUILTIN_BUNDLES, RETIRED_MANAGED_PACKAGES } from '../src/profile.mjs'
+import {
+  AGGREGATED_BUNDLES,
+  BUILTIN_BUNDLES,
+  DESKTOP_REPAIR_BUNDLE,
+  RETIRED_MANAGED_PACKAGES,
+} from '../src/profile.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const executablePath = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -72,13 +77,23 @@ async function createLegacyFixture(root, skinId) {
   const recoveryStatePath = resolve(userData, 'plugin-recovery', 'state.json')
   const skinPackage = legacySkinPackage(skinId)
   const skinSection = legacySkinSection(skinId)
+  const legacyRepairRoot = resolve(root, 'legacy-desktop-repair')
+  const repairTarget = resolve(profileDir, 'node_modules', ...DESKTOP_REPAIR_BUNDLE.split('/'))
 
-  await mkdir(profileDir, { recursive: true })
+  await Promise.all([
+    mkdir(profileDir, { recursive: true }),
+    mkdir(legacyRepairRoot, { recursive: true }),
+  ])
+  await writeFile(resolve(legacyRepairRoot, 'package.json'), `${JSON.stringify({
+    name: DESKTOP_REPAIR_BUNDLE,
+    version: '0.1.0',
+  }, null, 2)}\n`)
   await writeFile(manifestPath, `${JSON.stringify({
     name: 'dsh-profile-desktop',
     private: true,
     dependencies: {
       'dsh-plugin-hub': '0.1.1',
+      [DESKTOP_REPAIR_BUNDLE]: `link:${legacyRepairRoot.replaceAll('\\', '/')}`,
       [skinPackage]: '0.1.2',
     },
     dsh: {
@@ -95,6 +110,8 @@ async function createLegacyFixture(root, skinId) {
       },
     },
   }, null, 2)}\n`)
+  await mkdir(resolve(repairTarget, '..'), { recursive: true })
+  await symlink(legacyRepairRoot, repairTarget, process.platform === 'win32' ? 'junction' : 'dir')
   await writeFile(profilePatchPath, `${skinSection}\n\n- id: retained-community-row\n`)
   await writeFile(homePatchPath, `- id: retained-home-row\n\n${skinSection}\n`)
 
@@ -142,8 +159,28 @@ async function createLegacyFixture(root, skinId) {
     profilePatchPath,
     homePatchPath,
     recoveryStatePath,
+    repairTarget,
     skinPackage,
   }
+}
+
+async function assertOrphanedRepairLinkWasAdopted(fixture) {
+  const packagedRepairRoot = resolve(
+    executablePath,
+    '..',
+    'resources',
+    'app.asar.unpacked',
+    'node_modules',
+    ...DESKTOP_REPAIR_BUNDLE.split('/'),
+  )
+  assert.equal(
+    await realpath(fixture.repairTarget),
+    await realpath(packagedRepairRoot),
+    'packaged Desktop did not adopt the unrecorded legacy repair link',
+  )
+  const managedLinks = JSON.parse(await readFile(resolve(fixture.profileDir, '.dsh-desktop-links.json'), 'utf8'))
+  assert.equal(managedLinks[DESKTOP_REPAIR_BUNDLE]?.mode, 'link')
+  assert.equal(await realpath(managedLinks[DESKTOP_REPAIR_BUNDLE]?.source), await realpath(packagedRepairRoot))
 }
 
 function assertRetiredPackagesAreGone(manifest, skinPackage) {
@@ -161,6 +198,8 @@ function assertRetiredPackagesAreGone(manifest, skinPackage) {
 async function verifyInvalidLegacySkinFallsBack() {
   const fixture = await createLegacyFixture(resolve(temporary, 'invalid-qq98'), 'qq98')
   const firstRun = await launchOnce(fixture)
+  assert.doesNotMatch(firstRun.runtimeLog, /\[startup\] direct-state=repairing/u)
+  await assertOrphanedRepairLinkWasAdopted(fixture)
   assert.doesNotMatch(
     firstRun.runtimeLog,
     /ERR_MODULE_NOT_FOUND[\s\S]{0,500}@linxin666\/dsh-client-ui-skin-qq98/u,
@@ -257,7 +296,7 @@ async function verifyKnownLegacySkinMigratesToV2Selection() {
 try {
   await verifyInvalidLegacySkinFallsBack()
   await verifyKnownLegacySkinMigratesToV2Selection()
-  console.log('verified legacy false-positive repair, aggregate and schemastery migration, qq98 safe fallback, and xp Skin Center v2 selection migration')
+  console.log('verified orphaned Desktop link adoption, legacy false-positive repair, aggregate and schemastery migration, qq98 safe fallback, and xp Skin Center v2 selection migration')
 } finally {
   await rm(temporary, { recursive: true, force: true })
 }

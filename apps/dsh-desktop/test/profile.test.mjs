@@ -471,6 +471,42 @@ test('profile bootstrap retargets a recorded Desktop link after the install root
   }
 })
 
+test('profile bootstrap adopts an unrecorded Desktop link declared by an older profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-unrecorded-link-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const packageName = '@linxin666/dsh-desktop-repair'
+  const oldRoot = join(root, 'old-build', 'desktop-repair')
+  const nextRoot = join(root, 'installed', 'desktop-repair')
+  const target = join(profileDir, 'node_modules', ...packagePathSegments(packageName))
+  try {
+    for (const packageRoot of [oldRoot, nextRoot]) {
+      await mkdir(packageRoot, { recursive: true })
+      await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: packageName, version: '0.1.0' }))
+    }
+    await mkdir(dirname(target), { recursive: true })
+    await symlink(oldRoot, target, process.platform === 'win32' ? 'junction' : 'dir')
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [packageName]: `link:${oldRoot.replaceAll('\\', '/')}` },
+      dsh: { profile: { bundles: BUILTIN_BUNDLES } },
+    }, null, 2)}\n`)
+
+    const result = await ensureDesktopProfile({
+      dshHome,
+      packageRoots: new Map([[packageName, nextRoot]]),
+    })
+
+    assert.equal(result.changed, true)
+    assert.equal(await realpath(target), await realpath(nextRoot))
+    const records = JSON.parse(await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8'))
+    assert.deepEqual(records[packageName], { mode: 'link', source: nextRoot })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('profile bootstrap never replaces an unrecorded package target', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-unmanaged-'))
   const dshHome = join(root, 'home')

@@ -872,8 +872,7 @@ export async function startElectronApp(metadata) {
     }
   } catch (error) {
     await logStore.append(`[plugins] persistent plugin transaction recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showDirectStartupState('repairing')
-    return
+    throw error
   }
   const packageResolutionStartedAt = performance.now()
   const runtimePackages = resolveRuntimePackages()
@@ -903,8 +902,7 @@ export async function startElectronApp(metadata) {
     })
   } catch (error) {
     await logStore.append(`[profile] bootstrap failed before Runtime startup: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showDirectStartupState('repairing')
-    return
+    throw error
   }
   const profile = prepared.profile
   qqBotCredentials = prepared.credentials
@@ -1022,21 +1020,18 @@ export async function startElectronApp(metadata) {
     })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime authorization failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showDirectStartupState('repairing')
-    return
+    throw error
   }
   if (primaryFullUserPermission.approved !== true) {
     await logStore.append('[permission] primary Runtime full-user authorization was not granted').catch(() => {})
-    await showDirectStartupState('repairing')
-    return
+    throw new Error('primary Runtime full-user authorization was not granted')
   }
   let primaryFullUserOverlay
   try {
     primaryFullUserOverlay = await writePrimaryFullUserOverlay({ userData })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime overlay preparation failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showDirectStartupState('repairing')
-    return
+    throw error
   }
   const desktopCapabilities = [...new Set(
     Object.values(DESKTOP_SURFACES).flatMap((surface) => desktopContractForSurface(surface).capabilities),
