@@ -6,7 +6,7 @@
 
 English: No changes yet.
 
-## 3.0.0 - 2026-08-22
+## 3.0.1 - 2026-08-22
 
 中文：
 
@@ -19,6 +19,7 @@ English: No changes yet.
 - 扩展坞加入原生社区插件市场，直接读取 `awesome-dsh-plugin.com/plugins.json` 索引并提供本地搜索、分类、排序和分页，不再嵌入第三方市场页面或显示其沙箱边界栏。安装只把不透明目录 ID 交给主进程解析，经一次原生确认后复用完整权限的事务安装、Runtime 重启和失败回滚；旧 `dshmarket` 运行时依赖已退役。
 - 新增独立嵌入式终端、受校验的 Managed Git 修复路径，以及不依赖主 Runtime 的恢复界面和隔离恢复会话；迁移完成标记缺失时可从已提交 journal 自愈，存在中断 journal 时仍严格保留恢复流程。
 - 修复 Task Ledger v3 过长错误文本导致后续写入永久失败、损坏 v3 被过期 v2 静默覆盖、SSH 断线重试失效、连接替换泄漏并拆错隧道、取消请求误报成功和分块上传绕过大小限制等稳定性问题，并补齐回归测试。
+- 修复 Windows 发布 Runner 上内置终端工作目录门禁依赖 xterm 可视区长路径文本而重复超时的问题；PowerShell 现在内部比较完整规范化路径并输出有界结果标记，仍严格验证真实 Shell cwd，同时提供明确的 mismatch 诊断。
 
 English:
 
@@ -31,6 +32,7 @@ English:
 - Extension Dock now includes a native community plugin market backed directly by the `awesome-dsh-plugin.com/plugins.json` index, with local search, category filtering, sorting, and pagination. It no longer embeds the third-party market page or its sandbox boundary banner. Installation passes only an opaque catalog ID to the main process, then reuses the full-permission transactional installer, Runtime restart, and rollback after one native confirmation; the old `dshmarket` runtime dependency is retired.
 - Added a standalone embedded terminal, a validated Managed Git repair path, and recovery surfaces and isolated recovery sessions that do not depend on the primary Runtime. A missing migration completion marker can self-heal from a committed journal, while an interrupted journal still preserves the strict recovery path.
 - Fixed Task Ledger v3 write poisoning from oversized error text, stale v2 data replacing a damaged v3 ledger, ineffective SSH disconnect retries, connection replacement leaks and wrong-tunnel teardown, cancellation falsely reporting success, and chunked uploads bypassing the size limit, with regression coverage for each class.
+- Fixed repeated Windows release-runner timeouts caused by matching a long terminal working-directory path in the visible xterm viewport. PowerShell now compares the full normalized path internally and emits a bounded result marker, preserving strict validation of the real shell cwd while reporting an explicit mismatch.
 
 ## 2.7.0 - 2026-08-20
 
@@ -66,7 +68,7 @@ English:
 - Git Graph Host 增加受控 Worktree 服务和 ID-only loopback 路由，限制 realpath、分支、冲突、操作中状态和丢弃确认；取消只取消 Session，不自动清理 Worktree。
 - Runtime Provider 缺少 `workspace.register`、`session.create` 或 `session.observe` 时记录能力证据并显式回退现有 shared-workspace；Session CWD 不匹配时阻断。
 - 增加有界 Evidence 面板、Commit/Merge/Keep/二次确认 Discard 审核、运行通知 Deep Link，以及真实临时 Git 仓库 Candidate 执行兼容夹具。
-- 历史 2.6 正式版曾默认启用仅用于产品改进的有界匿名统计；该默认值已由 3.0.0 的“默认关闭、仅用户主动诊断导出”政策取代。
+- 历史 2.6 正式版曾默认启用仅用于产品改进的有界匿名统计；该默认值已由 3.0.1 的“默认关闭、仅用户主动诊断导出”政策取代。
 
 English:
 
@@ -74,7 +76,7 @@ English:
 - Git Graph Host adds a controlled Worktree service and ID-only loopback routes with realpath, branch, conflict, in-progress, and discard-confirmation fences. Cancellation cancels only the Session and never removes a Worktree implicitly.
 - When `workspace.register`, `session.create`, or `session.observe` is unavailable, the Runtime Provider records capability evidence and falls back explicitly to the existing shared-workspace executor; a Session CWD mismatch is blocked.
 - Added a bounded Evidence panel, Commit/Merge/Keep/two-step Discard review, run deep-link notifications, and a real temporary Git repository Candidate execution fixture.
-- Historical 2.6 release builds enabled bounded anonymous product metrics by default. That default is superseded in 3.0.0 by the off-by-default, user-initiated diagnostic-export policy.
+- Historical 2.6 release builds enabled bounded anonymous product metrics by default. That default is superseded in 3.0.1 by the off-by-default, user-initiated diagnostic-export policy.
 
 ## 2.5.0 - 2026-08-19
 

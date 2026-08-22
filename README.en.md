@@ -20,13 +20,13 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-### Latest release: 3.0.0
+### Latest release: 3.0.1
 
-`desktop-v3.0.0` is the platform Stable release: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade, rollback, and known limitations](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+`desktop-v3.0.1` is the platform Stable release: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade, rollback, and known limitations](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
 
 | Version | Highlights |
 | --- | --- |
-| **3.0.0** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, migration/rollback assistant, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
+| **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, migration/rollback assistant, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
 | **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
 | **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, and Candidate execution fixtures. Its historical anonymous-metrics behavior is replaced by the 3.0 default-off policy. |
 | **2.5.0** | Adds the Runtime Adapter and upstream compatibility defenses, secure `.dshpreset` and Web Profile migration, atomic plugin batches, strict deep-link/file ingress, and structured notifications. |
@@ -43,7 +43,7 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 3.0.0 Platform-Stability Highlights
+### 3.0.1 Platform-Stability Highlights
 
 - **Stable public boundaries**: Desktop Contract and SDK remain on 1.x. Runtime Provider, Preset, Task/Run/Evidence, Deep Link, Runtime matrix, and patch registry have machine-readable schemas, version rules, and compatibility fixtures. Plugins enhance through capability detection while remaining usable in ordinary DSH Web.
 - **Stable Runtime is deliberate**: Stable accepts only exact `known-good` or `supported` matrix entries after provider, Desktop range, package integrity, lockfile, and patch evidence agree. Candidate and blocked Runtime entries cannot be silently selected.

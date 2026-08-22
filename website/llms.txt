@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.0.0 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface and adds stable public contracts and schemas, a controlled Runtime support matrix, safe migration and rollback, Stable/Beta channels, release-manifest verification, and user-initiated privacy-redacted diagnostics.
+> DeepSeek Harness Desktop 3.0.1 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface and adds stable public contracts and schemas, a controlled Runtime support matrix, safe migration and rollback, Stable/Beta channels, release-manifest verification, and user-initiated privacy-redacted diagnostics.
 
 ## What it is
 
@@ -15,8 +15,8 @@
 
 ## Download
 
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe
-- v3.0.0 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.0.0
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.0.1-x64.exe
+- v3.0.1 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.0.1
 
 ## Source and documentation
 
@@ -28,8 +28,8 @@
 ## Key facts
 
 - Supported systems: Windows 10 and Windows 11, x64
-- Current release: v3.0.0
-- v3.0.0 freezes the 1.x SDK/Contract/Provider boundaries and public schemas, limits Stable Runtime to verified `known-good` or `supported` matrix entries, covers the 2.3–2.7 migration matrix by detecting, validating, and snapshotting recognized v2/v3 state while treating legacy browser-localStorage state as confirmation-required and non-disclosing in the scan; after confirmation, supported preserved-origin v1 data can be copied only into an empty v3 Host ledger and verified by task count/fingerprint without removing the original browser value, while an unknown, missing, or changed origin blocks the copy for recovery, and Stable/Beta updates remain separate without automatic downgrades
+- Current release: v3.0.1
+- v3.0.1 freezes the 1.x SDK/Contract/Provider boundaries and public schemas, limits Stable Runtime to verified `known-good` or `supported` matrix entries, covers the 2.3–2.7 migration matrix by detecting, validating, and snapshotting recognized v2/v3 state while treating legacy browser-localStorage state as confirmation-required and non-disclosing in the scan; after confirmation, supported preserved-origin v1 data can be copied only into an empty v3 Host ledger and verified by task count/fingerprint without removing the original browser value, while an unknown, missing, or changed origin blocks the copy for recovery, and Stable/Beta updates remain separate without automatic downgrades
 - Published assets include `SHA256SUMS.txt` and `release-manifest.json`; the manifest reports the actual per-asset signature state. A local or source build may be unsigned and does not establish the state of a published asset
 - Desktop telemetry is disabled by default. Diagnostics are generated only after user confirmation to a selected local location and are redacted to exclude secrets, user content, full prompts, full sessions, tool results, project content, paths, and SSH private keys
 - The public website does not automatically report installer clicks; installer links remain direct GitHub Release downloads

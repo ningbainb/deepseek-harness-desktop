@@ -20,13 +20,13 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/ningbainb/deepseek-harness-desktop) 点 Star，帮助更多桌面版用户发现它。
 
-### 最新版：3.0.0
+### 最新版：3.0.1
 
-`desktop-v3.0.0` 是平台稳定版：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级、回滚和已知限制](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
+`desktop-v3.0.1` 是平台稳定版：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级、回滚和已知限制](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
 
 | 版本 | 主要更新 |
 | --- | --- |
-| **3.0.0** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，独立升级/回滚助手，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
+| **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，独立升级/回滚助手，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
 | **2.7.0** | 修复 Windows 8% Runtime 启动故障并升级到 DSH rc.7；新增托盘后台自动化、Host 持久任务调度、插件兼容声明/锁、browser-safe Desktop SDK、安全工作区外部打开和 Candidate Matrix。 |
 | **2.6.0** | Task Board v3 引入 Project、Task Run、Evidence 与 Git Worktree 审核流；Runtime Provider 缺少可选能力时显式回退 shared-workspace，并加入 Candidate 执行兼容夹具。该版本的匿名统计行为仅作历史记录，已由 3.0 的默认关闭政策取代。 |
 | **2.5.0** | 新增 Runtime Adapter 与上游兼容防线、安全 `.dshpreset` 和 Web Profile 迁移、原子插件批量事务、严格 Deep Link/文件关联与结构化通知。 |
@@ -43,7 +43,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 | **0.1.4** | 桌宠迁移到全局 Shell Overlay，首页和设置页均可见；恢复五张 Web UI 插件配置卡；皮肤中心完整展示安装版随附的九套皮肤。 |
 | **0.1.3** | 加入稳定版 GitHub Release 更新检查、双语更新说明、用户确认下载、任务栏进度和二次确认安装。 |
 
-### 3.0.0 平台稳定版亮点
+### 3.0.1 平台稳定版亮点
 
 - **可依赖的公开边界**：Desktop Contract 与 SDK 保持 1.x；Runtime Provider、Preset、Task/Run/Evidence、Deep Link、runtime matrix 和 patch registry 有机器 Schema、版本政策与兼容夹具。插件按 capability detection 增强，在普通 DSH Web 中保持可用。
 - **Stable Runtime 不是猜测**：Stable 只接受精确 `known-good` / `supported` 矩阵项，并核对 provider、Desktop 范围、包完整性、lockfile 和 patch 证据；候选或 blocked Runtime 不会被悄悄放行。

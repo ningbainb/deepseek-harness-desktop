@@ -10,6 +10,7 @@ import { promisify } from 'node:util'
 import {
   MIGRATION_MATRIX_FIXTURE_ROOT,
   MIGRATION_MATRIX_FIXTURE_VERSIONS,
+  MIGRATION_MATRIX_DESKTOP_VERSION,
   materializePackagedMigrationFixture,
   packagedMigrationFixtureMode,
   runPackagedMigrationMatrix,
@@ -18,10 +19,17 @@ import {
 const execFileAsync = promisify(execFile)
 const migrationMatrixScript = fileURLToPath(new URL('../scripts/verify-packaged-migration-matrix.mjs', import.meta.url))
 const migrationMatrixRunner = fileURLToPath(new URL('../scripts/packaged-migration-matrix-runner.mjs', import.meta.url))
+const desktopManifest = fileURLToPath(new URL('../package.json', import.meta.url))
 
 async function expectMissing(path) {
   await assert.rejects(access(path), (error) => error?.code === 'ENOENT')
 }
+
+test('packaged migration eligibility follows the current Desktop patch version', async () => {
+  const manifest = JSON.parse(await readFile(desktopManifest, 'utf8'))
+  assert.equal(MIGRATION_MATRIX_DESKTOP_VERSION, manifest.version)
+  assert.equal(manifest.version, '3.0.1')
+})
 
 test('packaged migration fixture materialization copies only Desktop-owned state and maps every supported ledger generation', async () => {
   for (const version of MIGRATION_MATRIX_FIXTURE_VERSIONS) {
