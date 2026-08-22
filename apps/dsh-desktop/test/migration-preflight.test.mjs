@@ -360,11 +360,12 @@ test('pre-bootstrap migration anchor is inert, hidden, and released only once', 
 test('electron normal bootstrap does not scan, plan, or resume migrations', async () => {
   const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
   const bootstrap = source.slice(source.indexOf('export async function startElectronApp'))
-  const profileBootstrapAt = bootstrap.indexOf('prepareDesktopRuntimeInputsWithBaselineRecovery')
+  const profileBootstrapAt = bootstrap.indexOf('prepareDesktopRuntimeInputs({')
   const migrationAssistantAt = bootstrap.indexOf('const migrationAssistant = new MigrationAssistant')
 
   assert.ok(profileBootstrapAt >= 0)
   assert.ok(migrationAssistantAt >= 0)
+  assert.doesNotMatch(bootstrap, /prepareDesktopRuntimeInputsWithBaselineRecovery\(/u)
   assert.doesNotMatch(bootstrap, /preflightDesktopMigrationGate\(/u)
   assert.doesNotMatch(bootstrap.slice(0, profileBootstrapAt), /migrationAssistant\.(?:listJournals|planMigration|beginMigration|resumeMigration)\(/u)
   assert.doesNotMatch(bootstrap, /resolvePreBootstrapMigration/u)
