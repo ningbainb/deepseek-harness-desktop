@@ -281,6 +281,9 @@ const LEGACY_DESKTOP_PATCH_CONFIG = `- id: directory-picker
 `
 export const DESKTOP_PATCH_CONFIG = `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- insert:
+    - id: authorization
+      name: '@deepseek-ai/dsh-authorization'
 - id: llm-deepseek
   config:
     retryPolicy:

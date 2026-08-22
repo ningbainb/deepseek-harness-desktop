@@ -12,6 +12,7 @@ import {
   AGGREGATED_BUNDLES,
   BUILTIN_BUNDLES,
   BUILTIN_SKIN_IDS,
+  CODEX_PROVIDER_CONFLICTS,
   DESKTOP_PATCH_CONFIG,
   DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES,
   DEPENDENCY_ONLY_BUNDLES,
@@ -243,6 +244,17 @@ test('desktop profile uses the RC.1 native Codex provider plus the native market
   assert.doesNotMatch(DESKTOP_PATCH_CONFIG, /id: dsh-market/u)
   assert.match(DESKTOP_PATCH_CONFIG, /id: llm-deepseek[\s\S]*maxRetries: 4/u)
   assert.match(DESKTOP_PATCH_CONFIG, /retryableCodes:[\s\S]*STREAM_CLOSED/u)
+})
+
+test('desktop profile mounts the RC.1 authorization service without restoring conflicting Codex plugins', () => {
+  assert.equal(
+    [...DESKTOP_PATCH_CONFIG.matchAll(/name: '@deepseek-ai\/dsh-authorization'/gu)].length,
+    1,
+  )
+  for (const packageName of ['dsh-codex', 'dsh-codex-auth', 'dsh-codex-connect']) {
+    assert.equal(CODEX_PROVIDER_CONFLICTS.includes(packageName), true)
+    assert.equal(MANAGED_RUNTIME_PACKAGES.includes(packageName), false)
+  }
 })
 
 test('desktop profile includes the official QQ Bot bundle', () => {
