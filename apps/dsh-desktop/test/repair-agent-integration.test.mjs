@@ -76,6 +76,7 @@ async function runFaultScenario(type) {
   const builtins = provider('desktop-builtins')
   const coordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => true,
     runRepair: async () => {
       modelCalls += 1
       if (!REPAIRABLE.has(type)) return { status: 'unavailable' }

@@ -39,9 +39,11 @@ test('full startup retries once then reaches same-home builtins without a model'
   const full = fakeProvider({ profileName: 'desktop', failures: 2, calls })
   const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
   const providers = new Map([[full.profileName, full], [builtins.profileName, builtins]])
+  let repairCalls = 0
   const coordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => providers.get(profileName),
-    runRepair: async () => ({ status: 'unavailable' }),
+    canRepair: async () => false,
+    runRepair: async () => { repairCalls += 1; return { status: 'unavailable' } },
     publishState: (state) => states.push(state),
   })
 
@@ -60,13 +62,33 @@ test('full startup retries once then reaches same-home builtins without a model'
     ['ensure', 'desktop-builtins'],
     ['start', 'desktop-builtins'],
   ])
+  assert.equal(repairCalls, 0)
   assert.deepEqual(states, [
     'starting-full',
     'retrying-full',
-    'repairing',
     'starting-builtins',
     'ready-builtins',
   ])
+})
+
+test('repair availability errors fail closed before the repairing state', async () => {
+  const calls = []
+  const states = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 2, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  let repairCalls = 0
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => { throw new Error('bounded repair availability failure') },
+    runRepair: async () => { repairCalls += 1; return { status: 'unavailable' } },
+    publishState: (state) => states.push(state),
+  })
+
+  const result = await coordinator.start()
+
+  assert.equal(result.state, 'ready-builtins')
+  assert.equal(repairCalls, 0)
+  assert.equal(states.includes('repairing'), false)
 })
 
 test('healthy full startup never creates a fallback provider or calls repair', async () => {
@@ -113,6 +135,7 @@ test('applied repair commits only after the repaired full Runtime is ready', asy
   let repairInput
   const coordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => true,
     runRepair: async (input) => {
       repairInput = input
       calls.push(['repair'])
@@ -149,6 +172,7 @@ test('failed repaired full start rolls back before the same-home builtins fallba
   const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
   const coordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => true,
     runRepair: async () => ({
       status: 'applied',
       async commit() { calls.push(['commit']) },
@@ -179,6 +203,7 @@ test('rollback failure is contained and builtins still becomes ready', async () 
   const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
   const coordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => true,
     runRepair: async () => ({
       status: 'applied',
       async rollback() {

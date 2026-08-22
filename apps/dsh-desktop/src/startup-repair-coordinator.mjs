@@ -22,6 +22,7 @@ function assertProvider(provider, profileName) {
 export class StartupRepairCoordinator {
   constructor({
     createProvider,
+    canRepair = async () => false,
     runRepair = async () => ({ status: 'unavailable' }),
     publishState = () => {},
     activateProvider = () => {},
@@ -30,6 +31,7 @@ export class StartupRepairCoordinator {
     cancelSchedule = clearTimeout,
   } = {}) {
     if (typeof createProvider !== 'function') throw new TypeError('startup provider factory is required')
+    if (typeof canRepair !== 'function') throw new TypeError('startup repair availability callback must be a function')
     if (typeof runRepair !== 'function') throw new TypeError('startup repair callback must be a function')
     if (typeof publishState !== 'function' || typeof activateProvider !== 'function') {
       throw new TypeError('startup coordinator callbacks must be functions')
@@ -38,6 +40,7 @@ export class StartupRepairCoordinator {
       throw new TypeError('startup stop timeout must be between 1 and 60000 milliseconds')
     }
     this.createProvider = createProvider
+    this.canRepair = canRepair
     this.runRepair = runRepair
     this.publishState = publishState
     this.activateProvider = activateProvider
@@ -104,12 +107,19 @@ export class StartupRepairCoordinator {
       }
     }
 
-    await this.#publish('repairing')
-    const repair = await this.runRepair(Object.freeze({
+    const repairInput = Object.freeze({
       fullAttempts: 2,
       failureCount: failures.length,
       failures: Object.freeze([...failures]),
-    })).catch(() => ({ status: 'failed' }))
+    })
+    const repairAvailable = await Promise.resolve()
+      .then(() => this.canRepair(repairInput))
+      .then(value => value === true, () => false)
+    let repair = { status: 'unavailable', reason: 'model-unavailable' }
+    if (repairAvailable) {
+      await this.#publish('repairing')
+      repair = await this.runRepair(repairInput).catch(() => ({ status: 'failed' }))
+    }
     let rollbackFailed = false
     if (repair?.status === 'applied') {
       try {

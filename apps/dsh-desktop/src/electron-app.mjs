@@ -89,6 +89,7 @@ import { normalizeProductContext } from './telemetry-events.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
 import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
 import { RepairIncidentStore } from './repair-incident-store.mjs'
+import { hasConfiguredRepairModel } from './repair-model-availability.mjs'
 import { RepairRuntimeController } from './repair-runtime-controller.mjs'
 import { RepairTransactionManager } from './repair-transaction.mjs'
 import { createRegisteredRepairChecks, RepairVerifier } from './repair-verifier.mjs'
@@ -1885,6 +1886,14 @@ export async function startElectronApp(metadata) {
   }
   const startupCoordinator = new StartupRepairCoordinator({
     createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
+    canRepair: async () => {
+      const available = await hasConfiguredRepairModel({
+        dshHome,
+        compatibilityEnvironment: legacyCredentialEnvironment,
+      })
+      if (!available) builtinsFallbackDetail = 'no-model'
+      return available
+    },
     runRepair: runAutomaticRepair,
     activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
     publishState: async (state) => {
