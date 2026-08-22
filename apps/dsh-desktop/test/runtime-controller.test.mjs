@@ -267,8 +267,8 @@ test('controller reaches ready state from streamed output and stops cleanly', as
     environmentProvider: () => ({
       QQBOT_APPID: 'desktop-app',
       QQBOT_SECRET: 'runtime-only',
-      // This is the exact additional environment supplied by the native-
-      // confirmed, isolated Free Mode launch path.  It must survive the
+      // This is the exact additional environment supplied by the confirmed
+      // primary Runtime launch path. It must survive the
       // controller's child-environment construction rather than merely being
       // recorded in Desktop state.
       DSH_PERMISSION_MODE: 'danger-full-access',

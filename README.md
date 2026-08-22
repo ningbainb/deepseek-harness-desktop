@@ -20,13 +20,14 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/ningbainb/deepseek-harness-desktop) 点 Star，帮助更多桌面版用户发现它。
 
-### 最新版：3.0.1
+### 最新版：3.0.2
 
-`desktop-v3.0.1` 是平台稳定版：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级、回滚和已知限制](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
+`desktop-v3.0.2` 使用“直接载入 + 零点击自动修复”启动策略：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级与回滚](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
 
 | 版本 | 主要更新 |
 | --- | --- |
-| **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，独立升级/回滚助手，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
+| **3.0.2** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；移除启动迁移、隔离恢复和安全模式选择页。 |
+| **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
 | **2.7.0** | 修复 Windows 8% Runtime 启动故障并升级到 DSH rc.7；新增托盘后台自动化、Host 持久任务调度、插件兼容声明/锁、browser-safe Desktop SDK、安全工作区外部打开和 Candidate Matrix。 |
 | **2.6.0** | Task Board v3 引入 Project、Task Run、Evidence 与 Git Worktree 审核流；Runtime Provider 缺少可选能力时显式回退 shared-workspace，并加入 Candidate 执行兼容夹具。该版本的匿名统计行为仅作历史记录，已由 3.0 的默认关闭政策取代。 |
 | **2.5.0** | 新增 Runtime Adapter 与上游兼容防线、安全 `.dshpreset` 和 Web Profile 迁移、原子插件批量事务、严格 Deep Link/文件关联与结构化通知。 |
@@ -43,19 +44,20 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 | **0.1.4** | 桌宠迁移到全局 Shell Overlay，首页和设置页均可见；恢复五张 Web UI 插件配置卡；皮肤中心完整展示安装版随附的九套皮肤。 |
 | **0.1.3** | 加入稳定版 GitHub Release 更新检查、双语更新说明、用户确认下载、任务栏进度和二次确认安装。 |
 
-### 3.0.1 平台稳定版亮点
+### 3.0.2 直接启动与自动修复
 
-- **可依赖的公开边界**：Desktop Contract 与 SDK 保持 1.x；Runtime Provider、Preset、Task/Run/Evidence、Deep Link、runtime matrix 和 patch registry 有机器 Schema、版本政策与兼容夹具。插件按 capability detection 增强，在普通 DSH Web 中保持可用。
-- **Stable Runtime 不是猜测**：Stable 只接受精确 `known-good` / `supported` 矩阵项，并核对 provider、Desktop 范围、包完整性、lockfile 和 patch 证据；候选或 blocked Runtime 不会被悄悄放行。
-- **升级前先给出可审查计划**：Migration Assistant 扫描允许的全局状态，生成 safe/needs-confirmation/blocked 计划；私有快照和原子 journal 支持继续、回滚和有限保留，不复制项目内容。
-- **可验证发布**：更新分为 Stable/Beta；Stable 不接收 prerelease，任何频道都不会自动降级。Release 同时提供校验、manifest 和签名验证基础设施；未配置证书时正式社区版本可未签名，配置证书后自动强制签名和有效时间戳，manifest 与正式发布说明记录实际状态。
-- **默认不上传任何遥测**：诊断只能由用户确认并导出到自选位置。JSON/ZIP 含清单和哈希，集中删除 key/token/cookie、路径、URL query、Prompt、完整 Session、Tool Result、项目内容和 SSH 私钥。
+- **不再让用户选启动方式**：新用户直接进入内置环境；老用户直接读取当前 `DSH_HOME`、Profile、对话、Session、设置、任务、皮肤和全部插件，不创建迁移计划或隔离 Home。
+- **完整启动优先**：完整 Profile 失败时原样重试一次，不先停用插件，也不把“外来插件”当作启动阻断条件。
+- **模型自动修复**：确认为插件或配置问题后，可调用用户已经配置的模型在私有事务工作区生成候选；只有通过注册检查的修改才会原子应用。
+- **失败自动收敛**：候选无效、没有可用模型或修复后仍失败时自动回滚，并从同一个 Home 启动内置插件；聊天和设置不搬家。
+- **状态页不做选择题**：启动界面只显示“正在载入”“正在自动修复”“正在验证”等状态。日志和脱敏诊断位于设置的高级区域。
+- **发布前跑真实矩阵**：2.3–2.7、3.0.1 与干净安装 Home 加上故障注入，必须在未签名的 unpacked 候选上通过 direct-start matrix，之后才能生成安装器。
 
 ### 历史 2.7.0 功能亮点
 
 - **可靠 Windows 启动**：移除 PowerShell 5.1 `-WindowStyle Hidden` 与 Electron Node 模式的冲突，隐藏窗口仍由 `spawn` 的 `windowsHide` 处理；空旧补丁、状态订阅竞态和 IPC 错误不会再把启动页永久留在 8%。
 - **验证过的 Runtime 组合**：内置 `@deepseek-ai/dsh` `0.1.0-rc.7`、`dshmarket` `1.15.0`、Web UI 聚合 `0.2.3`、兼容 rc.7 的 Codex Connect 与 `dsh-live-stats` `0.1.20`，Stable 继续精确锁定而非追随 `latest`。
-- **托盘与后台自动化需显式选择**：默认关闭仍会退出。选择“最小化到托盘并启用后台自动化”后，关闭主窗口才保留 Runtime 和到期任务；显式退出、更新、安全模式和崩溃路径一律完整停止。
+- **托盘与后台自动化需显式选择**：默认关闭仍会退出。选择“最小化到托盘并启用后台自动化”后，关闭主窗口才保留 Runtime 和到期任务；显式退出、更新和崩溃路径一律完整停止。
 - **Host 持久任务调度**：Task Board 保存时区、cron 槽位、租约、misfire/running 策略和确定性运行键；启用后台自动化时通过真实 DSH Session 执行并回写 Task Run，Host 不可用时仍回退浏览器调度。
 - **可审计的扩展边界**：扩展坞校验 `dsh.compatibility` 的版本、Desktop API、能力、Surface 与运行时证据，并在 profile 写入 `desktop-plugins.lock.json`。browser-safe SDK 不导入 Electron 或私有 DSH 模块；预览的外部打开仅传工作区根和相对路径，Host 验证后才交给系统。
 - **Candidate Matrix**：候选 DSH 在临时 worktree 中收集矩阵、Stable 支持和离线社区插件质量证据；候选永远不能自动改写 Stable 依赖、lockfile、更新元数据或发布。

@@ -319,6 +319,7 @@ export class ActiveRuntimeProvider extends EventEmitter {
   createSession(value) { return this.active.createSession(value) }
   subscribeSession(value) { return this.active.subscribeSession(value) }
   registerHostService(value) { return this.active.registerHostService(value) }
+  probe() { return this.active.probe() }
   getSupportEvidence() { return this.active.getSupportEvidence() }
   getWorkspaceFileOpenToken() { return this.active.controller?.getWorkspaceFileOpenToken?.() }
 }

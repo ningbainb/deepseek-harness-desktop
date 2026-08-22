@@ -20,13 +20,14 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-### Latest release: 3.0.1
+### Latest release: 3.0.2
 
-`desktop-v3.0.1` is the platform Stable release: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade, rollback, and known limitations](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+`desktop-v3.0.2` uses direct loading and zero-click automatic repair: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
 
 | Version | Highlights |
 | --- | --- |
-| **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, migration/rollback assistant, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
+| **3.0.2** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, and falls back to built-ins in the same Home without startup choices. |
+| **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
 | **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
 | **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, and Candidate execution fixtures. Its historical anonymous-metrics behavior is replaced by the 3.0 default-off policy. |
 | **2.5.0** | Adds the Runtime Adapter and upstream compatibility defenses, secure `.dshpreset` and Web Profile migration, atomic plugin batches, strict deep-link/file ingress, and structured notifications. |
@@ -43,13 +44,14 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 3.0.1 Platform-Stability Highlights
+### 3.0.2 Direct Start and Automatic Repair
 
-- **Stable public boundaries**: Desktop Contract and SDK remain on 1.x. Runtime Provider, Preset, Task/Run/Evidence, Deep Link, Runtime matrix, and patch registry have machine-readable schemas, version rules, and compatibility fixtures. Plugins enhance through capability detection while remaining usable in ordinary DSH Web.
-- **Stable Runtime is deliberate**: Stable accepts only exact `known-good` or `supported` matrix entries after provider, Desktop range, package integrity, lockfile, and patch evidence agree. Candidate and blocked Runtime entries cannot be silently selected.
-- **Reviewable upgrade and rollback**: the Migration Assistant scans only allowed global state, produces `safe`, `needs-confirmation`, or `blocked` plans, and uses private snapshots plus an atomic journal to resume or roll back without copying project content.
-- **Verifiable releases**: Stable and Beta are separate channels; Stable rejects prereleases and no channel automatically downgrades. A local build may be unsigned. When signing is required, a missing certificate fails the gate, and published artifacts state their actual signature status in `release-manifest.json`.
-- **No default telemetry upload**: diagnostics are exported only after user confirmation to a chosen location. JSON/ZIP bundles carry a manifest and hashes and redact keys, tokens, cookies, paths, URL queries, prompts, complete sessions, tool results, project content, and SSH private keys.
+- **No startup choices**: fresh users enter the built-in environment, while existing users read their current `DSH_HOME`, profile, conversations, sessions, settings, tasks, skins, and every plugin directly.
+- **Full profile first**: a failed complete-profile start is retried once unchanged. Desktop does not pre-emptively disable a plugin or block startup because publisher, registry, or compatibility metadata is absent.
+- **Model-backed repair**: an attributable plugin or configuration failure may invoke a model the user has already configured. It works in a private transaction workspace, and only a candidate that passes registered checks can be applied atomically.
+- **Automatic convergence**: a rejected candidate, missing model, or failed repaired start rolls back and starts built-in plugins from the same Home. Conversations and settings are never moved into a temporary profile.
+- **Status rather than decisions**: the startup surface shows only loading, repair, and verification progress. Logs and redacted diagnostics remain in the advanced settings area.
+- **Packaged matrix gate**: preserved Homes from 2.3 through 2.7 and 3.0.1, a clean install, and injected failures must pass against the unsigned unpacked candidate before an installer is built.
 
 ### Historical 2.7.0 Highlights
 

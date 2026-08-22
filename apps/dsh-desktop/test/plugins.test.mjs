@@ -1212,29 +1212,6 @@ test('full-access external install rolls back an opaque source that resolves to 
       ['install', '--offline', '--frozen-lockfile'],
     ])
 
-    const isolatedManager = new PluginManager({
-      profileDir,
-      pnpmCli: 'pnpm.mjs',
-      profileScope: 'isolated-free-mode',
-      runner: async ({ args }) => {
-        calls.push(['isolated', ...args])
-        if (args[0] !== 'add') return
-        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-        manifest.dependencies[protectedName] = source.installSpec
-        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
-        const installedRoot = join(profileDir, 'node_modules', ...protectedName.split('/'))
-        await mkdir(installedRoot, { recursive: true })
-        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
-          name: protectedName,
-          version: '99.0.0',
-          dsh: { bundle: { patch: './cordis.patch.yml' } },
-        }))
-      },
-    })
-    const isolated = await isolatedManager.installFullAccessExternal(source)
-    assert.equal(isolated.result.name, protectedName)
-    assert.equal(await isolated.rollback(), true)
-    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), originalManifest)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

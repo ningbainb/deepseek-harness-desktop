@@ -374,6 +374,7 @@ const recoveryResolutionLabels = Object.freeze({
   'baseline-quarantine-active': '桌面基线仍在使用',
   'legacy-false-positive-repaired': '2.2 已自动修复误判',
   'restored-by-user': '已由用户恢复',
+  'restored-by-direct-start': '已在启动时恢复全部插件',
 })
 
 function incidentMarkup(incident) {
@@ -401,13 +402,13 @@ async function refreshRecovery() {
     ? '正常模式'
     : baselineQuarantineAvailable
       ? '桌面基线模式，已隔离无法识别的用户加载配置'
-      : '安全模式，只加载内置插件'
+      : '检测到旧版本留下的插件停用状态'
   restoreSafeMode.hidden = !state.safeMode
   restoreSafeMode.textContent = baselineQuarantineAvailable
     ? '恢复原始加载配置并重启'
     : state.disabledPlugins.length > 0
     ? `恢复全部（${state.disabledPlugins.length}）并重启`
-    : '退出安全模式并重启'
+    : '恢复历史停用插件并重启'
   recoveryIncidents.innerHTML = state.incidents.length
     ? state.incidents.map(incidentMarkup).join('')
     : '<p class="empty">没有记录到插件启动故障</p>'
@@ -742,12 +743,12 @@ recoverySnapshots.addEventListener('click', async (event) => {
 })
 
 restoreSafeMode.addEventListener('click', async () => {
-  if (!window.confirm('恢复安全模式停用的全部插件并重启 DSH？如果插件本身仍有故障，可再次进入安全模式。')) return
+  if (!window.confirm('恢复旧版本停用的全部插件并重启 DSH？')) return
   await extensionOperations.run(async () => {
     try {
       const result = await window.dshDesktop.restoreDisabledPlugins()
       const count = result.restored?.length ?? 0
-      notify(count > 0 ? `已恢复 ${count} 个插件，DSH 已重启` : '已退出安全模式，DSH 已重启')
+      notify(count > 0 ? `已恢复 ${count} 个插件，DSH 已重启` : '旧停用状态已清除，DSH 已重启')
       await refresh()
     } catch (error) {
       notify(error.message, true)

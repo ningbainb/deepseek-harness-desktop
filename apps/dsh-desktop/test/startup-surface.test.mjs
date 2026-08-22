@@ -46,7 +46,7 @@ test('startup surface never asks new or existing users about migration', async (
     readFile(new URL('startup.mjs', uiRoot), 'utf8'),
   ])
   assert.doesNotMatch(html, /迁移|升级|隔离|恢复会话/u)
-  assert.doesNotMatch(renderer, /migration|upgrade-migration|setMigrationAssistantStatus/u)
+  assert.doesNotMatch(renderer, /migration/u)
 })
 
 test('whale pose stays inside the right-side swim corridor', () => {

@@ -1,26 +1,29 @@
-# Desktop 3.0 upgrade and rollback
+# Desktop 3.0.2 upgrade and rollback
 
-Desktop 3.0 upgrades deliberately preserve a recovery boundary. The Migration Assistant service scans a fixed set of Desktop state files, produces a data-free plan, creates a private snapshot before mutation, writes an atomic journal, and can resume or restore that snapshot after interruption.
+Desktop 3.0.2 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
 
-## Supported source family
+## Startup behavior
 
-The migration matrix covers Desktop 2.3 through 2.7. A scan classifies the plan as `safe`, `needs-confirmation`, or `blocked` based on version evidence, profile ownership, runtime support, plugin compatibility, preset/SDK/provider compatibility, and task storage. Recognized Task Store v2/v3 state is detected, validated, and captured only inside the allowlisted snapshot/journal boundary. The legacy 2.3 browser-localStorage task path is deliberately `needs-confirmation`: the scan does not expose browser contents or task/run counts. After explicit confirmation, supported preserved-origin v1 data is read only from its same-origin key through a hidden CSP/no-scheduler/no-permission probe, copied only into an empty v3 Host ledger, and verified by task count and fingerprint; the original browser value is retained. An unknown, missing, or changed origin blocks the copy and keeps recovery/rollback guidance available. Keep a separate offline backup and use the recovery guidance for that legacy data.
+Startup is automatic and has one normal destination: the complete existing profile.
 
-Blocked plans do not start automatically. Typical blockers include malformed or conflicting version evidence, unsupported legacy state, a newer state that would be downgraded, blocked runtime support, or incompatible plugins. A `needs-confirmation` plan requires explicit confirmation before it can create a journal.
+1. Load the current Home, settings, conversations, sessions, tasks, skins, and every installed plugin.
+2. If the full profile fails, retry it once without rewriting user state.
+3. If the failure is attributable to profile or plugin state and a model is configured, run one bounded repair in a private transaction workspace. The model receives only the minimum diagnostic context, never credentials, full conversations, or unrelated project files.
+4. Verify the candidate with registered checks, apply it atomically, and try the full profile again.
+5. If verified repair is unavailable or still fails, start the built-in plugins from the same Home. Conversations and settings remain in place.
 
-## Snapshot and journal
+The startup page is status-only. There are no migration, isolation, safe-mode, or plugin-source decisions for users to interpret.
 
-The private snapshot contains only the Desktop profile manifest, profile lockfile, managed settings patch, task state, Desktop state, and runtime-support state. It records sizes and hashes for verification but never treats a project directory as migration input. By default, recent snapshots are retained privately for a bounded period; unreadable recovery data is retained for explicit repair instead of being deleted automatically.
+## Rollback boundaries
 
-The journal moves through `started`, `step-complete`, `committed`, and `rolled-back`. Each step is atomically recorded after it completes. After an interruption, reopening the service lists pending steps without rerunning completed ones. A rollback restores the exact allowlisted snapshot bytes and keeps project content outside the migration boundary untouched.
+Plugin installation and automatic repair remain transactional. Before a persistent plugin mutation, Desktop archives the affected manifest, lockfile, patch files, and package links. A failed activation restores that archive and the previous Runtime. Automatic repair applies only a verified candidate and rolls it back if the repaired full-profile start fails.
 
-## Before proceeding
+Application updates retain the existing installer rollback and update-shutdown checks. Runtime installation damage is handled by the updater path; it is not treated as a profile or plugin problem.
 
-1. Review the scan and its guidance before confirming a plan.
-2. Resolve `blocked` runtime or plugin compatibility problems instead of bypassing them.
-3. Keep a separate offline backup for unsupported legacy state or any state you do not recognize.
-4. If a migration is interrupted, resume its journal or roll it back before starting another migration.
+Keep an independent backup before major operating-system or disk changes. Desktop rollback covers mutations it owns, not arbitrary project edits or hardware loss.
 
-Desktop Stable accepts only its selected update channel and never accepts a downgrade. A Stable channel installation does not consume prerelease artifacts. Release artifact hashes, updater metadata, and optional signature verification are checked independently of migration state.
+## Explicit imports
+
+The Extension Dock's user-initiated Web Profile import remains available. It previews selected packages and attributable non-secret configuration, then applies them transactionally. This explicit import is separate from application startup and is never required merely to open Desktop.
 
 See [compatibility policy](compatibility-policy.md), [runtime support policy](runtime-support-policy.md), and [security boundaries](security-boundaries.md).

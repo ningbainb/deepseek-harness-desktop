@@ -1,4 +1,0 @@
-# Desktop-managed patch state for the representative 2.7 profile.
-- id: scheduler-state
-  config:
-    enabled: true

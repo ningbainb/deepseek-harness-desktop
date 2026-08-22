@@ -1080,36 +1080,6 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
   }
 
-  disableCurrentAndRestart() {
-    return this.#enqueue(async () => {
-      const state = await this.store.getState()
-      const name = state.currentIncident?.pluginName
-      if (!name) throw new Error('当前没有可停用的故障插件')
-      await this.controller.stop()
-      const transaction = await this.pluginManager.setEnabled(name, false)
-      try {
-        await this.ensureProfile()
-        await this.store.setSafeMode(false)
-        await this.controller.start()
-        transaction.commit()
-        if (transaction.result.dependencySpec) {
-          await this.store.rememberDisabledDependencies({ [name]: transaction.result.dependencySpec })
-        }
-        await this.store.resolveIncident(state.currentIncident.id, 'disabled-by-user')
-        return transaction.result
-      } catch (error) {
-        await transaction.rollback()
-        await this.ensureProfile()
-        await this.controller.start().catch(() => {})
-        throw error
-      }
-    })
-  }
-
-  enterSafeModeAndRestart() {
-    return this.#enqueue(() => this.#enterSafeMode())
-  }
-
   restoreDisabledAndRestart() {
     return this.#enqueue(async () => {
       const disabledDependencies = await this.store.getDisabledDependencies()
@@ -1142,16 +1112,32 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
   }
 
-  prepareSafeMode() {
+  /** Restore plugins left disabled by an older release before direct startup. */
+  restoreForDirectStartup() {
     return this.#enqueue(async () => {
-      this.recoveryStage = 2
-      const transaction = await this.pluginManager.enterSafeMode()
-      transaction.commit()
-      await this.store.rememberDisabledDependencies(transaction.result.disabledDependencies)
-      await this.store.setSafeMode(true)
-      await this.ensureProfile()
-      await this.#log(`[plugin-recovery] launch safe mode enabled; disabled=${transaction.result.disabled.join(',') || 'none'}`)
-      return transaction.result
+      const state = await this.store.getState()
+      const disabledDependencies = await this.store.getDisabledDependencies()
+      if (!state.safeMode && Object.keys(disabledDependencies).length === 0) {
+        return Object.freeze({ restored: Object.freeze([]), changed: false })
+      }
+      let prepared
+      try {
+        prepared = await this.#prepareDisabledDependencyRestore(disabledDependencies)
+        await this.ensureProfile()
+        for (const transaction of prepared.transactions) transaction.commit()
+        await this.store.clearRecoveryMode('restored-by-direct-start')
+        await this.#log(`[plugin-recovery] restored prior disabled plugins for direct startup: ${prepared.restoredPlugins.join(',') || 'none'}`)
+        return Object.freeze({
+          restored: Object.freeze([...prepared.restoredPlugins]),
+          changed: true,
+        })
+      } catch (error) {
+        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+          await transaction.rollback().catch(() => {})
+        }
+        await this.ensureProfile().catch(() => {})
+        throw error
+      }
     })
   }
 

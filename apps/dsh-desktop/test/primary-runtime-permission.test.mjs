@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { FreeModePermissionStore } from '../src/free-mode-permission-store.mjs'
-import { FULL_USER_RUNTIME_OVERLAY } from '../src/free-mode-full-user-overlay.mjs'
+import { FULL_USER_RUNTIME_OVERLAY } from '../src/primary-full-user-overlay.mjs'
 import {
   PRIMARY_RUNTIME_PERMISSION_SOURCE,
   ensurePrimaryRuntimeFullUserPermission,

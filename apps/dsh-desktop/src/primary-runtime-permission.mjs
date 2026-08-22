@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 
-import { FULL_USER_RUNTIME_OVERLAY } from './free-mode-full-user-overlay.mjs'
+import { FULL_USER_RUNTIME_OVERLAY } from './primary-full-user-overlay.mjs'
 
 export const PRIMARY_RUNTIME_PERMISSION_SOURCE = Object.freeze({
   id: 'desktop-primary-runtime-v1',

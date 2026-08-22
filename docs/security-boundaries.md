@@ -11,7 +11,7 @@ Desktop 3.0 treats compatibility, diagnostics, presets, runtime selection, and t
 | Workspace opening | The Host requires a registered canonical workspace root, a relative allowlisted file, real-path revalidation, and a private main-to-Host capability before native opening. |
 | Runtime selection | Stable starts only a matching `known-good` or `supported` matrix entry; candidate and blocked states cannot be promoted by local metadata. |
 | Primary full-user Runtime | A one-time native confirmation authorizes `danger-full-access` and `approval: never` only within the current Windows user; every start still verifies official Runtime evidence and bytes, and no renderer or plugin can choose the overlay. |
-| Recovery Runtime | An isolated recovery session is offered only after a real startup failure, stops the primary Runtime before launch, and never exposes Repair Shell or private Electron-main IPC to the Runtime page. |
+| Automatic repair | A bounded repair Runtime works only in a private transaction workspace, receives redacted diagnostic context, and cannot commit changes until registered verification passes. Failed application is rolled back. |
 | Child tool PATH | The app-owned `runtime-bin` directory is prepended only to Runtime, plugin installer, and terminal child environments; Desktop never changes process-global, user, or system PATH. |
 | Plugin and preset integrity | Exact package and archive hashes detect unexpected bytes but do not establish publisher identity, trust, or broad code permission. |
 | Task data | Worktree evidence retains bounded review metadata, not prompts, session transcripts, tool output, credentials, or unbounded unknown fields. |

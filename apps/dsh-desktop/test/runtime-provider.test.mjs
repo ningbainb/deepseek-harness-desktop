@@ -193,6 +193,7 @@ test('active provider switches profiles without changing Home and forwards only 
   const builtins = createProvider({
     controller: builtinsController,
     profileName: 'desktop-builtins',
+    upstreamVersion: '0.1.0-rc.8',
     ensureProfile: async () => ({ profileDir: 'C:\\dsh-home\\profiles\\desktop-builtins' }),
   }).provider
   const active = new ActiveRuntimeProvider({ providers: [full, builtins], activeProfileName: 'desktop' })
@@ -206,6 +207,7 @@ test('active provider switches profiles without changing Home and forwards only 
 
   assert.equal(active.dshHome, 'C:\\dsh-home')
   assert.equal(active.profileName, 'desktop-builtins')
+  assert.equal(active.probe().upstreamVersion, '0.1.0-rc.8')
   assert.equal(active.resolveProfilePaths().profileDir, 'C:\\dsh-home\\profiles\\desktop-builtins')
   assert.deepEqual(statuses, [
     ['desktop', 'ready'],

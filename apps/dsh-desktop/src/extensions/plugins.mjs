@@ -24,7 +24,6 @@ const PROTECTED_PACKAGES = new Set([
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
 ])
-const PLUGIN_PROFILE_SCOPES = new Set(['desktop', 'isolated-free-mode'])
 const MAX_PNPM_PATH_ENTRIES = 64
 const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i
@@ -418,7 +417,6 @@ export class PluginManager {
     executable = process.execPath,
     registry = new PluginRegistry(),
     hostCompatibility,
-    profileScope = 'desktop',
     pathEntries = [],
     beforeMutation = async () => {},
     profileArchive,
@@ -429,8 +427,6 @@ export class PluginManager {
     this.executable = executable
     this.registry = registry
     this.hostCompatibility = hostCompatibility
-    if (!PLUGIN_PROFILE_SCOPES.has(profileScope)) throw new TypeError('plugin profile scope is invalid')
-    this.profileScope = profileScope
     this.pathEntries = normalizePnpmPathEntries(pathEntries)
     if (typeof beforeMutation !== 'function') throw new TypeError('beforeMutation must be a function')
     this.beforeMutation = beforeMutation
@@ -1002,8 +998,7 @@ export class PluginManager {
   */
   installFullAccessExternal(descriptor) {
     const external = assertExternalPluginDescriptor(descriptor)
-    const mayReplaceManagedIdentity = this.profileScope === 'isolated-free-mode'
-    if (!mayReplaceManagedIdentity && external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
+    if (external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
       throw new Error(`${external.package.name} is a built-in desktop plugin and cannot be replaced by an external source`)
     }
     const installSpec = external.installSpec
@@ -1031,7 +1026,7 @@ export class PluginManager {
         // materializes them. Check again here, inside the snapshot-backed
         // transaction, so a same-name core package is restored rather than
         // persisted into the normal Desktop profile.
-        if (!mayReplaceManagedIdentity && PROTECTED_PACKAGES.has(name)) {
+        if (PROTECTED_PACKAGES.has(name)) {
           throw new Error(`${name} is a built-in desktop plugin and cannot be replaced by an external source`)
         }
         const installed = await readInstalledManifest(this.profileDir, name)

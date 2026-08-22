@@ -71,7 +71,7 @@ test('opt-in minimize-to-tray intercepts a window close and leaves runtime owner
   assert.equal(quit, 0)
 })
 
-test('quit, unavailable tray, safe mode, crash, and explicit process exit all bypass background hiding', () => {
+test('quit, unavailable tray, crash, and explicit process exit all bypass background hiding', () => {
   let hidden = 0
   let behavior = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
   let bypass
@@ -85,8 +85,6 @@ test('quit, unavailable tray, safe mode, crash, and explicit process exit all by
   behavior = CLOSE_BEHAVIORS.QUIT
   assert.equal(controller.handleWindowClose(closeEvent()), false)
   behavior = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
-  bypass = 'safe-mode'
-  assert.equal(controller.handleWindowClose(closeEvent()), false)
   bypass = 'runtime-crashed'
   assert.equal(controller.handleWindowClose(closeEvent()), false)
   bypass = undefined

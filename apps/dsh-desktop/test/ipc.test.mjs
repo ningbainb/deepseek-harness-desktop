@@ -17,11 +17,11 @@ import {
 import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
 
-test('desktop action validation exposes only fixed recovery and diagnostic operations', () => {
-  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit']) {
+test('desktop action validation exposes only diagnostics and exit', () => {
+  for (const action of ['open-logs', 'export-diagnostics', 'exit']) {
     assert.equal(normalizeDesktopAction(action), action)
   }
-  for (const action of ['run-command', '../repair', '', 42]) {
+  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'run-command', '../repair', '', 42]) {
     assert.throws(() => normalizeDesktopAction(action), /desktop action/)
   }
 })
@@ -175,7 +175,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   const handled = []
   const observed = []
   const exported = []
-  const migrationActions = []
   let updateChannel = 'stable'
   const unregister = registerDesktopIpc({
     ipcMain,
@@ -190,10 +189,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
     exportDiagnostics: async () => {
       exported.push('startup-diagnostics')
       return { canceled: false, exported: true }
-    },
-    openMigrationAssistant: async () => {
-      migrationActions.push('open')
-      return { status: 'committed' }
     },
     exitApp: () => {},
     handleHelpAction: async (action) => {
@@ -212,7 +207,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       updateChannel = channel
       return channel
     },
-    onRecoveryAction: (action) => observed.push(['recovery', action]),
     onSettingsOpened: () => observed.push(['settings']),
     onUpdateCheck: () => observed.push(['updates']),
   })
@@ -221,14 +215,13 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'extensions'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'terminal'), true)
   assert.equal(await handlers.get('desktop:star-prompt-claim')({ sender }), true)
-  await handlers.get('desktop:action')({ sender }, 'retry')
+  await assert.rejects(
+    handlers.get('desktop:action')({ sender }, 'retry'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   assert.deepEqual(
     await handlers.get('desktop:action')({ sender }, 'export-diagnostics'),
     { canceled: false, exported: true },
-  )
-  assert.deepEqual(
-    await handlers.get('desktop:action')({ sender }, 'upgrade-migration'),
-    { status: 'committed' },
   )
   assert.equal(await handlers.get('desktop:settings-opened')({ sender }), true)
   await handlers.get('desktop:update-check')({ sender })
@@ -249,8 +242,7 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(handlers.has('desktop:close-behavior-set'), false)
   assert.deepEqual(handled, ['community', 'extensions', 'terminal'])
   assert.deepEqual(exported, ['startup-diagnostics'])
-  assert.deepEqual(migrationActions, ['open'])
-  assert.deepEqual(observed, [['recovery', 'retry'], ['settings'], ['updates']])
+  assert.deepEqual(observed, [['settings'], ['updates']])
   unregister()
 })
 

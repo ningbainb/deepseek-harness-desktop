@@ -1117,7 +1117,7 @@ test('2.2 repairs the legacy unknown-timeout safe mode without touching plugin f
   }
 })
 
-test('2.2 preserves a user-requested safe mode for one-click recovery', async () => {
+test('direct startup restores plugins left disabled by an older release without a Runtime cycle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-user-safe-mode-'))
   const profileDir = join(root, 'profile')
   const stateDir = join(root, 'recovery')
@@ -1172,6 +1172,7 @@ test('2.2 preserves a user-requested safe mode for one-click recovery', async ()
       store,
       ensureProfile: async () => {},
       builtInBundles: BUILTIN_BUNDLES,
+      automatic: false,
     })
 
     await recovery.initialize()
@@ -1179,14 +1180,17 @@ test('2.2 preserves a user-requested safe mode for one-click recovery', async ()
     assert.equal(state.safeMode, true)
     assert.deepEqual(state.disabledPlugins, [packageName])
 
-    assert.deepEqual(await recovery.restoreDisabledAndRestart(), { restored: [packageName] })
+    assert.deepEqual(await recovery.restoreForDirectStartup(), {
+      restored: [packageName],
+      changed: true,
+    })
     const restoredState = await recovery.getState()
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-    assert.equal(stops, 1)
-    assert.equal(starts, 1)
+    assert.equal(stops, 0)
+    assert.equal(starts, 0)
     assert.equal(restoredState.safeMode, false)
     assert.deepEqual(restoredState.disabledPlugins, [])
-    assert.equal(restoredState.currentIncident.resolution, 'restored-by-user')
+    assert.equal(restoredState.currentIncident.resolution, 'restored-by-direct-start')
     assert.equal(manifest.dependencies[packageName], '1.0.0')
     assert.equal(manifest.dsh.profile.bundles.includes(packageName), true)
     await recovery.dispose()

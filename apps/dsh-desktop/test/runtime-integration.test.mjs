@@ -10,21 +10,19 @@ import { BoundedLogStore } from '../src/log-store.mjs'
 import {
   SECONDARY_WINDOW_PARTITION,
   beginDesktopStartup,
+  createSerializedStartupSurfaceLoader,
   createDesktopShutdownLifecycle,
   prepareDesktopRuntimeInputs,
-  prepareDesktopRuntimeInputsWithBaselineRecovery,
   requestsUpdateShutdown,
   secondaryWindowWebPreferences,
   desktopDeepLinkFrom,
 } from '../src/electron-app.mjs'
 import {
   BUILTIN_SKIN_IDS,
-  DESKTOP_PROFILE_BOOTSTRAP_ERROR,
   WEB_UI_SETTINGS_NAMESPACES,
   ensureDesktopProfile,
   resolveDshCliPath,
 } from '../src/profile.mjs'
-import { DesktopProfileBaselineQuarantine } from '../src/profile-baseline-quarantine.mjs'
 import { DshRuntimeController } from '../src/runtime-controller.mjs'
 import { parseUpdateShutdownRequest } from '../src/update-shutdown-receipt.mjs'
 
@@ -146,6 +144,38 @@ test('runtime boot begins while the startup shell is still loading', async () =>
   assert.equal(started.includes('unexpected-runtime'), false)
 })
 
+test('rapid direct-start states serialize local startup-page navigations', async () => {
+  const events = []
+  const releases = []
+  const load = createSerializedStartupSurfaceLoader({
+    load: state => new Promise((resolve) => {
+      events.push(`start:${state}`)
+      releases.push(() => {
+        events.push(`finish:${state}`)
+        resolve()
+      })
+    }),
+  })
+
+  const preparing = load('preparing')
+  await Promise.resolve()
+  const startingFull = load('starting-full')
+  await Promise.resolve()
+  assert.deepEqual(events, ['start:preparing'])
+  releases.shift()()
+  await preparing
+  await Promise.resolve()
+  assert.deepEqual(events, ['start:preparing', 'finish:preparing', 'start:starting-full'])
+  releases.shift()()
+  await startingFull
+  assert.deepEqual(events, [
+    'start:preparing',
+    'finish:preparing',
+    'start:starting-full',
+    'finish:starting-full',
+  ])
+})
+
 test('secondary windows use an isolated non-persistent Electron session', () => {
   const preferences = secondaryWindowWebPreferences({ preload: 'desktop-preload.cjs' })
   assert.equal(SECONDARY_WINDOW_PARTITION.startsWith('persist:'), false)
@@ -256,274 +286,6 @@ test('recovery does not start a replacement runtime when the old runtime cannot 
   assert.equal(await lifecycle.recover(), false)
   assert.equal(lifecycle.runtimeStopped, false)
   assert.equal(starts, 0)
-})
-
-test('initial unreadable profile inputs retry once from a private Desktop baseline', async () => {
-  for (const fixture of [
-    { name: 'manifest', file: 'package.json', content: '{ invalid profile manifest\n' },
-    { name: 'manifest-null', file: 'package.json', content: 'null\n' },
-    { name: 'links', file: '.dsh-desktop-links.json', content: '{ invalid desktop links\n' },
-    {
-      name: 'patch',
-      file: 'cordis.patch.yml',
-      content: '# --- dsh-desktop managed (auto-generated; do not edit) ---\n- id: broken\n',
-    },
-  ]) {
-    const root = await mkdtemp(join(tmpdir(), `dsh-desktop-bootstrap-${fixture.name}-`))
-    const profileDir = join(root, 'profiles', 'desktop')
-    try {
-      await mkdir(profileDir, { recursive: true })
-      if (!['manifest', 'manifest-null'].includes(fixture.name)) {
-        await writeFile(join(profileDir, 'package.json'), JSON.stringify({
-          name: 'dsh-profile-desktop',
-          private: true,
-          dependencies: {},
-          dsh: { profile: { bundles: [] } },
-        }))
-      }
-      await writeFile(join(profileDir, fixture.file), fixture.content)
-      const quarantine = new DesktopProfileBaselineQuarantine({
-        dshHome: root,
-        profileDir,
-        stateDir: join(root, 'recovery'),
-      })
-      let notifications = 0
-      const prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-        baselineQuarantine: quarantine,
-        prepareProfile: () => ensureDesktopProfile({ dshHome: root, packageRoots: new Map() }),
-        migrateSettings: async () => {},
-        loadCredentials: async () => undefined,
-        onBaselineRecovery: async () => { notifications += 1 },
-      })
-      assert.equal(prepared.baselineRecovered, true)
-      assert.equal(prepared.profile.profileDir, profileDir)
-      assert.equal(notifications, 1)
-      assert.deepEqual(await quarantine.getState(), { available: true })
-      const repaired = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-      assert.equal(repaired.name, 'dsh-profile-desktop')
-      assert.equal(await quarantine.restore(), true)
-      assert.equal(await readFile(join(profileDir, fixture.file), 'utf8'), fixture.content)
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  }
-})
-
-test('an already-active baseline is reconciled before the first profile preparation', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-bootstrap-active-marker-'))
-  const profileDir = join(root, 'profiles', 'desktop')
-  const opaquePatch = '- id: opaque-user-loader\n  name: @user/unregistered\n'
-  try {
-    await mkdir(profileDir, { recursive: true })
-    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
-      name: 'dsh-profile-desktop',
-      private: true,
-      dependencies: {},
-      dsh: { profile: { bundles: [] } },
-    }))
-    await writeFile(join(profileDir, 'cordis.patch.yml'), opaquePatch)
-    const quarantine = new DesktopProfileBaselineQuarantine({
-      dshHome: root,
-      profileDir,
-      stateDir: join(root, 'recovery'),
-    })
-    await quarantine.quarantine()
-    // Simulate the crash window after active.json but before all loader bytes
-    // were replaced.  This patch is valid YAML, so the old ordering would
-    // merge it during ensureDesktopProfile instead of quarantining it first.
-    await writeFile(join(profileDir, 'cordis.patch.yml'), opaquePatch)
-    let firstProfilePatch
-    let recoveryNotifications = 0
-    const prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine: quarantine,
-      prepareProfile: async () => {
-        firstProfilePatch = await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')
-        return { profileDir }
-      },
-      migrateSettings: async () => {},
-      loadCredentials: async () => undefined,
-      onBaselineRecovery: async () => { recoveryNotifications += 1 },
-    })
-
-    assert.equal(firstProfilePatch, '')
-    assert.equal(prepared.baselineRecovered, true)
-    assert.equal(recoveryNotifications, 1)
-    assert.equal(await quarantine.hasUntrustedActivation(), false)
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('baseline bootstrap helper leaves normal failures alone and restores after a failed retry', async () => {
-  let inactiveActivationChecks = 0
-  let inactiveQuarantines = 0
-  const normal = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-    baselineQuarantine: {
-      getState: async () => ({ available: false }),
-      hasUntrustedActivation: async () => { inactiveActivationChecks += 1; return true },
-      quarantine: async () => { inactiveQuarantines += 1; return { available: true } },
-      restore: async () => true,
-    },
-    prepareProfile: async () => ({ profileDir: 'normal-profile' }),
-    migrateSettings: async () => {},
-    loadCredentials: async () => undefined,
-  })
-  assert.deepEqual(normal, {
-    profile: { profileDir: 'normal-profile' },
-    credentials: undefined,
-    baselineRecovered: false,
-  })
-  assert.equal(inactiveActivationChecks, 0)
-  assert.equal(inactiveQuarantines, 0)
-
-  let quarantines = 0
-  let restores = 0
-  const quarantine = {
-    quarantine: async () => {
-      quarantines += 1
-      return { changed: true, available: true }
-    },
-    restore: async () => { restores += 1; return true },
-  }
-  await assert.rejects(
-    prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine: quarantine,
-      prepareProfile: async () => { throw new Error('permission denied') },
-      migrateSettings: async () => {},
-      loadCredentials: async () => undefined,
-    }),
-    /permission denied/u,
-  )
-  assert.equal(quarantines, 0)
-  assert.equal(restores, 0)
-
-  let attempts = 0
-  await assert.rejects(
-    prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine: quarantine,
-      prepareProfile: async () => {
-        attempts += 1
-        if (attempts === 1) {
-          const error = new Error('invalid desktop profile')
-          error.code = DESKTOP_PROFILE_BOOTSTRAP_ERROR
-          throw error
-        }
-        throw new Error('baseline retry failed')
-      },
-      migrateSettings: async () => {},
-      loadCredentials: async () => undefined,
-    }),
-    /baseline retry failed/u,
-  )
-  assert.equal(quarantines, 1)
-  assert.equal(restores, 1)
-})
-
-test('a broken unmanaged profile node_modules tree is isolated, rebuilt, and restored by the bootstrap baseline', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-bootstrap-node-modules-'))
-  const profileDir = join(root, 'profiles', 'desktop')
-  const packageName = '@deepseek-ai/dsh-base'
-  const sourceDir = join(root, 'runtime-source', '@deepseek-ai', 'dsh-base')
-  const targetDir = join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-base')
-  const originalPackage = Buffer.from(`${JSON.stringify({
-    name: packageName,
-    version: '0.0.0-user-tree',
-    opaque: 'preserve this exact user dependency tree',
-  }, null, 2)}\n`)
-  try {
-    await mkdir(sourceDir, { recursive: true })
-    await mkdir(targetDir, { recursive: true })
-    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({ name: packageName, version: '1.0.0' }))
-    await writeFile(join(targetDir, 'package.json'), originalPackage)
-    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
-      name: 'dsh-profile-desktop',
-      private: true,
-      dependencies: {},
-      dsh: { profile: { bundles: [] } },
-    }))
-    const quarantine = new DesktopProfileBaselineQuarantine({
-      dshHome: root,
-      profileDir,
-      stateDir: join(root, 'recovery'),
-    })
-    let attempts = 0
-    const prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine: quarantine,
-      prepareProfile: async () => {
-        attempts += 1
-        return ensureDesktopProfile({
-          dshHome: root,
-          packageRoots: new Map([[packageName, sourceDir]]),
-        })
-      },
-      migrateSettings: async () => {},
-      loadCredentials: async () => undefined,
-    })
-
-    assert.equal(attempts, 2)
-    assert.equal(prepared.baselineRecovered, true)
-    assert.equal((await quarantine.getState()).available, true)
-    assert.deepEqual(
-      JSON.parse(await readFile(join(targetDir, 'package.json'), 'utf8')),
-      { name: packageName, version: '1.0.0' },
-    )
-
-    assert.equal(await quarantine.restore(), true)
-    assert.deepEqual(await readFile(join(targetDir, 'package.json')), originalPackage)
-    assert.deepEqual(await quarantine.getState(), { available: false })
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('a malformed managed profile package manifest uses the same reversible bootstrap baseline', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-bootstrap-broken-node-manifest-'))
-  const profileDir = join(root, 'profiles', 'desktop')
-  const packageName = '@deepseek-ai/dsh-base'
-  const sourceDir = join(root, 'runtime-source', '@deepseek-ai', 'dsh-base')
-  const targetDir = join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-base')
-  const originalPackage = Buffer.from('{ malformed user package metadata\n')
-  try {
-    await mkdir(sourceDir, { recursive: true })
-    await mkdir(targetDir, { recursive: true })
-    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({ name: packageName, version: '1.0.0' }))
-    await writeFile(join(targetDir, 'package.json'), originalPackage)
-    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
-      name: 'dsh-profile-desktop',
-      private: true,
-      dependencies: {},
-      dsh: { profile: { bundles: [] } },
-    }))
-    const quarantine = new DesktopProfileBaselineQuarantine({
-      dshHome: root,
-      profileDir,
-      stateDir: join(root, 'recovery'),
-    })
-    let attempts = 0
-    const prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine: quarantine,
-      prepareProfile: async () => {
-        attempts += 1
-        return ensureDesktopProfile({
-          dshHome: root,
-          packageRoots: new Map([[packageName, sourceDir]]),
-        })
-      },
-      migrateSettings: async () => {},
-      loadCredentials: async () => undefined,
-    })
-
-    assert.equal(attempts, 2)
-    assert.equal(prepared.baselineRecovered, true)
-    assert.deepEqual(
-      JSON.parse(await readFile(join(targetDir, 'package.json'), 'utf8')),
-      { name: packageName, version: '1.0.0' },
-    )
-    assert.equal(await quarantine.restore(), true)
-    assert.deepEqual(await readFile(join(targetDir, 'package.json')), originalPackage)
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
 })
 
 test('legacy v1 skin selections migrate before the official runtime resolves its boot graph', { timeout: 150_000 }, async () => {

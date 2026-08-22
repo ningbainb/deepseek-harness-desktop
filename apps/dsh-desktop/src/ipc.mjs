@@ -12,7 +12,7 @@ import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 
-const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit'])
+const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
 const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', 'privacy', 'updates'])
 const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
@@ -43,6 +43,7 @@ const RECOVERY_RESOLUTIONS = new Set([
   'baseline-quarantine-bootstrap',
   'legacy-false-positive-repaired',
   'restored-by-user',
+  'restored-by-direct-start',
 ])
 const RECOVERY_SUMMARIES = Object.freeze({
   unknown: '启动恢复需要处理。',
@@ -268,10 +269,8 @@ export function registerDesktopIpc({
   version,
   platform,
   pluginRecovery,
-  ensureProfile,
   openLogs,
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
-  openMigrationAssistant = async () => { throw new Error('migration assistant is unavailable') },
   exitApp,
   handleHelpAction,
   handleToolAction,
@@ -285,7 +284,6 @@ export function registerDesktopIpc({
   confirmUpdateChannelChange = async () => true,
   getSettingsWindowBounds = async () => undefined,
   setSettingsWindowBounds = async () => undefined,
-  onRecoveryAction = () => {},
   onSettingsOpened = () => {},
   onUpdateCheck = () => {},
   listSkills = async () => ({ skills: [] }),
@@ -366,20 +364,8 @@ export function registerDesktopIpc({
   })
   handle('desktop:action', main, async (_event, _surface, rawAction) => {
     const action = normalizeDesktopAction(rawAction)
-    if (['retry', 'repair', 'disable-plugin', 'safe-mode'].includes(action)) {
-      try { onRecoveryAction(action) } catch {}
-    }
-    if (action === 'retry') return controller.restart()
-    if (action === 'repair') {
-      await controller.stop()
-      await ensureProfile()
-      return controller.start()
-    }
-    if (action === 'disable-plugin') return pluginRecovery?.disableCurrentAndRestart?.()
-    if (action === 'safe-mode') return pluginRecovery?.enterSafeModeAndRestart?.()
     if (action === 'open-logs') return openLogs()
     if (action === 'export-diagnostics') return exportDiagnostics()
-    if (action === 'upgrade-migration') return openMigrationAssistant()
     exitApp()
     return undefined
   })

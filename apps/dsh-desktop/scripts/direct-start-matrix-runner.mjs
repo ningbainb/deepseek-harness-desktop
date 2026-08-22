@@ -169,7 +169,11 @@ export async function verifyPackagedDirectStart(layout, result) {
     throw new TypeError('packaged direct-start verification input is invalid')
   }
   if (!/\[startup\] direct-state=ready-full/u.test(result.runtimeLog)) {
-    throw new Error(`packaged direct-start ${layout.version ?? 'fresh'} did not reach full ready`)
+    const observed = [...result.runtimeLog.matchAll(/\[startup\] direct-state=([^\r\n]+)/gu)]
+      .map(match => match[1])
+    throw new Error(
+      `packaged direct-start ${layout.version ?? 'fresh'} did not reach full ready (observed: ${observed.join(' -> ') || 'none'})`,
+    )
   }
   if (/\[startup\] direct-state=ready-builtins/u.test(result.runtimeLog)) {
     throw new Error(`packaged direct-start ${layout.version ?? 'fresh'} unexpectedly used builtins fallback`)
