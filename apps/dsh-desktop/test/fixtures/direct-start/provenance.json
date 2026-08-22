@@ -31,7 +31,7 @@
     "faults/syntax-error/index.mjs": "7f54c0d351d756eb76eb9a85b9ae068862a76facd3964551e01686a25a433477",
     "faults/syntax-error/package.json": "8261b0e980d3f8ee7d5596350d534ecf3568611446cb95f766abcd7c396bfd15",
     "probe-package/cordis.patch.yml": "97cb4e3b6dd322c3e9543b65ec88330f98389c5c9b73c29466c845def081595d",
-    "probe-package/index.mjs": "3c4ef73126612944d9441c508a6d8a8828afa188f721d5d0f96c124ea5186a9e",
+    "probe-package/index.mjs": "722273a3733e10bae44a1b5306d64e27272167e6e9f4070a18b9fa73a1bfd7a5",
     "probe-package/package.json": "1c383ec2296dc70b1c81ad3b1a391acf36f54b661e252407fbb2850f62162481"
   }
 }

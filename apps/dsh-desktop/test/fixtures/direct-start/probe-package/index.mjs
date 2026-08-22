@@ -13,6 +13,7 @@ export function apply(ctx) {
   writeFileSync(resultPath, `${JSON.stringify({
     marker: marker.marker,
     profile: process.env.DSH_PROFILE,
+    legacyCredentialVisible: process.env.LEGACY_FIXTURE_API_KEY === 'fixture-old-api-key-do-not-log',
   }, null, 2)}\n`, 'utf8')
   ctx.logger?.info?.('[direct-start-probe] existing session marker is runtime-readable')
 }

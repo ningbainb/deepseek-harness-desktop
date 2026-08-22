@@ -8,6 +8,8 @@ import { runPackagedDesktop } from './packaged-smoke-runner.mjs'
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url))
 const PROBE_PACKAGE = '@fixture/direct-start-session-probe'
+const LEGACY_CREDENTIAL_VERSION = '3.0.1'
+const LEGACY_CREDENTIAL_VALUE = 'fixture-old-api-key-do-not-log'
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
 
@@ -151,6 +153,23 @@ export async function materializeDirectStartFixture({
     writeFile(join(sessionDir, 'marker.json'), `${JSON.stringify({ marker: descriptor.sessionMarker }, null, 2)}\n`),
   ])
   await installSessionProbe({ fixtureRoot: sourceRoot, profileDir })
+  const expectsLegacyCredential = version === LEGACY_CREDENTIAL_VERSION
+  let legacyCredentialPath
+  let legacyCredentialSha256
+  if (expectsLegacyCredential) {
+    const legacyDshHome = join(
+      userData,
+      'free-mode-sessions',
+      'active',
+      'direct-start-legacy',
+      'dsh',
+    )
+    await mkdir(legacyDshHome, { recursive: true })
+    legacyCredentialPath = join(legacyDshHome, '.credentials.yaml')
+    const content = `version: 1\nrefs:\n  LEGACY_FIXTURE_API_KEY: ${LEGACY_CREDENTIAL_VALUE}\n`
+    await writeFile(legacyCredentialPath, content, { encoding: 'utf8', mode: 0o600 })
+    legacyCredentialSha256 = sha256(Buffer.from(content, 'utf8'))
+  }
   return Object.freeze({
     kind: 'existing',
     version,
@@ -161,6 +180,8 @@ export async function materializeDirectStartFixture({
     sessionMarker: descriptor.sessionMarker,
     runtimeReadablePath: join(sessionDir, 'runtime-readable.json'),
     expectedProbeBundle: PROBE_PACKAGE,
+    expectsLegacyCredential,
+    ...(legacyCredentialPath === undefined ? {} : { legacyCredentialPath, legacyCredentialSha256 }),
   })
 }
 
@@ -186,11 +207,25 @@ export async function verifyPackagedDirectStart(layout, result) {
   if (readable.marker !== layout.sessionMarker || readable.profile !== 'desktop') {
     throw new Error(`packaged direct-start ${layout.version} did not read the original session from the full Runtime`)
   }
+  if (Boolean(readable.legacyCredentialVisible) !== layout.expectsLegacyCredential) {
+    throw new Error(`packaged direct-start ${layout.version} legacy credential compatibility failed`)
+  }
+  if (layout.legacyCredentialPath !== undefined) {
+    const afterSha256 = sha256(await readFile(layout.legacyCredentialPath))
+    if (afterSha256 !== layout.legacyCredentialSha256) {
+      throw new Error(`packaged direct-start ${layout.version} modified the legacy credential source`)
+    }
+  }
   const manifest = JSON.parse(await readFile(join(layout.profileDir, 'package.json'), 'utf8'))
   if (!manifest.dsh?.profile?.bundles?.includes(layout.expectedProbeBundle)) {
     throw new Error(`packaged direct-start ${layout.version} did not retain and attempt every enabled test bundle`)
   }
-  return Object.freeze({ version: layout.version, state: 'ready-full', sessionMarker: readable.marker })
+  return Object.freeze({
+    version: layout.version,
+    state: 'ready-full',
+    sessionMarker: readable.marker,
+    legacyCredentialVisible: Boolean(readable.legacyCredentialVisible),
+  })
 }
 
 export async function runPackagedDirectStartFixture({

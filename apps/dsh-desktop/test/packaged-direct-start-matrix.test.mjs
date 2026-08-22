@@ -12,6 +12,7 @@ import {
   DIRECT_START_FIXTURE_VERSIONS,
   materializeDirectStartFixture,
   runPackagedDirectStartMatrix,
+  verifyPackagedDirectStart,
   verifyDirectStartFixtureProvenance,
 } from '../scripts/direct-start-matrix-runner.mjs'
 
@@ -40,10 +41,44 @@ test('every historical Home is materialized without fabricated runtime version e
         JSON.parse(await readFile(join(layout.dshHome, 'sessions', 'direct-start-fixture', 'marker.json'), 'utf8')).marker,
         layout.sessionMarker,
       )
+      assert.equal(layout.expectsLegacyCredential, version === '3.0.1')
+      if (version === '3.0.1') {
+        assert.equal(typeof layout.legacyCredentialPath, 'string')
+        assert.match(layout.legacyCredentialSha256, /^[a-f0-9]{64}$/u)
+      }
     } finally {
       await rm(root, { recursive: true, force: true })
     }
   }
+})
+
+test('3.0.1 packaged verification requires the legacy key in the Runtime without serializing it', async (context) => {
+  const root = await mkdtemp(join(tmpdir(), 'direct-start-legacy-key-'))
+  context.after(() => rm(root, { recursive: true, force: true }))
+  const layout = await materializeDirectStartFixture({ root, version: '3.0.1' })
+  const runtimeReadablePath = join(layout.dshHome, 'sessions', 'direct-start-fixture', 'runtime-readable.json')
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(runtimeReadablePath, `${JSON.stringify({
+    marker: layout.sessionMarker,
+    profile: 'desktop',
+    legacyCredentialVisible: false,
+  })}\n`)
+
+  await assert.rejects(
+    verifyPackagedDirectStart(layout, { runtimeLog: '[startup] direct-state=ready-full\n' }),
+    /legacy credential/u,
+  )
+
+  await writeFile(runtimeReadablePath, `${JSON.stringify({
+    marker: layout.sessionMarker,
+    profile: 'desktop',
+    legacyCredentialVisible: true,
+  })}\n`)
+  const result = await verifyPackagedDirectStart(layout, {
+    runtimeLog: '[startup] direct-state=ready-full\n',
+  })
+  assert.equal(result.legacyCredentialVisible, true)
+  assert.equal(JSON.stringify(result).includes('fixture-old-api-key'), false)
 })
 
 test('packaged direct-start matrix covers every historical Home plus a truly fresh Home', async () => {

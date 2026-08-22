@@ -49,6 +49,10 @@ import {
 import { publicUpdateStatus, registerDesktopIpc } from './ipc.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
+import {
+  readLegacyCredentialCompatibility,
+  validateLegacyCredentialEnvironment,
+} from './legacy-credential-compat.mjs'
 import { builtinsFallbackNotification, DesktopNotificationService } from './notifications.mjs'
 import { startQqBotConnector } from './optional-integrations.mjs'
 import {
@@ -143,6 +147,7 @@ export function prioritizeRuntimeBinPathEntries(runtimeBin, pathEntries, { platf
 }
 
 export function desktopRuntimeEnvironmentFor({
+  credentialEnvironment = {},
   qqBotCredentials,
   backgroundAutomation = false,
   fullUser = false,
@@ -150,7 +155,9 @@ export function desktopRuntimeEnvironmentFor({
   if (typeof fullUser !== 'boolean') {
     throw new TypeError('fullUser must be a boolean')
   }
+  const normalizedCredentialEnvironment = validateLegacyCredentialEnvironment(credentialEnvironment)
   return Object.freeze({
+    ...normalizedCredentialEnvironment,
     ...(qqBotCredentials
       ? { QQBOT_APPID: qqBotCredentials.appId, QQBOT_SECRET: qqBotCredentials.appSecret }
       : { QQBOT_APPID: '', QQBOT_SECRET: '' }),
@@ -498,6 +505,28 @@ export async function startElectronApp(metadata) {
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
   const logStore = new BoundedLogStore({ directory: logsDirectory })
+  let legacyCredentialEnvironment = Object.freeze({})
+  try {
+    const legacyCompatibility = await readLegacyCredentialCompatibility({
+      userDataDir: userData,
+      dshHomeDir: dshHome,
+    })
+    legacyCredentialEnvironment = legacyCompatibility.environment
+    if (legacyCompatibility.summary.candidates > 0) {
+      await logStore.append(
+        `[credentials] legacy candidates=${legacyCompatibility.summary.candidates}`
+        + ` valid=${legacyCompatibility.summary.validCandidates}`
+        + ` recovered=${legacyCompatibility.summary.recoveredRefs}`
+        + ` current=${legacyCompatibility.summary.skippedCurrentRefs}`
+        + ` rejected=${legacyCompatibility.summary.rejectedRefs}`
+        + ` invalid=${legacyCompatibility.summary.invalidCandidates}`,
+      )
+    }
+  } catch (error) {
+    await logStore.append(
+      `[credentials] legacy compatibility unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+    )
+  }
   const statePath = desktopWindowStatePath
   const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
   const state = await loadWindowState(statePath, screen.getAllDisplays())
@@ -848,6 +877,7 @@ export async function startElectronApp(metadata) {
     `[startup] profile-ready=${Math.round(performance.now() - profileStartedAt)}ms packages=${runtimePackages.size}`,
   )
   const desktopRuntimeEnvironment = () => desktopRuntimeEnvironmentFor({
+    credentialEnvironment: legacyCredentialEnvironment,
     qqBotCredentials,
     backgroundAutomation: true,
     fullUser: true,
@@ -1627,7 +1657,10 @@ export async function startElectronApp(metadata) {
       pathEntries: runtimePathEntries,
       patchFiles,
       preferredPort: repairPort,
-      environmentProvider: () => environment,
+      environmentProvider: () => Object.freeze({
+        ...legacyCredentialEnvironment,
+        ...environment,
+      }),
       preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
     }),
   })
@@ -1668,6 +1701,7 @@ export async function startElectronApp(metadata) {
       patchFiles: [primaryFullUserOverlay],
       preferredPort: 0,
       environmentProvider: () => desktopRuntimeEnvironmentFor({
+        credentialEnvironment: legacyCredentialEnvironment,
         qqBotCredentials: undefined,
         backgroundAutomation: false,
         fullUser: true,
