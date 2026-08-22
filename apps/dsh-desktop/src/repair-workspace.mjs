@@ -24,7 +24,6 @@ const PROFILE_REPAIR_FILES = Object.freeze([
   'cordis.yaml',
   'pnpm-workspace.yaml',
   'pnpm-workspace.yml',
-  '.npmrc',
 ])
 const EXCLUDED_DIRECTORIES = new Set(['.git'])
 
