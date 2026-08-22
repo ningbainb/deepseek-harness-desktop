@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
+import { parse } from 'yaml'
 
 import {
   AGGREGATED_BUNDLES,
@@ -28,6 +29,23 @@ import {
   resolveRuntimePackages,
   resolveDshCliPath,
 } from '../src/profile.mjs'
+
+function aggregateLoaderPackageNames(source) {
+  const packageNames = new Set()
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry)
+      return
+    }
+    if (value === null || typeof value !== 'object') return
+    if (typeof value.id === 'string' && typeof value.name === 'string') {
+      packageNames.add(value.name)
+    }
+    for (const entry of Object.values(value)) visit(entry)
+  }
+  visit(parse(source))
+  return [...packageNames].toSorted()
+}
 
 test('packaged paths point at physical asar-unpacked files', () => {
   assert.equal(
@@ -94,14 +112,15 @@ test('profile manifest removes bundles already supplied by the web UI aggregate'
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('@linxin666/dsh-client-ui-skin-qq2006'), true)
 })
 
-test('desktop profile includes one plugin store plus Codex login and reasoning controls', () => {
-  assert.equal(BUILTIN_BUNDLES.includes('dshmarket'), true)
+test('desktop profile uses the RC.1 native Codex provider plus the native market and reasoning controls', () => {
+  assert.equal(BUILTIN_BUNDLES.includes('dshmarket'), false)
   assert.equal(BUILTIN_BUNDLES.includes('dsh-plugin-hub'), false)
-  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dshmarket'), true)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dshmarket'), false)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-plugin-hub'), false)
-  assert.equal(BUILTIN_BUNDLES.includes('dsh-codex-connect'), true)
+  assert.equal(RETIRED_MANAGED_PACKAGES.includes('dshmarket'), true)
+  assert.equal(BUILTIN_BUNDLES.includes('dsh-codex-connect'), false)
   assert.equal(BUILTIN_BUNDLES.includes('reasoning-slider'), true)
-  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-codex-connect'), true)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-codex-connect'), false)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('reasoning-slider'), true)
   assert.equal(BUILTIN_BUNDLES.includes('@linxin666/dsh-client-ui-mode-switcher'), false)
   assert.equal(DEPENDENCY_ONLY_BUNDLES.includes('@linxin666/dsh-client-ui-mode-switcher'), true)
@@ -111,8 +130,7 @@ test('desktop profile includes one plugin store plus Codex login and reasoning c
   assert.equal(BUILTIN_BUNDLES.includes('@vectorize-io/hindsight-coding-agents'), false)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@vectorize-io/hindsight-coding-agents'), false)
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('@vectorize-io/hindsight-coding-agents'), true)
-  assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*profile: desktop/)
-  assert.match(DESKTOP_PATCH_CONFIG, /id: dsh-market[\s\S]*allowRestart: false/)
+  assert.doesNotMatch(DESKTOP_PATCH_CONFIG, /id: dsh-market/u)
   assert.match(DESKTOP_PATCH_CONFIG, /id: llm-deepseek[\s\S]*maxRetries: 4/u)
   assert.match(DESKTOP_PATCH_CONFIG, /retryableCodes:[\s\S]*STREAM_CLOSED/u)
 })
@@ -204,17 +222,18 @@ test('profile manifest retires obsolete managed packages', () => {
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('dsh-plugin-hub'), true)
 })
 
-test('profile manifest keeps an existing Codex provider without double-owning the route', () => {
+test('profile manifest retires legacy Codex providers now owned by RC.1 llm-pi-ai', () => {
   const manifest = createDesktopProfileManifest({
     dependencies: { 'dsh-codex': '0.2.2', 'dsh-codex-connect': '0.1.0-alpha.4.5' },
     dsh: { profile: { bundles: ['dsh-codex'] } },
   })
-  assert.equal(manifest.dsh.profile.bundles.includes('dsh-codex'), true)
+  assert.equal(manifest.dsh.profile.bundles.includes('dsh-codex'), false)
   assert.equal(manifest.dsh.profile.bundles.includes('dsh-codex-connect'), false)
+  assert.equal(manifest.dependencies['dsh-codex'], undefined)
   assert.equal(manifest.dependencies['dsh-codex-connect'], undefined)
 })
 
-test('profile bootstrap retires its managed Codex Connect link when another provider owns the route', async () => {
+test('profile bootstrap refuses to link the legacy Codex Connect provider on RC.1', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-codex-conflict-'))
   const dshHome = join(root, 'home')
   const profileDir = join(dshHome, 'profiles', 'desktop')
@@ -223,14 +242,6 @@ test('profile bootstrap retires its managed Codex Connect link when another prov
     await mkdir(packageRoot, { recursive: true })
     await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: 'dsh-codex-connect' }))
     const packageRoots = new Map([['dsh-codex-connect', packageRoot]])
-    await ensureDesktopProfile({ dshHome, packageRoots })
-
-    const manifestPath = join(profileDir, 'package.json')
-    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-    manifest.dependencies['dsh-codex'] = '0.2.2'
-    manifest.dsh.profile.bundles.push('dsh-codex')
-    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
-
     const result = await ensureDesktopProfile({ dshHome, packageRoots })
     assert.equal(result.manifest.dsh.profile.bundles.includes('dsh-codex-connect'), false)
     assert.equal(result.manifest.dependencies['dsh-codex-connect'], undefined)
@@ -507,6 +518,38 @@ test('profile bootstrap migrates legacy skin selection before DSH loads and pres
   }
 })
 
+test('published aggregate loader dependencies are linked into the isolated Desktop profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-aggregate-loaders-'))
+  try {
+    const resolved = resolveRuntimePackages()
+    const aggregateRoot = resolved.get('@linxin666/dsh-web-ui-all')
+    if (aggregateRoot === undefined) throw new Error('published web UI aggregate is missing')
+    const loaderPackages = aggregateLoaderPackageNames(
+      readFileSync(join(aggregateRoot, 'cordis.patch.yml'), 'utf8'),
+    )
+    const { profileDir, manifest } = await ensureDesktopProfile({ dshHome: root })
+
+    assert.ok(loaderPackages.length > 0, 'published aggregate must declare loader packages')
+    for (const packageName of loaderPackages) {
+      assert.equal(
+        MANAGED_RUNTIME_PACKAGES.includes(packageName),
+        true,
+        `aggregate loader package must be managed by the isolated Desktop profile: ${packageName}`,
+      )
+      const sourceDir = resolved.get(packageName)
+      assert.notEqual(sourceDir, undefined, `aggregate loader package must resolve: ${packageName}`)
+      assert.match(manifest.dependencies[packageName], /^link:/u)
+      assert.equal(
+        await realpath(join(profileDir, 'node_modules', ...packagePathSegments(packageName))),
+        await realpath(sourceDir),
+        `aggregate loader package must be linked into the Desktop profile: ${packageName}`,
+      )
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('profile bootstrap preserves explicit Skin Center state and archives an unsupported legacy skin', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-retired-skin-migration-'))
   const dshHome = join(root, 'home')
@@ -773,14 +816,13 @@ test('official DSH CLI composes the isolated desktop profile', async () => {
     assert.match(result.stdout, /dsh-host-directory-picker-browse/)
     assert.match(result.stdout, /directory-picker-desktop-client/)
     assert.match(result.stdout, /dsh-client-ui-directory-picker-browse/)
-    assert.match(result.stdout, /- id: dsh-market/)
-    assert.match(result.stdout, /profile: desktop/)
+    assert.doesNotMatch(result.stdout, /- id: dsh-market/u)
     assert.match(result.stdout, /- id: llm-deepseek[\s\S]*?maxRetries: 4/u)
     assert.match(result.stdout, /- id: llm-deepseek[\s\S]*?STREAM_CLOSED/u)
     assert.doesNotMatch(result.stdout, /- id: dsh-plugin-hub/)
-    assert.match(result.stdout, /- id: llm-openai-codex/)
-    assert.match(result.stdout, /name: dsh-codex-connect/)
-    assert.match(result.stdout, /enableSearch: false/)
+    assert.match(result.stdout, /- id: llm-pi-ai/)
+    assert.match(result.stdout, /name: '@deepseek-ai\/dsh-llm-pi-ai'/)
+    assert.doesNotMatch(result.stdout, /name: dsh-codex-connect/)
     assert.match(result.stdout, /- id: reasoning-slider/)
     assert.match(result.stdout, /- id: im-qqbot[\s\S]*?disabled: true/)
     assert.doesNotMatch(result.stdout, /dsh-host-directory-picker-native/)

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
@@ -17,12 +17,12 @@ async function git(cwd, ...argv) {
   return result.stdout.trim()
 }
 
-function packagedModule(appDir, packageName) {
+function packagedModule(appDir, executablePath, packageName) {
+  const resourcesDirectory = executablePath
+    ? join(dirname(resolve(executablePath)), 'resources')
+    : resolve(appDir, 'dist', 'win-unpacked', 'resources')
   return resolve(
-    appDir,
-    'dist',
-    'win-unpacked',
-    'resources',
+    resourcesDirectory,
     'app.asar.unpacked',
     'node_modules',
     '@linxin666',
@@ -36,9 +36,9 @@ function packagedModule(appDir, packageName) {
  * Load the exact modules shipped beside the packaged Electron app and prove a
  * real repository isolation/review lifecycle. No source-tree import is used.
  */
-export async function runTaskBoardWorktreeE2E({ appDir = resolve('.') } = {}) {
-  const taskBoardPath = packagedModule(appDir, 'dsh-client-ui-task-board')
-  const gitGraphPath = packagedModule(appDir, 'dsh-client-ui-git-graph')
+export async function runTaskBoardWorktreeE2E({ appDir = resolve('.'), executablePath } = {}) {
+  const taskBoardPath = packagedModule(appDir, executablePath, 'dsh-client-ui-task-board')
+  const gitGraphPath = packagedModule(appDir, executablePath, 'dsh-client-ui-git-graph')
   const taskBoard = await import(pathToFileURL(taskBoardPath).href)
   const gitGraph = await import(pathToFileURL(gitGraphPath).href)
 

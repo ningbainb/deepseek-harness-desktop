@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { _electron as electron } from 'playwright'
+
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const execFileAsync = promisify(execFile)
 const desktopRoot = join(import.meta.dirname, '..')
@@ -29,7 +31,37 @@ async function settleWithin(promise, timeoutMs, message) {
   }
 }
 
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function waitForRuntimeWindow(application, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (application.process().exitCode !== null) {
+      throw new Error(`packaged application exited with code ${application.process().exitCode} before Runtime readiness`)
+    }
+    const runtimeWindow = application.windows().find((candidate) => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+    if (runtimeWindow !== undefined) return runtimeWindow
+    await delay(100)
+  }
+  throw new Error('packaged Runtime window did not become ready before timeout')
+}
+
+async function readStartupDiagnostics(userData) {
+  const logsDirectory = join(userData, 'logs')
+  const logFiles = await readdir(logsDirectory, { withFileTypes: true }).catch(() => [])
+  const sections = await Promise.all(logFiles
+    .filter((entry) => entry.isFile())
+    .map(async (entry) => {
+      const contents = await readFile(join(logsDirectory, entry.name), 'utf8').catch(() => '')
+      return `--- ${entry.name} ---\n${contents.slice(-4_000)}`
+    }))
+  return sections.join('\n')
+}
+
 try {
+  await seedPrimaryRuntimePermissionForTest({ userData })
   application = await electron.launch({
     executablePath,
     env: {
@@ -39,12 +71,15 @@ try {
       DSH_HOME: dshHome,
     },
   })
-  const page = await application.firstWindow()
   try {
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: 120_000 })
+    await waitForRuntimeWindow(application, 120_000)
   } catch (error) {
-    const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
-    throw new Error(`packaged runtime was not ready before shutdown verification\n${runtimeLog.slice(-4_000)}`, { cause: error })
+    const diagnostics = await readStartupDiagnostics(userData)
+    const windowUrls = application.windows().map((candidate) => candidate.url()).join(', ')
+    throw new Error(
+      `packaged runtime was not ready before shutdown verification\nwindows: ${windowUrls || '(none)'}\n${diagnostics}`,
+      { cause: error },
+    )
   }
 
   const playwrightPid = application.process().pid

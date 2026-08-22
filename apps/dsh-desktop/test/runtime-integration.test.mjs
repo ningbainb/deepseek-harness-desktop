@@ -788,23 +788,6 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       })
       assert.equal(stylesheet.ok, true, `${skinId} Skin Center stylesheet was not served`)
     }
-    const marketInstalled = await fetch(new URL('/dsh-market/installed', url), {
-      signal: AbortSignal.timeout(5_000),
-    })
-    assert.equal(marketInstalled.ok, true, 'dshmarket installed route was not served')
-    assert.equal((await marketInstalled.json()).profile, 'desktop')
-    const marketStatus = await fetch(new URL('/dsh-market/status', url), {
-      signal: AbortSignal.timeout(5_000),
-    })
-    assert.equal(marketStatus.ok, true, 'dshmarket status route was not served')
-    assert.equal((await marketStatus.json()).restart, false, 'desktop supervisor must own runtime restarts')
-    const marketRegistry = await fetch(new URL('/dsh-market/registry', url), {
-      signal: AbortSignal.timeout(10_000),
-    })
-    assert.equal(marketRegistry.ok, true, 'dshmarket registry route was not served')
-    const registryBody = await marketRegistry.json()
-    assert.ok(registryBody.registry.plugins.length > 0, 'dshmarket catalog is empty')
-
     browser = await chromium.launch({ headless: true })
     const page = await browser.newPage({ locale: 'en-US' })
     await page.goto(url, { waitUntil: 'domcontentloaded' })
@@ -819,9 +802,11 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     await page.locator('style[data-plugin-css="reasoning-slider"]').waitFor({ state: 'attached', timeout: 10_000 })
     await page.getByRole('button', { name: /^(?:鲸鱼娘（原版）|whale girl)$/u }).waitFor({ state: 'visible', timeout: 10_000 })
     await page.locator('button').filter({ hasText: /^(?:设置|Settings)$/u }).first().evaluate((button) => button.click())
-    await page.getByRole('button', { name: /^(?:插件市场|Plugin Market)$/u }).click()
-    await page.getByRole('heading', { name: /^(?:插件市场|Plugin Market)$/u }).waitFor({ state: 'visible', timeout: 10_000 })
-    await page.getByPlaceholder(/^(?:搜索插件，比如：通知、终端、记忆…|Search plugins: notify, terminal, memory…)$/u).waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(
+      await page.getByRole('button', { name: /^(?:插件市场|Plugin Market)$/u }).count(),
+      0,
+      'retired Runtime market entry must not remain mounted',
+    )
 
     const applySkin = await fetch(new URL('/api/skin-center/v2/active', url), {
       method: 'POST',

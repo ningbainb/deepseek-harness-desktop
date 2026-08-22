@@ -6,14 +6,14 @@
 {
   "dsh": {
     "compatibility": {
-      "desktop": { "range": ">=2.7.0 <3.0.0", "api": "^1.2.0" },
+      "desktop": { "range": ">=3.0.0 <4.0.0", "api": "^1.2.0" },
       "runtime": {
-        "range": ">=0.1.0-rc.7 <0.2.0",
+        "range": ">=0.1.0-rc.8 <0.2.0",
         "evidence": {
-          "providerId": "runtime-provider-host-job",
-          "runtime": "0.1.0-rc.7",
-          "desktop": "2.7.0",
-          "verifiedAt": "2026-08-20",
+          "providerId": "dsh-cli-provider-v1",
+          "runtime": "0.1.0-rc.8",
+          "desktop": "3.0.0",
+          "verifiedAt": "2026-08-21",
           "matrixArtifact": "apps/dsh-desktop/runtime-support/supported-runtimes.json"
         }
       },

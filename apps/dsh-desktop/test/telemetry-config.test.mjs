@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { resolveTelemetryEndpoint } from '../src/telemetry-config.mjs'
 
-test('keeps development and ordinary packaged builds disconnected', async () => {
+test('keeps development and ordinary packaged builds disconnected by default', async () => {
   let reads = 0
   const readFile = async () => {
     reads += 1
@@ -14,14 +14,15 @@ test('keeps development and ordinary packaged builds disconnected', async () => 
   assert.equal(await resolveTelemetryEndpoint({
     isPackaged: true,
     resourcesPath: 'resources',
-    readFile: async () => '{"endpoint":""}',
+    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events"}',
   }), undefined)
 })
 
-test('accepts only an exact credential-free HTTPS ingestion endpoint', async () => {
+test('accepts an ingestion endpoint only after an explicit opt-in seam', async () => {
   assert.equal(await resolveTelemetryEndpoint({
     isPackaged: true,
     resourcesPath: 'resources',
+    explicitlyEnabled: true,
     readFile: async () => '{"endpoint":"https://telemetry.example/v1/events"}',
   }), 'https://telemetry.example/v1/events')
 
@@ -34,6 +35,7 @@ test('accepts only an exact credential-free HTTPS ingestion endpoint', async () 
     assert.equal(await resolveTelemetryEndpoint({
       isPackaged: true,
       resourcesPath: 'resources',
+      explicitlyEnabled: true,
       readFile: async () => JSON.stringify({ endpoint }),
     }), undefined)
   }

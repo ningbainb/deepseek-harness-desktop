@@ -198,6 +198,16 @@ describe('WorktreeExecutionCoordinator', () => {
     expect(evidence.get('ev-run-cancel')).toMatchObject({ resultStatus: 'cancelled', worktreeId: 'wt-1' })
   })
 
+  it('answers false for a settled run instead of queueing a stale cancellation', async () => {
+    const { provider, worktrees } = fixture()
+    const coordinator = new WorktreeExecutionCoordinator(provider, worktrees, new InMemoryEvidenceStore())
+    await coordinator.run({ task, project, runId: 'run-settled-cancel', startedAt: 1 })
+    expect(await coordinator.cancel('run-settled-cancel')).toBe(false)
+    // A retry with the same run id must not inherit the stale cancellation.
+    const retried = await coordinator.run({ task, project, runId: 'run-settled-cancel', startedAt: 2 })
+    expect(retried.run.resultStatus).toBe('awaiting-review')
+  })
+
   it('reconciles a persisted Session without creating a second Worktree or prompt', async () => {
     const { provider, worktrees, session } = fixture({ complete: false })
     let prompts = 0

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/desktop-contract-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Contract v1",
+  "$comment": "Contract v1 accepts additive optional fields. A new required major must use a new contract schema.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["apiVersion", "surface", "capabilities"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "surface": {
+      "enum": ["main", "extensions", "community"]
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capabilityId" }
+    },
+    "runtime": { "$ref": "#/$defs/runtimeSnapshot" }
+  },
+  "$defs": {
+    "capabilityId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "supportStatus": {
+      "enum": ["known-good", "supported", "candidate", "blocked", "degraded", "unsupported"]
+    },
+    "capabilityStatus": {
+      "enum": ["available", "unavailable", "unsupported"]
+    },
+    "runtimeCapability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/capabilityId" },
+        "status": { "$ref": "#/$defs/capabilityStatus" }
+      }
+    },
+    "runtimeSnapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["providerId", "upstreamVersion", "supportStatus", "capabilities"],
+      "properties": {
+        "providerId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+        },
+        "upstreamVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "supportStatus": { "$ref": "#/$defs/supportStatus" },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/runtimeCapability" }
+        }
+      }
+    }
+  }
+}

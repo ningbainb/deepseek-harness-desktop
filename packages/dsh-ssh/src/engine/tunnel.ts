@@ -6,13 +6,14 @@
 
 import { createServer, type Server as NetServer, type Socket } from 'node:net'
 import type { TunnelInfo } from '../protocol.ts'
-import { acquire, disposeRecord, type PoolEngine } from './connection-pool.ts'
+import { acquire, disposeRecord, type PoolEngine, type PoolRecord } from './connection-pool.ts'
 
 /** One active tunnel record (server + pinned client + live sockets). */
 export interface TunnelRecord {
   info: TunnelInfo
   server: NetServer
   alias: string
+  record: PoolRecord
   sockets: Set<Socket>
 }
 
@@ -89,7 +90,7 @@ export async function startTunnel(
   const address = server.address()
   info.localPort = typeof address === 'object' && address !== null ? address.port : 0
   info.state = 'forwarding'
-  engine.tunnels.set(id, { info, server, alias, sockets })
+  engine.tunnels.set(id, { info, server, alias, record, sockets })
   return info
 }
 
@@ -108,7 +109,23 @@ export function stopTunnel(engine: TunnelEngine, id: string): boolean {
     try { socket.destroy() } catch { /* already closed */ }
   }
   tunnel.sockets.clear()
-  disposeRecord(engine, tunnel.alias)
+  if ([...engine.tunnels.values()].some(other => other.alias === tunnel.alias && other.record === tunnel.record)) {
+    // Another tunnel still pins this connection; keep it alive for them.
+    return true
+  }
+  if (engine.pool.get(tunnel.alias) === tunnel.record) {
+    // The last tunnel on this connection: unpin and tear it down unless a
+    // pooled operation is still in flight (the idle sweep then reaps it).
+    tunnel.record.pinned = false
+    if (tunnel.record.inFlight === 0) disposeRecord(engine, tunnel.alias, tunnel.record)
+    return true
+  }
+  // Our connection was replaced in the pool after it broke; end the orphan
+  // directly without touching the replacement that now serves other traffic.
+  try { tunnel.record.client.end() } catch { /* already closed */ }
+  for (const hop of tunnel.record.hops) {
+    try { hop.end() } catch { /* already closed */ }
+  }
   return true
 }
 

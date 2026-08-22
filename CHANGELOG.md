@@ -6,6 +6,32 @@
 
 English: No changes yet.
 
+## 3.0.0 - 2026-08-22
+
+中文：
+
+- 冻结 Desktop Contract 1.x、browser-safe Desktop Client SDK 1.x、Runtime Provider 1.x、`.dshpreset` v1、Task/Run/Evidence、Deep Link、运行时矩阵与兼容补丁注册表的公开边界；为每项提供机器可读 Schema、加性字段兼容夹具与公开版本策略。未来未知 major 会给出升级指引，不会被猜测性读取或写回覆盖。
+- Stable 启动只接受 `known-good` 或 `supported` 的精确 Runtime matrix 项，校验 provider、Desktop 范围、完整性、lockfile 证据与 patch registry；`candidate`、`blocked`、未知或旧诊断状态绝不会提升为 Stable。补丁项现在强制 owner、appliesTo、tests、removeWhen 和 lastVerified，并拒绝过期或无测试记录。
+- 新增独立迁移助手：它只扫描并私有快照允许的 profile/lock/managed settings/Task/Desktop/Runtime 状态，按 safe、needs-confirmation、blocked 生成计划，以原子 journal 支持崩溃后继续或回滚，并保留有限、已验证的快照。2.3–2.7 代表性 fixture 覆盖旧任务、Contract、Preset、Provider、Worktree/Evidence、Scheduler 与插件 metadata。
+- 更新系统支持 `stable` 与 `beta`；Stable 拒绝 prerelease，Beta 不会改写 Stable 元数据，切回 Stable 不自动降级更高 Beta。发布产物新增 SHA-256 `release-manifest.json`；未配置证书时正式社区版本可未签名，配置证书后自动强制 Authenticode signer/timestamp 验证，manifest 与正式发布说明记录实际状态。
+- 诊断导出升级为用户选择位置、确认后生成的脱敏 JSON/ZIP：包含内容清单与每文件哈希，只保留有界版本、运行时、恢复、任务/调度数量和更新状态；集中删除凭据、路径、URL query、Prompt、完整 Session、Tool Result、项目内容与 SSH 私钥。遥测默认关闭，诊断不上传。
+- Task/Evidence 读取改为允许列表正规化；未知未来 Task major 保留原文件并阻止写入，未知/敏感可选字段不再持久化。SDK 也在每次功能调用前检查 Contract capability 和安全 Deep Link ID。
+- 扩展坞加入原生社区插件市场，直接读取 `awesome-dsh-plugin.com/plugins.json` 索引并提供本地搜索、分类、排序和分页，不再嵌入第三方市场页面或显示其沙箱边界栏。安装只把不透明目录 ID 交给主进程解析，经一次原生确认后复用完整权限的事务安装、Runtime 重启和失败回滚；旧 `dshmarket` 运行时依赖已退役。
+- 新增独立嵌入式终端、受校验的 Managed Git 修复路径，以及不依赖主 Runtime 的恢复界面和隔离恢复会话；迁移完成标记缺失时可从已提交 journal 自愈，存在中断 journal 时仍严格保留恢复流程。
+- 修复 Task Ledger v3 过长错误文本导致后续写入永久失败、损坏 v3 被过期 v2 静默覆盖、SSH 断线重试失效、连接替换泄漏并拆错隧道、取消请求误报成功和分块上传绕过大小限制等稳定性问题，并补齐回归测试。
+
+English:
+
+- Freezes the public Desktop Contract 1.x, browser-safe Desktop Client SDK 1.x, Runtime Provider 1.x, `.dshpreset` v1, Task/Run/Evidence, Deep Link, runtime-matrix, and compatibility-patch boundaries. Each has a machine-readable schema, additive-field fixtures, and a public versioning policy. A future unsupported major reports an upgrade path rather than being guessed or overwritten.
+- Stable startup accepts only exact `known-good` or `supported` Runtime matrix entries and checks the provider, Desktop range, integrity, lockfile evidence, and patch registry. `candidate`, `blocked`, unknown, and legacy diagnostic states are never promoted to Stable. Patch records now require an owner, appliesTo, tests, removeWhen, and lastVerified, and stale or untested records fail the gate.
+- Adds an independent migration assistant. It scans and privately snapshots only allowlisted profile, lock, managed-setting, Task, Desktop, and Runtime state; emits safe, needs-confirmation, or blocked plans; and uses an atomic journal for resume or rollback after interruption with bounded verified retention. Representative 2.3–2.7 fixtures cover legacy tasks, Contract, Preset, Provider, Worktree/Evidence, Scheduler, and plugin metadata.
+- Updates now have `stable` and `beta` channels. Stable rejects prereleases, Beta cannot rewrite Stable metadata, and moving back to Stable never auto-downgrades a newer Beta. Release assets now have a SHA-256 `release-manifest.json`. An official community release may be unsigned without a certificate; configuring one automatically requires Authenticode signer/timestamp verification, and both the manifest and published notes record the actual state.
+- Diagnostic export is now an explicitly confirmed JSON/ZIP written only to a user-selected location. It has a content manifest and per-file hashes while retaining only bounded version, runtime, recovery, task/scheduler-count, and update state. A central redactor removes credentials, paths, URL queries, prompts, full sessions, tool results, project content, and SSH private keys. Telemetry is off by default and diagnostics are never uploaded.
+- Task/Evidence reads now use allowlisted normalization. An unknown future Task major preserves the original file and blocks writes; unknown or sensitive optional fields no longer persist. The SDK also checks Contract capabilities and safe Deep Link IDs before every feature call.
+- Extension Dock now includes a native community plugin market backed directly by the `awesome-dsh-plugin.com/plugins.json` index, with local search, category filtering, sorting, and pagination. It no longer embeds the third-party market page or its sandbox boundary banner. Installation passes only an opaque catalog ID to the main process, then reuses the full-permission transactional installer, Runtime restart, and rollback after one native confirmation; the old `dshmarket` runtime dependency is retired.
+- Added a standalone embedded terminal, a validated Managed Git repair path, and recovery surfaces and isolated recovery sessions that do not depend on the primary Runtime. A missing migration completion marker can self-heal from a committed journal, while an interrupted journal still preserves the strict recovery path.
+- Fixed Task Ledger v3 write poisoning from oversized error text, stale v2 data replacing a damaged v3 ledger, ineffective SSH disconnect retries, connection replacement leaks and wrong-tunnel teardown, cancellation falsely reporting success, and chunked uploads bypassing the size limit, with regression coverage for each class.
+
 ## 2.7.0 - 2026-08-20
 
 中文：
@@ -40,7 +66,7 @@ English:
 - Git Graph Host 增加受控 Worktree 服务和 ID-only loopback 路由，限制 realpath、分支、冲突、操作中状态和丢弃确认；取消只取消 Session，不自动清理 Worktree。
 - Runtime Provider 缺少 `workspace.register`、`session.create` 或 `session.observe` 时记录能力证据并显式回退现有 shared-workspace；Session CWD 不匹配时阻断。
 - 增加有界 Evidence 面板、Commit/Merge/Keep/二次确认 Discard 审核、运行通知 Deep Link，以及真实临时 Git 仓库 Candidate 执行兼容夹具。
-- 官方正式版默认启用仅用于产品改进的有界匿名统计，不提供应用内关闭开关；不收集持久标识、IP、对话、文件、路径、凭据、日志或堆栈，不保存原始事件，按日汇总最长保留 365 天。源码、开发、测试与 Fork 构建不包含官方统计端点。
+- 历史 2.6 正式版曾默认启用仅用于产品改进的有界匿名统计；该默认值已由 3.0.0 的“默认关闭、仅用户主动诊断导出”政策取代。
 
 English:
 
@@ -48,7 +74,7 @@ English:
 - Git Graph Host adds a controlled Worktree service and ID-only loopback routes with realpath, branch, conflict, in-progress, and discard-confirmation fences. Cancellation cancels only the Session and never removes a Worktree implicitly.
 - When `workspace.register`, `session.create`, or `session.observe` is unavailable, the Runtime Provider records capability evidence and falls back explicitly to the existing shared-workspace executor; a Session CWD mismatch is blocked.
 - Added a bounded Evidence panel, Commit/Merge/Keep/two-step Discard review, run deep-link notifications, and a real temporary Git repository Candidate execution fixture.
-- Official release builds enable bounded anonymous product metrics by default without an in-app off switch, solely for product improvement. They collect no persistent identifier, IP address, conversation, file, path, credential, log, or stack trace, retain no raw events, and expire daily aggregates after at most 365 days. Source, development, test, and Fork builds contain no official endpoint.
+- Historical 2.6 release builds enabled bounded anonymous product metrics by default. That default is superseded in 3.0.0 by the off-by-default, user-initiated diagnostic-export policy.
 
 ## 2.5.0 - 2026-08-19
 

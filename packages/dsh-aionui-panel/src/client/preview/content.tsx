@@ -413,9 +413,9 @@ function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
     setUrl(normalizeUrl(tab.content ?? ''))
   }, [tab.id, tab.content])
 
-  // The frame is sandboxed WITH allow-popups: sites like bilibili hardcode
-  // target=_blank on their nav links, so popups are permitted rather than
-  // silently dropped. allow-same-origin is intentionally OMITTED, so the
+  // The frame is sandboxed without popup authority. Embedded pages must stay
+  // inside the preview instead of spawning a browser window behind Desktop.
+  // allow-same-origin is intentionally OMITTED, so the
   // embedded site runs in an OPAQUE origin: it cannot reach window.parent or
   // touch same-origin storage, which also means localStorage access inside
   // the frame throws. The load guard and normalizeUrl's same-origin block
@@ -463,7 +463,7 @@ function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
         className={previewCss.urlFrame}
         src={url}
         title={tab.title}
-        sandbox="allow-scripts allow-forms allow-popups"
+        sandbox={URL_PREVIEW_SANDBOX}
         allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
         allowFullScreen
         onLoad={guardFrameNavigation}
@@ -471,6 +471,9 @@ function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
     </div>
   )
 }
+
+/** Embedded pages can render and submit forms, but cannot open new windows. */
+export const URL_PREVIEW_SANDBOX = 'allow-scripts allow-forms'
 
 /** Bare domains get https://; whitespace queries go to a search engine. */
 export function normalizeUrl(input: string): string {

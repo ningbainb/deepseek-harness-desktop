@@ -1,6 +1,12 @@
 import { EventEmitter } from 'node:events'
 
 import { emitBestEffort } from './best-effort-events.mjs'
+import {
+  DEFAULT_UPDATE_CHANNEL,
+  evaluateUpdateForChannel,
+  normalizeUpdateChannel,
+  updateChannelConfiguration,
+} from './release-channel.mjs'
 
 export const UPDATE_STARTUP_DELAY_MS = 15_000
 export const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -71,6 +77,7 @@ export class DesktopUpdateController extends EventEmitter {
     beforeInstall = async () => {},
     onInstallFailure = async () => {},
     downloadRouter,
+    updateChannel = DEFAULT_UPDATE_CHANNEL,
     installLaunchTimeoutMs = UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
     setTimeoutFn = setTimeout,
     setIntervalFn = setInterval,
@@ -86,6 +93,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.beforeInstall = beforeInstall
     this.onInstallFailure = onInstallFailure
     this.downloadRouter = downloadRouter
+    this.updateChannel = normalizeUpdateChannel(updateChannel)
     this.installLaunchTimeoutMs = installLaunchTimeoutMs
     this.setTimeoutFn = setTimeoutFn
     this.setIntervalFn = setIntervalFn
@@ -108,7 +116,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.started = true
     this.updater.autoDownload = false
     this.updater.autoInstallOnAppQuit = false
-    this.updater.allowPrerelease = false
+    this.#configureUpdateChannel()
     this.updater.fullChangelog = false
     this.#listen('update-available', (info) => void this.#handleAvailable(info))
     this.#listen('update-not-available', () => void this.#handleNotAvailable())
@@ -162,6 +170,19 @@ export class DesktopUpdateController extends EventEmitter {
 
   async #handleAvailable(info) {
     if (this.downloading) return
+    const decision = evaluateUpdateForChannel({
+      currentVersion: this.currentVersion,
+      candidateVersion: info?.version,
+      channel: this.updateChannel,
+    })
+    if (!decision.accepted) {
+      const manual = this.manualCheck
+      this.checking = false
+      this.manualCheck = false
+      this.#appendDiagnostic(`[updater] ignored ${info?.version || 'unknown'} on ${this.updateChannel}: ${decision.reason}`)
+      this.#publish({ phase: 'current', visible: manual })
+      return
+    }
     this.checking = false
     this.manualCheck = false
     this.#appendDiagnostic(`[updater] version ${info?.version || 'unknown'} is available`)
@@ -263,6 +284,23 @@ export class DesktopUpdateController extends EventEmitter {
 
   getStatus() {
     return { ...this.status }
+  }
+
+  getChannel() {
+    return this.updateChannel
+  }
+
+  setUpdateChannel(channel) {
+    this.updateChannel = normalizeUpdateChannel(channel)
+    if (this.updater) this.#configureUpdateChannel()
+    return updateChannelConfiguration(this.updateChannel)
+  }
+
+  #configureUpdateChannel() {
+    const configuration = updateChannelConfiguration(this.updateChannel)
+    this.updater.channel = configuration.updaterChannel
+    this.updater.allowPrerelease = configuration.allowPrerelease
+    this.updater.allowDowngrade = configuration.allowDowngrade
   }
 
   #publish(status) {

@@ -33,8 +33,13 @@ export async function resolveTelemetryEndpoint({
   resourcesPath,
   readFile = readFileDefault,
   testEndpoint,
+  explicitlyEnabled = false,
 }) {
   if (testEndpoint !== undefined) return validEndpoint(testEndpoint, { allowLocalHttp: true })
+  // Desktop 3.0 never enables collection merely because an official build
+  // happens to contain an endpoint. A future opt-in surface must pass this
+  // explicit flag after recording the user's choice locally.
+  if (explicitlyEnabled !== true) return undefined
   if (isPackaged !== true || typeof resourcesPath !== 'string' || resourcesPath.length === 0) return undefined
   let configuration
   try {

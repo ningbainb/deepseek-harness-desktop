@@ -40,7 +40,7 @@ export type DesktopContract = {
     runtime?: {
         providerId: string;
         upstreamVersion: string;
-        supportStatus: 'known-good' | 'degraded' | 'unsupported';
+        supportStatus: 'known-good' | 'supported' | 'candidate' | 'blocked' | 'degraded' | 'unsupported';
         capabilities: readonly {
             id: string;
             status: 'available' | 'unavailable' | 'unsupported';
@@ -71,6 +71,9 @@ export declare class DesktopClientError extends Error {
     constructor(code: DesktopClientError['code'], message: string);
 }
 type Unsubscribe = () => void;
+export type PluginInstallRequestResult = {
+    accepted: boolean;
+} | DesktopAvailability;
 export type DesktopClient = Readonly<{
     getDesktopInfo: () => Promise<DesktopInfo | DesktopAvailability>;
     getContract: () => Promise<DesktopContract | DesktopAvailability>;
@@ -81,6 +84,15 @@ export type DesktopClient = Readonly<{
     subscribeDeepLinks: (handler: (link: string) => void) => Unsubscribe;
     openDesktopSurface: (surface: DesktopSurface) => Promise<boolean>;
     openWorkspaceFile: (request: WorkspaceFileOpenRequest) => Promise<WorkspaceFileOpenResult>;
+    /**
+     * Hand a remote npm/git/HTTPS plugin reference to the Desktop. The
+     * Extension Dock opens with the source pre-filled; its install form and
+     * the native approval dialog own every later decision. Nothing is
+     * installed by this call.
+     */
+    requestPluginInstall: (request: {
+        source: string;
+    }) => Promise<PluginInstallRequestResult>;
 }>;
 /** Create a public client around an optional typed Desktop bridge. */
 export declare function createDesktopClient({ globalObject }?: {
@@ -95,6 +107,9 @@ export declare const showNotification: (request: DesktopNotificationRequest) => 
 export declare const subscribeDeepLinks: (handler: (link: string) => void) => Unsubscribe;
 export declare const openDesktopSurface: (surface: DesktopSurface) => Promise<boolean>;
 export declare const openWorkspaceFile: (request: WorkspaceFileOpenRequest) => Promise<WorkspaceFileOpenResult>;
+export declare const requestPluginInstall: (request: {
+    source: string;
+}) => Promise<PluginInstallRequestResult>;
 export declare function taskDeepLink(taskId: string): string;
 export declare function runDeepLink(runId: string): string;
 export {};

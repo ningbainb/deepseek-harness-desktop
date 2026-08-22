@@ -1,0 +1,25 @@
+{
+  "desktopVersion": "2.3.0",
+  "schemaVersion": 1,
+  "storage": "localStorage",
+  "tasks": [
+    {
+      "id": "task-23",
+      "title": "2.3 browser ledger task",
+      "description": "Representative browser-owned task retained during migration.",
+      "prompt": "Only run after the migrated Task is opened.",
+      "status": "todo",
+      "createdAt": 1700002300000,
+      "updatedAt": 1700002301000,
+      "executions": [
+        {
+          "id": "run-23",
+          "sessionId": "session-23",
+          "startedAt": 1700002300100,
+          "endedAt": 1700002300200,
+          "result": "succeeded"
+        }
+      ]
+    }
+  ]
+}

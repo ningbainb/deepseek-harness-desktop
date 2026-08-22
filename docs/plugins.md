@@ -1,6 +1,6 @@
 # 如何把新插件加入全家桶
 
-本指南说明如何把一个新插件加入 dsh-web-ui 全家桶，使其可以被聚合插件包（`dsh-web-ui-all` / `dsh-skins`）一键装齐，也可独立安装。
+本指南说明如何把插件加入 `dsh-web-ui-all` / `dsh-skins` 聚合包，同时保留独立安装能力。
 
 ## 流程
 
@@ -10,7 +10,7 @@
 node scripts/dsh-plugin-new <name>
 ```
 
-在 `packages/<name>/` 生成标准 bundle 骨架（`<name>` 限小写字母、数字、单连字符，如 `dsh-task-board`），并替换模板中的 `__NAME__` 占位。生成的结构：
+命令在 `packages/<name>/` 生成 bundle 骨架并替换 `__NAME__`；名称只允许小写字母、数字和单连字符，例如 `dsh-task-board`：
 
 ```text
 packages/<name>/
@@ -40,7 +40,7 @@ packages/<name>/
 - `patchFrom`：该包的 `cordis.patch.yml` insert 行会被汇总进聚合包 patch；
 - `deps`：解析为包名写入聚合包 `package.json` 的 `dependencies`（`workspace:*`）。
 
-皮肤（新增或改动）不需要进任何 aggregate.yml：`packages/dsh-skins/build.mjs` 会把 `packages/skins/<id>` 的 `skin.json` + `lib/client.js` 复制进 `dsh-skins/skins/<id>`（npm 上皮肤资产全部内置在 dsh-skins 一个包里，避免为每个皮肤包名付 npm 新包名费用）。改完皮肤后运行 `pnpm --filter @linxin666/dsh-skins build`。皮肤启用互斥由 `dsh-skin use` 管理（`~/.dsh/cordis.patch.yml` managed 区段）。
+皮肤不进 aggregate.yml；`packages/dsh-skins/build.mjs` 会把各皮肤的 `skin.json` 和 `lib/client.js` 收入 `dsh-skins`。修改后运行 `pnpm --filter @linxin666/dsh-skins build`；启用互斥由 `dsh-skin use` 管理。
 
 ### 4. 重新生成聚合包
 
@@ -56,16 +56,7 @@ pnpm install   # workspace 链接（packages/* 与 packages/skins/*）
 pnpm -r build  # 全仓构建
 ```
 
-> **前置要求**：类型来源是官方 NPM SDK——`@deepseek-ai/*` 官方 NPM SDK 包（scope registry 为
-> registry.npmjs.org），**不依赖任何 DSH 源码 checkout**。首次构建前：
-> 1. 若仍使用私有 scope 认证，设置环境变量 `export NPM_TOKEN='<token>'`（真实令牌只放环境变量，勿提交）；
->    当前 SDK 已结束内测，公开包通常无需令牌即可安装；
-> 2. token 放**用户级 `~/.npmrc`**（`//registry.npmjs.org/:_authToken=${NPM_TOKEN}`，由 pnpm 展开
->    环境变量）；项目 `.npmrc` 只留 scope 映射（`@deepseek-ai:registry=https://registry.npmjs.org/`，
->    已在 `.gitignore` 中）。注意：项目级 `.npmrc` 里的 `${NPM_TOKEN}` 占位符在 pnpm 11 下不会被
->    展开、被忽略，不承担认证职责；
-> 3. 所有 pnpm/npm 命令必须在设置了 `NPM_TOKEN` 的环境中执行（fresh shell 需自行 export）。
-> 缺失时 `pnpm install` 无法拉取私有 SDK 包，`pnpm -r build` / `pnpm typecheck` 会失败。
+> **前置要求**：类型只来自 registry.npmjs.org 上公开的 `@deepseek-ai/*` NPM SDK，不依赖 DSH 源码 checkout。若环境仍需私有 scope 认证，只在环境变量或用户级 `~/.npmrc` 中配置 `NPM_TOKEN`，勿提交；项目 `.npmrc` 仅保留 scope registry 映射。
 
 ### 6. 本地验证
 
@@ -82,16 +73,13 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 
 重启 `dsh web`，确认聚合包插件行挂载生效。调试阶段也可先单独安装单包（`link:<dsh-web-ui>/packages/<name>`）验证。
 
-> 注意：profile 目录不是 pnpm workspace，聚合包 package.json 里的 `workspace:*` 依赖无法就地解析，
-> 会回退拉取 npm 已发布的版本——若 npm 版本滞后或损坏（如历史上的 dsh-pet 0.1.1 缺 chunk），
-> 会出现「宿主已挂载但 UI 不显示」的现象。此时用 `node scripts/link-profile.mjs` 把仓库构建产物
-> 链接进 `~/.dsh/profiles/node_modules/@linxin666/`，即可让全部子包走本地代码。
+> profile 目录不是 pnpm workspace，`workspace:*` 会回退到 npm 已发布版本。若版本滞后导致 UI 未显示，运行 `node scripts/link-profile.mjs`，让 profile 使用本地构建产物。
 
 ## 第三方插件准入原则
 
 家族仓库欢迎社区插件，但收编必须透明：
 
-1. **活跃且有上游的第三方 → 不搬代码**。优先 fork 到 dsh-external 组织维护（保留上游关联，可随时 merge 上游更新），或作为依赖引用；全家桶只注册其安装入口。
+1. **活跃且有上游的第三方 → 不搬代码**。优先在 dsh-external fork 并保留上游关联，或直接作为依赖；全家桶只登记安装入口。
 2. **收编条件**（无活跃上游、上游已停更、或作者明确授权组织托管）：
    - 用 `git subtree add` 迁入，保留完整 git 历史；
    - **必须**保留上游 LICENSE 文件与作者署名（包内 LICENSE、README 作者声明）；
@@ -101,11 +89,11 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 
 ### Desktop 社区插件入口
 
-桌面版不再由 `dsh-web-ui-settings` 挂载旧的「社区插件」组内卡片；发现、安装、恢复与回滚统一由扩展坞的 Plugin Market（`dshmarket`）负责。`community.json` 与 `scripts/community-index` 仍是仓库内受版本控制的贡献者元数据和一致性门禁，但它们不会创建桌面设置卡片，也不会授权自动安装第三方包。
+扩展坞原生市场读取 awesome-dsh-plugin 公开目录并在本地检索。点击安装后，主进程把目录 ID 解析为安装源，复用确认、事务安装和失败回滚。市场不嵌入第三方页面或执行目录命令；`community.json` 与 `scripts/community-index` 仅保存贡献者元数据并执行一致性校验。
 
 ### Desktop 兼容性声明
 
-社区 bundle 可在 `package.json` 的 `dsh.compatibility` 中声明 Desktop 契约；字段、示例和 `desktop-plugins.lock.json` 见 [Desktop 插件兼容性声明](desktop-plugin-compatibility.md)。未声明项为“未知”，必须经扩展坞确认，不能当作已适配。
+社区 bundle 可用 `package.json#dsh.compatibility` 声明 Desktop 契约，详见 [Desktop 插件兼容性声明](desktop-plugin-compatibility.md)。未声明项视为“未知”，安装前必须确认。
 
 ## 插件规范要点
 
@@ -119,7 +107,7 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 ```
 
 - **类型来源（只能基于官方 NPM SDK）**：各包把用到的 `@deepseek-ai/*` 包声明为 `devDependencies`
-  （`^0.1.0-rc.7`；cordis 用 `^4.0.1`），TS 从 node_modules 自动解析类型
+  （`^0.1.0-rc.8`；cordis 用 `^4.0.1`），TS 从 node_modules 自动解析类型
   （SDK 包的 `exports["."].types` 统一指向 `lib/types/index.d.ts`，client 半区子路径
   `./client` 同理）。**禁止** tsconfig `extends` / `paths` / `references` 指向任何 DSH 源码
   checkout（历史形态：`../../../test-zhu1090093659` 相对路径、`~/.dsh/source/current` 绝对
@@ -139,10 +127,10 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
   处理 CSS）；client 半区闭包工厂在测试中不可直接 import——用 `vitest.setup.ts` 的最小
   `__ModuleLoader__` stub（`packages/dsh-live-stats/vitest.setup.ts`）或 `vi.mock` 替换
   （`packages/dsh-remote-web-ui/tests/remote-entry.spec.tsx` 的 `createSnapshotStore` mock）。
-- **设置页插件配置（rc.7 槽位契约）**：`settings.section` 是以 `id` 定位的 list 槽，适合注册一级设置页；`settings.plugin.item` 是 keyed 槽，注册者必须提供 `key`，不能用它承载全家桶根卡。`dsh-web-ui-settings` 在 `settings.section` 注册 `web-ui-plugins` 一级分区，并声明 list 形态的 `web-ui.plugin.item` 子槽；各功能插件把自己的卡片注册进该子槽，从而在设置页收拢为一个「Web UI 插件」分区。插件接入仍只需两步：
-  1. **host 半区**：`installSettingsSection(ctx, settingsNamespace('<ns>'), <z-schema>, <composition entry>, { setSource, onChange })`（`@deepseek-ai/dsh-settings`）注册命名空间；`setSource` 注入动态读取器，`onChange` 让已派生的行为跟随已提交的修改，无需重启。
-  2. **browser 半区**：注入 `settingsScope`（`@deepseek-ai/dsh-client-ui-settings` 提供 `ctx.settingsScope`；`bind()` 还要求调用方注入 `connection` 与 `remote`），`ctx.settingsScope.bind({ namespace })` 读写该命名空间，并注册 `web-ui.plugin.item` 卡片（自行 `declare module '@deepseek-ai/dsh-client-ui-slots'` 声明该槽，shape 与 `ui-plugin-config` 一致；slot `order` 用 100+ 避开内置卡片）。样板实现见 `packages/dsh-remote-web-ui`（`src/client/settings-form.ts` + `PluginSettingsCard.tsx` + `*SettingsCard.tsx`，自包含的 staged 表单，不依赖兄弟 UI 包）。
-- **皮肤类插件**：改用 `scripts/dsh-skin-new` 脚手架（皮肤规范见 skin-center / 各皮肤包 README），不经过本流程第 3-4 步的 `dsh-web-ui-all` 注册。皮肤中心的 GUI 卡片通过 `web-ui.plugin.item` 子槽接入「Web UI 插件」分区；不得把它注册到官方 keyed 的 `settings.plugin.item` 槽。
+- **设置页插件配置（rc.8 槽位契约）**：`dsh-web-ui-settings` 在 list 槽 `settings.section` 注册 `web-ui-plugins` 分区，并声明 list 子槽 `web-ui.plugin.item`；功能插件把卡片注册到该子槽。官方 keyed 槽 `settings.plugin.item` 要求 `key`，不承载全家桶根卡。接入分两步：
+  1. **host 半区**：用 `installSettingsSection(...)` 注册命名空间；`setSource` 提供动态读取，`onChange` 同步已提交的修改。
+  2. **browser 半区**：注入 `settingsScope`、`connection` 和 `remote`，调用 `bind({ namespace })` 并注册 `web-ui.plugin.item` 卡片。样板见 `packages/dsh-remote-web-ui`；slot `order` 使用 100+。
+- **皮肤类插件**：使用 `scripts/dsh-skin-new`，不走 `dsh-web-ui-all` 注册；GUI 卡片加入 `web-ui.plugin.item`，不得加入 keyed 的 `settings.plugin.item`。
 ## 移植 harness 插件的挂载约束
 
-聚合包 insert 行不带 `config`，loader 调 `apply` 前会用插件 schema 默认值填充配置；`apply` 若无条件加载时校验会把填充后的空配置当配置而抛错，profile 加载失败。应改为：组合条目配置了关键字段才在加载时校验，否则调用时提示「未配置」（settings section 提交仍严格校验）。参考 `packages/dsh-tool-describe-image`。
+聚合包 insert 行不带 `config`，loader 会先填充 schema 默认值。`apply` 只在关键字段存在时校验；否则调用时提示“未配置”，设置页提交仍严格校验。参考 `packages/dsh-tool-describe-image`。

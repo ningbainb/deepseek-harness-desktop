@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "name": "Minimal Desktop 3.0.0 preset",
+  "description": "A no-package, no-secret fixture for Desktop 3.0.0 documentation.",
+  "createdAt": "2026-08-20T00:00:00.000Z",
+  "source": {
+    "desktopVersion": "3.0.0",
+    "runtimeVersion": "0.1.1-rc.1"
+  },
+  "requiredCapabilities": [],
+  "requiredSecrets": []
+}

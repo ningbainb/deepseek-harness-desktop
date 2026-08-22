@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 2.7.0 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface, fixes Windows Runtime startup, and adds opt-in tray background automation, Host durable task scheduling, extension compatibility evidence, a browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix.
+> DeepSeek Harness Desktop 3.0.0 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface and adds stable public contracts and schemas, a controlled Runtime support matrix, safe migration and rollback, Stable/Beta channels, release-manifest verification, and user-initiated privacy-redacted diagnostics.
 
 ## What it is
 
@@ -15,8 +15,8 @@
 
 ## Download
 
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-2.7.0-x64.exe
-- v2.7.0 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v2.7.0
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.0.0-x64.exe
+- v3.0.0 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.0.0
 
 ## Source and documentation
 
@@ -28,9 +28,11 @@
 ## Key facts
 
 - Supported systems: Windows 10 and Windows 11, x64
-- Current release: v2.7.0
-- v2.7.0 fixes the Windows 8% Runtime startup path, upgrades to DSH rc.7, and adds opt-in tray background automation, Host durable Task Board scheduling, plugin compatibility evidence/lock diagnostics, safe workspace external opening, and Candidate Matrix
-- Official release builds enable bounded anonymous product metrics by default for product improvement; source and Fork builds contain no official endpoint, and the complete boundary is published in the privacy policy
+- Current release: v3.0.0
+- v3.0.0 freezes the 1.x SDK/Contract/Provider boundaries and public schemas, limits Stable Runtime to verified `known-good` or `supported` matrix entries, covers the 2.3–2.7 migration matrix by detecting, validating, and snapshotting recognized v2/v3 state while treating legacy browser-localStorage state as confirmation-required and non-disclosing in the scan; after confirmation, supported preserved-origin v1 data can be copied only into an empty v3 Host ledger and verified by task count/fingerprint without removing the original browser value, while an unknown, missing, or changed origin blocks the copy for recovery, and Stable/Beta updates remain separate without automatic downgrades
+- Published assets include `SHA256SUMS.txt` and `release-manifest.json`; the manifest reports the actual per-asset signature state. A local or source build may be unsigned and does not establish the state of a published asset
+- Desktop telemetry is disabled by default. Diagnostics are generated only after user confirmation to a selected local location and are redacted to exclude secrets, user content, full prompts, full sessions, tool results, project content, paths, and SSH private keys
+- The public website does not automatically report installer clicks; installer links remain direct GitHub Release downloads
 - Skin state is isolated in profiles/desktop and legacy global cordis.patch.yml pollution is migrated away so the official dsh web profile remains valid
 - Installer preflight supports direct upgrades from 0.1.9 through 2.3 and closes legacy product-name processes even when their old installation path is no longer registered
 - Preflight decodes PowerShell EncodedCommand payloads, preserves Windows 8.3 short-path references, falls back to WMI paths when process handles are unavailable, and waits with backoff after forced termination
@@ -48,7 +50,7 @@
 - Task board, Git graph, file and change preview, live token statistics, pet, and 11 skins
 - Mobile pairing for workspaces, conversations, models, reasoning, and permissions
 - SSH terminal, SFTP, port forwarding, cluster execution, and live system monitoring
-- Stable GitHub Release checks, background downloads, bilingual release notes, checksums, and user-confirmed installation
+- Stable/Beta GitHub Release checks, background downloads, bilingual release notes, checksums, release manifests, and user-confirmed installation
 
 ## Interface screenshots
 
@@ -61,4 +63,4 @@
 
 DeepSeek Harness Desktop, community-maintained open-source Windows desktop distribution for DeepSeek Harness: https://ningbainb.github.io/deepseek-harness-desktop/
 
-Privacy policy and anonymous product metrics boundary: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
+Privacy policy and Desktop diagnostic boundary: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html

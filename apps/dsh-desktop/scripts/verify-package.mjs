@@ -3,7 +3,12 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import YAML from 'yaml'
+import sharp from 'sharp'
 
+import afterPack from './after-pack.cjs'
+
+import { selectManagedGitRelease, verifyManagedGitInstall } from '../src/managed-git.mjs'
+import { MANAGED_GIT_MANIFEST } from '../src/managed-git-manifest.mjs'
 import {
   BUILTIN_SKIN_IDS,
   DSH_BOOT_RUNTIME_PACKAGES,
@@ -11,6 +16,14 @@ import {
   packagePathSegments,
 } from '../src/profile.mjs'
 import { CRITICAL_RUNTIME_FILES } from '../src/runtime-integrity.mjs'
+import {
+  assessRuntimeSupport,
+  normalizeKnownGoodRuntimeEvidence,
+  readRuntimePackageVersion,
+  readRuntimeSupportMatrix,
+  STABLE_RUNTIME_MATRIX_STATUSES,
+  verifyRuntimeFileEvidence,
+} from '../src/runtime-support-policy.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argumentsList = process.argv.slice(2)
@@ -18,11 +31,15 @@ const allowMissingUpdateMetadata = argumentsList.includes('--allow-missing-updat
 const resourcesArgument = argumentsList.find((argument) => !argument.startsWith('--'))
 const resources = resolve(resourcesArgument || join(appDir, 'dist', 'win-unpacked', 'resources'))
 const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
+const { packageSupportsPlatform } = afterPack
+const TARGET_PLATFORM = Object.freeze({ platform: 'win32', arch: 'x64' })
+const ELECTRON_LOCALES = Object.freeze(['en-US.pak', 'zh-CN.pak', 'zh-TW.pak'])
 const requiredPackages = [
   ...DSH_BOOT_RUNTIME_PACKAGES,
   '@deepseek-ai/dsh-host-directory-picker',
   'electron-updater',
   'fflate',
+  'node-pty',
   'pnpm',
   'semver',
   '@tencent-connect/qqbot-connector',
@@ -42,6 +59,83 @@ for (const packageName of requiredPackages) {
 }
 
 await access(join(unpackedModules, '@deepseek-ai', 'dsh', 'lib', 'bin.js'))
+const packagedRuntimeEvidence = normalizeKnownGoodRuntimeEvidence(JSON.parse(await readFile(
+  join(resources, 'runtime-support', 'known-good.json'),
+  'utf8',
+)))
+const packagedRuntimeVersion = await readRuntimePackageVersion({
+  cliPath: join(unpackedModules, '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+  readFile,
+})
+if (packagedRuntimeVersion !== packagedRuntimeEvidence.runtimeVersion) {
+  throw new Error('packaged Runtime package version does not match Known Good evidence')
+}
+
+const packagedPackageDirectories = []
+for (const entry of await readdir(unpackedModules, { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue
+  const entryRoot = join(unpackedModules, entry.name)
+  if (!entry.name.startsWith('@')) {
+    packagedPackageDirectories.push(entryRoot)
+    continue
+  }
+  for (const child of await readdir(entryRoot, { withFileTypes: true })) {
+    if (child.isDirectory()) packagedPackageDirectories.push(join(entryRoot, child.name))
+  }
+}
+for (const packageRoot of packagedPackageDirectories) {
+  let manifest
+  try {
+    manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error instanceof SyntaxError) continue
+    throw error
+  }
+  if (!packageSupportsPlatform(manifest, TARGET_PLATFORM)) {
+    throw new Error(`packaged Runtime retains a foreign-platform package: ${manifest.name}`)
+  }
+}
+
+const electronLocales = (await readdir(join(resources, '..', 'locales')))
+  .filter(file => file.endsWith('.pak'))
+  .toSorted()
+if (JSON.stringify(electronLocales) !== JSON.stringify([...ELECTRON_LOCALES].toSorted())) {
+  throw new Error(`packaged Electron locales differ from the supported set: ${electronLocales.join(', ')}`)
+}
+const packagedRuntimeFileHashes = await verifyRuntimeFileEvidence({
+  cliPath: join(unpackedModules, '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+  expectedFileHashes: packagedRuntimeEvidence.fileHashes,
+  readFile,
+})
+const packagedRuntimeMatrix = await readRuntimeSupportMatrix(
+  join(resources, 'runtime-support', 'supported-runtimes.json'),
+  { readFile },
+)
+const packagedRuntimeAssessment = assessRuntimeSupport(packagedRuntimeMatrix, {
+  upstreamVersion: packagedRuntimeVersion,
+  providerId: packagedRuntimeEvidence.providerId,
+  desktopVersion: packagedRuntimeEvidence.desktopVersion,
+  integrity: packagedRuntimeEvidence.integrity,
+  lockfileSha256: packagedRuntimeEvidence.lockfile.sha256,
+  fileHashes: packagedRuntimeFileHashes,
+  patchEvidence: packagedRuntimeEvidence.patches,
+})
+if (!STABLE_RUNTIME_MATRIX_STATUSES.includes(packagedRuntimeAssessment.status)) {
+  throw new Error(`packaged Runtime support matrix is not Stable eligible: ${packagedRuntimeAssessment.reason}`)
+}
+const packagedManagedGitRelease = selectManagedGitRelease(MANAGED_GIT_MANIFEST, {
+  platform: 'win32',
+  arch: 'x64',
+})
+if (packagedManagedGitRelease === null) throw new Error('packaged managed Git release is missing')
+const packagedManagedGit = await verifyManagedGitInstall({
+  userDataDirectory: resources,
+  release: packagedManagedGitRelease,
+})
+if (packagedManagedGit.version !== packagedManagedGitRelease.version) {
+  throw new Error('packaged managed Git version does not match its reviewed manifest')
+}
+await access(join(resources, 'managed-git', 'current', 'LICENSE.txt'))
 await access(join(unpackedModules, 'pnpm', 'bin', 'pnpm.mjs'))
 for (const relativePath of CRITICAL_RUNTIME_FILES) {
   await access(join(unpackedModules, ...relativePath.split('/')))
@@ -104,8 +198,27 @@ for (const skinId of BUILTIN_SKIN_IDS) {
     ['light preview', manifest.preview?.light],
     ['dark preview', manifest.preview?.dark],
   ]) {
-    if (asset !== undefined) await access(skinAssetPath(skinRoot, asset, `${skinId} ${name}`))
+    if (asset === undefined) continue
+    const packagedAssetPath = skinAssetPath(skinRoot, asset, `${skinId} ${name}`)
+    await access(packagedAssetPath)
+    if (name === 'light preview' || name === 'dark preview') {
+      const metadata = await sharp(packagedAssetPath).metadata()
+      if ((metadata.width ?? 0) > 1440 || (metadata.height ?? 0) > 900) {
+        throw new Error(`packaged Skin Center preview exceeds 1440x900 for ${skinId}`)
+      }
+    }
   }
+}
+try {
+  const demoEntries = await readdir(
+    join(unpackedModules, 'cytoscape-fcose', 'demo'),
+    { recursive: true, withFileTypes: true },
+  )
+  if (demoEntries.some(entry => entry.isFile())) {
+    throw new Error('packaged Runtime still contains cytoscape-fcose demo assets')
+  }
+} catch (error) {
+  if (error?.code !== 'ENOENT') throw error
 }
 const retiredSkinCarrierRoot = join(unpackedModules, '@linxin666', 'dsh-skins')
 const retiredSkinCarrier = JSON.parse(await readFile(join(retiredSkinCarrierRoot, 'package.json'), 'utf8'))
@@ -134,6 +247,8 @@ if (sshClientBytes > 250_000 || sshClient.includes('CoreBrowserTerminal')) {
 }
 await access(join(unpackedModules, '@xterm', 'xterm', 'lib', 'xterm.js'))
 await access(join(unpackedModules, '@xterm', 'addon-fit', 'lib', 'addon-fit.js'))
+await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty.node'))
+await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty', 'conpty.dll'))
 const aggregatePatch = await readFile(
   join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'cordis.patch.yml'),
   'utf8',
@@ -242,6 +357,14 @@ if (!allowMissingUpdateMetadata) await access(join(resources, 'app-update.yml'))
 // TTY, so that file is commonly stale in CI. Validate the same config file the
 // successful package command consumed instead of trusting a leftover artifact.
 const packagingConfig = YAML.parse(await readFile(join(appDir, 'electron-builder.yml'), 'utf8'))
+if (packagingConfig.compression !== 'maximum') {
+  throw new Error('packaging config must use maximum compression')
+}
+if (JSON.stringify(packagingConfig.electronLanguages) !== JSON.stringify(
+  ELECTRON_LOCALES.map(locale => locale.slice(0, -'.pak'.length)),
+)) {
+  throw new Error('packaging config Electron locale allowlist is invalid')
+}
 if (!packagingConfig.protocols?.some((entry) => entry.schemes?.includes('dsh'))) {
   throw new Error('packaging config is missing the dsh protocol registration')
 }
@@ -250,6 +373,17 @@ if (!packagingConfig.fileAssociations?.some((entry) => entry.ext === 'dshpreset'
 }
 if (!packagingConfig.extraResources?.some((entry) => entry.to === 'telemetry-config.json')) {
   throw new Error('packaging config is missing the anonymous metrics resource')
+}
+for (const runtimeSupportResource of [
+  'runtime-support/supported-runtimes.json',
+  'runtime-support/known-good.json',
+]) {
+  if (!packagingConfig.extraResources?.some((entry) => entry.to === runtimeSupportResource)) {
+    throw new Error(`packaging config is missing the Runtime support resource ${runtimeSupportResource}`)
+  }
+}
+if (!packagingConfig.extraResources?.some((entry) => entry.to === 'managed-git/current')) {
+  throw new Error('packaging config is missing the bundled managed Git resource')
 }
 
 console.log(`verified ${requiredPackages.length} packaged runtime packages in ${resources}`)

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright'
 
 import { createPresetBuffer } from '../src/presets/preset-archive.mjs'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const delay = (milliseconds) => new Promise((resolveDelay) => { setTimeout(resolveDelay, milliseconds) })
 
@@ -47,6 +48,7 @@ export async function runPresetDeepLinkE2E({ appDir, executablePath, electronPat
     readme: '# Preview fixture\n',
   })
   await writeFile(presetPath, preset, { flag: 'wx' })
+  await seedPrimaryRuntimePermissionForTest({ userData })
 
   let app
   try {

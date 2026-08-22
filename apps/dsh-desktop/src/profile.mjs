@@ -24,8 +24,6 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@linxin666/dsh-desktop-compat',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
-  'dshmarket',
-  'dsh-codex-connect',
   'reasoning-slider',
 ])
 
@@ -37,7 +35,9 @@ export const BUILTIN_BUNDLES = Object.freeze([
 export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-client-ui-aionui-panel',
   '@linxin666/dsh-client-ui-community-plugins',
+  '@linxin666/dsh-chat-recovery',
   '@linxin666/dsh-client-ui-git-graph',
+  '@linxin666/dsh-desktop-launcher',
   '@linxin666/dsh-client-ui-plugin-manager',
   '@linxin666/dsh-client-ui-skin-center',
   '@linxin666/dsh-client-ui-skill-explorer',
@@ -73,7 +73,9 @@ export const LEGACY_SKIN_PACKAGES = Object.freeze([
 // package names: Skin Center v2 serves their assets from its own skins/ tree.
 export const BUILTIN_SKIN_IDS = Object.freeze([
   'blue-fantasy',
+  'cyber-night',
   'dragon-heir',
+  'furina',
   'harbor',
   'maid-atelier',
   'matrix',
@@ -88,27 +90,30 @@ export const BUILTIN_SKIN_IDS = Object.freeze([
 ].toSorted())
 
 // These packages were linked directly by older desktop releases. They are
-// either supplied by the aggregate now or replaced by the single supported
-// marketplace. Leaving them in dependencies lets DSH's bundle reconciler (or
-// dshmarket's client-only hot mount) load them a second time.
+// either supplied by the aggregate now or replaced by Desktop-native features.
+// Leaving them in dependencies lets DSH's bundle reconciler load them a second
+// time or retain an obsolete runtime-owned surface.
 export const RETIRED_MANAGED_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-skin-qq2006',
   '@linxin666/dsh-web-ui-compat',
   '@vectorize-io/hindsight-coding-agents',
   ...LEGACY_SKIN_PACKAGES,
   'dsh-plugin-hub',
+  'dshmarket',
 ].toSorted())
 
-// Only one package may own the openai-codex adapter. Fresh profiles use Codex
-// Connect, while upgraded profiles keep an already-installed provider instead
-// of failing startup with duplicate route ownership.
+// RC.1's @deepseek-ai/dsh-base owns the native llm-pi-ai adapter, including
+// openai-codex. These older add-ons declared the same provider and now make the
+// Cordis tree fail before readiness. Retire only their profile rows/managed
+// links; user package bytes outside Desktop's link ledger remain untouched.
 export const CODEX_PROVIDER_CONFLICTS = Object.freeze([
   'dsh-codex',
   'dsh-codex-auth',
+  'dsh-codex-connect',
 ].toSorted())
 
 export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
-  'llm-openai-codex',
+  'llm-pi-ai',
   'live-stats',
   'pet',
   'remote-web-ui',
@@ -121,7 +126,9 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-desktop-client',
   '@linxin666/dsh-client-ui-aionui-panel',
   '@linxin666/dsh-client-ui-community-plugins',
+  '@linxin666/dsh-chat-recovery',
   '@linxin666/dsh-client-ui-git-graph',
+  '@linxin666/dsh-desktop-launcher',
   '@linxin666/dsh-client-ui-mode-switcher',
   '@linxin666/dsh-client-ui-plugin-manager',
   '@linxin666/dsh-client-ui-skin-center',
@@ -139,8 +146,6 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   'dsh-better-sidebar',
-  'dsh-codex-connect',
-  'dshmarket',
   'reasoning-slider',
 ].toSorted())
 
@@ -168,7 +173,9 @@ function isRetiredLegacySkinPackage(packageName) {
 }
 
 function isRetiredManagedPackage(packageName) {
-  return RETIRED_MANAGED_PACKAGES.includes(packageName) || isRetiredLegacySkinPackage(packageName)
+  return RETIRED_MANAGED_PACKAGES.includes(packageName)
+    || CODEX_PROVIDER_CONFLICTS.includes(packageName)
+    || isRetiredLegacySkinPackage(packageName)
 }
 
 // Desktop-owned packages supplied to another bundle's composition instead of
@@ -186,7 +193,7 @@ export const DESKTOP_PLUGIN_COMPAT_PACKAGES = Object.freeze([
 ].toSorted())
 
 // Desktop carries a newer compatibility bridge than the released aggregate.
-// It also restores Live Stats, which the 0.2.3 aggregate no longer declares.
+// It also restores Live Stats, which the published aggregate does not declare.
 // Resolve these direct application dependencies before consulting the pinned
 // aggregate's dependency tree so fresh and packaged profiles use them.
 export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
@@ -214,16 +221,24 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
 ].toSorted())
 
-// DSH rc.7 exposes these runtime modules as peers. Keep them explicit so the
+// DSH v0.1.1-rc.1 exposes these runtime modules as peers. Keep them explicit so the
 // packaged host is hermetic instead of resolving through a developer machine.
 export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/cordis-plugin-group',
   '@deepseek-ai/dsh',
   '@deepseek-ai/dsh-anonymous-user-id',
+  '@deepseek-ai/dsh-app-boot',
   '@deepseek-ai/dsh-attachment',
   '@deepseek-ai/dsh-atomic-write',
+  '@deepseek-ai/dsh-authorization',
+  '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-bash-local',
   '@deepseek-ai/dsh-brand',
+  '@deepseek-ai/dsh-client-locale',
+  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-client-ui-conversation',
+  '@deepseek-ai/dsh-client-ui-settings',
+  '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-code-runtime',
   '@deepseek-ai/dsh-compaction',
   '@deepseek-ai/dsh-fs',
@@ -242,6 +257,7 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-typert-protocol',
   '@deepseek-ai/dsh-workflow',
   '@deepseek-ai/dsh-web',
+  '@deepseek-ai/dsh-web-app',
 ].toSorted())
 
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
@@ -278,10 +294,6 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
         initialDelayMs: 750
         maxDelayMs: 15000
         jitterRatio: 0.15
-- id: dsh-market
-  config:
-    profile: desktop
-    allowRestart: false
 ${DESKTOP_PATCH_END}
 `
 const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
@@ -316,12 +328,6 @@ export function materializeFilesystemPath(path) {
 export function createDesktopProfileManifest(existing = {}) {
   const existingBundles = existing.dsh?.profile?.bundles
   const existingDependencies = existing.dependencies ?? {}
-  const hasExistingCodexProvider = CODEX_PROVIDER_CONFLICTS.some((name) =>
-    existingDependencies[name] !== undefined
-      || (Array.isArray(existingBundles) && existingBundles.includes(name)))
-  const managedBundles = hasExistingCodexProvider
-    ? BUILTIN_BUNDLES.filter((name) => name !== 'dsh-codex-connect')
-    : [...BUILTIN_BUNDLES]
   const communityBundles = Array.isArray(existingBundles)
     ? existingBundles.filter((name) =>
          !BUILTIN_BUNDLES.includes(name)
@@ -332,8 +338,7 @@ export function createDesktopProfileManifest(existing = {}) {
   const dependencies = Object.fromEntries(
     Object.entries(existingDependencies)
       .filter(([name]) =>
-        !isRetiredManagedPackage(name)
-        && !(hasExistingCodexProvider && name === 'dsh-codex-connect')),
+        !isRetiredManagedPackage(name)),
   )
 
   return {
@@ -342,7 +347,7 @@ export function createDesktopProfileManifest(existing = {}) {
     dependencies,
     dsh: {
       profile: {
-        bundles: [...managedBundles, ...communityBundles],
+        bundles: [...BUILTIN_BUNDLES, ...communityBundles],
       },
     },
   }
@@ -934,8 +939,7 @@ export async function ensureDesktopProfile({
   )
   const manifest = createDesktopProfileManifest(existing)
   const activePackageRoots = new Map(packageRoots)
-  const codexConnectEnabled = manifest.dsh.profile.bundles.includes('dsh-codex-connect')
-  if (!codexConnectEnabled) activePackageRoots.delete('dsh-codex-connect')
+  for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
     if (isRetiredLegacySkinPackage(packageName)) activePackageRoots.delete(packageName)
   }
@@ -998,8 +1002,8 @@ export async function ensureDesktopProfile({
   ].filter(isRetiredLegacySkinPackage)
   const packagesToRetire = new Set([
     ...RETIRED_MANAGED_PACKAGES,
+    ...CODEX_PROVIDER_CONFLICTS,
     ...legacyProfilePackages,
-    ...(codexConnectEnabled ? [] : ['dsh-codex-connect']),
   ])
   const retired = await Promise.all([...packagesToRetire]
     .toSorted()

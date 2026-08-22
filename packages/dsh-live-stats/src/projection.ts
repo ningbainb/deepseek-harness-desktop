@@ -4,7 +4,7 @@ import { z } from 'zod'
 // @deepseek-ai/dsh-token-meter/projection).
 import type {} from '@deepseek-ai/dsh-session-projection/types'
 import type { Message, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
-import type { EpochHeader, SessionEvent, SurfaceEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SurfaceEvent } from '@deepseek-ai/dsh-session'
 import { isSurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { LiveTokenUsageProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -53,6 +53,13 @@ const projectionSchema = z.object({
   tokensPerSecond: z.number().nonnegative().optional(),
 }).strict() as unknown as z.ZodType<LiveTokenUsageProjection>
 
+const tokenBucketsSchema = z.object({
+  uncachedInputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  cacheReadTokens: z.number().int().nonnegative(),
+  cacheWriteTokens: z.number().int().nonnegative(),
+}).strict()
+
 type OutputBlock =
   | { kind: 'text'; characters: number }
   | { kind: 'reasoning'; characters: number }
@@ -64,7 +71,7 @@ interface ActiveStep {
   step: number
   buckets: TokenUsageProjection
   exact: boolean
-  blocks: Array<OutputBlock | undefined>
+  blocks: Record<string, OutputBlock>
   /** Running sum of the per-block estimates of every non-undefined block. */
   pricedTokens: number
   /** Count of non-undefined blocks (guards the role overhead and zero case). */
@@ -79,19 +86,67 @@ interface SettledSample {
   buckets: TokenUsageProjection
   estimated: boolean
   /** Last measured throughput; carried across rate-less steps. */
-  tokensPerSecond: number | undefined
+  tokensPerSecond?: number
 }
 
-interface State {
+/** Plain-JSON fold state persisted by the RC.1 projection cache. */
+export interface LiveTokenUsageState {
   settled: TokenUsageProjection
   settledEstimates: number
   last: SettledSample | null
   /** Surface message seq -> estimated tokens, kept in increasing seq order. */
-  surface: Map<number, number>
+  surface: Record<string, number>
   surfaceTokens: number
-  header: EpochHeader | undefined
+  headerTokens: number
   active: ActiveStep | null
 }
+
+type State = LiveTokenUsageState
+type LiveTokenUsageProjectionDefinition = ProjectionDefinition<'liveTokenUsage', State> & {
+  wire: NonNullable<ProjectionDefinition<'liveTokenUsage', State>['wire']>
+}
+
+const outputBlockSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('text'), characters: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('reasoning'), characters: z.number().int().nonnegative() }).strict(),
+  z.object({
+    kind: z.literal('tool-call'),
+    nameCharacters: z.number().int().nonnegative(),
+    argumentCharacters: z.number().int().nonnegative(),
+  }).strict(),
+  z.object({ kind: z.literal('fixed'), tokens: z.number().int().nonnegative() }).strict(),
+])
+
+const sequenceKey = z.string().regex(/^(?:0|[1-9]\d*)$/u)
+const sequenceTableSchema = z.record(sequenceKey, z.number().int().nonnegative())
+const blockTableSchema = z.record(sequenceKey, outputBlockSchema)
+const activeStepSchema = z.object({
+  turn: z.number().int().nonnegative(),
+  step: z.number().int().nonnegative(),
+  buckets: tokenBucketsSchema,
+  exact: z.boolean(),
+  blocks: blockTableSchema,
+  pricedTokens: z.number().int().nonnegative(),
+  pricedBlocks: z.number().int().nonnegative(),
+  firstOutputTime: z.number().optional(),
+  latestOutputTime: z.number().optional(),
+}).strict()
+const settledSampleSchema = z.object({
+  turn: z.number().int().nonnegative(),
+  step: z.number().int().nonnegative(),
+  buckets: tokenBucketsSchema,
+  estimated: z.boolean(),
+  tokensPerSecond: z.number().nonnegative().optional(),
+}).strict()
+const stateSchema = z.object({
+  settled: tokenBucketsSchema,
+  settledEstimates: z.number().int().nonnegative(),
+  last: settledSampleSchema.nullable(),
+  surface: sequenceTableSchema,
+  surfaceTokens: z.number().int().nonnegative(),
+  headerTokens: z.number().int().nonnegative(),
+  active: activeStepSchema.nullable(),
+}).strict() as unknown as z.ZodType<LiveTokenUsageState>
 
 function surfaceMessage(event: SurfaceEvent): Message {
   switch (event.type) {
@@ -110,29 +165,31 @@ function applySurface(
 ): Pick<State, 'surface' | 'surfaceTokens'> {
   const tokens = estimateMessageTokens(surfaceMessage(event), spec)
   if (event.surfaceOp === 'append') {
-    state.surface.set(event.seq, tokens)
+    state.surface[event.seq] = tokens
     return {
       surface: state.surface,
       surfaceTokens: state.surfaceTokens + tokens,
     }
   }
   const operation = event.surfaceOp
-  if (!state.surface.has(operation.start) || !state.surface.has(operation.end) || operation.start > operation.end) {
+  if (!Object.hasOwn(state.surface, operation.start)
+    || !Object.hasOwn(state.surface, operation.end)
+    || operation.start > operation.end) {
     throw new Error(
       'live-stats: replace at seq ' + event.seq + ' has invalid current range ' + operation.start + '-' + operation.end,
     )
   }
-  // Keys enter in increasing seq order (appends grow, and a replace's own
-  // seq is always the newest), so one pass with an early exit removes the
-  // exact range. Deleting entries while iterating a Map is safe.
+  // Integer object keys enumerate in increasing order. This keeps the state
+  // plain JSON for RC.1 checkpoint persistence without losing the early exit.
   let removed = 0
-  for (const [seq, nodeTokens] of state.surface) {
+  for (const sequence of Object.keys(state.surface)) {
+    const seq = Number(sequence)
     if (seq < operation.start) continue
     if (seq > operation.end) break
-    removed += nodeTokens
-    state.surface.delete(seq)
+    removed += state.surface[sequence] ?? 0
+    delete state.surface[sequence]
   }
-  state.surface.set(event.seq, tokens)
+  state.surface[event.seq] = tokens
   return {
     surface: state.surface,
     surfaceTokens: state.surfaceTokens - removed + tokens,
@@ -226,7 +283,7 @@ function exactStep(step: ActiveStep, usage: TokenUsage, time: number): ActiveSte
     exact: true,
     // The exact usage supersedes every block priced from streamed deltas;
     // retain only the exact buckets so later deltas cannot re-estimate.
-    blocks: [],
+    blocks: {},
     pricedTokens: 0,
     pricedBlocks: 0,
     ...(usage.outputTokens > 0
@@ -268,17 +325,17 @@ function view(state: State): LiveTokenUsageProjection {
  */
 export function createLiveTokenUsageProjectionDefinition(
   spec: EstimatorSpec,
-): ProjectionDefinition<'liveTokenUsage', State> {
+): LiveTokenUsageProjectionDefinition {
   return {
     key: 'liveTokenUsage',
-    schema: projectionSchema,
+    stateSchema,
     init: () => ({
       settled: zeroBuckets(),
       settledEstimates: 0,
       last: null,
-      surface: new Map(),
+      surface: {},
       surfaceTokens: 0,
-      header: undefined,
+      headerTokens: 0,
       active: null,
     }),
     apply: (state, event: SessionEvent) => {
@@ -290,10 +347,10 @@ export function createLiveTokenUsageProjectionDefinition(
             ...event.data,
             buckets: {
               ...zeroBuckets(),
-              uncachedInputTokens: estimateHeaderTokens(state.header, spec) + state.surfaceTokens,
+              uncachedInputTokens: state.headerTokens + state.surfaceTokens,
             },
             exact: false,
-            blocks: [],
+            blocks: {},
             pricedTokens: 0,
             pricedBlocks: 0,
           },
@@ -301,7 +358,7 @@ export function createLiveTokenUsageProjectionDefinition(
       } else if (event.type === 'request/header') {
         next = {
           ...next,
-          header: event.data.header,
+          headerTokens: estimateHeaderTokens(event.data.header, spec),
           ...(next.active === null ? {} : {
             active: {
               ...next.active,
@@ -344,6 +401,7 @@ export function createLiveTokenUsageProjectionDefinition(
       } else if (event.type === 'step/end' && next.active !== null) {
         const active = next.active
         const rate = rateOf(active)
+        const residentRate = rate ?? state.last?.tokensPerSecond
         const previous = next.last?.turn === active.turn && next.last.step === active.step
           ? next.last
           : undefined
@@ -360,7 +418,7 @@ export function createLiveTokenUsageProjectionDefinition(
             estimated: !active.exact,
             // Carry the last measured rate across a rate-less step instead of
             // clobbering it: the row stays resident (see view()).
-            tokensPerSecond: rate ?? state.last?.tokensPerSecond,
+          ...(residentRate === undefined ? {} : { tokensPerSecond: residentRate }),
           },
           active: null,
         }
@@ -379,7 +437,10 @@ export function createLiveTokenUsageProjectionDefinition(
       if (isSurfaceEvent(event)) next = { ...next, ...applySurface(next, event, spec) }
       return next
     },
-    view,
-    stateVersion: 2,
+    wire: {
+      viewSchema: projectionSchema,
+      view,
+    },
+    stateVersion: 3,
   }
 }

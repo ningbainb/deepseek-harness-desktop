@@ -40,9 +40,10 @@ function countWords(text) {
   return cjk + rest.split(/\s+/).filter(Boolean).length
 }
 
-/** Git blob hash of a working-tree file (content-addressed, no staging needed). */
-function blobHash(file) {
-  return execFileSync('git', ['hash-object', file], { cwd: root }).toString().trim()
+/** Git blob hash after applying the file's repository attributes and clean filters. */
+function blobHash(file, repoRoot = root) {
+  const path = relative(repoRoot, file).replaceAll('\\', '/')
+  return execFileSync('git', ['hash-object', '--path', path, file], { cwd: repoRoot }).toString().trim()
 }
 
 /** Parse a pairing record into { README.md: hash, README.zh.md: hash }. */
@@ -132,7 +133,7 @@ function isExternal(url) {
   return url.startsWith('//') || url.startsWith('/') || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)
 }
 
-export { countWords, signature, sigEqual, slugify, isExternal }
+export { countWords, blobHash, signature, sigEqual, slugify, isExternal }
 if (import.meta.main) {
   /* ---------- 1 + 2 + 5. README triplets, pairing, heading levels ---------- */
   const pairs = []

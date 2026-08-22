@@ -1,4 +1,5 @@
 import { createExtensionOperationQueue } from './extension-operation-queue.mjs'
+import { selectCommunityMarketPlugins } from './community-market-view.mjs'
 
 const themeQuery = new URLSearchParams(window.location.search).get('theme')
 if (themeQuery === 'dark' || themeQuery === 'light') {
@@ -10,6 +11,18 @@ const communityPluginList = document.querySelector('#community-plugin-list')
 const skillList = document.querySelector('#skill-list')
 const pluginCount = document.querySelector('#plugin-count')
 const skillCount = document.querySelector('#skill-count')
+const marketCount = document.querySelector('#market-count')
+const marketTotal = document.querySelector('#market-total')
+const marketUpdated = document.querySelector('#market-updated')
+const marketQuery = document.querySelector('#market-query')
+const marketCategory = document.querySelector('#market-category')
+const marketSort = document.querySelector('#market-sort')
+const marketResultState = document.querySelector('#market-result-state')
+const marketList = document.querySelector('#market-list')
+const marketPagination = document.querySelector('#market-pagination')
+const marketPageState = document.querySelector('#market-page-state')
+const marketPrevious = document.querySelector('#market-previous')
+const marketNext = document.querySelector('#market-next')
 const toast = document.querySelector('#toast')
 const qqBotCard = document.querySelector('#qqbot-card')
 const qqBotStateLabel = document.querySelector('#qqbot-state-label')
@@ -26,6 +39,7 @@ const recoveryCount = document.querySelector('#recovery-count')
 const recoveryMode = document.querySelector('#recovery-mode')
 const recoveryModeLabel = document.querySelector('#recovery-mode-label')
 const restoreSafeMode = document.querySelector('#restore-safe-mode')
+const revokeFullUserTrust = document.querySelector('#revoke-full-user-trust')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
 const activationBanner = document.querySelector('#activation-banner')
@@ -38,11 +52,19 @@ const presetPackages = document.querySelector('#preset-packages')
 const presetConfig = document.querySelector('#preset-config')
 let activePresetPlan
 let activeMigrationPlan
+let marketCatalog
+let marketPage = 1
+let marketView
+let installedMarketReferences = new Set()
+
+const MARKET_PAGE_SIZE = 20
+const compactNumber = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
 
 function setOperationBusy(busy) {
   document.body.dataset.busy = String(busy)
   document.body.setAttribute('aria-busy', String(busy))
   for (const button of document.querySelectorAll('button:not([role="tab"])')) button.disabled = busy
+  if (!busy) syncMarketPaginationState()
 }
 
 const extensionOperations = createExtensionOperationQueue({ onBusyChange: setOperationBusy })
@@ -262,7 +284,84 @@ function skillMarkup(skill) {
 
 function communityPluginMarkup(plugin) {
   const state = plugin.enabled ? '已启用' : '未启用'
-  return `<article class="community-plugin-card"><div><div class="name-row"><span class="name">${escapeHtml(plugin.name)}</span><span class="badge">社区</span><span class="badge inactive">${state}</span></div><p class="description">${escapeHtml(plugin.description)}</p><p class="community-author">作者：${escapeHtml(plugin.author)} · 第三方插件与素材由作者仓库说明负责</p></div><button type="button" class="item-action community-open" data-open-community-plugin="${escapeHtml(plugin.id)}">查看作者仓库</button></article>`
+  return `<article class="community-plugin-card"><div><div class="name-row"><span class="name">${escapeHtml(plugin.name)}</span><span class="badge">社区</span><span class="badge inactive">${state}</span></div><p class="description">${escapeHtml(plugin.description)}</p><p class="community-author">作者：${escapeHtml(plugin.author)} · 第三方插件与素材由作者仓库说明负责</p></div><div class="item-actions"><button type="button" class="item-action community-open" data-open-community-plugin="${escapeHtml(plugin.id)}">查看作者仓库</button></div></article>`
+}
+
+function marketDescription(plugin) {
+  const description = plugin.description?.zh ?? plugin.description?.en ?? '社区目录暂未提供说明。'
+  if (!plugin.deprecated) return description
+  return `${description}${plugin.replacement ? ` 已停止维护，建议改用 ${plugin.replacement}。` : ' 已停止维护。'}`
+}
+
+function marketPluginMarkup(plugin) {
+  const sourceBadge = plugin.sourceKind === 'npm' ? 'NPM' : 'GIT'
+  const deprecatedBadge = plugin.deprecated ? '<span class="badge inactive">已弃用</span>' : ''
+  const action = plugin.installed
+    ? '<span class="market-installed">已安装</span>'
+    : `<button type="button" class="primary market-install" data-install-market-plugin="${escapeHtml(plugin.id)}">安装</button>`
+  const downloads = Number.isSafeInteger(plugin.downloads) ? compactNumber.format(plugin.downloads) : '--'
+  const stars = Number.isSafeInteger(plugin.stars) ? compactNumber.format(plugin.stars) : '--'
+  const author = plugin.owner ? `by ${plugin.owner}` : '社区作者'
+  return `<article class="market-card"><div class="market-card-head"><div class="market-card-title"><h3 title="${escapeHtml(plugin.name)}">${escapeHtml(plugin.displayName)}</h3><p>${escapeHtml(author)}</p></div><div class="name-row"><span class="badge">${sourceBadge}</span>${deprecatedBadge}</div></div><p class="description">${escapeHtml(marketDescription(plugin))}</p><div class="market-source" title="${escapeHtml(plugin.installSpec)}">${escapeHtml(plugin.installSpec)}</div><div class="market-card-foot"><div class="market-stats"><span>DL ${escapeHtml(downloads)}</span><span>STAR ${escapeHtml(stars)}</span><span>${escapeHtml(plugin.category)}</span></div>${action}</div></article>`
+}
+
+function syncMarketPaginationState() {
+  if (!marketView) return
+  marketPrevious.disabled = extensionOperations?.busy === true || marketView.page <= 1
+  marketNext.disabled = extensionOperations?.busy === true || marketView.page >= marketView.pages
+}
+
+function renderMarket() {
+  if (!marketCatalog) return
+  marketView = selectCommunityMarketPlugins(marketCatalog.plugins, {
+    query: marketQuery.value,
+    category: marketCategory.value,
+    sort: marketSort.value,
+    page: marketPage,
+    pageSize: MARKET_PAGE_SIZE,
+    installed: installedMarketReferences,
+  })
+  marketPage = marketView.page
+  marketResultState.textContent = marketView.total === marketCatalog.count
+    ? `显示全部 ${marketView.total} 个条目`
+    : `找到 ${marketView.total} 个条目`
+  marketList.innerHTML = marketView.items.length
+    ? marketView.items.map(marketPluginMarkup).join('')
+    : '<p class="market-empty">没有符合当前条件的插件</p>'
+  marketPagination.hidden = marketView.pages <= 1
+  marketPageState.textContent = `${marketView.page} / ${marketView.pages}`
+  syncMarketPaginationState()
+  if (extensionOperations.busy) setOperationBusy(true)
+}
+
+async function refreshMarket() {
+  marketResultState.textContent = '正在读取社区目录'
+  try {
+    const catalog = await window.dshDesktop.listCommunityMarket()
+    marketCatalog = catalog
+    marketPage = 1
+    marketCount.textContent = compactNumber.format(catalog.count)
+    marketTotal.textContent = compactNumber.format(catalog.count)
+    marketUpdated.textContent = catalog.updated ?? '--'
+    const selectedCategory = marketCategory.value
+    marketCategory.innerHTML = '<option value="all">全部分类</option>' + catalog.categories.map((category) => {
+      const label = category.label?.zh ?? category.label?.en ?? category.id
+      return `<option value="${escapeHtml(category.id)}">${escapeHtml(label)}</option>`
+    }).join('')
+    if ([...marketCategory.options].some((option) => option.value === selectedCategory)) {
+      marketCategory.value = selectedCategory
+    }
+    renderMarket()
+  } catch (error) {
+    marketCatalog = undefined
+    marketView = undefined
+    marketCount.textContent = '--'
+    marketTotal.textContent = '--'
+    marketUpdated.textContent = '--'
+    marketResultState.textContent = '社区目录暂时不可用'
+    marketList.innerHTML = `<p class="market-empty">${escapeHtml(error.message)}</p>`
+    marketPagination.hidden = true
+  }
 }
 
 const recoveryResolutionLabels = Object.freeze({
@@ -346,11 +445,13 @@ async function refresh() {
     pluginCount.textContent = inventory.plugins.length
     skillCount.textContent = inventory.skills.length
     renderQqBot(inventory.qqbot)
+    installedMarketReferences = new Set(inventory.plugins.flatMap((plugin) => [plugin.name, plugin.requested].filter(Boolean)))
     communityPluginList.innerHTML = inventory.communityPlugins?.length
       ? inventory.communityPlugins.map(communityPluginMarkup).join('')
       : '<p class="empty">暂无社区推荐</p>'
     renderPlugins(inventory.plugins)
     skillList.innerHTML = inventory.skills.length ? inventory.skills.map(skillMarkup).join('') : '<p class="empty">尚未发现技能</p>'
+    renderMarket()
     if (extensionOperations.busy) setOperationBusy(true)
   } catch (error) {
     notify(error.message, true)
@@ -459,6 +560,16 @@ const removePresetPreviewListener = window.dshDesktop.onPresetPreview((plan) => 
   if (tab) activateTab(tab)
   renderPresetPlan(plan)
 })
+const removePluginPrefillListener = window.dshDesktop.onPluginInstallPrefill?.((payload) => {
+  const spec = typeof payload?.spec === 'string' ? payload.spec : ''
+  if (spec === '' || spec.length > 2_048) return
+  const tab = tabs.find((item) => item.dataset.tab === 'plugins')
+  if (tab) activateTab(tab)
+  const input = document.querySelector('#plugin-spec')
+  input.value = spec
+  input.focus()
+  notify('已从外部请求填入安装来源，请确认后点击「安装并重启」。')
+})
 
 document.querySelector('#plugin-form').addEventListener('submit', async (event) => {
   event.preventDefault()
@@ -466,9 +577,10 @@ document.querySelector('#plugin-form').addEventListener('submit', async (event) 
   const data = new FormData(form)
   const spec = data.get('spec')
   const allowUnknown = data.get('allowUnknown') === 'on'
+  const fullAccess = data.get('fullAccess') === 'on'
   await extensionOperations.run(async () => {
     try {
-      const result = await window.dshDesktop.installPlugin(spec, allowUnknown)
+      const result = await window.dshDesktop.installPlugin(spec, allowUnknown, fullAccess)
       notify(`${result.name} 已安装，DSH 已重启`)
       showActivation(`${result.name} 已安装。可立即刷新列表；如扩展界面仍显示旧状态，请完整重启 Harness。`, { mode: result.restartRequired ? 'restart' : 'refresh' })
       form.reset()
@@ -483,6 +595,7 @@ window.addEventListener('beforeunload', () => {
   removeProgressListener()
   removeNavigationListener()
   removePresetPreviewListener()
+  removePluginPrefillListener?.()
 }, { once: true })
 
 pluginList.addEventListener('click', async (event) => {
@@ -525,6 +638,50 @@ communityPluginList.addEventListener('click', async (event) => {
       await window.dshDesktop.openCommunityPlugin(button.dataset.openCommunityPlugin)
     } catch (error) {
       notify(error.message, true)
+    }
+  })
+})
+
+for (const control of [marketQuery, marketCategory, marketSort]) {
+  control.addEventListener(control === marketQuery ? 'input' : 'change', () => {
+    marketPage = 1
+    renderMarket()
+  })
+}
+marketPrevious.addEventListener('click', () => {
+  if (!marketView || marketView.page <= 1) return
+  marketPage = marketView.page - 1
+  renderMarket()
+  document.querySelector('#market').scrollIntoView({ block: 'start', behavior: 'smooth' })
+})
+marketNext.addEventListener('click', () => {
+  if (!marketView || marketView.page >= marketView.pages) return
+  marketPage = marketView.page + 1
+  renderMarket()
+  document.querySelector('#market').scrollIntoView({ block: 'start', behavior: 'smooth' })
+})
+document.querySelector('#market-reload').addEventListener('click', () => {
+  void extensionOperations.run(refreshMarket)
+})
+marketList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-install-market-plugin]')
+  if (!button) return
+  await extensionOperations.run(async () => {
+    try {
+      const plugin = marketCatalog?.plugins.find((candidate) => candidate.id === button.dataset.installMarketPlugin)
+      const result = await window.dshDesktop.installMarketPlugin(button.dataset.installMarketPlugin)
+      installedMarketReferences.add(button.dataset.installMarketPlugin)
+      if (plugin) {
+        for (const value of [plugin.name, plugin.npm, plugin.displayName, plugin.installSpec]) {
+          if (value) installedMarketReferences.add(value)
+        }
+      }
+      notify(`${result.name} 已安装，DSH 已重启`)
+      showActivation(`${result.name} 已安装。刷新即可查看当前扩展状态。`, { mode: result.restartRequired ? 'restart' : 'refresh' })
+      await refresh()
+    } catch (error) {
+      if (error.message.includes('was not approved')) notify('已取消安装')
+      else notify(error.message, true)
     }
   })
 })
@@ -638,8 +795,20 @@ checkPluginUpdatesButton.addEventListener('click', () => {
 })
 refreshButton.addEventListener('click', () => {
   void extensionOperations.run(async () => {
-    await refresh()
+    await Promise.all([refresh(), refreshMarket()])
     await checkPluginUpdates({ silent: true })
+  })
+})
+
+revokeFullUserTrust.addEventListener('click', async () => {
+  if (!window.confirm('撤销主 Runtime 和外来插件的完整权限授权？当前 Runtime 会继续运行，但下次启动会重新请求原生确认。')) return
+  await extensionOperations.run(async () => {
+    try {
+      await window.dshDesktop.revokeFullUserTrust()
+      notify('完整权限授权已撤销；下次启动会重新确认')
+    } catch (error) {
+      notify(error.message, true)
+    }
   })
 })
 document.querySelector('#activation-refresh').addEventListener('click', () => {
@@ -750,4 +919,5 @@ document.querySelector('#import-preset').addEventListener('click', () => {
 })
 
 await extensionOperations.run(refresh)
+void refreshMarket()
 void extensionOperations.run(() => checkPluginUpdates({ silent: true }))

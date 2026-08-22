@@ -31,6 +31,8 @@ class FakeUpdater extends EventEmitter {
 
 function createHarness({
   enabled = true,
+  currentVersion = '1.0.0',
+  updateChannel,
   beforeInstall,
   onInstallFailure,
   downloadRouter,
@@ -47,7 +49,8 @@ function createHarness({
   const controller = new DesktopUpdateController({
     updater,
     enabled,
-    currentVersion: '1.0.0',
+    currentVersion,
+    updateChannel,
     getWindow: getWindow ?? (() => ({
       isDestroyed: () => false,
       setProgressBar: (value) => progress.push(value),
@@ -68,6 +71,40 @@ function createHarness({
   controller.start()
   return { controller, updater, progress, logs, states, beforeInstallCalls: () => beforeInstallCalls }
 }
+
+test('updater selects beta metadata only when the persisted channel is beta', () => {
+  const stable = createHarness()
+  assert.equal(stable.controller.getChannel(), 'stable')
+  assert.equal(stable.updater.channel, 'latest')
+  assert.equal(stable.updater.allowPrerelease, false)
+  assert.equal(stable.updater.allowDowngrade, false)
+  stable.controller.dispose()
+
+  const beta = createHarness({ updateChannel: 'beta' })
+  assert.equal(beta.controller.getChannel(), 'beta')
+  assert.equal(beta.updater.channel, 'beta')
+  assert.equal(beta.updater.allowPrerelease, true)
+  assert.equal(beta.updater.allowDowngrade, false)
+  beta.controller.dispose()
+})
+
+test('stable ignores beta metadata and never downloads a lower Stable release after beta', async () => {
+  const stable = createHarness()
+  await stable.controller.check()
+  stable.updater.emit('update-available', { version: '1.1.0-beta.1', releaseNotes: 'Beta.' })
+  await tick()
+  assert.equal(stable.updater.downloads, 0)
+  assert.ok(stable.logs.some((line) => line.includes('channel-mismatch')))
+  stable.controller.dispose()
+
+  const switched = createHarness({ currentVersion: '1.1.0-beta.2', updateChannel: 'stable' })
+  await switched.controller.check()
+  switched.updater.emit('update-available', { version: '1.0.0', releaseNotes: 'Stable.' })
+  await tick()
+  assert.equal(switched.updater.downloads, 0)
+  assert.ok(switched.logs.some((line) => line.includes('downgrade')))
+  switched.controller.dispose()
+})
 
 test('download failover publishes the active source and suppresses intermediate errors', async () => {
   let retrying = true

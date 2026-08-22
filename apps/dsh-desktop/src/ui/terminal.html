@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+    <title>内置终端 / Built-in Terminal</title>
+    <link rel="stylesheet" href="./harness-base.css">
+    <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css">
+    <link rel="stylesheet" href="./terminal.css">
+    <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  </head>
+  <body>
+    <main class="terminal-shell">
+      <header class="terminal-toolbar">
+        <div class="terminal-identity">
+          <p class="eyebrow">DeepSeek Harness Desktop</p>
+          <div class="terminal-title-row">
+            <h1>内置终端</h1>
+            <span id="terminal-status" class="terminal-status" data-state="starting" role="status" aria-live="polite">正在启动</span>
+          </div>
+          <p id="terminal-context" class="terminal-context">PowerShell 会在应用内运行，不会打开外部控制台。</p>
+        </div>
+        <div class="terminal-actions">
+          <button type="button" id="clear-terminal">清屏</button>
+          <button type="button" id="restart-terminal" class="primary">重启会话</button>
+          <button type="button" id="close-terminal" aria-label="收起内置终端">收起</button>
+        </div>
+      </header>
+      <section class="terminal-frame" aria-label="本地交互终端">
+        <div id="terminal-host" class="terminal-host"></div>
+      </section>
+      <footer>当前用户权限执行 · 终端嵌入当前窗口 · 收起面板即结束会话 · Ctrl+Alt+T 展开或收起</footer>
+    </main>
+    <script type="module" src="./terminal.mjs"></script>
+  </body>
+</html>

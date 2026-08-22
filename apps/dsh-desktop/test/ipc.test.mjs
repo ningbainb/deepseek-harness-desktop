@@ -9,6 +9,7 @@ import {
   normalizeWindowChromeTheme,
   publicBackgroundStatus,
   publicRuntimeStatus,
+  publicUpdateChannel,
   publicUpdateStatus,
   registerDesktopIpc,
 } from '../src/ipc.mjs'
@@ -16,7 +17,7 @@ import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
 
 test('desktop action validation exposes only fixed recovery and diagnostic operations', () => {
-  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'exit']) {
+  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit']) {
     assert.equal(normalizeDesktopAction(action), action)
   }
   for (const action of ['run-command', '../repair', '', 42]) {
@@ -41,11 +42,17 @@ test('window chrome Help IPC accepts only fixed application actions', () => {
   }
 })
 
-test('window chrome Tools IPC exposes only the Extension Dock action', () => {
+test('window chrome Tools IPC exposes only fixed Desktop tool surfaces', () => {
   assert.equal(normalizeToolAction('extensions'), 'extensions')
+  assert.equal(normalizeToolAction('terminal'), 'terminal')
   for (const action of ['run-command', 'open-url', '', 42]) {
     assert.throws(() => normalizeToolAction(action), /Tools action/)
   }
+})
+
+test('public update channel exposes only the Stable/Beta selection and no-downgrade policy', () => {
+  assert.deepEqual(publicUpdateChannel('beta'), { channel: 'beta', noAutomaticDowngrade: true })
+  assert.deepEqual(publicUpdateChannel('untrusted'), { channel: 'stable', noAutomaticDowngrade: true })
 })
 
 test('window action IPC returns a clone-safe acknowledgement instead of BrowserWindow objects', async () => {
@@ -65,6 +72,8 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   const handled = []
   const observed = []
   const exported = []
+  const migrationActions = []
+  let updateChannel = 'stable'
   const unregister = registerDesktopIpc({
     ipcMain,
     surfaceRegistry,
@@ -79,6 +88,10 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       exported.push('startup-diagnostics')
       return { canceled: false, exported: true }
     },
+    openMigrationAssistant: async () => {
+      migrationActions.push('open')
+      return { status: 'committed' }
+    },
     exitApp: () => {},
     handleHelpAction: async (action) => {
       handled.push(action)
@@ -91,6 +104,11 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
     setWindowChromeTheme: () => {},
     claimStarPrompt: async () => true,
     getUpdateController: () => undefined,
+    getUpdateChannel: () => updateChannel,
+    setUpdateChannel: async (channel) => {
+      updateChannel = channel
+      return channel
+    },
     onRecoveryAction: (action) => observed.push(['recovery', action]),
     onSettingsOpened: () => observed.push(['settings']),
     onUpdateCheck: () => observed.push(['updates']),
@@ -98,20 +116,105 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
 
   assert.equal(await handlers.get('desktop:help-action')({ sender }, 'community'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'extensions'), true)
+  assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'terminal'), true)
   assert.equal(await handlers.get('desktop:star-prompt-claim')({ sender }), true)
   await handlers.get('desktop:action')({ sender }, 'retry')
   assert.deepEqual(
     await handlers.get('desktop:action')({ sender }, 'export-diagnostics'),
     { canceled: false, exported: true },
   )
+  assert.deepEqual(
+    await handlers.get('desktop:action')({ sender }, 'upgrade-migration'),
+    { status: 'committed' },
+  )
   assert.equal(await handlers.get('desktop:settings-opened')({ sender }), true)
   await handlers.get('desktop:update-check')({ sender })
+  assert.deepEqual(await handlers.get('desktop:update-channel-get')({ sender }), {
+    channel: 'stable',
+    noAutomaticDowngrade: true,
+  })
+  assert.deepEqual(await handlers.get('desktop:update-channel-set')({ sender }, 'beta'), {
+    channel: 'beta',
+    noAutomaticDowngrade: true,
+  })
+  await assert.rejects(
+    handlers.get('desktop:update-channel-set')({ sender }, 'nightly'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   assert.equal(handlers.has('desktop:background-status'), false)
   assert.equal(handlers.has('desktop:close-behavior-get'), false)
   assert.equal(handlers.has('desktop:close-behavior-set'), false)
-  assert.deepEqual(handled, ['community', 'extensions'])
+  assert.deepEqual(handled, ['community', 'extensions', 'terminal'])
   assert.deepEqual(exported, ['startup-diagnostics'])
+  assert.deepEqual(migrationActions, ['open'])
   assert.deepEqual(observed, [['recovery', 'retry'], ['settings'], ['updates']])
+  unregister()
+})
+
+test('plugin install request IPC accepts only remote references and never installs by itself', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const requested = []
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.0.0',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    onPluginInstallRequest: async (spec) => {
+      requested.push(spec)
+    },
+  })
+
+  // Remote references only: bare npm names, scoped/typed specs, git, HTTPS.
+  assert.deepEqual(
+    await handlers.get('desktop:plugin-install-request')({ sender }, 'dsh-status-rotator'),
+    { accepted: true, spec: 'dsh-status-rotator' },
+  )
+  assert.deepEqual(
+    await handlers.get('desktop:plugin-install-request')({ sender }, '@linxin666/dsh-plugin@1.2.0'),
+    { accepted: true, spec: '@linxin666/dsh-plugin@1.2.0' },
+  )
+  assert.deepEqual(
+    await handlers.get('desktop:plugin-install-request')({ sender }, 'git+https://github.com/user/repo.git'),
+    { accepted: true, spec: 'git+https://github.com/user/repo.git' },
+  )
+  // Local filesystem references must stay exclusive to the native picker.
+  for (const invalid of [
+    '',
+    'C:\\tools\\plugin',
+    'file:///C:/tools/plugin.tgz',
+    'git+file:///C:/tools/repo',
+    'workspace:*',
+    42,
+  ]) {
+    await assert.rejects(
+      handlers.get('desktop:plugin-install-request')({ sender }, invalid),
+      (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+    )
+  }
+  assert.deepEqual(requested, [
+    'dsh-status-rotator',
+    '@linxin666/dsh-plugin@1.2.0',
+    'git+https://github.com/user/repo.git',
+  ])
   unregister()
 })
 
@@ -150,6 +253,10 @@ test('desktop IPC rejects unregistered and wrong-surface senders with stable cod
     (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
   )
   await assert.rejects(
+    handlers.get('desktop:update-channel-set')({ sender: extensionSender }, 'beta'),
+    (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
+  )
+  await assert.rejects(
     handlers.get('desktop:action')({ sender: extensionSender }, 'export-diagnostics'),
     (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
   )
@@ -161,7 +268,134 @@ test('desktop IPC rejects unregistered and wrong-surface senders with stable cod
     handlers.get('desktop:window-chrome-theme')({ sender: mainSender }, 'system'),
     (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
   )
+  await assert.rejects(
+    handlers.get('desktop:plugin-install-request')({ sender: extensionSender }, 'dsh-status-rotator'),
+    (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
+  )
   unregister()
+})
+
+test('desktop:status projects plugin-recovery details without exposing raw key, prompt, or tool text', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  const sensitive = {
+    key: 'IPC_PRIVATE_API_KEY',
+    prompt: 'IPC_PRIVATE_PROMPT',
+    tool: 'IPC_PRIVATE_TOOL_RESULT',
+  }
+  controller.status = {
+    state: 'crashed',
+    error: `OPENAI_API_KEY=${sensitive.key}\nprompt: ${sensitive.prompt}\ntool result: ${sensitive.tool}`,
+  }
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.0.0',
+    platform: 'win32',
+    pluginRecovery: {
+      getState: async () => ({
+        safeMode: true,
+        currentIncident: {
+          identified: true,
+          pluginName: '@community/example',
+          loaderId: `tool:${sensitive.tool}`,
+          reasonCode: 'load-failed',
+          summary: `prompt: ${sensitive.prompt}`,
+          technicalDetails: `OPENAI_API_KEY=${sensitive.key}\nprompt: ${sensitive.prompt}\ntool result: ${sensitive.tool}`,
+          resolution: 'safe-mode-auto',
+        },
+      }),
+    },
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+  })
+  try {
+    const status = await handlers.get('desktop:status')({ sender })
+    const incident = status.recovery.currentIncident
+    assert.equal(status.errorPresent, true)
+    assert.equal(status.errorCategory, 'unknown')
+    assert.match(status.errorFingerprint, /^[a-f0-9]{16}$/u)
+    assert.equal(Object.hasOwn(status, 'error'), false)
+    assert.equal(incident.reasonCode, 'load-failed')
+    assert.equal(incident.technicalDetailsPresent, true)
+    assert.match(incident.technicalDetailsFingerprint, /^[a-f0-9]{16}$/u)
+    assert.equal(Object.hasOwn(incident, 'technicalDetails'), false)
+    assert.equal(incident.summary, '插件加载失败，已保留恢复选项。')
+    assert.equal(incident.loaderId, undefined)
+    const serialized = JSON.stringify(status)
+    assert.doesNotMatch(serialized, /IPC_PRIVATE_(?:API_KEY|PROMPT|TOOL_RESULT)/u)
+    assert.doesNotMatch(serialized, /OPENAI_API_KEY|prompt:|tool result:/u)
+  } finally {
+    unregister()
+  }
+})
+
+test('a Main renderer cannot silently opt a Stable installation into Beta', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  let updateChannel = 'stable'
+  let writes = 0
+  const confirmations = []
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.0.0',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    getUpdateChannel: () => updateChannel,
+    setUpdateChannel: async (next) => {
+      writes += 1
+      updateChannel = next
+      return next
+    },
+    confirmUpdateChannelChange: async (change) => {
+      confirmations.push(change)
+      return false
+    },
+  })
+  try {
+    assert.deepEqual(await handlers.get('desktop:update-channel-set')({ sender }, 'beta'), {
+      channel: 'stable',
+      noAutomaticDowngrade: true,
+    })
+    assert.deepEqual(confirmations, [{ from: 'stable', to: 'beta' }])
+    assert.equal(writes, 0)
+    assert.equal(updateChannel, 'stable')
+  } finally {
+    unregister()
+  }
 })
 
 test('workspace-file IPC is main-surface-only and delegates the native-open authority', async () => {
@@ -236,21 +470,21 @@ test('workspace-file IPC is main-surface-only and delegates the native-open auth
   }
 })
 
-test('public status omits process and filesystem internals', () => {
-  assert.deepEqual(
-    publicRuntimeStatus({ state: 'crashed', error: 'failed', url: 'http://127.0.0.1:1/', pid: 1234 }),
-    { state: 'crashed', error: 'failed', url: undefined, restartAttempt: 0 },
-  )
-  assert.deepEqual(
-    publicRuntimeStatus({ state: 'crashed', error: 'failed', restartBlocked: 'repeated-crash' }),
-    {
-      state: 'crashed',
-      error: 'failed',
-      url: undefined,
-      restartAttempt: 0,
-      restartBlocked: 'repeated-crash',
-    },
-  )
+test('public status omits process, filesystem, and raw runtime-error internals', () => {
+  const crashed = publicRuntimeStatus({ state: 'crashed', error: 'failed', url: 'http://127.0.0.1:1/', pid: 1234 })
+  assert.equal(crashed.state, 'crashed')
+  assert.equal(crashed.errorPresent, true)
+  assert.equal(crashed.errorCategory, 'unknown')
+  assert.match(crashed.errorFingerprint, /^[a-f0-9]{16}$/u)
+  assert.equal(Object.hasOwn(crashed, 'error'), false)
+  assert.equal(crashed.url, undefined)
+  assert.equal(crashed.restartAttempt, 0)
+  assert.doesNotMatch(JSON.stringify(crashed), /failed/u)
+
+  const restartBlocked = publicRuntimeStatus({ state: 'crashed', error: 'failed', restartBlocked: 'repeated-crash' })
+  assert.equal(restartBlocked.restartBlocked, 'repeated-crash')
+  assert.equal(restartBlocked.errorPresent, true)
+  assert.equal(Object.hasOwn(restartBlocked, 'error'), false)
 })
 
 test('public runtime status carries only a read-only background summary', () => {
@@ -263,7 +497,7 @@ test('public runtime status carries only a read-only background summary', () => 
     publicRuntimeStatus({ state: 'ready' }, undefined, { enabled: false, trayAvailable: true, closeBehavior: 'quit' }),
     {
       state: 'ready',
-      error: undefined,
+      errorPresent: false,
       url: undefined,
       restartAttempt: 0,
       background: { enabled: false, trayAvailable: true, closeBehavior: 'quit' },

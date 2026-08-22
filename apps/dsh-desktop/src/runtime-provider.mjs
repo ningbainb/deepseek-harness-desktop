@@ -11,6 +11,16 @@ export const RUNTIME_CAPABILITY_IDS = Object.freeze([
   'host-service.register',
 ])
 
+/** 3.0 adds matrix states without removing the 2.x degraded/unsupported values. */
+export const RUNTIME_PROVIDER_SUPPORT_STATUSES = Object.freeze([
+  'known-good',
+  'supported',
+  'candidate',
+  'blocked',
+  'degraded',
+  'unsupported',
+])
+
 export const RUNTIME_PROVIDER_ERROR_CODES = Object.freeze({
   CAPABILITY_UNSUPPORTED: 'runtime-capability-unsupported',
   OPERATION_FAILED: 'runtime-provider-operation-failed',
@@ -91,7 +101,7 @@ export class DshRuntimeProvider {
     if (typeof desktopVersion !== 'string' || desktopVersion.length === 0) {
       throw invalidConfiguration('runtime provider desktop version is required')
     }
-    if (!['known-good', 'degraded', 'unsupported'].includes(supportStatus)) {
+    if (!RUNTIME_PROVIDER_SUPPORT_STATUSES.includes(supportStatus)) {
       throw invalidConfiguration('runtime provider support status is invalid')
     }
     const optionals = { registerWorkspace, createSession, subscribeSession, registerHostService }

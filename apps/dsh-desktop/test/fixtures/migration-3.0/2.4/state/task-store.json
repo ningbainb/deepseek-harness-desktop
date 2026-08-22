@@ -1,0 +1,29 @@
+{
+  "desktopVersion": "2.4.0",
+  "schemaVersion": 2,
+  "revision": 24,
+  "updatedAt": 1700002401000,
+  "storage": "host-task-store",
+  "tasks": [
+    {
+      "id": "task-24",
+      "title": "2.4 Host Task Store task",
+      "description": "Representative v2 Host ledger task.",
+      "prompt": "Keep this Task readable after the v2 to v3 copy.",
+      "status": "running",
+      "createdAt": 1700002400000,
+      "updatedAt": 1700002401000,
+      "executions": [
+        {
+          "id": "run-24",
+          "runId": "run-24",
+          "workspaceId": "workspace-24",
+          "sessionId": "session-24",
+          "startedAt": 1700002400100,
+          "endedAt": 1700002400200,
+          "result": "succeeded"
+        }
+      ]
+    }
+  ]
+}

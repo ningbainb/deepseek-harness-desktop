@@ -23,6 +23,7 @@ import { SchedulerService } from '../core/scheduler.ts'
 import { LocalStorageTaskStore } from '../core/store.ts'
 import type { TaskStore } from '../core/store.ts'
 import { claimTaskboardApply, releaseTaskboardApply } from './apply-guard.ts'
+import { isDesktopMigrationProbe } from './migration-probe.ts'
 import { mountBoard } from './board-mount.tsx'
 import { selectPreferredTaskStore } from './host-store.ts'
 import { RemoteTaskStoreV3 } from './v3-host-store.ts'
@@ -83,6 +84,12 @@ export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'setting
  * @param ctx - client root context (services: sessions, workspaces).
  */
 export function apply(ctx: ClientContext): void {
+  // The Desktop migration bridge opens a hidden, same-origin document solely
+  // to read the pre-Host v1 localStorage ledger.  It must not mount this
+  // plugin, start a browser scheduler, or execute a due task while recovery
+  // is still deciding whether to continue or roll back.
+  if (isDesktopMigrationProbe()) return
+
   // A duplicated client injection (module factory executed twice in one page
   // lifetime) would otherwise mount a second sidebar entry and board view.
   // First application wins; later calls become no-ops (see apply-guard.ts).

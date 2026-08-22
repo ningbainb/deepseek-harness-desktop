@@ -13,6 +13,49 @@ test('navigation policy keeps the renderer on the active DSH origin', () => {
   assert.equal(classifyNavigation('not a url', runtimeOrigin), 'deny')
 })
 
+test('loopback Runtime navigation stays inside Electron and never opens the system browser', () => {
+  const handlers = new Map()
+  const opened = []
+  let windowOpenHandler
+  const webContents = {
+    on: (event, handler) => handlers.set(event, handler),
+    setWindowOpenHandler: (handler) => { windowOpenHandler = handler },
+  }
+  installNavigationPolicy({
+    webContents,
+    getRuntimeOrigin: () => 'http://127.0.0.1:43125',
+    openExternal: (url) => { opened.push(url) },
+  })
+
+  const sameOrigin = { prevented: false, preventDefault() { this.prevented = true } }
+  handlers.get('will-navigate')(sameOrigin, 'http://127.0.0.1:43125/session/1')
+  assert.equal(sameOrigin.prevented, false)
+  assert.deepEqual(windowOpenHandler({ url: 'http://127.0.0.1:43125/' }), { action: 'deny' })
+  assert.deepEqual(windowOpenHandler({ url: 'http://127.0.0.1:43126/' }), { action: 'deny' })
+  assert.deepEqual(opened, [])
+})
+
+test('renderer-owned HTTPS navigation and popups are denied without opening the system browser', () => {
+  const handlers = new Map()
+  const opened = []
+  let windowOpenHandler
+  const webContents = {
+    on: (event, handler) => handlers.set(event, handler),
+    setWindowOpenHandler: (handler) => { windowOpenHandler = handler },
+  }
+  installNavigationPolicy({
+    webContents,
+    getRuntimeOrigin: () => 'http://127.0.0.1:43125',
+    openExternal: (url) => { opened.push(url) },
+  })
+
+  const navigation = { prevented: false, preventDefault() { this.prevented = true } }
+  handlers.get('will-navigate')(navigation, 'https://example.com/web')
+  assert.equal(navigation.prevented, true)
+  assert.deepEqual(windowOpenHandler({ url: 'https://example.com/popup' }), { action: 'deny' })
+  assert.deepEqual(opened, [])
+})
+
 test('navigation policy hands the Codex OAuth bootstrap to the system browser', async () => {
   const handlers = new Map()
   let windowOpenHandler
@@ -64,7 +107,7 @@ test('navigation policy hands the Codex OAuth bootstrap to the system browser', 
   assert.deepEqual(popupOpenHandler({ url: 'javascript:alert(1)' }), { action: 'deny' })
 })
 
-test('navigation policy reports external browser rejection without leaking it', async () => {
+test('navigation policy does not call the external browser for ordinary renderer popups', async () => {
   const errors = []
   let windowOpenHandler
   const webContents = {
@@ -80,5 +123,5 @@ test('navigation policy reports external browser rejection without leaking it', 
 
   assert.deepEqual(windowOpenHandler({ url: 'https://example.com' }), { action: 'deny' })
   await new Promise((resolve) => setImmediate(resolve))
-  assert.deepEqual(errors, ['browser unavailable'])
+  assert.deepEqual(errors, [])
 })

@@ -2,8 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/dshpreset-v1.schema.json",
   "title": "DeepSeek Harness Desktop Preset v1 manifest",
+  "$comment": "Preset v1 accepts additive optional fields for forward compatibility. formatVersion 1 remains the only supported major; callers should direct other majors to an upgrade path.",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
     "formatVersion",
     "name",
@@ -19,7 +20,7 @@
     "createdAt": { "type": "string", "format": "date-time" },
     "source": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["desktopVersion", "runtimeVersion"],
       "properties": {
         "desktopVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$" },

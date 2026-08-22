@@ -8,6 +8,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -17,9 +18,20 @@ const dshHome = resolve(temporary, 'dsh-home')
 const userData = resolve(temporary, 'user-data')
 let electronApp
 
+async function waitForRuntimeWindow(application, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const page = application.windows().find((candidate) => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+    if (page !== undefined) return page
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100))
+  }
+  throw new Error('runtime window did not appear before the E2E timeout')
+}
+
 try {
   await mkdir(dshHome, { recursive: true })
   await mkdir(userData, { recursive: true })
+  await seedPrimaryRuntimePermissionForTest({ userData })
   await writeFile(
     resolve(dshHome, 'settings.yaml'),
     "ui-onboarding:\n  welcomeNoticeVersion: '2026-08-13.1'\n",
@@ -35,10 +47,24 @@ try {
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
+      DSH_DESKTOP_DISABLE_UPDATES: '1',
+      DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_HOME: dshHome,
+      DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
   })
-  const page = await electronApp.firstWindow()
+  electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
+  electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
+  const startupPage = await electronApp.firstWindow()
+  let page
+  try {
+    page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
+  } catch (error) {
+    const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => '')
+    console.error(`runtime did not become ready; recent log:\n${runtimeLog.slice(-4_000) || '(no runtime log)'}`)
+    console.error(`startup surface:\n${(await startupPage.locator('body').innerText().catch(() => '')).slice(-2_000) || '(unavailable)'}`)
+    throw error
+  }
   const rendererEvents = []
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -46,14 +72,14 @@ try {
     }
   })
   page.on('pageerror', (error) => rendererEvents.push(`[pageerror] ${error.message}`))
-  try {
-    await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: runtimeReadyTimeoutMs })
-  } catch (error) {
-    const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => '')
-    console.error(`runtime did not become ready; recent log:\n${runtimeLog.slice(-4_000) || '(no runtime log)'}`)
-    throw error
-  }
   await page.waitForSelector('#dsh-desktop-window-chrome')
+  const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
+  try {
+    await continueButton.waitFor({ state: 'visible', timeout: 5_000 })
+    await continueButton.click()
+  } catch {
+    // A reused fixture may already have completed onboarding.
+  }
 
   const addWorkspace = page.getByRole('button', { name: /add workspace|添加工作区/iu })
   try {

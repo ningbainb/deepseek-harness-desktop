@@ -17,6 +17,7 @@
         </header>
         <nav aria-label="扩展类型" role="tablist">
           <button type="button" class="tab active" id="plugins-tab" role="tab" aria-controls="plugins" aria-selected="true" data-tab="plugins"><span>插件</span><small id="plugin-count">0</small></button>
+          <button type="button" class="tab" id="market-tab" role="tab" aria-controls="market" aria-selected="false" tabindex="-1" data-tab="market"><span>市场</span><small id="market-count">--</small></button>
           <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" aria-selected="false" tabindex="-1" data-tab="recovery"><span>插件恢复</span><small id="recovery-count">0</small></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" aria-selected="false" tabindex="-1" data-tab="skills"><span>技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="presets-tab" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tab="presets"><span>Preset</span><small>V1</small></button>
@@ -31,6 +32,31 @@
       <section class="activation-banner" id="activation-banner" aria-live="polite" hidden>
         <div><strong>后续动作</strong><p id="activation-message">扩展状态已改变。</p></div>
         <div class="item-actions"><button type="button" class="primary" id="activation-refresh">刷新</button><button type="button" class="secondary" id="restart-runtime">Restart DeepSeek Harness</button></div>
+      </section>
+      <section id="market" class="panel market-panel" role="tabpanel" aria-labelledby="market-tab" hidden>
+        <header class="market-masthead">
+          <div class="market-intro">
+            <p class="market-kicker">AWESOME-DSH-PLUGIN / NATIVE INSTALL</p>
+            <h2>社区插件市场</h2>
+            <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+          </div>
+          <div class="market-metrics" aria-label="目录状态">
+            <div><strong id="market-total">--</strong><span>可安装条目</span></div>
+            <div><strong id="market-updated">--</strong><span>目录更新</span></div>
+          </div>
+        </header>
+        <div class="market-controls">
+          <label class="market-search" for="market-query"><span>搜索</span><input type="search" id="market-query" placeholder="名称、作者或描述" autocomplete="off" spellcheck="false"></label>
+          <label for="market-category"><span>分类</span><select id="market-category"><option value="all">全部分类</option></select></label>
+          <label for="market-sort"><span>排序</span><select id="market-sort"><option value="popular">下载优先</option><option value="newest">最近收录</option><option value="name">名称</option></select></label>
+        </div>
+        <div class="market-results-head"><p id="market-result-state" aria-live="polite">正在读取社区目录</p><button type="button" class="market-reload" id="market-reload">重新读取目录</button></div>
+        <div class="market-grid" id="market-list" aria-live="polite"><p class="market-empty">正在读取目录</p></div>
+        <div class="market-pagination" id="market-pagination" hidden>
+          <button type="button" class="secondary" id="market-previous">上一页</button>
+          <span id="market-page-state">1 / 1</span>
+          <button type="button" class="secondary" id="market-next">下一页</button>
+        </div>
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
         <div class="panel-head">
@@ -77,12 +103,13 @@
           </div>
         </article>
         <form id="plugin-form">
-          <label for="plugin-spec">NPM 包名</label>
+          <label for="plugin-spec">插件来源 / NPM 包名</label>
           <div class="field-row">
-            <input type="text" id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0" autocomplete="off" spellcheck="false" required>
+            <input type="text" id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0 或本地目录/.tgz" autocomplete="off" spellcheck="false" required>
             <button type="submit" class="primary">安装并重启</button>
           </div>
           <label class="risk-check"><input type="checkbox" name="allowUnknown">允许安装未声明 Desktop/DSH 适配范围的插件</label>
+          <label class="risk-check"><input type="checkbox" name="fullAccess" checked>主 Runtime 完整权限（默认）：确认来源风险后安装到持久化 Desktop Profile，并按当前 Windows 用户权限运行；不会替换 Desktop 内置组件</label>
         </form>
         <div class="plugin-tools">
           <p id="plugin-update-state">内置插件随桌面版更新；社区插件仅在此处检查。</p>
@@ -99,6 +126,13 @@
         <div class="recovery-safety">
           这些操作只改变桌面版插件配置。聊天记录、模型设置、账号信息和个人设置不会受影响。
         </div>
+        <article class="recovery-mode">
+          <div>
+            <span class="meta">完整权限授权</span>
+            <strong>当前 Windows 用户</strong>
+          </div>
+          <button type="button" class="item-action danger" id="revoke-full-user-trust">撤销并在下次启动重新确认</button>
+        </article>
         <article class="recovery-mode" id="recovery-mode">
           <div>
             <span class="meta">当前启动模式</span>

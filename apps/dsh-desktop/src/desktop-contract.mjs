@@ -1,4 +1,4 @@
-export const DESKTOP_API_VERSION = '1.2.0'
+export const DESKTOP_API_VERSION = '1.3.0'
 
 export const DESKTOP_SURFACES = Object.freeze({
   MAIN: 'main',
@@ -16,7 +16,9 @@ export const DESKTOP_CAPABILITIES = Object.freeze({
   RUNTIME_READ: 'runtime.read',
   UPDATES_READ: 'updates.read',
   UPDATES_INSTALL: 'updates.install',
+  UPDATE_CHANNEL_MANAGE: 'updates.channel.manage',
   EXTENSIONS_MANAGE: 'extensions.manage',
+  PLUGINS_INSTALL_REQUEST: 'plugins.install.request',
   SKILLS_READ: 'skills.read',
   SKILLS_IMPORT: 'skills.import',
   NOTIFICATIONS_SHOW: 'notifications.show',
@@ -29,6 +31,8 @@ const CAPABILITIES_BY_SURFACE = Object.freeze({
     DESKTOP_CAPABILITIES.RUNTIME_READ,
     DESKTOP_CAPABILITIES.UPDATES_READ,
     DESKTOP_CAPABILITIES.UPDATES_INSTALL,
+    DESKTOP_CAPABILITIES.UPDATE_CHANNEL_MANAGE,
+    DESKTOP_CAPABILITIES.PLUGINS_INSTALL_REQUEST,
     DESKTOP_CAPABILITIES.SKILLS_READ,
     DESKTOP_CAPABILITIES.NOTIFICATIONS_SHOW,
     DESKTOP_CAPABILITIES.DEEP_LINKS_SUBSCRIBE,
@@ -62,7 +66,7 @@ function runtimeSnapshotOf(runtimeProvider) {
     || snapshot.providerId.length === 0
     || typeof snapshot.upstreamVersion !== 'string'
     || snapshot.upstreamVersion.length === 0
-    || !['known-good', 'degraded', 'unsupported'].includes(snapshot.supportStatus)
+    || !['known-good', 'supported', 'candidate', 'blocked', 'degraded', 'unsupported'].includes(snapshot.supportStatus)
     || !Array.isArray(snapshot.capabilities)
     || snapshot.capabilities.some((item) => (
       item === null

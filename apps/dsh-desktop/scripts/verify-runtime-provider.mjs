@@ -28,7 +28,7 @@ try {
     controller,
     ensureProfile,
     dshHome,
-    upstreamVersion: process.env.DSH_CANDIDATE_VERSION ?? '0.1.0-rc.7',
+    upstreamVersion: process.env.DSH_CANDIDATE_VERSION ?? '0.1.1-rc.1',
     desktopVersion: '2.5.0',
     runtimeIdentity: { packageName: '@deepseek-ai/dsh', cliRelativePath: 'lib/bin.js' },
   })

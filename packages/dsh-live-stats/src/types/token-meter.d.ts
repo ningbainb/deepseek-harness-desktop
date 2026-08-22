@@ -48,6 +48,11 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
     /** Live per-step token estimates plus generation throughput. */
     liveTokenUsage: import('@deepseek-ai/dsh-token-meter/client').LiveTokenUsageProjection
   }
+
+  interface SessionProjectionStateMap {
+    /** Plain-JSON replay state owned by the Desktop Live Stats fold. */
+    liveTokenUsage: import('../projection.ts').LiveTokenUsageState
+  }
 }
 
 // Module-augmentation marker: makes this file an external module so the

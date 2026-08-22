@@ -3,6 +3,7 @@ import { handleAdminRequest } from './admin-dashboard.mjs'
 const MAX_REQUEST_BYTES = 8_192
 const MAX_BATCH_EVENTS = 20
 const MAX_DOWNLOAD_CLICK_BYTES = 256
+const ADMIN_HOSTNAME = 'guanli.1521003.xyz'
 const OFFICIAL_WEBSITE_ORIGINS = new Set([
   'https://ningbainb.github.io',
   'https://1521003.xyz',
@@ -280,6 +281,9 @@ async function handleDownloadClick(request, env, seams) {
 
 async function handleFetch(request, env, seams = {}) {
   const url = new URL(request.url)
+  if (url.hostname === ADMIN_HOSTNAME && url.pathname === '/') {
+    return response(302, null, { location: '/admin' })
+  }
   if (url.pathname === '/v1/events') return handleProductEvents(request, env, seams)
   if (url.pathname === '/v1/download-clicks') return handleDownloadClick(request, env, seams)
   if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
@@ -295,6 +299,7 @@ async function handleScheduled(_controller, env) {
 }
 
 export const __test = Object.freeze({
+  ADMIN_HOSTNAME,
   EVENT_FIELDS,
   EVENT_POLICY,
   DOWNLOAD_CLICK_FIELDS,

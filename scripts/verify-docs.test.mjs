@@ -6,7 +6,11 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { countWords, signature, sigEqual, slugify, isExternal } from './verify-docs.mjs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { countWords, blobHash, signature, sigEqual, slugify, isExternal } from './verify-docs.mjs'
 
 test('countWords counts CJK characters individually', () => {
   assert.equal(countWords('中文字符测试'), 6)
@@ -18,6 +22,20 @@ test('countWords counts ASCII words by whitespace', () => {
 
 test('countWords mixes CJK and ASCII', () => {
   assert.equal(countWords('中文 README 测试 file'), 6)
+})
+
+test('blobHash applies Git text normalization before hashing', (t) => {
+  const repo = mkdtempSync(join(tmpdir(), 'verify-docs-'))
+  t.after(() => rmSync(repo, { recursive: true, force: true }))
+  execFileSync('git', ['init', '--quiet'], { cwd: repo })
+  writeFileSync(join(repo, '.gitattributes'), '*.md text eol=lf\n')
+  const readme = join(repo, 'README.md')
+  writeFileSync(readme, 'line one\r\nline two\r\n')
+  const expected = execFileSync('git', ['hash-object', '--stdin'], {
+    cwd: repo,
+    input: 'line one\nline two\n',
+  }).toString().trim()
+  assert.equal(blobHash(readme, repo), expected)
 })
 
 test('signature collects heading levels in order', () => {

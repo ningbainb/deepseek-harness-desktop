@@ -4,6 +4,7 @@ import { performance } from 'node:perf_hooks'
 import { join } from 'node:path'
 
 import { terminateChildProcessTree } from '../src/runtime-controller.mjs'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { parseStartupTimings } from './startup-metrics.mjs'
 
 const OUTPUT_LIMIT = 16_384
@@ -14,8 +15,16 @@ export async function runPackagedDesktop({
   dshHome,
   agentsHome = join(userData, 'agents'),
   timeoutMs = 180_000,
+  requireStartupTimings = true,
+  windowsHide = true,
+  forceRendererAccessibility = false,
+  onSpawn,
 }) {
   if (!appPath || !userData || !dshHome) throw new TypeError('appPath, userData, and dshHome are required')
+  if (typeof requireStartupTimings !== 'boolean') throw new TypeError('requireStartupTimings must be a boolean')
+  if (typeof windowsHide !== 'boolean') throw new TypeError('windowsHide must be a boolean')
+  if (typeof forceRendererAccessibility !== 'boolean') throw new TypeError('forceRendererAccessibility must be a boolean')
+  if (onSpawn !== undefined && typeof onSpawn !== 'function') throw new TypeError('onSpawn must be a function when provided')
   let output = ''
   let child
   let timeout
@@ -37,8 +46,9 @@ export async function runPackagedDesktop({
   }
 
   try {
+    await seedPrimaryRuntimePermissionForTest({ userData })
     const startedAt = performance.now()
-    child = spawn(appPath, [], {
+    child = spawn(appPath, forceRendererAccessibility ? ['--force-renderer-accessibility'] : [], {
       env: {
         ...process.env,
         DSH_DESKTOP_USER_DATA: userData,
@@ -49,10 +59,24 @@ export async function runPackagedDesktop({
       },
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
+      windowsHide,
     })
     child.stdout.on('data', appendOutput)
     child.stderr.on('data', appendOutput)
+    const spawnObserver = onSpawn === undefined
+      ? undefined
+      : Promise.resolve()
+        .then(() => onSpawn(Object.freeze({
+          processId: child.pid,
+          appPath,
+          userData,
+          dshHome,
+          forceRendererAccessibility,
+        })))
+        .catch(async (error) => {
+          await terminateChildProcessTree(child).catch(() => child.kill('SIGKILL'))
+          throw error
+        })
 
     let timedOut = false
     timeout = setTimeout(() => {
@@ -65,6 +89,7 @@ export async function runPackagedDesktop({
       child.once('error', rejectExit)
       child.once('exit', (code, signal) => resolveExit({ code, signal }))
     })
+    if (spawnObserver !== undefined) await spawnObserver
     const elapsedMs = Number((performance.now() - startedAt).toFixed(1))
     if (timedOut) throw new Error(`packaged desktop smoke timed out after ${timeoutMs}ms\n${await diagnostics()}`)
     if (code !== 0) {
@@ -77,7 +102,7 @@ export async function runPackagedDesktop({
     return Object.freeze({
       elapsedMs,
       runtimeLog,
-      timings: parseStartupTimings(runtimeLog),
+      ...(requireStartupTimings ? { timings: parseStartupTimings(runtimeLog) } : {}),
     })
   } finally {
     clearTimeout(timeout)

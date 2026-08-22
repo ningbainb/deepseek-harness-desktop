@@ -23,7 +23,7 @@ describe('Desktop Client SDK v1', () => {
     const onDeepLink = vi.fn()
     const bridge = {
       getInfo: vi.fn(async () => ({ appId: 'desktop', productName: 'Desktop', version: '2.7.0', platform: 'win32' })),
-      getContract: vi.fn(async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: ['notifications.show', 'workspace-files.open'] })),
+      getContract: vi.fn(async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: ['notifications.show', 'workspace-files.open', 'extensions.manage', 'updates.read'] })),
       getStatus: vi.fn(async () => ({
         state: 'ready',
         restartAttempt: 0,
@@ -63,8 +63,78 @@ describe('Desktop Client SDK v1', () => {
     expect(openWorkspaceFile).not.toHaveBeenCalled()
   })
 
+  it('hands plugin install sources to the Desktop only after capability checks', async () => {
+    const requestPluginInstall = vi.fn(async () => ({ accepted: true }))
+    const client = createDesktopClient({
+      globalObject: {
+        dshDesktop: {
+          getContract: async () => ({ apiVersion: '1.3.0', surface: 'main', capabilities: ['plugins.install.request'] }),
+          requestPluginInstall,
+        },
+      },
+    })
+    expect(await client.requestPluginInstall({ source: 'dshmarket' })).toEqual({ accepted: true })
+    expect(requestPluginInstall).toHaveBeenCalledWith('dshmarket')
+    await expect(client.requestPluginInstall({ source: '' })).rejects.toMatchObject({ code: 'desktop-invalid-argument' })
+    await expect(client.requestPluginInstall({ source: 42 as unknown as string })).rejects.toMatchObject({ code: 'desktop-invalid-argument' })
+    expect(requestPluginInstall).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports plugin install requests as unavailable without the capability or bridge', async () => {
+    const requestPluginInstall = vi.fn(async () => ({ accepted: true }))
+    const denied = createDesktopClient({
+      globalObject: {
+        dshDesktop: {
+          getContract: async () => ({ apiVersion: '1.3.0', surface: 'main', capabilities: [] }),
+          requestPluginInstall,
+        },
+      },
+    })
+    expect(await denied.requestPluginInstall({ source: 'dshmarket' })).toEqual({ available: false, reason: 'unavailable' })
+    expect(requestPluginInstall).not.toHaveBeenCalled()
+    const noBridge = createDesktopClient({ globalObject: { dshDesktop: {} } })
+    expect(await noBridge.requestPluginInstall({ source: 'dshmarket' })).toEqual({ available: false, reason: 'unavailable' })
+  })
+
   it('creates safe task and run deep links', () => {
     expect(taskDeepLink('task-1')).toBe('dsh://task/task-1')
     expect(runDeepLink('run-1')).toBe('dsh://run/run-1')
+    for (const value of ['../task', 'task?query', 'task/child', 'Task-1', '']) {
+      expect(() => taskDeepLink(value)).toThrow(/safe Desktop identifier|non-empty/u)
+      expect(() => runDeepLink(value)).toThrow(/safe Desktop identifier|non-empty/u)
+    }
+  })
+
+  it('uses advertised Contract capabilities before invoking optional Desktop bridges', async () => {
+    const bridge = {
+      getContract: vi.fn(async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: [] })),
+      showNotification: vi.fn(async () => ({ shown: true })),
+      toolAction: vi.fn(async () => true),
+      helpAction: vi.fn(async () => true),
+      openWorkspaceFile: vi.fn(async () => ({ opened: true })),
+    }
+    const client = createDesktopClient({ globalObject: { dshDesktop: bridge } })
+    expect(await client.showNotification({ category: 'task', id: 'task-1', title: 'Done', body: 'No bridge call' })).toEqual({ available: false, reason: 'unavailable' })
+    expect(await client.openDesktopSurface('extensions')).toBe(false)
+    expect(await client.openDesktopSurface('updates')).toBe(false)
+    expect(await client.openWorkspaceFile({ root: 'C:/work', path: 'README.md' })).toEqual({ available: false, reason: 'unavailable' })
+    expect(bridge.showNotification).not.toHaveBeenCalled()
+    expect(bridge.toolAction).not.toHaveBeenCalled()
+    expect(bridge.helpAction).not.toHaveBeenCalled()
+    expect(bridge.openWorkspaceFile).not.toHaveBeenCalled()
+  })
+
+  it('ignores malformed optional runtime snapshots instead of casting them into the public Contract', async () => {
+    const client = createDesktopClient({
+      globalObject: {
+        dshDesktop: {
+          getContract: async () => ({
+            apiVersion: '1.2.0', surface: 'main', capabilities: [],
+            runtime: { providerId: 'provider', upstreamVersion: '0.1.0', supportStatus: 'not-a-status', capabilities: [] },
+          }),
+        },
+      },
+    })
+    expect(await client.getContract()).toEqual({ apiVersion: '1.2.0', surface: 'main', capabilities: [] })
   })
 })

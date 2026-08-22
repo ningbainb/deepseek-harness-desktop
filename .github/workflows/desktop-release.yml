@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - desktop-v*
+      - desktop-beta-v*
 
 permissions:
   contents: write
@@ -16,6 +17,49 @@ jobs:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - name: Classify release channel and validate the tag version
+        id: release
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $desktopVersion = (Get-Content -Raw -Encoding utf8 'apps/dsh-desktop/package.json' | ConvertFrom-Json).version
+          if ($tag -match '^desktop-v(?<version>\d+\.\d+\.\d+)$') {
+            $channel = 'stable'
+            $updaterChannel = 'latest'
+            $prerelease = 'false'
+            $tagVersion = $Matches.version
+          } elseif ($tag -match '^desktop-beta-v(?<version>\d+\.\d+\.\d+-[0-9A-Za-z.-]+)$') {
+            $channel = 'beta'
+            $updaterChannel = 'beta'
+            $prerelease = 'true'
+            $tagVersion = $Matches.version
+          } else {
+            throw "Release tag must be desktop-vX.Y.Z or desktop-beta-vX.Y.Z-prerelease; received $tag"
+          }
+          if ($tagVersion -ne $desktopVersion) {
+            throw "Release tag version $tagVersion does not match apps/dsh-desktop/package.json version $desktopVersion"
+          }
+          @(
+            "channel=$channel"
+            "updater_channel=$updaterChannel"
+            "prerelease=$prerelease"
+            "version=$desktopVersion"
+          ) | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Select Windows signing policy
+        id: signing
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
+        run: |
+          $certificateMaterial = @(
+            $env:CSC_LINK
+            $env:WIN_CSC_LINK
+            $env:CSC_NAME
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+          $required = if (@($certificateMaterial).Count -gt 0) { 'true' } else { 'false' }
+          "required=$required" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -25,57 +69,129 @@ jobs:
       - run: pnpm --filter @deepseek-ai/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:runtime-provider:e2e
-      - name: Configure official anonymous product metrics
+      - name: Verify default telemetry configuration is inert
         shell: pwsh
-        env:
-          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
         run: |
-          $endpointText = [string]$env:DSH_TELEMETRY_ENDPOINT
-          if ([string]::IsNullOrWhiteSpace($endpointText)) {
-            throw 'Repository variable DSH_TELEMETRY_ENDPOINT is required for an official Desktop release.'
+          $configuration = Get-Content -Raw -Encoding utf8 'apps/dsh-desktop/build/telemetry-config.json' | ConvertFrom-Json
+          if ($configuration.endpoint -ne '') {
+            throw 'Release builds must keep the default telemetry endpoint empty.'
           }
-          try {
-            $endpoint = [System.Uri]::new($endpointText.Trim(), [System.UriKind]::Absolute)
-          } catch {
-            throw 'DSH_TELEMETRY_ENDPOINT must be an absolute HTTPS URL.'
-          }
-          if ($endpoint.Scheme -ne 'https' -or
-              [string]::IsNullOrWhiteSpace($endpoint.Host) -or
-              $endpoint.AbsolutePath -ne '/v1/events' -or
-              $endpoint.Query -ne '' -or
-              $endpoint.Fragment -ne '' -or
-              $endpoint.UserInfo -ne '') {
-            throw 'DSH_TELEMETRY_ENDPOINT must be a credential-free HTTPS URL ending exactly in /v1/events.'
-          }
-          $configuration = [ordered]@{ endpoint = $endpoint.AbsoluteUri } | ConvertTo-Json -Compress
-          Set-Content -LiteralPath 'apps/dsh-desktop/build/telemetry-config.json' -Value $configuration -Encoding utf8NoBOM
-      - run: pnpm desktop:pack
+      - name: Package the selected release channel
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:win --config.publish.channel=${{ steps.release.outputs.updater_channel }}
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
       - name: Verify packaged directory picker
         shell: pwsh
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
           pnpm --filter @deepseek-ai/dsh-desktop test:directory-picker:e2e
+      - name: Verify packaged embedded terminal
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @deepseek-ai/dsh-desktop test:terminal:e2e
+      - name: Verify packaged window chrome
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @deepseek-ai/dsh-desktop test:window-chrome:e2e
+      - name: Verify cleared profile rebuild
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @deepseek-ai/dsh-desktop test:profile-reset:e2e
       - name: Verify packaged update shutdown receipt
         shell: pwsh
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
           pnpm --filter @deepseek-ai/dsh-desktop test:update-shutdown:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify
+      - name: Verify packaged migration matrix
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @deepseek-ai/dsh-desktop test:migration-matrix:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke
+      - name: Verify Windows Authenticode signatures
+        run: pnpm --filter @deepseek-ai/dsh-desktop release:signatures:verify
+        env:
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
       - name: Write checksums
         shell: pwsh
         run: |
-          $installer = Get-Item apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
+          $installers = @(Get-ChildItem -LiteralPath apps/dsh-desktop/dist -Filter 'DeepSeek-Harness-Desktop-Setup-*.exe' -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected one installer, found $($installers.Count)."
+          }
+          $installer = $installers[0]
           $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
           "$hash  $($installer.Name)" | Set-Content -Encoding ascii apps/dsh-desktop/dist/SHA256SUMS.txt
+      - name: Write release manifest
+        run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:write
+        env:
+          DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
+      - name: Verify release manifest
+        run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:verify
+        env:
+          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_NAME: ${{ vars.CSC_NAME }}
+      - name: Write release notes with verified signing status
+        shell: pwsh
+        run: |
+          $manifest = Get-Content -Raw -Encoding utf8 'apps/dsh-desktop/dist/release-manifest.json' | ConvertFrom-Json
+          $executables = @($manifest.files | Where-Object { $_.file -match '\.exe$' })
+          if ($executables.Count -eq 0) {
+            throw 'Release manifest contains no Windows executable.'
+          }
+          $statuses = @($executables | ForEach-Object { $_.signature.status } | Sort-Object -Unique)
+          if ($statuses.Count -ne 1 -or $statuses[0] -notin @('valid', 'unsigned')) {
+            throw 'Release manifest contains an inconsistent or unsupported executable signature state.'
+          }
+          $statusSection = if ($statuses[0] -eq 'valid') {
+            @'
+          ## 已验证的签名状态 / Verified signing status
+
+          - 中文：本次发布的 Windows 安装器状态为 `valid`，已通过 Authenticode 签名和有效时间戳验证；每个资产的 signer 与 timestamp 以 `release-manifest.json` 为准。
+          - English: The Windows installer status for this release is `valid`. Its Authenticode signature and timestamp passed verification; use `release-manifest.json` for the signer and timestamp of each asset.
+          '@
+          } else {
+            @'
+          ## 已验证的签名状态 / Verified signing status
+
+          - 中文：本次发布的 Windows 安装器状态为 `unsigned`。Windows 可能显示未知发布者或 SmartScreen 提示；请只从本项目 GitHub Release 下载并核对同一 Release 的 SHA-256。
+          - English: The Windows installer status for this release is `unsigned`. Windows may show an unknown-publisher or SmartScreen prompt; download only from this project's GitHub Release and verify the SHA-256 from the same Release.
+          '@
+          }
+          $baseNotes = (Get-Content -Raw -Encoding utf8 'docs/launch/release-notes.md').TrimEnd()
+          $resolvedNotes = "$baseNotes`n`n---`n`n$($statusSection.Trim())`n"
+          [IO.File]::WriteAllText(
+            'apps/dsh-desktop/dist/release-notes.md',
+            $resolvedNotes,
+            [Text.UTF8Encoding]::new($false)
+          )
       - uses: softprops/action-gh-release@v2
         with:
-          body_path: docs/launch/release-notes.md
+          body_path: apps/dsh-desktop/dist/release-notes.md
+          prerelease: ${{ steps.release.outputs.prerelease }}
           overwrite_files: false
           files: |
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
-            apps/dsh-desktop/dist/latest.yml
+            apps/dsh-desktop/dist/*.yml
             apps/dsh-desktop/dist/SHA256SUMS.txt
+            apps/dsh-desktop/dist/release-manifest.json

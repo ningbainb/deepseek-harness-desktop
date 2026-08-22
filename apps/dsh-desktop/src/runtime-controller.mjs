@@ -16,6 +16,14 @@ export const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
 export const DESKTOP_PROFILE_NAME = 'desktop'
 const STABLE_RUNTIME_RESET_MS = 60_000
 const WINDOWS_CONSOLE_PRELOAD_PATH = fileURLToPath(new URL('./windows-console-preload.cjs', import.meta.url))
+const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/iu
+
+function validateRuntimeProfileName(value) {
+  if (typeof value !== 'string' || !PROFILE_NAME_PATTERN.test(value)) {
+    throw new TypeError('runtime profile name is invalid')
+  }
+  return value
+}
 
 function createWorkspaceFileOpenCapabilityToken() {
   // base64url encodes 32 CSPRNG bytes as the exact opaque token shape shared
@@ -24,15 +32,35 @@ function createWorkspaceFileOpenCapabilityToken() {
   return randomBytes(32).toString('base64url')
 }
 
-function runtimeArguments(cliPath, preferredPort, consolePreloadPath) {
+function validateRuntimePatchFiles(value) {
+  if (!Array.isArray(value) || value.length > 8) {
+    throw new TypeError('runtime patch files must be an array of at most eight paths')
+  }
+  const normalized = value.map((path) => {
+    if (
+      typeof path !== 'string'
+      || path.length === 0
+      || path.length > 4_096
+      || /[\u0000-\u001f\u007f]/u.test(path)
+    ) {
+      throw new TypeError('runtime patch file path is invalid')
+    }
+    return path
+  })
+  return Object.freeze(normalized)
+}
+
+function runtimeArguments(cliPath, preferredPort, consolePreloadPath, profileName, patchFiles = []) {
   return [
     '--expose-internals',
     ...(consolePreloadPath ? ['--require', consolePreloadPath] : []),
     cliPath,
     '--profile',
-    DESKTOP_PROFILE_NAME,
+    profileName,
+    ...patchFiles.flatMap((path) => ['--patch', path]),
     '--port',
     String(preferredPort),
+    '--no-open',
   ]
 }
 
@@ -44,6 +72,8 @@ export function createRuntimeInvocation({
   executable,
   cliPath,
   preferredPort = 0,
+  profileName = DESKTOP_PROFILE_NAME,
+  patchFiles = [],
   platform = process.platform,
   systemRoot = process.env.SystemRoot,
 } = {}) {
@@ -56,7 +86,15 @@ export function createRuntimeInvocation({
   if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
     throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
   }
-  const args = runtimeArguments(cliPath, preferredPort, platform === 'win32' ? WINDOWS_CONSOLE_PRELOAD_PATH : undefined)
+  const normalizedProfileName = validateRuntimeProfileName(profileName)
+  const normalizedPatchFiles = validateRuntimePatchFiles(patchFiles)
+  const args = runtimeArguments(
+    cliPath,
+    preferredPort,
+    platform === 'win32' ? WINDOWS_CONSOLE_PRELOAD_PATH : undefined,
+    normalizedProfileName,
+    normalizedPatchFiles,
+  )
   if (platform !== 'win32') return { executable, args }
 
   // Electron is a GUI-subsystem executable and therefore gives its Node-mode
@@ -199,9 +237,12 @@ export class DshRuntimeController extends EventEmitter {
     cancelSchedule = clearTimeout,
     terminateProcessTree = terminateChildProcessTree,
     pathEntries = [],
+    patchFiles = [],
+    patchFilesProvider,
     platform = process.platform,
     systemRoot = process.env.SystemRoot,
     preferredPort = 0,
+    profileName = DESKTOP_PROFILE_NAME,
     onReadyPort = () => {},
     environmentProvider = () => ({}),
     workspaceFileOpenTokenFactory = createWorkspaceFileOpenCapabilityToken,
@@ -224,8 +265,14 @@ export class DshRuntimeController extends EventEmitter {
     this.cancelSchedule = cancelSchedule
     this.terminateProcessTree = terminateProcessTree
     this.pathEntries = pathEntries
+    this.patchFiles = validateRuntimePatchFiles(patchFiles)
+    if (patchFilesProvider !== undefined && typeof patchFilesProvider !== 'function') {
+      throw new TypeError('runtime patchFilesProvider must be a function')
+    }
+    this.patchFilesProvider = patchFilesProvider ?? (() => this.patchFiles)
     this.platform = platform
     this.systemRoot = systemRoot
+    this.profileName = validateRuntimeProfileName(profileName)
     if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
       throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
     }
@@ -370,9 +417,9 @@ export class DshRuntimeController extends EventEmitter {
       ...process.env,
       ...additionalEnvironment,
       DSH_HOME: this.dshHome,
-      DSH_PROFILE: DESKTOP_PROFILE_NAME,
-      DSH_SKIN_PROFILE: DESKTOP_PROFILE_NAME,
-      DSH_SKINS_DIR: join(this.dshHome, 'profiles', DESKTOP_PROFILE_NAME, 'node_modules', '@linxin666'),
+      DSH_PROFILE: this.profileName,
+      DSH_SKIN_PROFILE: this.profileName,
+      DSH_SKINS_DIR: join(this.dshHome, 'profiles', this.profileName, 'node_modules', '@linxin666'),
       // Override an ambient parent value. The token is new for every Host
       // spawn and never appears in argv, diagnostics, or public status.
       [DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV]: workspaceFileOpenToken,
@@ -380,12 +427,15 @@ export class DshRuntimeController extends EventEmitter {
       PATH: [...this.pathEntries, process.env.PATH].filter(Boolean).join(delimiter),
     }
     try {
+      const launchPatchFiles = validateRuntimePatchFiles(this.patchFilesProvider() ?? [])
       const invocation = createRuntimeInvocation({
         executable: this.executable,
         cliPath: this.cliPath,
         platform: this.platform,
         systemRoot: this.systemRoot,
         preferredPort: this.preferredPort,
+        profileName: this.profileName,
+        patchFiles: launchPatchFiles,
       })
       const child = this.spawnProcess(
         invocation.executable,

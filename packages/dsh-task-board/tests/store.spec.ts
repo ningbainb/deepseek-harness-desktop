@@ -150,6 +150,25 @@ describe('parseLedger', () => {
     expect(parsed[1].id).toBe('t-3')
     expect(parsed[1].status).toBe('todo')
   })
+
+  it('keeps documented task fields while discarding unknown persisted payloads', () => {
+    const valid = createTask({ title: 'ok', description: '', prompt: 'known task prompt' }, 1, 't-1')
+    const parsed = parseLedger(JSON.stringify([{
+      ...valid,
+      promptHistory: 'must not persist',
+      sessionTranscript: ['must not persist'],
+      toolResult: { secret: 'must not persist' },
+      executions: [{
+        id: 'run-1', sessionId: undefined, startedAt: 1, endedAt: undefined, result: undefined, error: undefined,
+        rawToolOutput: 'must not persist',
+      }],
+    }]))
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0]).not.toHaveProperty('promptHistory')
+    expect(parsed[0]).not.toHaveProperty('sessionTranscript')
+    expect(parsed[0]).not.toHaveProperty('toolResult')
+    expect(parsed[0]?.executions[0]).not.toHaveProperty('rawToolOutput')
+  })
 })
 
 describe('isTaskRecord', () => {

@@ -1,9 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
 import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/skills.mjs'
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
+import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 
 const CHANNELS = [
   'extensions:list',
@@ -16,8 +17,11 @@ const CHANNELS = [
   'extensions:recovery-state',
   'extensions:recovery-restore-all',
   'extensions:recovery-restore',
+  'extensions:full-user-trust-revoke',
   'extensions:diagnostics-export',
   'extensions:community-open',
+  'extensions:market-list',
+  'extensions:market-install',
   'extensions:skill-import',
   'extensions:skill-open',
   'extensions:skill-root',
@@ -50,10 +54,30 @@ export function registerExtensionIpc({
   presetService,
   migrationService,
   notificationService,
+  communityMarket,
+  // Both callbacks run exclusively in the main process. The resolver turns
+  // the renderer's source reference into a private descriptor, while the
+  // confirmer owns the native user-consent decision. Neither descriptor is
+  // returned through IPC.
+  resolveFullAccessPlugin = async () => undefined,
+  confirmFullAccessPlugin = async () => false,
+  revalidateFullAccessPlugin = async (descriptor) => descriptor,
+  completeFullAccessPlugin = async () => {},
+  revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
+  exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
 }) {
   if (typeof surfaceRegistry?.assert !== 'function') {
     throw new TypeError('extension IPC requires a desktop surface registry')
+  }
+  if (typeof revalidateFullAccessPlugin !== 'function') {
+    throw new TypeError('full access plugin revalidation callback must be a function')
+  }
+  if (typeof completeFullAccessPlugin !== 'function') {
+    throw new TypeError('full access plugin approval completion callback must be a function')
+  }
+  if (typeof revokeFullUserTrust !== 'function') {
+    throw new TypeError('full-user trust revocation callback must be a function')
   }
   for (const channel of CHANNELS) ipcMain.removeHandler(channel)
   let skillPaths = new Map()
@@ -157,17 +181,68 @@ export function registerExtensionIpc({
     }
   })
 
-  const installPlugin = (payload) => {
+  const installPlugin = (payload, { confirmationMode } = {}) => {
+    if (confirmationMode !== undefined && confirmationMode !== 'market') {
+      throw new TypeError('invalid plugin confirmation mode')
+    }
     const request = typeof payload === 'string'
-      ? { spec: payload, allowUnknown: false }
+      ? { spec: payload, allowUnknown: false, fullAccess: false }
       : payload
     if (
       request === null
       || typeof request !== 'object'
       || typeof request.spec !== 'string'
       || typeof request.allowUnknown !== 'boolean'
+      || (request.fullAccess !== undefined && typeof request.fullAccess !== 'boolean')
     ) {
       throw new TypeError('invalid plugin install request')
+    }
+
+    if (request.fullAccess === true) {
+      return enqueuePluginMutation(async () => {
+        // Resolve and obtain native approval before taking the runtime down.
+        // A rejection, cancellation, or invalid descriptor is therefore a
+        // no-mutation operation.
+        const descriptor = assertExternalPluginDescriptor(await resolveFullAccessPlugin(Object.freeze({
+          spec: request.spec,
+        })))
+        const approved = await confirmFullAccessPlugin(
+          descriptor,
+          confirmationMode === undefined ? undefined : Object.freeze({ mode: confirmationMode }),
+        )
+        if (approved !== true) throw new Error('full access plugin installation was not approved')
+        try {
+          // Local content can change after the native confirmation. Electron
+          // main re-resolves and stages the private descriptor immediately
+          // before stopping Runtime or writing the persistent Desktop profile.
+          const installationDescriptor = assertExternalPluginDescriptor(
+            await revalidateFullAccessPlugin(descriptor),
+          )
+          await controller.stop()
+          let transaction
+          try {
+            transaction = await pluginManager.installFullAccessExternal(installationDescriptor)
+            await ensureProfile()
+            await controller.start()
+            await transaction.commit()
+            return Object.freeze({ ...transaction.result, isolated: false })
+          } catch (error) {
+            try {
+              if (transaction) await transaction.rollback()
+              await ensureProfile()
+              await controller.start()
+            } catch (recoveryError) {
+              throw new Error(
+                `full access plugin installation failed and the persistent Desktop profile could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
+                { cause: new AggregateError([error, recoveryError]) },
+              )
+            }
+            throw error
+          }
+        } finally {
+          await completeFullAccessPlugin(descriptor)
+        }
+      })
     }
 
     return enqueuePluginMutation(async () => {
@@ -392,23 +467,25 @@ export function registerExtensionIpc({
     }
     return enqueuePluginMutation(() => pluginRecovery.restoreSnapshotAndRestart(id))
   })
-  handleExtension('extensions:diagnostics-export', async () => {
-    const result = await dialog.showSaveDialog(getWindow(), {
-      title: '导出插件诊断包',
-      defaultPath: `dsh-plugin-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: 'DSH diagnostics', extensions: ['json'] }],
-    })
-    if (result.canceled || !result.filePath) return { canceled: true }
-    const diagnostics = await pluginRecovery.getDiagnostics({
-      runtime: {
-        state: controller.status?.state,
-        error: typeof controller.status?.error === 'string' ? controller.status.error.slice(0, 4_000) : undefined,
-      },
-    })
-    await writeFile(result.filePath, `${JSON.stringify(diagnostics, null, 2)}\n`)
-    return { canceled: false }
+  handleExtension('extensions:full-user-trust-revoke', (_event, ...args) => {
+    if (args.length !== 0) throw new TypeError('full-user trust revocation does not accept arguments')
+    return revokeFullUserTrust()
   })
+  handleExtension('extensions:diagnostics-export', () => exportDiagnostics())
   handleExtension('extensions:community-open', (_event, id) => shell.openExternal(resolveCommunityPluginUrl(id)))
+  handleExtension('extensions:market-list', () => {
+    if (typeof communityMarket?.list !== 'function') throw new Error('community market is unavailable')
+    return communityMarket.list()
+  })
+  handleExtension('extensions:market-install', async (_event, id) => {
+    if (typeof communityMarket?.resolveInstall !== 'function') throw new Error('community market is unavailable')
+    const spec = await communityMarket.resolveInstall(id)
+    return trackProductOperation('install', () => installPlugin({
+      spec,
+      allowUnknown: true,
+      fullAccess: true,
+    }, { confirmationMode: 'market' }))
+  })
   handleExtension('extensions:skill-import', async () => {
     const result = await dialog.showOpenDialog(getWindow(), {
       title: '选择技能目录 / Select skill folder',

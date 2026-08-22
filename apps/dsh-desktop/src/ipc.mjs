@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import {
   DESKTOP_ERROR_CODES,
   DESKTOP_SURFACES,
@@ -5,13 +7,89 @@ import {
   desktopContractForSurface,
 } from './desktop-contract.mjs'
 import { normalizeDesktopNotification } from './notifications.mjs'
+import { parseRemoteExternalPluginReference } from './external-plugin-source.mjs'
+import { assertUpdateChannel } from './update-channel-preferences.mjs'
+import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 
-const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'exit'])
+const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit'])
 const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', 'privacy', 'updates'])
-const TOOL_ACTIONS = new Set(['extensions'])
+const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
+const SAFE_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]{0,127}\/)?[a-z0-9][a-z0-9._-]{0,127}$/u
+const SAFE_RECOVERY_LOADER_ID = /^[a-z0-9][a-z0-9._:-]{0,127}$/u
+const RECOVERY_REASON_CODES = new Set([
+  'unknown',
+  'load-failed',
+  'missing-dependency',
+  'capability-conflict',
+  'incompatible',
+  'plugin-inspection-failed',
+  'untrusted-profile-loader',
+  'untrusted-profile-bootstrap',
+  'unattributed-plugin-startup',
+])
+const RECOVERY_RESOLUTIONS = new Set([
+  'auto-disabled',
+  'disabled-by-user',
+  'safe-mode-auto',
+  'safe-mode',
+  'baseline-quarantine-active',
+  'baseline-quarantine-bootstrap',
+  'legacy-false-positive-repaired',
+  'restored-by-user',
+])
+const RECOVERY_SUMMARIES = Object.freeze({
+  unknown: '启动恢复需要处理。',
+  'load-failed': '插件加载失败，已保留恢复选项。',
+  'missing-dependency': '插件依赖不可用，已保留恢复选项。',
+  'capability-conflict': '检测到插件能力冲突，已保留恢复选项。',
+  incompatible: '插件与当前桌面版不兼容，已保留恢复选项。',
+  'plugin-inspection-failed': '插件检查失败，已保留恢复选项。',
+  'untrusted-profile-loader': '不受信任的加载配置已被隔离。',
+  'untrusted-profile-bootstrap': '不受信任的启动配置已被隔离。',
+  'unattributed-plugin-startup': '插件启动失败，未能可靠定位来源。',
+})
+
+function safeRecoveryIdentifier(value, pattern, limit) {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return pattern.test(normalized) ? normalized.slice(0, limit) : undefined
+}
+
+function privateValueFingerprint(value) {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16)
+}
+
+function runtimeErrorCategory(value) {
+  const normalized = value.toLowerCase()
+  if (/(?:runtime integrity|checksum|sha(?:256|512)|signature)/u.test(normalized)) return 'integrity'
+  if (/(?:eaddrinuse|port\s+\d{2,5}\s+(?:is\s+)?(?:already\s+)?(?:in\s+use|occupied))/u.test(normalized)) return 'port-conflict'
+  if (/(?:eacces|eperm|permission denied)/u.test(normalized)) return 'permission'
+  if (/(?:timed out|timeout|did not become ready)/u.test(normalized)) return 'startup-timeout'
+  if (/(?:plugin|bundle|loader|cordis|patch|module)/u.test(normalized)) return 'plugin-load'
+  return 'unknown'
+}
+
+function publicRecoveryIncident(incident) {
+  const reasonCode = RECOVERY_REASON_CODES.has(incident.reasonCode) ? incident.reasonCode : 'unknown'
+  const technicalDetails = typeof incident.technicalDetails === 'string' && incident.technicalDetails.length > 0
+    ? incident.technicalDetails
+    : undefined
+  const pluginName = safeRecoveryIdentifier(incident.pluginName, SAFE_PLUGIN_NAME, 256)
+  const loaderId = safeRecoveryIdentifier(incident.loaderId, SAFE_RECOVERY_LOADER_ID, 128)
+  return {
+    identified: incident.identified === true,
+    ...(pluginName === undefined ? {} : { pluginName }),
+    ...(loaderId === undefined ? {} : { loaderId }),
+    reasonCode,
+    summary: RECOVERY_SUMMARIES[reasonCode],
+    technicalDetailsPresent: technicalDetails !== undefined,
+    ...(technicalDetails === undefined ? {} : { technicalDetailsFingerprint: privateValueFingerprint(technicalDetails) }),
+    ...(RECOVERY_RESOLUTIONS.has(incident.resolution) ? { resolution: incident.resolution } : {}),
+  }
+}
 
 export function normalizeWindowChromeTheme(value) {
   if (typeof value !== 'string' || !WINDOW_CHROME_THEMES.has(value)) {
@@ -54,15 +132,7 @@ export function publicRecoveryStatus(status) {
     busy: status.busy === true,
     recoveryStage: Number.isInteger(status.recoveryStage) ? Math.max(0, Math.min(2, status.recoveryStage)) : 0,
     currentIncident: incident && typeof incident === 'object'
-      ? {
-          identified: incident.identified === true,
-          pluginName: typeof incident.pluginName === 'string' ? incident.pluginName.slice(0, 240) : undefined,
-          loaderId: typeof incident.loaderId === 'string' ? incident.loaderId.slice(0, 240) : undefined,
-          reasonCode: typeof incident.reasonCode === 'string' ? incident.reasonCode.slice(0, 80) : 'unknown',
-          summary: typeof incident.summary === 'string' ? incident.summary.slice(0, 500) : undefined,
-          technicalDetails: typeof incident.technicalDetails === 'string' ? incident.technicalDetails.slice(-8_000) : undefined,
-          resolution: typeof incident.resolution === 'string' ? incident.resolution.slice(0, 80) : undefined,
-        }
+      ? publicRecoveryIncident(incident)
       : undefined,
   }
 }
@@ -87,10 +157,17 @@ export function publicBackgroundStatus(status) {
 
 export function publicRuntimeStatus(status, recoveryStatus, backgroundStatus) {
   const state = typeof status?.state === 'string' ? status.state : 'stopped'
+  const runtimeError = typeof status?.error === 'string' && status.error.length > 0 ? status.error : undefined
   const background = publicBackgroundStatus(backgroundStatus)
   return {
     state,
-    error: typeof status?.error === 'string' ? status.error.slice(0, 4_000) : undefined,
+    errorPresent: runtimeError !== undefined,
+    ...(runtimeError === undefined
+      ? {}
+      : {
+          errorCategory: runtimeErrorCategory(runtimeError),
+          errorFingerprint: privateValueFingerprint(runtimeError),
+        }),
     url: state === 'ready' && typeof status?.url === 'string' ? status.url : undefined,
     restartAttempt: Number.isInteger(status?.restartAttempt) ? status.restartAttempt : 0,
     ...(status?.restartBlocked === 'repeated-crash' ? { restartBlocked: status.restartBlocked } : {}),
@@ -116,6 +193,14 @@ export function publicUpdateStatus(status) {
   }
 }
 
+/** A small, clone-safe projection of the persisted update channel policy. */
+export function publicUpdateChannel(value) {
+  return Object.freeze({
+    channel: normalizeUpdateChannel(value),
+    noAutomaticDowngrade: true,
+  })
+}
+
 export function registerDesktopIpc({
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
@@ -129,12 +214,17 @@ export function registerDesktopIpc({
   ensureProfile,
   openLogs,
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
+  openMigrationAssistant = async () => { throw new Error('migration assistant is unavailable') },
   exitApp,
   handleHelpAction,
   handleToolAction,
+  onPluginInstallRequest = async () => { throw new Error('plugin install requests are unavailable') },
   setWindowChromeTheme,
   claimStarPrompt,
   getUpdateController,
+  getUpdateChannel = () => 'stable',
+  setUpdateChannel = async () => { throw new Error('update channel selection is unavailable') },
+  confirmUpdateChannelChange = async () => true,
   getSettingsWindowBounds = async () => undefined,
   setSettingsWindowBounds = async () => undefined,
   onRecoveryAction = () => {},
@@ -162,8 +252,11 @@ export function registerDesktopIpc({
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
     'desktop:update-status',
+    'desktop:update-channel-get',
+    'desktop:update-channel-set',
     'desktop:update-check',
     'desktop:update-install',
+    'desktop:plugin-install-request',
     'desktop:settings-window-bounds-get',
     'desktop:settings-window-bounds-set',
     'desktop:settings-opened',
@@ -220,6 +313,7 @@ export function registerDesktopIpc({
     if (action === 'safe-mode') return pluginRecovery?.enterSafeModeAndRestart?.()
     if (action === 'open-logs') return openLogs()
     if (action === 'export-diagnostics') return exportDiagnostics()
+    if (action === 'upgrade-migration') return openMigrationAssistant()
     exitApp()
     return undefined
   })
@@ -239,11 +333,44 @@ export function registerDesktopIpc({
   })
   handle('desktop:star-prompt-claim', main, async () => await claimStarPrompt?.() === true)
   handle('desktop:update-status', main, () => publicUpdateStatus(getUpdateController?.()?.getStatus?.()))
+  handle('desktop:update-channel-get', main, () => publicUpdateChannel(getUpdateChannel()))
+  handle('desktop:update-channel-set', main, async (_event, _surface, rawChannel) => {
+    const channel = assertUpdateChannel(rawChannel)
+    const current = normalizeUpdateChannel(getUpdateChannel())
+    // The Main DSH renderer can host community code. Stable-to-Beta is an
+    // account-level release-policy change, so it must be confirmed by a native
+    // Desktop dialog rather than trusting page code or a capability string.
+    if (current === 'stable' && channel === 'beta') {
+      const confirmed = await confirmUpdateChannelChange({ from: current, to: channel })
+      if (confirmed !== true) return publicUpdateChannel(current)
+    }
+    const persisted = await setUpdateChannel(channel)
+    return publicUpdateChannel(persisted?.channel ?? persisted ?? channel)
+  })
   handle('desktop:update-check', main, () => {
     try { onUpdateCheck() } catch {}
     return getUpdateController?.()?.check?.({ manual: true })
   })
   handle('desktop:update-install', main, () => getUpdateController?.()?.install?.())
+  handle('desktop:plugin-install-request', main, async (_event, _surface, rawSource) => {
+    // A web panel may only hand over a remote npm/git/HTTPS reference — the
+    // same boundary the recovery shell enforces. Local paths stay exclusive
+    // to the native file picker; nothing is installed by this request, the
+    // Extension Dock prefill and its native approval own that decision.
+    if (typeof rawSource !== 'string' || rawSource.length === 0 || rawSource.length > 2_048) {
+      throw new TypeError('plugin install source is invalid')
+    }
+    const parsed = parseRemoteExternalPluginReference(rawSource, { includeBare: true })
+    if (
+      parsed === undefined
+      || !['npm', 'git', 'https'].includes(parsed.sourceType)
+      || /^git\+file:/iu.test(parsed.installSpec)
+    ) {
+      throw new TypeError('plugin install source must be an npm, git, or HTTPS reference')
+    }
+    await onPluginInstallRequest(parsed.installSpec)
+    return { accepted: true, spec: parsed.installSpec }
+  })
   handle('desktop:settings-window-bounds-get', main, () => getSettingsWindowBounds())
   handle('desktop:settings-window-bounds-set', main, (_event, _surface, bounds) => setSettingsWindowBounds(bounds))
   handle('desktop:settings-opened', main, () => {

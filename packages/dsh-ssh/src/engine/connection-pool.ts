@@ -87,7 +87,7 @@ export function buildConnectConfig(entry: SshHostEntry, sock?: ConnectConfig['so
   return config
 }
 
-/** Connect one ssh2 client (resolve on ready, reject on error/close). */
+/** Connect one ssh2 client and retain an error sink after the handshake. */
 function connectClient(config: ConnectConfig): Promise<Client> {
   return new Promise((resolve, reject) => {
     const client = new Client()
@@ -97,10 +97,15 @@ function connectClient(config: ConnectConfig): Promise<Client> {
       settled = true
       resolve(client)
     })
-    client.once('error', (error) => {
+    client.on('error', (error) => {
       if (settled) return
       settled = true
       reject(error instanceof Error ? error : new Error(String(error)))
+    })
+    client.once('close', () => {
+      if (settled) return
+      settled = true
+      reject(new Error('SSH connection closed before handshake completed'))
     })
     try {
       client.connect(config)
@@ -182,12 +187,20 @@ export async function acquire(engine: PoolEngine, alias: string): Promise<PoolRe
 }
 
 async function doAcquire(engine: PoolEngine, alias: string): Promise<PoolRecord> {
+  // Reuse the healthy pooled record: replacing it would orphan a live
+  // connection (and its keepalive) outside the pool map where no sweep or
+  // dispose can ever reach it again.
+  const existing = engine.pool.get(alias)
+  if (existing !== undefined && !existing.broken) return existing
   const entry = engine.store.find(alias)
   if (entry === undefined) throw new Error('alias \'' + alias + '\' not found — add it first')
   const { client, hops } = await connectChain(engine, entry)
   const record: PoolRecord = { client, hops, idleAt: Date.now(), pinned: false, broken: false, inFlight: 0 }
-  client.on('error', () => { record.broken = true })
-  client.on('close', () => { record.broken = true })
+  const markBroken = (): void => { record.broken = true }
+  for (const connection of [client, ...hops]) {
+    connection.on('error', markBroken)
+    connection.on('close', markBroken)
+  }
   engine.pool.set(alias, record)
   return record
 }
@@ -236,6 +249,15 @@ export async function withClient<T>(engine: PoolEngine, alias: string, fn: (clie
       const result = await fn(record.client)
       record.idleAt = Date.now()
       return result
+    } catch (error) {
+      lastError = error
+      // Retry only a connection-level failure (the record was marked broken
+      // by its error/close listener); an application error from `fn` must
+      // surface immediately so non-idempotent operations never run twice.
+      if (!record.broken || attempt >= attempts) throw error
+      // Tear the dead record down so the next attempt reconnects instead of
+      // reusing the broken client.
+      disposeRecord(engine, alias, record)
     } finally {
       record.inFlight -= 1
     }

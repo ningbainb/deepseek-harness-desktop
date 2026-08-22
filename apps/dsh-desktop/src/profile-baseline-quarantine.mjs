@@ -3,10 +3,12 @@ import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import {
+  BUILTIN_BUNDLES,
   DESKTOP_PATCH_END,
   DESKTOP_PATCH_START,
   DESKTOP_SKIN_STATE_END,
   DESKTOP_SKIN_STATE_START,
+  MANAGED_RUNTIME_PACKAGES,
   SKIN_PATCH_END,
   SKIN_PATCH_START,
   createDesktopProfileManifest,
@@ -17,6 +19,26 @@ const SCHEMA_VERSION = 1
 const EMPTY_HOME_PATCH = '[]\n'
 const EMPTY_PROFILE_PATCH = ''
 const EMPTY_LINK_RECORD = '{}\n'
+const DESKTOP_MANAGED_PACKAGES = new Set([
+  ...BUILTIN_BUNDLES,
+  ...MANAGED_RUNTIME_PACKAGES,
+])
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hasUserOwnedProfilePackage(manifest) {
+  if (!isRecord(manifest)) return false
+  const dependencies = isRecord(manifest.dependencies)
+    ? Object.keys(manifest.dependencies)
+    : []
+  const bundles = Array.isArray(manifest.dsh?.profile?.bundles)
+    ? manifest.dsh.profile.bundles
+    : []
+  return [...dependencies, ...bundles].some((name) =>
+    typeof name === 'string' && name.length > 0 && !DESKTOP_MANAGED_PACKAGES.has(name))
+}
 
 /**
  * Files that can make DSH evaluate a user-controlled loader before Desktop has
@@ -322,6 +344,27 @@ export class DesktopProfileBaselineQuarantine {
           || (Array.isArray(bundles) && bundles.some((bundle) => typeof bundle !== 'string'))
       } catch {
         return true
+      }
+    })
+  }
+
+  /**
+   * Return whether a syntactically valid profile has an external package or
+   * bundle activation. This intentionally differs from
+   * hasUntrustedActivation(): a normal community plugin is not unsafe before
+   * it fails, but it is a reversible recovery target after a narrowly
+   * recognized unattributed process crash.
+   */
+  hasUserActivation() {
+    return this.#enqueue(async () => {
+      const profileManifest = await readTextIfPresent(join(this.profileDir, 'package.json'))
+      if (profileManifest === undefined) return false
+      try {
+        return hasUserOwnedProfilePackage(JSON.parse(profileManifest))
+      } catch {
+        // Syntax failures belong to hasUntrustedActivation(), which retains
+        // the stronger pre-bootstrap recovery path.
+        return false
       }
     })
   }

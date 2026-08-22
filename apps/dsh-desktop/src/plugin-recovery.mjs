@@ -12,8 +12,18 @@ const MAX_INCIDENTS = 20
 const MAX_TECHNICAL_DETAILS = 8_000
 const MAX_RECOVERY_CANDIDATES = 48
 
-const HOST_STARTUP_FAILURE = /(?:\bEADDRINUSE\b|\blisten\b[^\r\n]{0,160}\b(?:127\.0\.0\.1|localhost|::1)\b|\bport\s+\d{2,5}\s+(?:is\s+)?(?:already\s+)?(?:in\s+use|occupied)\b|\b(?:spawn|createprocess)\b[^\r\n]{0,160}\b(?:ENOENT|EACCES|EPERM)\b|\bpermission denied\b|\bPowerShell\b|\bWindows\s+code\s+0xFFFFFFFF\b|\bsigned\s+-1\b|\bcode\s*(?:=|:)?\s*-1\b|\b4294967295\b|\b-WindowStyle\b|\bruntime integrity\b|\bapp\.asar\b)/iu
+const HOST_STARTUP_FAILURE = /(?:\bEADDRINUSE\b|\blisten\b[^\r\n]{0,160}\b(?:127\.0\.0\.1|localhost|::1)\b|\bport\s+\d{2,5}\s+(?:is\s+)?(?:already\s+)?(?:in\s+use|occupied)\b|\b(?:powershell(?:\.exe)?|pwsh(?:\.exe)?)\b[^\r\n]{0,160}(?:-windowstyle|\bwindowstyle\b|\bhidden\b|\bencodedcommand\b)|\bWindows\s+code\s+0xFFFFFFFF\b|\bsigned\s+-1\b|\bcode\s*(?:=|:)?\s*-1\b|\b4294967295\b|\b-WindowStyle\b|\bruntime integrity\b|\bapp\.asar\b)/iu
+// Only Desktop/runtime executable lookup failures are host faults. A blanket
+// `spawn … ENOENT` rule masks community bundles that launch a missing helper
+// and then fail during bootstrap.
+const KNOWN_HOST_SPAWN_FAILURE = /\b(?:spawn|createprocess)\b[^\r\n]{0,160}\b(?:git(?:\.exe)?|powershell(?:\.exe)?|pwsh(?:\.exe)?|node(?:\.exe)?|electron(?:\.exe)?|pnpm(?:\.cmd|\.exe)?)\b[^\r\n]{0,160}\b(?:ENOENT|EACCES|EPERM)\b/iu
+const UNKNOWN_PROCESS_SPAWN_FAILURE = /\b(?:spawn|createprocess)\b[^\r\n]{0,160}\b(?:ENOENT|EACCES|EPERM)\b/iu
 const PLUGIN_BOOTSTRAP_FAILURE = /(?:did not become ready|tim(?:ed|e)[ -]?out|exited before readiness|failed to (?:import|load)|\b(?:plugin|bundle|loader|cordis|patch|module)\b)/iu
+// Crashpad's NotConnectedToHandler termination code means the runtime died at
+// process level before it could attribute the fault to a loader. Keep this
+// deliberately narrow: an arbitrary non-zero exit is not evidence against a
+// user's profile and must not trigger automatic isolation.
+const CRASHPAD_UNATTRIBUTED_PROCESS_FAILURE = /(?:\bcrashpad\b[^\r\n]{0,240}\bnot[\s_-]*connected\b|\bnot[\s_-]*connected[\s_-]*to[\s_-]*(?:the[\s_-]*)?handler\b|\b0x0*ffff7003\b)/iu
 
 function asMessage(value) {
   return String(value ?? '').slice(-MAX_TECHNICAL_DETAILS)
@@ -35,16 +45,28 @@ function recoveryCandidates(value) {
  */
 export function isHostStartupFailure(rawText) {
   const technicalDetails = asMessage(rawText)
-  return HOST_STARTUP_FAILURE.test(technicalDetails)
+  return HOST_STARTUP_FAILURE.test(technicalDetails) || KNOWN_HOST_SPAWN_FAILURE.test(technicalDetails)
 }
 
 export function isPluginBootstrapFailure(rawText) {
   const technicalDetails = asMessage(rawText)
-  return !isHostStartupFailure(technicalDetails) && PLUGIN_BOOTSTRAP_FAILURE.test(technicalDetails)
+  return !isHostStartupFailure(technicalDetails)
+    && (PLUGIN_BOOTSTRAP_FAILURE.test(technicalDetails) || UNKNOWN_PROCESS_SPAWN_FAILURE.test(technicalDetails))
+}
+
+/**
+ * Crashpad's handler-disconnect termination is the one unattributed native
+ * crash where a reversible user-profile retry is justified. Host signatures
+ * remain authoritative even when a Crashpad line happens to be nearby.
+ */
+export function isCrashpadUnattributedProcessFailure(rawText) {
+  const technicalDetails = asMessage(rawText)
+  return !isHostStartupFailure(technicalDetails) && CRASHPAD_UNATTRIBUTED_PROCESS_FAILURE.test(technicalDetails)
 }
 
 export function shouldAutomaticallyEnterSafeMode(rawText, { candidatePlugins = [] } = {}) {
-  return recoveryCandidates(candidatePlugins).length > 0 && isPluginBootstrapFailure(rawText)
+  return recoveryCandidates(candidatePlugins).length > 0
+    && (isPluginBootstrapFailure(rawText) || isCrashpadUnattributedProcessFailure(rawText))
 }
 
 /** A tagged package-manifest read failure is safe to recover before runtime startup. */
@@ -819,12 +841,34 @@ export class DesktopPluginRecovery extends EventEmitter {
     }
   }
 
+  async #hasUserProfileActivation() {
+    if (!this.baselineQuarantine || typeof this.baselineQuarantine.hasUserActivation !== 'function') return false
+    try {
+      return await this.baselineQuarantine.hasUserActivation() === true
+    } catch (error) {
+      await this.#log('[plugin-recovery] user profile activation check is unavailable')
+      return false
+    }
+  }
+
+  async #isBaselineQuarantineEligible(technicalDetails) {
+    if (isHostStartupFailure(technicalDetails)) return false
+    const pluginBootstrapFailure = isPluginBootstrapFailure(technicalDetails)
+    const crashpadProcessFailure = isCrashpadUnattributedProcessFailure(technicalDetails)
+    if (!pluginBootstrapFailure && !crashpadProcessFailure) return false
+    if (await this.#hasUntrustedProfileActivation()) return true
+    // A valid community bundle is a recovery target only for the narrow
+    // Crashpad handler-disconnect failure. Broader unknown runtime failures
+    // retain the existing no-false-positive policy.
+    return crashpadProcessFailure && await this.#hasUserProfileActivation()
+  }
+
   async #markBaselineRecoveryActive({ incident } = {}) {
     const state = await this.store.getState()
     let activeIncident = incident
     if (
       !activeIncident?.id
-      && ['untrusted-profile-loader', 'untrusted-profile-bootstrap'].includes(state.currentIncident?.reasonCode)
+      && ['untrusted-profile-loader', 'untrusted-profile-bootstrap', 'unattributed-process-crash'].includes(state.currentIncident?.reasonCode)
     ) {
       activeIncident = state.currentIncident
     }
@@ -890,17 +934,24 @@ export class DesktopPluginRecovery extends EventEmitter {
     if (this.recoveryStage >= 3) return false
     if (this.recoveryStage === 2) {
       const technicalDetails = `${this.lines.join('\n')}\n${status?.error ?? ''}`
-      if (!isPluginBootstrapFailure(technicalDetails) || !await this.#hasUntrustedProfileActivation()) {
+      if (!await this.#isBaselineQuarantineEligible(technicalDetails)) {
         return false
       }
       this.recoveryStage = 3
+      const crashpadProcessFailure = isCrashpadUnattributedProcessFailure(technicalDetails)
       const incident = await this.store.recordIncident({
         identified: false,
-        reasonCode: 'untrusted-profile-loader',
-        summary: '安全模式后仍检测到无法识别的用户加载配置，已暂时切换到桌面基线以恢复启动',
+        reasonCode: crashpadProcessFailure ? 'unattributed-process-crash' : 'untrusted-profile-loader',
+        summary: crashpadProcessFailure
+          ? '安全模式后仍发生无法归因的进程崩溃，已暂时切换到桌面基线以恢复启动'
+          : '安全模式后仍检测到无法识别的用户加载配置，已暂时切换到桌面基线以恢复启动',
         technicalDetails,
       })
-      await this.#log('[plugin-recovery] plugin-safe-mode retry still saw an opaque user loader; trying a reversible Desktop baseline once')
+      await this.#log(
+        crashpadProcessFailure
+          ? '[plugin-recovery] plugin-safe-mode retry still saw an unattributed Crashpad failure; trying a reversible Desktop baseline once'
+          : '[plugin-recovery] plugin-safe-mode retry still saw an opaque user loader; trying a reversible Desktop baseline once',
+      )
       return this.#quarantineUntrustedProfile({ incident })
     }
     if (this.recoveryStage === 1) {
@@ -922,6 +973,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     const profileCandidates = await this.#profileRecoveryCandidates()
     const candidatePlugins = recoveryCandidates([...activePlugins, ...profileCandidates])
     const technicalDetails = `${this.lines.join('\n')}\n${status?.error ?? ''}`
+    const crashpadProcessFailure = isCrashpadUnattributedProcessFailure(technicalDetails)
     const analysis = classifyPluginFailure(`${this.lines.join('\n')}\n${status?.error ?? ''}`, {
       activePlugins: candidatePlugins,
       protectedPlugins: this.builtInBundles,
@@ -929,8 +981,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     const automaticSafeModeEligible = !analysis.identified
       && shouldAutomaticallyEnterSafeMode(technicalDetails, { candidatePlugins })
     const baselineQuarantineEligible = !analysis.identified
-      && isPluginBootstrapFailure(technicalDetails)
-      && await this.#hasUntrustedProfileActivation()
+      && await this.#isBaselineQuarantineEligible(technicalDetails)
     const enrichedAnalysis = analysis.identified
       ? analysis
       : Object.freeze({
@@ -938,13 +989,17 @@ export class DesktopPluginRecovery extends EventEmitter {
         candidatePlugins,
         ...(automaticSafeModeEligible
           ? {
-              reasonCode: 'unattributed-plugin-startup',
-              summary: `未能定位单个插件，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`,
+              reasonCode: crashpadProcessFailure ? 'unattributed-process-crash' : 'unattributed-plugin-startup',
+              summary: crashpadProcessFailure
+                ? `检测到无法归因的进程崩溃，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`
+                : `未能定位单个插件，已暂时停用 ${candidatePlugins.length} 个用户插件以恢复启动`,
             }
           : baselineQuarantineEligible
             ? {
-                reasonCode: 'untrusted-profile-loader',
-                summary: '检测到无法识别的用户加载配置，已暂时切换到桌面基线以恢复启动',
+                reasonCode: crashpadProcessFailure ? 'unattributed-process-crash' : 'untrusted-profile-loader',
+                summary: crashpadProcessFailure
+                  ? '检测到无法归因的进程崩溃，已暂时切换到桌面基线以恢复启动'
+                  : '检测到无法识别的用户加载配置，已暂时切换到桌面基线以恢复启动',
               }
           : {}),
       })

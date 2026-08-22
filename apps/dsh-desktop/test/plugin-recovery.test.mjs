@@ -10,6 +10,7 @@ import {
   DesktopPluginRecovery,
   PluginRecoveryStore,
   classifyPluginFailure,
+  isCrashpadUnattributedProcessFailure,
   recoverProfileAfterPluginInspectionFailure,
   isPluginPackageInspectionFailure,
   shouldAutomaticallyEnterSafeMode,
@@ -93,6 +94,24 @@ test('unknown plugin startup recovery excludes port and Windows launcher failure
     'PowerShell -WindowStyle Hidden exited before readiness',
     { candidatePlugins },
   ), false)
+  assert.equal(isCrashpadUnattributedProcessFailure(
+    '[0819/092634.721:ERROR:third_party\\crashpad\\client\\crashpad_client_win.cc:867] not connected',
+  ), true)
+  assert.equal(shouldAutomaticallyEnterSafeMode(
+    'Crashpad client not connected\nruntime exited unexpectedly with Windows code 0xFFFF7003 (signed -36861)',
+    { candidatePlugins },
+  ), true)
+  assert.equal(isCrashpadUnattributedProcessFailure(
+    'Crashpad client not connected\nruntime startup failed: listen EADDRINUSE 127.0.0.1:43125',
+  ), false)
+  assert.equal(shouldAutomaticallyEnterSafeMode(
+    'Crashpad client not connected\nError: spawn git.exe ENOENT',
+    { candidatePlugins },
+  ), false)
+  assert.equal(shouldAutomaticallyEnterSafeMode(
+    'plugin startup failed: Error: spawn optional-helper.exe ENOENT',
+    { candidatePlugins },
+  ), true)
   assert.equal(shouldAutomaticallyEnterSafeMode(
     'DSH runtime did not become ready within 120000ms',
     { candidatePlugins: [] },
@@ -188,6 +207,43 @@ test('a freshly ensured Desktop profile has no opaque activation', async () => {
     })
 
     assert.equal(await quarantine.hasUntrustedActivation(), false)
+    assert.equal(await quarantine.hasUserActivation(), false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('private baseline distinguishes valid external activation from Desktop-managed profile links', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-private-baseline-user-activation-'))
+  const profileDir = join(root, 'profiles', 'desktop')
+  const externalBundle = '@community/crashpad-opaque'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {
+        '@linxin666/dsh-client-ui-git-graph': 'link:C:/Desktop/git-graph',
+      },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }))
+    const quarantine = new DesktopProfileBaselineQuarantine({
+      dshHome: root,
+      profileDir,
+      stateDir: join(root, 'recovery'),
+    })
+
+    assert.equal(await quarantine.hasUntrustedActivation(), false)
+    assert.equal(await quarantine.hasUserActivation(), false)
+
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [externalBundle]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, externalBundle] } },
+    }))
+    assert.equal(await quarantine.hasUntrustedActivation(), false)
+    assert.equal(await quarantine.hasUserActivation(), true)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -688,6 +744,161 @@ test('unattributed timeout uses lightweight profile candidates when normal inven
   }
 })
 
+test('an unattributed Crashpad handler disconnect enters safe mode from a valid profile when inventory inspection fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-crashpad-safe-mode-'))
+  const profileDir = join(root, 'profile')
+  const packageName = '@community/crashpad-opaque'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [packageName]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, packageName] } },
+    }, null, 2)}\n`)
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    controller.stop = async () => {
+      controller.status = { state: 'stopped' }
+      controller.emit('status', controller.status)
+    }
+    let starts = 0
+    controller.start = async () => {
+      starts += 1
+      controller.status = { state: 'starting' }
+      controller.emit('status', controller.status)
+      controller.status = { state: 'ready', url: 'http://127.0.0.1:16544/' }
+      controller.emit('status', controller.status)
+      return controller.status.url
+    }
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async () => {},
+      beforeMutation: async () => {},
+    })
+    manager.inventory = async () => { throw new Error('dependency tree is not recognizable') }
+    const store = new PluginRecoveryStore({
+      profileDir,
+      stateDir: join(root, 'recovery'),
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: manager,
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      schedule: () => ({ unref() {} }),
+      cancelSchedule: () => {},
+    })
+    await recovery.initialize()
+    controller.emit('line', {
+      stream: 'stderr',
+      line: '[0819/092634.721:ERROR:third_party\\crashpad\\client\\crashpad_client_win.cc:867] not connected',
+    })
+    controller.status = {
+      state: 'crashed',
+      error: 'runtime exited unexpectedly with Windows code 0xFFFF7003 (signed -36861)',
+    }
+    controller.emit('status', controller.status)
+
+    for (let attempt = 0; attempt < 100 && controller.status.state !== 'ready'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const state = await recovery.getState()
+    const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(starts, 1)
+    assert.equal(controller.status.state, 'ready')
+    assert.equal(state.safeMode, true)
+    assert.equal(state.currentIncident.reasonCode, 'unattributed-process-crash')
+    assert.deepEqual(state.currentIncident.candidatePlugins, [packageName])
+    assert.deepEqual(state.disabledPlugins, [packageName])
+    assert.equal(manifest.dependencies[packageName], undefined)
+    assert.equal(manifest.dsh.profile.bundles.includes(packageName), false)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('an unattributed Crashpad handler disconnect falls back to a reversible baseline when valid user candidates cannot be read', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-crashpad-baseline-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const stateDir = join(root, 'recovery')
+  const packageName = '@community/unreadable-tree'
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [packageName]: '1.0.0' },
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES, packageName] } },
+    }, null, 2)}\n`)
+    const baselineQuarantine = new DesktopProfileBaselineQuarantine({ dshHome, profileDir, stateDir })
+    assert.equal(await baselineQuarantine.hasUntrustedActivation(), false)
+    assert.equal(await baselineQuarantine.hasUserActivation(), true)
+
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    controller.stop = async () => {
+      controller.status = { state: 'stopped' }
+      controller.emit('status', controller.status)
+    }
+    let starts = 0
+    controller.start = async () => {
+      starts += 1
+      controller.status = { state: 'starting' }
+      controller.emit('status', controller.status)
+      controller.status = { state: 'ready', url: 'http://127.0.0.1:16545/' }
+      controller.emit('status', controller.status)
+      return controller.status.url
+    }
+    const store = new PluginRecoveryStore({ profileDir, stateDir, builtInBundles: BUILTIN_BUNDLES })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: {
+        inventory: async () => { throw new Error('dependency tree is not recognizable') },
+        recoveryCandidates: async () => [],
+        enterSafeMode: async () => { throw new Error('safe mode must not require an unreadable candidate') },
+      },
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      baselineQuarantine,
+      schedule: () => ({ unref() {} }),
+      cancelSchedule: () => {},
+    })
+    await recovery.initialize()
+    controller.status = {
+      state: 'crashed',
+      error: '[crashpad] not connected\nruntime exited unexpectedly with Windows code 0xFFFF7003 (signed -36861)',
+    }
+    controller.emit('status', controller.status)
+
+    for (let attempt = 0; attempt < 100 && controller.status.state !== 'ready'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    const state = await recovery.getState()
+    const baselineManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(starts, 1)
+    assert.equal(controller.status.state, 'ready')
+    assert.equal(state.safeMode, true)
+    assert.equal(state.baselineQuarantineAvailable, true)
+    assert.equal(state.currentIncident.reasonCode, 'unattributed-process-crash')
+    assert.deepEqual(state.disabledPlugins, [])
+    assert.equal(baselineManifest.dependencies[packageName], undefined)
+    assert.equal(await baselineQuarantine.restore(), true)
+    const restoredManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(restoredManifest.dependencies[packageName], '1.0.0')
+    assert.equal(restoredManifest.dsh.profile.bundles.includes(packageName), true)
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('unknown host failures preserve community plugins instead of entering automatic safe mode', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-unattributed-'))
   try {
@@ -733,6 +944,64 @@ test('unknown host failures preserve community plugins instead of entering autom
     assert.equal(state.safeMode, false)
     assert.equal(state.currentIncident.pluginName, undefined)
     assert.deepEqual(state.disabledPlugins, [])
+    await recovery.dispose()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a Git executable host failure wins over a nearby Crashpad marker and never isolates valid user activation', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-git-host-'))
+  try {
+    const controller = new EventEmitter()
+    controller.status = { state: 'starting' }
+    controller.stop = async () => {}
+    controller.start = async () => {}
+    let safeModeCalls = 0
+    let quarantines = 0
+    const baselineQuarantine = {
+      getState: async () => ({ available: false }),
+      hasUntrustedActivation: async () => false,
+      hasUserActivation: async () => true,
+      quarantine: async () => {
+        quarantines += 1
+        return { changed: true, available: true }
+      },
+      restore: async () => true,
+    }
+    const store = new PluginRecoveryStore({
+      profileDir: join(root, 'profile'),
+      stateDir: join(root, 'recovery'),
+      builtInBundles: BUILTIN_BUNDLES,
+    })
+    const recovery = new DesktopPluginRecovery({
+      controller,
+      pluginManager: {
+        inventory: async () => [{ name: '@community/example', builtIn: false }],
+        recoveryCandidates: async () => ['@community/example'],
+        enterSafeMode: async () => {
+          safeModeCalls += 1
+          throw new Error('safe mode must not run for a Git host failure')
+        },
+      },
+      store,
+      ensureProfile: async () => {},
+      builtInBundles: BUILTIN_BUNDLES,
+      baselineQuarantine,
+    })
+    await recovery.initialize()
+    controller.status = {
+      state: 'crashed',
+      error: '[crashpad] not connected\ndsh: fatal load failure: Error: spawn git.exe ENOENT',
+    }
+    controller.emit('status', controller.status)
+
+    for (let attempt = 0; attempt < 30; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    const state = await recovery.getState()
+    assert.equal(safeModeCalls, 0)
+    assert.equal(quarantines, 0)
+    assert.equal(state.safeMode, false)
+    assert.equal(state.baselineQuarantineAvailable, false)
     await recovery.dispose()
   } finally {
     await rm(root, { recursive: true, force: true })

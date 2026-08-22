@@ -1,0 +1,4 @@
+# Desktop-managed patch state for the representative 2.4 profile.
+- id: desktop-contract-v1
+  config:
+    enabled: true

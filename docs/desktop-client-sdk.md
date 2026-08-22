@@ -6,7 +6,7 @@
 
 The SDK exposes typed wrappers for Desktop information and Contract discovery, Runtime Status subscription, notifications, Deep Link helpers, and the fixed Desktop surfaces `extensions` and `updates`. It returns `{ available: false, reason: 'unavailable' }` outside Desktop instead of requiring callers to special-case normal DSH Web.
 
-`getRuntimeStatus()` includes the read-only background summary when Desktop provides it. It does not expose a Tray handle, close-preference writer, background scheduler controller, raw preload object, IPC channel, Electron object, credential, plugin installer, or DSH internal service.
+`getRuntimeStatus()` includes the read-only background summary when Desktop provides it. It does not expose a Tray handle, close-preference writer, background scheduler controller, raw preload object, IPC channel, Electron object, credential, direct plugin installer, or DSH internal service.
 
 ## Safe workspace external open
 
@@ -20,6 +20,14 @@ Desktop `1.2` also offers `openWorkspaceFile({ root, path })` behind the `worksp
 This private capability authenticates Electron main to the Host; it is not a browser-session identity. The public DSH route protocol does not provide a renderer-session credential, so plugins should continue to pass the workspace root selected by their UI. The Host enforces that this explicit root exactly matches a registered canonical workspace root.
 
 Any main-surface plugin can use this single SDK method after capability detection. The Aion Preview panel is one consumer; the Desktop capability remains available even when that panel is disabled.
+
+## Plugin install handoff
+
+Desktop `1.3` also offers `requestPluginInstall({ source })` behind the `plugins.install.request` Contract capability. It hands a remote npm, git, or HTTPS plugin reference to Desktop:
+
+- The source is validated in Electron main against the same remote-reference rules the Recovery Shell enforces. Local filesystem references, `git+file:`, and malformed values are rejected before anything opens.
+- The call itself installs nothing. Desktop opens Extension Dock on the plugins tab with the source pre-filled; the install form, the `fullAccess` confirmation, and the native approval dialog own every later decision, including the transactional rollback on failure.
+- A marketplace panel can therefore stay a pure index: it never spawns `pnpm`/`dsh` itself and never bypasses the Extension Dock's install-time protections.
 
 ## Compatibility and SemVer
 

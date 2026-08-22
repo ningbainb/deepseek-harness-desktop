@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/runtime-provider-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Runtime Provider v1",
+  "$comment": "Provider v1 accepts additive optional fields. Support-state terminology retains legacy degraded and unsupported values for existing clients.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["providerId", "upstreamVersion", "supportStatus", "capabilities"],
+  "properties": {
+    "providerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "upstreamVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "supportStatus": {
+      "enum": ["known-good", "supported", "candidate", "blocked", "degraded", "unsupported"]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "status": {
+          "enum": ["available", "unavailable", "unsupported"]
+        }
+      }
+    }
+  }
+}

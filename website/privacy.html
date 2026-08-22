@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 隐私政策：官方正式版默认启用仅用于产品改进的匿名汇总统计，并明确列出不收集的内容。">
+    <meta name="description" content="DeepSeek Harness Desktop 3.0 隐私政策：默认关闭遥测，不自动上传；诊断仅在用户确认后导出到自选位置。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ningbainb.github.io/deepseek-harness-desktop/privacy.html">
     <link rel="icon" href="official-whale.svg" type="image/svg+xml">
@@ -28,78 +28,67 @@
     <main id="main" class="privacy-page">
       <div class="container privacy-shell">
         <header class="privacy-hero">
-          <span class="section-pill">PRIVACY / PRODUCT METRICS</span>
+          <span class="section-pill">PRIVACY / LOCAL DIAGNOSTICS</span>
           <h1>隐私政策</h1>
-          <p class="privacy-lead">匿名统计只回答产品是否正常工作，不记录你用它做了什么。</p>
-          <p class="privacy-updated">最后更新：2026 年 8 月 19 日</p>
+          <p class="privacy-lead">Desktop 3.0 默认关闭遥测，不自动上传；诊断只在你主动确认后导出。</p>
+          <p class="privacy-updated">最后更新：2026 年 8 月 20 日</p>
         </header>
 
         <div class="privacy-layout">
           <nav class="privacy-toc" aria-label="隐私政策目录">
             <a href="#local-first">本地优先</a>
-            <a href="#default-metrics">默认匿名统计</a>
-            <a href="#collected">统计范围</a>
+            <a href="#default-diagnostics">默认关闭</a>
+            <a href="#diagnostics">诊断导出</a>
             <a href="#not-collected">明确不收集</a>
-            <a href="#processing">处理与保留</a>
+            <a href="#processing">处理方式</a>
             <a href="#contact">联系维护者</a>
           </nav>
 
           <article class="privacy-content">
-            <section class="privacy-callout" id="default-metrics">
-              <p class="privacy-kicker">默认开启，不提供应用内关闭开关</p>
-              <h2>使用官方正式版即表示你已阅读本政策</h2>
-              <p>DeepSeek Harness Desktop 官方正式版默认启用匿名产品统计。下载安装、启动或继续使用本软件，即表示你已经阅读、理解并在适用法律允许的范围内同意本政策所述的数据处理方式。</p>
-              <p>普通源码构建、开发构建、测试构建和 Fork 构建不包含官方统计端点，默认不会向官方统计服务发送数据。</p>
+            <section class="privacy-callout" id="default-diagnostics">
+              <p class="privacy-kicker">默认关闭，不自动上传</p>
+              <h2>诊断仅在用户主动确认后导出</h2>
+              <p>DeepSeek Harness Desktop 3.0 默认不配置遥测端点，不自动采集或上传产品事件、诊断日志或安装信息。仅在用户主动确认后导出时，Desktop 才会生成诊断包并写入用户选择的位置。</p>
+              <p>官网不自动上报安装包点击；安装链接保持直达 GitHub Release。官网可能从 GitHub 的公开 API 读取 Release、Star 和安装包下载计数来更新页面，这不是向本项目上传的遥测。</p>
             </section>
 
             <section id="local-first">
               <h2>本地优先</h2>
-              <p>你的对话、提示词、AI 回复、API 密钥、账号配置、工作区、文件、插件配置和个人偏好保存在你的设备或你自行选择的服务中。桌面版不会为了产品统计而上传这些内容。</p>
-              <p>当你主动配置并调用模型服务、远程连接、QQ Bot 或其他第三方服务时，相关数据会按照你的操作发送给对应服务商；这不属于本政策所述的匿名产品统计。</p>
+              <p>你的对话、提示词、AI 回复、API 密钥、账号配置、工作区、文件、插件配置和个人偏好保存在你的设备或你自行选择的服务中。Desktop 不会为了遥测或诊断自动上传这些内容。</p>
+              <p>当你主动配置并调用模型服务、远程连接、QQ Bot 或其他第三方服务时，相关数据会按照你的操作发送给对应服务商；这些传输不属于 Desktop 3.0 的自动遥测或诊断导出。</p>
             </section>
 
-            <section id="collected">
-              <h2>统计范围</h2>
-              <p>应用只会发送由固定枚举或有限区间组成的产品数据：</p>
-              <ul>
-                <li>软件版本、稳定或预发布通道、Windows 10/11 大类、中文/英文/其他语言大类；</li>
-                <li>应用启动、运行时启动结果与耗时区间、固定类别的恢复操作；</li>
-                <li>设置、扩展、社群、更新与帮助等主要桌面入口的打开次数；</li>
-                <li>更新结果、扩展安装/更新/移除/启停的操作类型与成功或失败；</li>
-                <li>一次应用会话的时长区间。</li>
-                <li>官方网站安装包的版本、导航/首屏/终端卡片/安装区四类固定下载入口，以及按日聚合的两位国家代码。</li>
-              </ul>
-              <p>应用和网站不发送客户端精确时间；统计服务仅使用请求到达时的 UTC 日期完成按日聚合。安装包仍由 GitHub 直接提供，地区统计表示下载点击而不是完整下载成功。</p>
+            <section id="diagnostics">
+              <h2>诊断导出范围</h2>
+              <p>导出前，Desktop 会显示内容清单并要求确认。导出的 JSON/ZIP 只包含版本、Desktop/DSH/Provider/Node/Electron/操作系统摘要、更新频道、Runtime matrix 和 patch 评估、迁移/恢复状态、Task 与 Scheduler 的有界计数、安装/签名信息，以及有界且脱敏的最近错误。</p>
+              <p>诊断包包含清单和哈希，用于检查包内容和文件完整性。它只保存到用户选择的位置，不会由 Desktop 或官网自动上传；是否随后手动分享给维护者由用户决定。</p>
             </section>
 
             <section id="not-collected">
-              <h2>明确不收集的内容</h2>
+              <h2>明确不收集和不导出的内容</h2>
               <div class="privacy-boundary-grid">
-                <div><strong>不收集内容</strong><span>对话、提示词、AI 回复、会话标题、文件内容、文件名或路径</span></div>
-                <div><strong>不收集凭据</strong><span>API Key、Token、Cookie、请求头、账号信息或配置</span></div>
-                <div><strong>不收集身份</strong><span>IP 地址、User-Agent、机器码、硬件序列号或长期设备标识</span></div>
-                <div><strong>不收集诊断原文</strong><span>插件名、模型名、原始错误、日志、堆栈或崩溃转储</span></div>
+                <div><strong>不收集对话</strong><span>对话、提示词、AI 回复、会话标题、文件内容、文件名或路径</span></div>
+                <div><strong>不收集凭据</strong><span>API Key、Token、Cookie、请求头、账号信息、密码或 SSH 私钥</span></div>
+                <div><strong>不导出用户内容</strong><span>完整 Prompt、完整 Session History、Tool Result、项目文件或项目内容</span></div>
+                <div><strong>不保留身份标识</strong><span>用户名、真实 Home 路径、URL 凭据或 query、机器码、硬件序列号或长期设备标识</span></div>
               </div>
-              <p>网站下载统计不会保存省州、城市、精确位置、精确时区、Referrer 或原始下载请求。</p>
-              <p>匿名产品统计也不会读取或复用 DeepSeek Harness 自带的匿名用户标识与会话遥测记录，不用于广告、跨产品跟踪、用户画像、自动化决策或用户风控，也不会出售给第三方。</p>
+              <p>集中脱敏会移除常见 key、token、authorization、private key、cookie、真实用户目录和 URL 凭据或查询参数。不能被安全归类的内容不会因为诊断便利而被猜测性保留。</p>
             </section>
 
             <section id="processing">
-              <h2>处理方式与保存期限</h2>
-              <p>统计请求通过 HTTPS 发送，由 Cloudflare 网络接收。Cloudflare 会为提供网络服务而处理连接信息，但本项目的统计代码不会将 IP 地址、User-Agent 或请求头写入产品统计数据库。</p>
-              <p>服务端不会保存原始事件，而是在接收时直接写成桌面产品维度或“UTC 日期、两位国家代码、安装包版本、固定下载入口、数量”的按日汇总记录。数据库没有用户、安装或设备标识，无法构建个人事件历史。</p>
-              <p>按日汇总记录最长保留 <strong>365 天</strong>，之后自动删除。因为数据中没有用户标识，维护者无法按个人查询、导出或删除某个人的统计记录。</p>
+              <h2>处理方式与保留</h2>
+              <p>Desktop 和官网不向本项目遥测服务自动发送事件，因此项目不会因为正常使用、启动、更新或安装包点击而建立个人、设备或会话事件历史。GitHub 及用户主动选择的第三方服务会按各自政策处理连接请求。</p>
+              <p>用户导出的诊断包留在其选择的位置；项目不会自动接收、保存或保留该包。用户如果主动提交文件到 Issue、邮件或其他渠道，应先自行核对内容，并适用该渠道的公开规则。</p>
             </section>
 
             <section>
               <h2>可靠性、安全与政策更新</h2>
-              <p>客户端、网站和服务端都使用固定事件白名单、字段枚举、来源限制、批量与大小限制。网站通过异步 Beacon 上报下载点击，失败时直接丢弃，不会取消、替换或延迟 GitHub 安装包直链；桌面上报失败也不会阻止或延迟应用启动、使用、更新或退出。</p>
-              <p>本政策可能随产品功能、统计范围或服务商变化而更新。若未来计划加入能够识别或长期关联用户的新字段，项目会重新评估政策和产品交互；本政策不能被解释为允许收集上述明确排除的数据。</p>
+              <p>关闭遥测不改变安装、更新、会话或 GitHub 下载路径。诊断导出失败不会阻止应用启动、使用、更新或退出。若未来考虑增加任何自动上传能力，项目会先重新评估产品交互、代码和政策；本页面不能被解释为允许收集上述明确排除的数据。</p>
             </section>
 
             <section id="contact">
               <h2>联系维护者</h2>
-              <p>如对隐私政策或匿名产品统计有疑问，请通过 <a href="https://github.com/ningbainb/deepseek-harness-desktop/issues" target="_blank" rel="noreferrer">GitHub Issues</a> 联系项目维护者。完整的可审查版本也保存在仓库根目录的 <a href="https://github.com/ningbainb/deepseek-harness-desktop/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">PRIVACY.md</a>。</p>
+              <p>如对隐私政策或诊断边界有疑问，请通过 <a href="https://github.com/ningbainb/deepseek-harness-desktop/issues" target="_blank" rel="noreferrer">GitHub Issues</a> 联系项目维护者。完整的可审查版本也保存在仓库根目录的 <a href="https://github.com/ningbainb/deepseek-harness-desktop/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">PRIVACY.md</a>。</p>
             </section>
           </article>
         </div>

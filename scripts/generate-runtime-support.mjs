@@ -16,6 +16,7 @@ export const RUNTIME_SUPPORT_STATUSES = Object.freeze(['known-good', 'supported'
 export const STABLE_RUNTIME_SUPPORT_STATUSES = Object.freeze(['known-good', 'supported'])
 
 const RUNTIME_SUPPORT_STATUS_SET = new Set(RUNTIME_SUPPORT_STATUSES)
+const PATCH_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
@@ -51,8 +52,10 @@ export function lockfileIntegrity(lockfile, packageName, version) {
 
 function patchRegistryIds(source) {
   const ids = [...source.matchAll(/\bid:\s*'([a-z0-9]+(?:-[a-z0-9]+)*)'/gu)].map((match) => match[1])
-  if (ids.length === 0 || new Set(ids).size !== ids.length) throw new Error('compat patch registry ids are invalid')
-  return ids
+  if (ids.length === 0 || new Set(ids).size !== ids.length || ids.some((id) => !PATCH_ID.test(id))) {
+    throw new Error('compat patch registry ids are invalid')
+  }
+  return ids.toSorted()
 }
 
 async function collectClientSlots(root) {
@@ -70,20 +73,22 @@ export async function createRuntimeSupportManifest(root = REPOSITORY_ROOT, { sup
     rootManifest: resolve(root, 'package.json'),
     desktopManifest: resolve(root, 'apps/dsh-desktop/package.json'),
     runtimeManifest: resolve(root, 'apps/dsh-desktop/node_modules/@deepseek-ai/dsh/package.json'),
+    runtimeCli: resolve(root, 'apps/dsh-desktop/node_modules/@deepseek-ai/dsh/lib/bin.js'),
     lockfile: resolve(root, 'pnpm-lock.yaml'),
     patchRegistry: resolve(root, 'packages/dsh-desktop-compat/src/patch-registry.ts'),
   }
-  const [rootText, desktopText, runtimeText, lockfile, patchRegistry, slots] = await Promise.all([
+  const [rootText, desktopText, runtimeBytes, runtimeCliBytes, lockfile, patchRegistry, slots] = await Promise.all([
     readFile(paths.rootManifest, 'utf8'),
     readFile(paths.desktopManifest, 'utf8'),
-    readFile(paths.runtimeManifest, 'utf8'),
+    readFile(paths.runtimeManifest),
+    readFile(paths.runtimeCli),
     readFile(paths.lockfile, 'utf8'),
     readFile(paths.patchRegistry, 'utf8'),
     collectClientSlots(root),
   ])
   const rootManifest = JSON.parse(rootText)
   const desktopManifest = JSON.parse(desktopText)
-  const runtimeManifest = JSON.parse(runtimeText)
+  const runtimeManifest = JSON.parse(runtimeBytes.toString('utf8'))
   const declaredVersion = exactVersion(desktopManifest.dependencies?.['@deepseek-ai/dsh'], 'Desktop DSH dependency')
   const installedVersion = exactVersion(runtimeManifest.version, 'installed DSH package')
   if (runtimeManifest.name !== '@deepseek-ai/dsh' || installedVersion !== declaredVersion) {
@@ -112,11 +117,16 @@ export async function createRuntimeSupportManifest(root = REPOSITORY_ROOT, { sup
       packageName: runtimeManifest.name,
       version: installedVersion,
       integrity: lockfileIntegrity(lockfile, runtimeManifest.name, installedVersion),
+      files: {
+        'package.json': sha256(runtimeBytes),
+        'lib/bin.js': sha256(runtimeCliBytes),
+      },
       bin: structuredClone(runtimeManifest.bin),
       exports: runtimeManifest.exports ?? null,
       peerDependencies: structuredClone(runtimeManifest.peerDependencies ?? {}),
     },
     lockfile: {
+      path: 'pnpm-lock.yaml',
       sha256: sha256(lockfile),
     },
     provider: {

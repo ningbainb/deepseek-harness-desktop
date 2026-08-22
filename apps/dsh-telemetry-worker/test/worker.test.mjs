@@ -294,6 +294,22 @@ test('scheduled retention deletes aggregate rows older than 365 days', async () 
   assert.match(database.runs[1].sql, /-365 days/iu)
 })
 
+test('management custom domain root redirects to the admin surface only', async () => {
+  const managementRoot = await worker.fetch(
+    new Request('https://guanli.1521003.xyz/'),
+    enabledEnvironment(),
+  )
+  assert.equal(managementRoot.status, 302)
+  assert.equal(managementRoot.headers.get('location'), '/admin')
+  assert.equal(managementRoot.headers.get('cache-control'), 'no-store')
+
+  const workerRoot = await worker.fetch(
+    new Request('https://telemetry.example/'),
+    enabledEnvironment(),
+  )
+  assert.equal(workerRoot.status, 404)
+})
+
 test('admin surface fails closed when production secrets are not configured', async () => {
   for (const path of ['/admin', '/admin/login', '/admin/api/summary', '/admin/dashboard.js']) {
     const response = await worker.fetch(adminRequest(path), enabledEnvironment())
