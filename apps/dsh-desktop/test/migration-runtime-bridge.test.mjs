@@ -41,7 +41,7 @@ async function startRuntime(root, logs) {
   return { controller, url: await controller.start() }
 }
 
-test('real Runtime Host routes copy v2 to v3 and import confirmed v1 without executing tasks', { timeout: 150_000 }, async () => {
+test('real Runtime Host routes read v2 lazily, publish on mutation, and import confirmed v1 without executing tasks', { timeout: 150_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-migration-runtime-'))
   const logs = new BoundedLogStore({ directory: join(root, 'logs') })
   let controller
@@ -50,6 +50,7 @@ test('real Runtime Host routes copy v2 to v3 and import confirmed v1 without exe
     await ensureDesktopProfile({ dshHome: root })
     const stateDirectory = join(root, 'profiles', 'desktop', 'state', 'task-board')
     const v2Path = join(stateDirectory, 'tasks-v2.json')
+    const v3Path = join(stateDirectory, 'tasks-v3.json')
     const v2Source = {
       schemaVersion: 2,
       revision: 4,
@@ -66,7 +67,7 @@ test('real Runtime Host routes copy v2 to v3 and import confirmed v1 without exe
     const v2Migrated = await v2Response.json()
     assert.equal(v2Migrated.schemaVersion, 3)
     assert.equal(v2Migrated.migration?.from, 2)
-    assert.equal(v2Migrated.migration?.status, 'complete')
+    assert.equal(v2Migrated.migration?.status, 'pending-write')
     assert.equal(v2Migrated.tasks.length, 1)
     assert.equal(v2Migrated.tasks[0].id, 'v2-task')
     assert.deepEqual(v2Migrated.tasks[0].runs, [{
@@ -78,6 +79,22 @@ test('real Runtime Host routes copy v2 to v3 and import confirmed v1 without exe
       runtimeProviderEvidence: {},
     }])
     assert.deepEqual(JSON.parse(await readFile(v2Path, 'utf8')), v2Source)
+    await assert.rejects(readFile(v3Path), { code: 'ENOENT' })
+
+    const v2Mutation = structuredClone(v2Migrated)
+    v2Mutation.tasks[0].title = 'Edited after the lazy v2 read'
+    const v2WriteResponse = await fetch(v3Endpoint, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(v2Mutation),
+      signal: AbortSignal.timeout(10_000),
+    })
+    assert.equal(v2WriteResponse.ok, true)
+    const v2Persisted = await v2WriteResponse.json()
+    assert.equal(v2Persisted.migration?.status, 'complete')
+    assert.equal(v2Persisted.tasks[0].title, 'Edited after the lazy v2 read')
+    assert.deepEqual(JSON.parse(await readFile(v2Path, 'utf8')), v2Source)
+    assert.equal(JSON.parse(await readFile(v3Path, 'utf8')).migration.status, 'complete')
 
     // Start from the now-empty v3 space in a fresh profile to exercise the
     // direct v1 bridge against the real fixed Host route. The browser value
