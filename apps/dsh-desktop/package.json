@@ -99,6 +99,7 @@
     "@deepseek-ai/dsh-workspace": "0.1.1-rc.1",
     "@deepseek-ai/dsh-workflow": "0.1.1-rc.1",
     "@linxin666/dsh-desktop-compat": "workspace:*",
+    "@linxin666/dsh-desktop-repair": "workspace:*",
     "@linxin666/dsh-desktop-client": "workspace:*",
     "@linxin666/dsh-live-stats": "workspace:*",
     "@linxin666/dsh-client-ui-mode-switcher": "workspace:*",

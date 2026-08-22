@@ -1,0 +1,5 @@
+# Desktop composes this host-only bundle only in its managed desktop-repair
+# profile. The ordinary desktop and desktop-builtins profiles do not mount it.
+- insert:
+    - id: desktop-repair
+      name: '@linxin666/dsh-desktop-repair'
