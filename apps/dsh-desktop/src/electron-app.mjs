@@ -30,6 +30,7 @@ import {
   assertExternalPluginDescriptor,
   ExternalPluginSourceResolver,
   parseRemoteExternalPluginReference,
+  revalidateExternalPluginSource,
   stageExternalPluginSource,
 } from './external-plugin-source.mjs'
 import { createFreeModePluginApproval } from './free-mode-plugin-approval.mjs'
@@ -2851,40 +2852,27 @@ export async function startElectronApp(metadata) {
     return operation
   }
 
-  // Full-access plugin descriptors remain in Electron main. After native
-  // source confirmation, local bytes are staged and installed transactionally
-  // into the persistent Desktop profile; no temporary Runtime is created.
-  let resolveFullAccessPlugin = fullAccessApprovalUnavailable
-  let confirmFullAccessPlugin = fullAccessApprovalUnavailable
-  let revalidateFullAccessPlugin = fullAccessApprovalUnavailable
-  let completeFullAccessPlugin = fullAccessApprovalUnavailable
-  try {
-    const approval = await getFullAccessPluginApproval()
-    resolveFullAccessPlugin = approval.resolve
-    confirmFullAccessPlugin = approval.confirm
-    const persistentPluginStagingDirectory = (descriptor) => join(
-      userData,
-      'plugin-staging',
-      approval.launchSessionIdFor(assertExternalPluginDescriptor(descriptor)),
-    )
-    revalidateFullAccessPlugin = async (descriptor) => {
-      const revalidated = assertExternalPluginDescriptor(await approval.revalidate(descriptor))
-      if ((revalidated.fingerprintKind ?? 'content') !== 'content') return revalidated
-      return stageExternalPluginSource(revalidated, {
-        stagingDirectory: persistentPluginStagingDirectory(descriptor),
-      })
-    }
-    completeFullAccessPlugin = async (descriptor) => {
-      try {
-        await approval.complete(descriptor)
-      } finally {
-        await rm(persistentPluginStagingDirectory(descriptor), { recursive: true, force: true }).catch(() => {})
-      }
-    }
-  } catch (error) {
-    await logStore.append(
-      `[free-mode] full-access plugin approval unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
-    ).catch(() => {})
+  // Normal plugin installation is already an explicit user action. Keep the
+  // source descriptor private to Electron main, revalidate it, and install it
+  // transactionally without a second trust or compatibility decision.
+  const persistentPluginSourceResolver = new ExternalPluginSourceResolver({ baseDir: desktopProfileDir })
+  const resolveFullAccessPlugin = ({ spec }) => persistentPluginSourceResolver.resolve(spec)
+  const persistentPluginStagingDirectory = (descriptor) => join(
+    userData,
+    'plugin-staging',
+    assertExternalPluginDescriptor(descriptor).candidateId.slice('sha256:'.length),
+  )
+  const revalidateFullAccessPlugin = async (descriptor) => {
+    const revalidated = await revalidateExternalPluginSource(descriptor, {
+      resolver: persistentPluginSourceResolver,
+    })
+    if ((revalidated.fingerprintKind ?? 'content') !== 'content') return revalidated
+    return stageExternalPluginSource(revalidated, {
+      stagingDirectory: persistentPluginStagingDirectory(descriptor),
+    })
+  }
+  const completeFullAccessPlugin = async (descriptor) => {
+    await rm(persistentPluginStagingDirectory(descriptor), { recursive: true, force: true }).catch(() => {})
   }
 
   const communityMarket = createCommunityMarketService({
@@ -2909,7 +2897,6 @@ export async function startElectronApp(metadata) {
     notificationService,
     communityMarket,
     resolveFullAccessPlugin,
-    confirmFullAccessPlugin,
     revalidateFullAccessPlugin,
     completeFullAccessPlugin,
     revokeFullUserTrust,

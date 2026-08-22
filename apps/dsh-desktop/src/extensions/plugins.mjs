@@ -638,25 +638,12 @@ export class PluginManager {
   }
 
   prepare(rawSpec, { allowUnknown = false } = {}) {
+    if (typeof allowUnknown !== 'boolean') throw new TypeError('allowUnknown must be a boolean')
     const parsed = validatePluginSpec(rawSpec)
     return this.#enqueue(async () => {
       if (PROTECTED_PACKAGES.has(parsed.name)) throw new Error(`${parsed.name} is a built-in desktop plugin`)
       const candidate = await this.registry.fetchManifest(parsed.name, requestedVersion(parsed))
       const compatibility = await this.#assess(candidate)
-      if (compatibility.status === 'incompatible') {
-        throw compatibilityError(
-          `${parsed.name}@${candidate.version} is incompatible with this desktop runtime`,
-          'plugin-incompatible',
-          compatibility,
-        )
-      }
-      if (compatibility.status === 'unknown' && !allowUnknown) {
-        throw compatibilityError(
-          `${parsed.name}@${candidate.version} does not declare desktop compatibility`,
-          'plugin-compatibility-unknown',
-          compatibility,
-        )
-      }
       const spec = `${parsed.name}@${candidate.version}`
       await this.#runPnpm(['store', 'add', spec])
       return Object.freeze({
@@ -707,20 +694,6 @@ export class PluginManager {
           throw new Error(`registry candidate identity does not match ${parsed.spec}`)
         }
         const compatibility = await this.#assess(candidate)
-        if (compatibility.status === 'incompatible') {
-          throw compatibilityError(
-            `${parsed.name}@${candidate.version} is incompatible with this desktop runtime`,
-            'plugin-incompatible',
-            compatibility,
-          )
-        }
-        if (compatibility.status === 'unknown' && !allowUnknown) {
-          throw compatibilityError(
-            `${parsed.name}@${candidate.version} does not declare desktop compatibility`,
-            'plugin-compatibility-unknown',
-            compatibility,
-          )
-        }
         const integrity = candidate.dist?.integrity
         if (typeof integrity !== 'string' || !SHA512_INTEGRITY_PATTERN.test(integrity)) {
           throw new Error(`${parsed.name}@${candidate.version} does not publish a valid sha512 integrity`)
@@ -804,10 +777,6 @@ export class PluginManager {
         if (typeof installed.dsh?.bundle?.patch !== 'string') {
           throw new Error(`${prepared.name} is not a DSH bundle package`)
         }
-        const compatibility = await this.#assess(installed)
-        if (compatibility.status === 'incompatible') {
-          throw new Error(`${prepared.spec} became incompatible after installation`)
-        }
         const manifest = await readManifest(this.profileDir)
         const bundles = new Set(manifest.dsh?.profile?.bundles ?? [])
         bundles.add(prepared.name)
@@ -885,10 +854,6 @@ export class PluginManager {
           }
           if (typeof installed.dsh?.bundle?.patch !== 'string') {
             throw new Error(`${item.name} is not a DSH bundle package`)
-          }
-          const compatibility = await this.#assess(installed)
-          if (compatibility.status === 'incompatible') {
-            throw new Error(`${item.spec} became incompatible after installation`)
           }
         }
 
@@ -1073,6 +1038,9 @@ export class PluginManager {
         if (installed === undefined) {
           throw new Error(`full-access external install did not materialize ${name}`)
         }
+        if (typeof installed.dsh?.bundle?.patch !== 'string') {
+          throw new Error(`${name} is not a DSH bundle package`)
+        }
         const version = typeof installed.version === 'string'
           ? installed.version
           : external.package.version
@@ -1204,14 +1172,6 @@ export class PluginManager {
       if (enabled) {
         const installed = await readInstalledManifest(this.profileDir, name)
         if (typeof installed?.dsh?.bundle?.patch !== 'string') throw new Error(`${name} is not a DSH bundle package`)
-        const compatibility = await this.#assess(installed)
-        if (compatibility.status === 'incompatible') {
-          throw compatibilityError(
-            `${name} is incompatible with this desktop runtime`,
-            'plugin-incompatible',
-            compatibility,
-          )
-        }
       }
       const profile = manifest.dsh?.profile ?? {}
       const bundles = new Set(profile.bundles ?? [])

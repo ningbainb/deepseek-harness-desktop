@@ -26,7 +26,7 @@ test('Extension Dock defaults new external plugin installs to the persistent ful
   assert.match(source, /持久化 Desktop Profile/u)
 })
 
-test('Electron wires full-access plugin approval through the main-process session permission store', async () => {
+test('Electron keeps recovery approvals private while normal user-selected installs need no approval', async () => {
   const source = await electronAppSource()
   const permissionStoreAt = source.indexOf('let freeModePermissionStore')
   const initializationAt = source.indexOf('const fullAccessApprovalUnavailable = async () =>')
@@ -54,12 +54,14 @@ test('Electron wires full-access plugin approval through the main-process sessio
 
   const registration = source.slice(registrationAt, registrationAt + 1_200)
   assert.match(registration, /resolveFullAccessPlugin,/u)
-  assert.match(registration, /confirmFullAccessPlugin,/u)
+  assert.doesNotMatch(registration, /confirmFullAccessPlugin,/u)
   assert.match(registration, /revalidateFullAccessPlugin,/u)
   assert.match(registration, /completeFullAccessPlugin,/u)
+  assert.match(source.slice(initializationAt, registrationAt), /const persistentPluginSourceResolver = new ExternalPluginSourceResolver/u)
+  assert.match(source.slice(initializationAt, registrationAt), /revalidateExternalPluginSource\(descriptor/u)
 })
 
-test('Electron confines a damaged durable permission ledger to freshly confirmed once-only plugin sessions', async () => {
+test('a damaged permission ledger affects recovery sessions but not normal plugin installation', async () => {
   const source = await electronAppSource()
   const initializationAt = source.indexOf('const fullAccessApprovalUnavailable = async () =>')
   const registrationAt = source.indexOf('const unregisterExtensionIpc = registerExtensionIpc({', initializationAt)
@@ -72,7 +74,8 @@ test('Electron confines a damaged durable permission ledger to freshly confirmed
   assert.match(initialization, /const forceOnce = permissionStore === emergencyFreeModePermissionStore/u)
   assert.match(initialization, /forceOnce,/u)
   assert.match(initialization, /fullAccessPluginApprovalStore !== permissionStore/u)
-  assert.match(initialization, /full-access plugin approval unavailable: \$\{error instanceof Error \? error\.name : 'unknown'\}/u)
+  assert.match(initialization, /const persistentPluginSourceResolver = new ExternalPluginSourceResolver/u)
+  assert.match(initialization, /const resolveFullAccessPlugin = \(\{ spec \}\) => persistentPluginSourceResolver\.resolve\(spec\)/u)
 })
 
 test('Electron uses one persistent full-user primary Runtime and keeps isolated Runtime creation behind recovery actions', async () => {
@@ -201,7 +204,7 @@ test('full-access external plugins install transactionally into the persistent D
   assert.match(isolatedLaunch, /isolatedPluginManager\.installFullAccessExternal\(stagedExternal\)/u)
   assert.doesNotMatch(isolatedLaunch, /runtimeProvider\.stop\(/u)
   assert.doesNotMatch(isolatedLaunch, /pluginManager\.installFullAccessExternal\(/u)
-  assert.match(callback, /await approval\.complete\(descriptor\)/u)
+  assert.doesNotMatch(callback, /approval\.(?:confirm|complete)\(/u)
   assert.match(callback, /await rm\(persistentPluginStagingDirectory\(descriptor\), \{ recursive: true, force: true \}\)/u)
   assert.match(source, /const userPluginArchive = new UserPluginArchive\(\{[\s\S]*profileDir: desktopProfileDir/u)
   assert.match(source, /profileArchive: userPluginArchive/u)

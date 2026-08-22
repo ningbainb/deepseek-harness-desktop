@@ -55,12 +55,11 @@ export function registerExtensionIpc({
   migrationService,
   notificationService,
   communityMarket,
-  // Both callbacks run exclusively in the main process. The resolver turns
-  // the renderer's source reference into a private descriptor, while the
-  // confirmer owns the native user-consent decision. Neither descriptor is
-  // returned through IPC.
+  // These callbacks run exclusively in the main process. The resolver turns
+  // the renderer's source reference into a private descriptor and the
+  // revalidator checks it again before mutation. No descriptor is returned
+  // through IPC.
   resolveFullAccessPlugin = async () => undefined,
-  confirmFullAccessPlugin = async () => false,
   revalidateFullAccessPlugin = async (descriptor) => descriptor,
   completeFullAccessPlugin = async () => {},
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
@@ -74,7 +73,7 @@ export function registerExtensionIpc({
     throw new TypeError('full access plugin revalidation callback must be a function')
   }
   if (typeof completeFullAccessPlugin !== 'function') {
-    throw new TypeError('full access plugin approval completion callback must be a function')
+    throw new TypeError('full access plugin cleanup callback must be a function')
   }
   if (typeof revokeFullUserTrust !== 'function') {
     throw new TypeError('full-user trust revocation callback must be a function')
@@ -200,20 +199,15 @@ export function registerExtensionIpc({
 
     if (request.fullAccess === true) {
       return enqueuePluginMutation(async () => {
-        // Resolve and obtain native approval before taking the runtime down.
-        // A rejection, cancellation, or invalid descriptor is therefore a
-        // no-mutation operation.
+        // The explicit install action is the user's decision. Resolve and
+        // revalidate the source before taking Runtime down, without a second
+        // publisher, compatibility, or trust prompt.
         const descriptor = assertExternalPluginDescriptor(await resolveFullAccessPlugin(Object.freeze({
           spec: request.spec,
         })))
-        const approved = await confirmFullAccessPlugin(
-          descriptor,
-          confirmationMode === undefined ? undefined : Object.freeze({ mode: confirmationMode }),
-        )
-        if (approved !== true) throw new Error('full access plugin installation was not approved')
         try {
-          // Local content can change after the native confirmation. Electron
-          // main re-resolves and stages the private descriptor immediately
+          // Local content can change after selection. Electron main
+          // re-resolves and stages the private descriptor immediately
           // before stopping Runtime or writing the persistent Desktop profile.
           const installationDescriptor = assertExternalPluginDescriptor(
             await revalidateFullAccessPlugin(descriptor),

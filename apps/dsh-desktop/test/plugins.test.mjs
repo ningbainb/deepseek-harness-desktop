@@ -276,7 +276,7 @@ test('plugin manager lazily checks only community updates and assesses candidate
   }
 })
 
-test('candidate preparation preloads exact compatible versions and guards unknown updates', async () => {
+test('candidate preparation preloads exact versions and reports compatibility without admission gating', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-prepare-'))
   const calls = []
   let candidate = {
@@ -309,19 +309,17 @@ test('candidate preparation preloads exact compatible versions and guards unknow
       version: '2.1.0',
       peerDependencies: undefined,
     }
-    await assert.rejects(manager.prepare('@community/example@latest'), /does not declare desktop compatibility/u)
-    await manager.prepare('@community/example@latest', { allowUnknown: true })
+    const unknown = await manager.prepare('@community/example@latest')
+    assert.equal(unknown.compatibility.status, 'unknown')
 
     candidate = {
       ...candidate,
       version: '3.0.0',
       engines: { node: '>=25' },
     }
-    await assert.rejects(
-      manager.prepare('@community/example@latest', { allowUnknown: true }),
-      /incompatible/u,
-    )
-    assert.equal(calls.length, 2)
+    const incompatible = await manager.prepare('@community/example@latest')
+    assert.equal(incompatible.compatibility.status, 'incompatible')
+    assert.equal(calls.length, 3)
     await assert.rejects(manager.prepare('@linxin666/dsh-web-ui-all@latest'), /built-in/u)
   } finally {
     await rm(profileDir, { recursive: true, force: true })
@@ -494,7 +492,7 @@ test('prepareMany deduplicates names, resolves every exact candidate, and prefet
   }
 })
 
-test('prepareMany compatibility and prefetch failures never produce an applicable batch', async () => {
+test('prepareMany treats compatibility as diagnostic while prefetch failures remain technical errors', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-prepare-many-fail-'))
   let runnerCalls = 0
   try {
@@ -505,6 +503,7 @@ test('prepareMany compatibility and prefetch failures never produce an applicabl
       dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
     }))
     let incompatible = true
+    let runnerError
     const manager = new PluginManager({
       profileDir,
       hostCompatibility,
@@ -523,14 +522,16 @@ test('prepareMany compatibility and prefetch failures never produce an applicabl
       },
       runner: async () => {
         runnerCalls += 1
-        throw new Error('store unavailable')
+        if (runnerError) throw runnerError
       },
     })
-    await assert.rejects(manager.prepareMany(['@community/failure@2.0.0']), /incompatible/u)
-    assert.equal(runnerCalls, 0)
-    incompatible = false
-    await assert.rejects(manager.prepareMany(['@community/failure@2.0.0']), /store unavailable/u)
+    const prepared = await manager.prepareMany(['@community/failure@2.0.0'])
+    assert.equal(prepared.items[0].compatibility.status, 'incompatible')
     assert.equal(runnerCalls, 1)
+    incompatible = false
+    runnerError = new Error('store unavailable')
+    await assert.rejects(manager.prepareMany(['@community/failure@2.0.0']), /store unavailable/u)
+    assert.equal(runnerCalls, 2)
   } finally {
     await rm(profileDir, { recursive: true, force: true })
   }
@@ -1033,7 +1034,7 @@ test('plugin manager serializes installs and protects built-ins', async () => {
   }
 })
 
-test('full-access external install accepts an incompatible local package without a DSH bundle while normal install remains restricted', async () => {
+test('external install ignores declared compatibility but still requires a DSH bundle entry', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-external-'))
   const profileDir = join(root, 'profile')
   const sourceDir = join(root, 'external-plugin')
@@ -1055,10 +1056,13 @@ test('full-access external install accepts an incompatible local package without
     await writeFile(join(sourceDir, 'package.json'), JSON.stringify({
       name: packageName,
       version: '9.9.9',
-      dsh: { compatibility: { desktop: '>=9.0.0' } },
+      dsh: {
+        bundle: { patch: './cordis.patch.yml' },
+        compatibility: { desktop: '>=9.0.0' },
+      },
     }))
     const descriptor = await resolveExternalPluginSource(sourceDir, { baseDir: root })
-    assert.equal(descriptor.loader.declaredDshBundle, false)
+    assert.equal(descriptor.loader.declaredDshBundle, true)
 
     const manager = new PluginManager({
       profileDir,
@@ -1077,7 +1081,14 @@ test('full-access external install accepts an incompatible local package without
         await writeFile(lockPath, 'new-lock\n')
         const installedRoot = join(profileDir, 'node_modules', ...packageName.split('/'))
         await mkdir(installedRoot, { recursive: true })
-        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: packageName, version: '9.9.9' }))
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
+          name: packageName,
+          version: '9.9.9',
+          dsh: {
+            bundle: { patch: './cordis.patch.yml' },
+            compatibility: { desktop: '>=9.0.0' },
+          },
+        }))
       },
     })
 
@@ -1182,7 +1193,11 @@ test('full-access external install rolls back an opaque source that resolves to 
         await writeFile(lockPath, 'mutated-lock\n')
         const installedRoot = join(profileDir, 'node_modules', ...protectedName.split('/'))
         await mkdir(installedRoot, { recursive: true })
-        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: protectedName, version: '99.0.0' }))
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
+          name: protectedName,
+          version: '99.0.0',
+          dsh: { bundle: { patch: './cordis.patch.yml' } },
+        }))
       },
     })
 
@@ -1209,7 +1224,11 @@ test('full-access external install rolls back an opaque source that resolves to 
         await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
         const installedRoot = join(profileDir, 'node_modules', ...protectedName.split('/'))
         await mkdir(installedRoot, { recursive: true })
-        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: protectedName, version: '99.0.0' }))
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
+          name: protectedName,
+          version: '99.0.0',
+          dsh: { bundle: { patch: './cordis.patch.yml' } },
+        }))
       },
     })
     const isolated = await isolatedManager.installFullAccessExternal(source)
@@ -1240,13 +1259,18 @@ test('full-access external install derives the actual package name after a confi
       profileDir,
       pnpmCli: 'pnpm.mjs',
       runner: async ({ args }) => {
+        if (args[0] === 'install') return
         assert.deepEqual(args, ['add', source.installSpec, '--save-exact'])
         const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
         manifest.dependencies[actualName] = source.installSpec
         await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
         const installedRoot = join(profileDir, 'node_modules', ...actualName.split('/'))
         await mkdir(installedRoot, { recursive: true })
-        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: actualName, version: '4.5.6' }))
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
+          name: actualName,
+          version: '4.5.6',
+          dsh: { bundle: { patch: './cordis.patch.yml' } },
+        }))
       },
     })
     const transaction = await manager.installFullAccessExternal(source)
