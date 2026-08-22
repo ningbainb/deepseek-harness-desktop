@@ -27,31 +27,25 @@ test('progress meter carries milestone ticks and a leading tip', async () => {
   assert.match(css, /@keyframes tip-swim/u)
 })
 
-test('startup surface keeps a diagnostics export path available before runtime readiness', async () => {
-  const [html, renderer, css] = await Promise.all([
-    readFile(new URL('startup.html', uiRoot), 'utf8'),
-    readFile(new URL('startup.mjs', uiRoot), 'utf8'),
-    readFile(new URL('startup.css', uiRoot), 'utf8'),
-  ])
-  assert.match(html, /data-action="export-diagnostics"/u)
-  assert.match(html, /data-tool-action="terminal"/u)
-  assert.match(html, /打开内置终端/u)
-  assert.match(html, /id="diagnostic-export-status"/u)
-  assert.match(renderer, /STARTUP_STALL_NOTICE_MS = 30_000/u)
-  assert.match(renderer, /启动耗时较长；可导出诊断日志/u)
-  assert.match(renderer, /action === 'export-diagnostics'/u)
-  assert.match(renderer, /window\.dshDesktop\.toolAction\('terminal'\)/u)
-  assert.match(css, /\.startup-support/u)
-})
-
-test('startup surface reports automatic migration without exposing a migration decision button', async () => {
+test('startup surface is status-only and exposes no recovery decisions', async () => {
   const [html, renderer] = await Promise.all([
     readFile(new URL('startup.html', uiRoot), 'utf8'),
     readFile(new URL('startup.mjs', uiRoot), 'utf8'),
   ])
-  assert.match(html, /升级迁移会在后台自动完成/u)
-  assert.doesNotMatch(html, /data-action="upgrade-migration"|migration-assistant-status/u)
-  assert.doesNotMatch(renderer, /upgrade-migration|setMigrationAssistantStatus/u)
+  assert.match(html, /id="recovery-summary"/u)
+  assert.match(html, /正在自动处理/u)
+  assert.doesNotMatch(html, /data-action=|data-tool-action=|<button/u)
+  assert.match(renderer, /STARTUP_STALL_NOTICE_MS = 30_000/u)
+  assert.doesNotMatch(renderer, /\.action\(|\.toolAction\(|safe-mode|disable-plugin|export-diagnostics/u)
+})
+
+test('startup surface never asks new or existing users about migration', async () => {
+  const [html, renderer] = await Promise.all([
+    readFile(new URL('startup.html', uiRoot), 'utf8'),
+    readFile(new URL('startup.mjs', uiRoot), 'utf8'),
+  ])
+  assert.doesNotMatch(html, /迁移|升级|隔离|恢复会话/u)
+  assert.doesNotMatch(renderer, /migration|upgrade-migration|setMigrationAssistantStatus/u)
 })
 
 test('whale pose stays inside the right-side swim corridor', () => {

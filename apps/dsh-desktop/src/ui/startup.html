@@ -36,29 +36,13 @@
             <span class="meter-tip" aria-hidden="true"></span>
           </div>
           <p class="status-detail" id="status-detail">完整 Harness 正在本地启动</p>
-          <div class="startup-support">
-            <button type="button" class="quiet" data-tool-action="terminal">打开内置终端</button>
-            <button type="button" class="quiet" data-action="export-diagnostics" aria-describedby="diagnostic-export-status">导出诊断日志</button>
-            <p class="startup-support-hint">升级迁移会在后台自动完成；启动卡住时仍可打开内置终端，或导出已脱敏的诊断日志。</p>
-          </div>
-          <p class="diagnostic-export-status" id="diagnostic-export-status" role="status" aria-live="polite" hidden></p>
         </div>
 
         <section class="recovery-summary" id="recovery-summary" hidden>
-          <h2 id="recovery-title">检测到插件导致启动失败</h2>
-          <p id="recovery-reason"></p>
-          <p class="data-safety">停用插件不会删除聊天记录、模型设置、账号信息和个人配置。</p>
+          <h2 id="recovery-title">正在自动处理</h2>
+          <p id="recovery-reason">应用会自动重试并保留原有数据，无需选择任何操作。</p>
+          <p class="data-safety">原有对话、模型设置、账号信息和个人配置会继续保留。</p>
         </section>
-        <pre id="error-log" hidden></pre>
-        <div class="actions" id="actions" hidden>
-          <button type="button" id="disable-plugin" data-action="disable-plugin" hidden>一键停用并重启</button>
-          <button type="button" id="safe-mode" data-action="safe-mode">进入安全模式</button>
-          <button type="button" id="retry" data-action="retry">重新尝试</button>
-          <button type="button" id="repair" data-action="repair">修复 Profile</button>
-          <button type="button" class="quiet" id="technical-details">查看技术详情</button>
-          <button type="button" class="quiet" data-action="open-logs">打开日志</button>
-          <button type="button" class="quiet" data-action="exit">退出</button>
-        </div>
       </section>
 
       <footer id="version">DESKTOP</footer>

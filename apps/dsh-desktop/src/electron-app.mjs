@@ -79,6 +79,7 @@ import {
 import { DesktopProfileBaselineQuarantine } from './profile-baseline-quarantine.mjs'
 import { ensurePrimaryRuntimeFullUserPermission } from './primary-runtime-permission.mjs'
 import { ProductMetricsRecorder } from './product-metrics.mjs'
+import { projectDirectStartupState } from './repair-state.mjs'
 import {
   BUILTIN_BUNDLES,
   DESKTOP_PROFILE_BOOTSTRAP_ERROR,
@@ -896,6 +897,73 @@ export async function startElectronApp(metadata) {
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
   const migrationRuntimeStatePath = join(userData, 'runtime-support-state.json')
   const logStore = new BoundedLogStore({ directory: logsDirectory })
+  const statePath = desktopWindowStatePath
+  const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
+  const state = await loadWindowState(statePath, screen.getAllDisplays())
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  mainWindow = new BrowserWindow({
+    ...state,
+    minWidth: 720,
+    minHeight: 540,
+    show: false,
+    title: metadata.productName,
+    icon: appIcon,
+    backgroundColor: '#040814',
+    ...windowChromeBrowserOptions(),
+    webPreferences: {
+      preload: MAIN_PRELOAD_PATH,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      spellcheck: false,
+    },
+  })
+  const unregisterMainSurface = surfaceRegistry.register(mainWindow.webContents, DESKTOP_SURFACES.MAIN)
+  applyWindowIcon(mainWindow, appIcon)
+  const removeEditContextMenu = installEditContextMenu({ webContents: mainWindow.webContents, Menu })
+  const removeMainWindowChrome = installWindowChrome({
+    browserWindow: mainWindow,
+    iconDataUrl: windowChromeIconDataUrl,
+    showHelpMenu: true,
+    showToolsMenu: true,
+    onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
+  })
+  const removeConversationPolish = installConversationPolish({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[conversation-polish] ${error.message}`),
+  })
+  const removeConversationSkills = installConversationSkills({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[conversation-skills] ${error.message}`),
+  })
+  const removeUpdateSurface = installUpdateSurface({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[update-surface] ${error.message}`),
+  })
+  const removeStarPromptSurface = installStarPromptSurface({
+    browserWindow: mainWindow,
+    forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
+    onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
+  })
+  if (state.maximized) mainWindow.maximize()
+  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
+  let activeOrigin
+  let communityWindow
+  let communityWindowPromise
+  let updateController
+  let updateChannelWriteQueue = Promise.resolve()
+  const showDirectStartupState = async (startupState) => {
+    const projection = projectDirectStartupState({ state: startupState })
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    await mainWindow.loadFile(STARTUP_PATH, { query: { directState: projection.state } })
+  }
+  mainWindow.once('ready-to-show', () => {
+    if (!updateShutdownRequested) mainWindow.show()
+  })
+  mainWindow.on('closed', () => { mainWindow = undefined })
+  await showDirectStartupState('preparing')
+  const existingHomeAtLaunch = await hasExistingDesktopState({ userData, desktopProfileDir })
   /**
    * This window is intentionally available before profile migration, Runtime
    * admission, or a normal Desktop BrowserWindow. A failed preflight must
@@ -1251,18 +1319,6 @@ export async function startElectronApp(metadata) {
     recoveryShell.window.removeListener?.('closed', onStartupRecoveryShellClosed)
     await recoveryShell.dispose()
   }
-  try {
-    // This is deliberately before settings, migration, profile, Runtime, and
-    // package admission. A slow or damaged preflight may not strand users in
-    // an invisible process: they already have a local window with logs/retry.
-    await showStartupRecoveryShell()
-  } catch (error) {
-    await logStore.append(`[recovery-shell] failed to create startup shell: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    app.quit()
-    return
-  }
-  return runStartupAfterRecoveryShell({
-    run: async () => {
   // One Desktop-main permission store is shared by the persistent primary
   // Runtime, the normal extension flow, and isolated recovery. Keeping it
   // here, before any
@@ -1829,10 +1885,9 @@ export async function startElectronApp(metadata) {
   const launchSafeModeRequested = await launchRequestsSafeMode()
   if (launchSafeModeRequested) await logStore.append('[plugin-recovery] safe mode requested at launch')
   if (!updateChannelPreference.exists) {
-    const existingDesktopState = await hasExistingDesktopState({ userData, desktopProfileDir })
     const seededChannel = initialUpdateChannel({
       hasPersistedPreference: false,
-      hasExistingDesktopState: existingDesktopState,
+      hasExistingDesktopState: existingHomeAtLaunch,
       appVersion: desktopVersion,
     })
     if (seededChannel === 'beta') {
@@ -1870,53 +1925,18 @@ export async function startElectronApp(metadata) {
     }
   } catch (error) {
     await logStore.append(`[plugins] persistent plugin transaction recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'profile-loader-failure',
-      fingerprintSource: 'plugin-archive-recovery-failed',
-      enterFreeMode: enterFullUserFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
+    await showDirectStartupState('repairing')
     return
   }
   const migrationAssistant = new MigrationAssistant({
     paths: migrationPaths,
     storageDir: join(userData, 'migration-assistant'),
   })
-  const preflightMigration = await preflightDesktopMigrationGate({
-    migrationAssistant,
-    log: (message) => logStore.append(message),
-  })
-  if (startupRecoveryShellClosed) return
-  if (!preflightMigration.bootstrapAllowed) {
-    const migrationPreflightNeedsRepair = preflightMigration.reason === 'migration-preflight-blocked'
-    await showStartupRecoveryShell({
-      category: migrationPreflightNeedsRepair ? 'migration-blocked' : 'migration-interrupted',
-      fingerprintSource: preflightMigration.reason,
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    return
-  }
-  let preflightMigrationPlan = preflightMigration.plan
-  let preflightMigrationJournal = preflightMigration.journal
-  // A user decision closes the purpose-built Recovery Shell before the
-  // migration worker, normal BrowserWindow, or their later anchors exist.
-  // Keep this private, content-free window alive across that exact handoff so
-  // Windows cannot treat the temporary no-window interval as an app exit.
-  let preBootstrapMigrationWindowAnchor
-  const retainPreBootstrapMigrationWindowAnchor = () => {
-    if (preBootstrapMigrationWindowAnchor === undefined) {
-      preBootstrapMigrationWindowAnchor = createPreBootstrapMigrationWindowAnchor({ BrowserWindow })
-    }
-    return preBootstrapMigrationWindowAnchor
-  }
-  const releasePreBootstrapMigrationWindowAnchor = () => {
-    const anchor = preBootstrapMigrationWindowAnchor
-    preBootstrapMigrationWindowAnchor = undefined
-    anchor?.release()
-  }
+  // Historical migration assets remain available only through the explicit
+  // advanced diagnostic action. Normal startup never scans, plans, creates,
+  // confirms, or resumes a migration journal.
+  let preflightMigrationPlan
+  let preflightMigrationJournal
   const baselineQuarantine = new DesktopProfileBaselineQuarantine({
     dshHome,
     profileDir: desktopProfileDir,
@@ -1950,63 +1970,6 @@ export async function startElectronApp(metadata) {
     await setQqBotProfileEnabled({ profileDir: result.profileDir, enabled: Boolean(qqBotCredentials) })
     return result
   }
-  const resolvePreBootstrapMigration = async () => {
-    // The gate above has already read the recovery store. Do not re-scan here:
-    // a later storage failure must never be mistaken for a no-migration launch.
-    while (preflightMigrationJournal !== undefined) {
-      const active = preflightMigrationJournal
-      if (!shouldAutoContinuePreBootstrapMigration(active)) {
-        await logStore.append(`[migration] journal ${active.id} is not eligible for automatic continuation`).catch(() => {})
-        return false
-      }
-      // Keep Electron alive while a migration-only Runtime/probe starts and
-      // stops before the real main window exists. No migration decision UI is
-      // created; the private snapshot is the rollback boundary.
-      retainPreBootstrapMigrationWindowAnchor()
-      await logStore.append(`[migration] automatically resuming journal ${active.id}`).catch(() => {})
-      try {
-        if (active.confirmationRequired && active.confirmedAt === undefined) {
-          await migrationAssistant.confirmMigration(active.id)
-        }
-        let journal = await migrationAssistant.getJournal(active.id)
-        preflightMigrationJournal = journal
-        for (const step of journal.steps) {
-          if (step.state !== 'pending') continue
-          if (step.id === 'capture-private-snapshot') {
-            journal = await migrationAssistant.completeStep(journal.id, step.id)
-            preflightMigrationJournal = journal
-            continue
-          }
-          if (step.id === 'migrate-profile-state') {
-            await ensureProfile()
-            journal = await migrationAssistant.completeStep(journal.id, step.id)
-            preflightMigrationJournal = journal
-          }
-        }
-        await logStore.append(`[migration] pre-bootstrap journal ${journal.id} accepted before profile/runtime startup`)
-        return true
-      } catch (error) {
-        // Keep the durable journal in place and stop this attempt. Returning
-        // false is important: looping the same failed journal here would pin
-        // startup forever instead of handing control to Free Mode.
-        await logStore.append(`[migration] pre-bootstrap recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-        return false
-      }
-    }
-    return true
-  }
-  if (!(await resolvePreBootstrapMigration())) {
-    releasePreBootstrapMigrationWindowAnchor()
-    await showStartupRecoveryShell({
-      category: 'migration-interrupted',
-      fingerprintSource: 'migration-recovery-session-available',
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    return
-  }
   let prepared
   try {
     prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
@@ -2021,16 +1984,7 @@ export async function startElectronApp(metadata) {
     })
   } catch (error) {
     await logStore.append(`[profile] bootstrap failed before Runtime startup: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'profile-loader-failure',
-      fingerprintSource: 'profile-bootstrap-failed',
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    // A visible local shell has now taken over the no-window safeguard.
-    releasePreBootstrapMigrationWindowAnchor()
+    await showDirectStartupState('repairing')
     return
   }
   const profile = prepared.profile
@@ -2126,19 +2080,16 @@ export async function startElectronApp(metadata) {
     await logStore.append(
       `[runtime] packaged support assessment blocked stage=${diagnostic.stage} desktop=${diagnostic.desktopVersion} runtime=${diagnostic.runtimeVersion} reason=${diagnostic.reason} errorCode=${diagnostic.errorCode} error=${diagnostic.errorName} message=${diagnostic.errorMessage}`,
     ).catch(() => {})
-    await showStartupRecoveryShell({
-      category: runtimeSupportRepairCategory(runtimeSupportAssessment),
-      fingerprintSource: `${runtimeSupportAssessment.reason}:${runtimeSupportStage}`,
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    const repairCategory = runtimeSupportRepairCategory(runtimeSupportAssessment)
+    productMetrics.recordInstallationRepairRequired(
+      repairCategory === 'runtime-integrity-failed' ? 'integrity-failed' : 'unsupported',
+    )
+    await showDirectStartupState('installation-repair-required')
     return
   }
   if (dshCliPath === undefined || runtimeVersion === undefined) {
-    await showStartupRecoveryShell({
-      category: 'runtime-unavailable',
-      fingerprintSource: dshCliPath === undefined ? 'runtime-cli-unavailable' : 'runtime-version-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    productMetrics.recordInstallationRepairRequired('runtime-missing')
+    await showDirectStartupState('installation-repair-required')
     return
   }
   let primaryFullUserPermission
@@ -2149,24 +2100,16 @@ export async function startElectronApp(metadata) {
     primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission({
       permissionStore: freeModePermissionStore,
       dialog,
-      parentWindow: startupRecoveryShell?.window,
+      parentWindow: mainWindow,
     })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime authorization failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'local-state-unavailable',
-      fingerprintSource: 'primary-runtime-permission-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    await showDirectStartupState('repairing')
     return
   }
   if (primaryFullUserPermission.approved !== true) {
     await logStore.append('[permission] primary Runtime full-user authorization was not granted').catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'permission-required',
-      fingerprintSource: 'primary-runtime-permission-required',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    await showDirectStartupState('repairing')
     return
   }
   let primaryFullUserOverlay
@@ -2174,11 +2117,7 @@ export async function startElectronApp(metadata) {
     primaryFullUserOverlay = await writePrimaryFullUserOverlay({ userData })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime overlay preparation failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'local-state-unavailable',
-      fingerprintSource: 'primary-runtime-overlay-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    await showDirectStartupState('repairing')
     return
   }
   const desktopCapabilities = [...new Set(
@@ -2556,53 +2495,6 @@ export async function startElectronApp(metadata) {
         throw new Error('migration step is not recognized by the Desktop recovery surface')
     }
   }
-  const completePreBootstrapMigration = async () => {
-    const active = preflightMigrationJournal
-      ?? (await migrationAssistant.listJournals()).find((journal) => journal.state === 'started' || journal.state === 'step-complete')
-    if (!active) return undefined
-    const wasRunning = runtimeProvider.status?.state === 'ready'
-    const previousMigrationWorker = migrationRuntimeWorker
-    migrationRuntimeWorker = true
-    try {
-      const completed = await migrationAssistant.resumeMigration(active.id, {
-        confirmed: true,
-        applyStep: applyMigrationStep,
-      })
-      if (!completed.resumed || completed.journal.state !== 'committed') {
-        throw new Error('the pre-bootstrap migration still requires explicit recovery')
-      }
-      preflightMigrationPlan = undefined
-      preflightMigrationJournal = undefined
-      recordMigrationOutcome('committed')
-      await logStore.append(`[migration] pre-bootstrap journal ${completed.journal.id} committed before DSH Web startup`)
-      return completed.journal
-    } finally {
-      // The temporary loopback Runtime is only a migration worker. Stop it
-      // before the normal surface is eligible to load so no live renderer can
-      // read/write profile or scheduler state during recovery.
-      if (!wasRunning && runtimeProvider.status?.state === 'ready') await runtimeProvider.stop()
-      migrationRuntimeWorker = previousMigrationWorker
-    }
-  }
-  if (preflightMigrationJournal !== undefined) {
-    retainPreBootstrapMigrationWindowAnchor()
-    try {
-      await completePreBootstrapMigration()
-    } catch (error) {
-      recordMigrationOutcome('interrupted')
-      await logStore.append(`[migration] pre-bootstrap journal remains recoverable: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-      releasePreBootstrapMigrationWindowAnchor()
-      await showStartupRecoveryShell({
-        category: 'migration-interrupted',
-        fingerprintSource: 'pre-bootstrap-migration-incomplete',
-        enterFreeMode: enterFullUserFreeMode,
-        chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-        loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-        cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-      })
-      return
-    }
-  }
   const withQuiescedMigrationRuntime = async (operation) => {
     const wasRunning = runtimeProvider.status?.state === 'ready'
     const previousMigrationWorker = migrationRuntimeWorker
@@ -2667,63 +2559,6 @@ export async function startElectronApp(metadata) {
     onEventError: (error) => logStore.append(`[qqbot] event delivery failed: ${error instanceof Error ? error.message : String(error)}`),
   })
 
-  const statePath = desktopWindowStatePath
-  const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
-  const state = await loadWindowState(statePath, screen.getAllDisplays())
-  const surfaceRegistry = new DesktopSurfaceRegistry()
-  mainWindow = new BrowserWindow({
-    ...state,
-    minWidth: 720,
-    minHeight: 540,
-    show: false,
-    title: metadata.productName,
-    icon: appIcon,
-    backgroundColor: '#040814',
-    ...windowChromeBrowserOptions(),
-    webPreferences: {
-      preload: MAIN_PRELOAD_PATH,
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      spellcheck: false,
-    },
-  })
-  releasePreBootstrapMigrationWindowAnchor()
-  const unregisterMainSurface = surfaceRegistry.register(mainWindow.webContents, DESKTOP_SURFACES.MAIN)
-  applyWindowIcon(mainWindow, appIcon)
-  const removeEditContextMenu = installEditContextMenu({ webContents: mainWindow.webContents, Menu })
-  const removeMainWindowChrome = installWindowChrome({
-    browserWindow: mainWindow,
-    iconDataUrl: windowChromeIconDataUrl,
-    showHelpMenu: true,
-    showToolsMenu: true,
-    onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
-  })
-  const removeConversationPolish = installConversationPolish({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[conversation-polish] ${error.message}`),
-  })
-  const removeConversationSkills = installConversationSkills({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[conversation-skills] ${error.message}`),
-  })
-  const removeUpdateSurface = installUpdateSurface({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[update-surface] ${error.message}`),
-  })
-  const removeStarPromptSurface = installStarPromptSurface({
-    browserWindow: mainWindow,
-    forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
-    onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
-  })
-  if (state.maximized) mainWindow.maximize()
-  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
-  let activeOrigin
-  let communityWindow
-  let communityWindowPromise
-  let updateController
-  let updateChannelWriteQueue = Promise.resolve()
   const persistUpdateChannel = (channel) => {
     const operation = updateChannelWriteQueue.then(async () => {
       const previous = updateController?.getChannel?.() ?? updateChannel
@@ -3161,15 +2996,11 @@ export async function startElectronApp(metadata) {
     try {
       await mainWindow.loadURL(status.url)
       deepLinkRouter.setReady(true)
-      // A repaired Runtime can become ready after the normal window has
-      // already been shown. Close only the recovery window's intentional
-      // quit-on-close hook after the real Desktop surface finished loading.
-      await dismissStartupRecoveryShell().catch(async (error) => {
-        await logStore.append(
-          `[recovery-shell] failed to dismiss after Runtime recovery: ${error instanceof Error ? error.name : 'unknown'}`,
-        ).catch(() => {})
-      })
       const rendererLoadedAt = performance.now()
+      productMetrics.recordDirectStartReady({
+        detail: existingHomeAtLaunch ? 'existing-home' : 'fresh-home',
+        durationMs: rendererLoadedAt - applicationStartedAt,
+      })
       void logStore.append(`[startup] renderer-loaded=${Math.round(rendererLoadedAt - runtimeReadyAt)}ms`)
       void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
       try {
@@ -3229,37 +3060,20 @@ export async function startElectronApp(metadata) {
       if (!mainWindow.webContents.getURL().startsWith('file:')) void loadStartup().catch(() => {})
       if (status.state === 'crashed') {
         const category = runtimeStartupRepairCategory(status)
-        // A crashed user/profile plugin can be retried in the isolated
-        // full-user session after native confirmation. On Windows, a missing
-        // Git has one separate, fixed-artifact repair path; a damaged
-        // packaged dependency closure still remains shell-only.
-        void showStartupRecoveryShell({
-          category,
-          fingerprintSource: `runtime-crashed:${category}`,
-          ...(category === 'external-tool-missing' && process.platform === 'win32'
-            ? { installManagedGit: installManagedGitForRecovery }
-            : category === 'plugin-startup-failure'
-            ? {
-                enterFreeMode: enterFullUserFreeMode,
-                chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-                loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-                cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-              }
-            : {}),
-        }).catch(async (error) => {
-          await logStore.append(`[recovery-shell] failed to open after Runtime crash: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
+        const detail = category === 'plugin-startup-failure'
+          ? 'plugin-startup'
+          : category === 'external-tool-missing'
+          ? 'runtime-missing'
+          : category === 'packaged-dependency-missing'
+          ? 'integrity-failed'
+          : 'startup-failed'
+        productMetrics.recordFullStartFailed({
+          detail,
+          durationMs: runtimeStartedAt === undefined ? 0 : performance.now() - runtimeStartedAt,
         })
       }
     }
   })
-
-  mainWindow.once('ready-to-show', () => {
-    if (!updateShutdownRequested) mainWindow.show()
-    void dismissStartupRecoveryShell().catch(async (error) => {
-      await logStore.append(`[recovery-shell] failed to dismiss after main window became ready: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    })
-  })
-  mainWindow.on('closed', () => { mainWindow = undefined })
   if (launchSafeModeRequested) {
     await pluginRecovery.prepareSafeMode()
     // The recovery service publishes asynchronously. Mark this synchronously
@@ -3522,23 +3336,4 @@ export async function startElectronApp(metadata) {
   })
   app.on('will-quit', () => closeBehaviorController?.beginExplicitQuit())
   app.on('window-all-closed', () => app.quit())
-    },
-    showRecoveryShell: () => {
-      // If no main-process Free Mode implementation was installed yet, do
-      // not leave an already-clicked recovery button waiting forever. When it
-      // was installed, `fail()` is a no-op and the existing isolated action
-      // remains available through this late startup failure.
-      failStartupFreeModeAction()
-      return showStartupRecoveryShell({
-        category: 'unknown',
-        fingerprintSource: 'post-shell-startup-failure',
-        // The boundary covers late startup work as well as the migration and
-        // Runtime-admission branches above. The shell retains its established
-        // Electron-main actions here; these are deliberately not references to
-        // run()'s local bindings, which are out of scope for this sibling
-        // callback after a late startup exception.
-      })
-    },
-    log: (line) => logStore.append(line),
-  })
 }
