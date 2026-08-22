@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "2.3": { "release": "2.3.0", "tag": null, "commit": "38b66ce23558887b2dff94ed8f663b92777abdc7" },
+    "2.4": { "release": "2.4.0", "tag": null, "commit": "2fb56b13e8e9b02bf8cd8275bf028e2b21e65063" },
+    "2.5": { "release": "2.5.0", "tag": null, "commit": "17174c37ca88e1091ab127125f2b139030fa5fbd" },
+    "2.6": { "release": "2.6.0", "tag": null, "commit": "69a6d558c15f7b0897ebae7acdc0ac305b3afb85" },
+    "2.7": { "release": "2.7.0", "tag": null, "commit": "5e0900a15eb211478832ff459aaaff567bf2209d" },
+    "3.0.1": { "release": "3.0.1", "tag": null, "commit": "cc46560cc86a348cbb9b46c84defe479cd8b3ae1" }
+  },
+  "files": {
+    "2.3/home.json": "7c234c2eef12cfb6c70d20ed3fdaafbed6528e9618a33481958e43c2afa76a3d",
+    "2.4/home.json": "a6bf90107312e1e97783bc6b8bc830bd086134fb865082b9c5b5a9e2eb73233c",
+    "2.5/home.json": "af8a17a4cd6ed7b849acda6749eb78f74bfc3a422f352007ec4f839e4fa9254d",
+    "2.6/home.json": "52459f5de1074fdf38bca278021a9baa30b2da30d008b811734fa8d8508e2417",
+    "2.7/home.json": "5363ac635182240d6fc6289eb0e318f772a0d40dc30945e5834204be10cd86d6",
+    "3.0.1/home.json": "36cbbd4782690e8f207301e5be226930b0e9d42f513af8eda5bc2feb5d9b3e25",
+    "README.md": "3f417193f48256083cddc184de0e9621971ee5e6cc4087c640b1aa6b2c791992",
+    "faults/bad-patch/cordis.patch.yml": "65c9ea8f901f1f218e2f7e2e07e22e88ba95f1fccded461d7e971591bb9ac6e1",
+    "faults/bad-patch/index.mjs": "5f3d5554abc8ecce5defdfdfe1ce7872e4474a80c8fe24290bd007a4064122b2",
+    "faults/bad-patch/package.json": "0a26f763949ffc6a1d6cbc7fd6bd5e13b8caed917d55d8397b1a6fd0205d1b2a",
+    "faults/healthy/index.mjs": "5f3d5554abc8ecce5defdfdfe1ce7872e4474a80c8fe24290bd007a4064122b2",
+    "faults/healthy/package.json": "bd20e826aa1aca61120ac05c5893f6ce8c7fa0d48726f55e5dadc296b47fcc78",
+    "faults/native-abi/index.mjs": "72dbeaa6c06937750424027283be18b1f4a5e3c484de401545a4f3efdb16f6c0",
+    "faults/native-abi/package.json": "bf4e5e163a347ff9bba086329c6f4a5faf812814f0ec639c6ac6ff5495ffd816",
+    "faults/repairable-config/config.json": "4a30c9be3f878a9b2ecf59f5e0ada934c9d7e390f09c232597a46d5b4e929a50",
+    "faults/repairable-config/index.mjs": "d1f31bd05a805678ae655cb5d932707f5ef3877ce5733dd73fea5bbef6452da3",
+    "faults/repairable-config/package.json": "86c22f1c4e1f0124aaf8e9e2684de7cc3f1bd4e02b4a048edd95149202b554fa",
+    "faults/startup-throw/index.mjs": "a3c5d5b32294b2eecd0f44871a7cabf0b3fe1775a6b598c25ce6f93f7c1be07e",
+    "faults/startup-throw/package.json": "1dc5c84988b55c930f3f561a4cffc9b5cd3c7937d3569fa2628b1e370cbc82c9",
+    "faults/syntax-error/index.mjs": "7f54c0d351d756eb76eb9a85b9ae068862a76facd3964551e01686a25a433477",
+    "faults/syntax-error/package.json": "8261b0e980d3f8ee7d5596350d534ecf3568611446cb95f766abcd7c396bfd15",
+    "probe-package/cordis.patch.yml": "97cb4e3b6dd322c3e9543b65ec88330f98389c5c9b73c29466c845def081595d",
+    "probe-package/index.mjs": "3c4ef73126612944d9441c508a6d8a8828afa188f721d5d0f96c124ea5186a9e",
+    "probe-package/package.json": "1c383ec2296dc70b1c81ad3b1a391acf36f54b661e252407fbb2850f62162481"
+  }
+}

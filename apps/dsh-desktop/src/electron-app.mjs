@@ -961,6 +961,7 @@ export async function startElectronApp(metadata) {
   let updateChannelWriteQueue = Promise.resolve()
   const showDirectStartupState = async (startupState) => {
     const projection = projectDirectStartupState({ state: startupState })
+    await logStore.append(`[startup] direct-state=${projection.state}`).catch(() => {})
     if (!mainWindow || mainWindow.isDestroyed()) return
     await mainWindow.loadFile(STARTUP_PATH, { query: { directState: projection.state } })
   }

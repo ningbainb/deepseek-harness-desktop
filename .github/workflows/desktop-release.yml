@@ -76,6 +76,17 @@ jobs:
           if ($configuration.endpoint -ne '') {
             throw 'Release builds must keep the default telemetry endpoint empty.'
           }
+      - name: Package unsigned direct-start candidate
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:dir
+        env:
+          DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
+          REQUIRE_SIGNING: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify direct-start matrix before signing
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @deepseek-ai/dsh-desktop test:direct-start-matrix:e2e
       - name: Package the selected release channel
         run: pnpm --filter @deepseek-ai/dsh-desktop pack:win --config.publish.channel=${{ steps.release.outputs.updater_channel }}
         env:
@@ -112,11 +123,6 @@ jobs:
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
           pnpm --filter @deepseek-ai/dsh-desktop test:update-shutdown:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify
-      - name: Verify packaged migration matrix
-        shell: pwsh
-        run: |
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:migration-matrix:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke
       - name: Verify Windows Authenticode signatures
         run: pnpm --filter @deepseek-ai/dsh-desktop release:signatures:verify

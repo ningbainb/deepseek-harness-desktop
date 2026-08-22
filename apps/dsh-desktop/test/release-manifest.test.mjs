@@ -197,13 +197,18 @@ test('official Desktop tag releases require signing only when certificate materi
   assert.match(workflow, /body_path: apps\/dsh-desktop\/dist\/release-notes\.md/u)
   assert.match(workflow, /apps\/dsh-desktop\/dist\/\$\{\{ steps\.release\.outputs\.updater_channel \}\}\.yml/u)
   assert.doesNotMatch(workflow, /apps\/dsh-desktop\/dist\/\*\.yml/u)
+  const unsignedCandidate = workflow.indexOf('- name: Package unsigned direct-start candidate')
+  const directStartGate = workflow.indexOf('- name: Verify direct-start matrix before signing')
+  const signedPackage = workflow.indexOf('- name: Package the selected release channel')
+  assert.ok(unsignedCandidate >= 0 && unsignedCandidate < directStartGate && directStartGate < signedPackage)
+  assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY: 'false'/u)
   for (const releaseGate of [
     'test:directory-picker:e2e',
     'test:terminal:e2e',
     'test:window-chrome:e2e',
     'test:profile-reset:e2e',
     'test:update-shutdown:e2e',
-    'test:migration-matrix:e2e',
+    'test:direct-start-matrix:e2e',
   ]) {
     assert.equal(workflow.includes(releaseGate), true, `release workflow is missing ${releaseGate}`)
   }

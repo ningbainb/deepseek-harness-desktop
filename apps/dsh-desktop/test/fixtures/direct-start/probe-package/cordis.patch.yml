@@ -1,0 +1,3 @@
+- insert:
+    - id: direct-start-session-probe
+      name: '@fixture/direct-start-session-probe'
