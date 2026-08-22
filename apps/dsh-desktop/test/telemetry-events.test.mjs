@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   createProductEvent,
   normalizeProductContext,
+  PRODUCT_EVENT_NAMES,
   sessionDurationBucket,
   startupDurationBucket,
 } from '../src/telemetry-events.mjs'
@@ -76,4 +77,47 @@ test('buckets startup and session durations without sending exact values', () =>
   assert.equal(sessionDurationBucket(299_999), 'under-5m')
   assert.equal(sessionDurationBucket(300_000), '5-30m')
   assert.equal(sessionDurationBucket(7_200_000), 'over-120m')
+})
+
+test('automatic startup and repair telemetry uses a fixed privacy-safe vocabulary', () => {
+  assert.deepEqual(PRODUCT_EVENT_NAMES.filter((name) => (
+    name.includes('start')
+    || name.includes('repair')
+    || name.includes('fallback')
+  )), [
+    'runtime_start_result',
+    'direct_start_ready',
+    'full_start_failed',
+    'repair_agent_started',
+    'repair_agent_succeeded',
+    'repair_agent_failed',
+    'builtins_fallback_ready',
+    'installation_repair_required',
+  ])
+
+  const context = normalizeProductContext({
+    version: '3.0.2',
+    platform: 'win32',
+    osRelease: '10.0.22631',
+    locale: 'zh-CN',
+  })
+  assert.deepEqual(createProductEvent(context, 'direct_start_ready', {
+    outcome: 'ready',
+    detail: 'existing-home',
+    bucket: '2-5s',
+  }), {
+    name: 'direct_start_ready',
+    appVersion: '3.0.2',
+    channel: 'stable',
+    os: 'windows-11',
+    language: 'zh',
+    outcome: 'ready',
+    detail: 'existing-home',
+    bucket: '2-5s',
+  })
+  assert.throws(() => createProductEvent(context, 'repair_agent_failed', {
+    outcome: 'failed',
+    detail: 'C:\\Users\\alice\\plugin secret prompt',
+    bucket: 'unknown',
+  }), /invalid product event dimensions/u)
 })

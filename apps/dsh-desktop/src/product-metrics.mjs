@@ -33,6 +33,7 @@ export class ProductMetricsRecorder {
     this.lastUpdatePhase = undefined
     this.launchRecorded = false
     this.sessionEndRecorded = false
+    this.milestones = new Set()
   }
 
   #record(name, dimensions) {
@@ -41,6 +42,12 @@ export class ProductMetricsRecorder {
     } catch {
       return false
     }
+  }
+
+  #recordMilestone(key, name, dimensions) {
+    if (this.milestones.has(key)) return false
+    this.milestones.add(key)
+    return this.#record(name, dimensions)
   }
 
   recordLaunch(detail = 'unknown') {
@@ -52,6 +59,62 @@ export class ProductMetricsRecorder {
   recordRecovery(detail) {
     return this.#record('runtime_recovery_action', {
       outcome: 'requested',
+      detail,
+      bucket: 'none',
+    })
+  }
+
+  recordDirectStartReady({ detail, durationMs }) {
+    return this.#recordMilestone('direct-start-ready', 'direct_start_ready', {
+      outcome: 'ready',
+      detail,
+      bucket: startupDurationBucket(durationMs),
+    })
+  }
+
+  recordFullStartFailed({ detail, durationMs }) {
+    return this.#recordMilestone('full-start-failed', 'full_start_failed', {
+      outcome: 'failed',
+      detail,
+      bucket: startupDurationBucket(durationMs),
+    })
+  }
+
+  recordRepairAgentStarted(detail) {
+    return this.#recordMilestone(`repair-agent-started:${detail}`, 'repair_agent_started', {
+      outcome: 'started',
+      detail,
+      bucket: 'none',
+    })
+  }
+
+  recordRepairAgentSucceeded({ detail, durationMs }) {
+    return this.#recordMilestone(`repair-agent-succeeded:${detail}`, 'repair_agent_succeeded', {
+      outcome: 'succeeded',
+      detail,
+      bucket: startupDurationBucket(durationMs),
+    })
+  }
+
+  recordRepairAgentFailed({ detail, durationMs }) {
+    return this.#recordMilestone(`repair-agent-failed:${detail}`, 'repair_agent_failed', {
+      outcome: 'failed',
+      detail,
+      bucket: startupDurationBucket(durationMs),
+    })
+  }
+
+  recordBuiltinsFallbackReady({ detail, durationMs }) {
+    return this.#recordMilestone('builtins-fallback-ready', 'builtins_fallback_ready', {
+      outcome: 'ready',
+      detail,
+      bucket: startupDurationBucket(durationMs),
+    })
+  }
+
+  recordInstallationRepairRequired(detail) {
+    return this.#recordMilestone('installation-repair-required', 'installation_repair_required', {
+      outcome: 'blocked',
       detail,
       bucket: 'none',
     })

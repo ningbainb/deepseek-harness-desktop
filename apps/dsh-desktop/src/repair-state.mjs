@@ -2,6 +2,28 @@ import { createHash } from 'node:crypto'
 
 export const REPAIR_STATE_SCHEMA_VERSION = 1
 
+export const DIRECT_STARTUP_STATES = Object.freeze([
+  'preparing',
+  'starting-full',
+  'retrying-full',
+  'repairing',
+  'verifying',
+  'ready-full',
+  'ready-builtins',
+  'installation-repair-required',
+])
+
+const DIRECT_STARTUP_SUMMARIES = Object.freeze({
+  preparing: '正在准备应用',
+  'starting-full': '正在载入原有数据和全部插件',
+  'retrying-full': '正在自动重试启动',
+  repairing: '正在自动修复插件',
+  verifying: '正在验证修复结果',
+  'ready-full': '启动完成',
+  'ready-builtins': '已使用内置插件启动',
+  'installation-repair-required': '正在修复应用安装',
+})
+
 export const REPAIR_MODES = Object.freeze([
   'normal',
   'free-shell',
@@ -127,6 +149,24 @@ function fingerprint(value) {
       ? `${value.name}:${value.message}`
       : JSON.stringify(value ?? null)
   return createHash('sha256').update(content).digest('hex').slice(0, 16)
+}
+
+/**
+ * Project internal startup progress into a non-interactive renderer view.
+ * Only a fixed state and summary cross the boundary; raw failures stay in the
+ * main process and are never made available to renderer code.
+ */
+export function projectDirectStartupState(input = {}) {
+  assertPlainObject(input, 'direct startup state input')
+  if (!DIRECT_STARTUP_STATES.includes(input.state)) {
+    throw new TypeError('invalid startup state')
+  }
+  return Object.freeze({
+    schemaVersion: REPAIR_STATE_SCHEMA_VERSION,
+    state: input.state,
+    summary: DIRECT_STARTUP_SUMMARIES[input.state],
+    interactive: false,
+  })
 }
 
 /**

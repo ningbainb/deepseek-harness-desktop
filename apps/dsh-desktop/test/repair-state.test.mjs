@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { projectRepairState, REPAIR_ACTION_IDS, REPAIR_CATEGORIES, REPAIR_MODES } from '../src/repair-state.mjs'
+import {
+  DIRECT_STARTUP_STATES,
+  projectDirectStartupState,
+  projectRepairState,
+  REPAIR_ACTION_IDS,
+  REPAIR_CATEGORIES,
+  REPAIR_MODES,
+} from '../src/repair-state.mjs'
 import { createRepairPlan, validateRepairPlan } from '../src/repair-plan.mjs'
 
 test('repair state projects raw startup failures without exposing private content', () => {
@@ -83,4 +90,35 @@ test('repair plans accept only a versioned finite action language', () => {
     ...plan,
     recommendedActionIds: ['force-runtime'],
   }), /unsupported value/u)
+})
+
+test('direct startup projection has no buttons, migration choices, or raw failures', () => {
+  const state = projectDirectStartupState({
+    state: 'repairing',
+    error: 'OPENAI_API_KEY=secret C:\\Users\\alice\\plugin\\index.js',
+  })
+
+  assert.deepEqual(state, {
+    schemaVersion: 1,
+    state: 'repairing',
+    summary: '正在自动修复插件',
+    interactive: false,
+  })
+  assert.deepEqual(DIRECT_STARTUP_STATES, [
+    'preparing',
+    'starting-full',
+    'retrying-full',
+    'repairing',
+    'verifying',
+    'ready-full',
+    'ready-builtins',
+    'installation-repair-required',
+  ])
+  assert.equal(JSON.stringify(state).includes('secret'), false)
+  assert.equal(JSON.stringify(state).includes('migration'), false)
+  assert.equal(Object.hasOwn(state, 'actions'), false)
+})
+
+test('direct startup projection rejects unknown internal states', () => {
+  assert.throws(() => projectDirectStartupState({ state: 'free-shell' }), /startup state/u)
 })
