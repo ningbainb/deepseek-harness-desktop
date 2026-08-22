@@ -91,3 +91,36 @@ test('repair incidents cap model attempts and tool action summaries', async () =
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('latest repair status retains only relative changed files and registered checks', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-latest-'))
+  let now = 1_000
+  try {
+    const store = new RepairIncidentStore({ userDataDir: root, now: () => now })
+    const { incident } = await store.claim({
+      desktopVersion: '3.0.2',
+      runtimeVersion: '0.1.1-rc.1',
+      phase: 'full-start',
+      error: { name: 'Error', code: 'PLUGIN_START_FAILED' },
+      bundles: [],
+    })
+    await store.transition(incident.fingerprint, 'running')
+    now += 1_000
+    await store.recordVerification(incident.fingerprint, {
+      changedFiles: ['plugins/example/index.mjs', 'profile/cordis.patch.yml'],
+      checks: ['plugin-example-test'],
+    })
+    await assert.rejects(
+      store.recordVerification(incident.fingerprint, { changedFiles: ['C:\\private\\plugin.js'], checks: [] }),
+      /path/u,
+    )
+    await store.transition(incident.fingerprint, 'verified')
+
+    const latest = await store.latest()
+    assert.equal(latest.fingerprint, incident.fingerprint)
+    assert.deepEqual(latest.changedFiles, ['plugins/example/index.mjs', 'profile/cordis.patch.yml'])
+    assert.deepEqual(latest.checks, ['plugin-example-test'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

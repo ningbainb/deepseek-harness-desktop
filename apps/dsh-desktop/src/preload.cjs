@@ -16,6 +16,7 @@ const api = Object.freeze({
   getContract: () => ipcRenderer.invoke('desktop:contract'),
   getInfo: () => ipcRenderer.invoke('desktop:info'),
   getStatus: () => ipcRenderer.invoke('desktop:status'),
+  getRepairStatus: () => ipcRenderer.invoke('desktop:repair-status'),
   setWindowChromeTheme: (theme) => ipcRenderer.invoke('desktop:window-chrome-theme', theme),
   showNotification: (notification) => ipcRenderer.invoke('desktop:notification-show', notification),
   onStatus: createSubscription('desktop:status', 'status'),

@@ -68,7 +68,7 @@ import { publicUpdateStatus, registerDesktopIpc } from './ipc.mjs'
 import { launchRequestsSafeMode } from './launch-safe-mode.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
-import { DesktopNotificationService } from './notifications.mjs'
+import { builtinsFallbackNotification, DesktopNotificationService } from './notifications.mjs'
 import { startQqBotConnector } from './optional-integrations.mjs'
 import {
   DesktopPluginRecovery,
@@ -1924,6 +1924,7 @@ export async function startElectronApp(metadata) {
     profileDir: desktopProfileDir,
     archiveDir: join(userData, 'plugin-archives', 'desktop'),
   })
+  const repairIncidentStore = new RepairIncidentStore({ userDataDir: userData })
   try {
     const recoveredPluginMutation = await userPluginArchive.recover()
     if (recoveredPluginMutation.recovered) {
@@ -2628,6 +2629,7 @@ export async function startElectronApp(metadata) {
     },
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
     migration: migrationDiagnostics,
+    repairIncidentStore,
     redactionRoots: [
       { path: profile.profileDir, replacement: '<desktop-profile>' },
       { path: userData, replacement: '<desktop-user-data>' },
@@ -2693,6 +2695,7 @@ export async function startElectronApp(metadata) {
       }
     },
     getUpdateController: () => updateController,
+    getRepairStatus: () => repairIncidentStore.latest(),
     getUpdateChannel: () => updateController?.getChannel?.() ?? updateChannel,
     setUpdateChannel: persistUpdateChannel,
     confirmUpdateChannelChange: async ({ from, to }) => {
@@ -3054,7 +3057,6 @@ export async function startElectronApp(metadata) {
     pluginSafeModeActive = true
   }
   const holdRuntime = process.env.DSH_DESKTOP_HOLD_STARTUP === '1'
-  const repairIncidentStore = new RepairIncidentStore({ userDataDir: userData })
   const repairRuntime = new RepairRuntimeController({
     ensureProfile: () => ensureDesktopProfile({
       dshHome,
@@ -3243,6 +3245,10 @@ export async function startElectronApp(metadata) {
           detail: builtinsFallbackDetail,
           durationMs: performance.now() - applicationStartedAt,
         })
+        const latestRepair = await repairIncidentStore.latest().catch(() => undefined)
+        await notificationService.show(
+          builtinsFallbackNotification(latestRepair?.fingerprint),
+        ).catch(() => {})
       }
     },
   })

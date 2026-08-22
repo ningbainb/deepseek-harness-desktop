@@ -6,6 +6,7 @@
 
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { RepairStatusCard } from './RepairStatusCard.tsx'
 import css from './web-ui-settings.module.css'
 
 /** Owner share of a family-plugin card. */
@@ -27,6 +28,7 @@ export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode 
     <div className={css.section}>
       <h2 className={css.heading} title={t('title')}>{t('title')}</h2>
       <p className={css.lede} title={t('description')}>{t('description')}</p>
+      <RepairStatusCard t={t} />
       <ul className={css.subcards}>
         {renderSlot('web-ui.plugin.item', {})}
       </ul>

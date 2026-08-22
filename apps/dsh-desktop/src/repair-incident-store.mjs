@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u
@@ -129,7 +129,15 @@ function assertIncident(value, fingerprint) {
   ) {
     throw new Error('repair incident state is invalid')
   }
-  return immutable(value)
+  const changedFiles = value.changedFiles ?? []
+  const checks = value.checks ?? []
+  if (!Array.isArray(changedFiles) || changedFiles.length > 4_096
+    || changedFiles.some(path => safeRelativePath(path) === undefined)
+    || !Array.isArray(checks) || checks.length > 64
+    || checks.some(name => typeof name !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(name))) {
+    throw new Error('repair incident verification summary is invalid')
+  }
+  return immutable({ ...value, changedFiles, checks })
 }
 
 export class RepairIncidentStore {
@@ -224,6 +232,8 @@ export class RepairIncidentStore {
         ],
         modelAttempts: [],
         toolActions: [],
+        changedFiles: [],
+        checks: [],
       })
       return immutable({ claimed: true, incident })
     })
@@ -231,6 +241,25 @@ export class RepairIncidentStore {
 
   inspect(fingerprint) {
     return this.#enqueue(() => this.#read(assertFingerprint(fingerprint)))
+  }
+
+  latest() {
+    return this.#enqueue(async () => {
+      let entries
+      try {
+        entries = await readdir(this.rootDir, { withFileTypes: true })
+      } catch (error) {
+        if (error?.code === 'ENOENT') return undefined
+        throw error
+      }
+      const incidents = []
+      for (const entry of entries) {
+        if (!entry.isDirectory() || !FINGERPRINT_PATTERN.test(entry.name)) continue
+        const incident = await this.#read(entry.name)
+        if (incident !== undefined) incidents.push(incident)
+      }
+      return incidents.toSorted((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]
+    })
   }
 
   transition(fingerprint, state, detail) {
@@ -290,6 +319,38 @@ export class RepairIncidentStore {
           ...(path === undefined ? {} : { path }),
           at,
         }],
+      })
+    })
+  }
+
+  recordVerification(fingerprint, { changedFiles = [], checks = [] } = {}) {
+    return this.#enqueue(async () => {
+      const current = await this.#read(assertFingerprint(fingerprint))
+      if (current === undefined) throw new Error('repair incident is missing')
+      if (current.state !== 'running') throw new Error('repair incident is not running')
+      if (!Array.isArray(changedFiles) || changedFiles.length > 4_096
+        || !Array.isArray(checks) || checks.length > 64) {
+        throw new TypeError('repair verification summary exceeds its budget')
+      }
+      const safeFiles = [...new Set(changedFiles.map((path) => {
+        const normalized = safeRelativePath(path)
+        if (normalized === undefined) throw new TypeError('repair changed file path is invalid')
+        return normalized
+      }))]
+        .toSorted((left, right) => left.localeCompare(right, 'en'))
+      const safeChecks = [...new Set(checks.map((name) => {
+        if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(name)) {
+          throw new TypeError('repair check is invalid')
+        }
+        return name
+      }))]
+        .toSorted((left, right) => left.localeCompare(right, 'en'))
+      const at = this.#at()
+      return this.#write({
+        ...current,
+        updatedAt: at,
+        changedFiles: safeFiles,
+        checks: safeChecks,
       })
     })
   }

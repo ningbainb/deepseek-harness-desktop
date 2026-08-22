@@ -15,6 +15,7 @@ const baseApi = {
   getContract: () => ipcRenderer.invoke('desktop:contract'),
   getInfo: () => ipcRenderer.invoke('desktop:info'),
   getStatus: () => ipcRenderer.invoke('desktop:status'),
+  getRepairStatus: () => ipcRenderer.invoke('desktop:repair-status'),
   setWindowChromeTheme: (theme) => ipcRenderer.invoke('desktop:window-chrome-theme', theme),
   showNotification: (notification) => ipcRenderer.invoke('desktop:notification-show', notification),
   openWorkspaceFile: (request) => ipcRenderer.invoke('desktop:workspace-file-open', request),

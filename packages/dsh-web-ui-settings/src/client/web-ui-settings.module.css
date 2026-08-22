@@ -107,6 +107,92 @@
   list-style: none;
 }
 
+.repairCard {
+  margin: 2px 0 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 72%, #57c9d8 28%);
+  border-radius: 10px;
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--dsw-alias-bg-layer-2) 92%, #2f9fb0 8%), var(--dsw-alias-bg-layer-3));
+}
+
+.repairHeader {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px 10px;
+}
+
+.repairGlyph {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 48%, transparent);
+  border-radius: 7px 7px 7px 2px;
+  color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 13%, transparent);
+  font: 700 11px/1 ui-monospace, "Cascadia Code", monospace;
+}
+
+.repairHeadingBlock { flex: 1; min-width: 0; }
+.repairHeadingBlock h3 { margin: 0; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 1.35; }
+.repairHeadingBlock p,
+.repairQuiet { margin: 3px 0 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 1.45; }
+.repairQuiet { padding: 0 14px 12px 52px; }
+
+.repairResult {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 11%, transparent);
+  font-size: 11px;
+}
+.repairResult_applied { color: #67d4b0; background: color-mix(in srgb, #47b993 13%, transparent); }
+.repairResult_rolled-back,
+.repairResult_exhausted { color: #e8b579; background: color-mix(in srgb, #c98d45 13%, transparent); }
+.repairResult_pending { color: #69cbd9; background: color-mix(in srgb, #4aaabb 13%, transparent); }
+
+.repairDisclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.repairDisclosure:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: -2px; }
+
+.repairBody { padding: 4px 14px 13px; border-top: 1px solid var(--dsw-alias-border-l2); }
+.repairDetails { display: grid; gap: 9px; margin: 9px 0 12px; }
+.repairDetailGroup { display: grid; grid-template-columns: minmax(88px, 0.26fr) 1fr; gap: 10px; }
+.repairDetailGroup dt { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.repairDetailGroup dd { min-width: 0; margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.repairDetailGroup ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.repairDetailGroup code { overflow-wrap: anywhere; color: inherit; font: 11px/1.45 ui-monospace, "Cascadia Code", monospace; }
+.repairEmptyValue { color: var(--dsw-alias-label-tertiary); }
+.repairActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.repairActions button {
+  padding: 6px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-1);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.repairActions button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+
 /* Reduced motion: drop the header/chevron transitions. Token colors and the
    focus ring stay, so usable states remain visible. */
 @media (prefers-reduced-motion: reduce) {

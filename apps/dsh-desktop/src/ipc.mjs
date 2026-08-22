@@ -17,6 +17,10 @@ const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', '
 const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
+const REPAIR_STATES = new Set(['claimed', 'running', 'verified', 'applied', 'rolled-back', 'exhausted'])
+const SAFE_REPAIR_NAME = /^[a-zA-Z0-9@._/+:-]{1,128}$/u
+const SAFE_REPAIR_CHECK = /^[a-z0-9][a-z0-9-]{0,79}$/u
+const SAFE_REPAIR_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9@._+/-]{1,320}$/u
 const SAFE_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]{0,127}\/)?[a-z0-9][a-z0-9._-]{0,127}$/u
 const SAFE_RECOVERY_LOADER_ID = /^[a-z0-9][a-z0-9._:-]{0,127}$/u
 const RECOVERY_REASON_CODES = new Set([
@@ -193,6 +197,59 @@ export function publicUpdateStatus(status) {
   }
 }
 
+export function publicRepairStatus(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return Object.freeze({ available: false })
+  }
+  const fingerprint = typeof value.fingerprint === 'string' && /^[a-f0-9]{64}$/u.test(value.fingerprint)
+    ? value.fingerprint
+    : undefined
+  const state = REPAIR_STATES.has(value.state) ? value.state : undefined
+  if (fingerprint === undefined || state === undefined) return Object.freeze({ available: false })
+  const safeTimestamp = (timestamp) => typeof timestamp === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(timestamp)
+    ? timestamp
+    : undefined
+  const safeName = (name) => typeof name === 'string'
+    && SAFE_REPAIR_NAME.test(name)
+    && !name.includes('..')
+    ? name
+    : undefined
+  const models = Array.isArray(value.modelAttempts)
+    ? value.modelAttempts.slice(0, 2).flatMap((attempt) => {
+        const provider = safeName(attempt?.provider)
+        const model = safeName(attempt?.model)
+        const outcome = safeName(attempt?.outcome)
+        return provider === undefined || model === undefined || outcome === undefined
+          ? []
+          : [Object.freeze({ provider, model, outcome })]
+      })
+    : []
+  const changedFiles = Array.isArray(value.changedFiles)
+    ? [...new Set(value.changedFiles.filter(path => typeof path === 'string'
+      && !path.includes('\\') && SAFE_REPAIR_PATH.test(path)))]
+      .slice(0, 4_096)
+      .toSorted((left, right) => left.localeCompare(right, 'en'))
+    : []
+  const checks = Array.isArray(value.checks)
+    ? [...new Set(value.checks.filter(check => typeof check === 'string' && SAFE_REPAIR_CHECK.test(check)))]
+      .slice(0, 64)
+      .toSorted((left, right) => left.localeCompare(right, 'en'))
+    : []
+  const result = ['applied', 'rolled-back', 'exhausted'].includes(state) ? state : 'pending'
+  return Object.freeze({
+    available: true,
+    fingerprint,
+    state,
+    result,
+    ...(safeTimestamp(value.createdAt) === undefined ? {} : { createdAt: value.createdAt }),
+    ...(safeTimestamp(value.updatedAt) === undefined ? {} : { updatedAt: value.updatedAt }),
+    models: Object.freeze(models),
+    changedFiles: Object.freeze(changedFiles),
+    checks: Object.freeze(checks),
+  })
+}
+
 /** A small, clone-safe projection of the persisted update channel policy. */
 export function publicUpdateChannel(value) {
   return Object.freeze({
@@ -222,6 +279,7 @@ export function registerDesktopIpc({
   setWindowChromeTheme,
   claimStarPrompt,
   getUpdateController,
+  getRepairStatus = async () => undefined,
   getUpdateChannel = () => 'stable',
   setUpdateChannel = async () => { throw new Error('update channel selection is unavailable') },
   confirmUpdateChannelChange = async () => true,
@@ -252,6 +310,7 @@ export function registerDesktopIpc({
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
     'desktop:update-status',
+    'desktop:repair-status',
     'desktop:update-channel-get',
     'desktop:update-channel-set',
     'desktop:update-check',
@@ -298,6 +357,13 @@ export function registerDesktopIpc({
     return publicRuntimeStatus(status, await pluginRecovery?.getState?.(), background)
   }
   handle('desktop:status', [main, extensions], () => getPublicStatus())
+  handle('desktop:repair-status', main, async () => {
+    try {
+      return publicRepairStatus(await getRepairStatus())
+    } catch {
+      return publicRepairStatus(undefined)
+    }
+  })
   handle('desktop:action', main, async (_event, _surface, rawAction) => {
     const action = normalizeDesktopAction(rawAction)
     if (['retry', 'repair', 'disable-plugin', 'safe-mode'].includes(action)) {

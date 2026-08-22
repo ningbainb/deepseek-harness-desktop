@@ -61,7 +61,11 @@ describe('Web UI settings section', () => {
     const renderSlot = vi.fn(() => <li data-testid="family-card">Task board settings</li>)
     const props = {
       close: () => {},
-      t: (key: 'title' | 'description') => key === 'title' ? 'Web UI Plugins' : 'Family configuration',
+      t: (key: 'title' | 'description') => key === 'title'
+        ? 'Web UI Plugins'
+        : key === 'description'
+          ? 'Family configuration'
+          : key,
       renderSlot: renderSlot as never,
     } as Parameters<typeof WebUIPluginsSection>[0]
 

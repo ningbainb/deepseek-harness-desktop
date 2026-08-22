@@ -199,8 +199,10 @@ export class AutomaticRepairRunner {
         commands,
       })
       let verification
+      let verifiedFiles = []
       try {
         await transaction.verify(async (candidate) => {
+          verifiedFiles = candidate.changedFiles.map(file => file.path)
           verification = await verifier.verify({
             ...candidate,
             checksRequested: repairResult.checksRequested ?? [],
@@ -212,6 +214,10 @@ export class AutomaticRepairRunner {
         await this.#exhaust(fingerprint, transaction, detail)
         return immutable({ status: 'failed', reason: detail })
       }
+      await this.incidentStore.recordVerification?.(fingerprint, {
+        changedFiles: verifiedFiles,
+        checks: repairResult.checksRequested ?? [],
+      })
       await this.incidentStore.transition(fingerprint, 'verified')
       try {
         await transaction.apply()

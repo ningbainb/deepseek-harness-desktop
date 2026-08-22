@@ -8,6 +8,7 @@ import {
   normalizeToolAction,
   normalizeWindowChromeTheme,
   publicBackgroundStatus,
+  publicRepairStatus,
   publicRuntimeStatus,
   publicUpdateChannel,
   publicUpdateStatus,
@@ -53,6 +54,108 @@ test('window chrome Tools IPC exposes only fixed Desktop tool surfaces', () => {
 test('public update channel exposes only the Stable/Beta selection and no-downgrade policy', () => {
   assert.deepEqual(publicUpdateChannel('beta'), { channel: 'beta', noAutomaticDowngrade: true })
   assert.deepEqual(publicUpdateChannel('untrusted'), { channel: 'stable', noAutomaticDowngrade: true })
+})
+
+test('desktop repair status exposes only bounded summaries and relative files', async () => {
+  const privateValue = 'PRIVATE_REPAIR_PROMPT_OR_KEY'
+  const raw = {
+    fingerprint: 'a'.repeat(64),
+    state: 'applied',
+    createdAt: '2026-08-22T01:02:03.000Z',
+    updatedAt: '2026-08-22T01:03:04.000Z',
+    modelAttempts: [{
+      provider: 'openai-compatible',
+      model: 'configured-model',
+      outcome: 'candidate-ready',
+      prompt: privateValue,
+    }],
+    changedFiles: ['plugins/example/index.mjs', 'C:\\Users\\Alice\\private.js'],
+    checks: ['plugin-example-test'],
+    toolActions: [{ tool: 'write', arguments: privateValue }],
+    apiKey: privateValue,
+  }
+  assert.deepEqual(publicRepairStatus(raw), {
+    available: true,
+    fingerprint: 'a'.repeat(64),
+    state: 'applied',
+    result: 'applied',
+    createdAt: '2026-08-22T01:02:03.000Z',
+    updatedAt: '2026-08-22T01:03:04.000Z',
+    models: [{ provider: 'openai-compatible', model: 'configured-model', outcome: 'candidate-ready' }],
+    changedFiles: ['plugins/example/index.mjs'],
+    checks: ['plugin-example-test'],
+  })
+  assert.deepEqual(publicRepairStatus(undefined), { available: false })
+
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.0.2',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    getRepairStatus: async () => raw,
+  })
+  try {
+    const status = await handlers.get('desktop:repair-status')({ sender })
+    assert.equal(status.available, true)
+    assert.doesNotMatch(JSON.stringify(status), /PRIVATE_REPAIR|C:\\Users|prompt|apiKey|arguments/u)
+  } finally {
+    unregister()
+  }
+})
+
+test('desktop repair status degrades to unavailable when the incident store cannot be read', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { phase: 'ready', url: 'http://127.0.0.1:7777/' }
+  controller.start = async () => {}
+  controller.stop = async () => {}
+  controller.restart = async () => {}
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    controller,
+    surfaceRegistry,
+    profile: { label: 'Desktop', name: 'desktop' },
+    openLogs: () => {},
+    exportDiagnostics: async () => undefined,
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    getRepairStatus: async () => { throw new Error('corrupt incident') },
+  })
+  try {
+    assert.deepEqual(await handlers.get('desktop:repair-status')({ sender }), { available: false })
+  } finally {
+    unregister()
+  }
 })
 
 test('window action IPC returns a clone-safe acknowledgement instead of BrowserWindow objects', async () => {

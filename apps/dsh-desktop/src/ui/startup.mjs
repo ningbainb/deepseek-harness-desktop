@@ -15,9 +15,6 @@ const progressValue = document.querySelector('#progress-value')
 const meterTip = document.querySelector('.meter-tip')
 meterTip.innerHTML = `<svg viewBox="0 0 50 50" focusable="false"><path d="${OFFICIAL_WHALE_PATH}"/></svg>`
 const whaleCanvas = document.querySelector('#whale-canvas')
-const recoverySummary = document.querySelector('#recovery-summary')
-const recoveryTitle = document.querySelector('#recovery-title')
-const recoveryReason = document.querySelector('#recovery-reason')
 
 const STARTUP_STALL_NOTICE_MS = 30_000
 
@@ -32,10 +29,10 @@ const copy = {
 
 const directCopy = Object.freeze({
   preparing: ['正在准备本地环境', '正在载入原有数据和全部插件'],
-  'starting-full': ['正在唤醒 Harness', '正在载入原有数据和全部插件'],
-  'retrying-full': ['正在自动重试启动', '原有数据和插件保持不变'],
+  'starting-full': ['正在启动全部插件', '原有数据会直接用于当前版本'],
+  'retrying-full': ['正在自动恢复', '应用正在重新载入全部插件'],
   repairing: ['正在自动修复插件', '完成验证后会自动继续启动'],
-  verifying: ['正在验证修复结果', '验证通过后会自动继续启动'],
+  verifying: ['正在验证修复', '验证通过后会自动继续启动'],
   'ready-full': ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
   'ready-builtins': ['正在载入内置插件', '原有数据保持不变'],
   'installation-repair-required': ['正在修复应用安装', '安装文件修复后会自动继续'],
@@ -104,15 +101,6 @@ function render(status) {
     ? '启动耗时较长，应用仍在自动处理；原有数据会继续保留'
     : message
 
-  const failed = state === 'crashed'
-  recoverySummary.hidden = !failed && !stalled
-  if (failed || stalled) {
-    recoveryTitle.textContent = '正在自动处理'
-    recoveryReason.textContent = stalled
-      ? '启动耗时较长，应用会继续自动处理，无需选择任何操作。'
-      : '应用会自动重试并保留原有数据，无需选择任何操作。'
-  }
-
   if (Number.isFinite(status?.previewProgress)) renderProgress(status.previewProgress)
   else if (stateChanged || progress === 0) renderProgress(initialProgressForState(state, progress))
 }
@@ -132,9 +120,21 @@ const previewState = new URLSearchParams(window.location.search).get('preview')
 const directState = new URLSearchParams(window.location.search).get('directState')
 if (directState && directCopy[directState]) {
   const [heading, message] = directCopy[directState]
+  const directProgress = {
+    preparing: 8,
+    'starting-full': 24,
+    'retrying-full': 39,
+    repairing: 56,
+    verifying: 78,
+    'ready-builtins': 92,
+    'ready-full': 100,
+    'installation-repair-required': 18,
+  }
+  currentState = directState.startsWith('ready-') ? 'ready' : 'starting'
+  document.body.dataset.state = currentState
   title.textContent = heading
   detail.textContent = message
-  renderProgress(directState === 'installation-repair-required' ? 18 : 8)
+  renderProgress(directProgress[directState] ?? 8)
 } else if (previewState && copy[previewState]) {
   try {
     const info = await window.dshDesktop.getInfo()

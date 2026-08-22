@@ -32,11 +32,12 @@ test('startup surface is status-only and exposes no recovery decisions', async (
     readFile(new URL('startup.html', uiRoot), 'utf8'),
     readFile(new URL('startup.mjs', uiRoot), 'utf8'),
   ])
-  assert.match(html, /id="recovery-summary"/u)
-  assert.match(html, /正在自动处理/u)
-  assert.doesNotMatch(html, /data-action=|data-tool-action=|<button/u)
+  assert.doesNotMatch(html, /recovery-summary|data-action=|data-tool-action=|<button|<dialog/u)
   assert.match(renderer, /STARTUP_STALL_NOTICE_MS = 30_000/u)
   assert.doesNotMatch(renderer, /\.action\(|\.toolAction\(|safe-mode|disable-plugin|export-diagnostics/u)
+  for (const copy of ['正在启动全部插件', '正在自动恢复', '正在自动修复插件', '正在验证修复']) {
+    assert.match(renderer, new RegExp(copy, 'u'))
+  }
 })
 
 test('startup surface never asks new or existing users about migration', async () => {

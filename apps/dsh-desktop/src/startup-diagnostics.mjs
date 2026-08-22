@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
 
 import { sanitizeLogLine } from './log-store.mjs'
+import { publicRepairStatus } from './ipc.mjs'
 
 export const STARTUP_DIAGNOSTICS_SCHEMA_VERSION = 1
 export const DIAGNOSTIC_BUNDLE_SCHEMA_VERSION = 1
@@ -338,13 +339,14 @@ export async function collectStartupDiagnostics({
   runtimeSupport,
   patchAssessment,
   migration,
+  repairIncidentStore,
 } = {}) {
   const timeoutMs = Number.isInteger(collectionTimeoutMs) && collectionTimeoutMs > 0
     ? collectionTimeoutMs
     : DEFAULT_COLLECTION_TIMEOUT_MS
   const redactionOptions = { redactionRoots }
   const collectionIssues = []
-  const [recovery, inventory, recentRuntimeLog] = await Promise.all([
+  const [recovery, inventory, recentRuntimeLog, repairIncident] = await Promise.all([
     boundedTimeout(
       typeof pluginRecovery?.getDiagnostics === 'function'
         ? () => pluginRecovery.getDiagnostics()
@@ -360,6 +362,11 @@ export async function collectStartupDiagnostics({
     boundedTimeout(
       typeof logStore?.tail === 'function' ? () => logStore.tail(600) : undefined,
       'runtime-log',
+      { timeoutMs, schedule, cancelSchedule, issues: collectionIssues, redactionOptions },
+    ),
+    boundedTimeout(
+      typeof repairIncidentStore?.latest === 'function' ? () => repairIncidentStore.latest() : undefined,
+      'repair-incident',
       { timeoutMs, schedule, cancelSchedule, issues: collectionIssues, redactionOptions },
     ),
   ])
@@ -394,6 +401,7 @@ export async function collectStartupDiagnostics({
     runtimeSupport,
     patchAssessment,
     migration,
+    repair: publicRepairStatus(repairIncident),
     collectionIssues,
   }
   const redacted = redactDiagnosticValue(document, redactionOptions)

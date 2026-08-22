@@ -11,6 +11,18 @@ export const NOTIFICATION_CATEGORIES = Object.freeze([
 const CATEGORY_SET = new Set(NOTIFICATION_CATEGORIES)
 const ID_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,127}$/u
 
+export function builtinsFallbackNotification(fingerprint = 'unknown') {
+  const suffix = typeof fingerprint === 'string' && /^[a-f0-9]{64}$/u.test(fingerprint)
+    ? fingerprint.slice(0, 16)
+    : 'unknown'
+  return Object.freeze({
+    category: 'plugin-recovery',
+    id: `plugin-recovery:builtins:${suffix}`,
+    title: '已使用内置插件启动',
+    body: '原有对话和设置仍在；应用已跳过本次未能自动修复的插件。',
+  })
+}
+
 export function normalizeDesktopNotification(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('invalid desktop notification')
