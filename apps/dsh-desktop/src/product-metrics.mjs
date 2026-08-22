@@ -173,7 +173,7 @@ export class ProductMetricsRecorder {
   }
 
   recordDockNudgeShown() {
-    return this.#record('dock_nudge_shown', {
+    return this.#recordMilestone('dock-nudge-shown', 'dock_nudge_shown', {
       outcome: 'shown',
       detail: 'first-three-launches',
       bucket: 'none',

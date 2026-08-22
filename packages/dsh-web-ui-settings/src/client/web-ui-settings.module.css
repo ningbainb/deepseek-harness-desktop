@@ -301,3 +301,132 @@
   line-height: 1.4;
   color: var(--dsw-alias-label-tertiary);
 }
+
+/* Desktop-only footer entry. It matches the shell's 36px Settings-adjacent
+   action geometry and keeps the first-three-launch hint non-modal. */
+.dockEntry {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.dockTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.dockTrigger:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dockTrigger:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.dockTrigger:focus-visible,
+.dockNudgeClose:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-2), 0 0 0 4px var(--dsw-alias-brand-primary);
+}
+
+.dockTrigger:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.dockNudge {
+  position: absolute;
+  z-index: 1200;
+  bottom: calc(100% + 10px);
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 248px;
+  box-sizing: border-box;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv3);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.dockNudge::after {
+  position: absolute;
+  top: 100%;
+  left: 13px;
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-2);
+  content: '';
+  transform: translateY(-5px) rotate(45deg);
+}
+
+.dockNudge span {
+  flex: 1;
+}
+
+.dockNudgeClose {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.dockNudgeClose:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dockError {
+  position: absolute;
+  z-index: 1190;
+  bottom: calc(100% + 10px);
+  left: 0;
+  width: 230px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv2);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dockTrigger {
+    transition: none;
+  }
+}

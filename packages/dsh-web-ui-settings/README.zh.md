@@ -8,6 +8,7 @@
 
 - **全家桶设置分区**：在 DSH 设置页注册一个一级分区，以静态标题和卡片归组 dsh web UI 全家桶插件。
 - **桌面插件市场独立**：DeepSeek Harness Desktop 通过扩展坞原生社区市场完成发现和事务安装，并继续由扩展坞负责恢复与回滚；本包明确不恢复旧的组内社区插件卡片。
+- **桌面拓展坞一键入口**：在受支持的 Desktop 中，拓展坞按钮紧邻设置；前三次符合条件的启动显示非模态轻提示，普通 Web 环境不会渲染桌面专用入口。
 
 ## 安装
 
@@ -45,4 +46,5 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-web-ui-settings
 ## 已知限制
 
 - 仅当依赖的 `@deepseek-ai/dsh-client-ui-settings` 存在时，该分区才会出现在 dsh 设置页。
+- 拓展坞快捷入口还要求 Desktop 宿主声明窄权限 `extensions.open`。
 - 认证代理模式本身不提供认证；没有正确配置并排序代理的部署必须让 `trustedProxyHosts` 保持为空。

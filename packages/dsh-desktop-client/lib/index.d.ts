@@ -3,12 +3,17 @@
  * Contract. This module deliberately knows only a narrow typed bridge; it
  * never exports the preload object, Electron, filesystems, or DSH internals.
  */
-export declare const DESKTOP_CLIENT_API_VERSION = "1.0.0";
+export declare const DESKTOP_CLIENT_API_VERSION = "1.1.0";
 export type DesktopSurface = 'extensions' | 'updates';
 export type DesktopAvailability = {
     available: false;
     reason: 'unavailable';
 };
+export type DockDismissReason = 'close' | 'escape' | 'clicked';
+export type DockEntryState = {
+    available: true;
+    showNudge: boolean;
+} | DesktopAvailability;
 export type DesktopInfo = {
     appId: string;
     productName: string;
@@ -83,6 +88,8 @@ export type DesktopClient = Readonly<{
     showNotification: (request: DesktopNotificationRequest) => Promise<DesktopNotificationResult>;
     subscribeDeepLinks: (handler: (link: string) => void) => Unsubscribe;
     openDesktopSurface: (surface: DesktopSurface) => Promise<boolean>;
+    getDockEntryState: () => Promise<DockEntryState>;
+    dismissDockNudge: (reason: DockDismissReason) => Promise<boolean>;
     openWorkspaceFile: (request: WorkspaceFileOpenRequest) => Promise<WorkspaceFileOpenResult>;
     /**
      * Hand a remote npm/git/HTTPS plugin reference to the Desktop. The
@@ -106,6 +113,8 @@ export declare const subscribeRuntimeStatus: (handler: (status: RuntimeStatus) =
 export declare const showNotification: (request: DesktopNotificationRequest) => Promise<DesktopNotificationResult>;
 export declare const subscribeDeepLinks: (handler: (link: string) => void) => Unsubscribe;
 export declare const openDesktopSurface: (surface: DesktopSurface) => Promise<boolean>;
+export declare const getDockEntryState: () => Promise<DockEntryState>;
+export declare const dismissDockNudge: (reason: DockDismissReason) => Promise<boolean>;
 export declare const openWorkspaceFile: (request: WorkspaceFileOpenRequest) => Promise<WorkspaceFileOpenResult>;
 export declare const requestPluginInstall: (request: {
     source: string;

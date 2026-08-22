@@ -70,6 +70,7 @@ test('update completion and dock funnel actions stay fixed and bounded', () => {
   recorder.recordUpdateCompleted()
   recorder.recordDockImpression()
   recorder.recordDockNudgeShown()
+  recorder.recordDockNudgeShown()
   recorder.recordDockNudgeDismissed('escape')
   recorder.recordDockClick()
   recorder.recordDockOpened(true)

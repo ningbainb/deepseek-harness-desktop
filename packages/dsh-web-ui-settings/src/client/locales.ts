@@ -26,6 +26,10 @@ export const zh = {
   'repairOpenLogs': '打开本地日志',
   'repairExportDiagnostics': '导出脱敏诊断',
   'repairNoItems': '无',
+  'dockLabel': '打开拓展坞',
+  'dockNudge': '插件、技能和桌面核心功能在这里',
+  'dockDismiss': '关闭拓展坞提示',
+  'dockOpenFailed': '拓展坞未能打开，请从工具菜单重试。',
 } satisfies Record<string, string>
 
 /** Key union for this namespace. */
@@ -55,6 +59,10 @@ export const en = {
   'repairOpenLogs': 'Open local logs',
   'repairExportDiagnostics': 'Export redacted diagnostics',
   'repairNoItems': 'None',
+  'dockLabel': 'Open Extension Dock',
+  'dockNudge': 'Plugins, skills, and core Desktop features are here',
+  'dockDismiss': 'Dismiss Extension Dock tip',
+  'dockOpenFailed': 'Extension Dock could not open. Try again from the Tools menu.',
 } satisfies Record<WebUIPluginsKey, string>
 
 /**

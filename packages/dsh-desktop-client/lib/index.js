@@ -3,7 +3,7 @@
  * Contract. This module deliberately knows only a narrow typed bridge; it
  * never exports the preload object, Electron, filesystems, or DSH internals.
  */
-export const DESKTOP_CLIENT_API_VERSION = '1.0.0';
+export const DESKTOP_CLIENT_API_VERSION = '1.1.0';
 export class DesktopClientError extends Error {
     code;
     constructor(code, message) {
@@ -186,11 +186,11 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
             });
         },
         async openDesktopSurface(surface) {
-            if (surface === 'extensions' && typeof bridge?.toolAction === 'function') {
-                if (!await hasBridgeCapability('extensions.manage'))
+            if (surface === 'extensions' && typeof bridge?.openExtensionDock === 'function') {
+                if (!await hasBridgeCapability('extensions.open'))
                     return false;
-                await bridge.toolAction('extensions');
-                return true;
+                const result = asRecord(await bridge.openExtensionDock());
+                return result?.opened === true;
             }
             if (surface === 'updates' && typeof bridge?.helpAction === 'function') {
                 if (!await hasBridgeCapability('updates.read'))
@@ -199,6 +199,27 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
                 return true;
             }
             return false;
+        },
+        async getDockEntryState() {
+            if (typeof bridge?.getDockEntryState !== 'function')
+                return unavailable();
+            if (!await hasBridgeCapability('extensions.open'))
+                return unavailable();
+            const result = asRecord(await bridge.getDockEntryState());
+            if (result?.available !== true || typeof result.showNudge !== 'boolean')
+                return unavailable();
+            return Object.freeze({ available: true, showNudge: result.showNudge });
+        },
+        async dismissDockNudge(reason) {
+            if (!['close', 'escape', 'clicked'].includes(reason)) {
+                throw new DesktopClientError('desktop-invalid-argument', 'Dock dismiss reason is invalid');
+            }
+            if (typeof bridge?.dismissDockNudge !== 'function')
+                return false;
+            if (!await hasBridgeCapability('extensions.open'))
+                return false;
+            const result = asRecord(await bridge.dismissDockNudge(reason));
+            return result?.dismissed === true;
         },
         async openWorkspaceFile(request) {
             const normalizedRequest = normalizeWorkspaceFileRequest(request);
@@ -236,6 +257,8 @@ export const subscribeRuntimeStatus = defaultClient.subscribeRuntimeStatus;
 export const showNotification = defaultClient.showNotification;
 export const subscribeDeepLinks = defaultClient.subscribeDeepLinks;
 export const openDesktopSurface = defaultClient.openDesktopSurface;
+export const getDockEntryState = defaultClient.getDockEntryState;
+export const dismissDockNudge = defaultClient.dismissDockNudge;
 export const openWorkspaceFile = defaultClient.openWorkspaceFile;
 export const requestPluginInstall = defaultClient.requestPluginInstall;
 export function taskDeepLink(taskId) {

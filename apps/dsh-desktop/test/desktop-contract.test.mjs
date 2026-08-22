@@ -9,15 +9,16 @@ import {
 } from '../src/desktop-contract.mjs'
 
 test('Desktop Contract v1 capability snapshots stay exact', () => {
-  assert.equal(DESKTOP_API_VERSION, '1.3.0')
+  assert.equal(DESKTOP_API_VERSION, '1.4.0')
   assert.deepEqual(desktopContractForSurface('main'), {
-    apiVersion: '1.3.0',
+    apiVersion: '1.4.0',
     surface: 'main',
     capabilities: [
       'runtime.read',
       'updates.read',
       'updates.install',
       'updates.channel.manage',
+      'extensions.open',
       'plugins.install.request',
       'skills.read',
       'notifications.show',
@@ -26,7 +27,7 @@ test('Desktop Contract v1 capability snapshots stay exact', () => {
     ],
   })
   assert.deepEqual(desktopContractForSurface('extensions'), {
-    apiVersion: '1.3.0',
+    apiVersion: '1.4.0',
     surface: 'extensions',
     capabilities: [
       'runtime.read',
@@ -36,7 +37,7 @@ test('Desktop Contract v1 capability snapshots stay exact', () => {
     ],
   })
   assert.deepEqual(desktopContractForSurface('community'), {
-    apiVersion: '1.3.0',
+    apiVersion: '1.4.0',
     surface: 'community',
     capabilities: [],
   })

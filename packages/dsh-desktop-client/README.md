@@ -9,6 +9,7 @@ English | [中文](README.zh.md)
 - Reads Desktop information, Contract capabilities, and runtime status.
 - Subscribes to runtime status and validated Deep Links.
 - Shows Desktop notifications and opens the Extensions or Updates surface when available.
+- Exposes the narrow `extensions.open` surface plus the bounded first-three-launch Dock hint state; it never grants extension management authority to the main page.
 - Opens a workspace-relative file through the Desktop validator and the platform default application.
 
 ## Install
@@ -23,12 +24,19 @@ No configuration or Desktop-only import is required.
 
 ```ts
 import {
+  getDockEntryState,
   hasCapability,
+  openDesktopSurface,
   openWorkspaceFile,
   showNotification,
   subscribeDeepLinks,
   taskDeepLink,
 } from '@linxin666/dsh-desktop-client'
+
+const dock = await getDockEntryState()
+if (dock.available) {
+  await openDesktopSurface('extensions')
+}
 
 if (await hasCapability('notifications.show')) {
   await showNotification({
@@ -51,7 +59,7 @@ dispose()
 
 ## Security model
 
-The SDK never exposes the preload object, Electron, arbitrary IPC, filesystem access, Shell access, plugin mutation, credentials, private keys, Tokens, or DSH runtime objects. The optional workspace-file helper accepts an explicitly supplied registered workspace root plus a relative path. Desktop resolves the root through its workspace registry, revalidates the final canonical file, and only then hands it to the operating system.
+The SDK never exposes the preload object, Electron, arbitrary IPC, filesystem access, Shell access, plugin mutation, credentials, private keys, Tokens, or DSH runtime objects. Opening Extension Dock requires only `extensions.open`; install, update, removal, and trust operations remain unavailable to the main surface. The optional workspace-file helper accepts an explicitly supplied registered workspace root plus a relative path. Desktop resolves the root through its workspace registry, revalidates the final canonical file, and only then hands it to the operating system.
 
 ## Known limitations
 

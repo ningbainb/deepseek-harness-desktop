@@ -8,6 +8,7 @@ The dsh web UI plugin group for the DSH settings page: it adds a first-level set
 
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.
 - **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
+- **One-click Desktop Dock entry**: on supported Desktop hosts, an Extension Dock button appears immediately beside Settings. The first three eligible launches show a non-modal hint; ordinary Web hosts render no Desktop-only entry.
 
 ## Install
 
@@ -45,4 +46,5 @@ Keep the token out of profile configuration. The proxy must authenticate before 
 ## Known limitations
 
 - The section shows on the dsh settings page only when its prerequisite (`@deepseek-ai/dsh-client-ui-settings`) is present.
+- The Extension Dock shortcut additionally requires a Desktop host advertising the narrow `extensions.open` capability.
 - Authenticated-proxy mode does not provide authentication itself; deployments without a correctly ordered proxy must leave `trustedProxyHosts` empty.

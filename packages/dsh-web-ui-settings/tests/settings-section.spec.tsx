@@ -21,6 +21,7 @@ vi.mock('../src/client/compat-settings-scope.ts', () => ({
 
 import { apply } from '../src/client/index.ts'
 import { WebUIPluginsSection } from '../src/client/WebUIPluginsCard.tsx'
+import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
 
 afterEach(() => {
   cleanup()
@@ -42,8 +43,8 @@ describe('Web UI settings section', () => {
     apply(ctx as never)
 
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section'])
-    expect(register).toHaveBeenCalledTimes(1)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(2)
     const [options, Component] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof WebUIPluginsSection]
     expect(options).toMatchObject({
       name: 'settings.section',
@@ -54,6 +55,14 @@ describe('Web UI settings section', () => {
     })
     expect(options).not.toHaveProperty('key')
     expect(Component).toBe(WebUIPluginsSection)
+    const [dockOptions, DockComponent] = register.mock.calls[1] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    expect(dockOptions).toMatchObject({
+      name: 'sidebar.footer.action',
+      id: 'desktop-extension-dock',
+      order: 100,
+      locale: 'web-ui-plugins',
+    })
+    expect(DockComponent).toBe(DesktopExtensionDockEntry)
     expect(particleClient).toHaveBeenCalledTimes(1)
   })
 

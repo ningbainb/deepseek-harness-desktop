@@ -4,6 +4,7 @@ import test from 'node:test'
 
 import {
   normalizeDesktopAction,
+  normalizeDockDismissReason,
   normalizeHelpAction,
   normalizeToolAction,
   normalizeWindowChromeTheme,
@@ -54,6 +55,15 @@ test('window chrome Tools IPC exposes only fixed Desktop tool surfaces', () => {
 test('public update channel exposes only the Stable/Beta selection and no-downgrade policy', () => {
   assert.deepEqual(publicUpdateChannel('beta'), { channel: 'beta', noAutomaticDowngrade: true })
   assert.deepEqual(publicUpdateChannel('untrusted'), { channel: 'stable', noAutomaticDowngrade: true })
+})
+
+test('Dock nudge dismissal accepts only fixed local interaction reasons', () => {
+  for (const reason of ['close', 'escape', 'clicked']) {
+    assert.equal(normalizeDockDismissReason(reason), reason)
+  }
+  for (const reason of ['opened', 'limit', '', 42]) {
+    assert.throws(() => normalizeDockDismissReason(reason), /Dock dismiss reason/u)
+  }
 })
 
 test('desktop repair status exposes only bounded summaries and relative files', async () => {
@@ -199,6 +209,18 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       handled.push(action)
       return browserWindow
     },
+    claimDockEntry: async () => {
+      observed.push(['dock-impression'])
+      return true
+    },
+    dismissDockNudge: async (reason) => {
+      observed.push(['dock-dismiss', reason])
+      return true
+    },
+    openExtensionDock: async () => {
+      observed.push(['dock-open'])
+      return true
+    },
     setWindowChromeTheme: () => {},
     claimStarPrompt: async () => true,
     getUpdateController: () => undefined,
@@ -214,6 +236,18 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(await handlers.get('desktop:help-action')({ sender }, 'community'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'extensions'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'terminal'), true)
+  assert.deepEqual(await handlers.get('desktop:dock-entry-state')({ sender }), {
+    available: true,
+    showNudge: true,
+  })
+  assert.deepEqual(await handlers.get('desktop:dock-nudge-dismiss')({ sender }, 'close'), {
+    dismissed: true,
+  })
+  assert.deepEqual(await handlers.get('desktop:dock-open')({ sender }), { opened: true })
+  await assert.rejects(
+    handlers.get('desktop:dock-nudge-dismiss')({ sender }, 'other'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   assert.equal(await handlers.get('desktop:star-prompt-claim')({ sender }), true)
   await assert.rejects(
     handlers.get('desktop:action')({ sender }, 'retry'),
@@ -242,7 +276,13 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(handlers.has('desktop:close-behavior-set'), false)
   assert.deepEqual(handled, ['community', 'extensions', 'terminal'])
   assert.deepEqual(exported, ['startup-diagnostics'])
-  assert.deepEqual(observed, [['settings'], ['updates']])
+  assert.deepEqual(observed, [
+    ['dock-impression'],
+    ['dock-dismiss', 'close'],
+    ['dock-open'],
+    ['settings'],
+    ['updates'],
+  ])
   unregister()
 })
 

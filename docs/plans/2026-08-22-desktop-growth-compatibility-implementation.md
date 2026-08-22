@@ -241,7 +241,7 @@ git commit -m "feat(telemetry): restore desktop analytics dashboard"
 
 **Step 1: 写失败测试。**
 
-断言主界面拥有 `extensions.open` 但没有 `extensions.manage`，一次 SDK 调用映射到 `toolAction('extensions')`，普通 Web 返回不可用。
+断言主界面拥有 `extensions.open` 但没有 `extensions.manage`，一次 SDK 调用映射到专用 `desktop:dock-open` IPC，普通 Web 返回不可用。
 
 **Step 2: 运行测试并确认失败。**
 
@@ -251,7 +251,7 @@ Expected: FAIL，因为当前主界面不能使用拓展坞能力，SDK 检查�
 
 **Step 3: 实现窄能力。**
 
-增加 `extensions.open`，只允许打开 surface；安装、删除、更新仍要求 `extensions.manage`。SDK 在 Desktop main surface 使用新能力，在旧宿主上保留安全失败。
+增加 `extensions.open`，只允许通过专用 IPC 打开 surface；安装、删除、更新仍要求 `extensions.manage`。SDK 在 Desktop main surface 使用新能力，在旧宿主上保留安全失败。
 
 **Step 4: 运行测试并提交。**
 

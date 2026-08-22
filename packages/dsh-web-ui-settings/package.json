@@ -35,6 +35,7 @@
     "react": "^18.2.0"
   },
   "dependencies": {
+    "@linxin666/dsh-desktop-client": "workspace:*",
     "@linxin666/dsh-particle-theme": "workspace:*",
     "schemastery": "^3.18.0"
   },

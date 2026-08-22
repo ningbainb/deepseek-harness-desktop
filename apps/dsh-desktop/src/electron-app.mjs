@@ -20,6 +20,7 @@ import {
   PRIVACY_POLICY_URL,
 } from './community-links.mjs'
 import { promptForDownloadDestination } from './download-destination.mjs'
+import { DockNudgeStore } from './dock-nudge-state.mjs'
 import { DeepLinkRouter, normalizeDeepLink, presetFileFrom } from './deep-links.mjs'
 import { BoundedLogStore } from './log-store.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
@@ -513,6 +514,9 @@ export async function startElectronApp(metadata) {
     }),
   })
   const productMetrics = new ProductMetricsRecorder({ client: productTelemetry })
+  const dockNudgeStore = new DockNudgeStore({
+    path: join(userData, 'dock-nudge-state.json'),
+  })
   const updateAnalyticsReceiptStore = new UpdateAnalyticsReceiptStore({
     path: join(userData, 'update-analytics-receipt.json'),
   })
@@ -1318,6 +1322,42 @@ export async function startElectronApp(metadata) {
       return shell.openExternal(PRIVACY_POLICY_URL)
     },
     handleToolAction: (action) => action === 'terminal' ? toggleDesktopTerminal() : createExtensionWindow(),
+    claimDockEntry: async () => {
+      productMetrics.recordDockImpression()
+      try {
+        const showNudge = await dockNudgeStore.claimLaunch()
+        if (showNudge) productMetrics.recordDockNudgeShown()
+        return showNudge
+      } catch (error) {
+        await logStore.append(`[dock] nudge state unavailable: ${error instanceof Error ? error.name : 'unknown'}`)
+        return false
+      }
+    },
+    dismissDockNudge: async (reason) => {
+      try {
+        const dismissed = await dockNudgeStore.dismiss()
+        if (dismissed) productMetrics.recordDockNudgeDismissed(reason)
+        return dismissed
+      } catch (error) {
+        await logStore.append(`[dock] nudge dismissal unavailable: ${error instanceof Error ? error.name : 'unknown'}`)
+        return false
+      }
+    },
+    openExtensionDock: async () => {
+      productMetrics.recordDockClick()
+      try {
+        const dismissed = await dockNudgeStore.dismiss()
+        if (dismissed) productMetrics.recordDockNudgeDismissed('clicked')
+      } catch {}
+      try {
+        await createExtensionWindow()
+        productMetrics.recordDockOpened(true)
+        return true
+      } catch (error) {
+        productMetrics.recordDockOpened(false)
+        throw error
+      }
+    },
     onPluginInstallRequest: async (spec) => {
       // Mirrors the .dshpreset handoff: validate in Electron main, open the
       // Extension Dock, and deliver only the structured install source. The

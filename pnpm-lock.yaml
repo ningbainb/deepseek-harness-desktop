@@ -1157,6 +1157,9 @@ importers:
 
   packages/dsh-web-ui-settings:
     dependencies:
+      '@linxin666/dsh-desktop-client':
+        specifier: workspace:*
+        version: link:../dsh-desktop-client
       '@linxin666/dsh-particle-theme':
         specifier: workspace:*
         version: link:../dsh-particle-theme

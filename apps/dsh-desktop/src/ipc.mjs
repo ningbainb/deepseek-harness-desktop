@@ -15,6 +15,7 @@ import { openWorkspaceFile } from './workspace-files.mjs'
 const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
 const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', 'privacy', 'updates'])
 const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
+const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
 const REPAIR_STATES = new Set(['claimed', 'running', 'verified', 'applied', 'rolled-back', 'exhausted'])
@@ -198,6 +199,13 @@ export function publicUpdateStatus(status) {
   }
 }
 
+export function normalizeDockDismissReason(value) {
+  if (typeof value !== 'string' || !DOCK_DISMISS_REASONS.has(value)) {
+    throw new TypeError(`invalid Dock dismiss reason: ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
 export function publicRepairStatus(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return Object.freeze({ available: false })
@@ -274,6 +282,9 @@ export function registerDesktopIpc({
   exitApp,
   handleHelpAction,
   handleToolAction,
+  claimDockEntry = async () => false,
+  dismissDockNudge = async () => false,
+  openExtensionDock = async () => false,
   onPluginInstallRequest = async () => { throw new Error('plugin install requests are unavailable') },
   setWindowChromeTheme,
   claimStarPrompt,
@@ -305,6 +316,9 @@ export function registerDesktopIpc({
     'desktop:action',
     'desktop:help-action',
     'desktop:tool-action',
+    'desktop:dock-entry-state',
+    'desktop:dock-nudge-dismiss',
+    'desktop:dock-open',
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
     'desktop:update-status',
@@ -383,6 +397,16 @@ export function registerDesktopIpc({
     await handleToolAction(action)
     return true
   })
+  handle('desktop:dock-entry-state', main, async () => ({
+    available: true,
+    showNudge: await claimDockEntry() === true,
+  }))
+  handle('desktop:dock-nudge-dismiss', main, async (_event, _surface, rawReason) => ({
+    dismissed: await dismissDockNudge(normalizeDockDismissReason(rawReason)) === true,
+  }))
+  handle('desktop:dock-open', main, async () => ({
+    opened: await openExtensionDock() === true,
+  }))
   handle('desktop:star-prompt-claim', main, async () => await claimStarPrompt?.() === true)
   handle('desktop:update-status', main, () => publicUpdateStatus(getUpdateController?.()?.getStatus?.()))
   handle('desktop:update-channel-get', main, () => publicUpdateChannel(getUpdateChannel()))
