@@ -7,6 +7,7 @@ import test from 'node:test'
 
 import {
   assertSigningConfiguration,
+  collectReleaseArtifactNames,
   collectWindowsExecutablePaths,
   createReleaseManifest,
   defaultReleaseMetadata,
@@ -83,6 +84,20 @@ test('release manifest hashes every publishable artifact and retains release com
       requireSigning: true,
       signatureVerifier: validSignature,
     })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('release artifact collection rejects a bare unpacked application copied beside the installer', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-release-bare-app-'))
+  try {
+    await writeReleaseFiles(directory)
+    await writeFile(join(directory, 'DeepSeek Harness Desktop.exe'), 'incomplete unpacked application')
+    await assert.rejects(
+      collectReleaseArtifactNames(directory),
+      /unexpected top-level Windows executable/u,
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -209,6 +224,8 @@ test('official Desktop tag releases require signing only when certificate materi
     'test:profile-reset:e2e',
     'test:update-shutdown:e2e',
     'test:direct-start-matrix:e2e',
+    'verify-packaged-fresh-second-launch.mjs',
+    'verify-packaged-orphaned-managed-link.mjs',
   ]) {
     assert.equal(workflow.includes(releaseGate), true, `release workflow is missing ${releaseGate}`)
   }

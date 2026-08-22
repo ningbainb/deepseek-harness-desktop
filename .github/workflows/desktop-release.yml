@@ -107,6 +107,16 @@ jobs:
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
           pnpm --filter @deepseek-ai/dsh-desktop test:direct-start-matrix:e2e
+      - name: Verify fresh second launch before signing
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          node apps/dsh-desktop/scripts/verify-packaged-fresh-second-launch.mjs
+      - name: Verify orphaned managed link recovery before signing
+        shell: pwsh
+        run: |
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          node apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs
       - name: Package the selected release channel
         run: pnpm --filter @deepseek-ai/dsh-desktop pack:win --config.publish.channel=${{ steps.release.outputs.updater_channel }}
         env:
