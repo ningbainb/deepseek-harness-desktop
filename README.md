@@ -26,7 +26,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 | 版本 | 主要更新 |
 | --- | --- |
-| **3.0.2** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；移除启动迁移、隔离恢复和安全模式选择页。 |
+| **3.0.2** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；移除启动迁移、隔离恢复和安全模式选择页；设置页恢复官方 ChatGPT OAuth 登录。 |
 | **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
 | **2.7.0** | 修复 Windows 8% Runtime 启动故障并升级到 DSH rc.7；新增托盘后台自动化、Host 持久任务调度、插件兼容声明/锁、browser-safe Desktop SDK、安全工作区外部打开和 Candidate Matrix。 |
 | **2.6.0** | Task Board v3 引入 Project、Task Run、Evidence 与 Git Worktree 审核流；Runtime Provider 缺少可选能力时显式回退 shared-workspace，并加入 Candidate 执行兼容夹具。该版本的匿名统计行为仅作历史记录，已由 3.0 的默认关闭政策取代。 |
@@ -121,7 +121,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 - 扩展坞支持社区 DSH bundle 安装/回滚、内置插件市场，以及项目、DSH、Agents 技能发现与安全导入；
 - 安装包自带官方 DSH、pnpm、固定校验的 MinGit 与原生依赖，无需另外安装 Node.js 或 Git；内置 Git 仅注入 Desktop 子进程，不修改系统 PATH、注册表或权限。
 
-桌面版已预装任务看板、Git 图谱、右侧面板、移动端远程、远程连接、鲸鱼娘宠物、全页粒子主题、实时令牌统计、Codex Connect、推理强度滑块、插件市场和皮肤中心。下载安装 EXE 即可使用，不需要另外安装 DSH、Node.js、Git 或执行插件命令。
+桌面版已预装任务看板、Git 图谱、右侧面板、移动端远程、远程连接、鲸鱼娘宠物、全页粒子主题、实时令牌统计、官方 ChatGPT 登录、推理强度滑块、插件市场和皮肤中心。下载安装 EXE 即可使用，不需要另外安装 DSH、Node.js、Git 或执行插件命令。
 
 ## 功能插件
 
@@ -131,9 +131,9 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 未绑定时插件保持禁用，不会让隐藏的后台进程等待终端扫码，也不会拖慢 Web UI 启动。绑定成功后桌面端会自动启用插件并重启 DSH。AppSecret 由 Electron `safeStorage` 结合 Windows 系统凭据保护加密保存，不会发送到渲染页面、写入日志或明文进入 `cordis.patch.yml`；运行时只通过子进程环境注入。
 
-### Codex 模型与推理强度（桌面版 0.1.8）
+### ChatGPT 登录、Codex 模型与推理强度
 
-桌面版内置 `dsh-codex-connect` 0.1.0-alpha.4.5，可在设置页通过系统浏览器完成 ChatGPT OAuth，并启用 OpenAI Codex 模型。它不会默认替换当前模型、接管全局搜索或启用远程图片工具；检测到已有 Codex Provider 时会保留现有配置，OAuth 凭据只保存在本机 DSH home。
+3.0.2 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程，不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取“是否已登录”，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
 
 内置 `reasoning-slider` 0.0.2，在模型选择器中只展示模型实际支持的推理强度，切换模型时会自动回退到有效档位。顶部帮助菜单同时提供 QQ 群二维码、一键加群与 GitHub 建议入口，所有外链均交由系统浏览器打开。
 

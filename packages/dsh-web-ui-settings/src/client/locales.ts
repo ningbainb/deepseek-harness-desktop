@@ -65,6 +65,47 @@ export const en = {
   'dockOpenFailed': 'Extension Dock could not open. Try again from the Tools menu.',
 } satisfies Record<WebUIPluginsKey, string>
 
+/** ChatGPT authorization settings copy. */
+export const chatGptAuthZh = {
+  'title': 'ChatGPT 登录',
+  'description': '使用 ChatGPT 账号授权 Codex 模型。授权信息只保存在本机。',
+  'loading': '正在检查登录状态',
+  'signedOut': '尚未登录',
+  'signedIn': '已登录 ChatGPT',
+  'unavailable': '当前运行环境没有提供 ChatGPT 授权能力，请确认桌面组件已完整加载。',
+  'readOnly': '当前凭据存储不可写，无法更改登录状态。',
+  'login': '使用 ChatGPT 登录',
+  'logout': '退出登录',
+  'cancel': '取消',
+  'openBrowser': '在浏览器继续',
+  'working': '正在准备 ChatGPT 登录',
+  'codeLabel': '授权码',
+  'answer': '继续',
+  'failed': '登录没有完成，请重试。',
+  'transportFailed': '无法连接本机授权服务，请重新启动桌面端后重试。',
+} satisfies Record<string, string>
+
+export type ChatGptAuthKey = keyof typeof chatGptAuthZh
+
+export const chatGptAuthEn = {
+  'title': 'ChatGPT sign-in',
+  'description': 'Authorize Codex models with your ChatGPT account. Authorization data stays on this device.',
+  'loading': 'Checking sign-in status',
+  'signedOut': 'Not signed in',
+  'signedIn': 'Signed in to ChatGPT',
+  'unavailable': 'ChatGPT authorization is unavailable in this runtime. Check that the Desktop components loaded completely.',
+  'readOnly': 'The credential store is read-only, so the sign-in state cannot be changed.',
+  'login': 'Sign in with ChatGPT',
+  'logout': 'Sign out',
+  'cancel': 'Cancel',
+  'openBrowser': 'Continue in browser',
+  'working': 'Preparing ChatGPT sign-in',
+  'codeLabel': 'Authorization code',
+  'answer': 'Continue',
+  'failed': 'Sign-in did not complete. Try again.',
+  'transportFailed': 'The local authorization service could not be reached. Restart Desktop and try again.',
+} satisfies Record<ChatGptAuthKey, string>
+
 /**
  * The `community-plugins` locale dictionaries for the community plugin index
  * card.

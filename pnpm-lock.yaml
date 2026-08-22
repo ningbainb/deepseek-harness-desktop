@@ -1173,6 +1173,9 @@ importers:
       '@deepseek-ai/dsh-api-remotes':
         specifier: ^0.1.1-rc.1
         version: 0.1.1-rc.1(0dbd24110e04aadb9415a7fc081ef3f0)
+      '@deepseek-ai/dsh-authorization':
+        specifier: ^0.1.1-rc.1
+        version: 0.1.1-rc.1(ed34808e936cdb91bc01b448b5c04dd2)
       '@deepseek-ai/dsh-client-connection':
         specifier: ^0.1.1-rc.1
         version: 0.1.1-rc.1(7c01bb8faf92012187ef49f6b1706332)
@@ -1188,6 +1191,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: ^0.1.1-rc.1
         version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-credentials':
+        specifier: ^0.1.1-rc.1
+        version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-host-webserver':
         specifier: ^0.1.1-rc.1
         version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))

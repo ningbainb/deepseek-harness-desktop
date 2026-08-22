@@ -71,6 +71,7 @@ test('full startup retries once then reaches same-home builtins without a model'
 
 test('healthy full startup never creates a fallback provider or calls repair', async () => {
   const calls = []
+  const states = []
   const full = fakeProvider({ profileName: 'desktop', calls })
   let repairCalls = 0
   let fallbackCalls = 0
@@ -80,6 +81,7 @@ test('healthy full startup never creates a fallback provider or calls repair', a
       return full
     },
     runRepair: async () => { repairCalls += 1; return { status: 'unavailable' } },
+    publishState: (state) => states.push(state),
   })
 
   const result = await coordinator.start()
@@ -87,6 +89,7 @@ test('healthy full startup never creates a fallback provider or calls repair', a
   assert.deepEqual(calls, [['ensure', 'desktop'], ['start', 'desktop']])
   assert.equal(repairCalls, 0)
   assert.equal(fallbackCalls, 0)
+  assert.deepEqual(states, ['starting-full', 'ready-full'])
 })
 
 test('fallback rejects a different Home instead of creating an isolated session', async () => {

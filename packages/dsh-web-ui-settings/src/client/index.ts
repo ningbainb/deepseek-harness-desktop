@@ -14,9 +14,17 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the sidebar footer action slot contract.
 import { installParticleThemeClient } from '@linxin666/dsh-particle-theme/src/client/index.ts'
 import { WebUiSettingsBinder } from './compat-settings-scope.ts'
+import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { DesktopExtensionDockEntry } from './desktop-extension-dock.tsx'
-import { en, zh, type WebUIPluginsKey } from './locales.ts'
+import {
+  chatGptAuthEn,
+  chatGptAuthZh,
+  en,
+  zh,
+  type ChatGptAuthKey,
+  type WebUIPluginsKey,
+} from './locales.ts'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
 
@@ -24,6 +32,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Web UI plugin group card copy. */
     'web-ui-plugins': WebUIPluginsKey
+    /** ChatGPT authorization surface copy. */
+    'chatgpt-auth': ChatGptAuthKey
   }
 
   interface SlotMap {
@@ -57,11 +67,20 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
+  ctx.effect(() => ctx.locale.register('chatgpt-auth', { zh: chatGptAuthZh, en: chatGptAuthEn }), 'web-ui-settings: ChatGPT dictionaries')
 
   // The rc.6 compatibility binder: family plugins read ctx.get('webUiSettings')
   // and fall back to the official settings scope on hosts that expose their
   // namespaces natively.
   const settingsBinder = new WebUiSettingsBinder(ctx)
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'chatgpt-auth',
+    order: 20,
+    label: () => ctx.locale.bind('chatgpt-auth')('title'),
+    locale: 'chatgpt-auth',
+  }, ChatGptAuthSection))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
