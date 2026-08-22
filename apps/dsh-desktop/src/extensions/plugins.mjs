@@ -143,6 +143,53 @@ export function validatePluginSpec(value) {
   return { name, spec: value }
 }
 
+function gitPrepareAllowBuildFromError(error, installSpec) {
+  if (typeof installSpec !== 'string' || !installSpec.startsWith('github:')) return undefined
+  const message = error instanceof Error ? error.message : String(error)
+  if (!message.includes('[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED]')) return undefined
+
+  const sourceMatch = /^github:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(#path:[^\s]+)?$/u.exec(installSpec)
+  const allowMatch = /(?:^|\r?\n)allowBuilds:\s*\r?\n[ \t]+([^\r\n]{1,4096}): true(?:\r?\n|$)/u.exec(message)
+  if (sourceMatch === null || allowMatch === null) return undefined
+
+  const allowedBuild = allowMatch[1]
+  if (/\s|[\0\r\n]/u.test(allowedBuild) || allowedBuild.startsWith('-')) return undefined
+  const urlSeparator = allowedBuild.lastIndexOf('@https://')
+  if (urlSeparator <= 0) return undefined
+  const packageName = allowedBuild.slice(0, urlSeparator)
+  let parsedPackage
+  try {
+    parsedPackage = validatePluginSpec(packageName)
+  } catch {
+    return undefined
+  }
+  if (parsedPackage.name !== packageName || parsedPackage.version !== undefined) return undefined
+
+  let buildUrl
+  try {
+    buildUrl = new URL(allowedBuild.slice(urlSeparator + 1))
+  } catch {
+    return undefined
+  }
+  if (
+    buildUrl.protocol !== 'https:'
+    || buildUrl.hostname !== 'codeload.github.com'
+    || buildUrl.username
+    || buildUrl.password
+    || buildUrl.search
+  ) return undefined
+  const pathMatch = /^\/([^/]+)\/([^/]+)\/tar\.gz\/([a-f0-9]{40,64})$/iu.exec(buildUrl.pathname)
+  if (pathMatch === null) return undefined
+  const expectedOwner = sourceMatch[1].toLowerCase()
+  const expectedRepository = sourceMatch[2].replace(/\.git$/iu, '').toLowerCase()
+  if (pathMatch[1].toLowerCase() !== expectedOwner || pathMatch[2].toLowerCase() !== expectedRepository) {
+    return undefined
+  }
+  const expectedHash = sourceMatch[3] ?? ''
+  if (buildUrl.hash !== expectedHash) return undefined
+  return allowedBuild
+}
+
 export function createPluginInventory(manifest, {
   installedManifests = new Map(),
   hostCompatibility,
@@ -1019,7 +1066,14 @@ export class PluginManager {
       try {
         snapshot = await captureProfileSnapshot(this.profileDir)
         const beforeManifest = await readManifest(this.profileDir)
-        await this.#runPnpm(['add', installSpec, '--save-exact'])
+        const addArgs = ['add', installSpec, '--save-exact']
+        try {
+          await this.#runPnpm(addArgs)
+        } catch (error) {
+          const allowedBuild = gitPrepareAllowBuildFromError(error, installSpec)
+          if (allowedBuild === undefined) throw error
+          await this.#runPnpm([...addArgs, `--allow-build=${allowedBuild}`])
+        }
         const manifest = await readManifest(this.profileDir)
         const name = installedExternalPackageName(beforeManifest, manifest, external)
         // Opaque remote sources declare their package identity only after pnpm

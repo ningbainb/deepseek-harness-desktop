@@ -1116,6 +1116,109 @@ test('external install ignores declared compatibility but still requires a DSH b
   }
 })
 
+test('full-access GitHub install retries once with pnpm exact git prepare approval', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-github-prepare-'))
+  const profileDir = join(root, 'profile')
+  const manifestPath = join(profileDir, 'package.json')
+  const lockPath = join(profileDir, 'pnpm-lock.yaml')
+  const packageName = '@0xsline/dsh-spotlight'
+  const source = await resolveExternalPluginSource('github:0xsline/dsh-spotlight')
+  const allowedBuild = `${packageName}@https://codeload.github.com/0xsline/dsh-spotlight/tar.gz/${'a'.repeat(40)}`
+  const calls = []
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(manifestPath, `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }, null, 2)}\n`)
+    await writeFile(lockPath, 'old-lock\n')
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async ({ args }) => {
+        calls.push(args)
+        if (calls.length === 1) {
+          throw new Error([
+            'pnpm exited with code 1',
+            '[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED] Git package build blocked.',
+            'Add the package to "allowBuilds" in your project:',
+            'allowBuilds:',
+            `  ${allowedBuild}: true`,
+          ].join('\n'))
+        }
+        assert.deepEqual(args, [
+          'add',
+          source.installSpec,
+          '--save-exact',
+          `--allow-build=${allowedBuild}`,
+        ])
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        manifest.dependencies[packageName] = source.installSpec
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        await writeFile(lockPath, 'new-lock\n')
+        const installedRoot = join(profileDir, 'node_modules', ...packageName.split('/'))
+        await mkdir(installedRoot, { recursive: true })
+        await writeFile(join(installedRoot, 'package.json'), JSON.stringify({
+          name: packageName,
+          version: '0.0.2',
+          dsh: { bundle: { patch: './cordis.patch.yml' } },
+        }))
+      },
+    })
+
+    const transaction = await manager.installFullAccessExternal(source)
+    assert.equal(transaction.result.name, packageName)
+    assert.equal(transaction.result.version, '0.0.2')
+    assert.deepEqual(calls, [
+      ['add', source.installSpec, '--save-exact'],
+      ['add', source.installSpec, '--save-exact', `--allow-build=${allowedBuild}`],
+    ])
+    await transaction.commit()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('full-access GitHub install does not approve a different repository from pnpm output', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-github-prepare-mismatch-'))
+  const profileDir = join(root, 'profile')
+  const source = await resolveExternalPluginSource('github:0xsline/dsh-spotlight')
+  const calls = []
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: [...BUILTIN_BUNDLES] } },
+    }, null, 2)}\n`)
+    await writeFile(join(profileDir, 'pnpm-lock.yaml'), 'old-lock\n')
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      runner: async ({ args }) => {
+        calls.push(args)
+        if (args[0] === 'install') return
+        throw new Error([
+          '[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED] Git package build blocked.',
+          'allowBuilds:',
+          `  @attacker/plugin@https://codeload.github.com/attacker/plugin/tar.gz/${'b'.repeat(40)}: true`,
+        ].join('\n'))
+      },
+    })
+
+    await assert.rejects(manager.installFullAccessExternal(source), /was rolled back/u)
+    assert.deepEqual(calls, [
+      ['add', source.installSpec, '--save-exact'],
+      ['install', '--offline', '--frozen-lockfile'],
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('full-access external install restores its profile snapshot after a post-install failure', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-full-access-external-rollback-'))
   const profileDir = join(root, 'profile')
