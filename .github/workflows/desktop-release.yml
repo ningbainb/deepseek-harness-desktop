@@ -107,11 +107,11 @@ jobs:
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
           pnpm --filter @deepseek-ai/dsh-desktop test:direct-start-matrix:e2e
-      - name: Verify fresh second launch before signing
+      - name: Verify zero-state relaunch before signing
         shell: pwsh
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          node apps/dsh-desktop/scripts/verify-packaged-fresh-second-launch.mjs
+          pnpm --filter @deepseek-ai/dsh-desktop test:fresh-relaunch:e2e
       - name: Verify orphaned managed link recovery before signing
         shell: pwsh
         run: |

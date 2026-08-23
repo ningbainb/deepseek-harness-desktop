@@ -2857,7 +2857,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-smoke-runner.mjs",
-      "line": 57,
+      "line": 61,
       "operation": "DSH_HOME"
     },
     {

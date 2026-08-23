@@ -192,6 +192,7 @@ test('signing configuration permits unsigned development but requires a certific
 })
 
 test('official Desktop tag releases require signing only when certificate material is configured', async () => {
+  const desktopPackage = JSON.parse(await readFile(join(import.meta.dirname, '..', 'package.json'), 'utf8'))
   const workflow = await readFile(
     join(import.meta.dirname, '..', '..', '..', '.github', 'workflows', 'desktop-release.yml'),
     'utf8',
@@ -217,6 +218,10 @@ test('official Desktop tag releases require signing only when certificate materi
   const signedPackage = workflow.indexOf('- name: Package the selected release channel')
   assert.ok(unsignedCandidate >= 0 && unsignedCandidate < directStartGate && directStartGate < signedPackage)
   assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY: 'false'/u)
+  assert.equal(
+    desktopPackage.scripts['test:fresh-relaunch:e2e'],
+    'node scripts/verify-packaged-fresh-second-launch.mjs',
+  )
   for (const releaseGate of [
     'test:directory-picker:e2e',
     'test:terminal:e2e',
@@ -224,7 +229,7 @@ test('official Desktop tag releases require signing only when certificate materi
     'test:profile-reset:e2e',
     'test:update-shutdown:e2e',
     'test:direct-start-matrix:e2e',
-    'verify-packaged-fresh-second-launch.mjs',
+    'test:fresh-relaunch:e2e',
     'verify-packaged-orphaned-managed-link.mjs',
   ]) {
     assert.equal(workflow.includes(releaseGate), true, `release workflow is missing ${releaseGate}`)

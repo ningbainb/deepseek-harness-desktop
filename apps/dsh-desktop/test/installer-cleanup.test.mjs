@@ -86,9 +86,10 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   const cleanup = await readFile(join(desktopRoot, 'build', 'cleanup-stale-processes.ps1'), 'utf8')
 
   assert.match(config, /include: build\/installer\.nsh/u)
-  assert.match(config, /oneClick: true/u)
+  assert.match(config, /oneClick: false/u)
   assert.match(config, /perMachine: false/u)
   assert.match(config, /allowElevation: false/u)
+  assert.match(config, /allowToChangeInstallationDirectory: true/u)
   assert.match(config, /packElevateHelper: false/u)
   assert.match(config, /from: build\/update-shutdown-v1[\s\S]*to: update-shutdown-v1/u)
   assert.match(config, /from: build\/update-shutdown-v2[\s\S]*to: update-shutdown-v2/u)

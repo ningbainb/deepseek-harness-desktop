@@ -27,6 +27,7 @@
     "test:directory-picker:e2e": "node scripts/verify-directory-picker.mjs",
     "test:profile-migration:e2e": "node scripts/verify-profile-migration.mjs",
     "test:direct-start-matrix:e2e": "node scripts/verify-packaged-direct-start-matrix.mjs",
+    "test:fresh-relaunch:e2e": "node scripts/verify-packaged-fresh-second-launch.mjs",
     "test:preset-deep-link:e2e": "node scripts/verify-preset-deep-link.mjs",
     "test:runtime-provider:e2e": "node scripts/verify-runtime-provider.mjs",
     "test:discovery-surfaces:e2e": "node scripts/verify-discovery-surfaces.mjs",
