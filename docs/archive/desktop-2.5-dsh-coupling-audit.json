@@ -2881,7 +2881,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs",
-      "line": 55,
+      "line": 60,
       "operation": "DSH_HOME"
     },
     {

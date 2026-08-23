@@ -8,13 +8,18 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const output = resolve(appDir, 'discovery-surfaces-preview.png')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-discovery-surfaces-e2e-'))
+const output = resolve(process.env.DSH_DESKTOP_E2E_SCREENSHOT ?? resolve(temporary, 'discovery-surfaces-preview.png'))
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
+const marketInstallId = process.env.DSH_DESKTOP_E2E_MARKET_INSTALL_ID
+if (marketInstallId !== undefined && !/^[A-Za-z0-9_-]{20}$/u.test(marketInstallId)) {
+  throw new Error('DSH_DESKTOP_E2E_MARKET_INSTALL_ID must be one opaque 20-character market identifier')
+}
 const runtimeReadyTimeoutMs = Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS)
   || (packagedExecutable || process.env.CI ? 120_000 : 90_000)
 let electronApp
 let page
+let extensionWindow
 
 async function diagnosticFiles(root) {
   const files = await readdir(root, { recursive: true }).catch(() => [])
@@ -129,13 +134,44 @@ try {
     timeout: 10_000,
   }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
   await dockTrigger.click()
-  const extensionWindow = await extensionWindowPromise
+  extensionWindow = await extensionWindowPromise
   assert.ok(extensionWindow, 'one-click Extension Dock entry did not open extensions.html')
+
+  let installedMarketPlugin
+  if (marketInstallId !== undefined) {
+    await extensionWindow.locator('#market-tab').click()
+    const marketPlugin = await extensionWindow.evaluate(async (id) => {
+      const catalog = await window.dshDesktop.listCommunityMarket()
+      return catalog.plugins.find((plugin) => plugin.id === id)
+    }, marketInstallId)
+    assert.ok(marketPlugin, `market plugin ${marketInstallId} is absent from the live catalog`)
+    await extensionWindow.locator('#market-query').fill(marketPlugin.name)
+    const installButton = extensionWindow.locator(`[data-install-market-plugin="${marketInstallId}"]`)
+    await installButton.waitFor({ state: 'visible' })
+    const mainNavigations = []
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) mainNavigations.push(frame.url())
+    })
+    await installButton.click()
+    const activationMessage = extensionWindow.locator('#activation-message')
+    await activationMessage.filter({ hasText: /已安装并通过启动检查/u }).waitFor({
+      state: 'visible',
+      timeout: runtimeReadyTimeoutMs,
+    })
+    assert.ok(page.url().startsWith('http://127.0.0.1:'), `market install left the main Runtime surface: ${page.url()}`)
+    assert.equal(
+      mainNavigations.some(url => url.startsWith('file:')),
+      false,
+      `market install flashed the startup surface: ${JSON.stringify(mainNavigations)}`,
+    )
+    installedMarketPlugin = marketPlugin.name
+  }
 
   console.log(JSON.stringify({
     nudgeGeometry,
     codexProvider: codex.name,
     codexModels: codex.models,
+    installedMarketPlugin,
     screenshot: output,
   }))
 } catch (error) {
@@ -143,6 +179,7 @@ try {
     failure: error instanceof Error ? error.message : String(error),
     pageUrl: page?.url(),
     pageText: await page?.locator('body').innerText().catch(() => undefined),
+    extensionText: await extensionWindow?.locator('body').innerText().catch(() => undefined),
     userData: await diagnosticFiles(resolve(temporary, 'user-data')),
     dshHome: await diagnosticFiles(resolve(temporary, 'dsh-home')),
   }))

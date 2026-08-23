@@ -42,7 +42,6 @@ const recoveryCount = document.querySelector('#recovery-count')
 const recoveryMode = document.querySelector('#recovery-mode')
 const recoveryModeLabel = document.querySelector('#recovery-mode-label')
 const restoreSafeMode = document.querySelector('#restore-safe-mode')
-const revokeFullUserTrust = document.querySelector('#revoke-full-user-trust')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
 const activationBanner = document.querySelector('#activation-banner')
@@ -822,17 +821,6 @@ refreshButton.addEventListener('click', () => {
   })
 })
 
-revokeFullUserTrust.addEventListener('click', async () => {
-  if (!window.confirm('撤销主 Runtime 和外来插件的完整权限授权？当前 Runtime 会继续运行，但下次启动会重新请求原生确认。')) return
-  await extensionOperations.run(async () => {
-    try {
-      await window.dshDesktop.revokeFullUserTrust()
-      notify('完整权限授权已撤销；下次启动会重新确认')
-    } catch (error) {
-      notify(error.message, true)
-    }
-  })
-})
 document.querySelector('#activation-refresh').addEventListener('click', () => {
   void extensionOperations.run(async () => {
     await refresh()
