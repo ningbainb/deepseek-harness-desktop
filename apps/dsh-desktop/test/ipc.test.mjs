@@ -14,6 +14,7 @@ import {
   publicUpdateChannel,
   publicUpdateStatus,
   registerDesktopIpc,
+  registerDesktopStartupIpc,
 } from '../src/ipc.mjs'
 import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
@@ -64,6 +65,51 @@ test('Dock nudge dismissal accepts only fixed local interaction reasons', () => 
   for (const reason of ['opened', 'limit', '', 42]) {
     assert.throws(() => normalizeDockDismissReason(reason), /Dock dismiss reason/u)
   }
+})
+
+test('startup IPC serves only the first page read-only contract until full registration', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const themes = []
+  const unregister = registerDesktopStartupIpc({
+    ipcMain,
+    surfaceRegistry,
+    setWindowChromeTheme: (target, theme) => {
+      themes.push({ target, theme })
+      return theme
+    },
+  })
+  try {
+    assert.deepEqual([...handlers.keys()].toSorted(), [
+      'desktop:contract',
+      'desktop:update-status',
+      'desktop:window-chrome-theme',
+    ])
+    assert.deepEqual(await handlers.get('desktop:contract')({ sender }), {
+      apiVersion: '1.4.0',
+      surface: 'main',
+      capabilities: ['updates.read'],
+    })
+    assert.deepEqual(
+      await handlers.get('desktop:update-status')({ sender }),
+      publicUpdateStatus(undefined),
+    )
+    assert.equal(await handlers.get('desktop:window-chrome-theme')({ sender }, 'light'), 'light')
+    assert.deepEqual(themes, [{ target: sender, theme: 'light' }])
+    assert.throws(
+      () => handlers.get('desktop:contract')({ sender: {} }),
+      /surface|registered/iu,
+    )
+  } finally {
+    unregister()
+  }
+  assert.equal(handlers.size, 0)
 })
 
 test('desktop repair status exposes only bounded summaries and relative files', async () => {

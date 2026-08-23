@@ -75,6 +75,26 @@ try {
   })
   await dismissFirstRunSurfaces(page)
 
+  const chatGptAuth = await page.evaluate(async () => {
+    const response = await fetch('/api/dsh-chatgpt-auth/state', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+    return { status: response.status, result: await response.json() }
+  })
+  assert.equal(chatGptAuth.status, 200, JSON.stringify(chatGptAuth))
+  assert.equal(chatGptAuth.result?.ok, true, JSON.stringify(chatGptAuth))
+  assert.equal(chatGptAuth.result?.value?.available, true, JSON.stringify(chatGptAuth))
+  assert.equal(chatGptAuth.result?.value?.writable, true, JSON.stringify(chatGptAuth))
+  assert.ok(
+    chatGptAuth.result?.value?.methods?.some(method => method.id === 'oauth'),
+    `ChatGPT OAuth is absent from the authorization bridge: ${JSON.stringify(chatGptAuth)}`,
+  )
+
   const nudge = page.getByText(/插件、技能和桌面核心功能在这里|Plugins, skills, and core Desktop features are here/u)
   await nudge.waitFor({ state: 'visible' })
   const nudgeGeometry = await nudge.locator('..').evaluate((element) => {
@@ -171,6 +191,11 @@ try {
     nudgeGeometry,
     codexProvider: codex.name,
     codexModels: codex.models,
+    chatGptAuth: {
+      available: chatGptAuth.result.value.available,
+      writable: chatGptAuth.result.value.writable,
+      methods: chatGptAuth.result.value.methods.map(method => method.id),
+    },
     installedMarketPlugin,
     screenshot: output,
   }))

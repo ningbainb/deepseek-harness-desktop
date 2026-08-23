@@ -1193,6 +1193,10 @@ test('direct startup restores plugins left disabled by an older release without 
     assert.equal(restoredState.currentIncident.resolution, 'restored-by-direct-start')
     assert.equal(manifest.dependencies[packageName], '1.0.0')
     assert.equal(manifest.dsh.profile.bundles.includes(packageName), true)
+    assert.equal(
+      JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).policyVersion,
+      4,
+    )
     await recovery.dispose()
   } finally {
     await rm(root, { recursive: true, force: true })

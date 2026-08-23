@@ -199,6 +199,53 @@ export function publicUpdateStatus(status) {
   }
 }
 
+/**
+ * Give the first local startup page only the read-only IPC it renders before
+ * the complete runtime and Desktop services have been constructed. The full
+ * registration replaces these handlers synchronously later in startup.
+ */
+export function registerDesktopStartupIpc({
+  ipcMain,
+  surfaceRegistry,
+  setWindowChromeTheme,
+} = {}) {
+  if (typeof ipcMain?.handle !== 'function' || typeof ipcMain?.removeHandler !== 'function') {
+    throw new TypeError('startup IPC requires ipcMain')
+  }
+  if (typeof surfaceRegistry?.assert !== 'function') {
+    throw new TypeError('startup IPC requires a desktop surface registry')
+  }
+  if (typeof setWindowChromeTheme !== 'function') {
+    throw new TypeError('startup IPC requires a window chrome theme handler')
+  }
+  const channels = [
+    'desktop:contract',
+    'desktop:window-chrome-theme',
+    'desktop:update-status',
+  ]
+  for (const channel of channels) ipcMain.removeHandler(channel)
+  const assertMain = (event) => surfaceRegistry.assert(event?.sender, DESKTOP_SURFACES.MAIN)
+  ipcMain.handle('desktop:contract', (event) => {
+    const surface = assertMain(event)
+    const contract = desktopContractForSurface(surface)
+    return Object.freeze({
+      ...contract,
+      capabilities: Object.freeze(contract.capabilities.filter((capability) => capability === 'updates.read')),
+    })
+  })
+  ipcMain.handle('desktop:window-chrome-theme', (event, rawTheme) => {
+    assertMain(event)
+    return setWindowChromeTheme(event.sender, normalizeWindowChromeTheme(rawTheme))
+  })
+  ipcMain.handle('desktop:update-status', (event) => {
+    assertMain(event)
+    return publicUpdateStatus(undefined)
+  })
+  return () => {
+    for (const channel of channels) ipcMain.removeHandler(channel)
+  }
+}
+
 export function normalizeDockDismissReason(value) {
   if (typeof value !== 'string' || !DOCK_DISMISS_REASONS.has(value)) {
     throw new TypeError(`invalid Dock dismiss reason: ${JSON.stringify(value)}`)

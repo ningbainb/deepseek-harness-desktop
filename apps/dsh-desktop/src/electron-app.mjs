@@ -47,7 +47,7 @@ import {
   QqBotCredentialStore,
   setQqBotProfileEnabled,
 } from './extensions/qqbot.mjs'
-import { publicUpdateStatus, registerDesktopIpc } from './ipc.mjs'
+import { publicUpdateStatus, registerDesktopIpc, registerDesktopStartupIpc } from './ipc.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
 import {
@@ -647,6 +647,15 @@ export async function startElectronApp(metadata) {
     browserWindow: mainWindow,
     forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
     onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
+  })
+  const unregisterStartupIpc = registerDesktopStartupIpc({
+    ipcMain,
+    surfaceRegistry,
+    setWindowChromeTheme: (sender, theme) => {
+      const target = BrowserWindow.fromWebContents(sender)
+      if (!target || target.isDestroyed()) return undefined
+      return setWindowChromeTheme(target, theme)
+    },
   })
   if (state.maximized) mainWindow.maximize()
   const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
@@ -1325,6 +1334,7 @@ export async function startElectronApp(metadata) {
     ],
   })
 
+  unregisterStartupIpc()
   const unregisterIpc = registerDesktopIpc({
     ipcMain,
     surfaceRegistry,
@@ -1989,9 +1999,6 @@ export async function startElectronApp(metadata) {
         removeConversationPolish,
         removeEditContextMenu,
         removeMainWindowChrome,
-        unregisterMainSurface,
-        unregisterIpc,
-        unregisterExtensionIpc,
         () => trayLifecycle?.dispose(),
         () => pluginRecovery.dispose(),
         () => qqBotBinding.dispose(),
@@ -2005,6 +2012,18 @@ export async function startElectronApp(metadata) {
       }
     },
   })
+  let rendererIpcFinalized = false
+  const finalizeRendererIpc = () => {
+    if (rendererIpcFinalized) return
+    rendererIpcFinalized = true
+    unregisterMainSurface()
+    unregisterIpc()
+    void unregisterExtensionIpc().catch((error) => {
+      void logStore.append(
+        `[shutdown] ${error instanceof Error ? error.message : String(error)}`,
+      ).catch(() => {})
+    })
+  }
 
   const closeBypassReason = () => {
     if (quitInProgress || updateShutdownRequested) return 'quit-in-progress'
@@ -2211,6 +2230,9 @@ export async function startElectronApp(metadata) {
         void logStore.append(`[shutdown] quit deferred because runtime stop failed: ${message}`).catch(() => {})
       })
   })
-  app.on('will-quit', () => closeBehaviorController?.beginExplicitQuit())
+  app.on('will-quit', () => {
+    closeBehaviorController?.beginExplicitQuit()
+  })
+  app.on('quit', finalizeRendererIpc)
   app.on('window-all-closed', () => app.quit())
 }

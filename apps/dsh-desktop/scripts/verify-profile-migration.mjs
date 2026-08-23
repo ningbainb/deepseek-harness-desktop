@@ -176,7 +176,7 @@ async function verifyInvalidLegacySkinFallsBack() {
   assert.equal(repairedRecovery.policyVersion, 4)
   assert.equal(repairedRecovery.safeMode, false)
   assert.deepEqual(repairedRecovery.disabledDependencies, {})
-  assert.equal(repairedRecovery.incidents[0].resolution, 'legacy-false-positive-repaired')
+  assert.equal(repairedRecovery.incidents[0].resolution, 'restored-by-direct-start')
 
   const migratedProfilePatch = await readFile(fixture.profilePatchPath, 'utf8')
   const migratedHomePatch = await readFile(fixture.homePatchPath, 'utf8')

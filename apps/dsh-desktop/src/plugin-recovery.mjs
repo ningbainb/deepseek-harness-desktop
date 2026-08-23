@@ -379,6 +379,7 @@ export class PluginRecoveryStore extends EventEmitter {
   clearRecoveryMode(resolution = 'restored-by-user') {
     return this.#enqueue(async () => {
       await this.#initialize()
+      this.state.policyVersion = RECOVERY_POLICY_VERSION
       this.state.safeMode = false
       this.state.disabledDependencies = {}
       const incident = this.state.incidents.find((item) => item.id === this.state.currentIncidentId)
