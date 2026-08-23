@@ -65,6 +65,7 @@ export function registerExtensionIpc({
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
+  onRuntimeMaintenanceChange = () => {},
 }) {
   if (typeof surfaceRegistry?.assert !== 'function') {
     throw new TypeError('extension IPC requires a desktop surface registry')
@@ -78,12 +79,23 @@ export function registerExtensionIpc({
   if (typeof revokeFullUserTrust !== 'function') {
     throw new TypeError('full-user trust revocation callback must be a function')
   }
+  if (typeof onRuntimeMaintenanceChange !== 'function') {
+    throw new TypeError('runtime maintenance callback must be a function')
+  }
   for (const channel of CHANNELS) ipcMain.removeHandler(channel)
   let skillPaths = new Map()
   let pluginMutationQueue = Promise.resolve()
   let acceptingPluginMutations = true
   let pendingPluginMutations = 0
   let disposed = false
+
+  const publishRuntimeMaintenance = (active) => {
+    try {
+      Promise.resolve(onRuntimeMaintenanceChange(active)).catch(() => {})
+    } catch {
+      // Presentation state must never change mutation or rollback semantics.
+    }
+  }
 
   const emitProgress = (operation, phase, details = {}) => {
     const window = getWindow()
@@ -131,6 +143,7 @@ export function registerExtensionIpc({
       return Promise.reject(new Error('plugin changes are unavailable while QQ Bot binding is in progress'))
     }
     pendingPluginMutations += 1
+    if (pendingPluginMutations === 1) publishRuntimeMaintenance(true)
     const guardedOperation = () => {
       if (!acceptingPluginMutations) {
         throw new Error('plugin changes are unavailable while the desktop is stopping')
@@ -138,7 +151,10 @@ export function registerExtensionIpc({
       return operation()
     }
     const result = pluginMutationQueue.then(guardedOperation, guardedOperation)
-    const settled = result.finally(() => { pendingPluginMutations -= 1 })
+    const settled = result.finally(() => {
+      pendingPluginMutations -= 1
+      if (pendingPluginMutations === 0) publishRuntimeMaintenance(false)
+    })
     pluginMutationQueue = settled.catch(() => {})
     return settled
   }

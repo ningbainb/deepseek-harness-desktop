@@ -348,14 +348,12 @@
 }
 
 .dockNudge {
-  position: absolute;
-  z-index: 1200;
-  bottom: calc(100% + 10px);
-  left: 0;
+  position: fixed;
+  z-index: 2147483000;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  width: 248px;
+  width: min(288px, calc(100vw - 24px));
   box-sizing: border-box;
   padding: 10px 10px 10px 12px;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -370,7 +368,7 @@
 .dockNudge::after {
   position: absolute;
   top: 100%;
-  left: 13px;
+  left: var(--dock-nudge-arrow-left, 14px);
   width: 9px;
   height: 9px;
   border-right: 1px solid var(--dsw-alias-border-l2);
@@ -382,6 +380,8 @@
 
 .dockNudge span {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dockNudgeClose {

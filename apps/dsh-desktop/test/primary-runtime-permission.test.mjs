@@ -19,69 +19,52 @@ test('primary Runtime permission fingerprint follows the fixed full-user overlay
   )
 })
 
-test('primary Runtime full-user permission is confirmed once, persisted, and re-confirmed after revocation', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'dsh-primary-runtime-permission-'))
-  const responses = [0, 0]
+test('the fixed primary Runtime starts with current-user permissions without a prompt or grant', async () => {
   let prompts = 0
-  let ids = 0
-  const dialog = {
-    async showMessageBox(options) {
-      prompts += 1
-      assert.match(options.message, /当前 Windows 用户权限/u)
-      assert.match(options.detail, /不会申请管理员权限或 UAC/u)
-      assert.match(options.detail, /每次启动仍会独立校验官方 Runtime/u)
-      return { response: responses.shift() }
-    },
-  }
+  const result = await ensurePrimaryRuntimeFullUserPermission({
+    dialog: { showMessageBox: async () => { prompts += 1 } },
+  })
+  assert.deepEqual(result, { approved: true, remembered: false, defaulted: true })
+  assert.equal(prompts, 0)
+})
+
+test('an older source grant remains readable without being required for startup', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-primary-runtime-permission-'))
   try {
     const store = new FreeModePermissionStore({
       path: join(directory, 'full-user-permissions.json'),
-      idFactory: () => `grant-${++ids}`,
+      idFactory: () => 'grant-1',
     })
-    const first = await ensurePrimaryRuntimeFullUserPermission({
-      permissionStore: store,
-      dialog,
-      confirmationIdFactory: () => 'confirmation-1',
-      now: () => '2026-08-21T00:00:00.000Z',
+    await store.approve({
+      trustScope: 'source',
+      source: PRIMARY_RUNTIME_PERMISSION_SOURCE,
+      approval: {
+        method: 'native-user-confirmation',
+        userConfirmed: true,
+        confirmationId: 'legacy-confirmation',
+        approvedAt: '2026-08-21T00:00:00.000Z',
+      },
     })
-    assert.deepEqual(first, { approved: true, remembered: false, grantId: 'grant-1' })
-    assert.equal(prompts, 1)
-
-    const reopened = new FreeModePermissionStore({
-      path: join(directory, 'full-user-permissions.json'),
-      idFactory: () => `grant-${++ids}`,
-    })
-    const remembered = await ensurePrimaryRuntimeFullUserPermission({ permissionStore: reopened, dialog })
-    assert.deepEqual(remembered, { approved: true, remembered: true, grantId: 'grant-1' })
-    assert.equal(prompts, 1)
-
-    const active = reopened.list().find((grant) => grant.active && grant.source.id === PRIMARY_RUNTIME_PERMISSION_SOURCE.id)
-    assert.ok(active)
-    await reopened.revoke(active.grantId, { revokedAt: '2026-08-21T01:00:00.000Z' })
-    const reapproved = await ensurePrimaryRuntimeFullUserPermission({
-      permissionStore: reopened,
-      dialog,
-      confirmationIdFactory: () => 'confirmation-2',
-      now: () => '2026-08-21T02:00:00.000Z',
-    })
-    assert.deepEqual(reapproved, { approved: true, remembered: false, grantId: 'grant-2' })
-    assert.equal(prompts, 2)
+    assert.deepEqual(
+      await ensurePrimaryRuntimeFullUserPermission({ permissionStore: store }),
+      { approved: true, remembered: true, grantId: 'grant-1' },
+    )
+    await store.revoke('grant-1', { revokedAt: '2026-08-21T01:00:00.000Z' })
+    assert.deepEqual(
+      await ensurePrimaryRuntimeFullUserPermission({ permissionStore: store }),
+      { approved: true, remembered: false, defaulted: true },
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
 })
 
-test('primary Runtime permission cancellation never issues a silent grant', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'dsh-primary-runtime-permission-cancel-'))
-  try {
-    const store = new FreeModePermissionStore({ path: join(directory, 'permissions.json') })
-    const result = await ensurePrimaryRuntimeFullUserPermission({
-      permissionStore: store,
-      dialog: { showMessageBox: async () => ({ response: 1 }) },
-    })
-    assert.deepEqual(result, { approved: false, remembered: false })
-    assert.deepEqual(store.list(), [])
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
+test('a corrupt legacy permission ledger cannot block the fixed primary Runtime', async () => {
+  const result = await ensurePrimaryRuntimeFullUserPermission({
+    permissionStore: {
+      load: async () => { throw new Error('corrupt ledger') },
+      authorize: async () => assert.fail('authorize must not run after a failed load'),
+    },
+  })
+  assert.deepEqual(result, { approved: true, remembered: false, defaulted: true })
 })

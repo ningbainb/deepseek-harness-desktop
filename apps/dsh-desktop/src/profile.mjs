@@ -284,6 +284,10 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
 - insert:
     - id: authorization
       name: '@deepseek-ai/dsh-authorization'
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex: {}
 - id: llm-deepseek
   config:
     retryPolicy:

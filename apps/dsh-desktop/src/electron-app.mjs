@@ -126,6 +126,14 @@ const COMMUNITY_PATH = join(SOURCE_DIR, 'ui', 'community.html')
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
 
+/** Planned Extension Dock restarts keep the current renderer visible. */
+export function runtimeStatusNeedsStartupSurface(status, { extensionMaintenance = false } = {}) {
+  const state = status?.state
+  if (state === 'crashed') return true
+  if (state === 'stopping' || state === 'restarting') return extensionMaintenance !== true
+  return false
+}
+
 function runtimeHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh')
 }
@@ -214,6 +222,34 @@ export async function ensurePnpmCommandShim({ directory, executable, pnpmCli }) 
   })
   if (existing !== content) await writeFile(path, content, { encoding: 'utf8', mode: 0o755 })
   return directory
+}
+
+/** Git discovery is an optional startup enhancement and may never hold the shell. */
+export async function boundedManagedGitInspection(
+  inspect,
+  pathEntries,
+  { timeoutMs = 4_000, schedule = setTimeout, cancel = clearTimeout } = {},
+) {
+  if (typeof inspect !== 'function') throw new TypeError('managed Git inspection must be a function')
+  if (!Array.isArray(pathEntries)) throw new TypeError('managed Git inspection PATH entries must be an array')
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 25 || timeoutMs > 30_000) {
+    throw new TypeError('managed Git startup timeout must be between 25 and 30000 milliseconds')
+  }
+  let timeout
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => inspect(pathEntries)),
+      new Promise((_, reject) => {
+        timeout = schedule(() => {
+          const error = new Error('managed Git inspection exceeded the startup deadline')
+          error.code = 'MANAGED_GIT_STARTUP_TIMEOUT'
+          reject(error)
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    cancel(timeout)
+  }
 }
 
 /** Run independent filesystem and credential startup work in parallel. */
@@ -725,7 +761,10 @@ export async function startElectronApp(metadata) {
    */
   const resolveManagedGitRuntimePathEntries = async (pathEntries, runtimeKind) => {
     try {
-      const result = await managedGitRuntimeService.inspect(pathEntries)
+      const result = await boundedManagedGitInspection(
+        entries => managedGitRuntimeService.inspect(entries),
+        pathEntries,
+      )
       if (result.source === 'bundled') {
         await logStore.append(`[managed-git] verified bundled Git selected for ${runtimeKind} Runtime`).catch(() => {})
       } else if (result.source === 'managed') {
@@ -1010,13 +1049,8 @@ export async function startElectronApp(metadata) {
   }
   let primaryFullUserPermission
   try {
-    if (fullUserPermissionStore === undefined) {
-      throw new Error('durable full-user permission store is unavailable')
-    }
     primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission({
       permissionStore: fullUserPermissionStore,
-      dialog,
-      parentWindow: mainWindow,
     })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime authorization failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
@@ -1589,6 +1623,7 @@ export async function startElectronApp(metadata) {
   const communityMarket = createCommunityMarketService({
     fetch: (input, options) => net.fetch(input, options),
   })
+  let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
     ipcMain,
     surfaceRegistry,
@@ -1613,6 +1648,7 @@ export async function startElectronApp(metadata) {
     revokeFullUserTrust,
     exportDiagnostics,
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
+    onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
   })
   dispatchDeepLink = async (link) => {
     if (link.kind === 'extensions' || link.kind === 'preset-preview') {
@@ -1688,7 +1724,10 @@ export async function startElectronApp(metadata) {
       void showRuntime(status, runtimeReadyAt)
     } else if (['crashed', 'stopping', 'restarting'].includes(status.state)) {
       deepLinkRouter.setReady(false)
-      if (!mainWindow.webContents.getURL().startsWith('file:')) void loadStartup().catch(() => {})
+      if (
+        runtimeStatusNeedsStartupSurface(status, { extensionMaintenance: extensionRuntimeMaintenance })
+        && !mainWindow.webContents.getURL().startsWith('file:')
+      ) void loadStartup().catch(() => {})
       if (status.state === 'crashed') {
         const category = runtimeStartupRepairCategory(status)
         const detail = category === 'plugin-startup-failure'

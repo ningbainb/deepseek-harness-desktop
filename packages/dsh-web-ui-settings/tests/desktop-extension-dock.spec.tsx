@@ -11,7 +11,10 @@ const desktop = vi.hoisted(() => ({
 
 vi.mock('@linxin666/dsh-desktop-client', () => desktop)
 
-import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
+import {
+  DesktopExtensionDockEntry,
+  calculateDockNudgePosition,
+} from '../src/client/desktop-extension-dock.tsx'
 import { zh } from '../src/client/locales.ts'
 
 const t = ((key: keyof typeof zh) => zh[key]) as never
@@ -37,10 +40,19 @@ describe('Desktop Extension Dock entry', () => {
 
   it('shows the exact lightweight first-three-launch message and closes without blocking', async () => {
     render(<DesktopExtensionDockEntry wide={true} t={t} />)
-    expect(await screen.findByText('插件、技能和桌面核心功能在这里')).toBeTruthy()
+    const copy = await screen.findByText('插件、技能和桌面核心功能在这里')
+    expect(copy.parentElement?.parentElement).toBe(document.body)
     fireEvent.click(screen.getByRole('button', { name: '关闭拓展坞提示' }))
     expect(screen.queryByText('插件、技能和桌面核心功能在这里')).toBeNull()
     expect(desktop.dismissDockNudge).toHaveBeenCalledWith('close')
+  })
+
+  it('clamps the portaled hint inside a narrow viewport while pointing at the trigger', () => {
+    expect(calculateDockNudgePosition({
+      trigger: { left: -8, top: 580, width: 36 },
+      viewportWidth: 240,
+      viewportHeight: 640,
+    })).toEqual({ left: 12, bottom: 70, arrowLeft: 14 })
   })
 
   it('dismisses with Escape and keeps keyboard focus untouched', async () => {

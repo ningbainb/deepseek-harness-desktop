@@ -367,7 +367,7 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
       }
       if (theme !== activeTheme) {
         activeTheme = theme;
-        window.dshDesktop?.setWindowChromeTheme?.(theme);
+        Promise.resolve(window.dshDesktop?.setWindowChromeTheme?.(theme)).catch(() => {});
       }
     };
     const markModalLayers = () => {

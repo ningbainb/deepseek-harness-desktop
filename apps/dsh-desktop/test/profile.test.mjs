@@ -246,10 +246,14 @@ test('desktop profile uses the RC.1 native Codex provider plus the native market
   assert.match(DESKTOP_PATCH_CONFIG, /retryableCodes:[\s\S]*STREAM_CLOSED/u)
 })
 
-test('desktop profile mounts the RC.1 authorization service without restoring conflicting Codex plugins', () => {
+test('desktop profile mounts authorization and activates the native Codex model catalog', () => {
   assert.equal(
     [...DESKTOP_PATCH_CONFIG.matchAll(/name: '@deepseek-ai\/dsh-authorization'/gu)].length,
     1,
+  )
+  assert.match(
+    DESKTOP_PATCH_CONFIG,
+    /- id: llm-pi-ai[\s\S]*?providers:\s*\n\s+openai-codex: \{\}/u,
   )
   for (const packageName of ['dsh-codex', 'dsh-codex-auth', 'dsh-codex-connect']) {
     assert.equal(CODEX_PROVIDER_CONFLICTS.includes(packageName), true)
@@ -980,6 +984,7 @@ test('official DSH CLI composes the isolated desktop profile', async () => {
     assert.doesNotMatch(result.stdout, /- id: dsh-plugin-hub/)
     assert.match(result.stdout, /- id: llm-pi-ai/)
     assert.match(result.stdout, /name: '@deepseek-ai\/dsh-llm-pi-ai'/)
+    assert.match(result.stdout, /- id: llm-pi-ai[\s\S]*?providers:\s*\n\s+openai-codex: \{\}/u)
     assert.doesNotMatch(result.stdout, /name: dsh-codex-connect/)
     assert.match(result.stdout, /- id: reasoning-slider/)
     assert.match(result.stdout, /- id: im-qqbot[\s\S]*?disabled: true/)

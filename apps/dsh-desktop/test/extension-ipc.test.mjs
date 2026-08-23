@@ -390,6 +390,7 @@ test('community market resolves an opaque catalog ID and installs it without an 
     confirmFullAccessPlugin: async () => assert.fail('market installs must not request trust approval'),
     revalidateFullAccessPlugin: async (value) => { events.push(['revalidate', value]); return descriptor },
     completeFullAccessPlugin: async (value) => events.push(['complete', value]),
+    onRuntimeMaintenanceChange: (active) => events.push(['maintenance', active]),
   })
 
   assert.equal(await ipcMain.handlers.get('extensions:market-list')(), publicCatalog)
@@ -400,6 +401,7 @@ test('community market resolves an opaque catalog ID and installs it without an 
   assert.deepEqual(events, [
     'list',
     ['catalog-resolve', 'opaque-market-id'],
+    ['maintenance', true],
     ['resolve', { spec: 'github:owner/plugin' }],
     ['revalidate', descriptor],
     'stop',
@@ -408,6 +410,7 @@ test('community market resolves an opaque catalog ID and installs it without an 
     'start',
     'commit',
     ['complete', descriptor],
+    ['maintenance', false],
   ])
 
   unregister()

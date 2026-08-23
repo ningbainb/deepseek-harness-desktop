@@ -14,6 +14,7 @@ import {
   createDesktopShutdownLifecycle,
   prepareDesktopRuntimeInputs,
   requestsUpdateShutdown,
+  runtimeStatusNeedsStartupSurface,
   secondaryWindowWebPreferences,
   desktopDeepLinkFrom,
 } from '../src/electron-app.mjs'
@@ -174,6 +175,14 @@ test('rapid direct-start states serialize local startup-page navigations', async
     'start:starting-full',
     'finish:starting-full',
   ])
+})
+
+test('planned Extension Dock maintenance keeps the current main surface visible', () => {
+  assert.equal(runtimeStatusNeedsStartupSurface({ state: 'stopping' }, { extensionMaintenance: true }), false)
+  assert.equal(runtimeStatusNeedsStartupSurface({ state: 'restarting' }, { extensionMaintenance: true }), false)
+  assert.equal(runtimeStatusNeedsStartupSurface({ state: 'crashed' }, { extensionMaintenance: true }), true)
+  assert.equal(runtimeStatusNeedsStartupSurface({ state: 'stopping' }), true)
+  assert.equal(runtimeStatusNeedsStartupSurface({ state: 'ready' }), false)
 })
 
 test('secondary windows use an isolated non-persistent Electron session', () => {

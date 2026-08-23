@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
+import { createPortal } from 'react-dom'
 import {
   dismissDockNudge,
   getDockEntryState,
@@ -13,10 +21,32 @@ export type DesktopExtensionDockEntryProps = {
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string
 }
 
+type DockNudgePosition = { left: number; bottom: number; arrowLeft: number }
+
+export function calculateDockNudgePosition({
+  trigger,
+  viewportWidth,
+  viewportHeight,
+}: {
+  trigger: Pick<DOMRect, 'left' | 'top' | 'width'>
+  viewportWidth: number
+  viewportHeight: number
+}): DockNudgePosition {
+  const margin = 12
+  const width = Math.min(288, Math.max(0, viewportWidth - margin * 2))
+  const maximumLeft = Math.max(margin, viewportWidth - width - margin)
+  const left = Math.min(Math.max(margin, trigger.left), maximumLeft)
+  const bottom = Math.max(margin, viewportHeight - trigger.top + 10)
+  const arrowLeft = Math.min(Math.max(14, trigger.left + trigger.width / 2 - left - 4), Math.max(14, width - 24))
+  return { left, bottom, arrowLeft }
+}
+
 /** Desktop-only one-click Extension Dock entry beside the Settings control. */
 export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntryProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [available, setAvailable] = useState(false)
   const [showNudge, setShowNudge] = useState(false)
+  const [nudgePosition, setNudgePosition] = useState<DockNudgePosition>()
   const [opening, setOpening] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -44,6 +74,32 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [dismiss, showNudge])
 
+  const updateNudgePosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (trigger === null) return
+    setNudgePosition(calculateDockNudgePosition({
+      trigger: trigger.getBoundingClientRect(),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    }))
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!showNudge) return
+    updateNudgePosition()
+    window.addEventListener('resize', updateNudgePosition)
+    window.addEventListener('scroll', updateNudgePosition, true)
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(updateNudgePosition)
+      : undefined
+    if (triggerRef.current !== null) observer?.observe(triggerRef.current)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', updateNudgePosition)
+      window.removeEventListener('scroll', updateNudgePosition, true)
+    }
+  }, [showNudge, updateNudgePosition, wide])
+
   const openDock = useCallback(async () => {
     if (opening) return
     setShowNudge(false)
@@ -65,6 +121,7 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
   return (
     <div className={css.dockEntry} data-wide={wide ? 'wide' : 'rail'}>
       <button
+        ref={triggerRef}
         type="button"
         className={css.dockTrigger}
         aria-label={label}
@@ -75,8 +132,17 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
       >
         <DockIcon />
       </button>
-      {showNudge && (
-        <div id="dsh-extension-dock-nudge" className={css.dockNudge} role="status">
+      {showNudge && nudgePosition && createPortal(
+        <div
+          id="dsh-extension-dock-nudge"
+          className={css.dockNudge}
+          role="status"
+          style={{
+            left: nudgePosition.left,
+            bottom: nudgePosition.bottom,
+            '--dock-nudge-arrow-left': `${nudgePosition.arrowLeft}px`,
+          } as CSSProperties}
+        >
           <span>{t('dockNudge' satisfies WebUIPluginsKey)}</span>
           <button
             type="button"
@@ -86,7 +152,8 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
           >
             ×
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
       {failed && (
         <span className={css.dockError} role="alert">
