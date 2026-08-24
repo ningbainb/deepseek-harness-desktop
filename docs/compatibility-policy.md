@@ -1,6 +1,6 @@
 # Desktop 3.0 compatibility policy
 
-DeepSeek Harness Desktop 3.0.3 keeps its public integration boundary deliberately small: the Desktop Contract and `@linxin666/dsh-desktop-client` SDK are the supported interfaces for plugins and desktop-aware web surfaces.
+DeepSeek Harness Desktop 3.0.4 keeps its public integration boundary deliberately small: the Desktop Contract and `@linxin666/dsh-desktop-client` SDK are the supported interfaces for plugins and desktop-aware web surfaces.
 
 ## Public contract
 
@@ -14,7 +14,7 @@ Desktop Contract `1.x` and SDK `1.x` accept additive optional fields and capabil
 
 ## Plugin loading
 
-Desktop 3.0.3 does not block normal startup because a user plugin lacks publisher, registry, or compatibility metadata. The complete current profile is loaded directly. Compatibility declarations under `dsh.compatibility` remain useful diagnostic evidence in Extension Dock, but they are not a startup authorization list.
+Desktop 3.0.4 does not block normal startup because a user plugin lacks publisher, registry, or compatibility metadata. The complete current profile is loaded directly. Compatibility declarations under `dsh.compatibility` remain useful diagnostic evidence in Extension Dock, but they are not a startup authorization list.
 
 New plugin installs are explicit user actions. Desktop validates the selected package reference, applies it transactionally to the persistent profile, and restores the previous archive if installation or activation fails. The built-in plugin market gives fresh users a normal discovery path without adding a startup choice screen.
 

@@ -7,7 +7,7 @@
     "normalStartupNetwork": false
   },
   "verifiedAt": "2026-08-20",
-  "desktopVersion": "3.0.3",
+  "desktopVersion": "3.0.4",
   "upstreamVersion": "0.1.1-rc.1",
   "entries": [
     {
@@ -48,7 +48,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-aionui-panel build",
@@ -92,7 +92,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-git-graph build",
@@ -136,7 +136,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher build",
@@ -180,7 +180,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-blue-fantasy build",
@@ -223,7 +223,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-center build",
@@ -266,7 +266,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-dragon-heir build",
@@ -309,7 +309,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-harbor build",
@@ -352,7 +352,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-miku build",
@@ -395,7 +395,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-minecraft build",
@@ -438,7 +438,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq2006 build",
@@ -481,7 +481,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq98 build",
@@ -524,7 +524,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-ths build",
@@ -567,7 +567,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-trading build",
@@ -610,7 +610,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-whale-song build",
@@ -653,7 +653,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-xp build",
@@ -714,7 +714,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-task-board build",
@@ -758,7 +758,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-web-ui-settings build",
@@ -802,7 +802,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-compat build",
@@ -846,7 +846,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-repair build",
@@ -890,7 +890,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-liangshen build",
@@ -934,7 +934,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-live-stats build",
@@ -978,7 +978,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-particle-theme build",
@@ -1022,7 +1022,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-pet build",
@@ -1066,7 +1066,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-remote-web-ui build",
@@ -1110,7 +1110,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-skins build"
@@ -1152,7 +1152,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-ssh build",
@@ -1196,7 +1196,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-tool-describe-image build",
@@ -1240,7 +1240,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.0.3",
+        "desktopVersion": "3.0.4",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-web-ui-all build"

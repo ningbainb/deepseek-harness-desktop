@@ -1,4 +1,4 @@
-# DeepSeek Harness Desktop 3.0.3
+# DeepSeek Harness Desktop 3.0.4
 
 ## 中文
 
@@ -17,11 +17,11 @@
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.3-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。未配置证书的社区 Release 可能是未签名版本，Windows 因此可能显示未知发布者提示。
+从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.4-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。未配置证书的社区 Release 可能是未签名版本，Windows 因此可能显示未知发布者提示。
 
 ### 说明
 
-Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动修复只使用用户已经配置的模型；没有模型时直接进入同 Home 内置插件回退。3.0.3 不删除独立备份，也不承诺恢复 Desktop 之外的项目编辑或磁盘损坏。
+Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动修复只使用用户已经配置的模型；没有模型时直接进入同 Home 内置插件回退。3.0.4 不删除独立备份，也不承诺恢复 Desktop 之外的项目编辑或磁盘损坏。
 
 ## English
 
@@ -40,8 +40,8 @@ Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.0.3-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Verify the SHA-256 first, then inspect the manifest for size, channel, Runtime, Schema, and actual signature state. A community Release may be unsigned when no certificate is configured, so Windows can show an unknown-publisher warning.
+Download `DeepSeek-Harness-Desktop-Setup-3.0.4-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Verify the SHA-256 first, then inspect the manifest for size, channel, Runtime, Schema, and actual signature state. A community Release may be unsigned when no certificate is configured, so Windows can show an unknown-publisher warning.
 
 ### Notice
 
-The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.3 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.
+The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.4 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.

@@ -12,7 +12,7 @@
       "status": "known-good",
       "upstreamVersion": "0.1.1-rc.1",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=3.0.3",
+      "desktopRange": "=3.0.4",
       "capabilities": [
         {
           "id": "host-service.register",
