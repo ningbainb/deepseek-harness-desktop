@@ -10,7 +10,7 @@
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [更新日志](CHANGELOG.md) · [桌面版技术说明](docs/desktop.md) · [兼容性政策](docs/compatibility-policy.md)
 
-> 当前稳定版：**3.0.1**
+> 当前稳定版：**3.0.7**
 
 如果这个项目对你有帮助，欢迎在 GitHub 点一个 **Star**，让更多需要 Windows 桌面版 Harness 的用户发现它。
 
@@ -25,9 +25,9 @@
 - **个性化界面**：内置多套皮肤、全页粒子主题与鲸鱼娘桌宠。
 - **可控升级**：Stable / Beta 频道分离，并提供兼容性检查、迁移计划、升级与回滚机制。
 
-## 3.0.1 平台稳定版
+## 3.0.7 当前稳定版
 
-3.0.1 的重点是让桌面版具备长期可维护、可升级、可扩展的稳定边界，而不是继续堆叠零散功能。
+当前 3.x 系列重点是让桌面版具备长期可维护、可升级、可扩展的稳定边界，同时保持完整的 Harness 桌面体验。
 
 - **稳定 API 边界**：Desktop Contract、Desktop SDK、Runtime Provider、Preset、Task / Run / Evidence 与 Deep Link 均有明确版本约束。
 - **受控 Runtime**：Stable 频道只使用经过验证的 Runtime 组合，通过 supported-runtime matrix 与兼容策略控制上游变化。
