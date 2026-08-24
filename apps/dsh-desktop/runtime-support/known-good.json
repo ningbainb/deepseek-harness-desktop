@@ -10,8 +10,8 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "3.0.4",
-    "rootVersion": "3.0.4",
+    "version": "3.0.5",
+    "rootVersion": "3.0.5",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
@@ -66,7 +66,7 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "5fb0a7cce6156de8b27201e06e297473e0d0302971148f99b6805e6c6bff6b7d",
+    "sha256": "de3d81e33a478eb6e8444b9c23a96f7a1c617db9c347f8223c9f2d7046fe9a36",
     "ids": [
       "cancellation-presentation",
       "desktop-skin-profile-isolation",

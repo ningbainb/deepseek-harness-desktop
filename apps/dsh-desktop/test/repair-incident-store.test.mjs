@@ -53,7 +53,7 @@ test('repair incident fingerprints and durable state exclude raw paths, credenti
     assert.match(persisted, /openai-compatible/u)
     assert.match(persisted, /plugins\/example\/index\.mjs/u)
 
-    const nextVersion = await store.claim({ ...input, desktopVersion: '3.0.4' })
+    const nextVersion = await store.claim({ ...input, desktopVersion: '3.0.5' })
     assert.equal(nextVersion.claimed, true)
     assert.notEqual(nextVersion.incident.fingerprint, fingerprint)
   } finally {

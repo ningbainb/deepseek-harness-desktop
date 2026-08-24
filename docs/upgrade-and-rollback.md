@@ -1,6 +1,6 @@
-# Desktop 3.0.4 upgrade and rollback
+# Desktop 3.0.5 upgrade and rollback
 
-Desktop 3.0.4 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
+Desktop 3.0.5 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
 
 ## Startup behavior
 

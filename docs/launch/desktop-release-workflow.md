@@ -1,4 +1,4 @@
-# DeepSeek Harness Desktop 3.0.4 release preparation and handoff
+# DeepSeek Harness Desktop 3.0.5 release preparation and handoff
 
 This guide describes repository verification for a possible release. It does not authorize a push, tag, GitHub Release, deployment, or announcement.
 
