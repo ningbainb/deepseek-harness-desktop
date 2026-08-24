@@ -482,8 +482,9 @@ function assertInventory(inventory) {
   }
   let files = 0
   let bytes = 0
-  let previous = undefined
   const seen = new Set()
+  const directories = new Set()
+  const lastChildByParent = new Map()
   for (const entry of inventory.entries) {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       throw new Error('user plugin archive inventory entry is invalid')
@@ -492,12 +493,27 @@ function assertInventory(inventory) {
       throw new Error('user plugin archive inventory path is invalid')
     }
     if (seen.has(entry.path)) throw new Error('user plugin archive inventory has duplicate paths')
-    seen.add(entry.path)
-    const sortKey = `${entry.path}\0${entry.kind}`
-    if (previous !== undefined && previous > sortKey) throw new Error('user plugin archive inventory is not deterministic')
-    previous = sortKey
     if (!['directory', 'file', 'symlink'].includes(entry.kind) || !Number.isInteger(entry.mode)) {
       throw new Error('user plugin archive inventory entry is invalid')
+    }
+    if (entry.path === '') {
+      if (seen.size !== 0) throw new Error('user plugin archive inventory is not deterministic')
+      seen.add(entry.path)
+      if (entry.kind === 'directory') directories.add(entry.path)
+    } else {
+      const separator = entry.path.lastIndexOf('/')
+      const parent = separator === -1 ? '' : entry.path.slice(0, separator)
+      const child = separator === -1 ? entry.path : entry.path.slice(separator + 1)
+      if (child.length === 0 || !directories.has(parent)) {
+        throw new Error('user plugin archive inventory is not deterministic')
+      }
+      const previousChild = lastChildByParent.get(parent)
+      if (previousChild !== undefined && previousChild >= child) {
+        throw new Error('user plugin archive inventory is not deterministic')
+      }
+      seen.add(entry.path)
+      lastChildByParent.set(parent, child)
+      if (entry.kind === 'directory') directories.add(entry.path)
     }
     if (entry.kind === 'file') {
       if (!Number.isInteger(entry.size) || entry.size < 0 || !SHA256_PATTERN.test(entry.sha256)) {
