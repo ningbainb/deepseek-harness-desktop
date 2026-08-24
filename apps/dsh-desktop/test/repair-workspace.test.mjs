@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { lstat, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -42,7 +42,7 @@ test('enabled repair roots include the original profile and every non-built-in b
       ['profile', undefined],
       ['plugin', '@user/plugin'],
     ])
-    assert.equal(resolved.roots[1].path, plugin)
+    assert.equal(resolved.roots[1].path, await realpath(plugin))
     assert.deepEqual(resolved.bundles.map(bundle => bundle.name), [
       '@built-in/bundle',
       '@missing/plugin',
