@@ -254,4 +254,14 @@ export const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
     removeWhen: 'The upstream skin service exposes a profile-scoped public persistence contract.',
     lastVerified: '2026-08-21',
   },
+  {
+    id: 'tools-capability-request-side',
+    appliesTo: ['0.1.1-rc.1'],
+    upstreamReference: '@deepseek-ai/dsh-llm-pi-ai 0.1.1-rc.1 GenerateOptions tools request path',
+    owner: 'desktop-platform',
+    tests: ['apps/dsh-desktop/test/tools-capability.test.mjs'],
+    reason: 'Add a route-level auto/native/none request-side tools capability while preserving ordinary chat and stable tool-history failure semantics.',
+    removeWhen: 'The upstream adapter exposes a request-side tools capability contract with the same route-level behavior.',
+    lastVerified: '2026-08-24',
+  },
 ] satisfies readonly DesktopCompatPatch[], { enforceFreshness: false })

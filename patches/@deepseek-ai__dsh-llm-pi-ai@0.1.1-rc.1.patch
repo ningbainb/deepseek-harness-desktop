@@ -1,0 +1,62 @@
+diff --git a/lib/index.js b/lib/index.js
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -303,6 +303,9 @@ function toolsOf(options) {
+ 		parameters: tool.parameters
+ 	}));
+ }
++function hasToolHistory(options) {
++	return options.messages?.some((message) => message?.role === "tool" || Array.isArray(message?.content) && message.content.some((block) => block?.type === "tool-call" || block?.type === "tool-result")) ?? false;
++}
+ /** Assemble the request-level pi-ai context envelope shared by both conversion paths. */
+ function piContext(options, messages) {
+ 	const tools = toolsOf(options);
+@@ -859,5 +859,8 @@ class PiAiLlm {
+ 			const snapshot = this.current();
+ 			const profile = this.profileOf(snapshot, options.provider);
+ 			const model = this.modelOf(snapshot, options.provider, options.model);
++			const toolsCapability = profile.toolsCapability ?? "auto";
++			if (toolsCapability === "none" && hasToolHistory(options)) throw new LlmError("provider route does not support tool history", "UNSUPPORTED_TOOLS");
++			const requestOptions = toolsCapability === "none" ? (({ tools: _tools, ...rest }) => rest)(options) : options;
+ 			const reasoning = resolveReasoningLevel(model, options.reasoningEffort ?? profile.reasoning);
+ 			const apiKey = await this.config.resolveApiKey(options.provider, profile);
+@@ -878,6 +878,6 @@ class PiAiLlm {
+ 					});
+ 				};
+-				const context = attachments === void 0 ? toPiContext(options, void 0, onReplayDegrade) : await toPiContext(options, attachments, onReplayDegrade, profile.maxRequestImageBytes);
++				const context = attachments === void 0 ? toPiContext(requestOptions, void 0, onReplayDegrade) : await toPiContext(requestOptions, attachments, onReplayDegrade, profile.maxRequestImageBytes);
+ 				const iterator = toStreamChunks(snapshot.models.streamSimple(model, context, {
+ 					...profileOptions(profile, reasoning, apiKey),
+ 					...options.temperature === void 0 ? {} : { temperature: options.temperature },
+@@ -1794,4 +1794,5 @@ const profile = z.object({
+ 	streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
+ 	maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
++	toolsCapability: z.union(["auto", "native", "none"]).default("auto"),
+ 	retryPolicy: RetryPolicySchema
+ });
+@@ -1857,7 +1857,8 @@ function resolveProfiles(providers) {
+ 		resolved.set(provider, {
+ 			...rest,
+ 			provider,
+ 			displayName,
++			toolsCapability: source.toolsCapability ?? "auto",
+ 			...apiKeyEnv === void 0 ? {} : { apiKeyEnv: credentialRef(apiKeyEnv) },
+ 			streamIdleTimeoutMs,
+ 			maxRequestImageBytes,
+diff --git a/lib/types/config.d.ts b/lib/types/config.d.ts
+--- a/lib/types/config.d.ts
++++ b/lib/types/config.d.ts
+@@ -84,4 +84,6 @@ export interface PiAiProviderProfile {
+      */
+     compat?: PiAiCompatProfile;
++    /** Request-side tools capability for this route; model names never override it. */
++    toolsCapability?: 'auto' | 'native' | 'none';
+     /**
+      * Context capacity for a model this route lists that neither the entry nor
+@@ -145,4 +145,6 @@ export interface ResolvedPiAiProviderProfile extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName'> {
+     /** Positive request-level base64 image payload bound after defaulting. */
+     maxRequestImageBytes: number;
++    /** Resolved request-side tools capability for this route. */
++    toolsCapability: 'auto' | 'native' | 'none';
+     /** Immutable retry policy captured with this provider route. */
+     retryPolicy: ResolvedRetryPolicy;

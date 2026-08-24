@@ -1,6 +1,6 @@
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
 
-import type { RepairAttemptSummary, RepairJobSettings, RepairModelSelection } from './job.ts'
+import type { RepairAttemptSummary, RepairJobSettings, RepairModelSelection, ToolsCapability } from './job.ts'
 
 interface DefaultModelFace {
   currentSelection(): ModelSelection
@@ -25,13 +25,24 @@ function validSelection(value: unknown): value is RepairModelSelection {
     && selection.model.trim() !== ''
 }
 
-function detachedSelection(value: RepairModelSelection): RepairModelSelection {
+function isToolsCapability(value: unknown): value is ToolsCapability {
+  return value === 'auto' || value === 'native' || value === 'none'
+}
+
+function detachedSelection(
+  value: RepairModelSelection,
+  defaultToolsCapability?: ToolsCapability,
+): RepairModelSelection {
+  const toolsCapability = isToolsCapability(value.toolsCapability)
+    ? value.toolsCapability
+    : defaultToolsCapability
   return Object.freeze({
     provider: value.provider.trim(),
     model: value.model.trim(),
     ...(typeof value.reasoningEffort === 'string' && value.reasoningEffort.trim() !== ''
       ? { reasoningEffort: value.reasoningEffort.trim() }
       : {}),
+    ...(toolsCapability === undefined ? {} : { toolsCapability }),
   })
 }
 
@@ -41,7 +52,7 @@ export function repairModelCandidates(
 ): RepairModelSelection[] {
   const values: RepairModelSelection[] = []
   const current = defaultModel.currentSelection()
-  if (validSelection(current)) values.push(detachedSelection(current))
+  if (validSelection(current)) values.push(detachedSelection(current, settings.defaultToolsCapability))
   for (const fallback of settings.fallbackModels ?? []) {
     if (validSelection(fallback)) values.push(detachedSelection(fallback))
   }
@@ -58,6 +69,7 @@ function failureCategory(error: unknown): RepairAttemptSummary['outcome'] {
   const input = error as { code?: unknown, status?: unknown, name?: unknown }
   const code = typeof input?.code === 'string' ? input.code.toUpperCase() : ''
   const status = typeof input?.status === 'number' ? input.status : undefined
+  if (code === 'UNSUPPORTED_TOOLS') return 'unsupported-tools'
   if (status === 401 || status === 403 || /AUTH|CREDENTIAL|UNAUTHORIZED/u.test(code)) return 'authentication'
   if (status === 402 || status === 429 || /QUOTA|RATE_LIMIT|BILLING/u.test(code)) return 'quota'
   if (code === 'REPAIR_TIMEOUT' || input?.name === 'TimeoutError') return 'timed-out'
@@ -97,8 +109,14 @@ export async function runRepairModelCandidates({
   if (candidates.length === 0) return Object.freeze({ status: 'model-unavailable', attempts: [] })
   const attempts: RepairAttemptSummary[] = []
   const startedAt = Date.now()
+  let runnableCandidates = 0
   for (let index = 0; index < candidates.length; index += 1) {
     const selection = candidates[index]
+    if (selection.toolsCapability === 'none') {
+      attempts.push({ provider: selection.provider, model: selection.model, outcome: 'unsupported-tools' })
+      continue
+    }
+    runnableCandidates += 1
     const remaining = timeoutMs - (Date.now() - startedAt)
     if (remaining < 1) return Object.freeze({ status: 'timed-out', attempts })
     try {
@@ -114,5 +132,8 @@ export async function runRepairModelCandidates({
       if (outcome === 'timed-out') return Object.freeze({ status: 'timed-out', attempts })
     }
   }
-  return Object.freeze({ status: 'failed', attempts })
+  return Object.freeze({
+    status: runnableCandidates === 0 ? 'model-unavailable' : 'failed',
+    attempts,
+  })
 }

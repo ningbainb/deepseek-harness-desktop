@@ -144,6 +144,43 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
   assert.doesNotMatch(serialized, /<dsh-home>|file:/u)
 })
 
+test('startup diagnostics preserve safe boot and direct-attempt correlation separately from runtime restart attempts', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    controller: {
+      status: {
+        state: 'ready',
+        pid: 4321,
+        restartAttempt: 2,
+      },
+    },
+    startupAttempt: {
+      bootId: 'abcdef0123456789',
+      startupAttempt: 3,
+      directAttempt: 3,
+      profileName: 'desktop',
+      runtimePid: 4321,
+      phase: 'full-repaired',
+      event: 'ready',
+      failureCategory: 'PROFILE_REPAIRABLE',
+      durationMs: 12_345,
+    },
+  })
+
+  assert.equal(diagnostics.runtime.pid, 4321)
+  assert.equal(diagnostics.runtime.restartAttempt, 2)
+  assert.deepEqual(diagnostics.startup.attempt, {
+    bootId: 'abcdef0123456789',
+    startupAttempt: 3,
+    directAttempt: 3,
+    profileName: 'desktop',
+    runtimePid: 4321,
+    phase: 'full-repaired',
+    event: 'ready',
+    failureCategory: 'PROFILE_REPAIRABLE',
+    durationMs: 12_345,
+  })
+})
+
 test('diagnostic projections never serialize plugin-recovery raw error, prompt, session, or tool data', async () => {
   const diagnostics = await collectStartupDiagnostics({
     controller: { status: { state: 'crashed', error: 'session: RUNTIME_PRIVATE_SESSION' } },

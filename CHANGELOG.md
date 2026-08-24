@@ -6,6 +6,23 @@
 
 English: No changes yet.
 
+## 3.0.8 - 2026-08-25
+
+中文：
+
+- 启动页现在公开显示检测、原样重试、自动修复、验证、回滚和同 Home 内置插件回退等阶段；用户能看到自动修复正在进行，而不是停在模糊的加载状态。
+- 没有配置模型或没有可用 Key 时，修复能力会明确报告“无可用模型”，不会调用云端模型，也不会把用户引导到隐藏的远程路径；应用会继续走同 Home 内置插件回退。
+- 增加请求侧 Tools capability 判断，自动区分原生工具调用、兼容补丁和无工具能力，避免把不被当前 Runtime 支持的 tools 请求发送给模型。
+- 设置页恢复修复状态卡、重试和脱敏诊断入口；修复记录只保留有界状态、相对文件和注册检查，不持久化 Key、Token、Cookie、Prompt、完整 Session 或 Tool Result。
+- 保持 DSH 0.1.1-rc.1 精确锁定，并将兼容补丁、运行时证据和社区插件质量报告重新生成为当前 Desktop 版本。
+
+English:
+
+- The startup surface now exposes detection, unchanged retry, automatic repair, verification, rollback, and same-Home built-ins fallback phases, so users can see repair progress instead of an ambiguous loading state.
+- When no model or usable key is configured, repair reports that no model is available, does not invoke a cloud model, and does not send the user through a hidden remote path; the app continues to the same-Home built-ins fallback.
+- Adds request-side Tools capability detection that distinguishes native tool calls, the compatibility patch, and no-tool operation, preventing unsupported tools requests from reaching the model.
+- Restores the settings repair-status card, retry action, and redacted diagnostics entry. Durable repair records keep only bounded status, relative files, and registered checks; they never persist keys, tokens, cookies, prompts, full sessions, or tool results.
+- Keeps DSH 0.1.1-rc.1 exactly pinned and regenerates the compatibility, runtime-evidence, and community-plugin-quality reports for the current Desktop version.
 ## 3.0.1 - 2026-08-22
 
 中文：

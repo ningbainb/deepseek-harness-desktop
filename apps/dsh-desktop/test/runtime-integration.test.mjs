@@ -113,6 +113,13 @@ test('credential load failure does not block profile preparation', async () => {
   assert.deepEqual(failures, ['decrypt failed'])
 })
 
+test('direct startup keeps full profile materialization inside the coordinator-owned provider', async () => {
+  const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /prepared\s*=\s*await\s+prepareDesktopRuntimeInputs/u)
+  assert.doesNotMatch(source, /prepareProfile:\s*\(\)\s*=>\s*ensureDesktopProfile/u)
+  assert.match(source, /const ensureProfile = \(\) => ensureProfileForMode\('full'\)/u)
+})
+
 test('runtime boot begins while the startup shell is still loading', async () => {
   const started = []
   let finishShell

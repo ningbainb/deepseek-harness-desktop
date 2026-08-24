@@ -25,6 +25,8 @@ export class StartupRepairCoordinator {
     canRepair = async () => false,
     runRepair = async () => ({ status: 'unavailable' }),
     publishState = () => {},
+    publishAttempt = () => {},
+    classifyFailure = () => undefined,
     activateProvider = () => {},
     stopTimeoutMs = 7_500,
     schedule = setTimeout,
@@ -33,7 +35,12 @@ export class StartupRepairCoordinator {
     if (typeof createProvider !== 'function') throw new TypeError('startup provider factory is required')
     if (typeof canRepair !== 'function') throw new TypeError('startup repair availability callback must be a function')
     if (typeof runRepair !== 'function') throw new TypeError('startup repair callback must be a function')
-    if (typeof publishState !== 'function' || typeof activateProvider !== 'function') {
+    if (
+      typeof publishState !== 'function'
+      || typeof publishAttempt !== 'function'
+      || typeof classifyFailure !== 'function'
+      || typeof activateProvider !== 'function'
+    ) {
       throw new TypeError('startup coordinator callbacks must be functions')
     }
     if (!Number.isInteger(stopTimeoutMs) || stopTimeoutMs < 1 || stopTimeoutMs > 60_000) {
@@ -43,11 +50,14 @@ export class StartupRepairCoordinator {
     this.canRepair = canRepair
     this.runRepair = runRepair
     this.publishState = publishState
+    this.publishAttempt = publishAttempt
+    this.classifyFailure = classifyFailure
     this.activateProvider = activateProvider
     this.stopTimeoutMs = stopTimeoutMs
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
     this.operation = undefined
+    this.directAttempt = 0
   }
 
   start() {
@@ -65,10 +75,68 @@ export class StartupRepairCoordinator {
     await this.publishState(state)
   }
 
-  async #startProvider(provider) {
-    await this.activateProvider(provider)
-    await provider.ensureProfile()
-    await provider.start()
+  async #publishAttempt(detail) {
+    try {
+      await this.publishAttempt(Object.freeze({ ...detail }))
+    } catch {
+      // Attempt diagnostics are best effort and must never change startup policy.
+    }
+  }
+
+  async #startProvider(provider, {
+    phase,
+    attempt,
+    failureDetails,
+  }) {
+    const startedAt = Date.now()
+    const startupAttempt = this.directAttempt + 1
+    this.directAttempt = startupAttempt
+    await this.#publishAttempt({
+      event: 'started',
+      phase,
+      attempt,
+      startupAttempt,
+      directAttempt: startupAttempt,
+      profileName: provider.profileName,
+    })
+    let failurePhase = 'provider-activation'
+    try {
+      await this.activateProvider(provider)
+      failurePhase = 'profile-bootstrap'
+      await provider.ensureProfile()
+      failurePhase = 'runtime-start'
+      await provider.start()
+    } catch (error) {
+      const failureCategory = await Promise.resolve()
+        .then(() => this.classifyFailure(error, {
+          phase: failurePhase,
+          profileName: provider.profileName,
+        }))
+        .catch(() => undefined)
+      const detail = Object.freeze({
+        event: 'failed',
+        phase,
+        failurePhase,
+        attempt,
+        startupAttempt,
+        directAttempt: startupAttempt,
+        profileName: provider.profileName,
+        failureCategory: typeof failureCategory === 'string' ? failureCategory : 'UNKNOWN_FATAL',
+        durationMs: Math.max(0, Date.now() - startedAt),
+      })
+      failureDetails?.push(detail)
+      await this.#publishAttempt(detail)
+      throw error
+    }
+    await this.#publishAttempt({
+      event: 'ready',
+      phase,
+      attempt,
+      startupAttempt,
+      directAttempt: startupAttempt,
+      profileName: provider.profileName,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    })
   }
 
   async #stopProvider(provider) {
@@ -94,10 +162,15 @@ export class StartupRepairCoordinator {
   async #run() {
     const full = await this.#provider('desktop')
     const failures = []
+    const failureDetails = []
     await this.#publish('starting-full')
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        await this.#startProvider(full)
+        await this.#startProvider(full, {
+          phase: 'full',
+          attempt,
+          failureDetails,
+        })
         await this.#publish('ready-full')
         return Object.freeze({ state: 'ready-full', provider: full, fullAttempts: attempt })
       } catch (error) {
@@ -111,6 +184,7 @@ export class StartupRepairCoordinator {
       fullAttempts: 2,
       failureCount: failures.length,
       failures: Object.freeze([...failures]),
+      failureDetails: Object.freeze([...failureDetails]),
     })
     const repairAvailable = await Promise.resolve()
       .then(() => this.canRepair(repairInput))
@@ -123,7 +197,11 @@ export class StartupRepairCoordinator {
     let rollbackFailed = false
     if (repair?.status === 'applied') {
       try {
-        await this.#startProvider(full)
+        await this.#startProvider(full, {
+          phase: 'full-repaired',
+          attempt: 3,
+          failureDetails: [],
+        })
         if (typeof repair.commit === 'function') await repair.commit()
         await this.#publish('ready-full')
         return Object.freeze({ state: 'ready-full', provider: full, fullAttempts: 3, repaired: true })
@@ -143,7 +221,11 @@ export class StartupRepairCoordinator {
       throw new Error('fallback Runtime must use the same DSH Home')
     }
     await this.#publish('starting-builtins')
-    await this.#startProvider(builtins)
+    await this.#startProvider(builtins, {
+      phase: 'builtins',
+      attempt: 1,
+      failureDetails: [],
+    })
     await this.#publish('ready-builtins')
     return Object.freeze({
       state: 'ready-builtins',

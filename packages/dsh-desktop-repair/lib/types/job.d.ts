@@ -13,9 +13,12 @@ export interface RepairModelSelection {
     provider: string;
     model: string;
     reasoningEffort?: string;
+    toolsCapability?: ToolsCapability;
 }
+export type ToolsCapability = 'auto' | 'native' | 'none';
 export interface RepairJobSettings {
     fallbackModels?: RepairModelSelection[];
+    defaultToolsCapability?: ToolsCapability;
 }
 export interface RepairJob {
     schemaVersion: 1;

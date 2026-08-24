@@ -9,6 +9,18 @@ const labels: Record<string, string> = {
   repairTitle: 'Automatic repair',
   repairDescription: 'Private local repair history',
   repairNone: 'No automatic repair has run.',
+  repairFullRetryFailed: 'Full startup and automatic repair did not complete; built-in plugins are active.',
+  repairMissingCredentials: 'No model Key is configured, so automatic repair did not call a model. Add a Key in Model settings first.',
+  repairNoModel: 'No repair model is configured. Choose a model and add its Key in Model settings.',
+  repairUnsupportedTools: 'The selected model does not support the tools required for automatic repair.',
+  repairFailed: 'Automatic repair did not pass verification; built-in plugins are active.',
+  repairBudgetExhausted: 'Automatic repair reached its safe attempt limit; built-in plugins are active.',
+  repairProfilePermission: 'A data-directory permission blocked full startup. Check the directory permissions.',
+  repairProfileInstallation: 'Installed application files blocked full startup. Repair or reinstall the application.',
+  repairProfileFailed: 'The application data directory could not finish startup. Check the local logs.',
+  repairRetry: 'Save and try again',
+  repairRetrying: 'Restarting and retrying',
+  repairRetryFailed: 'The retry could not start. Try again later.',
   repairLoading: 'Loading repair history',
   repairExpand: 'Show repair details',
   repairCollapse: 'Hide repair details',
@@ -74,5 +86,26 @@ describe('RepairStatusCard', () => {
     render(<RepairStatusCard t={(key) => labels[key] ?? key} />)
     expect(await screen.findByText('No automatic repair has run.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Show repair details' })).toBeNull()
+  })
+  it('explains missing model credentials and offers a safe retry', async () => {
+    const retry = vi.fn(async () => ({ accepted: true }))
+    Object.defineProperty(window, 'dshDesktop', {
+      configurable: true,
+      value: {
+        getRepairStatus: vi.fn(async () => ({
+          available: false,
+          reason: 'missing-credentials',
+          canRetry: true,
+        })),
+        retryRepair: retry,
+      },
+    })
+
+    render(<RepairStatusCard t={(key) => labels[key] ?? key} />)
+    expect(await screen.findByText(labels.repairMissingCredentials)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save and try again' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Save and try again' }))
+    await waitFor(() => expect(retry).toHaveBeenCalledTimes(1))
+    expect(document.body.textContent).not.toMatch(/secret-value|prompt|migration|isolation/iu)
   })
 })

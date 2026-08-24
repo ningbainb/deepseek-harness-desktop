@@ -1,4 +1,5 @@
 import { homedir, release as osRelease } from 'node:os'
+import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
@@ -70,6 +71,8 @@ import {
 import { projectDirectStartupState } from './repair-state.mjs'
 import {
   BUILTIN_BUNDLES,
+  classifyDesktopProfileBootstrapFailure,
+  DESKTOP_PROFILE_FAILURE_CATEGORIES,
   ensureDesktopProfile,
   resolveDshCliPath,
   resolveRuntimePackages,
@@ -89,7 +92,7 @@ import { normalizeProductContext } from './telemetry-events.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
 import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
 import { RepairIncidentStore } from './repair-incident-store.mjs'
-import { hasConfiguredRepairModel } from './repair-model-availability.mjs'
+import { resolveRepairModelAvailability } from './repair-model-availability.mjs'
 import { RepairRuntimeController } from './repair-runtime-controller.mjs'
 import { RepairTransactionManager } from './repair-transaction.mjs'
 import { createRegisteredRepairChecks, RepairVerifier } from './repair-verifier.mjs'
@@ -434,6 +437,7 @@ export function createDesktopShutdownLifecycle({
 
 export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
+  const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
   const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, safeStorage, screen, shell, Tray, WebContentsView } = electron
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
@@ -448,6 +452,10 @@ export async function startElectronApp(metadata) {
   let dispatchDeepLink
   let dispatchPresetFile
   const pendingPresetFiles = new Set()
+  let releaseDesktopProfileIngress
+  const desktopProfileIngressReady = new Promise((resolve) => {
+    releaseDesktopProfileIngress = resolve
+  })
   const deepLinkRouter = new DeepLinkRouter({
     protocol: metadata.protocol,
     dispatch: (link) => dispatchDeepLink(link),
@@ -573,6 +581,9 @@ export async function startElectronApp(metadata) {
   const desktopProfileDir = join(dshHome, 'profiles', 'desktop')
   const primaryRuntimeBinDirectory = join(userData, 'runtime-bin')
   let runtimeProvider
+  let latestStartupAttempt
+  let repairAvailabilityReason
+  let repairRetry = async () => ({ accepted: false })
   const desktopWindowStatePath = join(userData, 'window-state.json')
   const desktopPreferencesPath = join(userData, 'desktop-preferences.json')
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
@@ -670,14 +681,23 @@ export async function startElectronApp(metadata) {
       await mainWindow.loadFile(STARTUP_PATH, options)
     },
   })
-  const recordDirectStartupState = async (startupState) => {
-    const projection = projectDirectStartupState({ state: startupState })
-    await logStore.append(`[startup] direct-state=${projection.state}`).catch(() => {})
+  const recordDirectStartupState = async (startupState, { reason } = {}) => {
+    const projection = projectDirectStartupState({
+      state: startupState,
+      ...(reason === undefined ? {} : { reason }),
+    })
+    const reasonSuffix = projection.reason === undefined ? '' : ' reason=' + projection.reason
+    await logStore.append('[startup] direct-state=' + projection.state + reasonSuffix).catch(() => {})
     return projection
   }
-  const showDirectStartupState = async (startupState) => {
-    const projection = await recordDirectStartupState(startupState)
-    await loadStartupSurface({ query: { directState: projection.state } })
+  const showDirectStartupState = async (startupState, options = {}) => {
+    const projection = await recordDirectStartupState(startupState, options)
+    await loadStartupSurface({
+      query: {
+        directState: projection.state,
+        ...(projection.reason === undefined ? {} : { directReason: projection.reason }),
+      },
+    })
   }
   mainWindow.once('ready-to-show', () => {
     if (!updateShutdownRequested) mainWindow.show()
@@ -931,36 +951,33 @@ export async function startElectronApp(metadata) {
   await logStore.append(
     `[startup] package-resolution=${Math.round(performance.now() - packageResolutionStartedAt)}ms packages=${runtimePackages.size}`,
   )
-  const profileStartedAt = performance.now()
   let qqBotCredentials
   const qqBotCredentialStore = new QqBotCredentialStore({
     path: join(userData, 'qqbot-credentials.json'),
     safeStorage,
   })
-  const ensureProfile = async () => {
-    const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages })
-    await setQqBotProfileEnabled({ profileDir: result.profileDir, enabled: Boolean(qqBotCredentials) })
-    return result
+  qqBotCredentials = await qqBotCredentialStore.load().catch(async (error) => {
+    await logStore.append(
+      `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return undefined
+  })
+  const ensureProfileForMode = async (mode) => {
+    const profileStartedAt = performance.now()
+    try {
+      const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
+      if (mode === 'full') {
+        await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
+      }
+      await logStore.append(
+        '[startup] profile-ready=' + Math.round(performance.now() - profileStartedAt) + 'ms packages=' + runtimePackages.size + ' mode=' + mode,
+      )
+      return result
+    } finally {
+      if (mode === 'full') releaseDesktopProfileIngress()
+    }
   }
-  let prepared
-  try {
-    prepared = await prepareDesktopRuntimeInputs({
-      prepareProfile: () => ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
-      loadCredentials: () => qqBotCredentialStore.load(),
-      onCredentialError: (error) => logStore.append(
-        `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    })
-  } catch (error) {
-    await logStore.append(`[profile] bootstrap failed before Runtime startup: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    throw error
-  }
-  const profile = prepared.profile
-  qqBotCredentials = prepared.credentials
-  await setQqBotProfileEnabled({ profileDir: profile.profileDir, enabled: Boolean(qqBotCredentials) })
-  await logStore.append(
-    `[startup] profile-ready=${Math.round(performance.now() - profileStartedAt)}ms packages=${runtimePackages.size}`,
-  )
+  const ensureProfile = () => ensureProfileForMode('full')
   const desktopRuntimeEnvironment = () => desktopRuntimeEnvironmentFor({
     credentialEnvironment: legacyCredentialEnvironment,
     qqBotCredentials,
@@ -1099,17 +1116,17 @@ export async function startElectronApp(metadata) {
       lockfileSha256: knownGoodRuntimeEvidence?.lockfile.sha256,
     },
     resolvePackageVersion: (name) => resolvePackageVersion(name, {
-      profileDir: profile.profileDir,
+      profileDir: desktopProfileDir,
       anchors: [import.meta.url],
     }),
   })
   const pluginRecoveryStore = new PluginRecoveryStore({
-    profileDir: profile.profileDir,
+    profileDir: desktopProfileDir,
     stateDir: pluginRecoveryStateDir,
     builtInBundles: BUILTIN_BUNDLES,
   })
   const pluginManager = new PluginManager({
-    profileDir: profile.profileDir,
+    profileDir: desktopProfileDir,
     hostCompatibility,
     pathEntries: runtimePathEntries,
     profileArchive: userPluginArchive,
@@ -1181,11 +1198,7 @@ export async function startElectronApp(metadata) {
   })
   const builtinsRuntimeProvider = new DshRuntimeProvider({
     controller: builtinsRuntimeController,
-    ensureProfile: () => ensureDesktopProfile({
-      dshHome,
-      packageRoots: runtimePackages,
-      mode: 'builtins',
-    }),
+    ensureProfile: () => ensureProfileForMode('builtins'),
     dshHome,
     profileName: 'desktop-builtins',
     upstreamVersion: runtimeVersion,
@@ -1242,7 +1255,7 @@ export async function startElectronApp(metadata) {
     initialCredentials: qqBotCredentials,
     credentialStore: qqBotCredentialStore,
     startQrConnect: startQqBotConnector,
-    setProfileEnabled: (enabled) => setQqBotProfileEnabled({ profileDir: profile.profileDir, enabled }),
+    setProfileEnabled: (enabled) => setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled }),
     setRuntimeCredentials: (credentials) => { qqBotCredentials = credentials },
     restartRuntime: () => runtimeProvider.recover(),
     onEventError: (error) => logStore.append(`[qqbot] event delivery failed: ${error instanceof Error ? error.message : String(error)}`),
@@ -1329,8 +1342,9 @@ export async function startElectronApp(metadata) {
     },
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
     repairIncidentStore,
+    startupAttempt: latestStartupAttempt,
     redactionRoots: [
-      { path: profile.profileDir, replacement: '<desktop-profile>' },
+      { path: desktopProfileDir, replacement: '<desktop-profile>' },
       { path: userData, replacement: '<desktop-user-data>' },
       { path: dshHome, replacement: '<dsh-home>' },
       { path: projectRoot, replacement: '<workspace>' },
@@ -1430,7 +1444,14 @@ export async function startElectronApp(metadata) {
       }
     },
     getUpdateController: () => updateController,
-    getRepairStatus: () => repairIncidentStore.latest(),
+    getRepairStatus: async () => {
+      const incident = await repairIncidentStore.latest()
+      if (incident !== undefined) return incident
+      return repairAvailabilityReason === undefined
+        ? undefined
+        : { reason: repairAvailabilityReason, canRetry: true }
+    },
+    retryRepair: () => repairRetry(),
     getUpdateChannel: () => updateController?.getChannel?.() ?? updateChannel,
     setUpdateChannel: persistUpdateChannel,
     confirmUpdateChannelChange: async ({ from, to }) => {
@@ -1678,6 +1699,7 @@ export async function startElectronApp(metadata) {
     mainWindow.focus()
   }
   dispatchPresetFile = async (path) => {
+    await desktopProfileIngressReady
     try {
       const plan = await presetService.previewFile(path)
       const window = await createExtensionWindow()
@@ -1855,13 +1877,13 @@ export async function startElectronApp(metadata) {
     incidentStore: repairIncidentStore,
     desktopVersion,
     runtimeVersion,
-    profileDir: profile.profileDir,
+    profileDir: desktopProfileDir,
     builtInBundles: BUILTIN_BUNDLES,
     createTransaction: async ({ incidentDir, fingerprint, roots }) => {
       const manager = new RepairTransactionManager({
         archive: userPluginArchive,
         incidentDir,
-        profileDir: profile.profileDir,
+        profileDir: desktopProfileDir,
         roots,
       })
       return manager.begin({ incidentFingerprint: fingerprint })
@@ -1881,10 +1903,22 @@ export async function startElectronApp(metadata) {
     }),
   })
   let builtinsFallbackDetail = 'full-retry-failed'
+  let repairToolsCapabilityForJob = 'auto'
+  let repairFallbackModelsForJob
+  let retryInProgress = false
+  const repairReasonForAvailability = (availability) => availability?.reason === 'unsupported-tools'
+    ? 'unsupported-tools'
+    : availability?.reason === 'missing-credentials'
+      ? 'missing-credentials'
+      : 'no-model'
   const runAutomaticRepair = async (input) => {
     const repairStartedAt = performance.now()
     productMetrics.recordRepairAgentStarted('default-model')
-    const result = await automaticRepair.run(input)
+    const result = await automaticRepair.run({
+      ...input,
+      defaultToolsCapability: repairToolsCapabilityForJob,
+      fallbackModels: repairFallbackModelsForJob ?? automaticRepair.fallbackModels,
+    })
     if (result.status === 'applied') {
       return Object.freeze({
         ...result,
@@ -1917,6 +1951,7 @@ export async function startElectronApp(metadata) {
       : result.reason === 'model-unavailable'
         ? 'no-model'
         : 'repair-failed'
+    repairAvailabilityReason = builtinsFallbackDetail
     productMetrics.recordRepairAgentFailed({
       detail: result.reason === 'budget-exhausted'
         ? 'budget-exhausted'
@@ -1931,18 +1966,114 @@ export async function startElectronApp(metadata) {
     })
     return result
   }
-  const startupCoordinator = new StartupRepairCoordinator({
-    createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
-    canRepair: async () => {
-      const available = await hasConfiguredRepairModel({
+  repairRetry = async () => {
+    if (retryInProgress) return { accepted: false }
+    let availability
+    try {
+      availability = await resolveRepairModelAvailability({
         dshHome,
         compatibilityEnvironment: legacyCredentialEnvironment,
+        fallbackModels: automaticRepair.fallbackModels,
       })
-      if (!available) builtinsFallbackDetail = 'no-model'
-      return available
+    } catch {
+      builtinsFallbackDetail = 'no-model'
+      repairAvailabilityReason = 'no-model'
+      return { accepted: false, reason: 'no-model' }
+    }
+    if (availability?.available !== true) {
+      const reason = repairReasonForAvailability(availability)
+      builtinsFallbackDetail = reason
+      repairAvailabilityReason = reason
+      return { accepted: false, reason }
+    }
+    repairAvailabilityReason = undefined
+    retryInProgress = true
+    try {
+      app.relaunch()
+      app.quit()
+      return { accepted: true }
+    } catch {
+      retryInProgress = false
+      builtinsFallbackDetail = 'full-retry-failed'
+      repairAvailabilityReason = 'full-retry-failed'
+      return { accepted: false, reason: 'full-retry-failed' }
+    }
+  }
+  const startupCoordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
+    canRepair: async (input) => {
+      const blockingProfileFailure = (input?.failureDetails ?? []).find((detail) => (
+        detail?.failurePhase === 'profile-bootstrap'
+        && detail.failureCategory !== DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE
+      ))
+      if (blockingProfileFailure !== undefined) {
+        repairToolsCapabilityForJob = 'auto'
+        repairFallbackModelsForJob = undefined
+        builtinsFallbackDetail = blockingProfileFailure.failureCategory === DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE
+          ? 'profile-permission'
+          : blockingProfileFailure.failureCategory === DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE
+            ? 'profile-installation'
+            : 'profile-failed'
+        repairAvailabilityReason = builtinsFallbackDetail
+        return false
+      }
+      const availability = await resolveRepairModelAvailability({
+        dshHome,
+        compatibilityEnvironment: legacyCredentialEnvironment,
+        fallbackModels: automaticRepair.fallbackModels,
+      })
+      if (!availability.available) {
+        repairToolsCapabilityForJob = 'auto'
+        repairFallbackModelsForJob = undefined
+        builtinsFallbackDetail = availability.reason === 'unsupported-tools'
+          ? 'unsupported-tools'
+          : availability.reason === 'missing-credentials'
+            ? 'missing-credentials'
+            : 'no-model'
+        repairAvailabilityReason = builtinsFallbackDetail
+      }
+      if (availability.available) {
+        repairToolsCapabilityForJob = availability.toolsCapability ?? 'auto'
+        repairFallbackModelsForJob = availability.fallbackModels
+        repairAvailabilityReason = undefined
+      }
+      return availability.available
     },
     runRepair: runAutomaticRepair,
     activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
+    classifyFailure: (error) => classifyDesktopProfileBootstrapFailure(error),
+    publishAttempt: async (detail) => {
+      const safeProfile = typeof detail?.profileName === 'string'
+        && /^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(detail.profileName)
+        ? detail.profileName
+        : 'unknown'
+      const safeEvent = ['started', 'failed', 'ready'].includes(detail?.event) ? detail.event : 'unknown'
+      const safePhase = ['full', 'full-repaired', 'builtins'].includes(detail?.phase) ? detail.phase : 'unknown'
+      const safeFailureCategory = Object.values(DESKTOP_PROFILE_FAILURE_CATEGORIES).includes(detail?.failureCategory)
+        ? detail.failureCategory
+        : 'none'
+      const safeAttempt = Number.isInteger(detail?.startupAttempt) ? detail.startupAttempt : 0
+      const safeDirectAttempt = Number.isInteger(detail?.directAttempt) ? detail.directAttempt : 0
+      const safeDuration = Number.isFinite(detail?.durationMs) ? Math.max(0, Math.round(detail.durationMs)) : 0
+      latestStartupAttempt = Object.freeze({
+        bootId,
+        startupAttempt: safeAttempt,
+        directAttempt: safeDirectAttempt,
+        profileName: safeProfile,
+        runtimePid: Number.isInteger(runtimeProvider?.status?.pid) && runtimeProvider.status.pid > 0
+          ? runtimeProvider.status.pid
+          : undefined,
+        phase: safePhase,
+        event: safeEvent,
+        failureCategory: safeFailureCategory,
+        durationMs: safeDuration,
+      })
+      await logStore.append(
+        `[startup-attempt] bootId=${bootId} startupAttempt=${safeAttempt}`
+        + ` directAttempt=${safeDirectAttempt} profile=${safeProfile} phase=${safePhase}`
+        + ` event=${safeEvent} failureCategory=${safeFailureCategory} durationMs=${safeDuration}`,
+      )
+    },
     publishState: async (state) => {
       if (state === 'starting-builtins') {
         await showDirectStartupState('retrying-full')
@@ -1954,14 +2085,14 @@ export async function startElectronApp(metadata) {
       if (state === 'rolling-back') await showDirectStartupState('repairing')
       if (state === 'ready-full') await recordDirectStartupState(state)
       if (state === 'ready-builtins') {
-        await recordDirectStartupState(state)
+        await showDirectStartupState(state, { reason: builtinsFallbackDetail })
         productMetrics.recordBuiltinsFallbackReady({
           detail: builtinsFallbackDetail,
           durationMs: performance.now() - applicationStartedAt,
         })
         const latestRepair = await repairIncidentStore.latest().catch(() => undefined)
         await notificationService.show(
-          builtinsFallbackNotification(latestRepair?.fingerprint),
+          builtinsFallbackNotification(latestRepair?.fingerprint, builtinsFallbackDetail),
         ).catch(() => {})
       }
     },

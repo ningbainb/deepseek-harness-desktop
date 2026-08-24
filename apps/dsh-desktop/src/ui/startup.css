@@ -281,6 +281,69 @@ h1 {
   font-size: 11px;
   line-height: 1.5;
 }
+.startup-steps {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 187, 210, 0.14);
+  border-radius: 8px;
+  background: rgba(9, 27, 37, 0.34);
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.startup-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #6f8c98;
+  font-size: 10px;
+  line-height: 1.35;
+  transition: color 220ms ease, opacity 220ms ease;
+}
+
+.startup-step::before {
+  width: 12px;
+  flex: 0 0 12px;
+  color: #4d6874;
+  content: '-';
+  font: 12px/1 var(--mono);
+  text-align: center;
+}
+
+.startup-step[data-status="current"] {
+  color: #d9ebf1;
+}
+
+.startup-step[data-status="current"]::before {
+  color: #a8e6f4;
+  content: '>';
+}
+
+.startup-step[data-status="done"] {
+  color: #9cc6d1;
+}
+
+.startup-step[data-status="done"]::before {
+  color: #78cddd;
+  content: '+';
+}
+
+.startup-step[data-status="skipped"] {
+  opacity: 0.52;
+}
+
+.startup-guidance {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-left: 2px solid rgba(168, 230, 244, 0.64);
+  color: #c6e5ec;
+  background: rgba(28, 72, 87, 0.28);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: left;
+}
 
 footer {
   z-index: 4;

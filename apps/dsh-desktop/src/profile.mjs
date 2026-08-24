@@ -266,6 +266,21 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
 const ROOT_CONFIG = '[]\n'
 export const DESKTOP_PROFILE_BOOTSTRAP_ERROR = 'desktop-profile-bootstrap-invalid'
+export const DESKTOP_PROFILE_FAILURE_CATEGORIES = Object.freeze({
+  PROFILE_REPAIRABLE: 'PROFILE_REPAIRABLE',
+  INSTALLATION_FAILURE: 'INSTALLATION_FAILURE',
+  PERMISSION_FAILURE: 'PERMISSION_FAILURE',
+  UNKNOWN_FATAL: 'UNKNOWN_FATAL',
+})
+const INSTALLATION_FAILURE_CODES = new Set([
+  'DSH_DESKTOP_INSTALLATION_INCOMPLETE',
+  'MANAGED_GIT_INSTALL_INVALID',
+  'MANAGED_GIT_INSTALL_UNAVAILABLE',
+  'runtime-file-integrity-not-in-matrix',
+  'runtime-lockfile-not-in-matrix',
+  'runtime-matrix-unavailable',
+  'runtime-patch-evidence-not-in-matrix',
+])
 export const DESKTOP_PATCH_START = '# --- dsh-desktop managed (auto-generated; do not edit) ---'
 export const DESKTOP_PATCH_END = '# --- end dsh-desktop managed ---'
 export const SKIN_PATCH_START = '# --- dsh-skin managed (auto-generated; do not edit) ---'
@@ -378,6 +393,33 @@ export function createDesktopProfileManifest(existing = {}) {
       },
     },
   }
+}
+
+function errorChain(error) {
+  const chain = []
+  const seen = new Set()
+  let current = error
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    seen.add(current)
+    chain.push(current)
+    current = current.cause
+  }
+  return chain
+}
+
+/** Classify only bounded startup facts; no error messages or paths are returned. */
+export function classifyDesktopProfileBootstrapFailure(error) {
+  const chain = errorChain(error)
+  if (chain.some((entry) => ['EACCES', 'EPERM'].includes(entry?.code))) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE
+  }
+  if (chain.some((entry) => INSTALLATION_FAILURE_CODES.has(entry?.code))) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE
+  }
+  if (chain.some((entry) => entry?.code === DESKTOP_PROFILE_BOOTSTRAP_ERROR)) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE
+  }
+  return DESKTOP_PROFILE_FAILURE_CATEGORIES.UNKNOWN_FATAL
 }
 
 export function createDesktopRepairProfileManifest() {
@@ -801,6 +843,15 @@ async function readDesktopManagedPackageJson(path) {
   }
 }
 
+function validateDesktopPatchSyntax(source, label) {
+  if (typeof source !== 'string' || source.trim() === '') return
+  try {
+    parse(source)
+  } catch (error) {
+    throw profileBootstrapError(`desktop profile ${label} is invalid`, error)
+  }
+}
+
 async function writeIfChanged(path, content) {
   try {
     if ((await readFile(path, 'utf8')) === content) return false
@@ -1018,12 +1069,14 @@ export async function ensureDesktopProfile({
     throw error
   })
   if (!preserveUserProfile) existingPatch = ''
+  validateDesktopPatchSyntax(existingPatch, 'profile patch')
   if (isSemanticallyEmptyPatch(existingPatch)) existingPatch = ''
   const homePatchPath = join(dshHome, 'cordis.patch.yml')
   let homePatch = await readFile(homePatchPath, 'utf8').catch((error) => {
     if (error?.code === 'ENOENT') return undefined
     throw error
   })
+  validateDesktopPatchSyntax(homePatch, 'home patch')
   const originalHomePatch = homePatch
   if (preserveUserProfile) {
     const legacySkinMigration = await migrateLegacySkinState({

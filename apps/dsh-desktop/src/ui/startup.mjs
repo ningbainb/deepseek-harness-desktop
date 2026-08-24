@@ -15,6 +15,9 @@ const progressValue = document.querySelector('#progress-value')
 const meterTip = document.querySelector('.meter-tip')
 meterTip.innerHTML = `<svg viewBox="0 0 50 50" focusable="false"><path d="${OFFICIAL_WHALE_PATH}"/></svg>`
 const whaleCanvas = document.querySelector('#whale-canvas')
+const startupStepsContainer = document.querySelector('#startup-steps')
+const startupSteps = [...document.querySelectorAll('[data-startup-step]')]
+const startupGuidance = document.querySelector('#startup-guidance')
 
 const STARTUP_STALL_NOTICE_MS = 30_000
 
@@ -38,6 +41,22 @@ const directCopy = Object.freeze({
   'installation-repair-required': ['正在修复应用安装', '安装文件修复后会自动继续'],
 })
 
+const directReasonCopy = Object.freeze({
+  'full-retry-failed': { heading: '已使用内置插件启动', message: '自动修复未完成，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可在设置页查看脱敏修复记录，确认模型配置后再尝试。' },
+  'missing-credentials': { heading: '自动修复未启用', message: '未配置模型 Key，应用已使用内置插件启动。', guidance: '请在模型设置中填写 Key 并保存，然后点击“保存后重新尝试”。' },
+  'no-model': { heading: '自动修复未启用', message: '未配置可用的修复模型，应用已使用内置插件启动。', guidance: '请在模型设置中选择修复模型并配置 Key。' },
+  'unsupported-tools': { heading: '自动修复暂不可用', message: '当前模型不支持自动修复所需的工具，应用已使用内置插件启动。', guidance: '请改用支持工具调用的模型后再尝试。' },
+  'repair-failed': { heading: '自动修复未完成', message: '自动修复未通过验证，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可在设置页查看脱敏修复记录，确认模型配置后再尝试。' },
+  'budget-exhausted': { heading: '自动修复未完成', message: '自动修复达到安全尝试上限，应用已使用内置插件启动。', guidance: '可在设置页查看脱敏修复记录，稍后再尝试。' },
+  'profile-permission': { heading: '正在修复应用安装', message: '应用数据目录权限阻止了完整启动，应用已使用内置插件启动。', guidance: '请检查应用数据目录权限后再尝试。' },
+  'profile-installation': { heading: '正在修复应用安装', message: '应用安装文件阻止了完整启动，应用已使用内置插件启动。', guidance: '请修复或重新安装应用后再尝试。' },
+  'profile-failed': { heading: '已使用内置插件启动', message: '应用数据目录未能完成启动，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可检查本地日志了解安装问题，再尝试启动。' },
+})
+function safeDirectReason(value) {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(directReasonCopy, value)
+    ? value
+    : undefined
+}
 let currentState = 'stopped'
 let progress = 0
 let latestStatus = { state: 'stopped' }
@@ -61,6 +80,62 @@ function renderProgress(value) {
   }
 }
 
+function hideDirectProcess() {
+  if (startupStepsContainer) startupStepsContainer.hidden = true
+  for (const step of startupSteps) {
+    step.removeAttribute('aria-current')
+    delete step.dataset.status
+  }
+  if (startupGuidance) {
+    startupGuidance.hidden = true
+    startupGuidance.textContent = ''
+  }
+  document.body.removeAttribute('data-direct-state')
+}
+
+function directCopyFor(state, reason) {
+  const reasonCopy = directReasonCopy[reason]
+  if (state === 'ready-builtins' && reasonCopy !== undefined) {
+    return [reasonCopy.heading, reasonCopy.message]
+  }
+  return directCopy[state]
+}
+
+function renderDirectProcess(state, reason) {
+  if (!startupStepsContainer) return
+  startupStepsContainer.hidden = state === 'preparing'
+  const currentStep = {
+    'starting-full': 0,
+    'retrying-full': 1,
+    repairing: 2,
+    verifying: 3,
+    'installation-repair-required': 0,
+  }[state] ?? -1
+  const completedThrough = {
+    'retrying-full': 0,
+    repairing: 1,
+    verifying: 2,
+    'ready-full': 3,
+    'ready-builtins': 4,
+  }[state] ?? -1
+  const skipModelProcess = state === 'ready-builtins'
+    && ['missing-credentials', 'no-model', 'unsupported-tools'].includes(reason)
+  startupSteps.forEach((step, index) => {
+    let status = index <= completedThrough ? 'done' : 'pending'
+    if (index === currentStep) status = 'current'
+    if (skipModelProcess && (index === 2 || index === 3)) status = 'skipped'
+    if (state === 'ready-full' && index === 4) status = 'skipped'
+    step.dataset.status = status
+    if (status === 'current') step.setAttribute('aria-current', 'step')
+    else step.removeAttribute('aria-current')
+  })
+  if (startupGuidance) {
+    const reasonCopy = directReasonCopy[reason] ?? directReasonCopy['full-retry-failed']
+    startupGuidance.hidden = state !== 'ready-builtins'
+    startupGuidance.textContent = state === 'ready-builtins' ? reasonCopy.guidance : ''
+  }
+  document.body.dataset.directState = state
+}
 function startingState(state) {
   return state === 'starting' || state === 'restarting'
 }
@@ -86,6 +161,7 @@ function updateStartupStall(state, stateChanged) {
 }
 
 function render(status) {
+  hideDirectProcess()
   const state = copy[status?.state] ? status.state : 'crashed'
   const [heading, message] = copy[state]
   const stateChanged = currentState !== state
@@ -118,8 +194,10 @@ window.addEventListener('beforeunload', () => {
 
 const previewState = new URLSearchParams(window.location.search).get('preview')
 const directState = new URLSearchParams(window.location.search).get('directState')
+const directReasonKey = new URLSearchParams(window.location.search).get('directReason')
+const directReason = safeDirectReason(directReasonKey)
 if (directState && directCopy[directState]) {
-  const [heading, message] = directCopy[directState]
+  const [heading, message] = directCopyFor(directState, directReason)
   const directProgress = {
     preparing: 8,
     'starting-full': 24,
@@ -135,6 +213,7 @@ if (directState && directCopy[directState]) {
   title.textContent = heading
   detail.textContent = message
   renderProgress(directProgress[directState] ?? 8)
+  renderDirectProcess(directState, directReason)
 } else if (previewState && copy[previewState]) {
   try {
     const info = await window.dshDesktop.getInfo()

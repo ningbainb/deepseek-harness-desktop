@@ -5,6 +5,7 @@ import { AutomaticRepairRunner } from '../src/automatic-repair-runner.mjs'
 
 function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, status: 'verified' } } = {}) {
   const calls = []
+  const writeJobInputs = []
   const incident = { fingerprint: 'a'.repeat(64) }
   const incidentStore = {
     incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint,
@@ -41,10 +42,13 @@ function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, s
       bundles: [{ name: '@user/plugin', version: '1.0.0', enabled: true }],
     }),
     createTransaction: async () => transaction,
-    writeJob: async () => ({
+    writeJob: async (input) => {
+      writeJobInputs.push(input)
+      return {
       jobPath: 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint + '\\job.json',
       resultPath: 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint + '\\result.json',
-    }),
+      }
+    },
     repairRuntime: {
       async run() {
         calls.push(['model-runtime'])
@@ -60,7 +64,7 @@ function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, s
       async verify(input) { calls.push(['verify-candidate', input.checksRequested]); return verification },
     }),
   })
-  return { runner, calls, transaction }
+  return { runner, calls, transaction, writeJobInputs }
 }
 
 test('automatic repair applies a verified candidate and defers commit until full startup succeeds', async () => {
@@ -113,4 +117,25 @@ test('an already claimed fingerprint skips the model and converges to fallback',
 
   assert.deepEqual(repaired, { status: 'unavailable', reason: 'budget-exhausted' })
   assert.equal(calls.length, 0)
+})
+
+test('passes the checked tools capability and bounded fallback list into the repair job', async () => {
+  const { runner, writeJobInputs } = fixture()
+
+  await runner.run({
+    failures: [new Error('startup failed')],
+    defaultToolsCapability: 'none',
+    fallbackModels: [{
+      provider: 'fallback',
+      model: 'repair-2',
+      toolsCapability: 'native',
+    }],
+  })
+
+  assert.equal(writeJobInputs[0].defaultToolsCapability, 'none')
+  assert.deepEqual(writeJobInputs[0].fallbackModels, [{
+    provider: 'fallback',
+    model: 'repair-2',
+    toolsCapability: 'native',
+  }])
 })

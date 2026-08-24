@@ -12,7 +12,7 @@
       "status": "known-good",
       "upstreamVersion": "0.1.1-rc.1",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=3.0.7",
+      "desktopRange": "=3.0.8",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,7 +55,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "3bf52346b14c04b3ad6a6b03eddf248dd5d59575c05965dcb69a744d2c28add6"
+          "sha256": "7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b"
         },
         "slots": [
           "conversation.composer.dock",
@@ -69,12 +69,13 @@
         ],
         "patches": {
           "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-          "sha256": "de3d81e33a478eb6e8444b9c23a96f7a1c617db9c347f8223c9f2d7046fe9a36",
+          "sha256": "c87567f86e35aa69576a81985ba68a34137202bde50a1e62e4debd28b2b74fd6",
           "ids": [
             "cancellation-presentation",
             "desktop-skin-profile-isolation",
             "queued-turn-continuation",
-            "tool-call-arguments-envelope"
+            "tool-call-arguments-envelope",
+            "tools-capability-request-side"
           ]
         },
         "packagedRuntime": {

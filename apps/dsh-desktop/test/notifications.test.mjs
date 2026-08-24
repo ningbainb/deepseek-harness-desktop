@@ -19,6 +19,13 @@ test('builtins fallback notification is informational and asks for no recovery d
   assert.doesNotMatch(JSON.stringify(notification), /点击|选择|迁移|隔离|安全模式/u)
 })
 
+test('missing credentials notification explains that no model call was made', () => {
+  const notification = builtinsFallbackNotification('b'.repeat(64), 'missing-credentials')
+  assert.equal(notification.title, '自动修复未启用')
+  assert.match(notification.body, /模型 Key/u)
+  assert.match(notification.body, /填写 Key/u)
+  assert.doesNotMatch(JSON.stringify(notification), /secret|api.?key=/iu)
+})
 test('structured notifications validate category, id, bounded text, and allowlisted deep links', () => {
   assert.deepEqual(normalizeDesktopNotification({
     category: 'task',

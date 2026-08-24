@@ -79,9 +79,20 @@ export interface DesktopRepairModelSummary {
   outcome: string
 }
 
+export type DesktopRepairUnavailableReason =
+  | 'full-retry-failed'
+  | 'missing-credentials'
+  | 'no-model'
+  | 'unsupported-tools'
+  | 'repair-failed'
+  | 'budget-exhausted'
+  | 'profile-permission'
+  | 'profile-installation'
+  | 'profile-failed'
+
 /** Electron-owned automatic repair status; it never carries raw errors or model output. */
 export type DesktopRepairStatus =
-  | { available: false }
+  | { available: false; reason?: DesktopRepairUnavailableReason; canRetry?: boolean }
   | {
       available: true
       fingerprint: string
@@ -92,4 +103,6 @@ export type DesktopRepairStatus =
       models: DesktopRepairModelSummary[]
       changedFiles: string[]
       checks: string[]
+      reason?: DesktopRepairUnavailableReason
+      canRetry?: boolean
     }

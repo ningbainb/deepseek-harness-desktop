@@ -11,6 +11,21 @@ export const DIRECT_STARTUP_STATES = Object.freeze([
   'installation-repair-required',
 ])
 
+/** Safe reasons that may be shown after the full profile falls back. */
+export const DIRECT_STARTUP_REASONS = Object.freeze([
+  'full-retry-failed',
+  'missing-credentials',
+  'no-model',
+  'unsupported-tools',
+  'repair-failed',
+  'budget-exhausted',
+  'profile-permission',
+  'profile-installation',
+  'profile-failed',
+])
+
+const DIRECT_STARTUP_REASON_SET = new Set(DIRECT_STARTUP_REASONS)
+
 const DIRECT_STARTUP_SUMMARIES = Object.freeze({
   preparing: '正在准备应用',
   'starting-full': '正在载入原有数据和全部插件',
@@ -30,10 +45,15 @@ export function projectDirectStartupState(input = {}) {
   if (!DIRECT_STARTUP_STATES.includes(input.state)) {
     throw new TypeError('invalid startup state')
   }
+  const reason = input.reason === undefined ? undefined : String(input.reason)
+  if (reason !== undefined && !DIRECT_STARTUP_REASON_SET.has(reason)) {
+    throw new TypeError('invalid startup reason')
+  }
   return Object.freeze({
     schemaVersion: REPAIR_STATE_SCHEMA_VERSION,
     state: input.state,
     summary: DIRECT_STARTUP_SUMMARIES[input.state],
     interactive: false,
+    ...(reason === undefined ? {} : { reason }),
   })
 }

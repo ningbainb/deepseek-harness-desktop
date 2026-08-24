@@ -35,7 +35,14 @@ async function fixture() {
       args: ['--version'],
       cwd: 'profile',
     }],
-    settings: { fallbackModels: [{ provider: 'fallback', model: 'repair-2' }] },
+    settings: {
+      defaultToolsCapability: 'none',
+      fallbackModels: [{
+        provider: 'fallback',
+        model: 'repair-2',
+        toolsCapability: 'native',
+      }],
+    },
     timeoutMs: 90_000,
   }, null, 2)}\n`)
   return { incident, workspace, jobPath, resultPath }
@@ -46,6 +53,14 @@ describe('repair job boundary', () => {
     const { jobPath, resultPath } = await fixture()
     const job = await loadRepairJob(jobPath)
     expect(job.roots[0]).toEqual({ id: 'profile', kind: 'profile', relativePath: 'profile' })
+    expect(job.settings).toEqual({
+      defaultToolsCapability: 'none',
+      fallbackModels: [{
+        provider: 'fallback',
+        model: 'repair-2',
+        toolsCapability: 'native',
+      }],
+    })
     expect((await claimRepairJob(job)).claimed).toBe(true)
     await writeRepairResult(job, {
       status: 'model-unavailable',

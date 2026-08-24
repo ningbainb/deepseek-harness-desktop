@@ -12,8 +12,10 @@ import {
   AGGREGATED_BUNDLES,
   BUILTIN_BUNDLES,
   BUILTIN_SKIN_IDS,
+  classifyDesktopProfileBootstrapFailure,
   CODEX_PROVIDER_CONFLICTS,
   DESKTOP_PATCH_CONFIG,
+  DESKTOP_PROFILE_FAILURE_CATEGORIES,
   DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES,
   DEPENDENCY_ONLY_BUNDLES,
   DESKTOP_PLUGIN_COMPAT_PACKAGES,
@@ -47,6 +49,33 @@ function aggregateLoaderPackageNames(source) {
   visit(parse(source))
   return [...packageNames].toSorted()
 }
+
+test('profile bootstrap failure classification is bounded and follows wrapped causes', () => {
+  const invalid = Object.assign(new Error('invalid profile'), {
+    code: 'desktop-profile-bootstrap-invalid',
+  })
+  const wrapped = new Error('provider operation failed', { cause: invalid })
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(wrapped),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+  )
+  for (const code of ['EACCES', 'EPERM']) {
+    assert.equal(
+      classifyDesktopProfileBootstrapFailure(Object.assign(new Error('permission'), { code })),
+      DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE,
+    )
+  }
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(
+      Object.assign(new Error('installation incomplete'), { code: 'DSH_DESKTOP_INSTALLATION_INCOMPLETE' }),
+    ),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE,
+  )
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(new Error('unknown')),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.UNKNOWN_FATAL,
+  )
+})
 
 test('packaged paths point at physical asar-unpacked files', () => {
   assert.equal(
@@ -788,6 +817,55 @@ test('profile bootstrap repairs semantically empty patch documents without repla
     await writeFile(join(dshHome, 'cordis.patch.yml'), 'plugin: retained\n')
     await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), 'plugin: retained\n')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap leaves a missing root patch absent when the pinned runtime succeeds without it', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-missing-root-patch-'))
+  try {
+    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    await assert.rejects(
+      readFile(join(root, 'cordis.patch.yml'), 'utf8'),
+      (error) => error?.code === 'ENOENT',
+    )
+    const composed = spawnSync(
+      process.execPath,
+      [resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, DSH_HOME: root },
+        timeout: 20_000,
+      },
+    )
+    assert.equal(composed.status, 0, composed.stderr)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap classifies malformed profile and root patch YAML as repairable', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-malformed-patch-'))
+  const profileDir = join(root, 'profiles', 'desktop')
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'cordis.patch.yml'), '{invalid')
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome: root, packageRoots: new Map() }),
+      (error) => error?.code === 'desktop-profile-bootstrap-invalid'
+        && classifyDesktopProfileBootstrapFailure(error) === DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+    )
+    assert.equal(await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8'), '{invalid')
+
+    await writeFile(join(profileDir, 'cordis.patch.yml'), '[]\n')
+    await writeFile(join(root, 'cordis.patch.yml'), '{invalid')
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome: root, packageRoots: new Map() }),
+      (error) => error?.code === 'desktop-profile-bootstrap-invalid'
+        && classifyDesktopProfileBootstrapFailure(error) === DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+    )
+    assert.equal(await readFile(join(root, 'cordis.patch.yml'), 'utf8'), '{invalid')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

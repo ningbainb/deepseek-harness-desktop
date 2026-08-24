@@ -29,7 +29,16 @@ const USER_CONTENT_LOG_LINE = /(?:\b(?:prompt|session(?:\s+history)?|tool\s*(?:r
 const PRIVATE_DIAGNOSTIC_FIELD = /(?:^|[-_.])(technicaldetails|stack|stacktrace|raw|stderr|stdout|error|message|detail|cause)(?:$|[-_.])/iu
 const SAFE_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/iu
 const SAFE_VERSION = /^v?[0-9]+(?:\.[0-9]+){0,3}(?:[-+][0-9a-z.-]+)?$/iu
+const SAFE_BOOT_ID = /^[a-f0-9]{16}$/u
+const SAFE_PROFILE_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/iu
 const SAFE_DIAGNOSTIC_CODE = /^[a-z0-9][a-z0-9._-]{0,127}$/iu
+const MAX_SAFE_PID = 0x7fffffff
+const STARTUP_FAILURE_CATEGORIES = new Set([
+  'PROFILE_REPAIRABLE',
+  'INSTALLATION_FAILURE',
+  'PERMISSION_FAILURE',
+  'UNKNOWN_FATAL',
+])
 const DIAGNOSTIC_EXCLUSIONS = Object.freeze([
   'API keys, tokens, cookies, passwords, private keys, and authorization values',
   'project files, complete prompts, complete sessions, answers, and tool results',
@@ -279,12 +288,50 @@ function currentRuntimeSummary(controller) {
   const status = controller?.status
   return {
     state: typeof status?.state === 'string' ? status.state : 'unknown',
+    ...(Number.isInteger(status?.pid) && status.pid > 0 && status.pid <= MAX_SAFE_PID ? { pid: status.pid } : {}),
     ...(typeof status?.error === 'string' && status.error.length > 0
       ? { errorPresent: true, errorFingerprint: stableErrorFingerprint(status.error) }
       : {}),
     restartAttempt: Number.isInteger(status?.restartAttempt) ? Math.max(0, status.restartAttempt) : 0,
     ...(status?.restartBlocked === 'repeated-crash' ? { restartBlocked: status.restartBlocked } : {}),
   }
+}
+
+function projectStartupAttempt(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const bootId = safeIdentifier(value.bootId, SAFE_BOOT_ID, 16)
+  const profileName = safeIdentifier(value.profileName, SAFE_PROFILE_NAME, 64)
+  const phase = ['full', 'full-repaired', 'builtins'].includes(value.phase) ? value.phase : undefined
+  const event = ['started', 'failed', 'ready'].includes(value.event) ? value.event : undefined
+  const failureCategory = STARTUP_FAILURE_CATEGORIES.has(value.failureCategory)
+    ? value.failureCategory
+    : undefined
+  const startupAttempt = Number.isInteger(value.startupAttempt)
+    ? Math.max(0, Math.min(value.startupAttempt, 100))
+    : undefined
+  const directAttempt = Number.isInteger(value.directAttempt)
+    ? Math.max(0, Math.min(value.directAttempt, 100))
+    : undefined
+  const runtimePid = Number.isInteger(value.runtimePid) && value.runtimePid > 0 && value.runtimePid <= MAX_SAFE_PID
+    ? value.runtimePid
+    : undefined
+  const durationMs = Number.isFinite(value.durationMs)
+    ? Math.max(0, Math.min(Math.round(value.durationMs), 600_000))
+    : undefined
+  if (bootId === undefined && profileName === undefined && startupAttempt === undefined && directAttempt === undefined) {
+    return undefined
+  }
+  return Object.freeze({
+    ...(bootId === undefined ? {} : { bootId }),
+    ...(startupAttempt === undefined ? {} : { startupAttempt }),
+    ...(directAttempt === undefined ? {} : { directAttempt }),
+    ...(profileName === undefined ? {} : { profileName }),
+    ...(runtimePid === undefined ? {} : { runtimePid }),
+    ...(phase === undefined ? {} : { phase }),
+    ...(event === undefined ? {} : { event }),
+    ...(failureCategory === undefined ? {} : { failureCategory }),
+    ...(durationMs === undefined ? {} : { durationMs }),
+  })
 }
 
 function boundedTimeout(operation, source, {
@@ -340,6 +387,7 @@ export async function collectStartupDiagnostics({
   patchAssessment,
   migration,
   repairIncidentStore,
+  startupAttempt,
 } = {}) {
   const timeoutMs = Number.isInteger(collectionTimeoutMs) && collectionTimeoutMs > 0
     ? collectionTimeoutMs
@@ -370,6 +418,7 @@ export async function collectStartupDiagnostics({
       { timeoutMs, schedule, cancelSchedule, issues: collectionIssues, redactionOptions },
     ),
   ])
+  const startupAttemptSummary = projectStartupAttempt(startupAttempt)
   const generatedAt = now()
   const document = {
     schemaVersion: STARTUP_DIAGNOSTICS_SCHEMA_VERSION,
@@ -386,6 +435,9 @@ export async function collectStartupDiagnostics({
     },
     runtime: currentRuntimeSummary(controller),
     startup: {
+      ...(startupAttemptSummary === undefined
+        ? {}
+        : { attempt: startupAttemptSummary }),
       recentRuntimeLog: typeof recentRuntimeLog === 'string'
         ? summarizeDiagnosticLog(recentRuntimeLog, { limit: MAX_LOG_LENGTH })
         : undefined,

@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { hasConfiguredRepairModel } from '../src/repair-model-availability.mjs'
+import {
+  hasConfiguredRepairModel,
+  resolveRepairModelAvailability,
+} from '../src/repair-model-availability.mjs'
 
 async function fixture(context) {
   const dshHome = await mkdtemp(join(tmpdir(), 'dsh-repair-model-'))
@@ -132,4 +135,138 @@ test('does not accept an OAuth record when the selected provider route is absent
     environment: {},
     compatibilityEnvironment: {},
   }), false)
+})
+
+test('reports no-model when a selected pi-ai route is absent', async (context) => {
+  const dshHome = await fixture(context)
+  await writeYaml(dshHome, 'settings.yaml', JSON.stringify({
+    'agent-default-model': { provider: 'missing-route', model: 'repair-model' },
+  }))
+
+  assert.deepEqual(await resolveRepairModelAvailability({
+    dshHome,
+    environment: {},
+    compatibilityEnvironment: {},
+  }), {
+    available: false,
+    reason: 'no-model',
+    selection: {
+      provider: 'missing-route',
+      model: 'repair-model',
+    },
+  })
+})
+
+test('reports missing-credentials for a configured route without usable credentials', async (context) => {
+  const dshHome = await fixture(context)
+  await writeYaml(dshHome, 'settings.yaml', JSON.stringify({
+    'agent-default-model': { provider: 'openai', model: 'repair-model' },
+    'llm-pi-ai': { providers: { openai: { apiKeyEnv: 'OPENAI_API_KEY' } } },
+  }))
+
+  const availability = await resolveRepairModelAvailability({
+    dshHome,
+    environment: {},
+    compatibilityEnvironment: {},
+  })
+  assert.equal(availability.available, false)
+  assert.equal(availability.reason, 'missing-credentials')
+  assert.equal(availability.toolsCapability, 'auto')
+})
+
+test('reports unsupported-tools before attempting repair on a tools:none route', async (context) => {
+  const dshHome = await fixture(context)
+  await writeYaml(dshHome, 'settings.yaml', JSON.stringify({
+    'agent-default-model': { provider: 'company-gateway', model: 'repair-model' },
+    'llm-pi-ai': {
+      providers: {
+        'company-gateway': {
+          apiKeyEnv: 'COMPANY_GATEWAY_API_KEY',
+          toolsCapability: 'none',
+        },
+      },
+    },
+  }))
+
+  const availability = await resolveRepairModelAvailability({
+    dshHome,
+    environment: {},
+    compatibilityEnvironment: { COMPANY_GATEWAY_API_KEY: 'configured-secret' },
+  })
+  assert.equal(availability.available, false)
+  assert.equal(availability.reason, 'unsupported-tools')
+  assert.equal(availability.toolsCapability, 'none')
+})
+
+test('keeps repair available when a tools:none default has a compatible fallback', async (context) => {
+  const dshHome = await fixture(context)
+  await writeYaml(dshHome, 'settings.yaml', JSON.stringify({
+    'agent-default-model': { provider: 'company-gateway', model: 'repair-model' },
+    'llm-pi-ai': {
+      providers: {
+        'company-gateway': {
+          apiKeyEnv: 'COMPANY_GATEWAY_API_KEY',
+          toolsCapability: 'none',
+        },
+        fallback: {
+          apiKeyEnv: 'FALLBACK_API_KEY',
+          toolsCapability: 'native',
+        },
+      },
+    },
+  }))
+
+  const availability = await resolveRepairModelAvailability({
+    dshHome,
+    environment: {
+      FALLBACK_API_KEY: 'configured-secret',
+    },
+    compatibilityEnvironment: {
+      COMPANY_GATEWAY_API_KEY: 'configured-secret',
+    },
+    fallbackModels: [{ provider: 'fallback', model: 'repair-model-2' }],
+  })
+  assert.deepEqual(availability, {
+    available: true,
+    reason: 'available',
+    selection: {
+      provider: 'company-gateway',
+      model: 'repair-model',
+    },
+    toolsCapability: 'none',
+    fallbackModels: [{
+      provider: 'fallback',
+      model: 'repair-model-2',
+      toolsCapability: 'native',
+    }],
+  })
+})
+
+test('returns safe available repair selection and capability without secret values', async (context) => {
+  const dshHome = await fixture(context)
+  await writeYaml(dshHome, 'settings.yaml', JSON.stringify({
+    'agent-default-model': { provider: 'company-gateway', model: 'repair-model' },
+    'llm-pi-ai': {
+      providers: {
+        'company-gateway': {
+          apiKeyEnv: 'COMPANY_GATEWAY_API_KEY',
+          toolsCapability: 'native',
+        },
+      },
+    },
+  }))
+
+  assert.deepEqual(await resolveRepairModelAvailability({
+    dshHome,
+    environment: {},
+    compatibilityEnvironment: { COMPANY_GATEWAY_API_KEY: 'configured-secret' },
+  }), {
+    available: true,
+    reason: 'available',
+    selection: {
+      provider: 'company-gateway',
+      model: 'repair-model',
+    },
+    toolsCapability: 'native',
+  })
 })

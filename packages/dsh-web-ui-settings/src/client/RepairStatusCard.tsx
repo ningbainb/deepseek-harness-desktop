@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
-import type { DesktopRepairStatus } from '../protocol.ts'
+import type { DesktopRepairStatus, DesktopRepairUnavailableReason } from '../protocol.ts'
 import type { WebUIPluginsKey } from './locales.ts'
 import css from './web-ui-settings.module.css'
 
@@ -10,6 +10,7 @@ declare global {
   interface Window {
     dshDesktop?: {
       getRepairStatus?: () => Promise<DesktopRepairStatus>
+      retryRepair?: () => Promise<{ accepted?: boolean }>
       action?: (action: RepairAction) => Promise<unknown>
     }
   }
@@ -24,6 +25,17 @@ function resultKey(status: Extract<DesktopRepairStatus, { available: true }>): W
   if (status.result === 'rolled-back') return 'repairRolledBack'
   if (status.result === 'exhausted') return 'repairExhausted'
   return 'repairPending'
+}
+const unavailableReasonKeys: Record<DesktopRepairUnavailableReason, WebUIPluginsKey> = {
+  'full-retry-failed': 'repairFullRetryFailed',
+  'missing-credentials': 'repairMissingCredentials',
+  'no-model': 'repairNoModel',
+  'unsupported-tools': 'repairUnsupportedTools',
+  'repair-failed': 'repairFailed',
+  'budget-exhausted': 'repairBudgetExhausted',
+  'profile-permission': 'repairProfilePermission',
+  'profile-installation': 'repairProfileInstallation',
+  'profile-failed': 'repairProfileFailed',
 }
 
 function DetailList({ title, values, empty }: { title: string; values: string[]; empty: string }): ReactNode {
@@ -41,6 +53,8 @@ function DetailList({ title, values, empty }: { title: string; values: string[];
 
 export function RepairStatusCard({ t }: RepairStatusCardProps): ReactNode {
   const [status, setStatus] = useState<DesktopRepairStatus | undefined>()
+  const [retrying, setRetrying] = useState(false)
+  const [retryFailed, setRetryFailed] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -60,6 +74,16 @@ export function RepairStatusCard({ t }: RepairStatusCardProps): ReactNode {
     void window.dshDesktop?.action?.(action).catch(() => {})
   }
 
+  const runRepairRetry = (): void => {
+    const retryRepair = window.dshDesktop?.retryRepair
+    if (retrying || typeof retryRepair !== 'function') return
+    setRetrying(true)
+    setRetryFailed(false)
+    void retryRepair()
+      .then(result => { if (result?.accepted !== true) setRetryFailed(true) })
+      .catch(() => setRetryFailed(true))
+      .finally(() => setRetrying(false))
+  }
   return (
     <section className={css.repairCard} aria-labelledby="desktop-repair-title">
       <div className={css.repairHeader}>
@@ -76,7 +100,19 @@ export function RepairStatusCard({ t }: RepairStatusCardProps): ReactNode {
       </div>
 
       {status === undefined && <p className={css.repairQuiet}>{t('repairLoading')}</p>}
-      {status?.available === false && <p className={css.repairQuiet}>{t('repairNone')}</p>}
+      {status?.available === false && (
+        <div className={css.repairUnavailable}>
+          <p className={css.repairQuiet}>{status.reason === undefined ? t('repairNone') : t(unavailableReasonKeys[status.reason])}</p>
+          {status.canRetry === true && typeof window.dshDesktop?.retryRepair === 'function' && (
+            <div className={css.repairActions}>
+              <button type="button" className={css.repairRetry} disabled={retrying} onClick={runRepairRetry}>
+                {retrying ? t('repairRetrying') : t('repairRetry')}
+              </button>
+            </div>
+          )}
+          {retryFailed && <p className={`${css.repairQuiet} ${css.repairRetryError}`}>{t('repairRetryFailed')}</p>}
+        </div>
+      )}
       {status?.available === true && (
         <>
           <button

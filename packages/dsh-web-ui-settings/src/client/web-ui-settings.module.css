@@ -140,6 +140,11 @@
 .repairHeadingBlock h3 { margin: 0; color: var(--dsw-alias-label-primary); font-size: 14px; line-height: 1.35; }
 .repairHeadingBlock p,
 .repairQuiet { margin: 3px 0 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 1.45; }
+.repairUnavailable { padding-bottom: 12px; }
+.repairUnavailable .repairQuiet { padding-bottom: 8px; }
+.repairUnavailable .repairActions { padding: 0 14px 0 52px; }
+.repairRetryError { color: #b27a4e; }
+.repairActions button:disabled { opacity: 0.58; cursor: default; }
 .repairQuiet { padding: 0 14px 12px 52px; }
 
 .repairResult {

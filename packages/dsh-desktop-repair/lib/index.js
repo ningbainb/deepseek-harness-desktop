@@ -2,7 +2,7 @@ import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { ReasoningEffortId, createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { defineTool } from "@deepseek-ai/dsh-tools";
@@ -45,6 +45,14 @@ function safeName(value, label) {
 	if (typeof value !== "string" || !NAME_PATTERN.test(value) || value.includes("..")) throw new TypeError(`${label} is invalid`);
 	return value;
 }
+function safeToolsCapability(value, label) {
+	if (![
+		"auto",
+		"native",
+		"none"
+	].includes(String(value))) throw new TypeError(String(label) + " is invalid");
+	return value;
+}
 function safeRepairRelativePath(value, label = "repair path") {
 	if (typeof value !== "string" || value.length === 0 || value.length > 320 || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.split("/").some((part) => part === "" || part === "." || part === "..")) throw new TypeError(`${label} is outside repair workspace`);
 	return value;
@@ -61,7 +69,8 @@ function modelSelection(value) {
 	return {
 		provider: safeName(input.provider, "repair provider"),
 		model: safeName(input.model, "repair model"),
-		...input.reasoningEffort === void 0 ? {} : { reasoningEffort: safeName(input.reasoningEffort, "repair reasoning effort") }
+		...input.reasoningEffort === void 0 ? {} : { reasoningEffort: safeName(input.reasoningEffort, "repair reasoning effort") },
+		...input.toolsCapability === void 0 ? {} : { toolsCapability: safeToolsCapability(input.toolsCapability, "repair tools capability") }
 	};
 }
 function rootEntry(value) {
@@ -153,8 +162,10 @@ async function loadRepairJob(jobPath) {
 	if (new Set(commands.map((command) => command.name)).size !== commands.length) throw new TypeError("repair job commands are duplicated");
 	const settingsInput = input.settings ?? {};
 	if (settingsInput === null || typeof settingsInput !== "object" || Array.isArray(settingsInput)) throw new TypeError("repair job settings are invalid");
-	const fallbackInput = settingsInput.fallbackModels ?? [];
+	const settingsRecord = settingsInput;
+	const fallbackInput = settingsRecord.fallbackModels ?? [];
 	if (!Array.isArray(fallbackInput) || fallbackInput.length > 8) throw new TypeError("repair fallback models are invalid");
+	const defaultToolsCapability = settingsRecord.defaultToolsCapability === void 0 ? void 0 : safeToolsCapability(settingsRecord.defaultToolsCapability, "repair default tools capability");
 	if (!Number.isInteger(input.timeoutMs) || Number(input.timeoutMs) < 1e3 || Number(input.timeoutMs) > 9e4) throw new TypeError("repair job timeout is invalid");
 	const fingerprint = input.fingerprint;
 	if (typeof fingerprint !== "string" || !FINGERPRINT_PATTERN.test(fingerprint)) throw new TypeError("repair fingerprint is invalid");
@@ -167,7 +178,10 @@ async function loadRepairJob(jobPath) {
 		resultPath,
 		roots,
 		commands,
-		settings: { fallbackModels: fallbackInput.map(modelSelection) },
+		settings: {
+			fallbackModels: fallbackInput.map(modelSelection),
+			...defaultToolsCapability === void 0 ? {} : { defaultToolsCapability }
+		},
 		timeoutMs: Number(input.timeoutMs),
 		incidentDir,
 		jobPath: resolvedJobPath
@@ -208,17 +222,22 @@ function validSelection(value) {
 	const selection = value;
 	return typeof selection.provider === "string" && selection.provider.trim() !== "" && typeof selection.model === "string" && selection.model.trim() !== "";
 }
-function detachedSelection(value) {
+function isToolsCapability(value) {
+	return value === "auto" || value === "native" || value === "none";
+}
+function detachedSelection(value, defaultToolsCapability) {
+	const toolsCapability = isToolsCapability(value.toolsCapability) ? value.toolsCapability : defaultToolsCapability;
 	return Object.freeze({
 		provider: value.provider.trim(),
 		model: value.model.trim(),
-		...typeof value.reasoningEffort === "string" && value.reasoningEffort.trim() !== "" ? { reasoningEffort: value.reasoningEffort.trim() } : {}
+		...typeof value.reasoningEffort === "string" && value.reasoningEffort.trim() !== "" ? { reasoningEffort: value.reasoningEffort.trim() } : {},
+		...toolsCapability === void 0 ? {} : { toolsCapability }
 	});
 }
 function repairModelCandidates(defaultModel, settings = {}) {
 	const values = [];
 	const current = defaultModel.currentSelection();
-	if (validSelection(current)) values.push(detachedSelection(current));
+	if (validSelection(current)) values.push(detachedSelection(current, settings.defaultToolsCapability));
 	for (const fallback of settings.fallbackModels ?? []) if (validSelection(fallback)) values.push(detachedSelection(fallback));
 	const seen = /* @__PURE__ */ new Set();
 	return values.filter((selection) => {
@@ -232,6 +251,7 @@ function failureCategory(error) {
 	const input = error;
 	const code = typeof input?.code === "string" ? input.code.toUpperCase() : "";
 	const status = typeof input?.status === "number" ? input.status : void 0;
+	if (code === "UNSUPPORTED_TOOLS") return "unsupported-tools";
 	if (status === 401 || status === 403 || /AUTH|CREDENTIAL|UNAUTHORIZED/u.test(code)) return "authentication";
 	if (status === 402 || status === 429 || /QUOTA|RATE_LIMIT|BILLING/u.test(code)) return "quota";
 	if (code === "REPAIR_TIMEOUT" || input?.name === "TimeoutError") return "timed-out";
@@ -260,8 +280,18 @@ async function runRepairModelCandidates({ defaultModel, settings = {}, runCandid
 	});
 	const attempts = [];
 	const startedAt = Date.now();
+	let runnableCandidates = 0;
 	for (let index = 0; index < candidates.length; index += 1) {
 		const selection = candidates[index];
+		if (selection.toolsCapability === "none") {
+			attempts.push({
+				provider: selection.provider,
+				model: selection.model,
+				outcome: "unsupported-tools"
+			});
+			continue;
+		}
+		runnableCandidates += 1;
 		const remaining = timeoutMs - (Date.now() - startedAt);
 		if (remaining < 1) return Object.freeze({
 			status: "timed-out",
@@ -294,7 +324,7 @@ async function runRepairModelCandidates({ defaultModel, settings = {}, runCandid
 		}
 	}
 	return Object.freeze({
-		status: "failed",
+		status: runnableCandidates === 0 ? "model-unavailable" : "failed",
 		attempts
 	});
 }
@@ -444,11 +474,13 @@ var RepairToolController = class {
 		if (!isWithin(target, root.path)) throw new Error("path is outside repair workspace");
 		let current = root.path;
 		if ((await state(current))?.isSymbolicLink()) throw new Error("repair workspace roots cannot be filesystem links");
+		const realRoot = await realpath(root.path);
 		for (const part of normalized.split(sep).filter(Boolean)) {
 			current = join(current, part);
 			const currentState = await state(current);
 			if (currentState === void 0) break;
 			if (currentState.isSymbolicLink()) throw new Error("repair tools refuse filesystem links");
+			if (!isWithin(await realpath(current), realRoot)) throw new Error("repair tools refuse filesystem links");
 		}
 		return target;
 	}

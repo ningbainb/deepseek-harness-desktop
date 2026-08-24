@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { DIRECT_STARTUP_STATES, projectDirectStartupState } from '../src/repair-state.mjs'
+import { DIRECT_STARTUP_REASONS, DIRECT_STARTUP_STATES, projectDirectStartupState } from '../src/repair-state.mjs'
 
 test('direct startup projection has no buttons, choices, or raw failures', () => {
   const state = projectDirectStartupState({
@@ -32,4 +32,13 @@ test('direct startup projection has no buttons, choices, or raw failures', () =>
 test('direct startup projection rejects unknown states and invalid inputs', () => {
   assert.throws(() => projectDirectStartupState({ state: 'free-shell' }), /startup state/u)
   assert.throws(() => projectDirectStartupState(null), /must be an object/u)
+})
+test('direct startup projection carries only safe fallback reasons', () => {
+  const state = projectDirectStartupState({ state: 'ready-builtins', reason: 'missing-credentials' })
+  assert.equal(state.reason, 'missing-credentials')
+  assert.ok(DIRECT_STARTUP_REASONS.includes('missing-credentials'))
+  assert.throws(
+    () => projectDirectStartupState({ state: 'ready-builtins', reason: 'raw-error' }),
+    /startup reason/u,
+  )
 })

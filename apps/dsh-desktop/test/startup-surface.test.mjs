@@ -38,6 +38,9 @@ test('startup surface is status-only and exposes no recovery decisions', async (
   for (const copy of ['正在启动全部插件', '正在自动恢复', '正在自动修复插件', '正在验证修复']) {
     assert.match(renderer, new RegExp(copy, 'u'))
   }
+  assert.match(html, /startup-steps|startup-guidance/u)
+  assert.match(renderer, /directReason|missing-credentials|填写 Key/u)
+  assert.match(renderer, /renderDirectProcess/u)
 })
 
 test('startup surface never asks new or existing users about migration', async () => {

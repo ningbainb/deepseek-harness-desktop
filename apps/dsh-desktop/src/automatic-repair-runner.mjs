@@ -12,12 +12,19 @@ function immutable(value) {
   return value
 }
 
+const TOOLS_CAPABILITIES = new Set(['auto', 'native', 'none'])
+
+function normalizeToolsCapability(value) {
+  return TOOLS_CAPABILITIES.has(value) ? value : 'auto'
+}
+
 export async function writeAutomaticRepairJob({
   incidentDir,
   fingerprint,
   staged,
   commands = [],
   fallbackModels = [],
+  defaultToolsCapability = 'auto',
   timeoutMs = 90_000,
 } = {}) {
   if (typeof incidentDir !== 'string' || !isAbsolute(incidentDir)) {
@@ -34,7 +41,10 @@ export async function writeAutomaticRepairJob({
     resultPath,
     roots: staged.roots,
     commands,
-    settings: { fallbackModels: fallbackModels.slice(0, 1) },
+    settings: {
+      fallbackModels: fallbackModels.slice(0, 1),
+      defaultToolsCapability: normalizeToolsCapability(defaultToolsCapability),
+    },
     timeoutMs,
   }
   await writeFile(jobPath, `${JSON.stringify(job, null, 2)}\n`, {
@@ -145,7 +155,11 @@ export class AutomaticRepairRunner {
     }
   }
 
-  async run({ failures = [] } = {}) {
+  async run({
+    failures = [],
+    defaultToolsCapability = 'auto',
+    fallbackModels = this.fallbackModels,
+  } = {}) {
     const failure = Array.isArray(failures) && failures.length > 0
       ? failures.at(-1)
       : Object.assign(new Error('full startup failed'), { code: 'UNCLASSIFIED' })
@@ -179,7 +193,8 @@ export class AutomaticRepairRunner {
         fingerprint,
         staged,
         commands,
-        fallbackModels: this.fallbackModels,
+        fallbackModels: Array.isArray(fallbackModels) ? fallbackModels.slice(0, 1) : this.fallbackModels,
+        defaultToolsCapability: normalizeToolsCapability(defaultToolsCapability),
       })
       const repairResult = await this.repairRuntime.run(paths)
       await this.#recordResult(fingerprint, repairResult)

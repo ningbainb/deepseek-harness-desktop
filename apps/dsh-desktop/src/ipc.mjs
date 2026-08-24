@@ -19,6 +19,17 @@ const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
 const REPAIR_STATES = new Set(['claimed', 'running', 'verified', 'applied', 'rolled-back', 'exhausted'])
+const REPAIR_UNAVAILABLE_REASONS = new Set([
+  'full-retry-failed',
+  'missing-credentials',
+  'no-model',
+  'unsupported-tools',
+  'repair-failed',
+  'budget-exhausted',
+  'profile-permission',
+  'profile-installation',
+  'profile-failed',
+])
 const SAFE_REPAIR_NAME = /^[a-zA-Z0-9@._/+:-]{1,128}$/u
 const SAFE_REPAIR_CHECK = /^[a-z0-9][a-z0-9-]{0,79}$/u
 const SAFE_REPAIR_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9@._+/-]{1,320}$/u
@@ -253,15 +264,23 @@ export function normalizeDockDismissReason(value) {
   return value
 }
 
+const publicRepairUnavailable = (value) => {
+  const reason = REPAIR_UNAVAILABLE_REASONS.has(value?.reason) ? value.reason : undefined
+  return Object.freeze({
+    available: false,
+    ...(reason === undefined ? {} : { reason }),
+    ...(value?.canRetry === true ? { canRetry: true } : {}),
+  })
+}
 export function publicRepairStatus(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return Object.freeze({ available: false })
+    return publicRepairUnavailable(value)
   }
   const fingerprint = typeof value.fingerprint === 'string' && /^[a-f0-9]{64}$/u.test(value.fingerprint)
     ? value.fingerprint
     : undefined
   const state = REPAIR_STATES.has(value.state) ? value.state : undefined
-  if (fingerprint === undefined || state === undefined) return Object.freeze({ available: false })
+  if (fingerprint === undefined || state === undefined) return publicRepairUnavailable(value)
   const safeTimestamp = (timestamp) => typeof timestamp === 'string'
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(timestamp)
     ? timestamp
@@ -293,6 +312,8 @@ export function publicRepairStatus(value) {
       .toSorted((left, right) => left.localeCompare(right, 'en'))
     : []
   const result = ['applied', 'rolled-back', 'exhausted'].includes(state) ? state : 'pending'
+  const safeReason = REPAIR_UNAVAILABLE_REASONS.has(value.reason) ? value.reason : undefined
+  const canRetry = value.canRetry === true
   return Object.freeze({
     available: true,
     fingerprint,
@@ -303,6 +324,8 @@ export function publicRepairStatus(value) {
     models: Object.freeze(models),
     changedFiles: Object.freeze(changedFiles),
     checks: Object.freeze(checks),
+    ...(safeReason === undefined ? {} : { reason: safeReason }),
+    ...(canRetry ? { canRetry: true } : {}),
   })
 }
 
@@ -314,6 +337,13 @@ export function publicUpdateChannel(value) {
   })
 }
 
+const publicRepairRetryResult = (value) => {
+  const reason = REPAIR_UNAVAILABLE_REASONS.has(value?.reason) ? value.reason : undefined
+  return Object.freeze({
+    accepted: value?.accepted === true,
+    ...(reason === undefined ? {} : { reason }),
+  })
+}
 export function registerDesktopIpc({
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
@@ -337,6 +367,7 @@ export function registerDesktopIpc({
   claimStarPrompt,
   getUpdateController,
   getRepairStatus = async () => undefined,
+  retryRepair = async () => ({ accepted: false }),
   getUpdateChannel = () => 'stable',
   setUpdateChannel = async () => { throw new Error('update channel selection is unavailable') },
   confirmUpdateChannelChange = async () => true,
@@ -370,6 +401,7 @@ export function registerDesktopIpc({
     'desktop:star-prompt-claim',
     'desktop:update-status',
     'desktop:repair-status',
+    'desktop:repair-retry',
     'desktop:update-channel-get',
     'desktop:update-channel-set',
     'desktop:update-check',
@@ -421,6 +453,13 @@ export function registerDesktopIpc({
       return publicRepairStatus(await getRepairStatus())
     } catch {
       return publicRepairStatus(undefined)
+    }
+  })
+  handle('desktop:repair-retry', main, async () => {
+    try {
+      return publicRepairRetryResult(await retryRepair())
+    } catch {
+      return publicRepairRetryResult(undefined)
     }
   })
   handle('desktop:action', main, async (_event, _surface, rawAction) => {

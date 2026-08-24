@@ -36,10 +36,14 @@ export interface RepairModelSelection {
   provider: string
   model: string
   reasoningEffort?: string
+  toolsCapability?: ToolsCapability
 }
+
+export type ToolsCapability = 'auto' | 'native' | 'none'
 
 export interface RepairJobSettings {
   fallbackModels?: RepairModelSelection[]
+  defaultToolsCapability?: ToolsCapability
 }
 
 export interface RepairJob {
@@ -108,6 +112,13 @@ function safeName(value: unknown, label: string): string {
   return value
 }
 
+function safeToolsCapability(value: unknown, label: string): ToolsCapability {
+  if (!['auto', 'native', 'none'].includes(String(value))) {
+    throw new TypeError(String(label) + ' is invalid')
+  }
+  return value as ToolsCapability
+}
+
 export function safeRepairRelativePath(value: unknown, label = 'repair path'): string {
   if (
     typeof value !== 'string'
@@ -141,6 +152,9 @@ function modelSelection(value: unknown): RepairModelSelection {
     ...(input.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: safeName(input.reasoningEffort, 'repair reasoning effort') }),
+    ...(input.toolsCapability === undefined
+      ? {}
+      : { toolsCapability: safeToolsCapability(input.toolsCapability, 'repair tools capability') }),
   }
 }
 
@@ -257,8 +271,12 @@ export async function loadRepairJob(jobPath: string): Promise<RepairJob> {
   if (settingsInput === null || typeof settingsInput !== 'object' || Array.isArray(settingsInput)) {
     throw new TypeError('repair job settings are invalid')
   }
-  const fallbackInput = (settingsInput as Record<string, unknown>).fallbackModels ?? []
+  const settingsRecord = settingsInput as Record<string, unknown>
+  const fallbackInput = settingsRecord.fallbackModels ?? []
   if (!Array.isArray(fallbackInput) || fallbackInput.length > 8) throw new TypeError('repair fallback models are invalid')
+  const defaultToolsCapability = settingsRecord.defaultToolsCapability === undefined
+    ? undefined
+    : safeToolsCapability(settingsRecord.defaultToolsCapability, 'repair default tools capability')
   if (!Number.isInteger(input.timeoutMs) || Number(input.timeoutMs) < 1_000 || Number(input.timeoutMs) > 90_000) {
     throw new TypeError('repair job timeout is invalid')
   }
@@ -275,7 +293,10 @@ export async function loadRepairJob(jobPath: string): Promise<RepairJob> {
     resultPath,
     roots,
     commands,
-    settings: { fallbackModels: fallbackInput.map(modelSelection) },
+    settings: {
+      fallbackModels: fallbackInput.map(modelSelection),
+      ...(defaultToolsCapability === undefined ? {} : { defaultToolsCapability }),
+    },
     timeoutMs: Number(input.timeoutMs),
     incidentDir,
     jobPath: resolvedJobPath,

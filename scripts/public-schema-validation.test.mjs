@@ -19,6 +19,7 @@ test('public schema validation accepts current metadata and additive v1 fields',
     'cancellation-presentation',
     'tool-call-arguments-envelope',
     'desktop-skin-profile-isolation',
+    'tools-capability-request-side',
   ])
   assert.equal(report.matrixEntries, 1)
 })

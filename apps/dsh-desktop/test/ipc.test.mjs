@@ -141,6 +141,9 @@ test('desktop repair status exposes only bounded summaries and relative files', 
     changedFiles: ['plugins/example/index.mjs'],
     checks: ['plugin-example-test'],
   })
+  assert.deepEqual(publicRepairStatus({ reason: 'missing-credentials', canRetry: true }), {
+    available: false, reason: 'missing-credentials', canRetry: true,
+  })
   assert.deepEqual(publicRepairStatus(undefined), { available: false })
 
   const handlers = new Map()
@@ -168,12 +171,14 @@ test('desktop repair status exposes only bounded summaries and relative files', 
     handleToolAction: async () => {},
     setWindowChromeTheme: () => {},
     getUpdateController: () => undefined,
+    retryRepair: async () => ({ accepted: true, reason: 'missing-credentials', secret: 'PRIVATE' }),
     getRepairStatus: async () => raw,
   })
   try {
     const status = await handlers.get('desktop:repair-status')({ sender })
     assert.equal(status.available, true)
     assert.doesNotMatch(JSON.stringify(status), /PRIVATE_REPAIR|C:\\Users|prompt|apiKey|arguments/u)
+    assert.deepEqual(await handlers.get('desktop:repair-retry')({ sender }), { accepted: true, reason: 'missing-credentials' })
   } finally {
     unregister()
   }
