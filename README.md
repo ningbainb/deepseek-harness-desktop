@@ -20,13 +20,13 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/ningbainb/deepseek-harness-desktop) 点 Star，帮助更多桌面版用户发现它。
 
-### 最新版：3.0.5
+### 最新版：3.0.6
 
-`desktop-v3.0.5` 使用“直接载入 + 零点击自动修复”启动策略：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级与回滚](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
+`desktop-v3.0.6` 使用“直接载入 + 零点击自动修复”启动策略：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级与回滚](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
 
 | 版本 | 主要更新 |
 | --- | --- |
-| **3.0.5** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；移除启动迁移、隔离恢复和安全模式选择页；设置页恢复官方 ChatGPT OAuth 登录。 |
+| **3.0.6** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；移除启动迁移、隔离恢复和安全模式选择页；设置页恢复官方 ChatGPT OAuth 登录。 |
 | **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
 | **2.7.0** | 修复 Windows 8% Runtime 启动故障并升级到 DSH rc.7；新增托盘后台自动化、Host 持久任务调度、插件兼容声明/锁、browser-safe Desktop SDK、安全工作区外部打开和 Candidate Matrix。 |
 | **2.6.0** | Task Board v3 引入 Project、Task Run、Evidence 与 Git Worktree 审核流；Runtime Provider 缺少可选能力时显式回退 shared-workspace，并加入 Candidate 执行兼容夹具。该版本的匿名统计行为仅作历史记录，已由 3.0 的默认关闭政策取代。 |
@@ -44,7 +44,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 | **0.1.4** | 桌宠迁移到全局 Shell Overlay，首页和设置页均可见；恢复五张 Web UI 插件配置卡；皮肤中心完整展示安装版随附的九套皮肤。 |
 | **0.1.3** | 加入稳定版 GitHub Release 更新检查、双语更新说明、用户确认下载、任务栏进度和二次确认安装。 |
 
-### 3.0.5 直接启动与自动修复
+### 3.0.6 直接启动与自动修复
 
 - **不再让用户选启动方式**：新用户直接进入内置环境；老用户直接读取当前 `DSH_HOME`、Profile、对话、Session、设置、任务、皮肤和全部插件，不创建迁移计划或隔离 Home。
 - **完整启动优先**：完整 Profile 失败时原样重试一次，不先停用插件，也不把“外来插件”当作启动阻断条件。
@@ -133,7 +133,7 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 
 ### ChatGPT 登录、Codex 模型与推理强度
 
-3.0.5 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程，不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取“是否已登录”，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
+3.0.6 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程，不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取“是否已登录”，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
 
 内置 `reasoning-slider` 0.0.2，在模型选择器中只展示模型实际支持的推理强度，切换模型时会自动回退到有效档位。顶部帮助菜单同时提供 QQ 群二维码、一键加群与 GitHub 建议入口，所有外链均交由系统浏览器打开。
 

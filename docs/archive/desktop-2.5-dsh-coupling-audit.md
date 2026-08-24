@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 3.0.5.
+Authoritative Desktop version: 3.0.6.
 
 Stable DSH package version: 0.1.1-rc.1.
 
@@ -325,7 +325,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 58 | remote |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 15 | invariants |
 | host-service | packages/dsh-mode-switcher/src/client/index.ts | 8 | connection |
-| host-service | packages/dsh-particle-theme/src/client/index.ts | 29 | locale |
+| host-service | packages/dsh-particle-theme/src/client/index.ts | 29 | object |
 | host-service | packages/dsh-pet/src/client/index.ts | 70 | remote |
 | host-service | packages/dsh-remote-web-ui/src/client/index.ts | 93 | remote |
 | host-service | packages/dsh-remote-web-ui/src/invariant.ts | 15 | invariants |

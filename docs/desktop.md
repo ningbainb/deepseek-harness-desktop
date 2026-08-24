@@ -8,7 +8,7 @@ The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~
 
 ## Desktop 3.0 platform policy
 
-Desktop 3.0.5 is the direct-start and automatic-repair release. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
+Desktop 3.0.6 is the direct-start and automatic-repair release. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
 
 The Desktop Client SDK and Desktop Contract remain 1.x. Runtime Provider, Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility, Runtime matrix, and compat-patch inputs have machine-readable definitions. The applicable additive-change, deprecation, and major-version rules are in the [compatibility policy](compatibility-policy.md) and [schema versioning guide](schema-versioning.md).
 

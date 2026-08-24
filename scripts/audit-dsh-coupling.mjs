@@ -46,6 +46,14 @@ function normalizedPath(root, path) {
   return relative(root, path).split(sep).join('/')
 }
 
+export function canonicalText(value) {
+  return value.replace(/\r\n/g, '\n')
+}
+
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
 function lineAt(source, index) {
   return source.slice(0, index).split(/\r?\n/u).length
 }
@@ -71,7 +79,7 @@ export async function scanRuntimeSeams(root = REPOSITORY_ROOT) {
     .toSorted()
   const results = []
   for (const path of paths) {
-    const source = await readFile(resolve(root, path), 'utf8')
+    const source = canonicalText(await readFile(resolve(root, path), 'utf8'))
     for (const { category, source: patternSource } of SEAM_PATTERNS) {
       // Construct a fresh matcher for every file. Shared global RegExp instances
       // carry mutable lastIndex state and made the Linux full-suite audit flaky.
@@ -87,14 +95,14 @@ export async function scanRuntimeSeams(root = REPOSITORY_ROOT) {
     }
   }
   return results.toSorted((left, right) => (
-    left.category.localeCompare(right.category)
-    || left.path.localeCompare(right.path)
+    compareText(left.category, right.category)
+    || compareText(left.path, right.path)
     || left.line - right.line
   ))
 }
 
 function lockfileHash(lockfile) {
-  return createHash('sha256').update(lockfile).digest('hex')
+  return createHash('sha256').update(canonicalText(lockfile.toString('utf8'))).digest('hex')
 }
 
 export async function createCouplingAudit(root = REPOSITORY_ROOT) {
