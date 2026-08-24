@@ -1,4 +1,4 @@
-# DeepSeek Harness Desktop 3.0.6
+# DeepSeek Harness Desktop 3.0.7
 
 ## 中文
 
@@ -9,6 +9,7 @@
 - 自动修复有严格次数、时间和文件范围限制。模型不会收到 API Key、Cookie、凭据、完整对话、完整 Session、Tool Result 或无关项目内容；失败候选不会污染真实 Profile，修复后仍失败会自动回滚。
 - 没有可用模型、候选验证失败或修复后仍无法启动时，Desktop 会在同一个 Home 中自动使用内置插件启动。用户的聊天记录和设置不会被搬到临时目录，也不需要再点恢复按钮。
 - 用户主动从 Web Profile 导入插件的功能继续保留；它仍是扩展坞里的显式事务操作，与应用启动无关。插件市场继续为新用户提供正常的发现和安装入口。
+- 内置终端启动前的可选 Git 检查设置了明确时限，冷启动或打包环境变慢时不会阻塞终端面板打开。
 
 ### 验证
 
@@ -17,11 +18,11 @@
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.6-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。未配置证书的社区 Release 可能是未签名版本，Windows 因此可能显示未知发布者提示。
+从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.7-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。未配置证书的社区 Release 可能是未签名版本，Windows 因此可能显示未知发布者提示。
 
 ### 说明
 
-Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动修复只使用用户已经配置的模型；没有模型时直接进入同 Home 内置插件回退。3.0.6 不删除独立备份，也不承诺恢复 Desktop 之外的项目编辑或磁盘损坏。
+Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动修复只使用用户已经配置的模型；没有模型时直接进入同 Home 内置插件回退。3.0.7 不删除独立备份，也不承诺恢复 Desktop 之外的项目编辑或磁盘损坏。
 
 ## English
 
@@ -32,6 +33,7 @@ Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动
 - Automatic repair has strict attempt, time, and file-scope limits. It excludes API keys, cookies, credentials, full conversations, full sessions, tool results, and unrelated project content. Rejected candidates never touch the real profile, and an applied candidate is rolled back if the repaired full start still fails.
 - If no model is configured, verification fails, or the repaired profile still cannot start, Desktop automatically starts the built-in plugins from the same Home. Conversation and settings data are not moved into a temporary profile, and users do not need to choose a recovery button.
 - The explicit Web Profile import remains available in Extension Dock as a user-initiated transaction. It is separate from application startup. The built-in plugin market remains the discovery and installation path for fresh users.
+- Optional Git inspection before opening the built-in terminal is time-bounded, so cold or packaged environments cannot hold the terminal panel indefinitely.
 
 ### Verification
 
@@ -40,8 +42,8 @@ Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.0.6-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Verify the SHA-256 first, then inspect the manifest for size, channel, Runtime, Schema, and actual signature state. A community Release may be unsigned when no certificate is configured, so Windows can show an unknown-publisher warning.
+Download `DeepSeek-Harness-Desktop-Setup-3.0.7-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Verify the SHA-256 first, then inspect the manifest for size, channel, Runtime, Schema, and actual signature state. A community Release may be unsigned when no certificate is configured, so Windows can show an unknown-publisher warning.
 
 ### Notice
 
-The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.6 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.
+The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.7 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.

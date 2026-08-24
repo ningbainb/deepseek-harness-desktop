@@ -722,7 +722,10 @@ export async function startElectronApp(metadata) {
       })
       let pathEntries = [runtimeBin]
       try {
-        const git = await managedGitRuntimeService.inspect([runtimeBin])
+        const git = await boundedManagedGitInspection(
+          entries => managedGitRuntimeService.inspect(entries),
+          pathEntries,
+        )
         pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, git.pathEntries)
         if (git.source === 'bundled') {
           await logStore.append('[terminal] verified bundled Git added to the session PATH').catch(() => {})
