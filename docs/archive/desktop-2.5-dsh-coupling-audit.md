@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 3.0.2.
+Authoritative Desktop version: 3.0.3.
 
 Stable DSH package version: 0.1.1-rc.1.
 
@@ -597,27 +597,27 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 427 | profileDir |
 | profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 445 | profileDir |
 | profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 447 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 663 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 664 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 664 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 665 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 665 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 666 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 667 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 668 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 669 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 671 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 672 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 696 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 697 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 699 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 823 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 941 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 942 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 994 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1013 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1028 | profileDir |
-| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1072 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 679 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 680 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 680 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 681 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 681 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 682 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 683 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 684 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 685 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 687 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 688 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 712 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 713 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 715 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 839 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 957 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 958 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1010 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1029 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1044 | profileDir |
+| profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1088 | profileDir |
 | profile-home | apps/dsh-desktop/test/automatic-repair-runner.test.mjs | 37 | profileDir |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 8 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 8 | resolveDshCliPath |
@@ -1053,22 +1053,24 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 77 | profileDir |
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 107 | profileDir |
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 114 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 141 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 141 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 169 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 169 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 173 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 181 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 192 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 192 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 196 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 204 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 229 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 229 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 292 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 292 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 302 | profileDir |
-| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 306 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 140 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 140 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 159 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 159 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 187 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 187 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 191 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 199 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 210 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 210 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 214 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 222 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 247 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 247 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 310 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 310 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 320 | profileDir |
+| profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 324 | profileDir |
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 136 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 136 | DSH_PROFILE |
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 141 | profileDir |

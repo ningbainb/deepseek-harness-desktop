@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "3.0.2",
+  "desktopVersion": "3.0.3",
   "upstreamVersion": "0.1.1-rc.1",
   "lockfileSha256": "3bf52346b14c04b3ad6a6b03eddf248dd5d59575c05965dcb69a744d2c28add6",
   "policy": {
@@ -4303,127 +4303,127 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 663,
+      "line": 679,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 664,
+      "line": 680,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 664,
+      "line": 680,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 665,
+      "line": 681,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 665,
+      "line": 681,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 666,
+      "line": 682,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 667,
+      "line": 683,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 668,
+      "line": 684,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 669,
+      "line": 685,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 671,
+      "line": 687,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 672,
+      "line": 688,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 696,
+      "line": 712,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 697,
+      "line": 713,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 699,
+      "line": 715,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 823,
+      "line": 839,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 941,
+      "line": 957,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 942,
+      "line": 958,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 994,
+      "line": 1010,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1013,
+      "line": 1029,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1028,
+      "line": 1044,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1072,
+      "line": 1088,
       "operation": "profileDir"
     },
     {
@@ -7039,97 +7039,109 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 141,
+      "line": 140,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 141,
+      "line": 140,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 169,
+      "line": 159,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 169,
+      "line": 159,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 173,
+      "line": 187,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 181,
+      "line": 187,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 192,
+      "line": 191,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 192,
+      "line": 199,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 196,
+      "line": 210,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 204,
+      "line": 210,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 229,
+      "line": 214,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 229,
+      "line": 222,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 292,
+      "line": 247,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 292,
+      "line": 247,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 302,
+      "line": 310,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
-      "line": 306,
+      "line": 310,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
+      "line": 320,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/user-plugin-archive.test.mjs",
+      "line": 324,
       "operation": "profileDir"
     },
     {
