@@ -67,6 +67,7 @@ export class ProductAnalyticsIdentity {
     const day = date.toISOString().slice(0, 10)
     const month = day.slice(0, 7)
     return Object.freeze({
+      installationActor: periodActor(this.#secret, 'installation'),
       dailyActor: periodActor(this.#secret, `day:${day}`),
       monthlyActor: periodActor(this.#secret, `month:${month}`),
     })

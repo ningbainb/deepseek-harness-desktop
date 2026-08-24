@@ -10,7 +10,7 @@ const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
 const privacyPath = resolve(import.meta.dirname, '..', 'website', 'privacy.html')
 const siteScriptPath = resolve(import.meta.dirname, '..', 'website', 'script.js')
 
-test('privacy page states official anonymous analytics and user-confirmed diagnostics boundaries', async () => {
+test('privacy page states anonymous retention analytics and user-confirmed diagnostics boundaries', async () => {
   const html = await readFile(privacyPath, 'utf8')
   assert.deepEqual(collectPrivacyErrors(html), [])
 })

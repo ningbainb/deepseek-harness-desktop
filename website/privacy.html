@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 隐私政策：官方包使用周期轮换匿名值进行产品分析，诊断仅在用户确认后导出。">
+    <meta name="description" content="DeepSeek Harness Desktop 隐私政策：官方包使用匿名值统计活跃与留存，诊断仅在用户确认后导出。">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://ningbainb.github.io/deepseek-harness-desktop/privacy.html">
     <link rel="icon" href="official-whale.svg" type="image/svg+xml">
@@ -30,8 +30,8 @@
         <header class="privacy-hero">
           <span class="section-pill">PRIVACY / LOCAL DIAGNOSTICS</span>
           <h1>隐私政策</h1>
-          <p class="privacy-lead">官方包使用按日、按月轮换的匿名值统计产品使用；诊断只在你主动确认后导出。</p>
-          <p class="privacy-updated">最后更新：2026 年 8 月 22 日</p>
+          <p class="privacy-lead">官方包使用匿名值统计活跃、留存和使用时长区间；诊断只在你主动确认后导出。</p>
+          <p class="privacy-updated">最后更新：2026 年 8 月 23 日</p>
         </header>
 
         <div class="privacy-layout">
@@ -46,10 +46,10 @@
 
           <article class="privacy-content">
             <section class="privacy-callout" id="default-diagnostics">
-              <p class="privacy-kicker">周期匿名，不采集内容</p>
+              <p class="privacy-kicker">匿名统计，不采集内容</p>
               <h2>官方包默认进行匿名产品分析</h2>
-              <p>官方 Desktop 包发送固定词表的产品事件，用于统计日活、月活、国家或地区级用户数、版本采用、应用内更新、拓展坞使用和启动可靠性。开发、源码、测试和第三方重新打包版本保持断开。</p>
-              <p>Desktop 只上传由本地随机秘密按 UTC 日期和月份派生的匿名值，不上传该秘密或长期稳定安装 ID。服务端只获取国家级代码，不保存 IP，也不申请定位权限。</p>
+              <p>官方 Desktop 包发送固定词表的产品事件，用于统计日活、月活、D1/D7/D30 留存、国家或地区级用户数、使用时长区间、版本采用、应用内更新、拓展坞使用和启动可靠性。开发、源码、测试和第三方重新打包版本保持断开。</p>
+              <p>Desktop 上传由本地随机秘密派生的每日、每月和稳定匿名安装哈希，但不上传该秘密。稳定匿名安装哈希只用于首次启动日期和按日启动集合，不与账号、机器码或硬件信息关联。服务端只获取国家级代码，不保存 IP，也不申请定位权限。</p>
             </section>
 
             <section id="local-first">
@@ -70,14 +70,14 @@
                 <div><strong>不收集对话</strong><span>对话、提示词、AI 回复、会话标题、文件内容、文件名或路径</span></div>
                 <div><strong>不收集凭据</strong><span>API Key、Token、Cookie、请求头、账号信息、密码或 SSH 私钥</span></div>
                 <div><strong>不导出用户内容</strong><span>完整 Prompt、完整 Session History、Tool Result、项目文件或项目内容</span></div>
-                <div><strong>不保留身份标识</strong><span>用户名、真实 Home 路径、URL 凭据或 query、机器码、硬件序列号或长期设备标识</span></div>
+                <div><strong>不保留真实身份</strong><span>用户名、真实 Home 路径、URL 凭据或 query、机器码、硬件序列号或操作系统设备标识</span></div>
               </div>
               <p>集中脱敏会移除常见 key、token、authorization、private key、cookie、真实用户目录和 URL 凭据或查询参数。不能被安全归类的内容不会因为诊断便利而被猜测性保留。</p>
             </section>
 
             <section id="processing">
               <h2>处理方式与保留</h2>
-              <p>产品分析服务保存固定事件的日聚合、每日匿名去重行和每月匿名去重行，不提供单个匿名值的行为时间线。每日匿名行保留 35 天，每月匿名行保留 13 个月，趋势聚合保留 400 天。</p>
+              <p>产品分析服务保存固定事件的日聚合、每日匿名去重行、每月匿名去重行、稳定匿名安装哈希的首次启动日期和按日启动集合，不提供单个匿名值的事件详情或内容时间线。每日匿名行保留 35 天，每月匿名行保留 13 个月，留存 cohort 与趋势聚合保留 400 天。</p>
               <p>用户导出的诊断包留在其选择的位置；项目不会自动接收、保存或保留该包。用户如果主动提交文件到 Issue、邮件或其他渠道，应先自行核对内容，并适用该渠道的公开规则。</p>
             </section>
 

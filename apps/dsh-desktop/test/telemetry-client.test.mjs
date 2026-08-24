@@ -11,7 +11,11 @@ const CONTEXT = Object.freeze({
 })
 
 const SURFACE_EVENT = Object.freeze({ outcome: 'opened', detail: 'settings', bucket: 'none' })
-const ACTORS = Object.freeze({ dailyActor: 'a'.repeat(64), monthlyActor: 'b'.repeat(64) })
+const ACTORS = Object.freeze({
+  installationActor: 'c'.repeat(64),
+  dailyActor: 'a'.repeat(64),
+  monthlyActor: 'b'.repeat(64),
+})
 
 test('disabled clients drop events without scheduling or fetching', async () => {
   let fetched = 0
@@ -51,7 +55,7 @@ test('keeps events in memory and flushes one bounded JSON batch', async () => {
   assert.equal(requests[0].url, 'https://telemetry.example/v1/events')
   assert.equal(requests[0].init.method, 'POST')
   assert.deepEqual(JSON.parse(requests[0].init.body), {
-    schema: 2,
+    schema: 3,
     events: [{ name: 'surface_opened', ...CONTEXT, ...ACTORS, ...SURFACE_EVENT }],
   })
   assert.equal(requests[0].init.headers.origin, undefined)

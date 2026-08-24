@@ -1,6 +1,6 @@
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
 const DIMENSION_FIELDS = Object.freeze(['outcome', 'detail', 'bucket'])
-const ACTOR_FIELDS = Object.freeze(['dailyActor', 'monthlyActor'])
+const ACTOR_FIELDS = Object.freeze(['installationActor', 'dailyActor', 'monthlyActor'])
 const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const EVENT_POLICY = Object.freeze({
@@ -196,6 +196,7 @@ export function createProductEvent(context, actors, name, dimensions) {
   if (!exactFields(dimensions, DIMENSION_FIELDS)) throw new TypeError('invalid product event dimensions')
   if (
     !exactFields(actors, ACTOR_FIELDS)
+    || !ACTOR_PATTERN.test(actors.installationActor)
     || !ACTOR_PATTERN.test(actors.dailyActor)
     || !ACTOR_PATTERN.test(actors.monthlyActor)
   ) throw new TypeError('invalid anonymous product actor')

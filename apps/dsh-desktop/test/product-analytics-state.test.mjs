@@ -6,7 +6,7 @@ import test from 'node:test'
 
 import { ProductAnalyticsIdentityStore } from '../src/product-analytics-state.mjs'
 
-test('creates one local secret and derives stable but rotating daily and monthly actors', async (context) => {
+test('creates one local secret and derives stable installation plus rotating daily and monthly actors', async (context) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-product-analytics-'))
   context.after(() => rm(root, { recursive: true, force: true }))
   const path = join(root, 'product-analytics-state.json')
@@ -19,9 +19,12 @@ test('creates one local secret and derives stable but rotating daily and monthly
   const nextMonth = second.actorsAt(new Date('2026-09-01T00:00:00.000Z'))
 
   assert.deepEqual(firstDay, sameDay)
+  assert.equal(firstDay.installationActor, nextDay.installationActor)
+  assert.equal(firstDay.installationActor, nextMonth.installationActor)
   assert.notEqual(firstDay.dailyActor, nextDay.dailyActor)
   assert.equal(firstDay.monthlyActor, nextDay.monthlyActor)
   assert.notEqual(firstDay.monthlyActor, nextMonth.monthlyActor)
+  assert.match(firstDay.installationActor, /^[a-f0-9]{64}$/u)
   assert.match(firstDay.dailyActor, /^[a-f0-9]{64}$/u)
   assert.match(firstDay.monthlyActor, /^[a-f0-9]{64}$/u)
   assert.doesNotMatch(await readFile(path, 'utf8'), new RegExp(firstDay.dailyActor, 'u'))
@@ -36,6 +39,7 @@ test('replaces malformed analytics state without surfacing its contents', async 
   const identity = await new ProductAnalyticsIdentityStore({ path }).loadOrCreate()
   const actors = identity.actorsAt(new Date('2026-08-22T00:00:00.000Z'))
 
+  assert.match(actors.installationActor, /^[a-f0-9]{64}$/u)
   assert.match(actors.dailyActor, /^[a-f0-9]{64}$/u)
   assert.doesNotMatch(await readFile(path, 'utf8'), /private-corrupt-value/u)
 })

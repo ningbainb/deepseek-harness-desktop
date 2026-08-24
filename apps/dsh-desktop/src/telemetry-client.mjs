@@ -71,7 +71,7 @@ export class ProductTelemetryClient {
       .then(() => this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ schema: 2, events }),
+        body: JSON.stringify({ schema: 3, events }),
         signal: controller.signal,
       }))
       .then(response => response?.ok === true)

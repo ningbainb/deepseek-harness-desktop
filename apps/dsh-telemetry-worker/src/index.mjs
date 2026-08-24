@@ -9,7 +9,7 @@ const OFFICIAL_WEBSITE_ORIGINS = new Set([
   'https://1521003.xyz',
   'https://www.1521003.xyz',
 ])
-const EVENT_FIELDS = Object.freeze([
+const EVENT_FIELDS_V2 = Object.freeze([
   'name',
   'appVersion',
   'channel',
@@ -20,6 +20,11 @@ const EVENT_FIELDS = Object.freeze([
   'outcome',
   'detail',
   'bucket',
+])
+const EVENT_FIELDS_V3 = Object.freeze([
+  ...EVENT_FIELDS_V2.slice(0, 7),
+  'installationActor',
+  ...EVENT_FIELDS_V2.slice(7),
 ])
 const TOP_LEVEL_FIELDS = Object.freeze(['schema', 'events'])
 const DOWNLOAD_CLICK_FIELDS = Object.freeze(['schema', 'source', 'version'])
@@ -247,10 +252,27 @@ INSERT OR IGNORE INTO product_actor_monthly (
 ) VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
+const INSTALLATION_FIRST_SEEN_INSERT_SQL = `
+INSERT OR IGNORE INTO product_installation_first_seen (
+  installation_actor,
+  first_seen_day,
+  first_version
+) VALUES (?, ?, ?)
+`
+
+const INSTALLATION_DAILY_INSERT_SQL = `
+INSERT OR IGNORE INTO product_installation_daily (
+  day,
+  installation_actor
+) VALUES (?, ?)
+`
+
 const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-400 days')"
 const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-400 days')"
 const DAILY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_daily WHERE day < date('now', '-35 days')"
 const MONTHLY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_monthly WHERE month < strftime('%Y-%m', date('now', '-13 months'))"
+const INSTALLATION_FIRST_SEEN_RETENTION_SQL = "DELETE FROM product_installation_first_seen WHERE first_seen_day < date('now', '-400 days')"
+const INSTALLATION_DAILY_RETENTION_SQL = "DELETE FROM product_installation_daily WHERE day < date('now', '-400 days')"
 
 function response(status, body = null, headers = {}) {
   return new Response(body, {
@@ -274,10 +296,12 @@ function exactSearchParams(params, fields) {
   return entries.length === fields.length && exactFields(Object.fromEntries(entries), fields)
 }
 
-function validEvent(event) {
-  if (!exactFields(event, EVENT_FIELDS)) return false
+function validEvent(event, schema = 3) {
+  const fields = schema === 2 ? EVENT_FIELDS_V2 : schema === 3 ? EVENT_FIELDS_V3 : undefined
+  if (fields === undefined || !exactFields(event, fields)) return false
   if (typeof event.appVersion !== 'string' || !APP_VERSION_PATTERN.test(event.appVersion)) return false
   if (!ACTOR_PATTERN.test(event.dailyActor) || !ACTOR_PATTERN.test(event.monthlyActor)) return false
+  if (schema === 3 && !ACTOR_PATTERN.test(event.installationActor)) return false
   if (!CHANNELS.has(event.channel) || !OPERATING_SYSTEMS.has(event.os) || !LANGUAGES.has(event.language)) return false
   const policy = EVENT_POLICY[event.name]
   return policy !== undefined
@@ -305,6 +329,15 @@ function aggregateEvents(events) {
     else groups.set(key, { dimensions, count: 1 })
   }
   return groups.values()
+}
+
+function uniqueInstallationLaunches(events) {
+  const launches = new Map()
+  for (const event of events) {
+    if (event.name !== 'app_launch' || launches.has(event.installationActor)) continue
+    launches.set(event.installationActor, event)
+  }
+  return launches.values()
 }
 
 function uniqueActorEvents(events, country) {
@@ -379,10 +412,10 @@ async function handleProductEvents(request, env, seams) {
   const parsed = await parseBody(request)
   if (parsed.status) return response(parsed.status, parsed.status === 413 ? 'request too large' : 'invalid request')
   const body = parsed.value
-  if (!exactFields(body, TOP_LEVEL_FIELDS) || body.schema !== 2 || !Array.isArray(body.events)) {
+  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3].includes(body.schema) || !Array.isArray(body.events)) {
     return response(400, 'invalid request')
   }
-  if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event))) {
+  if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event, body.schema))) {
     return response(400, 'invalid request')
   }
 
@@ -398,6 +431,16 @@ async function handleProductEvents(request, env, seams) {
       env.METRICS.prepare(DAILY_ACTOR_INSERT_SQL).bind(day, event.dailyActor, ...dimensions),
       env.METRICS.prepare(MONTHLY_ACTOR_INSERT_SQL).bind(month, event.monthlyActor, ...dimensions),
     )
+  }
+  if (body.schema === 3) {
+    for (const event of uniqueInstallationLaunches(body.events)) {
+      statements.push(
+        env.METRICS.prepare(INSTALLATION_FIRST_SEEN_INSERT_SQL)
+          .bind(event.installationActor, day, event.appVersion),
+        env.METRICS.prepare(INSTALLATION_DAILY_INSERT_SQL)
+          .bind(day, event.installationActor),
+      )
+    }
   }
   try {
     await env.METRICS.batch(statements)
@@ -456,19 +499,26 @@ async function handleScheduled(_controller, env) {
   await env.METRICS.prepare(DOWNLOAD_RETENTION_SQL).run()
   await env.METRICS.prepare(DAILY_ACTOR_RETENTION_SQL).run()
   await env.METRICS.prepare(MONTHLY_ACTOR_RETENTION_SQL).run()
+  await env.METRICS.prepare(INSTALLATION_FIRST_SEEN_RETENTION_SQL).run()
+  await env.METRICS.prepare(INSTALLATION_DAILY_RETENTION_SQL).run()
 }
 
 export const __test = Object.freeze({
   ADMIN_HOSTNAME,
-  EVENT_FIELDS,
+  EVENT_FIELDS_V2,
+  EVENT_FIELDS_V3,
   EVENT_POLICY,
   DOWNLOAD_CLICK_FIELDS,
   DOWNLOAD_CLICK_UPSERT_SQL,
   DOWNLOAD_RETENTION_SQL,
   DAILY_ACTOR_INSERT_SQL,
   MONTHLY_ACTOR_INSERT_SQL,
+  INSTALLATION_FIRST_SEEN_INSERT_SQL,
+  INSTALLATION_DAILY_INSERT_SQL,
   DAILY_ACTOR_RETENTION_SQL,
   MONTHLY_ACTOR_RETENTION_SQL,
+  INSTALLATION_FIRST_SEEN_RETENTION_SQL,
+  INSTALLATION_DAILY_RETENTION_SQL,
   DOWNLOAD_SOURCES,
   MAX_BATCH_EVENTS,
   MAX_DOWNLOAD_CLICK_BYTES,

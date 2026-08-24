@@ -10,6 +10,7 @@ import {
 } from '../src/telemetry-events.mjs'
 
 const ACTORS = Object.freeze({
+  installationActor: 'c'.repeat(64),
   dailyActor: 'a'.repeat(64),
   monthlyActor: 'b'.repeat(64),
 })
@@ -56,6 +57,7 @@ test('creates exact fixed-shape events and rejects content-like fields', () => {
     channel: 'stable',
     os: 'windows-11',
     language: 'zh',
+    installationActor: 'c'.repeat(64),
     dailyActor: 'a'.repeat(64),
     monthlyActor: 'b'.repeat(64),
     outcome: 'opened',
@@ -74,6 +76,7 @@ test('creates exact fixed-shape events and rejects content-like fields', () => {
     bucket: 'unknown',
   }), /invalid product event dimensions/u)
   assert.throws(() => createProductEvent(context, {
+    installationActor: 'c'.repeat(64),
     dailyActor: 'stable-installation-id',
     monthlyActor: 'b'.repeat(64),
   }, 'surface_opened', {
@@ -126,6 +129,7 @@ test('automatic startup and repair telemetry uses a fixed privacy-safe vocabular
     channel: 'stable',
     os: 'windows-11',
     language: 'zh',
+    installationActor: 'c'.repeat(64),
     dailyActor: 'a'.repeat(64),
     monthlyActor: 'b'.repeat(64),
     outcome: 'ready',
