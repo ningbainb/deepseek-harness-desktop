@@ -29,3 +29,14 @@ index d27bfcbc0e20e6b66ca26c0c98826d78213824c5..cfe56bf3c1f5c6673579fc8558b9f82a
  # from ../dsh-aionui-panel
  - insert:
      - id: web-ui-dsh-aionui-panel
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -58,0 +59,5 @@
++				const railStyle = document.createElement("style");
++				railStyle.dataset.plugin = "@linxin666/dsh-web-ui-all";
++				railStyle.dataset.pluginCss = "@linxin666/dsh-web-ui-all/sidebar-rail.css";
++				railStyle.textContent = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=footerActions]{box-sizing:border-box;width:36px;min-width:36px;margin-inline:auto;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}";
++				document.head.appendChild(railStyle);
+@@ -65,0 +71,1 @@
++					railStyle.remove();

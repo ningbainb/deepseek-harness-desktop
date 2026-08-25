@@ -12,7 +12,7 @@ overrides:
 
 patchedDependencies:
   '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': b9fba5757b490db09a0910247a247d0c2f0537ac625b192d0aedad426eefcec4
-  '@linxin666/dsh-web-ui-all@0.2.5': d8054003cadb768a03c99f911d4e0bc524f099cbcd5d6522aa86f5c09405418e
+  '@linxin666/dsh-web-ui-all@0.2.5': 8fd5c65251fe8262b1b7cb5cc9cd61f29b4fda03b51755d88b179f1a8748e793
 
 importers:
 
@@ -206,7 +206,7 @@ importers:
         version: link:../../packages/dsh-particle-theme
       '@linxin666/dsh-web-ui-all':
         specifier: 0.2.5
-        version: 0.2.5(patch_hash=d8054003cadb768a03c99f911d4e0bc524f099cbcd5d6522aa86f5c09405418e)(137ab99ea686920e7b67ed9e4b149d6c)
+        version: 0.2.5(patch_hash=8fd5c65251fe8262b1b7cb5cc9cd61f29b4fda03b51755d88b179f1a8748e793)(137ab99ea686920e7b67ed9e4b149d6c)
       '@tencent-connect/dsh-qqbot':
         specifier: 0.4.0
         version: 0.4.0(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-agent@0.1.1-rc.1(aa3d9fe6db68ff807654619f7de13685))(@deepseek-ai/dsh-llm@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-attachment@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-brand@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))))(@deepseek-ai/dsh-session@0.1.1-rc.1(7df49adfe80cd12fee5d57cbd9c430d9))(@deepseek-ai/schemastery@3.18.1)(@tencent-connect/qqbot-connector@1.2.0)
@@ -11685,7 +11685,7 @@ snapshots:
       react: 18.3.1
       schemastery: 3.18.0
 
-  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=d8054003cadb768a03c99f911d4e0bc524f099cbcd5d6522aa86f5c09405418e)(137ab99ea686920e7b67ed9e4b149d6c)':
+  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=8fd5c65251fe8262b1b7cb5cc9cd61f29b4fda03b51755d88b179f1a8748e793)(137ab99ea686920e7b67ed9e4b149d6c)':
     dependencies:
       '@linxin666/dsh-chat-recovery': 0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-client-ui-aionui-panel': link:packages/dsh-aionui-panel

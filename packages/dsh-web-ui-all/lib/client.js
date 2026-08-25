@@ -4,6 +4,17 @@ window.__ModuleLoader__.load({
 		var module = { exports: {} };
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+		//#region \0dsh-css:packages/dsh-web-ui-all/src/client/sidebar-rail.module.css.mjs
+		const css = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>button,[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-taskboard-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-ssh-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow]{box-sizing:border-box;align-self:center;width:36px;min-width:36px;margin-inline:auto}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow][data-rail=rail]{align-items:center}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=footerActions]{box-sizing:border-box;flex-direction:column;justify-content:flex-start;align-items:center;gap:4px;width:36px;min-width:36px;margin-inline:auto}";
+		const tagId = "@linxin666/dsh-web-ui-all/sidebar-rail.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "@linxin666/dsh-web-ui-all";
+			tag.dataset.pluginCss = tagId;
+			tag.textContent = css;
+			document.head.appendChild(tag);
+		}
+		//#endregion
 		//#region src/client/index.ts
 		/** Column shims: element selector → attribute to stamp. */
 		const COLUMN_SHIMS = [
