@@ -55,7 +55,7 @@ import {
   readLegacyCredentialCompatibility,
   validateLegacyCredentialEnvironment,
 } from './legacy-credential-compat.mjs'
-import { builtinsFallbackNotification, DesktopNotificationService } from './notifications.mjs'
+import { builtinsFallbackNotification, DesktopNotificationService, sessionRecoveryNotification } from './notifications.mjs'
 import { startQqBotConnector } from './optional-integrations.mjs'
 import {
   DesktopPluginRecovery,
@@ -1318,6 +1318,16 @@ export async function startElectronApp(metadata) {
     },
   })
 
+  let sessionRecoverySkippedCount = 0
+  const observeSessionRecoveryLine = (entry) => {
+    const match = /\[dsh-session-recovery\]\s+skipped=(\d+)\s+kind=corrupt-zstd-header(?:\s|$)/u.exec(String(entry?.line ?? ''))
+    if (match === null) return
+    const count = Number(match[1])
+    if (Number.isSafeInteger(count) && count > 0) {
+      sessionRecoverySkippedCount = Math.max(sessionRecoverySkippedCount, Math.min(count, 1_000_000))
+    }
+  }
+  runtimeProvider.on('line', observeSessionRecoveryLine)
   const exportDiagnostics = () => exportStartupDiagnostics({
     dialog,
     getWindow: () => mainWindow ?? extensionWindow,
@@ -1341,6 +1351,7 @@ export async function startElectronApp(metadata) {
       arch: process.arch,
     },
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
+    sessionRecovery: { skipped: sessionRecoverySkippedCount },
     repairIncidentStore,
     startupAttempt: latestStartupAttempt,
     redactionRoots: [
@@ -1728,6 +1739,12 @@ export async function startElectronApp(metadata) {
     activeOrigin = new URL(status.url).origin
     try {
       await mainWindow.loadURL(status.url)
+      if (sessionRecoverySkippedCount > 0) {
+        await notificationService.show(
+          sessionRecoveryNotification(sessionRecoverySkippedCount),
+          { force: true },
+        ).catch(() => {})
+      }
       deepLinkRouter.setReady(true)
       const rendererLoadedAt = performance.now()
       productMetrics.recordDirectStartReady({
@@ -1750,6 +1767,7 @@ export async function startElectronApp(metadata) {
     productMetrics.observeRuntimeStatus(status)
     void trayLifecycle?.refresh()
     if (status.state === 'starting') runtimeStartedAt = performance.now()
+    if (status.state === 'starting') sessionRecoverySkippedCount = 0
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (status.state === 'ready' && status.url) {
       const runtimeReadyAt = performance.now()

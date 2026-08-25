@@ -20,8 +20,8 @@ import { mergeQqBotPatch, readQqBotPatchEnabled } from './extensions/qqbot.mjs'
 
 export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-base',
-  '@deepseek-ai/dsh-web-app',
   '@linxin666/dsh-desktop-compat',
+  '@deepseek-ai/dsh-web-app',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   'reasoning-slider',

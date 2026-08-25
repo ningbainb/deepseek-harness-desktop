@@ -144,6 +144,17 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
   assert.doesNotMatch(serialized, /<dsh-home>|file:/u)
 })
 
+test('session recovery diagnostics are bounded and contain only safe metadata', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    sessionRecovery: { skipped: 2_000_000 },
+  })
+  assert.deepEqual(diagnostics.sessionRecovery, {
+    skipped: 1_000_000,
+    kind: 'corrupt-zstd-header',
+    originalFilesPreserved: true,
+  })
+  assert.doesNotMatch(JSON.stringify(diagnostics.sessionRecovery), /C:\\\\|session\\.jsonl|session-id/u)
+})
 test('startup diagnostics preserve safe boot and direct-attempt correlation separately from runtime restart attempts', async () => {
   const diagnostics = await collectStartupDiagnostics({
     controller: {

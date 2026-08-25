@@ -18,6 +18,10 @@
       "types": "./lib/types/workspace-file-open-policy.d.ts",
       "default": "./lib/workspace-file-open-policy.js"
     },
+    "./session-recovery": {
+      "types": "./lib/types/session-recovery.d.ts",
+      "default": "./lib/session-recovery.js"
+    },
     "./package.json": "./package.json"
   },
   "dsh": {

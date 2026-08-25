@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   builtinsFallbackNotification,
+  sessionRecoveryNotification,
   DesktopNotificationService,
   normalizeDesktopNotification,
 } from '../src/notifications.mjs'
@@ -25,6 +26,15 @@ test('missing credentials notification explains that no model call was made', ()
   assert.match(notification.body, /模型 Key/u)
   assert.match(notification.body, /填写 Key/u)
   assert.doesNotMatch(JSON.stringify(notification), /secret|api.?key=/iu)
+})
+test('session recovery notification uses a separate category and exact count copy', () => {
+  assert.deepEqual(sessionRecoveryNotification(1), {
+    category: 'session',
+    id: 'session:recovery:1',
+    title: '有 1 个历史会话暂时无法读取',
+    body: '其他历史会话仍可使用；原始会话文件未被修改。',
+  })
+  assert.equal(sessionRecoveryNotification(2).title, '有 2 个历史会话暂时无法读取')
 })
 test('structured notifications validate category, id, bounded text, and allowlisted deep links', () => {
   assert.deepEqual(normalizeDesktopNotification({
@@ -71,6 +81,15 @@ test('notification service suppresses foreground, duplicate, and rapid category 
   assert.equal(shown.length, 2)
 })
 
+test('session recovery notification can be shown while the app is foregrounded', async () => {
+  let shown = 0
+  const service = new DesktopNotificationService({
+    isForeground: () => true,
+    showNative: async () => { shown += 1; return true },
+  })
+  assert.deepEqual(await service.show(sessionRecoveryNotification(1), { force: true }), { shown: true })
+  assert.equal(shown, 1)
+})
 test('notification clicks route only the already validated structured deep link', async () => {
   let click
   const routed = []

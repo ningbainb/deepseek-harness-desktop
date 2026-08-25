@@ -264,4 +264,14 @@ export const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
     removeWhen: 'The upstream adapter exposes a request-side tools capability contract with the same route-level behavior.',
     lastVerified: '2026-08-24',
   },
+  {
+    id: 'session-startup-corruption',
+    appliesTo: ['0.1.1-rc.1'],
+    upstreamReference: '@deepseek-ai/dsh-session-persistence-jsonl 0.1.1-rc.1 listArtifacts/readFirstZstdLine invalid frame magic at byte 0',
+    owner: 'desktop-platform',
+    tests: ['packages/dsh-desktop-compat/tests/session-recovery.spec.ts'],
+    reason: 'Skip only a confirmed invalid zstd frame header while preserving every original session artifact.',
+    removeWhen: 'The upstream JSONL persistence backend isolates an invalid session artifact during metadata enumeration.',
+    lastVerified: '2026-08-25',
+  },
 ] satisfies readonly DesktopCompatPatch[], { enforceFreshness: false })

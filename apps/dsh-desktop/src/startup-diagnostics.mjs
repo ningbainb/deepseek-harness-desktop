@@ -297,6 +297,20 @@ function currentRuntimeSummary(controller) {
   }
 }
 
+function projectSessionRecovery(value) {
+  const skipped = value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Number.isSafeInteger(value.skipped) && value.skipped > 0
+    ? Math.min(value.skipped, 1_000_000)
+    : 0
+  return Object.freeze({
+    skipped,
+    ...(skipped === 0 ? {} : {
+      kind: 'corrupt-zstd-header',
+      originalFilesPreserved: true,
+    }),
+  })
+}
+
 function projectStartupAttempt(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
   const bootId = safeIdentifier(value.bootId, SAFE_BOOT_ID, 16)
@@ -387,6 +401,7 @@ export async function collectStartupDiagnostics({
   patchAssessment,
   migration,
   repairIncidentStore,
+  sessionRecovery,
   startupAttempt,
 } = {}) {
   const timeoutMs = Number.isInteger(collectionTimeoutMs) && collectionTimeoutMs > 0
@@ -443,6 +458,7 @@ export async function collectStartupDiagnostics({
         : undefined,
     },
     recovery: projectRecoveryDiagnostics(recovery),
+    sessionRecovery: projectSessionRecovery(sessionRecovery),
     plugins: projectPluginInventory(inventory),
     taskScheduler: {
       tasks: taskSummary,

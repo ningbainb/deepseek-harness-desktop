@@ -2,6 +2,7 @@ import { normalizeDeepLink } from './deep-links.mjs'
 
 export const NOTIFICATION_CATEGORIES = Object.freeze([
   'plugin-recovery',
+  'session',
   'preset',
   'task',
   'run',
@@ -67,6 +68,18 @@ export function builtinsFallbackNotification(fingerprint = 'unknown', reason = '
   })
 }
 
+export function sessionRecoveryNotification(skippedCount = 1) {
+  const count = Number.isSafeInteger(skippedCount) && skippedCount > 0
+    ? Math.min(skippedCount, 1_000_000)
+    : 1
+  return Object.freeze({
+    category: 'session',
+    id: 'session:recovery:' + count,
+    title: '有 ' + count + ' 个历史会话暂时无法读取',
+    body: '其他历史会话仍可使用；原始会话文件未被修改。',
+  })
+}
+
 export function normalizeDesktopNotification(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('invalid desktop notification')
@@ -111,10 +124,10 @@ export class DesktopNotificationService {
     this.categories = new Map()
   }
 
-  async show(value) {
+  async show(value, { force = false } = {}) {
     const notification = normalizeDesktopNotification(value)
     const now = this.now()
-    if (this.isForeground()) return Object.freeze({ shown: false, reason: 'foreground' })
+    if (!force && this.isForeground()) return Object.freeze({ shown: false, reason: 'foreground' })
     if (this.ids.has(notification.id)) return Object.freeze({ shown: false, reason: 'duplicate' })
     const lastCategory = this.categories.get(notification.category)
     if (lastCategory !== undefined && now - lastCategory < this.minimumIntervalMs) {

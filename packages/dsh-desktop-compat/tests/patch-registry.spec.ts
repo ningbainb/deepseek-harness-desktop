@@ -7,7 +7,7 @@ import {
 } from '../src/patch-registry.ts'
 
 const policy = {
-  today: '2026-08-24',
+  today: '2026-08-25',
   testExists: () => true,
 }
 
@@ -21,6 +21,7 @@ describe('Desktop compat patch registry', () => {
       'tool-call-arguments-envelope',
       'desktop-skin-profile-isolation',
       'tools-capability-request-side',
+      'session-startup-corruption',
     ])
     for (const entry of DESKTOP_COMPAT_PATCHES) {
       expect(entry.appliesTo).toEqual(['0.1.1-rc.1'])
@@ -28,7 +29,7 @@ describe('Desktop compat patch registry', () => {
       expect(entry.owner).toBe('desktop-platform')
       expect(entry.tests).toEqual([entry.test])
       expect(entry.test).toMatch(/^(?:packages\/dsh-desktop-compat\/tests\/.+\.spec\.ts|apps\/dsh-desktop\/test\/.+\.test\.mjs)$/u)
-      expect(entry.lastVerified).toMatch(/^2026-08-(21|24)$/u)
+      expect(entry.lastVerified).toMatch(/^2026-08-(21|24|25)$/u)
     }
   })
 

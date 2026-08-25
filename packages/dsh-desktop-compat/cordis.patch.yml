@@ -1,5 +1,7 @@
-# Desktop-only host compatibility layer. It uses public DSH event and tool
-# hooks and can be removed when the upstream cancellation contract is fixed.
+# Desktop-only host compatibility layer. The first entry is version-bound to
+# the JSONL persistence seam and must load before dsh-workspace enumerates sessions.
 - insert:
+    - id: session-persistence-recovery
+      name: '@linxin666/dsh-desktop-compat/session-recovery'
     - id: desktop-compat
       name: '@linxin666/dsh-desktop-compat'
