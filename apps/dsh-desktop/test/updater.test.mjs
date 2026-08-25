@@ -5,6 +5,7 @@ import test from 'node:test'
 import {
   DesktopUpdateController,
   UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
+  UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
   formatUpdateDetails,
   normalizeReleaseNotes,
 } from '../src/updater.mjs'
@@ -40,6 +41,7 @@ function createHarness({
   getWindow,
   setTimeoutFn = () => ({ unref() {} }),
   clearTimeoutFn = () => {},
+  installPreparationTimeoutMs = UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
 } = {}) {
   const updater = new FakeUpdater()
   const progress = []
@@ -63,6 +65,7 @@ function createHarness({
     onInstallFailure,
     downloadRouter,
     setTimeoutFn,
+    installPreparationTimeoutMs,
     setIntervalFn: () => ({ unref() {} }),
     clearTimeoutFn,
     clearIntervalFn: () => {},
@@ -375,4 +378,31 @@ test('manual checks explain when updates are unavailable in development', async 
     currentVersion: '1.0.0',
     visible: true,
   })
+})
+
+test('hung install preparation exits with a bounded error and recovery callback', async () => {
+  let recoveries = 0
+  const harness = createHarness({
+    beforeInstall: () => new Promise(() => {}),
+    onInstallFailure: async () => { recoveries += 1 },
+    installPreparationTimeoutMs: 10,
+    setTimeoutFn: (callback, delay) => {
+      const timer = { id: setTimeout(callback, delay), delay, unref() {} }
+      return timer
+    },
+    clearTimeoutFn: (timer) => clearTimeout(timer.id),
+  })
+
+  await harness.controller.check()
+  harness.updater.emit('update-available', { version: '1.1.0', releaseNotes: 'Ready.' })
+  await tick()
+  harness.updater.emit('update-downloaded', { version: '1.1.0' })
+  await tick()
+
+  assert.equal(await harness.controller.install(), false)
+  assert.equal(harness.updater.installs, 0)
+  assert.equal(recoveries, 1)
+  assert.equal(harness.controller.getStatus().phase, 'error')
+  assert.match(harness.controller.getStatus().message, /update preparation did not finish before the timeout \(10ms\)/u)
+  harness.controller.dispose()
 })
