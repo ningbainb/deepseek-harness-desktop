@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "3.0.1",
+  "desktopVersion": "3.1.0",
   "upstreamVersion": "0.1.1-rc.1",
-  "lockfileSha256": "5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a",
+  "lockfileSha256": "5e997c1aaaff5173e3b88f4053ba2b83feb4b871fb0c23bcdef8fe1199280644",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -771,7 +771,7 @@
       "path": "packages/dsh-live-stats/src/projection.ts",
       "kind": "static-export",
       "specifier": "@deepseek-ai/dsh-token-meter/client",
-      "line": 20,
+      "line": 22,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2573,7 +2573,7 @@
       "category": "host-service",
       "path": "packages/dsh-particle-theme/src/client/index.ts",
       "line": 29,
-      "operation": "object"
+      "operation": "locale"
     },
     {
       "category": "host-service",

@@ -15,6 +15,26 @@ export function formatTokensPerSecond(value: number): string {
   return String(value < 100 ? Math.round(value * 10) / 10 : Math.round(value))
 }
 
+/** Format a token count using the compact units used by the DSH stats row. */
+export function formatCompactTokens(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000_000) return String(Math.round(value / 100_000_000) / 10) + 'B'
+  if (absolute >= 1_000_000) return String(Math.round(value / 10_000) / 100) + 'M'
+  if (absolute >= 1_000) return String(Math.round(value / 10) / 100) + 'K'
+  return String(Math.round(value))
+}
+
+/** Format a current-session cost estimate for the compact line. */
+export function formatEstimatedCost(value: number, currency = 'CNY'): string {
+  const safeValue = Number.isFinite(value) && value >= 0 ? value : 0
+  const symbol = currency === 'CNY' ? '¥' : currency + ' '
+  return symbol + safeValue.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })
+}
+
 const STYLE = {
   boxSizing: 'border-box',
   color: 'var(--dsw-alias-label-tertiary)',
@@ -31,11 +51,41 @@ const STYLE = {
   width: '100%',
 } as const
 
-/** Second composer-status line for active or latest response throughput. */
+export interface UsageCostLineProps {
+  projection?: {
+    uncachedInputTokens: number
+    outputTokens: number
+    cacheReadTokens: number
+    cacheWriteTokens: number
+    estimatedCost?: number
+    costCurrency?: string
+  }
+}
+
+/** Render the current-session token buckets and estimated cost. */
+export const UsageCostLine = memo(function UsageCostLine({ projection }: UsageCostLineProps) {
+  if (projection?.estimatedCost === undefined) return null
+  const inputTokens = projection.uncachedInputTokens
+    + projection.cacheReadTokens
+    + projection.cacheWriteTokens
+  return (
+    <div style={STYLE}>
+      API ↑{formatCompactTokens(inputTokens)} ↓{formatCompactTokens(projection.outputTokens)}
+      {' · '}≈{formatEstimatedCost(projection.estimatedCost, projection.costCurrency)}
+    </div>
+  )
+})
+
+/** Composer-status lines for the current cost estimate and response throughput. */
 export const TpsLine = memo(function TpsLine({ useProjection }: TpsLineProps) {
-  const rate = useProjection('liveTokenUsage')?.tokensPerSecond
-  if (rate === undefined) return null
-  return <div style={STYLE}>TPS {formatTokensPerSecond(rate)} tok/s</div>
+  const projection = useProjection('liveTokenUsage')
+  const rate = projection?.tokensPerSecond
+  return (
+    <>
+      <UsageCostLine projection={projection} />
+      {rate === undefined ? null : <div style={STYLE}>TPS {formatTokensPerSecond(rate)} tok/s</div>}
+    </>
+  )
 })
 
 /**

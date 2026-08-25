@@ -2,18 +2,18 @@
 
 [English](README.md) | 中文
 
-DSH Web 的实时输入/输出 token 估算与生成吞吐显示。它供给内置的会话状态行：响应流式输出时实时更新输入/输出 token 总量，生成吞吐组（`TPS 31.4 tok/s`）渲染在步骤计数之后、计费组之前：
+DSH Web 的实时输入/输出 token 估算、生成吞吐与会话费用显示。它供给内置的会话状态行：响应流式输出时实时更新输入/输出 token 总量，按当前计价档位显示紧凑的 `≈¥` API 费用，生成吞吐组（`TPS 31.4 tok/s`）渲染在步骤计数之后：
 
 ```text
-1 turns · 3 steps TPS 31.4 tok/s Input ~7.9K tok · Output ~12 tok
+1 turns · 3 steps API ↑7.9K ↓12 · ≈¥0.05 TPS 31.4 tok/s
 ```
 
-`~` 表示启发式估算。当 provider 用量到达时，估算值会被真实用量替换；精确的缓存统计始终来自 DSH 的持久化 token 用量投影。重试会替换该步骤先前的估算，被中止的回合会移除其未结算的估算。
+`~` 表示 token 启发式估算，`≈` 表示计算所得的 API 费用。当 provider 用量到达时，token 估算值会被真实用量替换；精确的缓存统计始终来自 DSH 的持久化 token 用量投影。重试会替换该步骤先前的估算，被中止的回合会移除其未结算的估算。
 
 ## 功能
 
 - **宿主侧**：注册可重放的 `liveTokenUsage` 会话投影（`ctx.sessionProjections`）。该折叠从表面日志加上 header/工具框架估算输入 token，从流式 chunk 估算输出 token，并在 `usage` chunk 或最终消息落地后立即用 provider 用量替换估算。TPS 由活跃步骤的输出 token 除以墙钟耗时得出，且速率是常驻的：一旦某个步骤测得速率，投影就会持续上报（新步骤尚未产生输出或遇到无速率步骤时回退到最近一次测得值），状态行不会闪烁消失。
-- **客户端**：仅为 roster 兼容保留。TPS 组渲染在会话统计行内部——ui-conversation 直接读取 `liveTokenUsage` 投影——因此客户端不再挂载任何内容。
+- **客户端**：在会话 composer dock 挂载费用/TPS 行。它直接读取宿主侧的 `liveTokenUsage` 投影，显示紧凑的输入/输出 token 总量和当前会话估算费用。
 
 ## 安装
 
@@ -31,7 +31,7 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-live-stats
 
 ```
 
-安装后**重启 `dsh web`**，会话状态行出现 TPS 组。
+安装后**重启 `dsh web`**，会话状态行出现费用/TPS 行。
 
 另一种方式：作为普通 overlay 行加入个人 DSH overlay（`~/.dsh/config.yaml`），保存即热加载：
 
@@ -54,6 +54,8 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-live-stats
 | `charsPerToken` | `number` | `4` | 一个 token 大致对应的文本字符数 |
 | `blockOverhead` | `number` | `4` | 每个内容块分配的固定框架 token 数 |
 | `roleOverhead` | `number` | `4` | 每条消息或助手响应分配的固定框架 token 数 |
+| `showCost` | `boolean` | `true` | 是否在 composer 行显示当前会话估算 API 费用 |
+| `priceMode` | `string` | `auto` | 按北京时间自动峰/谷计价，或强制使用 `peak` / `offpeak` |
 
 ## 导出形态
 
@@ -81,3 +83,4 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-live-stats
 - **仅 Web**：TPS 组渲染在 DSH Web 的会话统计行内；暂无 TUI 等价物。
 - **单一活跃步骤**：投影每个会话只跟踪一个活跃步骤，dock 行显示该会话的视图；并发会话各自拥有独立投影。
 - **密度假设**：`charsPerToken` 默认为 4 字符，会低估中文文本、高估纯 ASCII；若估算偏差明显，请按部署调整。
+- **费用估算**：显示的 `≈` 金额使用内置 DeepSeek 峰/谷价格计算当前会话，不是 provider 最终账单；按模型区分的价格表留待后续版本。

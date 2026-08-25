@@ -1,10 +1,10 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 3.0.1.
+Authoritative Desktop version: 3.1.0.
 
 Stable DSH package version: 0.1.1-rc.1.
 
-Lockfile SHA-256: `5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a`.
+Lockfile SHA-256: `5e997c1aaaff5173e3b88f4053ba2b83feb4b871fb0c23bcdef8fe1199280644`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -105,7 +105,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-live-stats/src/projection.ts | 9 | static-import | @deepseek-ai/dsh-session-projection | yes | public-stable | no |
 | packages/dsh-live-stats/src/projection.ts | 10 | static-import | @deepseek-ai/dsh-token-meter/client | yes | public-experimental | no |
 | packages/dsh-live-stats/src/projection.ts | 11 | static-import | @deepseek-ai/dsh-token-meter/client | yes | public-experimental | no |
-| packages/dsh-live-stats/src/projection.ts | 20 | static-export | @deepseek-ai/dsh-token-meter/client | yes | public-experimental | no |
+| packages/dsh-live-stats/src/projection.ts | 22 | static-export | @deepseek-ai/dsh-token-meter/client | yes | public-experimental | no |
 | packages/dsh-live-stats/tests/estimator.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
 | packages/dsh-live-stats/tests/projection.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
 | packages/dsh-live-stats/tests/projection.spec.ts | 6 | static-import | @deepseek-ai/dsh-llm | yes | public-stable | no |
@@ -314,7 +314,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 58 | remote |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 15 | invariants |
 | host-service | packages/dsh-mode-switcher/src/client/index.ts | 8 | connection |
-| host-service | packages/dsh-particle-theme/src/client/index.ts | 29 | object |
+| host-service | packages/dsh-particle-theme/src/client/index.ts | 29 | locale |
 | host-service | packages/dsh-pet/src/client/index.ts | 70 | remote |
 | host-service | packages/dsh-remote-web-ui/src/client/index.ts | 93 | remote |
 | host-service | packages/dsh-remote-web-ui/src/invariant.ts | 15 | invariants |
