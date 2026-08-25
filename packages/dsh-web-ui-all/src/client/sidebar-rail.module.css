@@ -1,0 +1,34 @@
+/**
+ * The shell keeps its native action and plugin footer actions in separate
+ * flex seats. When the sidebar becomes a rail, center those seats on the
+ * same 36px column so the icons do not drift to opposite edges.
+ */
+
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > button),
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [data-dsh-taskboard-entry]),
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [data-dsh-ssh-entry]),
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']) {
+  width: 36px;
+  min-width: 36px;
+  margin-inline: auto;
+  align-self: center;
+  box-sizing: border-box;
+}
+
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow'][data-rail='rail']) {
+  align-items: center;
+}
+/* The shell keeps the remote entry row and the dock entry side by side in a
+   wide footer. In the rail that creates the split-column layout from the
+   screenshot; give the shared footer a single 36px track and stack both
+   seats so the phone, update, and dock icons share one center line. */
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='footerActions']) {
+  box-sizing: border-box;
+  width: 36px;
+  min-width: 36px;
+  margin-inline: auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+}
