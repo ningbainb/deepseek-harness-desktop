@@ -6,6 +6,18 @@
 
 English: No changes yet.
 
+## 3.0.9 - 2026-08-25
+
+中文：
+
+- 修复冷启动时工具与帮助菜单早于完整 Desktop IPC 注册出现，导致打包版内置终端入口偶发无响应的问题；菜单现在会在 IPC 就绪后再启用。
+- 修复用户更新期间 QQ Bot 异步绑定/解绑任务可能在应用关停后重新启动本地 Runtime，进而触发后台未关闭或安装包文件被占用的问题。
+
+English:
+
+- Fixes a cold-start race where Tools and Help appeared before the complete Desktop IPC was registered, making the packaged built-in terminal entry intermittently unresponsive; the menus now enable only after IPC is ready.
+- Fixes an update-shutdown race where an asynchronous QQ Bot bind/unbind task could restart the local Runtime after shutdown, causing the background-process-not-closed prompt or installer file locks.
+
 ## 3.0.8 - 2026-08-25
 
 中文：

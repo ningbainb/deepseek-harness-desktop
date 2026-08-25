@@ -20,13 +20,13 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-### Latest release: 3.0.8
+### Latest release: 3.0.9
 
-`desktop-v3.0.8` uses direct loading and zero-click automatic repair: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+`desktop-v3.0.9` uses direct loading and zero-click automatic repair: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
 
 | Version | Highlights |
 | --- | --- |
-| **3.0.8** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, shows repair progress, and safely handles missing models or Tools capability without startup choices. |
+| **3.0.9** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, shows repair progress, and safely handles missing models or Tools capability without startup choices. |
 | **3.0.7** | First stable direct-start and zero-click repair release; preserved same-Home state, the complete plugin graph, and transactional rollback boundaries. |
 | **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
 | **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
@@ -45,7 +45,7 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 3.0.8 Direct Start and Automatic Repair
+### 3.0.9 Direct Start and Automatic Repair
 
 - **No startup choices**: fresh users enter the built-in environment, while existing users read their current `DSH_HOME`, profile, conversations, sessions, settings, tasks, skins, and every plugin directly.
 - **Full profile first**: a failed complete-profile start is retried once unchanged. Desktop does not pre-emptively disable a plugin or block startup because publisher, registry, or compatibility metadata is absent.

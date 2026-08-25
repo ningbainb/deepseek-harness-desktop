@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-ui",
-  "version": "3.0.8",
+  "version": "3.0.9",
   "private": true,
   "description": "DeepSeek Harness Web GUI 皮肤集合 + 主题库预览页（仿 Codex-Dream-Skin / DreamSkin.cc）。每个皮肤是符合官方标准（turtle-ui 式 setup）的独立可安装插件包。",
   "scripts": {
