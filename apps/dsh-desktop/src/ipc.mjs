@@ -12,8 +12,16 @@ import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 
-const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
-const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', 'privacy', 'updates'])
+const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit'])
+const HELP_ACTIONS = new Set([
+  'community',
+  'downloads',
+  'export-diagnostics',
+  'feedback',
+  'project',
+  'privacy',
+  'updates',
+])
 const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
 const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])

@@ -334,6 +334,7 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
           { label: '提交建议', action: 'feedback' },
           { label: 'GitHub 项目', action: 'project' },
           { label: '隐私政策', action: 'privacy' },
+          { label: '导出诊断日志', action: 'export-diagnostics' },
           { label: '检查更新', action: 'updates' },
         ],
         invoke: (action) => window.dshDesktop.helpAction(action),

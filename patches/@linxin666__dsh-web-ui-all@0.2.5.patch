@@ -36,7 +36,7 @@ diff --git a/lib/client.js b/lib/client.js
 +				const railStyle = document.createElement("style");
 +				railStyle.dataset.plugin = "@linxin666/dsh-web-ui-all";
 +				railStyle.dataset.pluginCss = "@linxin666/dsh-web-ui-all/sidebar-rail.css";
-+				railStyle.textContent = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=footerActions]{box-sizing:border-box;width:36px;min-width:36px;margin-inline:auto;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}";
++				railStyle.textContent = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[class*=footArea]>[class*=footerActions]{box-sizing:border-box;flex-direction:column;align-items:center;gap:4px}";
 +				document.head.appendChild(railStyle);
 @@ -65,0 +71,1 @@
 +					railStyle.remove();

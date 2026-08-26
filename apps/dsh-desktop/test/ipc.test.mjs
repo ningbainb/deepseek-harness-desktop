@@ -285,6 +285,7 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   })
 
   assert.equal(await handlers.get('desktop:help-action')({ sender }, 'community'), true)
+  assert.equal(await handlers.get('desktop:help-action')({ sender }, 'export-diagnostics'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'extensions'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'terminal'), true)
   assert.deepEqual(await handlers.get('desktop:dock-entry-state')({ sender }), {
@@ -325,7 +326,7 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(handlers.has('desktop:background-status'), false)
   assert.equal(handlers.has('desktop:close-behavior-get'), false)
   assert.equal(handlers.has('desktop:close-behavior-set'), false)
-  assert.deepEqual(handled, ['community', 'extensions', 'terminal'])
+  assert.deepEqual(handled, ['community', 'export-diagnostics', 'extensions', 'terminal'])
   assert.deepEqual(exported, ['startup-diagnostics'])
   assert.deepEqual(observed, [
     ['dock-impression'],

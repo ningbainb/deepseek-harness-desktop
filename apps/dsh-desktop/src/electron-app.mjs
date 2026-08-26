@@ -1394,6 +1394,7 @@ export async function startElectronApp(metadata) {
         return updateController?.check({ manual: true })
       }
       productMetrics.recordSurface('help')
+      if (action === 'export-diagnostics') return exportDiagnostics()
       if (action === 'downloads') return shell.openExternal(GITHUB_DOWNLOADS_URL)
       if (action === 'feedback') return shell.openExternal(GITHUB_FEEDBACK_URL)
       if (action === 'project') return shell.openExternal(GITHUB_PROJECT_URL)
@@ -2394,6 +2395,7 @@ export async function startElectronApp(metadata) {
       return shell.openExternal(PRIVACY_POLICY_URL)
     },
     openLogs,
+    exportDiagnostics,
     checkForUpdates: (options) => {
       productMetrics.recordSurface('updates')
       return updateController.check(options)

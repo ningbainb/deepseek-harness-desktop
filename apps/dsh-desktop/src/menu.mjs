@@ -11,6 +11,7 @@ export function createApplicationMenuTemplate({
   openTerminal,
   openLogs,
   openPrivacy = () => shell.openExternal(PRIVACY_POLICY_URL),
+  exportDiagnostics = () => {},
   openProject = () => shell.openExternal(GITHUB_PROJECT_URL),
   checkForUpdates,
   getCloseBehavior,
@@ -97,6 +98,7 @@ export function createApplicationMenuTemplate({
       label: '帮助 / Help',
       submenu: [
         { label: '检查更新 / Check for Updates', click: action(() => checkForUpdates({ manual: true })) },
+        { label: '导出诊断日志 / Export Diagnostics', click: action(exportDiagnostics) },
         { type: 'separator' },
         { label: '加入社群 / Join QQ Group', click: action(openCommunity) },
         { label: '提建议 / Suggest an Idea', click: action(openFeedback) },

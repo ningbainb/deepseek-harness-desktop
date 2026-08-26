@@ -38,6 +38,7 @@ test('Tools and Help menus expose built-in terminal, Extension Dock, and communi
     openTerminal: () => calls.push(['terminal']),
     openLogs: () => calls.push(['logs']),
     openPrivacy: () => calls.push(['privacy']),
+    exportDiagnostics: () => calls.push(['diagnostics']),
     openProject: () => calls.push(['project', GITHUB_PROJECT_URL]),
     checkForUpdates: (options) => calls.push(['updates', options]),
   })
@@ -49,6 +50,7 @@ test('Tools and Help menus expose built-in terminal, Extension Dock, and communi
   const feedback = help.submenu.find((entry) => entry.label === '提建议 / Suggest an Idea')
   const project = help.submenu.find((entry) => entry.label === 'GitHub 项目')
   const privacy = help.submenu.find((entry) => entry.label === '隐私政策 / Privacy')
+  const diagnostics = help.submenu.find((entry) => entry.label === '导出诊断日志 / Export Diagnostics')
 
   assert.equal(extensions.accelerator, 'CmdOrCtrl+Shift+X')
   assert.equal(terminal.accelerator, 'CmdOrCtrl+Alt+T')
@@ -58,6 +60,7 @@ test('Tools and Help menus expose built-in terminal, Extension Dock, and communi
   feedback.click()
   project.click()
   privacy.click()
+  diagnostics.click()
   assert.deepEqual(calls, [
     ['terminal'],
     ['extensions'],
@@ -65,6 +68,7 @@ test('Tools and Help menus expose built-in terminal, Extension Dock, and communi
     ['feedback'],
     ['project', GITHUB_PROJECT_URL],
     ['privacy'],
+    ['diagnostics'],
   ])
 })
 

@@ -19,16 +19,12 @@
   align-items: center;
 }
 /* The shell keeps the remote entry row and the dock entry side by side in a
-   wide footer. In the rail that creates the split-column layout from the
-   screenshot; give the shared footer a single 36px track and stack both
-   seats so the phone, update, and dock icons share one center line. */
-:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='footerActions']) {
+   wide footer. In the rail, stack the footer seats so the phone, update, and
+   dock icons share one center line while preserving the sidebar package's
+   native collapsed width and centering rules. */
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [class*='footArea'] > [class*='footerActions']) {
   box-sizing: border-box;
-  width: 36px;
-  min-width: 36px;
-  margin-inline: auto;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
   gap: 4px;
 }

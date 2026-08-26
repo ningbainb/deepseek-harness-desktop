@@ -75,6 +75,7 @@ test('main window chrome exposes accessible Tools and Help dropdowns with fixed 
     ['提交建议', 'feedback'],
     ['GitHub 项目', 'project'],
     ['隐私政策', 'privacy'],
+    ['导出诊断日志', 'export-diagnostics'],
     ['检查更新', 'updates'],
   ]) {
     assert.match(script, new RegExp(label))

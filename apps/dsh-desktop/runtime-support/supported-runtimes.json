@@ -55,7 +55,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b"
+          "sha256": "9e00018d6308920a3bee312d36ff5924afa54c02cbc16063e25a518e5d05c861"
         },
         "slots": [
           "conversation.composer.dock",
@@ -69,7 +69,7 @@
         ],
         "patches": {
           "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-          "sha256": "4aae66924fa00e2438274fa9c39761c85dee223dcfd9774f3907255043fe216d",
+          "sha256": "af2e8caf44dbb8b626705c46b4638501bbf91a0fe2ff2305b4a472ce794b7a73",
           "ids": [
             "cancellation-presentation",
             "desktop-skin-profile-isolation",
