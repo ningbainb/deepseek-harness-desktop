@@ -13,6 +13,8 @@ import { CardForm, booleanField, numberField, type CardActions, type CardShell, 
 export interface LiveStatsSettings {
   /** Master switch for the plugin. */
   enabled?: boolean
+  /** Whether the composer should show the estimated cost line. */
+  showCost?: boolean
   /** Approximate text characters represented by one token. */
   charsPerToken?: number
   /** Fixed framing tokens assigned to each content block. */
@@ -25,6 +27,8 @@ export interface LiveStatsSettings {
 export interface LiveStatsSettingsCardState extends CardShell {
   /** Master switch. */
   enabled: CardFieldState
+  /** Cost line visibility. */
+  showCost: CardFieldState
   /** Characters per token. */
   charsPerToken: CardFieldState
   /** Per-content-block framing tokens. */
@@ -50,6 +54,7 @@ export class LiveStatsSettingsCardController {
   constructor(scope: SettingsScope<LiveStatsSettings>) {
     this.form = new CardForm(scope, [
       booleanField('enabled'),
+      booleanField('showCost'),
       numberField('charsPerToken', { min: 0.01 }),
       numberField('blockOverhead', { integer: true, min: 0 }),
       numberField('roleOverhead', { integer: true, min: 0 }),
@@ -61,6 +66,7 @@ export class LiveStatsSettingsCardController {
     return {
       ...this.form.shell(),
       enabled: this.form.field('enabled'),
+      showCost: this.form.field('showCost'),
       charsPerToken: this.form.field('charsPerToken'),
       blockOverhead: this.form.field('blockOverhead'),
       roleOverhead: this.form.field('roleOverhead'),
@@ -117,6 +123,18 @@ export function LiveStatsSettingsCard(props: LiveStatsSettingsCardProps) {
         {...state.enabled}
         onEdit={(text) => { props.edit('enabled', text) }}
         onReset={() => { props.resetField('enabled') }}
+      />
+      <BooleanField
+        id="settings-live-stats-cost"
+        label={t('settings.showCost')}
+        hint={t('settings.showCostHint')}
+        inheritLabel={t('settings.inherit')}
+        onLabel={t('settings.on')}
+        offLabel={t('settings.off')}
+        {...fieldProps}
+        {...state.showCost}
+        onEdit={(text) => { props.edit('showCost', text) }}
+        onReset={() => { props.resetField('showCost') }}
       />
       <ValueField
         id="settings-live-stats-chars"

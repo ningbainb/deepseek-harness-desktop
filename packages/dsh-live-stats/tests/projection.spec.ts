@@ -104,11 +104,27 @@ describe('liveTokenUsage projection', () => {
       cacheWriteTokens: 0,
       estimated: false,
       tokensPerSecond: 15,
+      estimatedCost: expect.any(Number),
+      costCurrency: 'CNY',
+      pricePeriod: 'offpeak',
     })
+    expect(projected(ctx, session).estimatedCost).toBeCloseTo(0.000169, 10)
 
     // Settling with a positive elapsed window keeps the rate on the last row.
     session.append('step/end', { turn: 1, step: 1 })
     expect(projected(ctx, session).tokensPerSecond).toBe(15)
+  })
+
+  it('omits cost fields when cost display is disabled', () => {
+    const definition = createLiveTokenUsageProjectionDefinition(
+      resolveEstimatorConfig({}),
+      undefined,
+      false,
+    )
+    const view = definition.wire.view(definition.init())
+    expect(view.estimatedCost).toBeUndefined()
+    expect(view.costCurrency).toBeUndefined()
+    expect(view.pricePeriod).toBeUndefined()
   })
 
   it('keeps a usage-exact output exact against later output deltas', async () => {

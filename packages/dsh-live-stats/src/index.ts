@@ -5,6 +5,8 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 import { resolveEstimatorConfig } from './estimator.ts'
 import type { EstimatorConfig } from './estimator.ts'
 import { createLiveTokenUsageProjectionDefinition } from './projection.ts'
+import { resolvePricingConfig } from './pricing.ts'
+import type { PriceMode } from './pricing.ts'
 
 /** Services required by the host projection plugin. */
 export const inject = ['sessionProjections']
@@ -20,6 +22,10 @@ export const LIVE_STATS_SETTINGS_NAMESPACE = settingsNamespace('live-stats')
 export interface Config extends EstimatorConfig {
   /** Master switch for the plugin (browser half + host projection). */
   enabled?: boolean
+  /** Whether the client should render the estimated cost line. */
+  showCost?: boolean
+  /** Which DeepSeek price period the cost line should use. */
+  priceMode?: PriceMode
 }
 
 /** Runtime schema for {@link Config}. */
@@ -28,6 +34,8 @@ export const Config: z<Config> = z.object({
   blockOverhead: z.number().step(1).min(0).default(4),
   roleOverhead: z.number().step(1).min(0).default(4),
   enabled: z.boolean().default(true),
+  showCost: z.boolean().default(true),
+  priceMode: z.string().pattern(/^(auto|peak|offpeak)$/).default('auto') as unknown as z<PriceMode>,
 })
 
 /**
@@ -61,7 +69,11 @@ export function apply(ctx: Context, config: Config = {}): void {
       ...(source.blockOverhead === undefined ? {} : { blockOverhead: source.blockOverhead }),
       ...(source.roleOverhead === undefined ? {} : { roleOverhead: source.roleOverhead }),
     })
-    disposeProjection = ctx.sessionProjections.register(createLiveTokenUsageProjectionDefinition(spec))
+    disposeProjection = ctx.sessionProjections.register(createLiveTokenUsageProjectionDefinition(
+      spec,
+      resolvePricingConfig({ priceMode: source.priceMode }),
+      source.showCost !== false,
+    ))
   }
 
   installSettingsSection(ctx, LIVE_STATS_SETTINGS_NAMESPACE, Config, config ?? {}, {
@@ -73,4 +85,6 @@ export function apply(ctx: Context, config: Config = {}): void {
 
 export { createLiveTokenUsageProjectionDefinition } from './projection.ts'
 export { resolveEstimatorConfig } from './estimator.ts'
+export { estimateTokenCost, resolvePricePeriod, resolvePricingConfig } from './pricing.ts'
 export type { EstimatorConfig, EstimatorSpec } from './estimator.ts'
+export type { PriceMode, PricePeriod, PricingConfig, PricingSpec, TokenCostEstimate, TokenUsageBuckets } from './pricing.ts'

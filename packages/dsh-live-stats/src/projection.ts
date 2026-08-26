@@ -16,6 +16,8 @@ import {
   estimateToolCallBlockTokens,
 } from './estimator.ts'
 import type { EstimatorSpec } from './estimator.ts'
+import { estimateTokenCost, resolvePricingConfig } from './pricing.ts'
+import type { PricingSpec } from './pricing.ts'
 
 export type { LiveTokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 
@@ -51,6 +53,9 @@ const projectionSchema = z.object({
   cacheWriteTokens: z.number().int().nonnegative(),
   estimated: z.boolean(),
   tokensPerSecond: z.number().nonnegative().optional(),
+  estimatedCost: z.number().nonnegative().optional(),
+  costCurrency: z.literal('CNY').optional(),
+  pricePeriod: z.enum(['peak', 'offpeak']).optional(),
 }).strict() as unknown as z.ZodType<LiveTokenUsageProjection>
 
 const tokenBucketsSchema = z.object({
@@ -292,7 +297,7 @@ function exactStep(step: ActiveStep, usage: TokenUsage, time: number): ActiveSte
   }
 }
 
-function view(state: State): LiveTokenUsageProjection {
+function view(state: State, pricing: PricingSpec, showCost: boolean): LiveTokenUsageProjection {
   const active = state.active
   const previous = active !== null
     && state.last?.turn === active.turn
@@ -312,10 +317,16 @@ function view(state: State): LiveTokenUsageProjection {
   const rate = active === null
     ? state.last?.tokensPerSecond
     : rateOf(active) ?? state.last?.tokensPerSecond
+  const cost = showCost ? estimateTokenCost(buckets, pricing) : undefined
   return {
     ...buckets,
     estimated: estimates > 0,
     ...(rate === undefined ? {} : { tokensPerSecond: rate }),
+    ...(cost === undefined ? {} : {
+      estimatedCost: cost.amount,
+      costCurrency: 'CNY',
+      pricePeriod: cost.period,
+    }),
   }
 }
 
@@ -325,6 +336,8 @@ function view(state: State): LiveTokenUsageProjection {
  */
 export function createLiveTokenUsageProjectionDefinition(
   spec: EstimatorSpec,
+  pricing: PricingSpec = resolvePricingConfig(),
+  showCost = true,
 ): LiveTokenUsageProjectionDefinition {
   return {
     key: 'liveTokenUsage',
@@ -439,7 +452,7 @@ export function createLiveTokenUsageProjectionDefinition(
     },
     wire: {
       viewSchema: projectionSchema,
-      view,
+      view: state => view(state, pricing, showCost),
     },
     stateVersion: 3,
   }

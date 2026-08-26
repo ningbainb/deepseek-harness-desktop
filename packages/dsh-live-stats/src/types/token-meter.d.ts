@@ -40,6 +40,12 @@ declare module '@deepseek-ai/dsh-token-meter/client' {
     estimated: boolean
     /** Output tokens per second of the active (or latest settled) step. */
     tokensPerSecond?: number
+    /** Current-session cost estimate in the projection currency. */
+    estimatedCost?: number
+    /** Currency code used for the cost estimate. */
+    costCurrency?: string
+    /** Current DeepSeek pricing period. */
+    pricePeriod?: 'peak' | 'offpeak'
   }
 }
 
