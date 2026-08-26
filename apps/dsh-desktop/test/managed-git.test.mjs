@@ -415,3 +415,39 @@ test('managed Git retries a transient Windows activation lock before publishing 
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('system Git probe accepts the vendor suffix that stock macOS reports', async () => {
+  // Apple's git ships with the Xcode Command Line Tools, so this is what a
+  // stock macOS prints. Rejecting it made every such machine look like it had
+  // no system Git at all.
+  const apple = await probeSystemGit({ spawn: successfulGitSpawn('2.50.1 (Apple Git-155)'), timeoutMs: 50 })
+  assert.deepEqual(apple, { available: true, version: '2.50.1' })
+
+  // The suffix must never leak into the reported version.
+  assert.equal(apple.version.includes('Apple'), false)
+})
+
+test('system Git probe keeps accepting the versions Windows and Linux report', async () => {
+  const mingit = await probeSystemGit({ spawn: successfulGitSpawn('2.55.0.windows.5'), timeoutMs: 50 })
+  assert.deepEqual(mingit, { available: true, version: '2.55.0.windows.5' })
+
+  const linux = await probeSystemGit({ spawn: successfulGitSpawn('2.43.0'), timeoutMs: 50 })
+  assert.deepEqual(linux, { available: true, version: '2.43.0' })
+
+  const homebrew = await probeSystemGit({ spawn: successfulGitSpawn('2.51.0'), timeoutMs: 50 })
+  assert.deepEqual(homebrew, { available: true, version: '2.51.0' })
+})
+
+test('system Git probe still rejects output the version suffix must not rescue', async () => {
+  // A malformed version is not made valid by having a suffix after it.
+  const malformed = await probeSystemGit({ spawn: successfulGitSpawn('2.50.1-evil (Apple Git-155)'), timeoutMs: 50 })
+  assert.deepEqual(malformed, { available: false, reason: 'invalid-version-output' })
+
+  // Without separating whitespace the suffix is not a suffix, and the token as
+  // a whole is not a version.
+  const glued = await probeSystemGit({ spawn: successfulGitSpawn('2.50.1(Apple Git-155)'), timeoutMs: 50 })
+  assert.deepEqual(glued, { available: false, reason: 'invalid-version-output' })
+
+  const empty = await probeSystemGit({ spawn: successfulGitSpawn(''), timeoutMs: 50 })
+  assert.deepEqual(empty, { available: false, reason: 'invalid-version-output' })
+})
