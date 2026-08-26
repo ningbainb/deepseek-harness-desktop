@@ -32,7 +32,7 @@ const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?
 const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const CHANNELS = new Set(['stable', 'prerelease'])
-const OPERATING_SYSTEMS = new Set(['windows-10', 'windows-11', 'windows-other'])
+const OPERATING_SYSTEMS = new Set(['windows-10', 'windows-11', 'windows-other', 'macos'])
 const LANGUAGES = new Set(['zh', 'en', 'other'])
 const DOWNLOAD_SOURCES = new Set(['nav', 'hero', 'terminal', 'install'])
 

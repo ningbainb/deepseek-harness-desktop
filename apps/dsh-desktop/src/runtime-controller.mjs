@@ -163,17 +163,37 @@ export function formatRuntimeExit(code, signal, { platform = process.platform } 
   return 'runtime exited unexpectedly without an exit code'
 }
 
+// Windows terminates the whole tree through `taskkill /T`. POSIX has no such
+// flag, so the runtime child is spawned as a process-group leader (`detached`)
+// and the signal goes to the negated pid, which reaches every descendant the
+// child started. Signalling only the direct child leaves the grandchildren to
+// be reparented to pid 1, where nothing ever reaps them.
+function signalChildProcessGroup(child, signal, processKill) {
+  if (!Number.isInteger(child.pid) || child.pid <= 0) return false
+  try {
+    processKill(-child.pid, signal)
+    return true
+  } catch (error) {
+    // ESRCH means the group is already gone; EPERM means the child never became
+    // a group leader. Both fall back to the direct child instead of propagating,
+    // so a group that cannot be signalled never turns into no signal at all.
+    if (error?.code !== 'ESRCH' && error?.code !== 'EPERM') throw error
+    return false
+  }
+}
+
 export function terminateChildProcessTree(
   child,
   {
     platform = process.platform,
     systemRoot = process.env.SystemRoot,
     execFileFn = execFile,
+    processKill = process.kill,
   } = {},
 ) {
   if (!child || child.exitCode !== null) return Promise.resolve()
   if (platform !== 'win32' || !Number.isInteger(child.pid) || child.pid <= 0) {
-    child.kill('SIGTERM')
+    if (!signalChildProcessGroup(child, 'SIGTERM', processKill)) child.kill('SIGTERM')
     return Promise.resolve()
   }
   const executable = systemRoot ? join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill.exe'
@@ -185,6 +205,22 @@ export function terminateChildProcessTree(
       (error) => error ? reject(error) : resolve(),
     )
   })
+}
+
+/**
+ * Escalation used when the graceful tree shutdown fails or times out. On
+ * Windows the graceful path is already `taskkill /F`, so the direct kill is the
+ * only remaining lever; on POSIX the escalation has to reach the group too, or
+ * the force path leaks exactly the descendants the graceful path just tried to
+ * collect.
+ */
+export function forceKillChildProcessTree(
+  child,
+  { platform = process.platform, processKill = process.kill } = {},
+) {
+  if (!child || child.exitCode !== null) return
+  if (platform !== 'win32' && signalChildProcessGroup(child, 'SIGKILL', processKill)) return
+  child.kill('SIGKILL')
 }
 
 export async function probeHttpReady(
@@ -236,6 +272,7 @@ export class DshRuntimeController extends EventEmitter {
     schedule = setTimeout,
     cancelSchedule = clearTimeout,
     terminateProcessTree = terminateChildProcessTree,
+    forceTerminateProcessTree = forceKillChildProcessTree,
     pathEntries = [],
     patchFiles = [],
     patchFilesProvider,
@@ -264,6 +301,7 @@ export class DshRuntimeController extends EventEmitter {
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
     this.terminateProcessTree = terminateProcessTree
+    this.forceTerminateProcessTree = forceTerminateProcessTree
     this.pathEntries = pathEntries
     this.patchFiles = validateRuntimePatchFiles(patchFiles)
     if (patchFilesProvider !== undefined && typeof patchFilesProvider !== 'function') {
@@ -446,6 +484,10 @@ export class DshRuntimeController extends EventEmitter {
           shell: false,
           stdio: ['ignore', 'pipe', 'pipe'],
           windowsHide: true,
+          // Makes the child a POSIX process-group leader so shutdown can signal
+          // the whole group. Windows keeps its existing semantics: `detached`
+          // there means a new console, and `taskkill /T` already walks the tree.
+          detached: this.platform !== 'win32',
         },
       )
       this.child = child
@@ -538,6 +580,28 @@ export class DshRuntimeController extends EventEmitter {
     this.#terminateFailedStartupChild(redactionToken)
   }
 
+  // Single exit for every SIGKILL escalation, so the POSIX group semantics
+  // cannot drift apart from the graceful path in one branch and not another.
+  // Every caller is either a timer or a catch block, so an unexpected errno
+  // must not escape here: that would take down the app instead of the runtime.
+  #forceKillChild(child, redactionToken = this.workspaceFileOpenToken) {
+    try {
+      this.forceTerminateProcessTree(child, { platform: this.platform })
+    } catch (error) {
+      this.#appendDiagnostic(
+        `[process] force kill failed: ${this.#errorMessage(error, redactionToken)}`,
+        redactionToken,
+      )
+      // The group signal never reached the child, so the direct kill is the
+      // last lever left.
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // Nothing left to escalate to; the exit handler still reports the state.
+      }
+    }
+  }
+
   #terminateFailedStartupChild(redactionToken = this.workspaceFileOpenToken) {
     const child = this.child
     if (child === undefined || child.exitCode !== null || this.failedStartupCleanup) return
@@ -552,7 +616,7 @@ export class DshRuntimeController extends EventEmitter {
     }
 
     const forceTimer = this.schedule(() => {
-      if (child.exitCode === null) child.kill('SIGKILL')
+      if (child.exitCode === null) this.#forceKillChild(child)
     }, this.shutdownTimeoutMs)
     forceTimer?.unref?.()
 
@@ -570,7 +634,7 @@ export class DshRuntimeController extends EventEmitter {
           `[process] failed-startup tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,
           redactionToken,
         )
-        if (child.exitCode === null) child.kill('SIGKILL')
+        if (child.exitCode === null) this.#forceKillChild(child)
       })
   }
 
@@ -749,7 +813,7 @@ export class DshRuntimeController extends EventEmitter {
     const exited = new Promise((resolve) => {
       this.stopResolver = resolve
     })
-    const forceTimer = this.schedule(() => child.kill('SIGKILL'), this.shutdownTimeoutMs)
+    const forceTimer = this.schedule(() => this.#forceKillChild(child), this.shutdownTimeoutMs)
     try {
       await this.terminateProcessTree(child)
     } catch (error) {
@@ -757,7 +821,7 @@ export class DshRuntimeController extends EventEmitter {
         `[process] process-tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,
         redactionToken,
       )
-      child.kill('SIGKILL')
+      this.#forceKillChild(child)
     }
     await exited
     this.cancelSchedule(forceTimer)

@@ -207,6 +207,26 @@ test('rejects oversized, malformed, and unknown input', async () => {
   assert.equal(invalidInstallationActor.status, 400)
 })
 
+test('accepts the macos operating system family and still rejects unknown ones', async () => {
+  const database = new FakeDatabase()
+  // The merged ingestion line only accepts schema 2/3, so the macos
+  // acceptance contract is exercised against the current schema instead of
+  // the retired schema 1 this test originally targeted.
+  const accepted = await worker.fetch(requestFor({
+    schema: 2,
+    events: [{ ...VALID_EVENT, os: 'macos' }],
+  }), enabledEnvironment(database))
+  assert.equal(accepted.status, 204)
+  assert.equal(database.batches.length, 1)
+  assert.ok(database.batches[0][0].values.includes('macos'))
+
+  const rejected = await worker.fetch(requestFor({
+    schema: 2,
+    events: [{ ...VALID_EVENT, os: 'macos-27' }],
+  }), enabledEnvironment())
+  assert.equal(rejected.status, 400)
+})
+
 test('groups identical events and binds only aggregate dimensions', async () => {
   const database = new FakeDatabase()
   const now = new Date('2026-08-19T23:59:59.000Z')
