@@ -16,11 +16,15 @@ jobs:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - name: Fetch desktop release tags for the version floor check
+        run: git fetch --tags origin 'refs/tags/desktop-v*:refs/tags/desktop-v*'
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
+      - name: Enforce the desktop version release floor
+        run: node scripts/verify-desktop-version-floor.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @deepseek-ai/dsh-desktop exec playwright install chromium
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:window-chrome:e2e
