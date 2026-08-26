@@ -7,23 +7,22 @@ test('keeps development and ordinary packaged builds disconnected by default', a
   let reads = 0
   const readFile = async () => {
     reads += 1
-    return '{"endpoint":"https://telemetry.example/v1/events"}'
+    return '{"endpoint":"https://telemetry.example/v1/events","officialBuild":true}'
   }
   assert.equal(await resolveTelemetryEndpoint({ isPackaged: false, resourcesPath: 'unused', readFile }), undefined)
   assert.equal(reads, 0)
   assert.equal(await resolveTelemetryEndpoint({
     isPackaged: true,
     resourcesPath: 'resources',
-    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events"}',
+    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events","officialBuild":false}',
   }), undefined)
 })
 
-test('accepts an ingestion endpoint only after an explicit opt-in seam', async () => {
+test('accepts an ingestion endpoint only from an official packaged resource', async () => {
   assert.equal(await resolveTelemetryEndpoint({
     isPackaged: true,
     resourcesPath: 'resources',
-    explicitlyEnabled: true,
-    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events"}',
+    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events","officialBuild":true}',
   }), 'https://telemetry.example/v1/events')
 
   for (const endpoint of [
@@ -35,10 +34,14 @@ test('accepts an ingestion endpoint only after an explicit opt-in seam', async (
     assert.equal(await resolveTelemetryEndpoint({
       isPackaged: true,
       resourcesPath: 'resources',
-      explicitlyEnabled: true,
-      readFile: async () => JSON.stringify({ endpoint }),
+      readFile: async () => JSON.stringify({ endpoint, officialBuild: true }),
     }), undefined)
   }
+  assert.equal(await resolveTelemetryEndpoint({
+    isPackaged: true,
+    resourcesPath: 'resources',
+    readFile: async () => '{"endpoint":"https://telemetry.example/v1/events","officialBuild":true,"user":"forbidden"}',
+  }), undefined)
 })
 
 test('allows an explicit local endpoint only through the test seam', async () => {

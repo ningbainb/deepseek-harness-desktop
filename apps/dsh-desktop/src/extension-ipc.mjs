@@ -6,6 +6,26 @@ import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/ski
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 
+export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
+
+async function awaitWithTimeout(value, timeoutMs, label) {
+  const boundedTimeout = Number.isFinite(timeoutMs)
+    ? Math.max(0, timeoutMs)
+    : EXTENSION_QUIESCE_TIMEOUT_MS
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${boundedTimeout}ms`))
+    }, boundedTimeout)
+    timer?.unref?.()
+  })
+  try {
+    return await Promise.race([value, timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 const CHANNELS = [
   'extensions:list',
   'extensions:plugin-check',
@@ -55,17 +75,18 @@ export function registerExtensionIpc({
   migrationService,
   notificationService,
   communityMarket,
-  // Both callbacks run exclusively in the main process. The resolver turns
-  // the renderer's source reference into a private descriptor, while the
-  // confirmer owns the native user-consent decision. Neither descriptor is
-  // returned through IPC.
+  // These callbacks run exclusively in the main process. The resolver turns
+  // the renderer's source reference into a private descriptor and the
+  // revalidator checks it again before mutation. No descriptor is returned
+  // through IPC.
   resolveFullAccessPlugin = async () => undefined,
-  confirmFullAccessPlugin = async () => false,
   revalidateFullAccessPlugin = async (descriptor) => descriptor,
   completeFullAccessPlugin = async () => {},
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
+  onRuntimeMaintenanceChange = () => {},
+  quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
 }) {
   if (typeof surfaceRegistry?.assert !== 'function') {
     throw new TypeError('extension IPC requires a desktop surface registry')
@@ -74,10 +95,13 @@ export function registerExtensionIpc({
     throw new TypeError('full access plugin revalidation callback must be a function')
   }
   if (typeof completeFullAccessPlugin !== 'function') {
-    throw new TypeError('full access plugin approval completion callback must be a function')
+    throw new TypeError('full access plugin cleanup callback must be a function')
   }
   if (typeof revokeFullUserTrust !== 'function') {
     throw new TypeError('full-user trust revocation callback must be a function')
+  }
+  if (typeof onRuntimeMaintenanceChange !== 'function') {
+    throw new TypeError('runtime maintenance callback must be a function')
   }
   for (const channel of CHANNELS) ipcMain.removeHandler(channel)
   let skillPaths = new Map()
@@ -85,6 +109,14 @@ export function registerExtensionIpc({
   let acceptingPluginMutations = true
   let pendingPluginMutations = 0
   let disposed = false
+
+  const publishRuntimeMaintenance = (active) => {
+    try {
+      Promise.resolve(onRuntimeMaintenanceChange(active)).catch(() => {})
+    } catch {
+      // Presentation state must never change mutation or rollback semantics.
+    }
+  }
 
   const emitProgress = (operation, phase, details = {}) => {
     const window = getWindow()
@@ -132,6 +164,7 @@ export function registerExtensionIpc({
       return Promise.reject(new Error('plugin changes are unavailable while QQ Bot binding is in progress'))
     }
     pendingPluginMutations += 1
+    if (pendingPluginMutations === 1) publishRuntimeMaintenance(true)
     const guardedOperation = () => {
       if (!acceptingPluginMutations) {
         throw new Error('plugin changes are unavailable while the desktop is stopping')
@@ -139,7 +172,10 @@ export function registerExtensionIpc({
       return operation()
     }
     const result = pluginMutationQueue.then(guardedOperation, guardedOperation)
-    const settled = result.finally(() => { pendingPluginMutations -= 1 })
+    const settled = result.finally(() => {
+      pendingPluginMutations -= 1
+      if (pendingPluginMutations === 0) publishRuntimeMaintenance(false)
+    })
     pluginMutationQueue = settled.catch(() => {})
     return settled
   }
@@ -200,20 +236,15 @@ export function registerExtensionIpc({
 
     if (request.fullAccess === true) {
       return enqueuePluginMutation(async () => {
-        // Resolve and obtain native approval before taking the runtime down.
-        // A rejection, cancellation, or invalid descriptor is therefore a
-        // no-mutation operation.
+        // The explicit install action is the user's decision. Resolve and
+        // revalidate the source before taking Runtime down, without a second
+        // publisher, compatibility, or trust prompt.
         const descriptor = assertExternalPluginDescriptor(await resolveFullAccessPlugin(Object.freeze({
           spec: request.spec,
         })))
-        const approved = await confirmFullAccessPlugin(
-          descriptor,
-          confirmationMode === undefined ? undefined : Object.freeze({ mode: confirmationMode }),
-        )
-        if (approved !== true) throw new Error('full access plugin installation was not approved')
         try {
-          // Local content can change after the native confirmation. Electron
-          // main re-resolves and stages the private descriptor immediately
+          // Local content can change after selection. Electron main
+          // re-resolves and stages the private descriptor immediately
           // before stopping Runtime or writing the persistent Desktop profile.
           const installationDescriptor = assertExternalPluginDescriptor(
             await revalidateFullAccessPlugin(descriptor),
@@ -626,13 +657,23 @@ export function registerExtensionIpc({
     for (const channel of CHANNELS) ipcMain.removeHandler(channel)
     await pluginMutationQueue
   }
-  unregister.quiesce = async () => {
+  unregister.quiesce = async ({ timeoutMs = quiesceTimeoutMs } = {}) => {
     acceptingPluginMutations = false
-    await pluginMutationQueue
+    await awaitWithTimeout(
+      typeof qqBotBinding.quiesce === 'function' ? qqBotBinding.quiesce() : undefined,
+      timeoutMs,
+      'extension shutdown quiesce timed out while waiting for QQ Bot operations',
+    )
+    await awaitWithTimeout(
+      pluginMutationQueue,
+      timeoutMs,
+      'extension shutdown quiesce timed out while waiting for plugin mutations',
+    )
   }
   unregister.resume = () => {
     if (disposed) return false
     acceptingPluginMutations = true
+    if (typeof qqBotBinding.resume === 'function') qqBotBinding.resume()
     return true
   }
   return unregister

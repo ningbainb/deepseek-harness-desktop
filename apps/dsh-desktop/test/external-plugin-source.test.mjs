@@ -12,6 +12,7 @@ import {
   createExternalPluginSourceSummary,
   parseExternalPluginReference,
   parseRemoteExternalPluginReference,
+  revalidateExternalPluginSource,
   resolveExternalPluginSource,
   stageExternalPluginSource,
 } from '../src/external-plugin-source.mjs'
@@ -170,6 +171,30 @@ test('remote npm, git, and HTTPS sources produce opaque descriptors without down
     assert.equal('canonicalPath' in summary, false)
     assert.equal('installSpec' in summary, false)
   }
+})
+
+test('user-selected sources revalidate for technical consistency without a trust decision', async () => {
+  await withTemporaryDirectory(async (root) => {
+    const directory = await createPluginDirectory(root)
+    const resolver = new ExternalPluginSourceResolver({ baseDir: root })
+    const sources = [
+      '@external/registry-plugin@1.2.3',
+      'alias@npm:@external/registry-plugin@1.2.3',
+      'git+https://github.com/example/external-plugin.git#v1.2.3',
+      'git+ssh://git@github.com/example/external-plugin.git#v1.2.3',
+      'https://plugins.example.invalid/external-plugin.tgz',
+      directory,
+      `file:${directory}`,
+      `link:${directory}`,
+      `workspace:${directory}`,
+    ]
+    for (const spec of sources) {
+      const descriptor = await resolver.resolve(spec)
+      const revalidated = await revalidateExternalPluginSource(descriptor, { resolver })
+      assert.equal(revalidated.sourceId, descriptor.sourceId)
+      assert.equal(revalidated.installSpec, descriptor.installSpec)
+    }
+  })
 })
 
 test('a bare package falls back to npm only after an equally named local path is absent', async () => {

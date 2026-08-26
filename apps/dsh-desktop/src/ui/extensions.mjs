@@ -1,5 +1,8 @@
 import { createExtensionOperationQueue } from './extension-operation-queue.mjs'
-import { selectCommunityMarketPlugins } from './community-market-view.mjs'
+import {
+  communityMarketInstallPresentation,
+  selectCommunityMarketPlugins,
+} from './community-market-view.mjs'
 
 const themeQuery = new URLSearchParams(window.location.search).get('theme')
 if (themeQuery === 'dark' || themeQuery === 'light') {
@@ -39,7 +42,6 @@ const recoveryCount = document.querySelector('#recovery-count')
 const recoveryMode = document.querySelector('#recovery-mode')
 const recoveryModeLabel = document.querySelector('#recovery-mode-label')
 const restoreSafeMode = document.querySelector('#restore-safe-mode')
-const revokeFullUserTrust = document.querySelector('#revoke-full-user-trust')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
 const activationBanner = document.querySelector('#activation-banner')
@@ -56,6 +58,7 @@ let marketCatalog
 let marketPage = 1
 let marketView
 let installedMarketReferences = new Set()
+const marketInstallPhases = new Map()
 
 const MARKET_PAGE_SIZE = 20
 const compactNumber = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
@@ -296,13 +299,20 @@ function marketDescription(plugin) {
 function marketPluginMarkup(plugin) {
   const sourceBadge = plugin.sourceKind === 'npm' ? 'NPM' : 'GIT'
   const deprecatedBadge = plugin.deprecated ? '<span class="badge inactive">已弃用</span>' : ''
-  const action = plugin.installed
+  const presentation = communityMarketInstallPresentation({
+    installed: plugin.installed,
+    phase: marketInstallPhases.get(plugin.id),
+  })
+  const action = presentation.kind === 'installed'
     ? '<span class="market-installed">已安装</span>'
-    : `<button type="button" class="primary market-install" data-install-market-plugin="${escapeHtml(plugin.id)}">安装</button>`
+    : `<button type="button" class="primary market-install" data-install-market-plugin="${escapeHtml(plugin.id)}" data-state="${escapeHtml(presentation.kind)}" aria-busy="${presentation.kind === 'installing' ? 'true' : 'false'}"${presentation.disabled ? ' disabled' : ''}>${escapeHtml(presentation.label)}</button>`
+  const operationState = presentation.status
+    ? `<p class="market-operation-state ${escapeHtml(presentation.kind)}" role="status">${escapeHtml(presentation.status)}</p>`
+    : ''
   const downloads = Number.isSafeInteger(plugin.downloads) ? compactNumber.format(plugin.downloads) : '--'
   const stars = Number.isSafeInteger(plugin.stars) ? compactNumber.format(plugin.stars) : '--'
   const author = plugin.owner ? `by ${plugin.owner}` : '社区作者'
-  return `<article class="market-card"><div class="market-card-head"><div class="market-card-title"><h3 title="${escapeHtml(plugin.name)}">${escapeHtml(plugin.displayName)}</h3><p>${escapeHtml(author)}</p></div><div class="name-row"><span class="badge">${sourceBadge}</span>${deprecatedBadge}</div></div><p class="description">${escapeHtml(marketDescription(plugin))}</p><div class="market-source" title="${escapeHtml(plugin.installSpec)}">${escapeHtml(plugin.installSpec)}</div><div class="market-card-foot"><div class="market-stats"><span>DL ${escapeHtml(downloads)}</span><span>STAR ${escapeHtml(stars)}</span><span>${escapeHtml(plugin.category)}</span></div>${action}</div></article>`
+  return `<article class="market-card"><div class="market-card-head"><div class="market-card-title"><h3 title="${escapeHtml(plugin.name)}">${escapeHtml(plugin.displayName)}</h3><p>${escapeHtml(author)}</p></div><div class="name-row"><span class="badge">${sourceBadge}</span>${deprecatedBadge}</div></div><p class="description">${escapeHtml(marketDescription(plugin))}</p><div class="market-source" title="${escapeHtml(plugin.installSpec)}">${escapeHtml(plugin.installSpec)}</div>${operationState}<div class="market-card-foot"><div class="market-stats"><span>DL ${escapeHtml(downloads)}</span><span>STAR ${escapeHtml(stars)}</span><span>${escapeHtml(plugin.category)}</span></div>${action}</div></article>`
 }
 
 function syncMarketPaginationState() {
@@ -374,6 +384,7 @@ const recoveryResolutionLabels = Object.freeze({
   'baseline-quarantine-active': '桌面基线仍在使用',
   'legacy-false-positive-repaired': '2.2 已自动修复误判',
   'restored-by-user': '已由用户恢复',
+  'restored-by-direct-start': '已在启动时恢复全部插件',
 })
 
 function incidentMarkup(incident) {
@@ -401,13 +412,13 @@ async function refreshRecovery() {
     ? '正常模式'
     : baselineQuarantineAvailable
       ? '桌面基线模式，已隔离无法识别的用户加载配置'
-      : '安全模式，只加载内置插件'
+      : '检测到旧版本留下的插件停用状态'
   restoreSafeMode.hidden = !state.safeMode
   restoreSafeMode.textContent = baselineQuarantineAvailable
     ? '恢复原始加载配置并重启'
     : state.disabledPlugins.length > 0
     ? `恢复全部（${state.disabledPlugins.length}）并重启`
-    : '退出安全模式并重启'
+    : '恢复历史停用插件并重启'
   recoveryIncidents.innerHTML = state.incidents.length
     ? state.incidents.map(incidentMarkup).join('')
     : '<p class="empty">没有记录到插件启动故障</p>'
@@ -666,22 +677,32 @@ document.querySelector('#market-reload').addEventListener('click', () => {
 marketList.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-install-market-plugin]')
   if (!button) return
+  const pluginId = button.dataset.installMarketPlugin
+  if (!pluginId) return
   await extensionOperations.run(async () => {
+    const plugin = marketCatalog?.plugins.find((candidate) => candidate.id === pluginId)
+    marketInstallPhases.set(pluginId, 'installing')
+    renderMarket()
+    marketResultState.textContent = `正在安装 ${plugin?.displayName ?? '插件'}，首次构建可能需要一些时间`
     try {
-      const plugin = marketCatalog?.plugins.find((candidate) => candidate.id === button.dataset.installMarketPlugin)
-      const result = await window.dshDesktop.installMarketPlugin(button.dataset.installMarketPlugin)
-      installedMarketReferences.add(button.dataset.installMarketPlugin)
+      const result = await window.dshDesktop.installMarketPlugin(pluginId)
+      marketInstallPhases.delete(pluginId)
+      installedMarketReferences.add(pluginId)
       if (plugin) {
         for (const value of [plugin.name, plugin.npm, plugin.displayName, plugin.installSpec]) {
           if (value) installedMarketReferences.add(value)
         }
       }
       notify(`${result.name} 已安装，DSH 已重启`)
-      showActivation(`${result.name} 已安装。刷新即可查看当前扩展状态。`, { mode: result.restartRequired ? 'restart' : 'refresh' })
+      showActivation(`${result.name} 已安装并通过启动检查，无需再次重启。`, { mode: 'refresh' })
       await refresh()
     } catch (error) {
-      if (error.message.includes('was not approved')) notify('已取消安装')
-      else notify(error.message, true)
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('was not approved')) marketInstallPhases.delete(pluginId)
+      else marketInstallPhases.set(pluginId, 'error')
+      renderMarket()
+      if (message.includes('was not approved')) notify('已取消安装')
+      else notify(message, true)
     }
   })
 })
@@ -742,12 +763,12 @@ recoverySnapshots.addEventListener('click', async (event) => {
 })
 
 restoreSafeMode.addEventListener('click', async () => {
-  if (!window.confirm('恢复安全模式停用的全部插件并重启 DSH？如果插件本身仍有故障，可再次进入安全模式。')) return
+  if (!window.confirm('恢复旧版本停用的全部插件并重启 DSH？')) return
   await extensionOperations.run(async () => {
     try {
       const result = await window.dshDesktop.restoreDisabledPlugins()
       const count = result.restored?.length ?? 0
-      notify(count > 0 ? `已恢复 ${count} 个插件，DSH 已重启` : '已退出安全模式，DSH 已重启')
+      notify(count > 0 ? `已恢复 ${count} 个插件，DSH 已重启` : '旧停用状态已清除，DSH 已重启')
       await refresh()
     } catch (error) {
       notify(error.message, true)
@@ -800,17 +821,6 @@ refreshButton.addEventListener('click', () => {
   })
 })
 
-revokeFullUserTrust.addEventListener('click', async () => {
-  if (!window.confirm('撤销主 Runtime 和外来插件的完整权限授权？当前 Runtime 会继续运行，但下次启动会重新请求原生确认。')) return
-  await extensionOperations.run(async () => {
-    try {
-      await window.dshDesktop.revokeFullUserTrust()
-      notify('完整权限授权已撤销；下次启动会重新确认')
-    } catch (error) {
-      notify(error.message, true)
-    }
-  })
-})
 document.querySelector('#activation-refresh').addEventListener('click', () => {
   void extensionOperations.run(async () => {
     await refresh()

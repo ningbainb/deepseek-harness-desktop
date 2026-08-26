@@ -9,19 +9,27 @@ const OFFICIAL_WEBSITE_ORIGINS = new Set([
   'https://1521003.xyz',
   'https://www.1521003.xyz',
 ])
-const EVENT_FIELDS = Object.freeze([
+const EVENT_FIELDS_V2 = Object.freeze([
   'name',
   'appVersion',
   'channel',
   'os',
   'language',
+  'dailyActor',
+  'monthlyActor',
   'outcome',
   'detail',
   'bucket',
 ])
+const EVENT_FIELDS_V3 = Object.freeze([
+  ...EVENT_FIELDS_V2.slice(0, 7),
+  'installationActor',
+  ...EVENT_FIELDS_V2.slice(7),
+])
 const TOP_LEVEL_FIELDS = Object.freeze(['schema', 'events'])
 const DOWNLOAD_CLICK_FIELDS = Object.freeze(['schema', 'source', 'version'])
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
+const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const CHANNELS = new Set(['stable', 'prerelease'])
 const OPERATING_SYSTEMS = new Set(['windows-10', 'windows-11', 'windows-other', 'macos'])
@@ -47,6 +55,60 @@ const EVENT_POLICY = Object.freeze({
     ]),
     buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
   }),
+  direct_start_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['fresh-home', 'existing-home', 'repaired', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  full_start_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'plugin-startup',
+      'profile-invalid',
+      'runtime-missing',
+      'port-conflict',
+      'integrity-failed',
+      'repeated-crash',
+      'startup-failed',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_started: Object.freeze({
+    outcomes: new Set(['started']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['none']),
+  }),
+  repair_agent_succeeded: Object.freeze({
+    outcomes: new Set(['succeeded']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'model-unavailable',
+      'model-error',
+      'timeout',
+      'invalid-result',
+      'verification-failed',
+      'restart-failed',
+      'rollback-failed',
+      'budget-exhausted',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  builtins_fallback_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['no-model', 'repair-failed', 'budget-exhausted', 'full-retry-failed', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  installation_repair_required: Object.freeze({
+    outcomes: new Set(['blocked']),
+    details: new Set(['runtime-missing', 'integrity-failed', 'unsupported', 'unknown']),
+    buckets: new Set(['none']),
+  }),
   runtime_recovery_action: Object.freeze({
     outcomes: new Set(['requested']),
     details: new Set(['retry', 'repair', 'safe-mode', 'disable-plugin']),
@@ -60,6 +122,56 @@ const EVENT_POLICY = Object.freeze({
   update_result: Object.freeze({
     outcomes: new Set(['current', 'available', 'downloaded', 'install-requested', 'error']),
     details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_available: Object.freeze({
+    outcomes: new Set(['available']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_downloaded: Object.freeze({
+    outcomes: new Set(['downloaded']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_install_requested: Object.freeze({
+    outcomes: new Set(['requested']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_completed: Object.freeze({
+    outcomes: new Set(['completed']),
+    details: new Set(['receipt']),
+    buckets: new Set(['none']),
+  }),
+  update_error: Object.freeze({
+    outcomes: new Set(['error']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_impression: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_shown: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['first-three-launches']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_dismissed: Object.freeze({
+    outcomes: new Set(['dismissed']),
+    details: new Set(['close', 'escape', 'clicked', 'limit']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_click: Object.freeze({
+    outcomes: new Set(['clicked']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_opened: Object.freeze({
+    outcomes: new Set(['opened', 'failed']),
+    details: new Set(['settings-adjacent']),
     buckets: new Set(['none']),
   }),
   extension_operation: Object.freeze({
@@ -116,8 +228,51 @@ ON CONFLICT (
 ) DO UPDATE SET count = count + excluded.count
 `
 
-const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-365 days')"
-const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-365 days')"
+const DAILY_ACTOR_INSERT_SQL = `
+INSERT OR IGNORE INTO product_actor_daily (
+  day,
+  daily_actor,
+  country_code,
+  app_version,
+  event,
+  outcome,
+  detail
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+const MONTHLY_ACTOR_INSERT_SQL = `
+INSERT OR IGNORE INTO product_actor_monthly (
+  month,
+  monthly_actor,
+  country_code,
+  app_version,
+  event,
+  outcome,
+  detail
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+const INSTALLATION_FIRST_SEEN_INSERT_SQL = `
+INSERT OR IGNORE INTO product_installation_first_seen (
+  installation_actor,
+  first_seen_day,
+  first_version
+) VALUES (?, ?, ?)
+`
+
+const INSTALLATION_DAILY_INSERT_SQL = `
+INSERT OR IGNORE INTO product_installation_daily (
+  day,
+  installation_actor
+) VALUES (?, ?)
+`
+
+const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-400 days')"
+const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-400 days')"
+const DAILY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_daily WHERE day < date('now', '-35 days')"
+const MONTHLY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_monthly WHERE month < strftime('%Y-%m', date('now', '-13 months'))"
+const INSTALLATION_FIRST_SEEN_RETENTION_SQL = "DELETE FROM product_installation_first_seen WHERE first_seen_day < date('now', '-400 days')"
+const INSTALLATION_DAILY_RETENTION_SQL = "DELETE FROM product_installation_daily WHERE day < date('now', '-400 days')"
 
 function response(status, body = null, headers = {}) {
   return new Response(body, {
@@ -141,9 +296,12 @@ function exactSearchParams(params, fields) {
   return entries.length === fields.length && exactFields(Object.fromEntries(entries), fields)
 }
 
-function validEvent(event) {
-  if (!exactFields(event, EVENT_FIELDS)) return false
+function validEvent(event, schema = 3) {
+  const fields = schema === 2 ? EVENT_FIELDS_V2 : schema === 3 ? EVENT_FIELDS_V3 : undefined
+  if (fields === undefined || !exactFields(event, fields)) return false
   if (typeof event.appVersion !== 'string' || !APP_VERSION_PATTERN.test(event.appVersion)) return false
+  if (!ACTOR_PATTERN.test(event.dailyActor) || !ACTOR_PATTERN.test(event.monthlyActor)) return false
+  if (schema === 3 && !ACTOR_PATTERN.test(event.installationActor)) return false
   if (!CHANNELS.has(event.channel) || !OPERATING_SYSTEMS.has(event.os) || !LANGUAGES.has(event.language)) return false
   const policy = EVENT_POLICY[event.name]
   return policy !== undefined
@@ -169,6 +327,31 @@ function aggregateEvents(events) {
     const current = groups.get(key)
     if (current) current.count += 1
     else groups.set(key, { dimensions, count: 1 })
+  }
+  return groups.values()
+}
+
+function uniqueInstallationLaunches(events) {
+  const launches = new Map()
+  for (const event of events) {
+    if (event.name !== 'app_launch' || launches.has(event.installationActor)) continue
+    launches.set(event.installationActor, event)
+  }
+  return launches.values()
+}
+
+function uniqueActorEvents(events, country) {
+  const groups = new Map()
+  for (const event of events) {
+    const dimensions = [
+      country,
+      event.appVersion,
+      event.name,
+      event.outcome,
+      event.detail,
+    ]
+    const key = JSON.stringify([event.dailyActor, event.monthlyActor, ...dimensions])
+    if (!groups.has(key)) groups.set(key, Object.freeze({ event, dimensions }))
   }
   return groups.values()
 }
@@ -213,9 +396,9 @@ function downloadResponse(status, body = null, origin, headers = {}) {
   })
 }
 
-function countryCode(request, seams) {
+function countryCode(request, seams, fallback = 'XX') {
   const value = typeof seams.country === 'function' ? seams.country(request) : request.cf?.country
-  return typeof value === 'string' && /^[A-Z]{2}$/u.test(value) ? value : 'XX'
+  return typeof value === 'string' && /^[A-Z]{2}$/u.test(value) ? value : fallback
 }
 
 async function handleProductEvents(request, env, seams) {
@@ -229,18 +412,36 @@ async function handleProductEvents(request, env, seams) {
   const parsed = await parseBody(request)
   if (parsed.status) return response(parsed.status, parsed.status === 413 ? 'request too large' : 'invalid request')
   const body = parsed.value
-  if (!exactFields(body, TOP_LEVEL_FIELDS) || body.schema !== 1 || !Array.isArray(body.events)) {
+  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3].includes(body.schema) || !Array.isArray(body.events)) {
     return response(400, 'invalid request')
   }
-  if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event))) {
+  if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event, body.schema))) {
     return response(400, 'invalid request')
   }
 
   const now = typeof seams.now === 'function' ? seams.now() : new Date()
   const day = now.toISOString().slice(0, 10)
+  const month = day.slice(0, 7)
+  const country = countryCode(request, seams, 'ZZ')
   const statements = [...aggregateEvents(body.events)].map(({ dimensions, count }) => (
     env.METRICS.prepare(UPSERT_SQL).bind(day, ...dimensions, count)
   ))
+  for (const { event, dimensions } of uniqueActorEvents(body.events, country)) {
+    statements.push(
+      env.METRICS.prepare(DAILY_ACTOR_INSERT_SQL).bind(day, event.dailyActor, ...dimensions),
+      env.METRICS.prepare(MONTHLY_ACTOR_INSERT_SQL).bind(month, event.monthlyActor, ...dimensions),
+    )
+  }
+  if (body.schema === 3) {
+    for (const event of uniqueInstallationLaunches(body.events)) {
+      statements.push(
+        env.METRICS.prepare(INSTALLATION_FIRST_SEEN_INSERT_SQL)
+          .bind(event.installationActor, day, event.appVersion),
+        env.METRICS.prepare(INSTALLATION_DAILY_INSERT_SQL)
+          .bind(day, event.installationActor),
+      )
+    }
+  }
   try {
     await env.METRICS.batch(statements)
     return response(204)
@@ -296,15 +497,28 @@ async function handleScheduled(_controller, env) {
   if (!env?.METRICS || typeof env.METRICS.prepare !== 'function') return
   await env.METRICS.prepare(RETENTION_SQL).run()
   await env.METRICS.prepare(DOWNLOAD_RETENTION_SQL).run()
+  await env.METRICS.prepare(DAILY_ACTOR_RETENTION_SQL).run()
+  await env.METRICS.prepare(MONTHLY_ACTOR_RETENTION_SQL).run()
+  await env.METRICS.prepare(INSTALLATION_FIRST_SEEN_RETENTION_SQL).run()
+  await env.METRICS.prepare(INSTALLATION_DAILY_RETENTION_SQL).run()
 }
 
 export const __test = Object.freeze({
   ADMIN_HOSTNAME,
-  EVENT_FIELDS,
+  EVENT_FIELDS_V2,
+  EVENT_FIELDS_V3,
   EVENT_POLICY,
   DOWNLOAD_CLICK_FIELDS,
   DOWNLOAD_CLICK_UPSERT_SQL,
   DOWNLOAD_RETENTION_SQL,
+  DAILY_ACTOR_INSERT_SQL,
+  MONTHLY_ACTOR_INSERT_SQL,
+  INSTALLATION_FIRST_SEEN_INSERT_SQL,
+  INSTALLATION_DAILY_INSERT_SQL,
+  DAILY_ACTOR_RETENTION_SQL,
+  MONTHLY_ACTOR_RETENTION_SQL,
+  INSTALLATION_FIRST_SEEN_RETENTION_SQL,
+  INSTALLATION_DAILY_RETENTION_SQL,
   DOWNLOAD_SOURCES,
   MAX_BATCH_EVENTS,
   MAX_DOWNLOAD_CLICK_BYTES,

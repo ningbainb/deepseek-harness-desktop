@@ -4,10 +4,12 @@
  * never exports the preload object, Electron, filesystems, or DSH internals.
  */
 
-export const DESKTOP_CLIENT_API_VERSION = '1.0.0'
+export const DESKTOP_CLIENT_API_VERSION = '1.1.0'
 
 export type DesktopSurface = 'extensions' | 'updates'
 export type DesktopAvailability = { available: false; reason: 'unavailable' }
+export type DockDismissReason = 'close' | 'escape' | 'clicked'
+export type DockEntryState = { available: true; showNudge: boolean } | DesktopAvailability
 export type DesktopInfo = {
   appId: string
   productName: string
@@ -74,6 +76,9 @@ type Bridge = {
   showNotification?: (value: DesktopNotificationRequest) => Promise<unknown>
   onDeepLink?: (listener: (value: unknown) => void) => Unsubscribe
   toolAction?: (action: 'extensions') => Promise<unknown>
+  getDockEntryState?: () => Promise<unknown>
+  dismissDockNudge?: (reason: DockDismissReason) => Promise<unknown>
+  openExtensionDock?: () => Promise<unknown>
   helpAction?: (action: 'updates') => Promise<unknown>
   openWorkspaceFile?: (request: WorkspaceFileOpenRequest) => Promise<unknown>
   requestPluginInstall?: (source: string) => Promise<unknown>
@@ -90,6 +95,8 @@ export type DesktopClient = Readonly<{
   showNotification: (request: DesktopNotificationRequest) => Promise<DesktopNotificationResult>
   subscribeDeepLinks: (handler: (link: string) => void) => Unsubscribe
   openDesktopSurface: (surface: DesktopSurface) => Promise<boolean>
+  getDockEntryState: () => Promise<DockEntryState>
+  dismissDockNudge: (reason: DockDismissReason) => Promise<boolean>
   openWorkspaceFile: (request: WorkspaceFileOpenRequest) => Promise<WorkspaceFileOpenResult>
   /**
    * Hand a remote npm/git/HTTPS plugin reference to the Desktop. The
@@ -263,10 +270,10 @@ export function createDesktopClient({ globalObject = globalThis }: { globalObjec
       })
     },
     async openDesktopSurface(surface) {
-      if (surface === 'extensions' && typeof bridge?.toolAction === 'function') {
-        if (!await hasBridgeCapability('extensions.manage')) return false
-        await bridge.toolAction('extensions')
-        return true
+      if (surface === 'extensions' && typeof bridge?.openExtensionDock === 'function') {
+        if (!await hasBridgeCapability('extensions.open')) return false
+        const result = asRecord(await bridge.openExtensionDock())
+        return result?.opened === true
       }
       if (surface === 'updates' && typeof bridge?.helpAction === 'function') {
         if (!await hasBridgeCapability('updates.read')) return false
@@ -274,6 +281,22 @@ export function createDesktopClient({ globalObject = globalThis }: { globalObjec
         return true
       }
       return false
+    },
+    async getDockEntryState() {
+      if (typeof bridge?.getDockEntryState !== 'function') return unavailable()
+      if (!await hasBridgeCapability('extensions.open')) return unavailable()
+      const result = asRecord(await bridge.getDockEntryState())
+      if (result?.available !== true || typeof result.showNudge !== 'boolean') return unavailable()
+      return Object.freeze({ available: true, showNudge: result.showNudge })
+    },
+    async dismissDockNudge(reason) {
+      if (!['close', 'escape', 'clicked'].includes(reason)) {
+        throw new DesktopClientError('desktop-invalid-argument', 'Dock dismiss reason is invalid')
+      }
+      if (typeof bridge?.dismissDockNudge !== 'function') return false
+      if (!await hasBridgeCapability('extensions.open')) return false
+      const result = asRecord(await bridge.dismissDockNudge(reason))
+      return result?.dismissed === true
     },
     async openWorkspaceFile(request) {
       const normalizedRequest = normalizeWorkspaceFileRequest(request)
@@ -307,6 +330,8 @@ export const subscribeRuntimeStatus = defaultClient.subscribeRuntimeStatus
 export const showNotification = defaultClient.showNotification
 export const subscribeDeepLinks = defaultClient.subscribeDeepLinks
 export const openDesktopSurface = defaultClient.openDesktopSurface
+export const getDockEntryState = defaultClient.getDockEntryState
+export const dismissDockNudge = defaultClient.dismissDockNudge
 export const openWorkspaceFile = defaultClient.openWorkspaceFile
 export const requestPluginInstall = defaultClient.requestPluginInstall
 

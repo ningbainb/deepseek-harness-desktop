@@ -6,7 +6,7 @@ DeepSeek Harness Desktop runs background automation only after the user selects 
 
 The close preference is one of `quit`, `minimize-to-tray`, or `ask`. Closing a window in the opt-in mode hides the main window and keeps the Desktop Runtime alive. The native tray restores the window, shows current task/runtime state, opens Extension Dock, checks for updates, and provides an explicit quit action.
 
-Update installation, explicit quit, safe mode, crash recovery, and operating-system shutdown bypass background hiding. A fully exited Desktop application never claims to run scheduled work.
+Update installation, explicit quit, crash recovery, and operating-system shutdown bypass background hiding. A fully exited Desktop application never claims to run scheduled work.
 
 Renderers receive only the read-only `background` summary nested in the existing Runtime Status Contract response. The Tray object, close-preference writer, and Electron objects are never exposed to renderer or plugin code.
 

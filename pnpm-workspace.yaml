@@ -9,7 +9,7 @@ packages:
 # turtle-ui convention used by the bundled plugins.
 autoInstallPeers: false
 
-patchedDependencies: { '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.1-rc.1.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch }
+patchedDependencies: { '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.1-rc.1.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.1-rc.1': patches/@deepseek-ai__dsh-llm-pi-ai@0.1.1-rc.1.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch }
 
 # Desktop pins the published aggregate at 0.2.5, while the Aion panel, SSH,
 # Task Board, and Git Graph dependencies use reviewed workspace builds for

@@ -136,6 +136,26 @@ function isTrustedBridgeRequestResolved(request: IncomingMessage, access: Resolv
   return matchesProxyToken(request.headers[WEB_UI_SETTINGS_PROXY_TOKEN_HEADER], access.proxyToken)
 }
 
+/**
+ * Build the shared local-request guard used by settings and authorization
+ * routes. Keeping the trust decision in one place prevents a sensitive route
+ * from drifting away from the loopback/same-origin/proxy policy.
+ */
+export function createBridgeRouteGuard(access?: BridgeAccess): (req: IncomingMessage, res: ServerResponse) => boolean {
+  const resolvedAccess = resolveBridgeAccess(access)
+  return (req, res) => {
+    if (!isTrustedBridgeRequestResolved(req, resolvedAccess)) {
+      writeJson(res, 403, { error: 'forbidden' })
+      return false
+    }
+    if (req.method !== 'POST') {
+      writeJson(res, 405, { error: 'method not allowed: ' + (req.method ?? '') })
+      return false
+    }
+    return true
+  }
+}
+
 /** One JSON response. */
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body)
@@ -258,18 +278,7 @@ export function makeBridgeHandlers(deps: BridgeDeps): BridgeHandlers {
  */
 export function makeBridgeRoutes(deps: BridgeDeps, access?: BridgeAccess): WebRoute[] {
   const handlers = makeBridgeHandlers(deps)
-  const resolvedAccess = resolveBridgeAccess(access)
-  const guard = (req: IncomingMessage, res: ServerResponse): boolean => {
-    if (!isTrustedBridgeRequestResolved(req, resolvedAccess)) {
-      writeJson(res, 403, { error: 'forbidden' })
-      return false
-    }
-    if (req.method !== 'POST') {
-      writeJson(res, 405, { error: 'method not allowed: ' + (req.method ?? '') })
-      return false
-    }
-    return true
-  }
+  const guard = createBridgeRouteGuard(access)
   return [
     {
       kind: 'exact',

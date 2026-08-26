@@ -9,23 +9,15 @@ import { mountParticleWhale, OFFICIAL_WHALE_PATH } from './whale-particles.mjs'
 
 const title = document.querySelector('#status-title')
 const detail = document.querySelector('#status-detail')
-const errorLog = document.querySelector('#error-log')
-const actions = document.querySelector('#actions')
 const version = document.querySelector('#version')
 const meter = document.querySelector('#startup-progress')
 const progressValue = document.querySelector('#progress-value')
 const meterTip = document.querySelector('.meter-tip')
 meterTip.innerHTML = `<svg viewBox="0 0 50 50" focusable="false"><path d="${OFFICIAL_WHALE_PATH}"/></svg>`
 const whaleCanvas = document.querySelector('#whale-canvas')
-const recoverySummary = document.querySelector('#recovery-summary')
-const recoveryTitle = document.querySelector('#recovery-title')
-const recoveryReason = document.querySelector('#recovery-reason')
-const disablePlugin = document.querySelector('#disable-plugin')
-const safeMode = document.querySelector('#safe-mode')
-const retry = document.querySelector('#retry')
-const repair = document.querySelector('#repair')
-const technicalDetails = document.querySelector('#technical-details')
-const diagnosticExportStatus = document.querySelector('#diagnostic-export-status')
+const startupStepsContainer = document.querySelector('#startup-steps')
+const startupSteps = [...document.querySelectorAll('[data-startup-step]')]
+const startupGuidance = document.querySelector('#startup-guidance')
 
 const STARTUP_STALL_NOTICE_MS = 30_000
 
@@ -35,9 +27,38 @@ const copy = {
   ready: ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
   stopping: ['正在安全停止服务', '请稍候，本地任务正在收束'],
   restarting: ['正在重新连接', '正在恢复本地运行时'],
-  crashed: ['本地运行时启动失败', '请先重试；修复只会重建桌面版 Profile'],
+  crashed: ['正在自动处理启动问题', '应用会自动重试并保留原有数据'],
 }
 
+const directCopy = Object.freeze({
+  preparing: ['正在准备本地环境', '正在载入原有数据和全部插件'],
+  'starting-full': ['正在启动全部插件', '原有数据会直接用于当前版本'],
+  'retrying-full': ['正在自动恢复', '应用正在重新载入全部插件'],
+  repairing: ['正在自动修复插件', '完成验证后会自动继续启动'],
+  verifying: ['正在验证修复', '验证通过后会自动继续启动'],
+  'ready-full': ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
+  'ready-builtins': ['正在载入内置插件', '原有数据保持不变'],
+  'installation-repair-required': ['正在修复应用安装', '安装文件修复后会自动继续'],
+  'system-startup-failed': ['启动未能完成', '完整模式和内置模式都无法启动；请查看日志或导出诊断'],
+})
+
+const directReasonCopy = Object.freeze({
+  'full-retry-failed': { heading: '已使用内置插件启动', message: '自动修复未完成，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可在设置页查看脱敏修复记录，确认模型配置后再尝试。' },
+  'missing-credentials': { heading: '自动修复未启用', message: '未配置模型 Key，应用已使用内置插件启动。', guidance: '请在模型设置中填写 Key 并保存，然后点击“保存后重新尝试”。' },
+  'no-model': { heading: '自动修复未启用', message: '未配置可用的修复模型，应用已使用内置插件启动。', guidance: '请在模型设置中选择修复模型并配置 Key。' },
+  'unsupported-tools': { heading: '自动修复暂不可用', message: '当前模型不支持自动修复所需的工具，应用已使用内置插件启动。', guidance: '请改用支持工具调用的模型后再尝试。' },
+  'repair-failed': { heading: '自动修复未完成', message: '自动修复未通过验证，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可在设置页查看脱敏修复记录，确认模型配置后再尝试。' },
+  'budget-exhausted': { heading: '自动修复未完成', message: '自动修复达到安全尝试上限，应用已使用内置插件启动。', guidance: '可在设置页查看脱敏修复记录，稍后再尝试。' },
+  'profile-permission': { heading: '正在修复应用安装', message: '应用数据目录权限阻止了完整启动，应用已使用内置插件启动。', guidance: '请检查应用数据目录权限后再尝试。' },
+  'profile-installation': { heading: '正在修复应用安装', message: '应用安装文件阻止了完整启动，应用已使用内置插件启动。', guidance: '请修复或重新安装应用后再尝试。' },
+  'profile-failed': { heading: '已使用内置插件启动', message: '应用数据目录未能完成启动，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可检查本地日志了解安装问题，再尝试启动。' },
+  'rollback-failed': { heading: '插件修复已回滚', message: '自动修复启动失败后已恢复原插件文件，但部分文件未能完全复原；应用已使用内置插件启动。', guidance: '可在设置页导出脱敏诊断了解详情，必要时手动恢复插件目录。' },
+})
+function safeDirectReason(value) {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(directReasonCopy, value)
+    ? value
+    : undefined
+}
 let currentState = 'stopped'
 let progress = 0
 let latestStatus = { state: 'stopped' }
@@ -61,6 +82,62 @@ function renderProgress(value) {
   }
 }
 
+function hideDirectProcess() {
+  if (startupStepsContainer) startupStepsContainer.hidden = true
+  for (const step of startupSteps) {
+    step.removeAttribute('aria-current')
+    delete step.dataset.status
+  }
+  if (startupGuidance) {
+    startupGuidance.hidden = true
+    startupGuidance.textContent = ''
+  }
+  document.body.removeAttribute('data-direct-state')
+}
+
+function directCopyFor(state, reason) {
+  const reasonCopy = directReasonCopy[reason]
+  if (state === 'ready-builtins' && reasonCopy !== undefined) {
+    return [reasonCopy.heading, reasonCopy.message]
+  }
+  return directCopy[state]
+}
+
+function renderDirectProcess(state, reason) {
+  if (!startupStepsContainer) return
+  startupStepsContainer.hidden = state === 'preparing' || state === 'system-startup-failed'
+  const currentStep = {
+    'starting-full': 0,
+    'retrying-full': 1,
+    repairing: 2,
+    verifying: 3,
+    'installation-repair-required': 0,
+  }[state] ?? -1
+  const completedThrough = {
+    'retrying-full': 0,
+    repairing: 1,
+    verifying: 2,
+    'ready-full': 3,
+    'ready-builtins': 4,
+  }[state] ?? -1
+  const skipModelProcess = state === 'ready-builtins'
+    && ['missing-credentials', 'no-model', 'unsupported-tools'].includes(reason)
+  startupSteps.forEach((step, index) => {
+    let status = index <= completedThrough ? 'done' : 'pending'
+    if (index === currentStep) status = 'current'
+    if (skipModelProcess && (index === 2 || index === 3)) status = 'skipped'
+    if (state === 'ready-full' && index === 4) status = 'skipped'
+    step.dataset.status = status
+    if (status === 'current') step.setAttribute('aria-current', 'step')
+    else step.removeAttribute('aria-current')
+  })
+  if (startupGuidance) {
+    const reasonCopy = directReasonCopy[reason] ?? directReasonCopy['full-retry-failed']
+    startupGuidance.hidden = state !== 'ready-builtins'
+    startupGuidance.textContent = state === 'ready-builtins' ? reasonCopy.guidance : ''
+  }
+  document.body.dataset.directState = state
+}
 function startingState(state) {
   return state === 'starting' || state === 'restarting'
 }
@@ -85,13 +162,8 @@ function updateStartupStall(state, stateChanged) {
   }, STARTUP_STALL_NOTICE_MS)
 }
 
-function setDiagnosticExportStatus(message, failed = false) {
-  diagnosticExportStatus.hidden = false
-  diagnosticExportStatus.textContent = message
-  diagnosticExportStatus.dataset.state = failed ? 'error' : 'success'
-}
-
 function render(status) {
+  hideDirectProcess()
   const state = copy[status?.state] ? status.state : 'crashed'
   const [heading, message] = copy[state]
   const stateChanged = currentState !== state
@@ -100,42 +172,12 @@ function render(status) {
   updateStartupStall(state, stateChanged)
   document.body.dataset.state = state
   title.textContent = heading
-  const recovery = status?.recovery
-  const incident = recovery?.currentIncident
   const stalled = startupStalled && startingState(state)
-  detail.textContent = recovery?.safeMode
-    ? recovery?.baselineQuarantineAvailable
-      ? '桌面版正在使用基线恢复模式，无法识别的用户加载配置已被暂时隔离'
-      : '桌面版正在使用只加载内置插件的安全模式'
-    : status?.restartBlocked === 'repeated-crash'
-    ? '已停止自动重启，避免反复崩溃；请打开日志查看底层错误'
+  detail.textContent = status?.restartBlocked === 'repeated-crash'
+    ? '已停止重复启动，应用正在准备下一步自动处理'
     : stalled
-    ? '启动耗时较长；可导出诊断日志，或进入安全模式（临时停用用户插件，保留聊天和模型设置）'
+    ? '启动耗时较长，应用仍在自动处理；原有数据会继续保留'
     : message
-
-  const failed = state === 'crashed'
-  const identifiedPlugin = failed && incident?.identified && incident?.pluginName
-  recoverySummary.hidden = !failed && !stalled
-  if (failed && incident) {
-    recoveryTitle.textContent = identifiedPlugin
-      ? `检测到插件 ${incident.pluginName} 导致启动失败`
-      : '插件恢复中心已接管本次启动失败'
-    recoveryReason.textContent = incident.summary || '未能可靠定位故障插件，请进入安全模式。'
-  } else if (stalled) {
-    recoveryTitle.textContent = '启动耗时较长'
-    recoveryReason.textContent = '可先导出诊断日志；进入安全模式会临时停用用户安装的插件，保留聊天和模型设置；可随后在扩展中心逐一恢复。'
-  }
-  errorLog.hidden = true
-  actions.hidden = !failed && !stalled
-  errorLog.textContent = failed
-    ? (incident?.technicalDetails || status?.error || 'Unknown runtime error')
-    : ''
-  disablePlugin.hidden = !identifiedPlugin
-  safeMode.hidden = !failed && !stalled
-  retry.hidden = !failed || Boolean(incident)
-  repair.hidden = !failed || Boolean(incident)
-  technicalDetails.hidden = !failed
-  technicalDetails.textContent = '查看技术详情'
 
   if (Number.isFinite(status?.previewProgress)) renderProgress(status.previewProgress)
   else if (stateChanged || progress === 0) renderProgress(initialProgressForState(state, progress))
@@ -148,55 +190,36 @@ window.setInterval(() => {
   renderProgress(advanceStartupProgress(currentState, progress))
 }, 220)
 
-for (const button of document.querySelectorAll('[data-action]')) {
-  button.addEventListener('click', async () => {
-    const buttons = [...document.querySelectorAll('[data-action]')]
-    const action = button.dataset.action
-    if (action === 'export-diagnostics') {
-      setDiagnosticExportStatus('正在生成已脱敏的诊断日志…')
-    }
-    buttons.forEach((item) => { item.disabled = true })
-    try {
-      const result = await window.dshDesktop.action(action)
-      if (action === 'export-diagnostics') {
-        setDiagnosticExportStatus(result?.canceled
-          ? '已取消导出。'
-          : '诊断日志已导出，可附在问题反馈中。')
-      }
-    } catch (error) {
-      if (action === 'export-diagnostics') {
-        setDiagnosticExportStatus('导出失败。请重新选择一个可写入的位置后再试。', true)
-      } else {
-        render({ state: 'crashed', error: error.message })
-      }
-    } finally {
-      buttons.forEach((item) => { item.disabled = false })
-    }
-  })
-}
-
-for (const button of document.querySelectorAll('[data-tool-action="terminal"]')) {
-  button.addEventListener('click', async () => {
-    button.disabled = true
-    try {
-      await window.dshDesktop.toolAction('terminal')
-    } finally {
-      button.disabled = false
-    }
-  })
-}
-
-technicalDetails.addEventListener('click', () => {
-  errorLog.hidden = !errorLog.hidden
-  technicalDetails.textContent = errorLog.hidden ? '查看技术详情' : '收起技术详情'
-})
-
 window.addEventListener('beforeunload', () => {
   if (startupStallTimer !== undefined) window.clearTimeout(startupStallTimer)
 })
 
 const previewState = new URLSearchParams(window.location.search).get('preview')
-if (previewState && copy[previewState]) {
+const directState = new URLSearchParams(window.location.search).get('directState')
+const directReasonKey = new URLSearchParams(window.location.search).get('directReason')
+const directReason = safeDirectReason(directReasonKey)
+if (directState && directCopy[directState]) {
+  const [heading, message] = directCopyFor(directState, directReason)
+  const directProgress = {
+    preparing: 8,
+    'starting-full': 24,
+    'retrying-full': 39,
+    repairing: 56,
+    verifying: 78,
+    'ready-builtins': 92,
+    'ready-full': 100,
+    'installation-repair-required': 18,
+    'system-startup-failed': 100,
+  }
+  currentState = directState.startsWith('ready-') || directState === 'system-startup-failed'
+    ? 'ready'
+    : 'starting'
+  document.body.dataset.state = currentState
+  title.textContent = heading
+  detail.textContent = message
+  renderProgress(directProgress[directState] ?? 8)
+  renderDirectProcess(directState, directReason)
+} else if (previewState && copy[previewState]) {
   try {
     const info = await window.dshDesktop.getInfo()
     version.textContent = `DESKTOP ${info.version}`
@@ -215,9 +238,9 @@ if (previewState && copy[previewState]) {
     version.textContent = `DESKTOP ${info.version}`
     statusGate.initial(initialStatus)
   } catch (error) {
-    render({
-      state: 'crashed',
-      error: error instanceof Error ? error.message : String(error),
-    })
+    // The first splash is intentionally loaded before the complete Desktop
+    // IPC surface is registered. Keep showing preparation until the normal
+    // startup load replaces it; do not turn that short gap into an error UI.
+    render({ state: 'stopped' })
   }
 }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Amended by ADR-0010
 
 ## Context
 
@@ -16,30 +16,30 @@ Official releases need metrics by default and do not expose an application opt-o
 
 Official packaged builds send a closed vocabulary of coarse product events from the Electron main process to a first-party Cloudflare Worker endpoint supplied only by the official release workflow.
 
-The client creates no persistent installation or device identifier, does not reuse the DeepSeek Harness anonymous user identifier, keeps its queue only in memory, does not retry failed delivery, and never blocks product behavior on telemetry.
+The client creates a Desktop-specific local random secret and does not reuse the DeepSeek Harness anonymous user identifier, an account, or hardware data. It sends only HMAC-derived daily and monthly actors that rotate at UTC period boundaries; the secret and a stable installation identifier never leave the device. The queue stays in memory, failed delivery is not retried, and telemetry never blocks product behavior.
 
-The Worker validates exact fields, derives the UTC day at ingestion, groups identical records, and increments daily Cloudflare D1 aggregate rows. It does not store raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, stack traces, package names, model names, or other free-form values.
+The Worker validates exact fields, derives the UTC day, UTC month, and country-level code at ingestion, groups identical records, and stores aggregate event counts plus period-scoped actor rows for unique-user queries. It does not store raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, stack traces, package names, model names, or other free-form values.
 
 Product metrics are enabled whenever an official HTTPS endpoint is present in the packaged resource. The application exposes no user-facing switch. The public privacy policy describes the default behavior and states that installation, launch, or continued use indicates agreement where applicable law permits.
 
-The service has an operator-controlled ingestion kill switch. Daily aggregate rows are deleted after 365 days.
+The service has an operator-controlled ingestion kill switch. Daily actor rows are deleted after 35 days, monthly actor rows after 13 months, and aggregate trend rows after 400 days. The administration API exposes only aggregate DAU, MAU, country, version, update-funnel, Dock-funnel, surface, event, and download results and has no actor-detail endpoint.
 
 ## Consequences
 
 ### Positive
 
-- The product can measure reliability and feature trends without constructing user histories.
+- The product can measure DAU, MAU, country-level adoption, version adoption, in-app updates, and Dock conversion without constructing a cross-period user history.
 - Source and Fork builds remain disconnected because the committed endpoint configuration is empty.
 - The event and storage contracts are first-party, reviewable, and replaceable.
 - Transport, storage, and reporting failures cannot break or delay the desktop application.
-- Aggregation keeps Cloudflare Workers and D1 usage within their free tiers at the project's expected scale.
+- Period-scoped deduplication and aggregation keep Cloudflare Workers and D1 usage bounded at the project's expected scale.
 
 ### Negative
 
-- The product cannot calculate unique users, retention cohorts, funnels across launches, uninstall rates, or per-user crash histories.
+- The product cannot calculate cross-month retention cohorts, uninstall rates, account conversion, or per-user crash histories because actor values rotate and no stable identifier is uploaded.
 - The public ingestion endpoint cannot authenticate a distributed desktop binary, so aggregated trends can be spoofed and cannot support billing or security decisions.
 - Default-on collection without an application opt-out may require a different consent experience before intentionally targeting jurisdictions that require prior affirmative consent.
-- Aggregated rows cannot distinguish legitimate traffic from forged traffic after ingestion.
+- Aggregate and period-scoped actor rows cannot distinguish legitimate traffic from forged traffic after ingestion.
 
 ### Neutral
 
@@ -54,7 +54,7 @@ The service has an operator-controlled ingestion kill switch. Daily aggregate ro
 
 **DeepSeek Harness session telemetry** was rejected because it observes the sensitive conversation/session domain, has a different owner and purpose, and must remain isolated from desktop-shell product metrics.
 
-**Raw events in D1** were rejected because they would enable per-request timelines, increase write/storage usage, and add no required product insight.
+**Raw events or stable installation identities in D1** were rejected because they would enable per-device timelines, increase write/storage usage, and add no required product insight.
 
 ## References
 

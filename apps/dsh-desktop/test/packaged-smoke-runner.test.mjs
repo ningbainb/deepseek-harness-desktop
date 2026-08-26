@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -29,6 +29,24 @@ test('packaged smoke runner exposes the spawned process only to an explicit exte
   }
 })
 
+test('packaged smoke runner can preserve a genuinely empty user data root', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-smoke-empty-root-'))
+  const userData = join(root, 'user-data')
+  try {
+    await runPackagedDesktop({
+      appPath: process.execPath,
+      userData,
+      dshHome: join(root, 'dsh-home'),
+      timeoutMs: 10_000,
+      requireStartupTimings: false,
+      seedPrimaryRuntimePermission: false,
+    })
+    await assert.rejects(access(userData), error => error?.code === 'ENOENT')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('packaged smoke runner only accepts an explicit boolean Windows visibility setting', async () => {
   await assert.rejects(
     runPackagedDesktop({
@@ -50,5 +68,17 @@ test('packaged smoke runner only accepts an explicit boolean accessibility test 
       forceRendererAccessibility: 'true',
     }),
     /forceRendererAccessibility must be a boolean/u,
+  )
+})
+
+test('packaged smoke runner only accepts an explicit boolean permission seed switch', async () => {
+  await assert.rejects(
+    runPackagedDesktop({
+      appPath: process.execPath,
+      userData: 'test-user-data',
+      dshHome: 'test-dsh-home',
+      seedPrimaryRuntimePermission: 'false',
+    }),
+    /seedPrimaryRuntimePermission must be a boolean/u,
   )
 })

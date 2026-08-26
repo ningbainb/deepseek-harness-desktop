@@ -4,23 +4,26 @@ import test from 'node:test'
 
 import {
   normalizeDesktopAction,
+  normalizeDockDismissReason,
   normalizeHelpAction,
   normalizeToolAction,
   normalizeWindowChromeTheme,
   publicBackgroundStatus,
+  publicRepairStatus,
   publicRuntimeStatus,
   publicUpdateChannel,
   publicUpdateStatus,
   registerDesktopIpc,
+  registerDesktopStartupIpc,
 } from '../src/ipc.mjs'
 import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
 
-test('desktop action validation exposes only fixed recovery and diagnostic operations', () => {
-  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit']) {
+test('desktop action validation exposes only diagnostics and exit', () => {
+  for (const action of ['open-logs', 'export-diagnostics', 'exit']) {
     assert.equal(normalizeDesktopAction(action), action)
   }
-  for (const action of ['run-command', '../repair', '', 42]) {
+  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'run-command', '../repair', '', 42]) {
     assert.throws(() => normalizeDesktopAction(action), /desktop action/)
   }
 })
@@ -55,6 +58,167 @@ test('public update channel exposes only the Stable/Beta selection and no-downgr
   assert.deepEqual(publicUpdateChannel('untrusted'), { channel: 'stable', noAutomaticDowngrade: true })
 })
 
+test('Dock nudge dismissal accepts only fixed local interaction reasons', () => {
+  for (const reason of ['close', 'escape', 'clicked']) {
+    assert.equal(normalizeDockDismissReason(reason), reason)
+  }
+  for (const reason of ['opened', 'limit', '', 42]) {
+    assert.throws(() => normalizeDockDismissReason(reason), /Dock dismiss reason/u)
+  }
+})
+
+test('startup IPC serves only the first page read-only contract until full registration', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const themes = []
+  const unregister = registerDesktopStartupIpc({
+    ipcMain,
+    surfaceRegistry,
+    setWindowChromeTheme: (target, theme) => {
+      themes.push({ target, theme })
+      return theme
+    },
+  })
+  try {
+    assert.deepEqual([...handlers.keys()].toSorted(), [
+      'desktop:contract',
+      'desktop:update-status',
+      'desktop:window-chrome-theme',
+    ])
+    assert.deepEqual(await handlers.get('desktop:contract')({ sender }), {
+      apiVersion: '1.4.0',
+      surface: 'main',
+      capabilities: ['updates.read'],
+    })
+    assert.deepEqual(
+      await handlers.get('desktop:update-status')({ sender }),
+      publicUpdateStatus(undefined),
+    )
+    assert.equal(await handlers.get('desktop:window-chrome-theme')({ sender }, 'light'), 'light')
+    assert.deepEqual(themes, [{ target: sender, theme: 'light' }])
+    assert.throws(
+      () => handlers.get('desktop:contract')({ sender: {} }),
+      /surface|registered/iu,
+    )
+  } finally {
+    unregister()
+  }
+  assert.equal(handlers.size, 0)
+})
+
+test('desktop repair status exposes only bounded summaries and relative files', async () => {
+  const privateValue = 'PRIVATE_REPAIR_PROMPT_OR_KEY'
+  const raw = {
+    fingerprint: 'a'.repeat(64),
+    state: 'applied',
+    createdAt: '2026-08-22T01:02:03.000Z',
+    updatedAt: '2026-08-22T01:03:04.000Z',
+    modelAttempts: [{
+      provider: 'openai-compatible',
+      model: 'configured-model',
+      outcome: 'candidate-ready',
+      prompt: privateValue,
+    }],
+    changedFiles: ['plugins/example/index.mjs', 'C:\\Users\\Alice\\private.js'],
+    checks: ['plugin-example-test'],
+    toolActions: [{ tool: 'write', arguments: privateValue }],
+    apiKey: privateValue,
+  }
+  assert.deepEqual(publicRepairStatus(raw), {
+    available: true,
+    fingerprint: 'a'.repeat(64),
+    state: 'applied',
+    result: 'applied',
+    createdAt: '2026-08-22T01:02:03.000Z',
+    updatedAt: '2026-08-22T01:03:04.000Z',
+    models: [{ provider: 'openai-compatible', model: 'configured-model', outcome: 'candidate-ready' }],
+    changedFiles: ['plugins/example/index.mjs'],
+    checks: ['plugin-example-test'],
+  })
+  assert.deepEqual(publicRepairStatus({ reason: 'missing-credentials', canRetry: true }), {
+    available: false, reason: 'missing-credentials', canRetry: true,
+  })
+  assert.deepEqual(publicRepairStatus(undefined), { available: false })
+
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.0.2',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    retryRepair: async () => ({ accepted: true, reason: 'missing-credentials', secret: 'PRIVATE' }),
+    getRepairStatus: async () => raw,
+  })
+  try {
+    const status = await handlers.get('desktop:repair-status')({ sender })
+    assert.equal(status.available, true)
+    assert.doesNotMatch(JSON.stringify(status), /PRIVATE_REPAIR|C:\\Users|prompt|apiKey|arguments/u)
+    assert.deepEqual(await handlers.get('desktop:repair-retry')({ sender }), { accepted: true, reason: 'missing-credentials' })
+  } finally {
+    unregister()
+  }
+})
+
+test('desktop repair status degrades to unavailable when the incident store cannot be read', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { phase: 'ready', url: 'http://127.0.0.1:7777/' }
+  controller.start = async () => {}
+  controller.stop = async () => {}
+  controller.restart = async () => {}
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    controller,
+    surfaceRegistry,
+    profile: { label: 'Desktop', name: 'desktop' },
+    openLogs: () => {},
+    exportDiagnostics: async () => undefined,
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    getUpdateController: () => undefined,
+    getRepairStatus: async () => { throw new Error('corrupt incident') },
+  })
+  try {
+    assert.deepEqual(await handlers.get('desktop:repair-status')({ sender }), { available: false })
+  } finally {
+    unregister()
+  }
+})
+
 test('window action IPC returns a clone-safe acknowledgement instead of BrowserWindow objects', async () => {
   const handlers = new Map()
   const ipcMain = {
@@ -72,7 +236,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   const handled = []
   const observed = []
   const exported = []
-  const migrationActions = []
   let updateChannel = 'stable'
   const unregister = registerDesktopIpc({
     ipcMain,
@@ -88,10 +251,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       exported.push('startup-diagnostics')
       return { canceled: false, exported: true }
     },
-    openMigrationAssistant: async () => {
-      migrationActions.push('open')
-      return { status: 'committed' }
-    },
     exitApp: () => {},
     handleHelpAction: async (action) => {
       handled.push(action)
@@ -101,6 +260,18 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       handled.push(action)
       return browserWindow
     },
+    claimDockEntry: async () => {
+      observed.push(['dock-impression'])
+      return true
+    },
+    dismissDockNudge: async (reason) => {
+      observed.push(['dock-dismiss', reason])
+      return true
+    },
+    openExtensionDock: async () => {
+      observed.push(['dock-open'])
+      return true
+    },
     setWindowChromeTheme: () => {},
     claimStarPrompt: async () => true,
     getUpdateController: () => undefined,
@@ -109,7 +280,6 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
       updateChannel = channel
       return channel
     },
-    onRecoveryAction: (action) => observed.push(['recovery', action]),
     onSettingsOpened: () => observed.push(['settings']),
     onUpdateCheck: () => observed.push(['updates']),
   })
@@ -117,15 +287,26 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(await handlers.get('desktop:help-action')({ sender }, 'community'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'extensions'), true)
   assert.equal(await handlers.get('desktop:tool-action')({ sender }, 'terminal'), true)
+  assert.deepEqual(await handlers.get('desktop:dock-entry-state')({ sender }), {
+    available: true,
+    showNudge: true,
+  })
+  assert.deepEqual(await handlers.get('desktop:dock-nudge-dismiss')({ sender }, 'close'), {
+    dismissed: true,
+  })
+  assert.deepEqual(await handlers.get('desktop:dock-open')({ sender }), { opened: true })
+  await assert.rejects(
+    handlers.get('desktop:dock-nudge-dismiss')({ sender }, 'other'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   assert.equal(await handlers.get('desktop:star-prompt-claim')({ sender }), true)
-  await handlers.get('desktop:action')({ sender }, 'retry')
+  await assert.rejects(
+    handlers.get('desktop:action')({ sender }, 'retry'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   assert.deepEqual(
     await handlers.get('desktop:action')({ sender }, 'export-diagnostics'),
     { canceled: false, exported: true },
-  )
-  assert.deepEqual(
-    await handlers.get('desktop:action')({ sender }, 'upgrade-migration'),
-    { status: 'committed' },
   )
   assert.equal(await handlers.get('desktop:settings-opened')({ sender }), true)
   await handlers.get('desktop:update-check')({ sender })
@@ -146,8 +327,13 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   assert.equal(handlers.has('desktop:close-behavior-set'), false)
   assert.deepEqual(handled, ['community', 'extensions', 'terminal'])
   assert.deepEqual(exported, ['startup-diagnostics'])
-  assert.deepEqual(migrationActions, ['open'])
-  assert.deepEqual(observed, [['recovery', 'retry'], ['settings'], ['updates']])
+  assert.deepEqual(observed, [
+    ['dock-impression'],
+    ['dock-dismiss', 'close'],
+    ['dock-open'],
+    ['settings'],
+    ['updates'],
+  ])
   unregister()
 })
 

@@ -61,6 +61,8 @@ test('explicit desktop mismatch is incompatible and bounded', () => {
     required: '>=0.2.0',
     actual: '0.1.9',
   }])
+  assert.equal(Object.hasOwn(result, 'enabled'), false)
+  assert.equal(Object.hasOwn(result, 'action'), false)
 })
 
 test('Node engine and required peer conflicts are incompatible', () => {

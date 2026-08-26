@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { ensurePnpmCommandShim } from '../src/electron-app.mjs'
+import { boundedManagedGitInspection, ensurePnpmCommandShim } from '../src/electron-app.mjs'
 
 test('bundled pnpm is exposed to in-process plugin stores without a system install', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-tools-'))
@@ -21,4 +21,20 @@ test('bundled pnpm is exposed to in-process plugin stores without a system insta
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('optional Git discovery cannot hold Desktop startup indefinitely', async () => {
+  const never = new Promise(() => {})
+  await assert.rejects(
+    boundedManagedGitInspection(() => never, ['C:\\runtime-bin'], { timeoutMs: 25 }),
+    error => error?.code === 'MANAGED_GIT_STARTUP_TIMEOUT',
+  )
+})
+
+test('optional Git discovery returns verified PATH entries before its deadline', async () => {
+  const result = { source: 'system', pathEntries: ['C:\\runtime-bin'] }
+  assert.equal(
+    await boundedManagedGitInspection(async () => result, ['C:\\runtime-bin'], { timeoutMs: 100 }),
+    result,
+  )
 })

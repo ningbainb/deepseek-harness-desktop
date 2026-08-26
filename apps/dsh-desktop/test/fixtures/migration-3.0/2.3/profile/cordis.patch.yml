@@ -1,4 +1,0 @@
-# Desktop-managed patch state for the representative 2.3 profile.
-- id: desktop-managed-settings
-  config:
-    safeMode: false

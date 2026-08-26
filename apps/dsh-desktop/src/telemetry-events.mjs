@@ -1,5 +1,7 @@
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
 const DIMENSION_FIELDS = Object.freeze(['outcome', 'detail', 'bucket'])
+const ACTOR_FIELDS = Object.freeze(['installationActor', 'dailyActor', 'monthlyActor'])
+const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const EVENT_POLICY = Object.freeze({
   app_launch: Object.freeze({
@@ -20,6 +22,60 @@ const EVENT_POLICY = Object.freeze({
     ]),
     buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
   }),
+  direct_start_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['fresh-home', 'existing-home', 'repaired', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  full_start_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'plugin-startup',
+      'profile-invalid',
+      'runtime-missing',
+      'port-conflict',
+      'integrity-failed',
+      'repeated-crash',
+      'startup-failed',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_started: Object.freeze({
+    outcomes: new Set(['started']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['none']),
+  }),
+  repair_agent_succeeded: Object.freeze({
+    outcomes: new Set(['succeeded']),
+    details: new Set(['default-model', 'fallback-model']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  repair_agent_failed: Object.freeze({
+    outcomes: new Set(['failed']),
+    details: new Set([
+      'model-unavailable',
+      'model-error',
+      'timeout',
+      'invalid-result',
+      'verification-failed',
+      'restart-failed',
+      'rollback-failed',
+      'budget-exhausted',
+      'unknown',
+    ]),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  builtins_fallback_ready: Object.freeze({
+    outcomes: new Set(['ready']),
+    details: new Set(['no-model', 'repair-failed', 'budget-exhausted', 'full-retry-failed', 'unknown']),
+    buckets: new Set(['under-2s', '2-5s', '5-15s', '15-60s', 'over-60s', 'unknown']),
+  }),
+  installation_repair_required: Object.freeze({
+    outcomes: new Set(['blocked']),
+    details: new Set(['runtime-missing', 'integrity-failed', 'unsupported', 'unknown']),
+    buckets: new Set(['none']),
+  }),
   runtime_recovery_action: Object.freeze({
     outcomes: new Set(['requested']),
     details: new Set(['retry', 'repair', 'safe-mode', 'disable-plugin']),
@@ -33,6 +89,56 @@ const EVENT_POLICY = Object.freeze({
   update_result: Object.freeze({
     outcomes: new Set(['current', 'available', 'downloaded', 'install-requested', 'error']),
     details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_available: Object.freeze({
+    outcomes: new Set(['available']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_downloaded: Object.freeze({
+    outcomes: new Set(['downloaded']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_install_requested: Object.freeze({
+    outcomes: new Set(['requested']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  update_completed: Object.freeze({
+    outcomes: new Set(['completed']),
+    details: new Set(['receipt']),
+    buckets: new Set(['none']),
+  }),
+  update_error: Object.freeze({
+    outcomes: new Set(['error']),
+    details: new Set(['automatic', 'manual', 'none']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_impression: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_shown: Object.freeze({
+    outcomes: new Set(['shown']),
+    details: new Set(['first-three-launches']),
+    buckets: new Set(['none']),
+  }),
+  dock_nudge_dismissed: Object.freeze({
+    outcomes: new Set(['dismissed']),
+    details: new Set(['close', 'escape', 'clicked', 'limit']),
+    buckets: new Set(['none']),
+  }),
+  dock_entry_click: Object.freeze({
+    outcomes: new Set(['clicked']),
+    details: new Set(['settings-adjacent']),
+    buckets: new Set(['none']),
+  }),
+  dock_opened: Object.freeze({
+    outcomes: new Set(['opened', 'failed']),
+    details: new Set(['settings-adjacent']),
     buckets: new Set(['none']),
   }),
   extension_operation: Object.freeze({
@@ -84,11 +190,17 @@ export function normalizeProductContext({ version, platform, osRelease, locale }
   })
 }
 
-export function createProductEvent(context, name, dimensions) {
+export function createProductEvent(context, actors, name, dimensions) {
   if (!exactFields(context, ['appVersion', 'channel', 'os', 'language'])) {
     throw new TypeError('invalid product telemetry context')
   }
   if (!exactFields(dimensions, DIMENSION_FIELDS)) throw new TypeError('invalid product event dimensions')
+  if (
+    !exactFields(actors, ACTOR_FIELDS)
+    || !ACTOR_PATTERN.test(actors.installationActor)
+    || !ACTOR_PATTERN.test(actors.dailyActor)
+    || !ACTOR_PATTERN.test(actors.monthlyActor)
+  ) throw new TypeError('invalid anonymous product actor')
   const policy = EVENT_POLICY[name]
   if (
     policy === undefined
@@ -101,6 +213,7 @@ export function createProductEvent(context, name, dimensions) {
   return Object.freeze({
     name,
     ...context,
+    ...actors,
     outcome: dimensions.outcome,
     detail: dimensions.detail,
     bucket: dimensions.bucket,

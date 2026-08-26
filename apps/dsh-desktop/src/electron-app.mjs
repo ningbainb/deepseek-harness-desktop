@@ -1,12 +1,11 @@
 import { homedir, release as osRelease } from 'node:os'
-import { createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
-import { ensureApiRetryPolicies } from './api-retry-policy.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
 import { createCommunityQrImage } from './community.mjs'
 import {
@@ -22,6 +21,7 @@ import {
   PRIVACY_POLICY_URL,
 } from './community-links.mjs'
 import { promptForDownloadDestination } from './download-destination.mjs'
+import { DockNudgeStore } from './dock-nudge-state.mjs'
 import { DeepLinkRouter, normalizeDeepLink, presetFileFrom } from './deep-links.mjs'
 import { BoundedLogStore } from './log-store.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
@@ -29,28 +29,12 @@ import { createCommunityMarketService } from './extensions/community-market.mjs'
 import {
   assertExternalPluginDescriptor,
   ExternalPluginSourceResolver,
-  parseRemoteExternalPluginReference,
+  revalidateExternalPluginSource,
   stageExternalPluginSource,
 } from './external-plugin-source.mjs'
-import { createFreeModePluginApproval } from './free-mode-plugin-approval.mjs'
-import { createFreeModeLauncher } from './free-mode-launcher.mjs'
-import {
-  writeIsolatedRecoveryFullUserOverlay,
-  writePrimaryFullUserOverlay,
-} from './free-mode-full-user-overlay.mjs'
-import { FreeModePermissionStore, freeModePermissionSourceFromDescriptor } from './free-mode-permission-store.mjs'
-import {
-  cloneFreeModeAgentConfig,
-  cloneFreeModeHomePatch,
-  cloneFreeModeProfile,
-  inspectFreeModeAgentConfigClone,
-  inspectFreeModeHomePatch,
-  inspectFreeModeProfileClone,
-} from './free-mode-profile-clone.mjs'
-import { FreeModeRuntimeService } from './free-mode-runtime-service.mjs'
-import { FreeModeSessionManager } from './free-mode-session.mjs'
+import { writePrimaryFullUserOverlay } from './primary-full-user-overlay.mjs'
+import { FreeModePermissionStore } from './free-mode-permission-store.mjs'
 import { createManagedGitRuntimeService } from './managed-git-runtime-service.mjs'
-import { createPreflightRecoveryShell } from './preflight-recovery-shell.mjs'
 import { DESKTOP_SURFACES, desktopContractForSurface, DESKTOP_API_VERSION } from './desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from './desktop-surfaces.mjs'
 import {
@@ -64,44 +48,36 @@ import {
   QqBotCredentialStore,
   setQqBotProfileEnabled,
 } from './extensions/qqbot.mjs'
-import { publicUpdateStatus, registerDesktopIpc } from './ipc.mjs'
-import { launchRequestsSafeMode } from './launch-safe-mode.mjs'
+import { publicUpdateStatus, registerDesktopIpc, registerDesktopStartupIpc } from './ipc.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
-import { DesktopNotificationService } from './notifications.mjs'
+import {
+  readLegacyCredentialCompatibility,
+  validateLegacyCredentialEnvironment,
+} from './legacy-credential-compat.mjs'
+import { builtinsFallbackNotification, DesktopNotificationService } from './notifications.mjs'
 import { startQqBotConnector } from './optional-integrations.mjs'
 import {
   DesktopPluginRecovery,
   PluginRecoveryStore,
-  isPluginPackageInspectionFailure,
-  recoverProfileAfterPluginInspectionFailure,
 } from './plugin-recovery.mjs'
-import { DesktopProfileBaselineQuarantine } from './profile-baseline-quarantine.mjs'
 import { ensurePrimaryRuntimeFullUserPermission } from './primary-runtime-permission.mjs'
 import { ProductMetricsRecorder } from './product-metrics.mjs'
+import { ProductAnalyticsIdentityStore } from './product-analytics-state.mjs'
+import {
+  AutomaticRepairRunner,
+  discoverAutomaticRepairCommands,
+} from './automatic-repair-runner.mjs'
+import { projectDirectStartupState } from './repair-state.mjs'
 import {
   BUILTIN_BUNDLES,
-  DESKTOP_PROFILE_BOOTSTRAP_ERROR,
+  classifyDesktopProfileBootstrapFailure,
+  DESKTOP_PROFILE_FAILURE_CATEGORIES,
   ensureDesktopProfile,
   resolveDshCliPath,
   resolveRuntimePackages,
 } from './profile.mjs'
 import { WebProfileMigrationService } from './profile-migration.mjs'
-import { MigrationAssistant, createMigrationPaths } from './migration-assistant.mjs'
-import {
-  LEGACY_TASK_LEDGER_KEY,
-  LEGACY_TASK_LEDGER_MAX_BYTES,
-  assertLegacyTaskOrigin,
-  inspectHostTaskLedger,
-  migrateLegacyTaskLedger,
-  shouldReadLegacyTaskStorage,
-} from './migration-task-ledger.mjs'
-import {
-  createMigrationProbeUrl,
-  denyMigrationProbePermissions,
-  installMigrationProbeContentSecurityPolicy,
-  installMigrationProbeNavigationPolicy,
-} from './migration-probe.mjs'
 import { PresetService } from './presets/preset-service.mjs'
 import { persistRuntimePort, selectPreferredRuntimePort } from './runtime-port.mjs'
 import { installRendererPermissions } from './renderer-permissions.mjs'
@@ -114,7 +90,13 @@ import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
-import { DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
+import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
+import { RepairIncidentStore } from './repair-incident-store.mjs'
+import { resolveRepairModelAvailability } from './repair-model-availability.mjs'
+import { RepairRuntimeController } from './repair-runtime-controller.mjs'
+import { RepairTransactionManager } from './repair-transaction.mjs'
+import { createRegisteredRepairChecks, RepairVerifier } from './repair-verifier.mjs'
+import { StartupRepairCoordinator } from './startup-repair-coordinator.mjs'
 import { assertRuntimeIntegrity, resolveRuntimeCriticalFiles } from './runtime-integrity.mjs'
 import {
   assessRuntimeSupport,
@@ -127,12 +109,13 @@ import {
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
 import { parseUpdateMirrors, probeUpdateSource, UpdateDownloadRouter } from './update-mirrors.mjs'
 import { parseUpdateShutdownRequest, writeUpdateShutdownReceipt } from './update-shutdown-receipt.mjs'
+import { UpdateAnalyticsReceiptStore } from './update-analytics-receipt.mjs'
 import { DesktopUpdateChannelStore } from './update-channel-preferences.mjs'
 import { hasExistingDesktopState, initialUpdateChannel } from './release-channel.mjs'
 import { installUpdateSurface } from './update-surface.mjs'
 import { DesktopTrayLifecycle, restoreDesktopWindow } from './tray-lifecycle.mjs'
 import { UserPluginArchive } from './user-plugin-archive.mjs'
-import { getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
+import { applyWindowChrome, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
@@ -146,6 +129,14 @@ const COMMUNITY_PATH = join(SOURCE_DIR, 'ui', 'community.html')
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
 
+/** Planned Extension Dock restarts keep the current renderer visible. */
+export function runtimeStatusNeedsStartupSurface(status, { extensionMaintenance = false } = {}) {
+  const state = status?.state
+  if (state === 'crashed') return true
+  if (state === 'stopping' || state === 'restarting') return extensionMaintenance !== true
+  return false
+}
+
 function runtimeHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh')
 }
@@ -153,10 +144,6 @@ function runtimeHome() {
 function runtimeWorkspace(app) {
   if (!app.isPackaged) return join(SOURCE_DIR, '..', '..', '..')
   return homedir()
-}
-
-function sha256(content) {
-  return createHash('sha256').update(content).digest('hex')
 }
 
 export function prioritizeRuntimeBinPathEntries(runtimeBin, pathEntries, { platform = process.platform } = {}) {
@@ -174,67 +161,27 @@ export function prioritizeRuntimeBinPathEntries(runtimeBin, pathEntries, { platf
   ])
 }
 
-/**
- * Migration workers are allowed to run the local Host routes, but never the
- * durable background scheduler. This prevents a due task from claiming a
- * lease or opening a real DSH session while a private snapshot/journal is
- * still the only authority for recovery.
- */
 export function desktopRuntimeEnvironmentFor({
+  credentialEnvironment = {},
   qqBotCredentials,
   backgroundAutomation = false,
-  migrationWorker = false,
   fullUser = false,
 } = {}) {
   if (typeof fullUser !== 'boolean') {
     throw new TypeError('fullUser must be a boolean')
   }
-  if (fullUser && migrationWorker) {
-    throw new TypeError('a migration worker cannot run with full-user permissions')
-  }
+  const normalizedCredentialEnvironment = validateLegacyCredentialEnvironment(credentialEnvironment)
   return Object.freeze({
+    ...normalizedCredentialEnvironment,
     ...(qqBotCredentials
       ? { QQBOT_APPID: qqBotCredentials.appId, QQBOT_SECRET: qqBotCredentials.appSecret }
       : { QQBOT_APPID: '', QQBOT_SECRET: '' }),
-    DSH_DESKTOP_BACKGROUND_AUTOMATION: migrationWorker ? '0' : backgroundAutomation ? '1' : '0',
+    DSH_DESKTOP_BACKGROUND_AUTOMATION: backgroundAutomation ? '1' : '0',
     // Do not inherit an ambient DSH_PERMISSION_MODE from the Desktop process.
     // The persistent primary Runtime receives full-user access only after its
-    // Desktop-owned native authorization has been established. A migration
-    // worker remains workspace-write, and an isolated recovery Runtime has an
-    // independent main-process admission path.
+    // Desktop-owned native authorization has been established.
     DSH_PERMISSION_MODE: fullUser ? 'danger-full-access' : 'workspace-write',
   })
-}
-
-/** Persist only the small non-secret Runtime support projection that migration can roll back. */
-async function writeMigrationRuntimeSupportState(path, value) {
-  const directory = dirname(path)
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  const content = `${JSON.stringify(value, null, 2)}\n`
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    const verified = await readFile(path, 'utf8')
-    if (verified !== content) throw new Error('migration runtime support state did not verify after atomic write')
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    if (movedExisting) {
-      await rm(path, { force: true }).catch(() => {})
-      await rename(backup, path).catch(() => {})
-    }
-    throw error
-  }
 }
 
 export function secondaryWindowWebPreferences({ preload } = {}) {
@@ -280,6 +227,34 @@ export async function ensurePnpmCommandShim({ directory, executable, pnpmCli }) 
   return directory
 }
 
+/** Git discovery is an optional startup enhancement and may never hold the shell. */
+export async function boundedManagedGitInspection(
+  inspect,
+  pathEntries,
+  { timeoutMs = 4_000, schedule = setTimeout, cancel = clearTimeout } = {},
+) {
+  if (typeof inspect !== 'function') throw new TypeError('managed Git inspection must be a function')
+  if (!Array.isArray(pathEntries)) throw new TypeError('managed Git inspection PATH entries must be an array')
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 25 || timeoutMs > 30_000) {
+    throw new TypeError('managed Git startup timeout must be between 25 and 30000 milliseconds')
+  }
+  let timeout
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => inspect(pathEntries)),
+      new Promise((_, reject) => {
+        timeout = schedule(() => {
+          const error = new Error('managed Git inspection exceeded the startup deadline')
+          error.code = 'MANAGED_GIT_STARTUP_TIMEOUT'
+          reject(error)
+        }, timeoutMs)
+      }),
+    ])
+  } finally {
+    cancel(timeout)
+  }
+}
+
 /** Run independent filesystem and credential startup work in parallel. */
 export async function prepareDesktopRuntimeInputs({
   prepareProfile,
@@ -301,222 +276,6 @@ export async function prepareDesktopRuntimeInputs({
     credentialsPromise,
   ])
   return { profile, credentials }
-}
-
-/**
- * Only profile bootstrap syntax/managed-section failures may be retried from a
- * clean Desktop baseline. Host, updater, permissions, and runtime failures
- * must retain their normal error path.
- */
-export function isRecoverableDesktopProfileBootstrapFailure(error) {
-  return error?.code === DESKTOP_PROFILE_BOOTSTRAP_ERROR
-}
-
-/**
- * Once the Desktop-owned recovery shell is visible, startup work must never
- * reject back to main.mjs. That fallback can only show an exit-only native
- * dialog, which would turn a recoverable profile, Runtime, or updater error
- * into the same startup dead end that the shell exists to avoid.
- *
- * The caller creates the first shell before entering this boundary. On a
- * later failure we retain that shell (or recreate it if a prior transition
- * dismissed it), record only a categorical error name, and resolve normally.
- */
-export async function runStartupAfterRecoveryShell({
-  run,
-  showRecoveryShell,
-  log = async () => {},
-} = {}) {
-  if (typeof run !== 'function') throw new TypeError('post-shell startup run must be a function')
-  if (typeof showRecoveryShell !== 'function') throw new TypeError('post-shell recovery shell callback must be a function')
-
-  try {
-    return await run()
-  } catch (error) {
-    await log(
-      `[recovery-shell] post-shell startup failure contained: ${error instanceof Error ? error.name : 'unknown'}`,
-    ).catch(() => {})
-    try {
-      await showRecoveryShell({
-        category: 'unknown',
-        fingerprintSource: 'post-shell-startup-failure',
-      })
-    } catch (recoveryError) {
-      // The first shell was already created before this boundary. If a
-      // replacement/update fails, do not revive main.mjs's exit-only fallback.
-      await log(
-        `[recovery-shell] failed to retain post-shell recovery state: ${recoveryError instanceof Error ? recoveryError.name : 'unknown'}`,
-      ).catch(() => {})
-    }
-    return undefined
-  }
-}
-
-/**
- * Give the very first Recovery Shell a safe Free Mode action before normal
- * startup has finished constructing the isolated launcher. A click made
- * during that narrow interval waits for the Electron-main-owned action; no
- * renderer argument is forwarded and no later lexical binding is read.
- */
-export function createStartupFreeModeActionBridge() {
-  let installedAction
-  let terminalFailure
-  let resolveInstalledAction
-  const actionReady = new Promise((resolve) => {
-    resolveInstalledAction = resolve
-  })
-  const invoke = async (...argumentsFromCaller) => {
-    if (argumentsFromCaller.length !== 0) {
-      throw new TypeError('startup free-mode action does not accept arguments')
-    }
-    const action = installedAction ?? await actionReady
-    if (terminalFailure !== undefined) throw terminalFailure
-    return action()
-  }
-  const install = (action) => {
-    if (typeof action !== 'function') throw new TypeError('startup free-mode action must be a function')
-    if (terminalFailure !== undefined) return false
-    installedAction = action
-    resolveInstalledAction(action)
-    return true
-  }
-  const fail = () => {
-    // A startup exception may happen before the real action is installed.
-    // Wake any click already queued in the local shell so it receives a
-    // recoverable error instead of awaiting an impossible initialization.
-    // Once the action exists it remains usable through late startup errors.
-    if (installedAction !== undefined || terminalFailure !== undefined) return false
-    terminalFailure = new Error('startup free-mode action is unavailable; retry Desktop recovery')
-    resolveInstalledAction(undefined)
-    return true
-  }
-  return Object.freeze({
-    invoke,
-    install,
-    fail,
-    // The bridge is intentionally actionable before the real implementation
-    // is ready: `invoke()` queues the request. A terminal startup failure
-    // settles that queue and retracts the action rather than leaving the
-    // Recovery Shell indefinitely busy.
-    get available() { return terminalFailure === undefined },
-  })
-}
-
-async function reconcileActiveDesktopBaseline(baselineQuarantine) {
-  if (
-    !baselineQuarantine
-    || typeof baselineQuarantine.getState !== 'function'
-    || typeof baselineQuarantine.hasUntrustedActivation !== 'function'
-    || typeof baselineQuarantine.quarantine !== 'function'
-  ) return false
-  const state = await baselineQuarantine.getState()
-  if (state?.available !== true || await baselineQuarantine.hasUntrustedActivation() !== true) return false
-  const result = await baselineQuarantine.quarantine()
-  if (result?.available !== true) throw new Error('private Desktop baseline recovery could not be reconciled')
-  return true
-}
-
-/**
- * Recover a broken user profile before a runtime controller exists. The
- * baseline archive is private; callers receive only the fact that recovery
- * happened and must not log source configuration bytes.
- */
-export async function prepareDesktopRuntimeInputsWithBaselineRecovery({
-  baselineQuarantine,
-  onBaselineRecovery = async () => {},
-  ...options
-} = {}) {
-  // An abrupt process exit can leave active.json durable before its raw
-  // profile/home loader inputs were reset. Reconcile that private archive
-  // before the very first ensureDesktopProfile()/compatibility pass; doing it
-  // later would let syntactically valid opaque loaders be merged and loaded.
-  const reconciledActiveBaseline = await reconcileActiveDesktopBaseline(baselineQuarantine)
-  try {
-    const prepared = await prepareDesktopRuntimeInputs(options)
-    if (reconciledActiveBaseline) {
-      try {
-        await onBaselineRecovery()
-      } catch {
-        // Progress diagnostics must not defeat a successfully reconciled
-        // startup baseline.
-      }
-    }
-    return Object.freeze({ ...prepared, baselineRecovered: reconciledActiveBaseline })
-  } catch (error) {
-    if (!isRecoverableDesktopProfileBootstrapFailure(error) || !baselineQuarantine) throw error
-    const result = await baselineQuarantine.quarantine()
-    if (result?.available !== true) throw error
-    try {
-      const prepared = await prepareDesktopRuntimeInputs(options)
-      try {
-        await onBaselineRecovery()
-      } catch {
-        // Progress diagnostics are never allowed to defeat a successful
-        // profile recovery before the runtime controller exists.
-      }
-      return Object.freeze({ ...prepared, baselineRecovered: result.changed === true })
-    } catch (retryError) {
-      if (result.changed === true) await baselineQuarantine.restore().catch(() => {})
-      throw retryError
-    }
-  }
-}
-
-function isInterruptedPreBootstrapMigration(journal) {
-  return journal?.state === 'started' || journal?.state === 'step-complete'
-}
-
-function isEligiblePreBootstrapMigrationPlan(plan) {
-  return plan?.status !== 'blocked' && /^2\.[3-7]\.\d+$/u.test(plan?.sourceVersion ?? '')
-}
-
-const PRE_BOOTSTRAP_REPAIR_GUIDANCE = Object.freeze({
-  'missing-profile-manifest': '修复 Desktop 档案配置后重试。',
-  'unreadable-profileManifest': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-profileManifest': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-taskState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-taskState': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-legacyTaskState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-legacyTaskState': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-desktopState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-desktopState': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-runtimePortState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-runtimePortState': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-runtimeSupportState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-runtimeSupportState': '修复损坏的 Desktop 状态文件后重试。',
-  'unreadable-pluginRecoveryState': '恢复 Desktop 本地状态的访问权限后重试。',
-  'invalid-pluginRecoveryState': '修复损坏的 Desktop 状态文件后重试。',
-  'invalid-version-evidence': '修复记录的 Desktop 版本信息后重试。',
-  'unknown-version': '使用 Desktop 恢复流程修复版本状态后重试。',
-  'conflicting-version-evidence': '修复冲突的 Desktop 版本信息后重试。',
-  'unsupported-legacy-version': '先将 Desktop 状态升级到受支持版本后重试。',
-  'unsupported-or-newer-version': '使用与当前 Desktop 版本匹配的恢复流程。',
-  'runtime-support-blocked': '安装 Known Good 或 Supported Runtime 后重试。',
-  'plugin-compatibility-blocked': '修复不兼容的 Desktop 插件后重试。',
-  'preset-sdk-provider-compatibility-blocked': '修复不兼容的 Preset、SDK 或 Provider 状态后重试。',
-})
-
-const PRE_BOOTSTRAP_REPAIR_FALLBACK = '请先修复本地 Desktop 升级状态后重试。'
-const PRE_BOOTSTRAP_REPAIR_PRESERVATION = '不要删除私有迁移恢复文件。'
-
-/**
- * Show only fixed recovery advice selected by allowlisted blocker codes. Raw
- * plan guidance can originate in damaged state and must never reach a native
- * pre-bootstrap dialog.
- */
-export function preflightMigrationRepairGuidance(plan) {
-  const blockers = Array.isArray(plan?.blockers) ? plan.blockers : []
-  const selected = []
-  for (const blocker of blockers) {
-    const guidance = typeof blocker === 'string' && Object.hasOwn(PRE_BOOTSTRAP_REPAIR_GUIDANCE, blocker)
-      ? PRE_BOOTSTRAP_REPAIR_GUIDANCE[blocker]
-      : undefined
-    if (guidance !== undefined && !selected.includes(guidance)) selected.push(guidance)
-    if (selected.length >= 2) break
-  }
-  if (selected.length === 0) selected.push(PRE_BOOTSTRAP_REPAIR_FALLBACK)
-  selected.push(PRE_BOOTSTRAP_REPAIR_PRESERVATION)
-  return Object.freeze(selected.slice(0, 3))
 }
 
 const RUNTIME_INTEGRITY_REPAIR_REASONS = new Set([
@@ -552,75 +311,6 @@ export function runtimeStartupRepairCategory(status) {
   return 'plugin-startup-failure'
 }
 
-/**
- * Inspect and, where needed, durably prepare Desktop's 2.x recovery journal
- * before any profile or Runtime bootstrap can change legacy state. A recovery
- * store error is deliberately fail-closed: treating it as "no migration" can
- * strand a private snapshot without a journal and then rewrite its source.
- */
-export async function preflightDesktopMigrationGate({
-  migrationAssistant,
-  log = async () => {},
-} = {}) {
-  try {
-    const journals = await migrationAssistant.listJournals()
-    if (!Array.isArray(journals)) throw new TypeError('migration recovery journal list is invalid')
-    const journal = journals.find(isInterruptedPreBootstrapMigration)
-    if (journal) {
-      await log(`[migration] interrupted pre-bootstrap journal found for ${journal.sourceVersion}`)
-      return Object.freeze({
-        bootstrapAllowed: true,
-        plan: undefined,
-        journal,
-      })
-    }
-
-    const plan = await migrationAssistant.planMigration()
-    if (isEligiblePreBootstrapMigrationPlan(plan)) {
-      // Snapshot and journal are durably persisted before existing 2.x
-      // profile/bootstrap code can rewrite state. The startup state machine
-      // then confirms and resumes it without a migration choice screen.
-      const preparedJournal = await migrationAssistant.beginMigration(plan)
-      await log(`[migration] pre-bootstrap journal prepared for ${plan.sourceVersion}`)
-      return Object.freeze({
-        bootstrapAllowed: true,
-        plan,
-        journal: preparedJournal,
-      })
-    }
-
-    if (plan?.status === 'blocked') {
-      await log('[migration] pre-bootstrap migration repair required; bootstrap blocked')
-      return Object.freeze({
-        bootstrapAllowed: false,
-        reason: 'migration-preflight-blocked',
-        plan,
-        journal: undefined,
-      })
-    }
-    return Object.freeze({
-      bootstrapAllowed: true,
-      plan,
-      journal: undefined,
-    })
-  } catch {
-    // Do not expose filesystem details from private recovery material. Logging
-    // is also best-effort so a log-store error cannot turn this back into a
-    // normal bootstrap path.
-    try {
-      await log('[migration] pre-bootstrap recovery state unavailable; bootstrap blocked')
-    } catch {
-      // The caller still receives a hard stop when diagnostics are unavailable.
-    }
-    return Object.freeze({
-      bootstrapAllowed: false,
-      reason: 'migration-preflight-unavailable',
-      plan: undefined,
-      journal: undefined,
-    })
-  }
-}
-
 /** Start the runtime without serializing it behind the local startup surface. */
 export function beginDesktopStartup({ loadShell, startRuntime, holdRuntime = false }) {
   if (typeof loadShell !== 'function' || typeof startRuntime !== 'function') {
@@ -631,52 +321,15 @@ export function beginDesktopStartup({ loadShell, startRuntime, holdRuntime = fal
   return Object.freeze({ shellPromise, runtimePromise })
 }
 
-/**
- * Every validated 2.3-2.7 pre-bootstrap journal is already backed by a
- * private snapshot. Desktop owns this product migration, so both safe plans
- * and the legacy-browser-ledger confirmation class continue without a second
- * choice screen. Unknown shapes still fail closed and fall back to Free Mode.
- */
-export function shouldAutoContinuePreBootstrapMigration(journal) {
-  return (journal?.planStatus === 'safe' && journal?.confirmationRequired === false)
-    || (journal?.planStatus === 'needs-confirmation' && journal?.confirmationRequired === true)
-}
-
-/**
- * Keep Electron alive while the migration-only loopback probe briefly opens
- * and closes its own hidden window. On Windows, closing that sole probe can
- * otherwise quit the app before its durable journal reaches `committed`.
- * This anchor never loads DSH Web or user content and is released as soon as
- * the real Desktop window exists.
- */
-export function createPreBootstrapMigrationWindowAnchor({ BrowserWindow } = {}) {
-  if (typeof BrowserWindow !== 'function') throw new TypeError('BrowserWindow is required for the migration window anchor')
-  const anchor = new BrowserWindow({
-    show: false,
-    skipTaskbar: true,
-    focusable: false,
-    frame: false,
-    width: 1,
-    height: 1,
-    webPreferences: {
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      spellcheck: false,
-    },
-  })
-  anchor.webContents?.setWindowOpenHandler?.(() => ({ action: 'deny' }))
-  let released = false
-  return Object.freeze({
-    release() {
-      if (released) return false
-      released = true
-      if (anchor.isDestroyed?.()) return false
-      anchor.destroy()
-      return true
-    },
-  })
+/** Keep local startup-page navigations from cancelling one another. */
+export function createSerializedStartupSurfaceLoader({ load } = {}) {
+  if (typeof load !== 'function') throw new TypeError('startup surface load must be a function')
+  let queue = Promise.resolve()
+  return (...argumentsList) => {
+    const operation = queue.catch(() => {}).then(() => load(...argumentsList))
+    queue = operation
+    return operation
+  }
 }
 
 /** Coordinate reversible update preparation separately from final app disposal. */
@@ -784,6 +437,7 @@ export function createDesktopShutdownLifecycle({
 
 export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
+  const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
   const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, safeStorage, screen, shell, Tray, WebContentsView } = electron
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
@@ -792,12 +446,17 @@ export async function startElectronApp(metadata) {
   let updateShutdownRequested = initialUpdateShutdownRequest !== undefined
   let requestUpdateShutdown
   let mainWindow
+  let mainWindowChromeReady = false
   let extensionWindow
   let terminalSurface
   let terminalPanelPromise
   let dispatchDeepLink
   let dispatchPresetFile
   const pendingPresetFiles = new Set()
+  let releaseDesktopProfileIngress
+  const desktopProfileIngressReady = new Promise((resolve) => {
+    releaseDesktopProfileIngress = resolve
+  })
   const deepLinkRouter = new DeepLinkRouter({
     protocol: metadata.protocol,
     dispatch: (link) => dispatchDeepLink(link),
@@ -865,6 +524,10 @@ export async function startElectronApp(metadata) {
     appVersion: app.getVersion(),
     manifestPath: join(SOURCE_DIR, '..', 'package.json'),
   })
+  const userData = app.getPath('userData')
+  const dshHome = runtimeHome()
+  const logsDirectory = join(userData, 'logs')
+  const logStore = new BoundedLogStore({ directory: logsDirectory })
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -872,8 +535,23 @@ export async function startElectronApp(metadata) {
       ? process.env.DSH_DESKTOP_TELEMETRY_TEST_ENDPOINT
       : undefined,
   })
+  let productAnalyticsIdentity
+  if (telemetryEndpoint !== undefined) {
+    try {
+      productAnalyticsIdentity = await new ProductAnalyticsIdentityStore({
+        path: join(userData, 'product-analytics-state.json'),
+      }).loadOrCreate()
+    } catch (error) {
+      await logStore.append(
+        `[telemetry] anonymous identity unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      )
+    }
+  }
   const productTelemetry = new ProductTelemetryClient({
-    endpoint: telemetryEndpoint,
+    endpoint: productAnalyticsIdentity === undefined ? undefined : telemetryEndpoint,
+    actorProvider: productAnalyticsIdentity === undefined
+      ? undefined
+      : () => productAnalyticsIdentity.actorsAt(new Date()),
     context: normalizeProductContext({
       version: desktopVersion,
       platform: process.platform,
@@ -882,110 +560,154 @@ export async function startElectronApp(metadata) {
     }),
   })
   const productMetrics = new ProductMetricsRecorder({ client: productTelemetry })
-  productMetrics.recordLaunch(launchDetail)
+  const dockNudgeStore = new DockNudgeStore({
+    path: join(userData, 'dock-nudge-state.json'),
+  })
+  const updateAnalyticsReceiptStore = new UpdateAnalyticsReceiptStore({
+    path: join(userData, 'update-analytics-receipt.json'),
+  })
+  let completedInAppUpdate = false
+  if (productTelemetry.enabled) {
+    try {
+      completedInAppUpdate = await updateAnalyticsReceiptStore.consumeCompleted(desktopVersion)
+    } catch (error) {
+      await logStore.append(
+        `[telemetry] update receipt unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      )
+    }
+  }
+  productMetrics.recordLaunch(completedInAppUpdate ? 'updated' : launchDetail)
+  if (completedInAppUpdate) productMetrics.recordUpdateCompleted()
 
-  const userData = app.getPath('userData')
-  const dshHome = runtimeHome()
   const desktopProfileDir = join(dshHome, 'profiles', 'desktop')
   const primaryRuntimeBinDirectory = join(userData, 'runtime-bin')
   let runtimeProvider
-  const logsDirectory = join(userData, 'logs')
+  let latestStartupAttempt
+  let repairAvailabilityReason
+  let repairRetry = async () => ({ accepted: false })
   const desktopWindowStatePath = join(userData, 'window-state.json')
   const desktopPreferencesPath = join(userData, 'desktop-preferences.json')
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
-  const migrationRuntimeStatePath = join(userData, 'runtime-support-state.json')
-  const logStore = new BoundedLogStore({ directory: logsDirectory })
-  /**
-   * This window is intentionally available before profile migration, Runtime
-   * admission, or a normal Desktop BrowserWindow. A failed preflight must
-   * never degrade into an exit-only native dialog: users need a local control
-   * plane for logs, retry, and recoverable migration decisions.
-   */
-  const openPreflightRecoveryShell = async ({
-    category = 'unknown',
-    fingerprintSource = category,
-    getState,
-    retry,
-    exitApp,
-    installManagedGit,
-    enterFreeMode,
-    revokeExternalPluginTrust,
-    chooseExternalPlugin,
-    loadExternalPluginSource,
-    cloneExistingProfile,
-    continueMigration,
-    rollbackMigration,
-  } = {}) => createPreflightRecoveryShell({
-    BrowserWindow,
+  let legacyCredentialEnvironment = Object.freeze({})
+  try {
+    const legacyCompatibility = await readLegacyCredentialCompatibility({
+      userDataDir: userData,
+      dshHomeDir: dshHome,
+    })
+    legacyCredentialEnvironment = legacyCompatibility.environment
+    if (legacyCompatibility.summary.candidates > 0) {
+      await logStore.append(
+        `[credentials] legacy candidates=${legacyCompatibility.summary.candidates}`
+        + ` valid=${legacyCompatibility.summary.validCandidates}`
+        + ` recovered=${legacyCompatibility.summary.recoveredRefs}`
+        + ` current=${legacyCompatibility.summary.skippedCurrentRefs}`
+        + ` rejected=${legacyCompatibility.summary.rejectedRefs}`
+        + ` invalid=${legacyCompatibility.summary.invalidCandidates}`,
+      )
+    }
+  } catch (error) {
+    await logStore.append(
+      `[credentials] legacy compatibility unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+    )
+  }
+  const statePath = desktopWindowStatePath
+  const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
+  const state = await loadWindowState(statePath, screen.getAllDisplays())
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  mainWindow = new BrowserWindow({
+    ...state,
+    minWidth: 720,
+    minHeight: 540,
+    show: false,
+    title: metadata.productName,
+    icon: appIcon,
+    backgroundColor: '#040814',
+    ...windowChromeBrowserOptions(),
+    webPreferences: {
+      preload: MAIN_PRELOAD_PATH,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      spellcheck: false,
+    },
+  })
+  const unregisterMainSurface = surfaceRegistry.register(mainWindow.webContents, DESKTOP_SURFACES.MAIN)
+  applyWindowIcon(mainWindow, appIcon)
+  const removeEditContextMenu = installEditContextMenu({ webContents: mainWindow.webContents, Menu })
+  const removeMainWindowChrome = installWindowChrome({
+    browserWindow: mainWindow,
+    iconDataUrl: windowChromeIconDataUrl,
+    showHelpMenu: () => mainWindowChromeReady,
+    showToolsMenu: () => mainWindowChromeReady,
+    onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
+  })
+  const removeConversationPolish = installConversationPolish({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[conversation-polish] ${error.message}`),
+  })
+  const removeConversationSkills = installConversationSkills({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[conversation-skills] ${error.message}`),
+  })
+  const removeUpdateSurface = installUpdateSurface({
+    browserWindow: mainWindow,
+    onError: (error) => void logStore.append(`[update-surface] ${error.message}`),
+  })
+  const removeStarPromptSurface = installStarPromptSurface({
+    browserWindow: mainWindow,
+    forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
+    onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
+  })
+  const unregisterStartupIpc = registerDesktopStartupIpc({
     ipcMain,
-    app,
-    getState: getState ?? (async () => ({
-      category,
-      mode: 'free-shell',
-      runtimeAvailable: false,
-      // Direct migration-recovery shells can be created after the isolated
-      // launcher is ready. Advertise the escape hatch only when this specific
-      // shell received its Electron-main callback; otherwise it stays hidden.
-      freeModeAvailable: typeof enterFreeMode === 'function',
-      error: fingerprintSource,
-    })),
-    openLogs: async () => {
-      const failure = await shell.openPath(logsDirectory)
-      if (typeof failure === 'string' && failure.length > 0) {
-        throw new Error('recovery-log-folder-unavailable')
-      }
-    },
-    retry: retry ?? (async () => {
-      app.relaunch()
-      app.quit()
-    }),
-    exitApp: exitApp ?? (async () => app.quit()),
-    installManagedGit,
-    enterFreeMode,
-    revokeExternalPluginTrust,
-    chooseExternalPlugin,
-    loadExternalPluginSource,
-    cloneExistingProfile,
-    continueMigration,
-    rollbackMigration,
-    onError: async (error) => {
-      // Only a categorical failure name is retained. The recovery renderer
-      // receives no error details, paths, profile content, or commands.
-      await logStore.append(`[recovery-shell] preflight action failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    },
-    browserWindowOptions: {
-      icon: appIcon,
+    surfaceRegistry,
+    setWindowChromeTheme: (sender, theme) => {
+      const target = BrowserWindow.fromWebContents(sender)
+      if (!target || target.isDestroyed()) return undefined
+      return setWindowChromeTheme(target, theme)
     },
   })
-  let startupRecoveryState = Object.freeze({
-    category: 'startup-preparing',
-    mode: 'free-shell',
-    runtimeAvailable: false,
-    freeModeAvailable: false,
-    error: 'startup-preflight-pending',
+  if (state.maximized) mainWindow.maximize()
+  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
+  let activeOrigin
+  let communityWindow
+  let communityWindowPromise
+  let updateController
+  let updateChannelWriteQueue = Promise.resolve()
+  const loadStartupSurface = createSerializedStartupSurfaceLoader({
+    load: async (options) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      await mainWindow.loadFile(STARTUP_PATH, options)
+    },
   })
-  let startupRecoveryShell
-  let startupRecoveryShellClosed = false
-  let onStartupRecoveryShellClosed
-  // The very first Recovery Shell is created before normal Desktop startup.
-  // Give it a main-process-only Free Mode action immediately, even while the
-  // actual isolated launcher is still being assembled below.  A queued click
-  // waits for that assembly rather than touching a later lexical binding (and
-  // therefore cannot hit a temporal-dead-zone/ReferenceError path if a
-  // settings or update read fails first).
-  const startupFreeModeActionBridge = createStartupFreeModeActionBridge()
-  const startupEnterFreeMode = startupFreeModeActionBridge.invoke
-  const installStartupFreeModeAction = startupFreeModeActionBridge.install
-  const failStartupFreeModeAction = startupFreeModeActionBridge.fail
-  let startupInstallManagedGit
-  let startupRevokeExternalPluginTrust
-  let startupChooseExternalPlugin
-  let startupLoadExternalPluginSource
-  let startupCloneExistingProfile
-  let activeFreeModeLauncher
+  const recordDirectStartupState = async (startupState, { reason } = {}) => {
+    const projection = projectDirectStartupState({
+      state: startupState,
+      ...(reason === undefined ? {} : { reason }),
+    })
+    const reasonSuffix = projection.reason === undefined ? '' : ' reason=' + projection.reason
+    await logStore.append('[startup] direct-state=' + projection.state + reasonSuffix).catch(() => {})
+    return projection
+  }
+  const showDirectStartupState = async (startupState, options = {}) => {
+    const projection = await recordDirectStartupState(startupState, options)
+    await loadStartupSurface({
+      query: {
+        directState: projection.state,
+        ...(projection.reason === undefined ? {} : { directReason: projection.reason }),
+      },
+    })
+  }
+  mainWindow.once('ready-to-show', () => {
+    if (!updateShutdownRequested) mainWindow.show()
+  })
+  mainWindow.on('closed', () => { mainWindow = undefined })
+  await showDirectStartupState('preparing')
+  const existingHomeAtLaunch = await hasExistingDesktopState({ userData, desktopProfileDir })
   const confirmManagedGitInstall = async () => {
-    const parent = startupRecoveryShell?.window ?? mainWindow ?? extensionWindow
+    const parent = mainWindow ?? extensionWindow
     const options = {
       type: 'warning',
       title: '修复 Desktop Git',
@@ -1021,7 +743,10 @@ export async function startElectronApp(metadata) {
       })
       let pathEntries = [runtimeBin]
       try {
-        const git = await managedGitRuntimeService.inspect([runtimeBin])
+        const git = await boundedManagedGitInspection(
+          entries => managedGitRuntimeService.inspect(entries),
+          pathEntries,
+        )
         pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, git.pathEntries)
         if (git.source === 'bundled') {
           await logStore.append('[terminal] verified bundled Git added to the session PATH').catch(() => {})
@@ -1033,7 +758,7 @@ export async function startElectronApp(metadata) {
           `[terminal] Git inspection unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
         ).catch(() => {})
       }
-      const parent = startupRecoveryShell?.window ?? mainWindow ?? extensionWindow
+      const parent = mainWindow ?? extensionWindow
       if (!parent || parent.isDestroyed?.()) throw new Error('terminal parent window is unavailable')
       const theme = getWindowChromeTheme(parent)
       let created
@@ -1065,12 +790,14 @@ export async function startElectronApp(metadata) {
    * A managed Git directory is never made process-global. Each Runtime gets
    * an explicit, short-lived PATH list only after the service has verified
    * the installed executable. A probe failure is deliberately non-fatal:
-   * the already-visible Recovery Shell must remain usable, and no download is
-   * attempted during startup.
+   * startup must remain usable, and no download is attempted automatically.
    */
   const resolveManagedGitRuntimePathEntries = async (pathEntries, runtimeKind) => {
     try {
-      const result = await managedGitRuntimeService.inspect(pathEntries)
+      const result = await boundedManagedGitInspection(
+        entries => managedGitRuntimeService.inspect(entries),
+        pathEntries,
+      )
       if (result.source === 'bundled') {
         await logStore.append(`[managed-git] verified bundled Git selected for ${runtimeKind} Runtime`).catch(() => {})
       } else if (result.source === 'managed') {
@@ -1131,669 +858,34 @@ export async function startElectronApp(metadata) {
     }
     return prioritizeRuntimeBinPathEntries(runtimeBin, outcome.pathEntries)
   }
-  const invokeStartupEnterFreeMode = async () => {
-    if (typeof startupEnterFreeMode !== 'function') {
-      throw new Error('free-mode-launch-unavailable')
-    }
-    return startupEnterFreeMode()
-  }
-  const invokeStartupInstallManagedGit = async () => {
-    if (startupRecoveryState.category !== 'external-tool-missing') return false
-    if (typeof startupInstallManagedGit !== 'function') {
-      throw new Error('managed-git-install-unavailable')
-    }
-    return startupInstallManagedGit()
-  }
-  const invokeStartupChooseExternalPlugin = async () => {
-    if (typeof startupChooseExternalPlugin !== 'function') {
-      throw new Error('external-plugin-picker-unavailable')
-    }
-    return startupChooseExternalPlugin()
-  }
-  const invokeStartupRevokeExternalPluginTrust = async () => {
-    if (typeof startupRevokeExternalPluginTrust !== 'function') {
-      throw new Error('external-plugin-trust-revocation-unavailable')
-    }
-    return startupRevokeExternalPluginTrust()
-  }
-  const invokeStartupLoadExternalPluginSource = async (sourceReference) => {
-    if (typeof startupLoadExternalPluginSource !== 'function') {
-      throw new Error('external-plugin-source-loader-unavailable')
-    }
-    return startupLoadExternalPluginSource(sourceReference)
-  }
-  const invokeStartupCloneExistingProfile = async () => {
-    if (typeof startupCloneExistingProfile !== 'function') {
-      throw new Error('existing-profile-clone-unavailable')
-    }
-    return startupCloneExistingProfile()
-  }
-  const showStartupRecoveryShell = async ({
-    category = 'startup-preparing',
-    fingerprintSource = category,
-    installManagedGit,
-    enterFreeMode,
-    revokeExternalPluginTrust,
-    chooseExternalPlugin,
-    loadExternalPluginSource,
-    cloneExistingProfile,
-  } = {}) => {
-    if (enterFreeMode !== undefined) {
-      installStartupFreeModeAction(enterFreeMode)
-    }
-    if (installManagedGit !== undefined) {
-      if (typeof installManagedGit !== 'function') throw new TypeError('startup managed Git install action must be a function')
-      startupInstallManagedGit = installManagedGit
-    }
-    if (revokeExternalPluginTrust !== undefined) {
-      if (typeof revokeExternalPluginTrust !== 'function') throw new TypeError('startup external-plugin trust revocation action must be a function')
-      startupRevokeExternalPluginTrust = revokeExternalPluginTrust
-    }
-    if (chooseExternalPlugin !== undefined) {
-      if (typeof chooseExternalPlugin !== 'function') throw new TypeError('startup external-plugin action must be a function')
-      startupChooseExternalPlugin = chooseExternalPlugin
-    }
-    if (loadExternalPluginSource !== undefined) {
-      if (typeof loadExternalPluginSource !== 'function') throw new TypeError('startup external-plugin source action must be a function')
-      startupLoadExternalPluginSource = loadExternalPluginSource
-    }
-    if (cloneExistingProfile !== undefined) {
-      if (typeof cloneExistingProfile !== 'function') throw new TypeError('startup existing-profile clone action must be a function')
-      startupCloneExistingProfile = cloneExistingProfile
-    }
-    startupRecoveryState = Object.freeze({
-      category,
-      mode: 'free-shell',
-      runtimeAvailable: false,
-      freeModeAvailable: startupFreeModeActionBridge.available,
-      managedGitInstallAvailable: typeof startupInstallManagedGit === 'function',
-      error: fingerprintSource,
-    })
-    if (startupRecoveryShell && !startupRecoveryShell.window.isDestroyed?.()) {
-      return startupRecoveryShell
-    }
-    const recoveryShell = await openPreflightRecoveryShell({
-      getState: async () => startupRecoveryState,
-      installManagedGit: invokeStartupInstallManagedGit,
-      enterFreeMode: invokeStartupEnterFreeMode,
-      revokeExternalPluginTrust: invokeStartupRevokeExternalPluginTrust,
-      chooseExternalPlugin: invokeStartupChooseExternalPlugin,
-      loadExternalPluginSource: invokeStartupLoadExternalPluginSource,
-      cloneExistingProfile: invokeStartupCloneExistingProfile,
-      exitApp: async () => {
-        if (activeFreeModeLauncher !== undefined) {
-          await activeFreeModeLauncher.dispose().catch(async (error) => {
-            await logStore.append(`[free-mode] shutdown cleanup failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-          })
-        }
-        app.quit()
-      },
-    })
-    onStartupRecoveryShellClosed = () => {
-      startupRecoveryShellClosed = true
-      const cleanup = activeFreeModeLauncher === undefined
-        ? Promise.resolve()
-        : activeFreeModeLauncher.dispose()
-      void cleanup
-        .catch(async (error) => {
-          await logStore.append(`[free-mode] window-close cleanup failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-        })
-        .finally(() => app.quit())
-    }
-    recoveryShell.window.once('closed', onStartupRecoveryShellClosed)
-    startupRecoveryShell = recoveryShell
-    return recoveryShell
-  }
-  const dismissStartupRecoveryShell = async () => {
-    const recoveryShell = startupRecoveryShell
-    if (!recoveryShell) return
-    startupRecoveryShell = undefined
-    recoveryShell.window.removeListener?.('closed', onStartupRecoveryShellClosed)
-    await recoveryShell.dispose()
-  }
+  // Keep the legacy approval ledger readable so users can revoke grants
+  // created by earlier releases. Startup no longer creates an isolated
+  // recovery session or asks users to choose a loading mode.
+  let fullUserPermissionStore
   try {
-    // This is deliberately before settings, migration, profile, Runtime, and
-    // package admission. A slow or damaged preflight may not strand users in
-    // an invisible process: they already have a local window with logs/retry.
-    await showStartupRecoveryShell()
-  } catch (error) {
-    await logStore.append(`[recovery-shell] failed to create startup shell: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    app.quit()
-    return
-  }
-  return runStartupAfterRecoveryShell({
-    run: async () => {
-  // One Desktop-main permission store is shared by the persistent primary
-  // Runtime, the normal extension flow, and isolated recovery. Keeping it
-  // here, before any
-    // profile mutation, avoids independent in-memory views of the same
-  // grant file and lets the local recovery shell fail closed if its private
-  // approval ledger cannot be read.
-  let freeModePermissionStore
-  let emergencyFreeModePermissionStore
-  try {
-    freeModePermissionStore = new FreeModePermissionStore({
+    fullUserPermissionStore = new FreeModePermissionStore({
       path: join(userData, 'free-mode-permissions.json'),
     })
+    await fullUserPermissionStore.load()
   } catch (error) {
-    freeModePermissionStore = undefined
+    fullUserPermissionStore = undefined
     await logStore.append(
-      `[free-mode] full-user permission store is unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      `[plugins] legacy permission ledger unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
     ).catch(() => {})
   }
-  /**
-   * A corrupt durable grant ledger must not turn the Recovery Shell back into
-   * an exit-only dead end.  The fallback is deliberately session-only: its
-   * once grant is never persisted and the damaged ledger is neither deleted
-   * nor trusted.  A separately native-confirmed external-plugin launch can
-   * use that same once-only store; it can never recreate durable trust while
-   * the damaged ledger remains in place.
-   */
-  const resolveFreeModeSessionPermissionStore = async () => {
-    if (freeModePermissionStore !== undefined) {
-      try {
-        await freeModePermissionStore.load()
-        return freeModePermissionStore
-      } catch (error) {
-        await logStore.append(
-          `[free-mode] durable permission ledger unavailable for isolated session: ${error instanceof Error ? error.name : 'unknown'}`,
-        ).catch(() => {})
-      }
-    }
-    if (emergencyFreeModePermissionStore === undefined) {
-      emergencyFreeModePermissionStore = new FreeModePermissionStore({
-        // Once grants do not write this path.  It only supplies an empty,
-        // in-memory-equivalent ledger for the explicitly confirmed session.
-        path: join(userData, `free-mode-session-permissions-${process.pid}.json`),
-      })
-    }
-    await emergencyFreeModePermissionStore.load()
-    return emergencyFreeModePermissionStore
-  }
-  // A Free Mode launch uses a Desktop-owned opaque source identity. It is
-  // intentionally not a path, plugin descriptor, Runtime URL, command, or
-  // renderer input. This identity is stable across Desktop upgrades so one
-  // explicit source-scoped approval can make Free Mode the quiet default
-  // recovery path. Runtime bytes are still independently verified immediately
-  // before every launch below.
-  const freeModeWorkbenchSeed = 'desktop-free-workbench-v1'
-  const freeModeWorkbenchSource = Object.freeze({
-    id: `sha256:${sha256(`identity:${freeModeWorkbenchSeed}`)}`,
-    contentSha256: sha256(`content:${freeModeWorkbenchSeed}`),
-  })
-  const freeModeRuntimeSupportDirectory = app.isPackaged
-    ? join(process.resourcesPath, 'runtime-support')
-    : join(SOURCE_DIR, '..', 'runtime-support')
-  const freeModeRuntimeMatrixPath = join(freeModeRuntimeSupportDirectory, 'supported-runtimes.json')
-  const freeModeKnownGoodRuntimePath = join(freeModeRuntimeSupportDirectory, 'known-good.json')
-  const freeModeDevelopmentLockfilePath = join(SOURCE_DIR, '..', '..', '..', 'pnpm-lock.yaml')
-
-  /**
-   * Verify the exact packaged/development Runtime before granting a
-   * full-user session. Free Mode deliberately bypasses Profile and plugin
-   * compatibility decisions after consent; it must never turn a damaged
-   * Desktop Runtime into an executable backdoor.
-   */
-  const prepareFreeModeRuntimeAdmission = async () => {
-    const [matrix, knownGood] = await Promise.all([
-      readRuntimeSupportMatrix(freeModeRuntimeMatrixPath, { readFile }),
-      readKnownGoodRuntimeEvidence(freeModeKnownGoodRuntimePath, { readFile }),
-    ])
-    const cliPath = resolveDshCliPath()
-    const runtimeVersion = await readRuntimePackageVersion({ cliPath, readFile })
-    if (
-      knownGood.desktopVersion !== desktopVersion
-      || knownGood.runtimeVersion !== runtimeVersion
-      || knownGood.providerId !== RUNTIME_PROVIDER_ID
-    ) {
-      throw new Error('free-mode Runtime evidence does not match this Desktop installation')
-    }
-    const fileHashes = await verifyRuntimeFileEvidence({
-      cliPath,
-      expectedFileHashes: knownGood.fileHashes,
-      readFile,
-    })
-    let lockfileSha256 = knownGood.lockfile.sha256
-    if (!app.isPackaged) {
-      const currentLockfileSha256 = sha256(await readFile(freeModeDevelopmentLockfilePath))
-      if (currentLockfileSha256 !== knownGood.lockfile.sha256) {
-        throw new Error('free-mode development lockfile does not match the reviewed Runtime evidence')
-      }
-      lockfileSha256 = currentLockfileSha256
-    }
-    const assessment = assessRuntimeSupport(matrix, {
-      upstreamVersion: runtimeVersion,
-      providerId: RUNTIME_PROVIDER_ID,
-      desktopVersion,
-      integrity: knownGood.integrity,
-      lockfileSha256,
-      fileHashes,
-      patchEvidence: knownGood.patches,
-    })
-    if (!['known-good', 'supported'].includes(assessment.status)) {
-      throw new Error('free-mode Runtime is not eligible for this Desktop build')
-    }
-    return Object.freeze({
-      cliPath,
-      runtimeVersion,
-      runtimePackages: resolveRuntimePackages(),
-      runtimeCriticalFiles: resolveRuntimeCriticalFiles(),
-      pnpmCli: resolvePnpmCliPath(),
-      knownGood,
-      assessment,
-    })
-  }
-
-  let freeModeLaunchPromise
-  /**
-   * Start an isolated recovery Runtime only from an Electron-main-owned
-   * source. Optional plugin preparation is confined to the temporary DSH home,
-   * so neither a source descriptor nor user code can rewrite the persistent
-   * Desktop profile while it is unavailable or under repair.
-   */
-  const launchIsolatedFullUserFreeMode = async ({
-    source,
-    preparePlugin,
-    getParentWindow = () => startupRecoveryShell?.window,
-    rememberSourceApproval = false,
-    approvedSessionId,
-  } = {}) => {
-    if (freeModeLaunchPromise !== undefined) return freeModeLaunchPromise
-    if (activeFreeModeLauncher?.inspect().length > 0) {
-      throw new Error('free-mode Runtime session is already active or cleaning up')
-    }
-    if (preparePlugin !== undefined && typeof preparePlugin !== 'function') {
-      throw new TypeError('free-mode plugin preparation callback is invalid')
-    }
-    if (typeof getParentWindow !== 'function') {
-      throw new TypeError('free-mode parent window callback is invalid')
-    }
-    if (typeof rememberSourceApproval !== 'boolean') {
-      throw new TypeError('free-mode remembered approval flag is invalid')
-    }
-    if (approvedSessionId !== undefined && typeof approvedSessionId !== 'string') {
-      throw new TypeError('free-mode approved session binding is invalid')
-    }
-    const operation = (async () => {
-      const permissionStore = await resolveFreeModeSessionPermissionStore()
-      const admission = await prepareFreeModeRuntimeAdmission()
-      if (startupRecoveryShellClosed) throw new Error('free-mode launch was cancelled while the recovery shell closed')
-
-      let isolatedProfilePrepared = false
-      const prepareIsolatedProfile = async ({ dshHome: isolatedDshHome, profileName }) => {
-        if (isolatedProfilePrepared) return
-        await ensureDesktopProfile({
-          dshHome: isolatedDshHome,
-          packageRoots: admission.runtimePackages,
-          profileName,
-        })
-        if (preparePlugin !== undefined) {
-          await preparePlugin(Object.freeze({
-            dshHome: isolatedDshHome,
-            profileName,
-            admission,
-          }))
-        }
-        isolatedProfilePrepared = true
-      }
-      const sessionManager = new FreeModeSessionManager({
-        appDataDir: userData,
-        originalDshHome: dshHome,
-        prepareProfile: prepareIsolatedProfile,
-      })
-      const runtimeService = new FreeModeRuntimeService({
-        sessionManager,
-        permissionStore,
-        createRuntimeController: async ({ dshHome: isolatedDshHome, profileName }) => {
-          // Recheck the actual executable bytes immediately before every
-          // full-user launch. The source identity controls consent; reviewed
-          // Runtime bytes control whether it is safe to execute at all.
-          await verifyRuntimeFileEvidence({
-            cliPath: admission.cliPath,
-            expectedFileHashes: admission.knownGood.fileHashes,
-            readFile,
-          })
-          // Creating the pnpm shim is an app-data write. Keep it after the
-          // native full-user confirmation and RuntimeService authorization,
-          // rather than treating a click on the recovery-shell button as
-          // consent to mutate even temporary Desktop state.
-          const runtimeBin = await ensurePnpmCommandShim({
-            directory: primaryRuntimeBinDirectory,
-            executable: process.execPath,
-            pnpmCli: admission.pnpmCli,
-          })
-          const runtimePathEntries = await resolveManagedGitRuntimePathEntries(
-            [runtimeBin],
-            'isolated recovery',
-          )
-          // DSH applies --patch overlays after both profile and home patches.
-          // This app-owned, session-local final layer keeps a copied custom
-          // loader from silently downgrading the user's just-confirmed
-          // full-user permission mode.
-          const fullUserOverlay = await writeIsolatedRecoveryFullUserOverlay({ userData })
-          return new DshRuntimeController({
-            cliPath: admission.cliPath,
-            cwd: runtimeWorkspace(app),
-            dshHome: isolatedDshHome,
-            profileName,
-            executable: process.execPath,
-            logStore,
-            autoRestart: false,
-            startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
-            pathEntries: runtimePathEntries,
-            patchFiles: [fullUserOverlay],
-            // This is deliberately not a migration worker or a safe-mode
-            // Runtime: the user's native approval enables normal Agent,
-            // terminal, plugin, tool, network, and scheduler behavior under
-            // their existing Windows account.
-            environmentProvider: () => desktopRuntimeEnvironmentFor({
-              backgroundAutomation: true,
-              migrationWorker: false,
-              fullUser: true,
-            }),
-            preflight: () => assertRuntimeIntegrity({ resolvedFiles: admission.runtimeCriticalFiles }),
-          })
-        },
-        createRuntimeProvider: async ({ controller, dshHome: isolatedDshHome, profileName }) => new DshRuntimeProvider({
-          controller,
-          ensureProfile: () => prepareIsolatedProfile({ dshHome: isolatedDshHome, profileName }),
-          dshHome: isolatedDshHome,
-          profileName,
-          upstreamVersion: admission.runtimeVersion,
-          desktopVersion,
-          runtimeIdentity: {
-            packageName: '@deepseek-ai/dsh',
-            version: admission.runtimeVersion,
-            cliRelativePath: 'lib/bin.js',
-          },
-          supportEvidence: {
-            manifestSchemaVersion: 1,
-            source: 'free-mode-reviewed-runtime',
-            matrix: admission.assessment,
-            knownGood: {
-              runtimeVersion: admission.knownGood.runtimeVersion,
-              providerId: admission.knownGood.providerId,
-              integrity: admission.knownGood.integrity,
-              lockfileSha256: admission.knownGood.lockfile.sha256,
-            },
-          },
-          supportStatus: admission.assessment.status,
-        }),
-      })
-      const launcher = createFreeModeLauncher({
-        getSource: async () => source,
-        permissionStore,
-        runtimeService,
-        dialog,
-        BrowserWindow,
-        getParentWindow,
-        browserWindowOptions: { icon: appIcon },
-        beforeRuntimeLaunch: async () => {
-          if (runtimeProvider === undefined) return
-          await runtimeProvider.stop()
-          if (runtimeProvider.status?.state !== 'stopped') {
-            throw new Error('primary Runtime did not stop before isolated recovery launch')
-          }
-        },
-        ...(approvedSessionId === undefined ? {} : { sessionIdFactory: () => approvedSessionId }),
-        // A corrupt durable ledger falls back to a process-local emergency
-        // store. Never claim to remember approval in that fail-safe path.
-        rememberApproval: rememberSourceApproval && permissionStore !== emergencyFreeModePermissionStore,
-        onError: ({ code }) => logStore.append(`[free-mode] session cleanup needs recovery: ${code}`).catch(() => {}),
-      })
-      activeFreeModeLauncher = launcher
-      try {
-        const result = await launcher.launch()
-        if (result.state === 'running') {
-          await logStore.append('[free-mode] isolated full-user Runtime started with approved Desktop permission').catch(() => {})
-        }
-        return result
-      } catch (error) {
-        await logStore.append(`[free-mode] full-user launch failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-        throw error
-      }
-    })()
-    freeModeLaunchPromise = operation
-    try {
-      return await operation
-    } finally {
-      if (freeModeLaunchPromise === operation) freeModeLaunchPromise = undefined
-    }
-  }
-  const enterFullUserFreeMode = async () => launchIsolatedFullUserFreeMode({
-    source: freeModeWorkbenchSource,
-    rememberSourceApproval: true,
-  })
-  /**
-   * Let a user bring their existing custom profile and hand-edited plugins
-   * into a disposable full-user session.  This is a copy-only operation: the
-   * original profile is fingerprinted before confirmation and again while
-   * staging, and the Runtime is never pointed at the original path.
-   */
-  const cloneExistingProfileIntoFreeMode = async () => {
-    let review
-    let homePatchReview
-    let agentConfigReview
-    try {
-      [review, homePatchReview, agentConfigReview] = await Promise.all([
-        inspectFreeModeProfileClone({ sourceProfileDir: desktopProfileDir }),
-        inspectFreeModeHomePatch({ sourceDshHome: dshHome }),
-        inspectFreeModeAgentConfigClone({ sourceDshHome: dshHome }),
-      ])
-    } catch (error) {
-      await logStore.append(`[free-mode] original profile clone inspection failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-      return false
-    }
-    const parent = startupRecoveryShell?.window
-    const response = parent && !parent.isDestroyed?.()
-      ? await dialog.showMessageBox(parent, {
-          type: 'warning',
-          title: '复制原配置到隔离恢复会话',
-          message: '复制当前 Desktop 配置、已安装插件和任务状态到隔离会话？',
-          detail: 'Desktop 不会改写原始 Profile。会临时复制当前 Agent 预设、技能、settings、凭据和 .env 到关闭后自动清理的隔离会话。复制后的插件和 Agent 会按当前 Windows 用户权限运行，包含终端、文件、网络和后台调度能力；获准代码仍可访问当前用户有权访问的文件。',
-          buttons: ['复制并继续', '取消'],
-          defaultId: 1,
-          cancelId: 1,
-          noLink: true,
-        })
-      : await dialog.showMessageBox({
-          type: 'warning',
-          title: '复制原配置到隔离恢复会话',
-          message: '复制当前 Desktop 配置、已安装插件和任务状态到隔离会话？',
-          detail: 'Desktop 不会改写原始 Profile。会临时复制当前 Agent 预设、技能、settings、凭据和 .env 到关闭后自动清理的隔离会话。复制后的插件和 Agent 会按当前 Windows 用户权限运行，包含终端、文件、网络和后台调度能力；获准代码仍可访问当前用户有权访问的文件。',
-          buttons: ['复制并继续', '取消'],
-          defaultId: 1,
-          cancelId: 1,
-          noLink: true,
-        })
-    if (response?.response !== 0) return false
-    const seed = `desktop-profile-clone-v3:${review.digest}:${homePatchReview.digest}:${agentConfigReview.digest}`
-    const source = Object.freeze({
-      id: `sha256:${sha256(`identity:${seed}`)}`,
-      contentSha256: sha256(`content:${seed}`),
-    })
-    await launchIsolatedFullUserFreeMode({
-      source,
-      preparePlugin: async ({ dshHome: isolatedDshHome, profileName }) => {
-        await cloneFreeModeProfile({
-          sourceProfileDir: desktopProfileDir,
-          targetProfileDir: join(isolatedDshHome, 'profiles', profileName),
-          expectedDigest: review.digest,
-        })
-        await cloneFreeModeHomePatch({
-          sourceDshHome: dshHome,
-          targetDshHome: isolatedDshHome,
-          expectedDigest: homePatchReview.digest,
-        })
-        await cloneFreeModeAgentConfig({
-          sourceDshHome: dshHome,
-          targetDshHome: isolatedDshHome,
-          expectedDigest: agentConfigReview.digest,
-        })
-      },
-    })
-    return true
-  }
-  // Keep every external-plugin approval in Electron main. This helper exists
-  // before normal Profile startup so the preflight Recovery Shell can use the
-  // same native consent path without exposing a privileged renderer bridge.
-  const fullAccessApprovalUnavailable = async () => {
-    throw new Error('full access plugin approval is unavailable because the local permission store could not be opened')
-  }
-  let fullAccessPluginApproval
-  let fullAccessPluginApprovalStore
-  const getFullAccessPluginApproval = async () => {
-    const permissionStore = await resolveFreeModeSessionPermissionStore()
-    const forceOnce = permissionStore === emergencyFreeModePermissionStore
-    if (fullAccessPluginApproval === undefined || fullAccessPluginApprovalStore !== permissionStore) {
-      fullAccessPluginApproval = createFreeModePluginApproval({
-        resolver: new ExternalPluginSourceResolver({ baseDir: desktopProfileDir }),
-        permissionStore,
-        forceOnce,
-        dialog,
-        // `extensionWindow` is declared at Desktop-main scope so this closure
-        // is also safe before the normal Extension window is constructed.
-        getWindow: () => extensionWindow ?? startupRecoveryShell?.window ?? mainWindow,
-      })
-      fullAccessPluginApprovalStore = permissionStore
-    }
-    return fullAccessPluginApproval
-  }
   const revokeFullUserTrust = async () => {
-    const approval = await getFullAccessPluginApproval()
-    const outcome = await approval.revokeAllPersistentTrust()
-    await logStore.append(`[free-mode] revoked persistent full-user trust count=${outcome.revokedCount}`).catch(() => {})
+    if (fullUserPermissionStore === undefined) {
+      throw new Error('the local permission store could not be opened')
+    }
+    const grants = await fullUserPermissionStore.load()
+    let revokedCount = 0
+    for (const grant of grants) {
+      if (grant.state !== 'active' || grant.trustScope === 'once') continue
+      if (await fullUserPermissionStore.revoke(grant.grantId)) revokedCount += 1
+    }
+    await logStore.append(`[plugins] revoked legacy full-user trust count=${revokedCount}`).catch(() => {})
     return true
   }
-  const revokeExternalPluginTrust = revokeFullUserTrust
-  const launchAuthorizedFullAccessPlugin = async (descriptor, {
-    getParentWindow = () => startupRecoveryShell?.window,
-    approvedSessionId,
-  } = {}) => {
-    const external = assertExternalPluginDescriptor(descriptor)
-    if (typeof approvedSessionId !== 'string') {
-      throw new TypeError('full access plugin launch requires its approved Desktop session binding')
-    }
-    let installed
-    const launched = await launchIsolatedFullUserFreeMode({
-      source: freeModePermissionSourceFromDescriptor(external),
-      getParentWindow,
-      approvedSessionId,
-      preparePlugin: async ({ dshHome: isolatedDshHome, profileName, admission }) => {
-        const isolatedProfileDir = join(isolatedDshHome, 'profiles', profileName)
-        const stagedExternal = (external.fingerprintKind ?? 'content') === 'content'
-          ? await stageExternalPluginSource(external, {
-              stagingDirectory: join(isolatedDshHome, '.desktop-external-plugin-staging'),
-            })
-          // A remote reference has no inspectable byte identity before pnpm
-          // fetches it. It remains limited to the explicit one-time approval.
-          : external
-        // `pnpm add git+…` invokes Git before the isolated Runtime exists.
-        // Inject only a verified, child-process-local command directory for
-        // this confirmed Git reference; npm/HTTPS/local sources retain the
-        // normal inherited environment unchanged.
-        const pluginPathEntries = await resolveManagedGitExternalPluginPathEntries(external)
-        const isolatedPluginManager = new PluginManager({
-          profileDir: isolatedProfileDir,
-          pnpmCli: admission.pnpmCli,
-          executable: process.execPath,
-          profileScope: 'isolated-free-mode',
-          pathEntries: pluginPathEntries,
-        })
-        const transaction = await isolatedPluginManager.installFullAccessExternal(stagedExternal)
-        installed = transaction.result
-        await transaction.commit()
-      },
-    })
-    if (launched?.state !== 'running' || installed === undefined) {
-      throw new Error('full access plugin session was not launched')
-    }
-    return Object.freeze({
-      ...launched,
-      name: installed.name,
-      ...(installed.version === undefined ? {} : { version: installed.version }),
-      fullAccess: true,
-      isolated: true,
-      restartRequired: false,
-    })
-  }
-  const chooseLocalExternalPluginForFreeMode = async () => {
-    const parent = startupRecoveryShell?.window
-    const options = {
-      title: '选择本地插件',
-      properties: ['openFile', 'openDirectory', 'dontAddToRecent'],
-      filters: [{ name: '插件目录或压缩包', extensions: ['tgz'] }],
-    }
-    const selection = parent && !parent.isDestroyed?.()
-      ? await dialog.showOpenDialog(parent, options)
-      : await dialog.showOpenDialog(options)
-    if (selection?.canceled === true || !Array.isArray(selection?.filePaths) || selection.filePaths.length !== 1) {
-      return false
-    }
-    const approval = await getFullAccessPluginApproval()
-    const descriptor = await approval.resolve({ spec: selection.filePaths[0] })
-    let approved = false
-    try {
-      approved = await approval.confirm(descriptor)
-      if (!approved) return false
-      const installationDescriptor = await approval.revalidate(descriptor)
-      await launchAuthorizedFullAccessPlugin(installationDescriptor, {
-        approvedSessionId: approval.launchSessionIdFor(installationDescriptor),
-      })
-      return true
-    } finally {
-      if (approved) await approval.complete(descriptor)
-    }
-  }
-  /**
-   * The Recovery Shell may submit only a remote npm, Git, or HTTPS reference.
-   * Parse it before resolving so a compromised/incorrect shell cannot turn a
-   * text field into a local-path scanner. Local directories and .tgz files
-   * remain available solely through the native picker above.
-   */
-  const loadExternalPluginSourceForFreeMode = async (sourceReference) => {
-    const parsed = parseRemoteExternalPluginReference(sourceReference, { includeBare: true })
-    if (
-      parsed === undefined
-      || !['npm', 'git', 'https'].includes(parsed.sourceType)
-      || /^git\+file:/iu.test(parsed.installSpec)
-    ) {
-      throw new Error('external-plugin-source-must-be-npm-git-or-https')
-    }
-    const approval = await getFullAccessPluginApproval()
-    const descriptor = await approval.resolve({ spec: parsed.installSpec })
-    let approved = false
-    try {
-      approved = await approval.confirm(descriptor)
-      if (!approved) return false
-      const installationDescriptor = await approval.revalidate(descriptor)
-      await launchAuthorizedFullAccessPlugin(installationDescriptor, {
-        approvedSessionId: approval.launchSessionIdFor(installationDescriptor),
-      })
-      return true
-    } finally {
-      if (approved) await approval.complete(descriptor)
-    }
-  }
-  // The first Recovery Shell is intentionally created before the rest of
-  // Desktop admission. Install each action once its main-process implementation
-  // exists, then reveal the non-destructive escape hatches. The shell itself
-  // already owns wrappers for these callbacks, so this needs no recreation.
-  installStartupFreeModeAction(enterFullUserFreeMode)
-  startupRevokeExternalPluginTrust = revokeExternalPluginTrust
-  startupChooseExternalPlugin = chooseLocalExternalPluginForFreeMode
-  startupLoadExternalPluginSource = loadExternalPluginSourceForFreeMode
-  startupCloneExistingProfile = cloneExistingProfileIntoFreeMode
-  if (startupRecoveryState.category === 'startup-preparing') {
-    startupRecoveryState = Object.freeze({
-      ...startupRecoveryState,
-      freeModeAvailable: true,
-    })
-  }
-  // Free Mode is now a fully initialized main-process action.  Only after
-  // that point may ordinary preference/update reads run: if any of them
-  // throws, the already-visible Recovery Shell can still launch the isolated
-  // workbench rather than being left with an uninitialized callback.
   const starPromptStore = new StarPromptStore({ path: join(userData, 'star-prompt-state.json') })
   const closePreferencesStore = new DesktopClosePreferencesStore(desktopPreferencesPath)
   const updateChannelStore = new DesktopUpdateChannelStore(updateChannelPreferencesPath)
@@ -1803,7 +895,6 @@ export async function startElectronApp(metadata) {
   let trayLifecycle
   let closeBehaviorController
   let refreshApplicationMenu = () => {}
-  let pluginSafeModeActive = false
   const getCloseBehavior = () => closeBehavior
   const synchronizeBackgroundMode = () => {
     if (!trayLifecycle) return
@@ -1826,13 +917,10 @@ export async function startElectronApp(metadata) {
     return closeBehavior
   }
   await logStore.append(`[startup] application-ready=${Math.round(applicationReadyAt - applicationStartedAt)}ms`)
-  const launchSafeModeRequested = await launchRequestsSafeMode()
-  if (launchSafeModeRequested) await logStore.append('[plugin-recovery] safe mode requested at launch')
   if (!updateChannelPreference.exists) {
-    const existingDesktopState = await hasExistingDesktopState({ userData, desktopProfileDir })
     const seededChannel = initialUpdateChannel({
       hasPersistedPreference: false,
-      hasExistingDesktopState: existingDesktopState,
+      hasExistingDesktopState: existingHomeAtLaunch,
       appVersion: desktopVersion,
     })
     if (seededChannel === 'beta') {
@@ -1843,208 +931,59 @@ export async function startElectronApp(metadata) {
     }
   }
   const pluginRecoveryStateDir = join(userData, 'plugin-recovery')
-  const migrationTaskStatePath = join(desktopProfileDir, 'state', 'task-board', 'tasks-v3.json')
-  const migrationLegacyTaskStatePath = join(desktopProfileDir, 'state', 'task-board', 'tasks-v2.json')
   const runtimePortStatePath = join(desktopProfileDir, '.dsh-desktop-runtime.json')
-  const migrationPaths = createMigrationPaths({
-    profileDir: desktopProfileDir,
-    stateDir: userData,
-    taskStatePath: migrationTaskStatePath,
-    legacyTaskStatePath: migrationLegacyTaskStatePath,
-    desktopStatePath: desktopWindowStatePath,
-    desktopPreferencesPath,
-    updateChannelPreferencesPath,
-    settingsWindowStatePath,
-    runtimePortPath: runtimePortStatePath,
-    runtimeSupportPath: migrationRuntimeStatePath,
-    pluginRecoveryPath: join(pluginRecoveryStateDir, 'state.json'),
-  })
   const userPluginArchive = new UserPluginArchive({
     profileDir: desktopProfileDir,
     archiveDir: join(userData, 'plugin-archives', 'desktop'),
   })
+  const repairIncidentStore = new RepairIncidentStore({ userDataDir: userData })
   try {
     const recoveredPluginMutation = await userPluginArchive.recover()
     if (recoveredPluginMutation.recovered) {
-      await logStore.append('[plugins] restored an interrupted persistent plugin transaction before migration preflight')
+      await logStore.append('[plugins] restored an interrupted persistent plugin transaction before direct startup')
     }
   } catch (error) {
     await logStore.append(`[plugins] persistent plugin transaction recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'profile-loader-failure',
-      fingerprintSource: 'plugin-archive-recovery-failed',
-      enterFreeMode: enterFullUserFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    return
+    throw error
   }
-  const migrationAssistant = new MigrationAssistant({
-    paths: migrationPaths,
-    storageDir: join(userData, 'migration-assistant'),
-  })
-  const preflightMigration = await preflightDesktopMigrationGate({
-    migrationAssistant,
-    log: (message) => logStore.append(message),
-  })
-  if (startupRecoveryShellClosed) return
-  if (!preflightMigration.bootstrapAllowed) {
-    const migrationPreflightNeedsRepair = preflightMigration.reason === 'migration-preflight-blocked'
-    await showStartupRecoveryShell({
-      category: migrationPreflightNeedsRepair ? 'migration-blocked' : 'migration-interrupted',
-      fingerprintSource: preflightMigration.reason,
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    return
-  }
-  let preflightMigrationPlan = preflightMigration.plan
-  let preflightMigrationJournal = preflightMigration.journal
-  // A user decision closes the purpose-built Recovery Shell before the
-  // migration worker, normal BrowserWindow, or their later anchors exist.
-  // Keep this private, content-free window alive across that exact handoff so
-  // Windows cannot treat the temporary no-window interval as an app exit.
-  let preBootstrapMigrationWindowAnchor
-  const retainPreBootstrapMigrationWindowAnchor = () => {
-    if (preBootstrapMigrationWindowAnchor === undefined) {
-      preBootstrapMigrationWindowAnchor = createPreBootstrapMigrationWindowAnchor({ BrowserWindow })
-    }
-    return preBootstrapMigrationWindowAnchor
-  }
-  const releasePreBootstrapMigrationWindowAnchor = () => {
-    const anchor = preBootstrapMigrationWindowAnchor
-    preBootstrapMigrationWindowAnchor = undefined
-    anchor?.release()
-  }
-  const baselineQuarantine = new DesktopProfileBaselineQuarantine({
-    dshHome,
-    profileDir: desktopProfileDir,
-    stateDir: pluginRecoveryStateDir,
-  })
   const packageResolutionStartedAt = performance.now()
   const runtimePackages = resolveRuntimePackages()
   const runtimeCriticalFiles = resolveRuntimeCriticalFiles()
   await logStore.append(
     `[startup] package-resolution=${Math.round(performance.now() - packageResolutionStartedAt)}ms packages=${runtimePackages.size}`,
   )
-  const profileStartedAt = performance.now()
   let qqBotCredentials
   const qqBotCredentialStore = new QqBotCredentialStore({
     path: join(userData, 'qqbot-credentials.json'),
     safeStorage,
   })
-  const ensureRetryPolicies = async () => {
+  qqBotCredentials = await qqBotCredentialStore.load().catch(async (error) => {
+    await logStore.append(
+      `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return undefined
+  })
+  const ensureProfileForMode = async (mode) => {
+    const profileStartedAt = performance.now()
     try {
-      const result = await ensureApiRetryPolicies({ dshHome })
-      if (result.changed) await logStore.append('[api-retry] added bounded retry defaults to configured providers')
-    } catch (error) {
-      await logStore.append(`[api-retry] settings migration skipped: ${error.message}`)
+      const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
+      if (mode === 'full') {
+        await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
+      }
+      await logStore.append(
+        '[startup] profile-ready=' + Math.round(performance.now() - profileStartedAt) + 'ms packages=' + runtimePackages.size + ' mode=' + mode,
+      )
+      return result
+    } finally {
+      if (mode === 'full') releaseDesktopProfileIngress()
     }
   }
-  const ensureProfile = async () => {
-    const [result] = await Promise.all([
-      ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
-      ensureRetryPolicies(),
-    ])
-    await setQqBotProfileEnabled({ profileDir: result.profileDir, enabled: Boolean(qqBotCredentials) })
-    return result
-  }
-  const resolvePreBootstrapMigration = async () => {
-    // The gate above has already read the recovery store. Do not re-scan here:
-    // a later storage failure must never be mistaken for a no-migration launch.
-    while (preflightMigrationJournal !== undefined) {
-      const active = preflightMigrationJournal
-      if (!shouldAutoContinuePreBootstrapMigration(active)) {
-        await logStore.append(`[migration] journal ${active.id} is not eligible for automatic continuation`).catch(() => {})
-        return false
-      }
-      // Keep Electron alive while a migration-only Runtime/probe starts and
-      // stops before the real main window exists. No migration decision UI is
-      // created; the private snapshot is the rollback boundary.
-      retainPreBootstrapMigrationWindowAnchor()
-      await logStore.append(`[migration] automatically resuming journal ${active.id}`).catch(() => {})
-      try {
-        if (active.confirmationRequired && active.confirmedAt === undefined) {
-          await migrationAssistant.confirmMigration(active.id)
-        }
-        let journal = await migrationAssistant.getJournal(active.id)
-        preflightMigrationJournal = journal
-        for (const step of journal.steps) {
-          if (step.state !== 'pending') continue
-          if (step.id === 'capture-private-snapshot') {
-            journal = await migrationAssistant.completeStep(journal.id, step.id)
-            preflightMigrationJournal = journal
-            continue
-          }
-          if (step.id === 'migrate-profile-state') {
-            await ensureProfile()
-            journal = await migrationAssistant.completeStep(journal.id, step.id)
-            preflightMigrationJournal = journal
-          }
-        }
-        await logStore.append(`[migration] pre-bootstrap journal ${journal.id} accepted before profile/runtime startup`)
-        return true
-      } catch (error) {
-        // Keep the durable journal in place and stop this attempt. Returning
-        // false is important: looping the same failed journal here would pin
-        // startup forever instead of handing control to Free Mode.
-        await logStore.append(`[migration] pre-bootstrap recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-        return false
-      }
-    }
-    return true
-  }
-  if (!(await resolvePreBootstrapMigration())) {
-    releasePreBootstrapMigrationWindowAnchor()
-    await showStartupRecoveryShell({
-      category: 'migration-interrupted',
-      fingerprintSource: 'migration-recovery-session-available',
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    return
-  }
-  let prepared
-  try {
-    prepared = await prepareDesktopRuntimeInputsWithBaselineRecovery({
-      baselineQuarantine,
-      prepareProfile: () => ensureDesktopProfile({ dshHome, packageRoots: runtimePackages }),
-      migrateSettings: ensureRetryPolicies,
-      loadCredentials: () => qqBotCredentialStore.load(),
-      onCredentialError: (error) => logStore.append(
-        `[qqbot] failed to load credentials: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-      onBaselineRecovery: () => logStore.append('[plugin-recovery] unreadable user profile configuration was isolated before runtime startup'),
-    })
-  } catch (error) {
-    await logStore.append(`[profile] bootstrap failed before Runtime startup: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'profile-loader-failure',
-      fingerprintSource: 'profile-bootstrap-failed',
-      enterFreeMode: enterFullUserFreeMode,
-      chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-      loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-      cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-    })
-    // A visible local shell has now taken over the no-window safeguard.
-    releasePreBootstrapMigrationWindowAnchor()
-    return
-  }
-  const profile = prepared.profile
-  qqBotCredentials = prepared.credentials
-  await setQqBotProfileEnabled({ profileDir: profile.profileDir, enabled: Boolean(qqBotCredentials) })
-  await logStore.append(
-    `[startup] profile-ready=${Math.round(performance.now() - profileStartedAt)}ms packages=${runtimePackages.size}`,
-  )
-  let migrationRuntimeWorker = false
+  const ensureProfile = () => ensureProfileForMode('full')
   const desktopRuntimeEnvironment = () => desktopRuntimeEnvironmentFor({
+    credentialEnvironment: legacyCredentialEnvironment,
     qqBotCredentials,
-    backgroundAutomation: !migrationRuntimeWorker,
-    migrationWorker: migrationRuntimeWorker,
-    fullUser: !migrationRuntimeWorker,
+    backgroundAutomation: true,
+    fullUser: true,
   })
   const projectRoot = runtimeWorkspace(app)
   const runtimeBin = await ensurePnpmCommandShim({
@@ -2126,60 +1065,37 @@ export async function startElectronApp(metadata) {
     await logStore.append(
       `[runtime] packaged support assessment blocked stage=${diagnostic.stage} desktop=${diagnostic.desktopVersion} runtime=${diagnostic.runtimeVersion} reason=${diagnostic.reason} errorCode=${diagnostic.errorCode} error=${diagnostic.errorName} message=${diagnostic.errorMessage}`,
     ).catch(() => {})
-    await showStartupRecoveryShell({
-      category: runtimeSupportRepairCategory(runtimeSupportAssessment),
-      fingerprintSource: `${runtimeSupportAssessment.reason}:${runtimeSupportStage}`,
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    const repairCategory = runtimeSupportRepairCategory(runtimeSupportAssessment)
+    productMetrics.recordInstallationRepairRequired(
+      repairCategory === 'runtime-integrity-failed' ? 'integrity-failed' : 'unsupported',
+    )
+    await showDirectStartupState('installation-repair-required')
     return
   }
   if (dshCliPath === undefined || runtimeVersion === undefined) {
-    await showStartupRecoveryShell({
-      category: 'runtime-unavailable',
-      fingerprintSource: dshCliPath === undefined ? 'runtime-cli-unavailable' : 'runtime-version-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
+    productMetrics.recordInstallationRepairRequired('runtime-missing')
+    await showDirectStartupState('installation-repair-required')
     return
   }
   let primaryFullUserPermission
   try {
-    if (freeModePermissionStore === undefined) {
-      throw new Error('durable full-user permission store is unavailable')
-    }
     primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission({
-      permissionStore: freeModePermissionStore,
-      dialog,
-      parentWindow: startupRecoveryShell?.window,
+      permissionStore: fullUserPermissionStore,
     })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime authorization failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'local-state-unavailable',
-      fingerprintSource: 'primary-runtime-permission-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
-    return
+    throw error
   }
   if (primaryFullUserPermission.approved !== true) {
     await logStore.append('[permission] primary Runtime full-user authorization was not granted').catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'permission-required',
-      fingerprintSource: 'primary-runtime-permission-required',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
-    return
+    throw new Error('primary Runtime full-user authorization was not granted')
   }
   let primaryFullUserOverlay
   try {
     primaryFullUserOverlay = await writePrimaryFullUserOverlay({ userData })
   } catch (error) {
     await logStore.append(`[permission] primary Runtime overlay preparation failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    await showStartupRecoveryShell({
-      category: 'local-state-unavailable',
-      fingerprintSource: 'primary-runtime-overlay-unavailable',
-    })
-    releasePreBootstrapMigrationWindowAnchor()
-    return
+    throw error
   }
   const desktopCapabilities = [...new Set(
     Object.values(DESKTOP_SURFACES).flatMap((surface) => desktopContractForSurface(surface).capabilities),
@@ -2201,27 +1117,17 @@ export async function startElectronApp(metadata) {
       lockfileSha256: knownGoodRuntimeEvidence?.lockfile.sha256,
     },
     resolvePackageVersion: (name) => resolvePackageVersion(name, {
-      profileDir: profile.profileDir,
+      profileDir: desktopProfileDir,
       anchors: [import.meta.url],
     }),
   })
   const pluginRecoveryStore = new PluginRecoveryStore({
-    profileDir: profile.profileDir,
+    profileDir: desktopProfileDir,
     stateDir: pluginRecoveryStateDir,
     builtInBundles: BUILTIN_BUNDLES,
   })
-  if (prepared.baselineRecovered) {
-    const incident = await pluginRecoveryStore.recordIncident({
-      identified: false,
-      reasonCode: 'untrusted-profile-bootstrap',
-      summary: '检测到无法读取的用户配置，已暂时切换到桌面基线以恢复启动',
-      technicalDetails: 'Desktop isolated unreadable user profile configuration before runtime startup',
-    })
-    await pluginRecoveryStore.setSafeMode(true)
-    await pluginRecoveryStore.resolveIncident(incident.id, 'baseline-quarantine-bootstrap')
-  }
   const pluginManager = new PluginManager({
-    profileDir: profile.profileDir,
+    profileDir: desktopProfileDir,
     hostCompatibility,
     pathEntries: runtimePathEntries,
     profileArchive: userPluginArchive,
@@ -2230,41 +1136,6 @@ export async function startElectronApp(metadata) {
       label: event?.name ? `${event.type}: ${event.name}` : event?.type ?? '插件变更前',
     }),
   })
-  const compatibilityStartedAt = performance.now()
-  let compatibilityReconciliation
-  try {
-    compatibilityReconciliation = await pluginManager.reconcileCompatibility({
-      preserveAllEnabled: true,
-    })
-  } catch (error) {
-    if (!isPluginPackageInspectionFailure(error)) throw error
-    await logStore.append(`[plugin-recovery] community package inspection failed before runtime startup: ${error instanceof Error ? error.message : String(error)}`)
-    const recovered = await recoverProfileAfterPluginInspectionFailure({
-      pluginManager,
-      store: pluginRecoveryStore,
-      ensureProfile,
-      error,
-      log: (line) => logStore.append(line),
-    })
-    if (!recovered.recovered) throw error
-    compatibilityReconciliation = await pluginManager.reconcileCompatibility({
-      preserveAllEnabled: true,
-    })
-  }
-  try {
-    await pluginManager.writeCompatibilityLock()
-  } catch (error) {
-    // This diagnostic is derived data. It must not turn a runnable Desktop
-    // profile into a permanent launch failure after recovery already succeeded.
-    await logStore.append(`[plugins] compatibility diagnostic refresh skipped: ${error instanceof Error ? error.message : String(error)}`)
-  }
-  await logStore.append(
-    `[startup] compatibility-ready=${Math.round(performance.now() - compatibilityStartedAt)}ms disabled=${compatibilityReconciliation.disabled.length}`,
-  )
-  for (const plugin of compatibilityReconciliation.disabled) {
-    await logStore.append(`[plugins] disabled incompatible community bundle: ${plugin.name}`)
-  }
-
   const preferredRuntimePort = await selectPreferredRuntimePort(runtimePortStatePath).catch(async (error) => {
     await logStore.append(`[port] failed to read preferred port: ${error instanceof Error ? error.message : String(error)}`)
     return 0
@@ -2275,39 +1146,32 @@ export async function startElectronApp(metadata) {
     if (Number.isInteger(portState?.port) && portState.port > 0 && portState.port <= 65_535) legacyRuntimePort = portState.port
   } catch (error) {
     if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) {
-      await logStore.append(`[migration] legacy runtime port state could not be read: ${error instanceof Error ? error.message : String(error)}`)
+      await logStore.append(`[runtime] legacy port state could not be read: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const rawRuntimeController = new DshRuntimeController({
+  const createPrimaryRuntimeController = (profileName) => new DshRuntimeController({
     cliPath: dshCliPath,
     cwd: projectRoot,
     dshHome,
-    profileName: 'desktop',
+    profileName,
     executable: process.execPath,
     logStore,
     autoRestart: false,
     startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
     pathEntries: runtimePathEntries,
-    patchFilesProvider: () => migrationRuntimeWorker ? [] : [primaryFullUserOverlay],
+    patchFiles: [primaryFullUserOverlay],
     preferredPort: preferredRuntimePort,
     onReadyPort: (port) => persistRuntimePort(runtimePortStatePath, port),
     environmentProvider: desktopRuntimeEnvironment,
     preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
   })
-  runtimeProvider = new DshRuntimeProvider({
-    controller: rawRuntimeController,
-    ensureProfile,
-    dshHome,
-    profileName: 'desktop',
-    upstreamVersion: runtimeVersion,
-    desktopVersion,
-    runtimeIdentity: {
+  const runtimeIdentity = {
       packageName: '@deepseek-ai/dsh',
       version: runtimeVersion,
       cliRelativePath: 'lib/bin.js',
-    },
-    supportEvidence: {
+    }
+  const runtimeSupportEvidence = {
       manifestSchemaVersion: 1,
       source: 'package-and-lockfile',
       matrix: runtimeSupportAssessment,
@@ -2319,43 +1183,35 @@ export async function startElectronApp(metadata) {
           lockfileSha256: knownGoodRuntimeEvidence.lockfile.sha256,
         },
       }),
-    },
+    }
+  const rawRuntimeController = createPrimaryRuntimeController('desktop')
+  const builtinsRuntimeController = createPrimaryRuntimeController('desktop-builtins')
+  const fullRuntimeProvider = new DshRuntimeProvider({
+    controller: rawRuntimeController,
+    ensureProfile,
+    dshHome,
+    profileName: 'desktop',
+    upstreamVersion: runtimeVersion,
+    desktopVersion,
+    runtimeIdentity,
+    supportEvidence: runtimeSupportEvidence,
     supportStatus: runtimeSupportAssessment.status,
   })
-  const installManagedGitForRecovery = async () => {
-    const outcome = await managedGitRuntimeService.repair([runtimeBin])
-    if (outcome.status === 'managed-git-cancelled') return false
-    if (!['bundled', 'managed', 'system'].includes(outcome.source)) return false
-
-    // `repair()` returns either the ambient system-Git entries unchanged, or
-    // a cmd directory whose archive, executable bytes, and Git identity were
-    // validated by the main-process service. This remains controller-local;
-    // neither process.env nor a Windows PATH/registry setting is changed.
-    rawRuntimeController.pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, outcome.pathEntries)
-    await logStore.append(`[managed-git] recovery completed with ${outcome.status}`).catch(() => {})
-    void runtimeProvider.recover().catch(async (error) => {
-      await logStore.append(
-        `[managed-git] Runtime retry after managed Git recovery failed: ${error instanceof Error ? error.name : 'unknown'}`,
-      ).catch(() => {})
-    })
-    return true
-  }
-  try {
-    await writeMigrationRuntimeSupportState(migrationRuntimeStatePath, {
-      schemaVersion: 1,
-      desktopVersion,
-      status: runtimeSupportAssessment.status,
-      providerId: RUNTIME_PROVIDER_ID,
-      runtimeVersion,
-      matrixArtifact: 'runtime-support/supported-runtimes.json',
-      ...(knownGoodRuntimeEvidence === undefined ? {} : {
-        integrity: knownGoodRuntimeEvidence.integrity,
-        lockfileSha256: knownGoodRuntimeEvidence.lockfile.sha256,
-      }),
-    })
-  } catch (error) {
-    await logStore.append(`[migration] runtime support state could not be recorded: ${error instanceof Error ? error.message : String(error)}`)
-  }
+  const builtinsRuntimeProvider = new DshRuntimeProvider({
+    controller: builtinsRuntimeController,
+    ensureProfile: () => ensureProfileForMode('builtins'),
+    dshHome,
+    profileName: 'desktop-builtins',
+    upstreamVersion: runtimeVersion,
+    desktopVersion,
+    runtimeIdentity,
+    supportEvidence: runtimeSupportEvidence,
+    supportStatus: runtimeSupportAssessment.status,
+  })
+  runtimeProvider = new ActiveRuntimeProvider({
+    providers: [fullRuntimeProvider, builtinsRuntimeProvider],
+    activeProfileName: 'desktop',
+  })
   const presetService = new PresetService({
     dshHome,
     desktopVersion,
@@ -2371,359 +1227,41 @@ export async function startElectronApp(metadata) {
     ensureProfile,
     builtInBundles: BUILTIN_BUNDLES,
     log: (line) => logStore.append(line),
-    baselineQuarantine,
+    automatic: false,
   })
-  const initialRecoveryState = await pluginRecovery.initialize()
-  pluginSafeModeActive = initialRecoveryState.safeMode === true
-  const onPluginRecoveryStatus = (state) => {
-    pluginSafeModeActive = state?.safeMode === true
-    void trayLifecycle?.refresh()
-  }
-  pluginRecovery.on('status', onPluginRecoveryStatus)
-  const migrationPlanSummary = (plan) => plan === undefined
-    ? Object.freeze({ status: 'not-started' })
-    : Object.freeze({
-        status: plan.status,
-        sourceVersion: plan.sourceVersion,
-        targetVersion: plan.targetVersion,
-        blockers: [...plan.blockers],
-        confirmations: [...plan.confirmations],
-      })
-  let migrationDiagnostics = Object.freeze({
-    preflight: migrationPlanSummary(preflightMigrationPlan),
-    lastOutcome: 'not-started',
+  await pluginRecovery.initialize()
+  await pluginRecovery.restoreForDirectStartup().catch(async (error) => {
+    await logStore.append(`[plugins] prior disabled-plugin restoration failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
   })
-  const recordMigrationOutcome = (outcome, plan = preflightMigrationPlan) => {
-    migrationDiagnostics = Object.freeze({
-      preflight: migrationPlanSummary(plan),
-      lastOutcome: outcome,
+  let compatibilityInspection
+  const inspectCompatibilityAfterReady = () => {
+    if (compatibilityInspection !== undefined) return compatibilityInspection
+    compatibilityInspection = (async () => {
+      const startedAt = performance.now()
+      const diagnostic = await pluginManager.inspectCompatibility()
+      await logStore.append(
+        `[plugins] compatibility diagnostic ready=${Math.round(performance.now() - startedAt)}ms incompatible=${diagnostic.incompatible.length} unknown=${diagnostic.unknown.length} unavailable=${diagnostic.unavailable.length}`,
+      )
+      await pluginManager.writeCompatibilityLock().catch(async (error) => {
+        await logStore.append(`[plugins] compatibility lock refresh skipped: ${error instanceof Error ? error.name : 'unknown'}`)
+      })
+      return diagnostic
+    })().catch(async (error) => {
+      await logStore.append(`[plugins] compatibility inspection skipped: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
+      return undefined
     })
-  }
-  const writeCurrentMigrationRuntimeState = () => writeMigrationRuntimeSupportState(migrationRuntimeStatePath, {
-    schemaVersion: 1,
-    desktopVersion,
-    status: runtimeSupportAssessment.status,
-    providerId: RUNTIME_PROVIDER_ID,
-    runtimeVersion,
-    matrixArtifact: 'runtime-support/supported-runtimes.json',
-    ...(knownGoodRuntimeEvidence === undefined ? {} : {
-      integrity: knownGoodRuntimeEvidence.integrity,
-      lockfileSha256: knownGoodRuntimeEvidence.lockfile.sha256,
-    }),
-  })
-  const ensureMigrationRuntime = async () => {
-    if (!migrationRuntimeWorker) {
-      throw new Error('migration runtime must be quiesced before it starts')
-    }
-    if (runtimeProvider.status?.state !== 'ready') await runtimeProvider.start()
-  }
-  const inspectLegacyV2TaskState = async () => {
-    let raw
-    try {
-      raw = await readFile(migrationLegacyTaskStatePath, 'utf8')
-    } catch (error) {
-      if (error?.code === 'ENOENT') return undefined
-      throw new Error('legacy Task v2 state could not be read', { cause: error })
-    }
-    let value
-    try {
-      value = JSON.parse(raw)
-    } catch {
-      throw new Error('legacy Task v2 state is malformed and was not replaced')
-    }
-    if (value?.schemaVersion !== 2 || !Array.isArray(value.tasks)) {
-      throw new Error('legacy Task v2 state has an unsupported required major or shape')
-    }
-    return Object.freeze({ taskCount: value.tasks.length })
-  }
-  const migrateTaskLedgerState = async ({ sourceVersion } = {}) => {
-    const [legacyV2, priorV3] = await Promise.all([
-      inspectLegacyV2TaskState(),
-      readFile(migrationTaskStatePath).then(() => true, (error) => {
-        if (error?.code === 'ENOENT') return false
-        throw error
-      }),
-    ])
-    await ensureMigrationRuntime()
-    const runtimeUrl = runtimeProvider.status?.url
-    if (typeof runtimeUrl !== 'string') throw new Error('Task ledger migration could not resolve the local Runtime URL')
-    const origin = new URL(runtimeUrl)
-    if (origin.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) {
-      throw new Error('Task ledger migration refused a non-loopback Runtime origin')
-    }
-    const endpoint = new URL('/api/dsh-task-board/v3', runtimeUrl).toString()
-    // A v3 ledger is already authoritative. Inspect it before asking for the
-    // legacy browser origin: a 2.6/2.7 profile may legitimately have no saved
-    // old port once its Host ledger is present, and must not be blocked or
-    // create a hidden renderer merely to discover that fact.
-    const hostBefore = await inspectHostTaskLedger({ endpoint })
-    if (!shouldReadLegacyTaskStorage(hostBefore)) {
-      if (legacyV2 !== undefined && !priorV3) {
-        if (hostBefore.v2MigrationStatus !== 'complete' || hostBefore.taskCount !== legacyV2.taskCount) {
-          throw new Error('Task v2-to-v3 verification failed; the v2 source and rollback snapshot were retained')
-        }
-      }
-      return Object.freeze({ status: 'host-ledger-present', ...hostBefore })
-    }
-    assertLegacyTaskOrigin({
-      sourceVersion,
-      hasV2Source: legacyV2 !== undefined,
-      hostLedgerEmpty: true,
-      recordedPort: legacyRuntimePort,
-      runtimeUrl,
-    })
-    let probeWindow
-    const getLegacyValue = async () => {
-      probeWindow ??= new BrowserWindow({
-        show: false,
-        skipTaskbar: true,
-        webPreferences: {
-          contextIsolation: true,
-          sandbox: true,
-          nodeIntegration: false,
-          spellcheck: false,
-        },
-      })
-      const probeUrl = createMigrationProbeUrl(runtimeUrl)
-      const removeNavigationPolicy = installMigrationProbeNavigationPolicy({
-        webContents: probeWindow.webContents,
-        probeUrl,
-      })
-      const removeContentSecurityPolicy = installMigrationProbeContentSecurityPolicy({
-        session: probeWindow.webContents.session,
-        webContents: probeWindow.webContents,
-      })
-      // This is the only renderer before the main Desktop window exists. It
-      // receives an explicit deny-all handler; the regular renderer replaces
-      // it with its narrow clipboard policy after recovery completes.
-      denyMigrationProbePermissions(probeWindow.webContents.session)
-      try {
-        await probeWindow.loadURL(probeUrl)
-      } finally {
-        removeNavigationPolicy()
-        removeContentSecurityPolicy()
-      }
-      // The old ledger is read from the exact preserved loopback origin. The
-      // page has a response CSP with scripts/network disabled, and the
-      // task-board probe guard rejects application, so no scheduler or task
-      // execution can occur while this bounded value is in memory.
-      return probeWindow.webContents.executeJavaScript(`(() => {
-        const value = localStorage.getItem(${JSON.stringify(LEGACY_TASK_LEDGER_KEY)})
-        if (value !== null && new TextEncoder().encode(value).byteLength > ${LEGACY_TASK_LEDGER_MAX_BYTES}) {
-          throw new Error('legacy task ledger exceeds the safe migration size')
-        }
-        return value
-      })()`, true)
-    }
-    try {
-      const result = await migrateLegacyTaskLedger({
-        endpoint,
-        getLegacyValue,
-      })
-      if (legacyV2 !== undefined && !priorV3) {
-        if (result.v2MigrationStatus !== 'complete' || result.taskCount !== legacyV2.taskCount) {
-          throw new Error('Task v2-to-v3 verification failed; the v2 source and rollback snapshot were retained')
-        }
-      }
-      return result
-    } finally {
-      if (probeWindow && !probeWindow.isDestroyed()) probeWindow.destroy()
-    }
-  }
-  const applyMigrationStep = async (step, journal = undefined) => {
-    switch (step.id) {
-      case 'capture-private-snapshot':
-        // beginMigration already captured and verified the exact allowlist.
-        return
-      case 'migrate-profile-state':
-        // Reuse the long-lived 2.x Profile migrator rather than duplicating
-        // package/link ownership logic in the recovery surface.
-        await ensureProfile()
-        return
-      case 'migrate-legacy-task-state':
-        // GET forces the Host's copy-first v2->v3 transition; a hidden
-        // loopback-origin probe then copies v1 only after count/hash readback.
-        // Both sources remain intact and are covered by the private snapshot.
-        await migrateTaskLedgerState({ sourceVersion: journal?.sourceVersion })
-        return
-      case 'verify-runtime-support':
-        if (!['known-good', 'supported'].includes(runtimeSupportAssessment.status)) {
-          throw new Error('the current Runtime is not eligible for a 3.0 migration')
-        }
-        await writeCurrentMigrationRuntimeState()
-        return
-      default:
-        throw new Error('migration step is not recognized by the Desktop recovery surface')
-    }
-  }
-  const completePreBootstrapMigration = async () => {
-    const active = preflightMigrationJournal
-      ?? (await migrationAssistant.listJournals()).find((journal) => journal.state === 'started' || journal.state === 'step-complete')
-    if (!active) return undefined
-    const wasRunning = runtimeProvider.status?.state === 'ready'
-    const previousMigrationWorker = migrationRuntimeWorker
-    migrationRuntimeWorker = true
-    try {
-      const completed = await migrationAssistant.resumeMigration(active.id, {
-        confirmed: true,
-        applyStep: applyMigrationStep,
-      })
-      if (!completed.resumed || completed.journal.state !== 'committed') {
-        throw new Error('the pre-bootstrap migration still requires explicit recovery')
-      }
-      preflightMigrationPlan = undefined
-      preflightMigrationJournal = undefined
-      recordMigrationOutcome('committed')
-      await logStore.append(`[migration] pre-bootstrap journal ${completed.journal.id} committed before DSH Web startup`)
-      return completed.journal
-    } finally {
-      // The temporary loopback Runtime is only a migration worker. Stop it
-      // before the normal surface is eligible to load so no live renderer can
-      // read/write profile or scheduler state during recovery.
-      if (!wasRunning && runtimeProvider.status?.state === 'ready') await runtimeProvider.stop()
-      migrationRuntimeWorker = previousMigrationWorker
-    }
-  }
-  if (preflightMigrationJournal !== undefined) {
-    retainPreBootstrapMigrationWindowAnchor()
-    try {
-      await completePreBootstrapMigration()
-    } catch (error) {
-      recordMigrationOutcome('interrupted')
-      await logStore.append(`[migration] pre-bootstrap journal remains recoverable: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-      releasePreBootstrapMigrationWindowAnchor()
-      await showStartupRecoveryShell({
-        category: 'migration-interrupted',
-        fingerprintSource: 'pre-bootstrap-migration-incomplete',
-        enterFreeMode: enterFullUserFreeMode,
-        chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-        loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-        cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-      })
-      return
-    }
-  }
-  const withQuiescedMigrationRuntime = async (operation) => {
-    const wasRunning = runtimeProvider.status?.state === 'ready'
-    const previousMigrationWorker = migrationRuntimeWorker
-    if (wasRunning) await runtimeProvider.stop()
-    migrationRuntimeWorker = true
-    try {
-      return await operation()
-    } finally {
-      migrationRuntimeWorker = previousMigrationWorker
-      if (wasRunning && runtimeProvider.status?.state !== 'ready') {
-        await runtimeProvider.start().catch(async (error) => {
-          await logStore.append(`[migration] runtime restart after recovery failed: ${error instanceof Error ? error.message : String(error)}`)
-        })
-      }
-    }
-  }
-  let migrationOperation = Promise.resolve()
-  const openMigrationAssistant = () => {
-    const operation = migrationOperation.then(async () => {
-      const active = (await migrationAssistant.listJournals())
-        .find((journal) => journal.state === 'started' || journal.state === 'step-complete')
-      if (active) {
-        const resumed = await withQuiescedMigrationRuntime(() => migrationAssistant.resumeMigration(active.id, {
-          confirmed: true,
-          applyStep: applyMigrationStep,
-        }))
-        recordMigrationOutcome(resumed.journal.state)
-        return Object.freeze({ status: resumed.journal.state, journalId: resumed.journal.id })
-      }
-
-      const plan = preflightMigrationPlan ?? await migrationAssistant.planMigration()
-      if (plan === undefined) return Object.freeze({ status: 'not-required' })
-      if (plan.status === 'blocked') {
-        recordMigrationOutcome('blocked', plan)
-        return Object.freeze({ status: 'blocked', blockers: [...plan.blockers] })
-      }
-
-      try {
-        const completed = await withQuiescedMigrationRuntime(async () => {
-          const journal = await migrationAssistant.beginMigration(plan, { confirmed: true })
-          return migrationAssistant.resumeMigration(journal.id, { confirmed: true, applyStep: applyMigrationStep })
-        })
-        preflightMigrationPlan = undefined
-        preflightMigrationJournal = undefined
-        recordMigrationOutcome(completed.journal.state, plan)
-        return Object.freeze({ status: completed.journal.state, journalId: completed.journal.id })
-      } catch (error) {
-        recordMigrationOutcome('interrupted', plan)
-        throw error
-      }
-    })
-    migrationOperation = operation.catch(() => {})
-    return operation
+    return compatibilityInspection
   }
   const qqBotBinding = new QqBotBindingService({
     initialCredentials: qqBotCredentials,
     credentialStore: qqBotCredentialStore,
     startQrConnect: startQqBotConnector,
-    setProfileEnabled: (enabled) => setQqBotProfileEnabled({ profileDir: profile.profileDir, enabled }),
+    setProfileEnabled: (enabled) => setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled }),
     setRuntimeCredentials: (credentials) => { qqBotCredentials = credentials },
     restartRuntime: () => runtimeProvider.recover(),
     onEventError: (error) => logStore.append(`[qqbot] event delivery failed: ${error instanceof Error ? error.message : String(error)}`),
   })
 
-  const statePath = desktopWindowStatePath
-  const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
-  const state = await loadWindowState(statePath, screen.getAllDisplays())
-  const surfaceRegistry = new DesktopSurfaceRegistry()
-  mainWindow = new BrowserWindow({
-    ...state,
-    minWidth: 720,
-    minHeight: 540,
-    show: false,
-    title: metadata.productName,
-    icon: appIcon,
-    backgroundColor: '#040814',
-    ...windowChromeBrowserOptions(),
-    webPreferences: {
-      preload: MAIN_PRELOAD_PATH,
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      spellcheck: false,
-    },
-  })
-  releasePreBootstrapMigrationWindowAnchor()
-  const unregisterMainSurface = surfaceRegistry.register(mainWindow.webContents, DESKTOP_SURFACES.MAIN)
-  applyWindowIcon(mainWindow, appIcon)
-  const removeEditContextMenu = installEditContextMenu({ webContents: mainWindow.webContents, Menu })
-  const removeMainWindowChrome = installWindowChrome({
-    browserWindow: mainWindow,
-    iconDataUrl: windowChromeIconDataUrl,
-    showHelpMenu: true,
-    showToolsMenu: true,
-    onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
-  })
-  const removeConversationPolish = installConversationPolish({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[conversation-polish] ${error.message}`),
-  })
-  const removeConversationSkills = installConversationSkills({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[conversation-skills] ${error.message}`),
-  })
-  const removeUpdateSurface = installUpdateSurface({
-    browserWindow: mainWindow,
-    onError: (error) => void logStore.append(`[update-surface] ${error.message}`),
-  })
-  const removeStarPromptSurface = installStarPromptSurface({
-    browserWindow: mainWindow,
-    forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
-    onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
-  })
-  if (state.maximized) mainWindow.maximize()
-  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
-  let activeOrigin
-  let communityWindow
-  let communityWindowPromise
-  let updateController
-  let updateChannelWriteQueue = Promise.resolve()
   const persistUpdateChannel = (channel) => {
     const operation = updateChannelWriteQueue.then(async () => {
       const previous = updateController?.getChannel?.() ?? updateChannel
@@ -2742,8 +1280,6 @@ export async function startElectronApp(metadata) {
     updateChannelWriteQueue = operation.catch(() => {})
     return operation
   }
-  let safeModeNoticeShown = false
-
   installNavigationPolicy({
     webContents: mainWindow.webContents,
     getRuntimeOrigin: () => activeOrigin,
@@ -2806,15 +1342,17 @@ export async function startElectronApp(metadata) {
       arch: process.arch,
     },
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
-    migration: migrationDiagnostics,
+    repairIncidentStore,
+    startupAttempt: latestStartupAttempt,
     redactionRoots: [
-      { path: profile.profileDir, replacement: '<desktop-profile>' },
+      { path: desktopProfileDir, replacement: '<desktop-profile>' },
       { path: userData, replacement: '<desktop-user-data>' },
       { path: dshHome, replacement: '<dsh-home>' },
       { path: projectRoot, replacement: '<workspace>' },
     ],
   })
 
+  unregisterStartupIpc()
   const unregisterIpc = registerDesktopIpc({
     ipcMain,
     surfaceRegistry,
@@ -2828,7 +1366,6 @@ export async function startElectronApp(metadata) {
     ensureProfile,
     openLogs: () => shell.openPath(logsDirectory),
     exportDiagnostics,
-    openMigrationAssistant,
     exitApp: () => app.quit(),
     handleHelpAction: (action) => {
       if (action === 'community') return createCommunityWindow()
@@ -2843,6 +1380,42 @@ export async function startElectronApp(metadata) {
       return shell.openExternal(PRIVACY_POLICY_URL)
     },
     handleToolAction: (action) => action === 'terminal' ? toggleDesktopTerminal() : createExtensionWindow(),
+    claimDockEntry: async () => {
+      productMetrics.recordDockImpression()
+      try {
+        const showNudge = await dockNudgeStore.claimLaunch()
+        if (showNudge) productMetrics.recordDockNudgeShown()
+        return showNudge
+      } catch (error) {
+        await logStore.append(`[dock] nudge state unavailable: ${error instanceof Error ? error.name : 'unknown'}`)
+        return false
+      }
+    },
+    dismissDockNudge: async (reason) => {
+      try {
+        const dismissed = await dockNudgeStore.dismiss()
+        if (dismissed) productMetrics.recordDockNudgeDismissed(reason)
+        return dismissed
+      } catch (error) {
+        await logStore.append(`[dock] nudge dismissal unavailable: ${error instanceof Error ? error.name : 'unknown'}`)
+        return false
+      }
+    },
+    openExtensionDock: async () => {
+      productMetrics.recordDockClick()
+      try {
+        const dismissed = await dockNudgeStore.dismiss()
+        if (dismissed) productMetrics.recordDockNudgeDismissed('clicked')
+      } catch {}
+      try {
+        await createExtensionWindow()
+        productMetrics.recordDockOpened(true)
+        return true
+      } catch (error) {
+        productMetrics.recordDockOpened(false)
+        throw error
+      }
+    },
     onPluginInstallRequest: async (spec) => {
       // Mirrors the .dshpreset handoff: validate in Electron main, open the
       // Extension Dock, and deliver only the structured install source. The
@@ -2872,6 +1445,14 @@ export async function startElectronApp(metadata) {
       }
     },
     getUpdateController: () => updateController,
+    getRepairStatus: async () => {
+      const incident = await repairIncidentStore.latest()
+      if (incident !== undefined) return incident
+      return repairAvailabilityReason === undefined
+        ? undefined
+        : { reason: repairAvailabilityReason, canRetry: true }
+    },
+    retryRepair: () => repairRetry(),
     getUpdateChannel: () => updateController?.getChannel?.() ?? updateChannel,
     setUpdateChannel: persistUpdateChannel,
     confirmUpdateChannelChange: async ({ from, to }) => {
@@ -2890,7 +1471,6 @@ export async function startElectronApp(metadata) {
     },
     getSettingsWindowBounds: () => settingsWindowStateStore.load(),
     setSettingsWindowBounds: (bounds) => settingsWindowStateStore.save(bounds),
-    onRecoveryAction: (action) => productMetrics.recordRecovery(action),
     onSettingsOpened: () => productMetrics.recordSurface('settings'),
     onUpdateCheck: () => productMetrics.recordSurface('updates'),
     notificationService,
@@ -2898,7 +1478,7 @@ export async function startElectronApp(metadata) {
     getRuntimeOrigin: () => activeOrigin,
     // This closes over Electron main's controller only. The opaque per-Host
     // capability never enters preload, the browser Contract, or status data.
-    getWorkspaceFileOpenToken: () => rawRuntimeController.getWorkspaceFileOpenToken(),
+    getWorkspaceFileOpenToken: () => runtimeProvider.getWorkspaceFileOpenToken(),
     getBackgroundStatus: () => ({
       enabled: isBackgroundAutomationEnabled(closeBehavior),
       closeBehavior,
@@ -2923,6 +1503,13 @@ export async function startElectronApp(metadata) {
         diagnostics: catalog.diagnostics.map((item) => ({ error: item.error })),
       }
     },
+  })
+  mainWindowChromeReady = true
+  await applyWindowChrome({
+    webContents: mainWindow.webContents,
+    iconDataUrl: windowChromeIconDataUrl,
+    showHelpMenu: true,
+    showToolsMenu: true,
   })
 
   const createExtensionWindow = async () => {
@@ -3052,45 +1639,33 @@ export async function startElectronApp(metadata) {
     return operation
   }
 
-  // Full-access plugin descriptors remain in Electron main. After native
-  // source confirmation, local bytes are staged and installed transactionally
-  // into the persistent Desktop profile; no temporary Runtime is created.
-  let resolveFullAccessPlugin = fullAccessApprovalUnavailable
-  let confirmFullAccessPlugin = fullAccessApprovalUnavailable
-  let revalidateFullAccessPlugin = fullAccessApprovalUnavailable
-  let completeFullAccessPlugin = fullAccessApprovalUnavailable
-  try {
-    const approval = await getFullAccessPluginApproval()
-    resolveFullAccessPlugin = approval.resolve
-    confirmFullAccessPlugin = approval.confirm
-    const persistentPluginStagingDirectory = (descriptor) => join(
-      userData,
-      'plugin-staging',
-      approval.launchSessionIdFor(assertExternalPluginDescriptor(descriptor)),
-    )
-    revalidateFullAccessPlugin = async (descriptor) => {
-      const revalidated = assertExternalPluginDescriptor(await approval.revalidate(descriptor))
-      if ((revalidated.fingerprintKind ?? 'content') !== 'content') return revalidated
-      return stageExternalPluginSource(revalidated, {
-        stagingDirectory: persistentPluginStagingDirectory(descriptor),
-      })
-    }
-    completeFullAccessPlugin = async (descriptor) => {
-      try {
-        await approval.complete(descriptor)
-      } finally {
-        await rm(persistentPluginStagingDirectory(descriptor), { recursive: true, force: true }).catch(() => {})
-      }
-    }
-  } catch (error) {
-    await logStore.append(
-      `[free-mode] full-access plugin approval unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
-    ).catch(() => {})
+  // Normal plugin installation is already an explicit user action. Keep the
+  // source descriptor private to Electron main, revalidate it, and install it
+  // transactionally without a second trust or compatibility decision.
+  const persistentPluginSourceResolver = new ExternalPluginSourceResolver({ baseDir: desktopProfileDir })
+  const resolveFullAccessPlugin = ({ spec }) => persistentPluginSourceResolver.resolve(spec)
+  const persistentPluginStagingDirectory = (descriptor) => join(
+    userData,
+    'plugin-staging',
+    assertExternalPluginDescriptor(descriptor).candidateId.slice('sha256:'.length),
+  )
+  const revalidateFullAccessPlugin = async (descriptor) => {
+    const revalidated = await revalidateExternalPluginSource(descriptor, {
+      resolver: persistentPluginSourceResolver,
+    })
+    if ((revalidated.fingerprintKind ?? 'content') !== 'content') return revalidated
+    return stageExternalPluginSource(revalidated, {
+      stagingDirectory: persistentPluginStagingDirectory(descriptor),
+    })
+  }
+  const completeFullAccessPlugin = async (descriptor) => {
+    await rm(persistentPluginStagingDirectory(descriptor), { recursive: true, force: true }).catch(() => {})
   }
 
   const communityMarket = createCommunityMarketService({
     fetch: (input, options) => net.fetch(input, options),
   })
+  let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
     ipcMain,
     surfaceRegistry,
@@ -3110,12 +1685,12 @@ export async function startElectronApp(metadata) {
     notificationService,
     communityMarket,
     resolveFullAccessPlugin,
-    confirmFullAccessPlugin,
     revalidateFullAccessPlugin,
     completeFullAccessPlugin,
     revokeFullUserTrust,
     exportDiagnostics,
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
+    onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
   })
   dispatchDeepLink = async (link) => {
     if (link.kind === 'extensions' || link.kind === 'preset-preview') {
@@ -3132,6 +1707,7 @@ export async function startElectronApp(metadata) {
     mainWindow.focus()
   }
   dispatchPresetFile = async (path) => {
+    await desktopProfileIngressReady
     try {
       const plan = await presetService.previewFile(path)
       const window = await createExtensionWindow()
@@ -3145,66 +1721,31 @@ export async function startElectronApp(metadata) {
   pendingPresetFiles.clear()
   const loadStartup = async () => {
     activeOrigin = undefined
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const preview = process.env.DSH_DESKTOP_STARTUP_PREVIEW_STATE
-      await mainWindow.loadFile(STARTUP_PATH, preview ? { query: { preview } } : undefined)
-    }
+    const preview = process.env.DSH_DESKTOP_STARTUP_PREVIEW_STATE
+    await loadStartupSurface(preview ? { query: { preview } } : undefined)
   }
   let releaseStartupSurface
   const startupSurfaceReady = new Promise((resolve) => { releaseStartupSurface = resolve })
   let runtimeStartedAt
+  let startupRuntimePromise
   const showRuntime = async (status, runtimeReadyAt) => {
     await startupSurfaceReady
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
+    void inspectCompatibilityAfterReady()
     activeOrigin = new URL(status.url).origin
     try {
       await mainWindow.loadURL(status.url)
       deepLinkRouter.setReady(true)
-      // A repaired Runtime can become ready after the normal window has
-      // already been shown. Close only the recovery window's intentional
-      // quit-on-close hook after the real Desktop surface finished loading.
-      await dismissStartupRecoveryShell().catch(async (error) => {
-        await logStore.append(
-          `[recovery-shell] failed to dismiss after Runtime recovery: ${error instanceof Error ? error.name : 'unknown'}`,
-        ).catch(() => {})
-      })
       const rendererLoadedAt = performance.now()
+      productMetrics.recordDirectStartReady({
+        detail: existingHomeAtLaunch ? 'existing-home' : 'fresh-home',
+        durationMs: rendererLoadedAt - applicationStartedAt,
+      })
       void logStore.append(`[startup] renderer-loaded=${Math.round(rendererLoadedAt - runtimeReadyAt)}ms`)
       void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
-      try {
-        const recoveryState = await pluginRecovery.getState()
-        if (recoveryState.safeMode && !safeModeNoticeShown && process.env.DSH_DESKTOP_SMOKE_EXIT !== '1') {
-          safeModeNoticeShown = true
-          const baselineQuarantineActive = recoveryState.baselineQuarantineAvailable === true
-          const recoveryDetail = baselineQuarantineActive
-            ? '无法识别的用户加载配置已被暂时隔离。可在插件恢复中恢复原始配置。'
-            : `${recoveryState.disabledPlugins.length} plugin(s) are disabled. Review recovery details in Extension Dock.`
-          void notificationService.show({
-            category: 'plugin-recovery',
-            id: 'plugin-recovery:safe-mode:current',
-            title: 'DeepSeek Harness is in plugin safe mode',
-            body: recoveryDetail,
-            deepLink: 'dsh://extensions',
-          }).catch(() => {})
-          const notice = await dialog.showMessageBox(mainWindow, {
-            type: 'warning',
-            title: '插件安全模式',
-            message: '当前仅加载内置插件',
-            detail: baselineQuarantineActive
-              ? '无法识别的用户插件加载配置已被暂时隔离。你可以打开“插件恢复”恢复原始配置；聊天记录和个人设置不会受影响。'
-              : `有 ${recoveryState.disabledPlugins.length} 个插件处于停用状态。你可以打开“插件恢复”查看原因并一键恢复；聊天记录和个人设置不会受影响。`,
-            buttons: ['打开插件恢复', '稍后'],
-            defaultId: 0,
-            cancelId: 1,
-            noLink: true,
-          })
-          if (notice.response === 0) await createExtensionWindow()
-        }
-      } catch (error) {
-        void logStore.append(`[plugin-recovery] failed to show safe-mode notice: ${error instanceof Error ? error.message : String(error)}`)
-      }
       if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
+        await startupRuntimePromise
         console.log(`desktop smoke ready: ${activeOrigin}`)
         app.quit()
       }
@@ -3226,53 +1767,394 @@ export async function startElectronApp(metadata) {
       void showRuntime(status, runtimeReadyAt)
     } else if (['crashed', 'stopping', 'restarting'].includes(status.state)) {
       deepLinkRouter.setReady(false)
-      if (!mainWindow.webContents.getURL().startsWith('file:')) void loadStartup().catch(() => {})
+      if (
+        runtimeStatusNeedsStartupSurface(status, { extensionMaintenance: extensionRuntimeMaintenance })
+        && !mainWindow.webContents.getURL().startsWith('file:')
+      ) void loadStartup().catch(() => {})
       if (status.state === 'crashed') {
         const category = runtimeStartupRepairCategory(status)
-        // A crashed user/profile plugin can be retried in the isolated
-        // full-user session after native confirmation. On Windows, a missing
-        // Git has one separate, fixed-artifact repair path; a damaged
-        // packaged dependency closure still remains shell-only.
-        void showStartupRecoveryShell({
-          category,
-          fingerprintSource: `runtime-crashed:${category}`,
-          ...(category === 'external-tool-missing' && process.platform === 'win32'
-            ? { installManagedGit: installManagedGitForRecovery }
-            : category === 'plugin-startup-failure'
-            ? {
-                enterFreeMode: enterFullUserFreeMode,
-                chooseExternalPlugin: chooseLocalExternalPluginForFreeMode,
-                loadExternalPluginSource: loadExternalPluginSourceForFreeMode,
-                cloneExistingProfile: cloneExistingProfileIntoFreeMode,
-              }
-            : {}),
-        }).catch(async (error) => {
-          await logStore.append(`[recovery-shell] failed to open after Runtime crash: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
+        const detail = category === 'plugin-startup-failure'
+          ? 'plugin-startup'
+          : category === 'external-tool-missing'
+          ? 'runtime-missing'
+          : category === 'packaged-dependency-missing'
+          ? 'integrity-failed'
+          : 'startup-failed'
+        productMetrics.recordFullStartFailed({
+          detail,
+          durationMs: runtimeStartedAt === undefined ? 0 : performance.now() - runtimeStartedAt,
         })
       }
     }
   })
-
-  mainWindow.once('ready-to-show', () => {
-    if (!updateShutdownRequested) mainWindow.show()
-    void dismissStartupRecoveryShell().catch(async (error) => {
-      await logStore.append(`[recovery-shell] failed to dismiss after main window became ready: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    })
-  })
-  mainWindow.on('closed', () => { mainWindow = undefined })
-  if (launchSafeModeRequested) {
-    await pluginRecovery.prepareSafeMode()
-    // The recovery service publishes asynchronously. Mark this synchronously
-    // so a close immediately after a safe-mode launch cannot hide the shell.
-    pluginSafeModeActive = true
-  }
   const holdRuntime = process.env.DSH_DESKTOP_HOLD_STARTUP === '1'
+  const repairRuntime = new RepairRuntimeController({
+    ensureProfile: () => ensureDesktopProfile({
+      dshHome,
+      packageRoots: runtimePackages,
+      mode: 'repair',
+    }),
+    createController: ({ profileName, preferredPort: repairPort, patchFiles, environment }) => new DshRuntimeController({
+      cliPath: dshCliPath,
+      cwd: projectRoot,
+      dshHome,
+      profileName,
+      executable: process.execPath,
+      logStore: { append: async () => {} },
+      autoRestart: false,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
+      pathEntries: runtimePathEntries,
+      patchFiles,
+      preferredPort: repairPort,
+      environmentProvider: () => Object.freeze({
+        ...legacyCredentialEnvironment,
+        ...environment,
+      }),
+      preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
+    }),
+  })
+  const createCandidateProbe = async ({ fingerprint, staged }) => {
+    const candidateProfileName = `desktop-candidate-${fingerprint.slice(0, 16)}`
+    if (!/^desktop-candidate-[a-f0-9]{16}$/u.test(candidateProfileName)) {
+      throw new Error('candidate profile name is invalid')
+    }
+    const candidateProfileDir = join(dshHome, 'profiles', candidateProfileName)
+    const cleanup = async () => rm(candidateProfileDir, { recursive: true, force: true })
+    await cleanup()
+    await ensureDesktopProfile({
+      dshHome,
+      packageRoots: runtimePackages,
+      mode: 'full',
+      profileName: candidateProfileName,
+    })
+    await cp(join(staged.workspace, 'profile'), candidateProfileDir, {
+      recursive: true,
+      force: true,
+    })
+    for (const root of staged.roots.filter(entry => entry.kind === 'plugin')) {
+      const target = join(candidateProfileDir, 'node_modules', ...root.packageName.split('/'))
+      await rm(target, { recursive: true, force: true })
+      await mkdir(dirname(target), { recursive: true })
+      await symlink(join(staged.workspace, root.relativePath), target, 'junction')
+    }
+    const controller = new DshRuntimeController({
+      cliPath: dshCliPath,
+      cwd: projectRoot,
+      dshHome,
+      profileName: candidateProfileName,
+      executable: process.execPath,
+      logStore: { append: async () => {} },
+      autoRestart: false,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
+      pathEntries: runtimePathEntries,
+      patchFiles: [primaryFullUserOverlay],
+      preferredPort: 0,
+      environmentProvider: () => desktopRuntimeEnvironmentFor({
+        credentialEnvironment: legacyCredentialEnvironment,
+        qqBotCredentials: undefined,
+        backgroundAutomation: false,
+        fullUser: true,
+      }),
+      preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
+    })
+    const stop = controller.stop.bind(controller)
+    const forceStop = controller.forceStop.bind(controller)
+    let cleaned = false
+    const cleanupOnce = async () => {
+      if (cleaned) return
+      cleaned = true
+      await cleanup()
+    }
+    controller.stop = async () => {
+      try {
+        await stop()
+      } finally {
+        await cleanupOnce()
+      }
+    }
+    controller.forceStop = async () => {
+      try {
+        await forceStop()
+      } finally {
+        await cleanupOnce()
+      }
+    }
+    return controller
+  }
+  const automaticRepair = new AutomaticRepairRunner({
+    incidentStore: repairIncidentStore,
+    desktopVersion,
+    runtimeVersion,
+    profileDir: desktopProfileDir,
+    builtInBundles: BUILTIN_BUNDLES,
+    createTransaction: async ({ incidentDir, fingerprint, roots }) => {
+      const manager = new RepairTransactionManager({
+        archive: userPluginArchive,
+        incidentDir,
+        profileDir: desktopProfileDir,
+        roots,
+      })
+      return manager.begin({ incidentFingerprint: fingerprint })
+    },
+    createCommands: (staged) => discoverAutomaticRepairCommands({
+      staged,
+      pnpmCli: resolvePnpmCliPath(),
+    }),
+    repairRuntime,
+    publishState: showDirectStartupState,
+    createVerifier: ({ fingerprint, staged, commands }) => new RepairVerifier({
+      registeredChecks: createRegisteredRepairChecks({
+        commands,
+        workspace: staged.workspace,
+      }),
+      createProbe: () => createCandidateProbe({ fingerprint, staged }),
+    }),
+  })
+  let builtinsFallbackDetail = 'full-retry-failed'
+  let builtinsRollbackFailed = false
+  let repairToolsCapabilityForJob = 'auto'
+  let repairFallbackModelsForJob
+  let retryInProgress = false
+  const repairReasonForAvailability = (availability) => availability?.reason === 'unsupported-tools'
+    ? 'unsupported-tools'
+    : availability?.reason === 'missing-credentials'
+      ? 'missing-credentials'
+      : 'no-model'
+  const runAutomaticRepair = async (input) => {
+    const repairStartedAt = performance.now()
+    productMetrics.recordRepairAgentStarted('default-model')
+    let result
+    try {
+      result = await automaticRepair.run({
+        ...input,
+        defaultToolsCapability: repairToolsCapabilityForJob,
+        fallbackModels: repairFallbackModelsForJob ?? automaticRepair.fallbackModels,
+      })
+    } catch {
+      // The runner owns its internal error boundary; this guard only keeps an
+      // unexpected escape from leaving the started metric without its outcome.
+      builtinsFallbackDetail = 'repair-failed'
+      repairAvailabilityReason = 'repair-failed'
+      productMetrics.recordRepairAgentFailed({
+        detail: 'model-error',
+        durationMs: performance.now() - repairStartedAt,
+      })
+      return Object.freeze({ status: 'failed', reason: 'repair-host-failed' })
+    }
+    if (result.status === 'applied') {
+      return Object.freeze({
+        ...result,
+        async commit() {
+          await result.commit()
+          productMetrics.recordRepairAgentSucceeded({
+            detail: result.modelDetail,
+            durationMs: performance.now() - repairStartedAt,
+          })
+        },
+        async rollback() {
+          try {
+            await result.rollback()
+            productMetrics.recordRepairAgentFailed({
+              detail: 'restart-failed',
+              durationMs: performance.now() - repairStartedAt,
+            })
+          } catch (error) {
+            productMetrics.recordRepairAgentFailed({
+              detail: 'rollback-failed',
+              durationMs: performance.now() - repairStartedAt,
+            })
+            throw error
+          }
+        },
+      })
+    }
+    builtinsFallbackDetail = result.reason === 'budget-exhausted'
+      ? 'budget-exhausted'
+      : result.reason === 'model-unavailable'
+        ? 'no-model'
+        : 'repair-failed'
+    repairAvailabilityReason = builtinsFallbackDetail
+    productMetrics.recordRepairAgentFailed({
+      detail: result.reason === 'budget-exhausted'
+        ? 'budget-exhausted'
+        : result.reason === 'model-unavailable'
+          ? 'model-unavailable'
+          : result.reason === 'timed-out'
+            ? 'timeout'
+            : result.reason?.includes('verification') || result.reason === 'check-failed'
+              ? 'verification-failed'
+              : 'model-error',
+      durationMs: performance.now() - repairStartedAt,
+    })
+    return result
+  }
+  repairRetry = async () => {
+    if (retryInProgress) return { accepted: false }
+    let availability
+    try {
+      availability = await resolveRepairModelAvailability({
+        dshHome,
+        compatibilityEnvironment: legacyCredentialEnvironment,
+        fallbackModels: automaticRepair.fallbackModels,
+      })
+    } catch {
+      builtinsFallbackDetail = 'no-model'
+      repairAvailabilityReason = 'no-model'
+      return { accepted: false, reason: 'no-model' }
+    }
+    if (availability?.available !== true) {
+      const reason = repairReasonForAvailability(availability)
+      builtinsFallbackDetail = reason
+      repairAvailabilityReason = reason
+      return { accepted: false, reason }
+    }
+    repairAvailabilityReason = undefined
+    retryInProgress = true
+    try {
+      app.relaunch()
+      app.quit()
+      return { accepted: true }
+    } catch {
+      retryInProgress = false
+      builtinsFallbackDetail = 'full-retry-failed'
+      repairAvailabilityReason = 'full-retry-failed'
+      return { accepted: false, reason: 'full-retry-failed' }
+    }
+  }
+  const startupCoordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => runtimeProvider.provider(profileName),
+    canRepair: async (input) => {
+      const blockingProfileFailure = (input?.failureDetails ?? []).find((detail) => (
+        detail?.failurePhase === 'profile-bootstrap'
+        && detail.failureCategory !== DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE
+      ))
+      if (blockingProfileFailure !== undefined) {
+        repairToolsCapabilityForJob = 'auto'
+        repairFallbackModelsForJob = undefined
+        builtinsFallbackDetail = blockingProfileFailure.failureCategory === DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE
+          ? 'profile-permission'
+          : blockingProfileFailure.failureCategory === DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE
+            ? 'profile-installation'
+            : 'profile-failed'
+        repairAvailabilityReason = builtinsFallbackDetail
+        return false
+      }
+      const availability = await resolveRepairModelAvailability({
+        dshHome,
+        compatibilityEnvironment: legacyCredentialEnvironment,
+        fallbackModels: automaticRepair.fallbackModels,
+      })
+      if (!availability.available) {
+        repairToolsCapabilityForJob = 'auto'
+        repairFallbackModelsForJob = undefined
+        builtinsFallbackDetail = availability.reason === 'unsupported-tools'
+          ? 'unsupported-tools'
+          : availability.reason === 'missing-credentials'
+            ? 'missing-credentials'
+            : 'no-model'
+        repairAvailabilityReason = builtinsFallbackDetail
+      }
+      if (availability.available) {
+        repairToolsCapabilityForJob = availability.toolsCapability ?? 'auto'
+        repairFallbackModelsForJob = availability.fallbackModels
+        repairAvailabilityReason = undefined
+      }
+      return availability.available
+    },
+    runRepair: runAutomaticRepair,
+    activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
+    onOutcome: async (outcome) => {
+      // Terminal coordinator outcomes that would otherwise stay inside the
+      // returned promise must remain observable in logs, metrics, and the
+      // startup surface instead of being swallowed by detached consumers.
+      if (outcome?.state === 'builtins-start-failed') {
+        await logStore.append(
+          '[startup] builtins fallback failed to start; no same-Home fallback remains',
+        ).catch(() => {})
+        productMetrics.recordRepairAgentFailed({
+          detail: 'builtins-start-failed',
+          durationMs: performance.now() - applicationStartedAt,
+        })
+        await showDirectStartupState('system-startup-failed').catch(() => {})
+        return
+      }
+      if (outcome?.state === 'ready-builtins' && outcome.rollbackFailed === true) {
+        builtinsRollbackFailed = true
+        await logStore.append(
+          '[startup] repaired full start rolled back; rollback did not fully converge',
+        ).catch(() => {})
+      }
+    },
+    classifyFailure: (error) => classifyDesktopProfileBootstrapFailure(error),
+    publishAttempt: async (detail) => {
+      const safeProfile = typeof detail?.profileName === 'string'
+        && /^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(detail.profileName)
+        ? detail.profileName
+        : 'unknown'
+      const safeEvent = ['started', 'failed', 'ready'].includes(detail?.event) ? detail.event : 'unknown'
+      const safePhase = ['full', 'full-repaired', 'builtins'].includes(detail?.phase) ? detail.phase : 'unknown'
+      const safeFailureCategory = Object.values(DESKTOP_PROFILE_FAILURE_CATEGORIES).includes(detail?.failureCategory)
+        ? detail.failureCategory
+        : 'none'
+      const safeAttempt = Number.isInteger(detail?.startupAttempt) ? detail.startupAttempt : 0
+      const safeDirectAttempt = Number.isInteger(detail?.directAttempt) ? detail.directAttempt : 0
+      const safeDuration = Number.isFinite(detail?.durationMs) ? Math.max(0, Math.round(detail.durationMs)) : 0
+      latestStartupAttempt = Object.freeze({
+        bootId,
+        startupAttempt: safeAttempt,
+        directAttempt: safeDirectAttempt,
+        profileName: safeProfile,
+        runtimePid: Number.isInteger(runtimeProvider?.status?.pid) && runtimeProvider.status.pid > 0
+          ? runtimeProvider.status.pid
+          : undefined,
+        phase: safePhase,
+        event: safeEvent,
+        failureCategory: safeFailureCategory,
+        durationMs: safeDuration,
+      })
+      await logStore.append(
+        `[startup-attempt] bootId=${bootId} startupAttempt=${safeAttempt}`
+        + ` directAttempt=${safeDirectAttempt} profile=${safeProfile} phase=${safePhase}`
+        + ` event=${safeEvent} failureCategory=${safeFailureCategory} durationMs=${safeDuration}`,
+      )
+    },
+    publishState: async (state) => {
+      if (state === 'starting-builtins') {
+        await showDirectStartupState('retrying-full')
+        return
+      }
+      if (['starting-full', 'retrying-full', 'repairing'].includes(state)) {
+        await showDirectStartupState(state)
+      }
+      if (state === 'rolling-back') await showDirectStartupState('repairing')
+      if (state === 'ready-full') await recordDirectStartupState(state)
+      if (state === 'ready-builtins') {
+        const fallbackReason = builtinsRollbackFailed ? 'rollback-failed' : builtinsFallbackDetail
+        await showDirectStartupState(state, { reason: fallbackReason })
+        productMetrics.recordBuiltinsFallbackReady({
+          detail: fallbackReason,
+          durationMs: performance.now() - applicationStartedAt,
+        })
+        const latestRepair = await repairIncidentStore.latest().catch(() => undefined)
+        await notificationService.show(
+          builtinsFallbackNotification(latestRepair?.fingerprint, fallbackReason),
+        ).catch(() => {})
+      }
+    },
+  })
   const startup = beginDesktopStartup({
     loadShell: loadStartup,
-    startRuntime: () => runtimeProvider.start(),
+    startRuntime: () => startupCoordinator.start(),
     holdRuntime,
   })
-  void startup.runtimePromise?.catch(() => {})
+  startupRuntimePromise = startup.runtimePromise
+  void startup.runtimePromise?.catch((error) => {
+    // A rejected coordinator promise (including a failed builtins fallback)
+    // must stay diagnosable instead of vanishing into an anonymous fault page.
+    void logStore.append(
+      `[startup] coordinator terminated: ${error instanceof Error ? error.message : 'unknown'}`,
+    ).catch(() => {})
+  })
   await startup.shellPromise
   if (process.env.DSH_DESKTOP_OPEN_EXTENSIONS === '1') await createExtensionWindow()
   if (process.env.DSH_DESKTOP_OPEN_COMMUNITY === '1') await createCommunityWindow()
@@ -3302,12 +2184,7 @@ export async function startElectronApp(metadata) {
         removeConversationPolish,
         removeEditContextMenu,
         removeMainWindowChrome,
-        unregisterMainSurface,
-        unregisterIpc,
-        unregisterExtensionIpc,
-        () => activeFreeModeLauncher?.dispose(),
         () => trayLifecycle?.dispose(),
-        () => pluginRecovery.off('status', onPluginRecoveryStatus),
         () => pluginRecovery.dispose(),
         () => qqBotBinding.dispose(),
       ]
@@ -3320,10 +2197,21 @@ export async function startElectronApp(metadata) {
       }
     },
   })
+  let rendererIpcFinalized = false
+  const finalizeRendererIpc = () => {
+    if (rendererIpcFinalized) return
+    rendererIpcFinalized = true
+    unregisterMainSurface()
+    unregisterIpc()
+    void unregisterExtensionIpc().catch((error) => {
+      void logStore.append(
+        `[shutdown] ${error instanceof Error ? error.message : String(error)}`,
+      ).catch(() => {})
+    })
+  }
 
   const closeBypassReason = () => {
     if (quitInProgress || updateShutdownRequested) return 'quit-in-progress'
-    if (pluginSafeModeActive) return 'safe-mode'
     if (runtimeProvider.status?.state === 'crashed') return 'runtime-crashed'
     return undefined
   }
@@ -3417,6 +2305,14 @@ export async function startElectronApp(metadata) {
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
     beforeInstall: async () => {
+      if (productTelemetry.enabled && typeof updateController?.status?.version === 'string') {
+        await updateAnalyticsReceiptStore.recordInstallRequested({
+          sourceVersion: desktopVersion,
+          targetVersion: updateController.status.version,
+        }).catch((error) => logStore.append(
+          `[telemetry] update receipt write failed: ${error instanceof Error ? error.name : 'unknown'}`,
+        ))
+      }
       closeBehaviorController?.beginExplicitQuit()
       quitInProgress = true
       await shutdownLifecycle.stop()
@@ -3494,7 +2390,6 @@ export async function startElectronApp(metadata) {
       return shell.openExternal(PRIVACY_POLICY_URL)
     },
     openLogs,
-    openMigrationAssistant,
     checkForUpdates: (options) => {
       productMetrics.recordSurface('updates')
       return updateController.check(options)
@@ -3520,25 +2415,9 @@ export async function startElectronApp(metadata) {
         void logStore.append(`[shutdown] quit deferred because runtime stop failed: ${message}`).catch(() => {})
       })
   })
-  app.on('will-quit', () => closeBehaviorController?.beginExplicitQuit())
-  app.on('window-all-closed', () => app.quit())
-    },
-    showRecoveryShell: () => {
-      // If no main-process Free Mode implementation was installed yet, do
-      // not leave an already-clicked recovery button waiting forever. When it
-      // was installed, `fail()` is a no-op and the existing isolated action
-      // remains available through this late startup failure.
-      failStartupFreeModeAction()
-      return showStartupRecoveryShell({
-        category: 'unknown',
-        fingerprintSource: 'post-shell-startup-failure',
-        // The boundary covers late startup work as well as the migration and
-        // Runtime-admission branches above. The shell retains its established
-        // Electron-main actions here; these are deliberately not references to
-        // run()'s local bindings, which are out of scope for this sibling
-        // callback after a late startup exception.
-      })
-    },
-    log: (line) => logStore.append(line),
+  app.on('will-quit', () => {
+    closeBehaviorController?.beginExplicitQuit()
   })
+  app.on('quit', finalizeRendererIpc)
+  app.on('window-all-closed', () => app.quit())
 }

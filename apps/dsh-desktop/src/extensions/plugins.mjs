@@ -24,7 +24,6 @@ const PROTECTED_PACKAGES = new Set([
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
 ])
-const PLUGIN_PROFILE_SCOPES = new Set(['desktop', 'isolated-free-mode'])
 const MAX_PNPM_PATH_ENTRIES = 64
 const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i
@@ -142,6 +141,53 @@ export function validatePluginSpec(value) {
     throw new TypeError(`invalid plugin package spec: ${JSON.stringify(value)}`)
   }
   return { name, spec: value }
+}
+
+function gitPrepareAllowBuildFromError(error, installSpec) {
+  if (typeof installSpec !== 'string' || !installSpec.startsWith('github:')) return undefined
+  const message = error instanceof Error ? error.message : String(error)
+  if (!message.includes('[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED]')) return undefined
+
+  const sourceMatch = /^github:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(#path:[^\s]+)?$/u.exec(installSpec)
+  const allowMatch = /(?:^|\r?\n)allowBuilds:\s*\r?\n[ \t]+([^\r\n]{1,4096}): true(?:\r?\n|$)/u.exec(message)
+  if (sourceMatch === null || allowMatch === null) return undefined
+
+  const allowedBuild = allowMatch[1]
+  if (/\s|[\0\r\n]/u.test(allowedBuild) || allowedBuild.startsWith('-')) return undefined
+  const urlSeparator = allowedBuild.lastIndexOf('@https://')
+  if (urlSeparator <= 0) return undefined
+  const packageName = allowedBuild.slice(0, urlSeparator)
+  let parsedPackage
+  try {
+    parsedPackage = validatePluginSpec(packageName)
+  } catch {
+    return undefined
+  }
+  if (parsedPackage.name !== packageName || parsedPackage.version !== undefined) return undefined
+
+  let buildUrl
+  try {
+    buildUrl = new URL(allowedBuild.slice(urlSeparator + 1))
+  } catch {
+    return undefined
+  }
+  if (
+    buildUrl.protocol !== 'https:'
+    || buildUrl.hostname !== 'codeload.github.com'
+    || buildUrl.username
+    || buildUrl.password
+    || buildUrl.search
+  ) return undefined
+  const pathMatch = /^\/([^/]+)\/([^/]+)\/tar\.gz\/([a-f0-9]{40,64})$/iu.exec(buildUrl.pathname)
+  if (pathMatch === null) return undefined
+  const expectedOwner = sourceMatch[1].toLowerCase()
+  const expectedRepository = sourceMatch[2].replace(/\.git$/iu, '').toLowerCase()
+  if (pathMatch[1].toLowerCase() !== expectedOwner || pathMatch[2].toLowerCase() !== expectedRepository) {
+    return undefined
+  }
+  const expectedHash = sourceMatch[3] ?? ''
+  if (buildUrl.hash !== expectedHash) return undefined
+  return allowedBuild
 }
 
 export function createPluginInventory(manifest, {
@@ -418,7 +464,6 @@ export class PluginManager {
     executable = process.execPath,
     registry = new PluginRegistry(),
     hostCompatibility,
-    profileScope = 'desktop',
     pathEntries = [],
     beforeMutation = async () => {},
     profileArchive,
@@ -429,8 +474,6 @@ export class PluginManager {
     this.executable = executable
     this.registry = registry
     this.hostCompatibility = hostCompatibility
-    if (!PLUGIN_PROFILE_SCOPES.has(profileScope)) throw new TypeError('plugin profile scope is invalid')
-    this.profileScope = profileScope
     this.pathEntries = normalizePnpmPathEntries(pathEntries)
     if (typeof beforeMutation !== 'function') throw new TypeError('beforeMutation must be a function')
     this.beforeMutation = beforeMutation
@@ -483,6 +526,56 @@ export class PluginManager {
       const lock = createDesktopPluginsLock(inventory)
       await this.#writeCompatibilityLock(inventory, lock)
       return lock
+    })
+  }
+
+  /**
+   * Inspect the enabled community bundle set without changing the Profile.
+   * Missing, malformed, or unreadable third-party manifests become bounded
+   * diagnostic rows so the Runtime still gets the first real load attempt.
+   */
+  inspectCompatibility() {
+    return this.#enqueue(async () => {
+      const manifest = await readManifest(this.profileDir)
+      const enabledBundles = new Set(manifest.dsh?.profile?.bundles ?? [])
+      const communityNames = Object.keys(manifest.dependencies ?? {})
+        .filter((name) => !PROTECTED_PACKAGES.has(name) && enabledBundles.has(name))
+        .toSorted()
+      const diagnostic = {
+        changed: false,
+        compatible: [],
+        incompatible: [],
+        unknown: [],
+        unavailable: [],
+      }
+      for (const name of communityNames) {
+        let installed
+        try {
+          installed = await readInstalledManifest(this.profileDir, name)
+        } catch {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'manifest-unreadable' }))
+          continue
+        }
+        if (installed === undefined) {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'manifest-missing' }))
+          continue
+        }
+        let compatibility
+        try {
+          compatibility = await this.#assess(installed)
+        } catch {
+          diagnostic.unavailable.push(Object.freeze({ name, reason: 'assessment-unavailable' }))
+          continue
+        }
+        diagnostic[compatibility.status].push(Object.freeze({
+          name,
+          reasons: compatibility.reasons,
+        }))
+      }
+      return Object.freeze(Object.fromEntries(Object.entries(diagnostic).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? Object.freeze(value) : value,
+      ])))
     })
   }
 
@@ -588,25 +681,12 @@ export class PluginManager {
   }
 
   prepare(rawSpec, { allowUnknown = false } = {}) {
+    if (typeof allowUnknown !== 'boolean') throw new TypeError('allowUnknown must be a boolean')
     const parsed = validatePluginSpec(rawSpec)
     return this.#enqueue(async () => {
       if (PROTECTED_PACKAGES.has(parsed.name)) throw new Error(`${parsed.name} is a built-in desktop plugin`)
       const candidate = await this.registry.fetchManifest(parsed.name, requestedVersion(parsed))
       const compatibility = await this.#assess(candidate)
-      if (compatibility.status === 'incompatible') {
-        throw compatibilityError(
-          `${parsed.name}@${candidate.version} is incompatible with this desktop runtime`,
-          'plugin-incompatible',
-          compatibility,
-        )
-      }
-      if (compatibility.status === 'unknown' && !allowUnknown) {
-        throw compatibilityError(
-          `${parsed.name}@${candidate.version} does not declare desktop compatibility`,
-          'plugin-compatibility-unknown',
-          compatibility,
-        )
-      }
       const spec = `${parsed.name}@${candidate.version}`
       await this.#runPnpm(['store', 'add', spec])
       return Object.freeze({
@@ -657,20 +737,6 @@ export class PluginManager {
           throw new Error(`registry candidate identity does not match ${parsed.spec}`)
         }
         const compatibility = await this.#assess(candidate)
-        if (compatibility.status === 'incompatible') {
-          throw compatibilityError(
-            `${parsed.name}@${candidate.version} is incompatible with this desktop runtime`,
-            'plugin-incompatible',
-            compatibility,
-          )
-        }
-        if (compatibility.status === 'unknown' && !allowUnknown) {
-          throw compatibilityError(
-            `${parsed.name}@${candidate.version} does not declare desktop compatibility`,
-            'plugin-compatibility-unknown',
-            compatibility,
-          )
-        }
         const integrity = candidate.dist?.integrity
         if (typeof integrity !== 'string' || !SHA512_INTEGRITY_PATTERN.test(integrity)) {
           throw new Error(`${parsed.name}@${candidate.version} does not publish a valid sha512 integrity`)
@@ -754,10 +820,6 @@ export class PluginManager {
         if (typeof installed.dsh?.bundle?.patch !== 'string') {
           throw new Error(`${prepared.name} is not a DSH bundle package`)
         }
-        const compatibility = await this.#assess(installed)
-        if (compatibility.status === 'incompatible') {
-          throw new Error(`${prepared.spec} became incompatible after installation`)
-        }
         const manifest = await readManifest(this.profileDir)
         const bundles = new Set(manifest.dsh?.profile?.bundles ?? [])
         bundles.add(prepared.name)
@@ -835,10 +897,6 @@ export class PluginManager {
           }
           if (typeof installed.dsh?.bundle?.patch !== 'string') {
             throw new Error(`${item.name} is not a DSH bundle package`)
-          }
-          const compatibility = await this.#assess(installed)
-          if (compatibility.status === 'incompatible') {
-            throw new Error(`${item.spec} became incompatible after installation`)
           }
         }
 
@@ -987,8 +1045,7 @@ export class PluginManager {
   */
   installFullAccessExternal(descriptor) {
     const external = assertExternalPluginDescriptor(descriptor)
-    const mayReplaceManagedIdentity = this.profileScope === 'isolated-free-mode'
-    if (!mayReplaceManagedIdentity && external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
+    if (external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
       throw new Error(`${external.package.name} is a built-in desktop plugin and cannot be replaced by an external source`)
     }
     const installSpec = external.installSpec
@@ -1009,19 +1066,29 @@ export class PluginManager {
       try {
         snapshot = await captureProfileSnapshot(this.profileDir)
         const beforeManifest = await readManifest(this.profileDir)
-        await this.#runPnpm(['add', installSpec, '--save-exact'])
+        const addArgs = ['add', installSpec, '--save-exact']
+        try {
+          await this.#runPnpm(addArgs)
+        } catch (error) {
+          const allowedBuild = gitPrepareAllowBuildFromError(error, installSpec)
+          if (allowedBuild === undefined) throw error
+          await this.#runPnpm([...addArgs, `--allow-build=${allowedBuild}`])
+        }
         const manifest = await readManifest(this.profileDir)
         const name = installedExternalPackageName(beforeManifest, manifest, external)
         // Opaque remote sources declare their package identity only after pnpm
         // materializes them. Check again here, inside the snapshot-backed
         // transaction, so a same-name core package is restored rather than
         // persisted into the normal Desktop profile.
-        if (!mayReplaceManagedIdentity && PROTECTED_PACKAGES.has(name)) {
+        if (PROTECTED_PACKAGES.has(name)) {
           throw new Error(`${name} is a built-in desktop plugin and cannot be replaced by an external source`)
         }
         const installed = await readInstalledManifest(this.profileDir, name)
         if (installed === undefined) {
           throw new Error(`full-access external install did not materialize ${name}`)
+        }
+        if (typeof installed.dsh?.bundle?.patch !== 'string') {
+          throw new Error(`${name} is not a DSH bundle package`)
         }
         const version = typeof installed.version === 'string'
           ? installed.version
@@ -1154,14 +1221,6 @@ export class PluginManager {
       if (enabled) {
         const installed = await readInstalledManifest(this.profileDir, name)
         if (typeof installed?.dsh?.bundle?.patch !== 'string') throw new Error(`${name} is not a DSH bundle package`)
-        const compatibility = await this.#assess(installed)
-        if (compatibility.status === 'incompatible') {
-          throw compatibilityError(
-            `${name} is incompatible with this desktop runtime`,
-            'plugin-incompatible',
-            compatibility,
-          )
-        }
       }
       const profile = manifest.dsh?.profile ?? {}
       const bundles = new Set(profile.bundles ?? [])

@@ -17,6 +17,7 @@ const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-directory-picker-e2e-'))
 const dshHome = resolve(temporary, 'dsh-home')
 const userData = resolve(temporary, 'user-data')
 let electronApp
+const processOutput = []
 
 async function waitForRuntimeWindow(application, timeoutMs) {
   const deadline = Date.now() + timeoutMs
@@ -53,8 +54,14 @@ try {
       DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
   })
-  electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
-  electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
+  electronApp.process().stdout?.on('data', (chunk) => {
+    processOutput.push(String(chunk))
+    process.stdout.write(chunk)
+  })
+  electronApp.process().stderr?.on('data', (chunk) => {
+    processOutput.push(String(chunk))
+    process.stderr.write(chunk)
+  })
   const startupPage = await electronApp.firstWindow()
   let page
   try {
@@ -126,3 +133,8 @@ try {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })
 }
+assert.doesNotMatch(
+  processOutput.join(''),
+  /No handler registered for 'desktop:(?:window-chrome-theme|update-status|contract)'/u,
+  'Desktop removed renderer IPC handlers before the final window shutdown completed',
+)

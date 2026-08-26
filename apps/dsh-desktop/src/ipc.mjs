@@ -12,11 +12,27 @@ import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 
-const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit'])
+const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
 const HELP_ACTIONS = new Set(['community', 'downloads', 'feedback', 'project', 'privacy', 'updates'])
 const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
+const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
+const REPAIR_STATES = new Set(['claimed', 'running', 'verified', 'applied', 'rolled-back', 'exhausted'])
+const REPAIR_UNAVAILABLE_REASONS = new Set([
+  'full-retry-failed',
+  'missing-credentials',
+  'no-model',
+  'unsupported-tools',
+  'repair-failed',
+  'budget-exhausted',
+  'profile-permission',
+  'profile-installation',
+  'profile-failed',
+])
+const SAFE_REPAIR_NAME = /^[a-zA-Z0-9@._/+:-]{1,128}$/u
+const SAFE_REPAIR_CHECK = /^[a-z0-9][a-z0-9-]{0,79}$/u
+const SAFE_REPAIR_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9@._+/-]{1,320}$/u
 const SAFE_PLUGIN_NAME = /^(?:@[a-z0-9][a-z0-9._-]{0,127}\/)?[a-z0-9][a-z0-9._-]{0,127}$/u
 const SAFE_RECOVERY_LOADER_ID = /^[a-z0-9][a-z0-9._:-]{0,127}$/u
 const RECOVERY_REASON_CODES = new Set([
@@ -39,6 +55,7 @@ const RECOVERY_RESOLUTIONS = new Set([
   'baseline-quarantine-bootstrap',
   'legacy-false-positive-repaired',
   'restored-by-user',
+  'restored-by-direct-start',
 ])
 const RECOVERY_SUMMARIES = Object.freeze({
   unknown: '启动恢复需要处理。',
@@ -193,6 +210,125 @@ export function publicUpdateStatus(status) {
   }
 }
 
+/**
+ * Give the first local startup page only the read-only IPC it renders before
+ * the complete runtime and Desktop services have been constructed. The full
+ * registration replaces these handlers synchronously later in startup.
+ */
+export function registerDesktopStartupIpc({
+  ipcMain,
+  surfaceRegistry,
+  setWindowChromeTheme,
+} = {}) {
+  if (typeof ipcMain?.handle !== 'function' || typeof ipcMain?.removeHandler !== 'function') {
+    throw new TypeError('startup IPC requires ipcMain')
+  }
+  if (typeof surfaceRegistry?.assert !== 'function') {
+    throw new TypeError('startup IPC requires a desktop surface registry')
+  }
+  if (typeof setWindowChromeTheme !== 'function') {
+    throw new TypeError('startup IPC requires a window chrome theme handler')
+  }
+  const channels = [
+    'desktop:contract',
+    'desktop:window-chrome-theme',
+    'desktop:update-status',
+  ]
+  for (const channel of channels) ipcMain.removeHandler(channel)
+  const assertMain = (event) => surfaceRegistry.assert(event?.sender, DESKTOP_SURFACES.MAIN)
+  ipcMain.handle('desktop:contract', (event) => {
+    const surface = assertMain(event)
+    const contract = desktopContractForSurface(surface)
+    return Object.freeze({
+      ...contract,
+      capabilities: Object.freeze(contract.capabilities.filter((capability) => capability === 'updates.read')),
+    })
+  })
+  ipcMain.handle('desktop:window-chrome-theme', (event, rawTheme) => {
+    assertMain(event)
+    return setWindowChromeTheme(event.sender, normalizeWindowChromeTheme(rawTheme))
+  })
+  ipcMain.handle('desktop:update-status', (event) => {
+    assertMain(event)
+    return publicUpdateStatus(undefined)
+  })
+  return () => {
+    for (const channel of channels) ipcMain.removeHandler(channel)
+  }
+}
+
+export function normalizeDockDismissReason(value) {
+  if (typeof value !== 'string' || !DOCK_DISMISS_REASONS.has(value)) {
+    throw new TypeError(`invalid Dock dismiss reason: ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
+const publicRepairUnavailable = (value) => {
+  const reason = REPAIR_UNAVAILABLE_REASONS.has(value?.reason) ? value.reason : undefined
+  return Object.freeze({
+    available: false,
+    ...(reason === undefined ? {} : { reason }),
+    ...(value?.canRetry === true ? { canRetry: true } : {}),
+  })
+}
+export function publicRepairStatus(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return publicRepairUnavailable(value)
+  }
+  const fingerprint = typeof value.fingerprint === 'string' && /^[a-f0-9]{64}$/u.test(value.fingerprint)
+    ? value.fingerprint
+    : undefined
+  const state = REPAIR_STATES.has(value.state) ? value.state : undefined
+  if (fingerprint === undefined || state === undefined) return publicRepairUnavailable(value)
+  const safeTimestamp = (timestamp) => typeof timestamp === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(timestamp)
+    ? timestamp
+    : undefined
+  const safeName = (name) => typeof name === 'string'
+    && SAFE_REPAIR_NAME.test(name)
+    && !name.includes('..')
+    ? name
+    : undefined
+  const models = Array.isArray(value.modelAttempts)
+    ? value.modelAttempts.slice(0, 2).flatMap((attempt) => {
+        const provider = safeName(attempt?.provider)
+        const model = safeName(attempt?.model)
+        const outcome = safeName(attempt?.outcome)
+        return provider === undefined || model === undefined || outcome === undefined
+          ? []
+          : [Object.freeze({ provider, model, outcome })]
+      })
+    : []
+  const changedFiles = Array.isArray(value.changedFiles)
+    ? [...new Set(value.changedFiles.filter(path => typeof path === 'string'
+      && !path.includes('\\') && SAFE_REPAIR_PATH.test(path)))]
+      .slice(0, 4_096)
+      .toSorted((left, right) => left.localeCompare(right, 'en'))
+    : []
+  const checks = Array.isArray(value.checks)
+    ? [...new Set(value.checks.filter(check => typeof check === 'string' && SAFE_REPAIR_CHECK.test(check)))]
+      .slice(0, 64)
+      .toSorted((left, right) => left.localeCompare(right, 'en'))
+    : []
+  const result = ['applied', 'rolled-back', 'exhausted'].includes(state) ? state : 'pending'
+  const safeReason = REPAIR_UNAVAILABLE_REASONS.has(value.reason) ? value.reason : undefined
+  const canRetry = value.canRetry === true
+  return Object.freeze({
+    available: true,
+    fingerprint,
+    state,
+    result,
+    ...(safeTimestamp(value.createdAt) === undefined ? {} : { createdAt: value.createdAt }),
+    ...(safeTimestamp(value.updatedAt) === undefined ? {} : { updatedAt: value.updatedAt }),
+    models: Object.freeze(models),
+    changedFiles: Object.freeze(changedFiles),
+    checks: Object.freeze(checks),
+    ...(safeReason === undefined ? {} : { reason: safeReason }),
+    ...(canRetry ? { canRetry: true } : {}),
+  })
+}
+
 /** A small, clone-safe projection of the persisted update channel policy. */
 export function publicUpdateChannel(value) {
   return Object.freeze({
@@ -201,6 +337,13 @@ export function publicUpdateChannel(value) {
   })
 }
 
+const publicRepairRetryResult = (value) => {
+  const reason = REPAIR_UNAVAILABLE_REASONS.has(value?.reason) ? value.reason : undefined
+  return Object.freeze({
+    accepted: value?.accepted === true,
+    ...(reason === undefined ? {} : { reason }),
+  })
+}
 export function registerDesktopIpc({
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
@@ -211,23 +354,25 @@ export function registerDesktopIpc({
   version,
   platform,
   pluginRecovery,
-  ensureProfile,
   openLogs,
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
-  openMigrationAssistant = async () => { throw new Error('migration assistant is unavailable') },
   exitApp,
   handleHelpAction,
   handleToolAction,
+  claimDockEntry = async () => false,
+  dismissDockNudge = async () => false,
+  openExtensionDock = async () => false,
   onPluginInstallRequest = async () => { throw new Error('plugin install requests are unavailable') },
   setWindowChromeTheme,
   claimStarPrompt,
   getUpdateController,
+  getRepairStatus = async () => undefined,
+  retryRepair = async () => ({ accepted: false }),
   getUpdateChannel = () => 'stable',
   setUpdateChannel = async () => { throw new Error('update channel selection is unavailable') },
   confirmUpdateChannelChange = async () => true,
   getSettingsWindowBounds = async () => undefined,
   setSettingsWindowBounds = async () => undefined,
-  onRecoveryAction = () => {},
   onSettingsOpened = () => {},
   onUpdateCheck = () => {},
   listSkills = async () => ({ skills: [] }),
@@ -249,9 +394,14 @@ export function registerDesktopIpc({
     'desktop:action',
     'desktop:help-action',
     'desktop:tool-action',
+    'desktop:dock-entry-state',
+    'desktop:dock-nudge-dismiss',
+    'desktop:dock-open',
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
     'desktop:update-status',
+    'desktop:repair-status',
+    'desktop:repair-retry',
     'desktop:update-channel-get',
     'desktop:update-channel-set',
     'desktop:update-check',
@@ -298,22 +448,24 @@ export function registerDesktopIpc({
     return publicRuntimeStatus(status, await pluginRecovery?.getState?.(), background)
   }
   handle('desktop:status', [main, extensions], () => getPublicStatus())
+  handle('desktop:repair-status', main, async () => {
+    try {
+      return publicRepairStatus(await getRepairStatus())
+    } catch {
+      return publicRepairStatus(undefined)
+    }
+  })
+  handle('desktop:repair-retry', main, async () => {
+    try {
+      return publicRepairRetryResult(await retryRepair())
+    } catch {
+      return publicRepairRetryResult(undefined)
+    }
+  })
   handle('desktop:action', main, async (_event, _surface, rawAction) => {
     const action = normalizeDesktopAction(rawAction)
-    if (['retry', 'repair', 'disable-plugin', 'safe-mode'].includes(action)) {
-      try { onRecoveryAction(action) } catch {}
-    }
-    if (action === 'retry') return controller.restart()
-    if (action === 'repair') {
-      await controller.stop()
-      await ensureProfile()
-      return controller.start()
-    }
-    if (action === 'disable-plugin') return pluginRecovery?.disableCurrentAndRestart?.()
-    if (action === 'safe-mode') return pluginRecovery?.enterSafeModeAndRestart?.()
     if (action === 'open-logs') return openLogs()
     if (action === 'export-diagnostics') return exportDiagnostics()
-    if (action === 'upgrade-migration') return openMigrationAssistant()
     exitApp()
     return undefined
   })
@@ -331,6 +483,16 @@ export function registerDesktopIpc({
     await handleToolAction(action)
     return true
   })
+  handle('desktop:dock-entry-state', main, async () => ({
+    available: true,
+    showNudge: await claimDockEntry() === true,
+  }))
+  handle('desktop:dock-nudge-dismiss', main, async (_event, _surface, rawReason) => ({
+    dismissed: await dismissDockNudge(normalizeDockDismissReason(rawReason)) === true,
+  }))
+  handle('desktop:dock-open', main, async () => ({
+    opened: await openExtensionDock() === true,
+  }))
   handle('desktop:star-prompt-claim', main, async () => await claimStarPrompt?.() === true)
   handle('desktop:update-status', main, () => publicUpdateStatus(getUpdateController?.()?.getStatus?.()))
   handle('desktop:update-channel-get', main, () => publicUpdateChannel(getUpdateChannel()))

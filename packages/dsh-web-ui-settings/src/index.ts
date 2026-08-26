@@ -19,6 +19,8 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { installParticleThemeSettings } from '@linxin666/dsh-particle-theme'
 import z from 'schemastery'
 import { makeBridgeRoutes, type BridgeAccess } from './bridge.ts'
+import { makeChatGptAuthRoutes } from './chatgpt-auth-routes.ts'
+import { ChatGptAuthorizationController } from './chatgpt-auth.ts'
 import { mountOnce } from './mount-once.ts'
 
 /** Default environment variable holding the reverse-proxy shared token. */
@@ -90,5 +92,32 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
         for (const dispose of disposers) dispose()
       }
     }, 'web-ui-settings: settings bridge')
+  })
+
+  // RC.1 exposes ChatGPT authorization as a host service, but ships no Web
+  // settings surface for it. This bridge projects only value-free progress;
+  // the official provider remains the sole reader and writer of the grant.
+  ctx.inject(['authorization', 'credentials'], (authCtx) => {
+    const controller = new ChatGptAuthorizationController({
+      authorization: authCtx.authorization,
+      credentials: authCtx.credentials,
+      onError: (error) => {
+        const candidateName = error instanceof Error ? error.name : 'UnknownError'
+        const name = /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(candidateName) ? candidateName : 'Error'
+        const candidateCode = typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code ?? '')
+          : ''
+        const code = /^[A-Z][A-Z0-9_-]{0,63}$/u.test(candidateCode) ? candidateCode : ''
+        authCtx.logger.warn('web-ui-settings: ChatGPT authorization failure', { name, code })
+      },
+    })
+    authCtx.effect(() => {
+      const disposers = makeChatGptAuthRoutes(controller, access)
+        .map(route => authCtx.webServer.register(route))
+      return () => {
+        controller.dispose()
+        for (const dispose of disposers) dispose()
+      }
+    }, 'web-ui-settings: ChatGPT authorization bridge')
   })
 }

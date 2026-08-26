@@ -71,3 +71,38 @@ export interface BridgeMutateRequest {
 export type BridgeMutateResult =
   | { ok: true; value: BridgeNamespaceView }
   | { ok: false; code: string; message: string }
+
+/** Privacy-safe Desktop repair attempt shown only in the advanced settings card. */
+export interface DesktopRepairModelSummary {
+  provider: string
+  model: string
+  outcome: string
+}
+
+export type DesktopRepairUnavailableReason =
+  | 'full-retry-failed'
+  | 'missing-credentials'
+  | 'no-model'
+  | 'unsupported-tools'
+  | 'repair-failed'
+  | 'budget-exhausted'
+  | 'profile-permission'
+  | 'profile-installation'
+  | 'profile-failed'
+
+/** Electron-owned automatic repair status; it never carries raw errors or model output. */
+export type DesktopRepairStatus =
+  | { available: false; reason?: DesktopRepairUnavailableReason; canRetry?: boolean }
+  | {
+      available: true
+      fingerprint: string
+      state: 'claimed' | 'running' | 'verified' | 'applied' | 'rolled-back' | 'exhausted'
+      result: 'pending' | 'applied' | 'rolled-back' | 'exhausted'
+      createdAt?: string
+      updatedAt?: string
+      models: DesktopRepairModelSummary[]
+      changedFiles: string[]
+      checks: string[]
+      reason?: DesktopRepairUnavailableReason
+      canRetry?: boolean
+    }

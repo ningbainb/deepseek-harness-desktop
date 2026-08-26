@@ -1,0 +1,12 @@
+{
+  "fixtureSchema": 1,
+  "release": "2.3.0",
+  "profile": {
+    "name": "dsh-profile-desktop",
+    "private": true,
+    "dependencies": {},
+    "dsh": { "profile": { "bundles": [] } }
+  },
+  "profilePatch": "[]\n",
+  "sessionMarker": "direct-start-session-23"
+}

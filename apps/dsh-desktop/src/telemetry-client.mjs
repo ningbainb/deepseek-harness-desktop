@@ -8,6 +8,7 @@ export class ProductTelemetryClient {
   constructor({
     endpoint,
     context,
+    actorProvider,
     fetchImpl = globalThis.fetch,
     schedule = globalThis.setTimeout,
     cancelSchedule = globalThis.clearTimeout,
@@ -16,6 +17,7 @@ export class ProductTelemetryClient {
   }) {
     this.endpoint = typeof endpoint === 'string' && endpoint.length > 0 ? endpoint : undefined
     this.context = context
+    this.actorProvider = actorProvider
     this.fetchImpl = fetchImpl
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
@@ -37,7 +39,8 @@ export class ProductTelemetryClient {
 
   record(name, dimensions) {
     if (!this.enabled || this.stopping) return false
-    this.queue.push(createProductEvent(this.context, name, dimensions))
+    const actors = this.actorProvider?.()
+    this.queue.push(createProductEvent(this.context, actors, name, dimensions))
     if (this.queue.length >= MAX_BATCH_EVENTS) {
       this.#clearTimer()
       void this.flush()
@@ -68,7 +71,7 @@ export class ProductTelemetryClient {
       .then(() => this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ schema: 1, events }),
+        body: JSON.stringify({ schema: 3, events }),
         signal: controller.signal,
       }))
       .then(response => response?.ok === true)

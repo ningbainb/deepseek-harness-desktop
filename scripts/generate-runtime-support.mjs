@@ -22,6 +22,12 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
 }
 
+// Repository text files may be materialized as CRLF on Windows. Hash their
+// canonical LF form so committed evidence is stable across checkouts.
+export function textSha256(value) {
+  return sha256(value.replace(/\r\n/g, '\n'))
+}
+
 function exactVersion(value, label) {
   if (typeof value !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(value)) {
     throw new Error(`${label} must be an exact version`)
@@ -127,7 +133,7 @@ export async function createRuntimeSupportManifest(root = REPOSITORY_ROOT, { sup
     },
     lockfile: {
       path: 'pnpm-lock.yaml',
-      sha256: sha256(lockfile),
+      sha256: textSha256(lockfile),
     },
     provider: {
       providerId: RUNTIME_PROVIDER_ID,
@@ -140,7 +146,7 @@ export async function createRuntimeSupportManifest(root = REPOSITORY_ROOT, { sup
     },
     compatPatches: {
       registry: 'packages/dsh-desktop-compat/src/patch-registry.ts',
-      sha256: sha256(patchRegistry),
+      sha256: textSha256(patchRegistry),
       ids: patchRegistryIds(patchRegistry),
     },
     clientSlots: {

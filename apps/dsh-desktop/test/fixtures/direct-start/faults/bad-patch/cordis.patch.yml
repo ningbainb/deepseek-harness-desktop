@@ -1,0 +1,3 @@
+- insert:
+    - id: broken-patch
+      name: '@fixture/bad-patch-plugin

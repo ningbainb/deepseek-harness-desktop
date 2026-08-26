@@ -53,6 +53,10 @@ test('boundary rejects a new import and permits controlled adapter imports', () 
     ...existing[0],
     path: 'apps/dsh-desktop/src/runtime-provider.mjs',
   }], baseline), [])
+  assert.deepEqual(compareImportBoundary([...existing, {
+    ...existing[0],
+    path: 'packages/dsh-desktop-repair/src/model-runner.ts',
+  }], baseline), [])
 })
 
 test('repository file listing omits tracked files deleted from the working tree', async () => {

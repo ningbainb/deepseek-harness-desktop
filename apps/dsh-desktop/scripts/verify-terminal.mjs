@@ -115,7 +115,8 @@ try {
   }
   assert.ok(startup, 'startup surface did not become available')
   const browserWindowIdsBefore = await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((window) => window.id))
-  await startup.getByRole('button', { name: '打开内置终端', exact: true }).click()
+  await startup.getByRole('button', { name: /工具|Tools/u }).click()
+  await startup.getByRole('menuitem', { name: /内置终端|Built-in Terminal/u }).click()
 
   const deadline = Date.now() + 20_000
   let terminal

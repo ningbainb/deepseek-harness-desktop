@@ -1,6 +1,6 @@
 {
   "name": "@linxin666/dsh-desktop-client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Safe, versioned Desktop Contract client for DSH web plugins without Electron or DSH runtime internals.",
   "type": "module",
   "main": "lib/index.js",

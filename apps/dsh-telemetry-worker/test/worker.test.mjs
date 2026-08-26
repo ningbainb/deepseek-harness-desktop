@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 
 import worker from '../src/index.mjs'
+import { __test as dashboardTest } from '../src/admin-dashboard.mjs'
 
 const VALID_EVENT = Object.freeze({
   name: 'runtime_start_result',
@@ -9,9 +11,25 @@ const VALID_EVENT = Object.freeze({
   channel: 'stable',
   os: 'windows-11',
   language: 'zh',
+  dailyActor: 'a'.repeat(64),
+  monthlyActor: 'b'.repeat(64),
   outcome: 'ready',
   detail: 'none',
   bucket: '2-5s',
+})
+
+const VALID_SCHEMA_3_LAUNCH = Object.freeze({
+  name: 'app_launch',
+  appVersion: '3.0.2',
+  channel: 'stable',
+  os: 'windows-11',
+  language: 'zh',
+  dailyActor: 'a'.repeat(64),
+  monthlyActor: 'b'.repeat(64),
+  installationActor: 'c'.repeat(64),
+  outcome: 'started',
+  detail: 'normal',
+  bucket: 'none',
 })
 
 const OFFICIAL_WEBSITE_ORIGIN = 'https://ningbainb.github.io'
@@ -135,7 +153,7 @@ test('rejects unsupported methods and browser-origin submissions', async () => {
   assert.equal(method.status, 405)
   assert.equal(method.headers.get('allow'), 'POST')
 
-  const browser = await worker.fetch(requestFor({ schema: 1, events: [VALID_EVENT] }, {
+  const browser = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT] }, {
     headers: { origin: 'https://attacker.example' },
   }), enabledEnvironment())
   assert.equal(browser.status, 403)
@@ -143,7 +161,7 @@ test('rejects unsupported methods and browser-origin submissions', async () => {
 
 test('returns no-content without touching D1 when ingestion is disabled', async () => {
   const database = new FakeDatabase()
-  const response = await worker.fetch(requestFor({ schema: 1, events: [VALID_EVENT] }), {
+  const response = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT] }), {
     INGEST_ENABLED: '0',
     METRICS: database,
   })
@@ -153,34 +171,49 @@ test('returns no-content without touching D1 when ingestion is disabled', async 
 
 test('rejects oversized, malformed, and unknown input', async () => {
   const environment = enabledEnvironment()
-  const oversized = await worker.fetch(requestFor({ schema: 1, events: [VALID_EVENT] }, {
+  const oversized = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT] }, {
     headers: { 'content-length': '8193' },
   }), environment)
   assert.equal(oversized.status, 413)
 
-  const wrongSchema = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT] }), environment)
+  const wrongSchema = await worker.fetch(requestFor({ schema: 1, events: [VALID_EVENT] }), environment)
   assert.equal(wrongSchema.status, 400)
 
-  const unknownBody = await worker.fetch(requestFor({ schema: 1, events: [VALID_EVENT], userId: 'forbidden' }), environment)
+  const unknownBody = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT], userId: 'forbidden' }), environment)
   assert.equal(unknownBody.status, 400)
 
   const unknownEventField = await worker.fetch(requestFor({
-    schema: 1,
+    schema: 2,
     events: [{ ...VALID_EVENT, prompt: 'forbidden' }],
   }), environment)
   assert.equal(unknownEventField.status, 400)
 
   const invalidEnum = await worker.fetch(requestFor({
-    schema: 1,
+    schema: 2,
     events: [{ ...VALID_EVENT, detail: 'C:\\Users\\secret\\project' }],
   }), environment)
   assert.equal(invalidEnum.status, 400)
+
+  const invalidActor = await worker.fetch(requestFor({
+    schema: 2,
+    events: [{ ...VALID_EVENT, dailyActor: 'stable-installation-id' }],
+  }), environment)
+  assert.equal(invalidActor.status, 400)
+
+  const invalidInstallationActor = await worker.fetch(requestFor({
+    schema: 3,
+    events: [{ ...VALID_SCHEMA_3_LAUNCH, installationActor: 'device-id' }],
+  }), environment)
+  assert.equal(invalidInstallationActor.status, 400)
 })
 
 test('accepts the macos operating system family and still rejects unknown ones', async () => {
   const database = new FakeDatabase()
+  // The merged ingestion line only accepts schema 2/3, so the macos
+  // acceptance contract is exercised against the current schema instead of
+  // the retired schema 1 this test originally targeted.
   const accepted = await worker.fetch(requestFor({
-    schema: 1,
+    schema: 2,
     events: [{ ...VALID_EVENT, os: 'macos' }],
   }), enabledEnvironment(database))
   assert.equal(accepted.status, 204)
@@ -188,7 +221,7 @@ test('accepts the macos operating system family and still rejects unknown ones',
   assert.ok(database.batches[0][0].values.includes('macos'))
 
   const rejected = await worker.fetch(requestFor({
-    schema: 1,
+    schema: 2,
     events: [{ ...VALID_EVENT, os: 'macos-27' }],
   }), enabledEnvironment())
   assert.equal(rejected.status, 400)
@@ -198,13 +231,13 @@ test('groups identical events and binds only aggregate dimensions', async () => 
   const database = new FakeDatabase()
   const now = new Date('2026-08-19T23:59:59.000Z')
   const response = await worker.fetch(requestFor({
-    schema: 1,
+    schema: 2,
     events: [VALID_EVENT, VALID_EVENT, { ...VALID_EVENT, language: 'en' }],
-  }), enabledEnvironment(database), { now: () => now })
+  }), enabledEnvironment(database), { now: () => now, country: () => 'CN' })
 
   assert.equal(response.status, 204)
   assert.equal(database.batches.length, 1)
-  assert.equal(database.batches[0].length, 2)
+  assert.equal(database.batches[0].length, 4)
   assert.deepEqual(database.batches[0][0].values, [
     '2026-08-19',
     'runtime_start_result',
@@ -218,11 +251,53 @@ test('groups identical events and binds only aggregate dimensions', async () => 
     2,
   ])
   assert.doesNotMatch(database.batches[0][0].sql, /ip|user.?agent|timestamp|raw/iu)
+  const daily = database.batches[0].find(statement => /product_actor_daily/iu.test(statement.sql))
+  const monthly = database.batches[0].find(statement => /product_actor_monthly/iu.test(statement.sql))
+  assert.deepEqual(daily.values, [
+    '2026-08-19',
+    'a'.repeat(64),
+    'CN',
+    '2.5.0',
+    'runtime_start_result',
+    'ready',
+    'none',
+  ])
+  assert.deepEqual(monthly.values, [
+    '2026-08',
+    'b'.repeat(64),
+    'CN',
+    '2.5.0',
+    'runtime_start_result',
+    'ready',
+    'none',
+  ])
+  assert.doesNotMatch(daily.sql, /ip|city|user.?agent|timestamp|raw/iu)
+})
+
+test('schema 3 records one stable installation cohort and daily presence for duplicate launches', async () => {
+  const database = new FakeDatabase()
+  const response = await worker.fetch(requestFor({
+    schema: 3,
+    events: [VALID_SCHEMA_3_LAUNCH, VALID_SCHEMA_3_LAUNCH],
+  }), enabledEnvironment(database), {
+    now: () => new Date('2026-08-23T10:00:00.000Z'),
+    country: () => 'CN',
+  })
+
+  assert.equal(response.status, 204)
+  assert.equal(database.batches.length, 1)
+  const firstSeen = database.batches[0].filter(statement => /product_installation_first_seen/iu.test(statement.sql))
+  const daily = database.batches[0].filter(statement => /product_installation_daily/iu.test(statement.sql))
+  assert.equal(firstSeen.length, 1)
+  assert.equal(daily.length, 1)
+  assert.deepEqual(firstSeen[0].values, ['c'.repeat(64), '2026-08-23', '3.0.2'])
+  assert.deepEqual(daily[0].values, ['2026-08-23', 'c'.repeat(64)])
+  assert.doesNotMatch(firstSeen[0].sql, /account|hardware|ip|user.?agent|raw/iu)
 })
 
 test('contains D1 failures without exposing internal details', async () => {
   const response = await worker.fetch(
-    requestFor({ schema: 1, events: [VALID_EVENT] }),
+    requestFor({ schema: 2, events: [VALID_EVENT] }),
     enabledEnvironment(new FakeDatabase({ fail: true })),
   )
   assert.equal(response.status, 503)
@@ -301,14 +376,22 @@ test('download beacon fails closed without touching D1 when ingestion is disable
   assert.deepEqual(database.runs, [])
 })
 
-test('scheduled retention deletes aggregate rows older than 365 days', async () => {
+test('scheduled retention keeps aggregate trends and retention cohorts on bounded windows', async () => {
   const database = new FakeDatabase()
   await worker.scheduled({}, { METRICS: database }, {})
-  assert.equal(database.runs.length, 2)
+  assert.equal(database.runs.length, 6)
   assert.match(database.runs[0].sql, /DELETE FROM metric_daily/iu)
   assert.match(database.runs[1].sql, /DELETE FROM download_click_daily/iu)
-  assert.match(database.runs[0].sql, /-365 days/iu)
-  assert.match(database.runs[1].sql, /-365 days/iu)
+  assert.match(database.runs[2].sql, /DELETE FROM product_actor_daily/iu)
+  assert.match(database.runs[3].sql, /DELETE FROM product_actor_monthly/iu)
+  assert.match(database.runs[4].sql, /DELETE FROM product_installation_first_seen/iu)
+  assert.match(database.runs[5].sql, /DELETE FROM product_installation_daily/iu)
+  assert.match(database.runs[0].sql, /-400 days/iu)
+  assert.match(database.runs[1].sql, /-400 days/iu)
+  assert.match(database.runs[2].sql, /-35 days/iu)
+  assert.match(database.runs[3].sql, /-13 months/iu)
+  assert.match(database.runs[4].sql, /-400 days/iu)
+  assert.match(database.runs[5].sql, /-400 days/iu)
 })
 
 test('management custom domain root redirects to the admin surface only', async () => {
@@ -408,6 +491,14 @@ test('authenticated admin page is dependency-free and protected by strict browse
   const body = await response.text()
   assert.match(body, /产品数据看板/u)
   assert.match(body, /下载按钮点击/u)
+  assert.match(body, /日活用户/u)
+  assert.match(body, /月活用户/u)
+  assert.match(body, /应用内更新漏斗/u)
+  assert.match(body, /拓展坞漏斗/u)
+  assert.match(body, /D1 留存率/u)
+  assert.match(body, /D7 留存率/u)
+  assert.match(body, /D30 留存率/u)
+  assert.match(body, /用户使用时长/u)
   assert.match(body, /\/admin\/dashboard\.js/u)
   assert.doesNotMatch(body, /https:\/\/(?:cdn|fonts|unpkg|jsdelivr)\./iu)
   assert.doesNotMatch(body, /correct-horse|session-secret/iu)
@@ -424,6 +515,17 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       { results: [{ total: 16 }] },
       { results: [{ surface: 'settings', count: 7 }] },
       { results: [{ event: 'app_launch', count: 16 }] },
+      { results: [{ day: '2026-08-19', count: 11 }] },
+      { results: [{ month: '2026-08', count: 31 }] },
+      { results: [{ countryCode: 'CN', count: 21 }] },
+      { results: [{ version: '3.0.2', count: 25 }] },
+      { results: [{ event: 'update_completed', count: 9 }] },
+      { results: [{ event: 'dock_opened', count: 12 }] },
+      { results: [
+        { cohortDay: '2026-08-18', cohortUsers: 10, retainedD1: 6, retainedD7: null, retainedD30: null },
+        { cohortDay: '2026-08-10', cohortUsers: 20, retainedD1: 10, retainedD7: 5, retainedD30: null },
+      ] },
+      { results: [{ bucket: '5-30m', count: 8 }] },
     ],
   })
   const environment = adminEnvironment(database)
@@ -436,7 +538,7 @@ test('admin summary returns only bounded aggregate queries for a signed session'
   assert.equal(response.status, 200)
   assert.match(response.headers.get('content-type'), /^application\/json/iu)
   assert.deepEqual(await response.json(), {
-    schema: 1,
+    schema: 3,
     rangeDays: 30,
     generatedAt: '2026-08-19T08:02:00.000Z',
     downloads: {
@@ -451,11 +553,76 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       surfaces: [{ surface: 'settings', count: 7 }],
       events: [{ event: 'app_launch', count: 16 }],
     },
+    active: {
+      dau: 11,
+      mau: 31,
+      dailyTrend: [{ day: '2026-08-19', count: 11 }],
+      monthlyTrend: [{ month: '2026-08', count: 31 }],
+      countries: [{ countryCode: 'CN', count: 21 }],
+      versions: [{ version: '3.0.2', count: 25 }],
+    },
+    funnels: {
+      updates: [{ event: 'update_completed', count: 9 }],
+      dock: [{ event: 'dock_opened', count: 12 }],
+    },
+    retention: {
+      d1: { cohortUsers: 30, retainedUsers: 16, rate: 53.33 },
+      d7: { cohortUsers: 20, retainedUsers: 5, rate: 25 },
+      d30: { cohortUsers: 0, retainedUsers: 0, rate: null },
+      cohorts: [
+        { cohortDay: '2026-08-18', cohortUsers: 10, retainedD1: 6, retainedD7: null, retainedD30: null },
+        { cohortDay: '2026-08-10', cohortUsers: 20, retainedD1: 10, retainedD7: 5, retainedD30: null },
+      ],
+    },
+    usage: {
+      sessionDurations: [{ bucket: '5-30m', count: 8 }],
+    },
   })
-  assert.equal(database.queries.length, 8)
+  assert.equal(database.queries.length, 16)
   for (const query of database.queries) {
     assert.deepEqual(query.values, ['-29 days'])
     assert.doesNotMatch(query.sql, /ip|city|user.?agent|referrer|raw/iu)
+  }
+})
+
+test('retention cohort SQL distinguishes mature zero retention from immature cohorts', () => {
+  const database = new DatabaseSync(':memory:')
+  try {
+    database.exec(`
+      CREATE TABLE product_installation_first_seen (
+        installation_actor TEXT PRIMARY KEY,
+        first_seen_day TEXT NOT NULL,
+        first_version TEXT NOT NULL
+      ) WITHOUT ROWID;
+      CREATE TABLE product_installation_daily (
+        day TEXT NOT NULL,
+        installation_actor TEXT NOT NULL,
+        PRIMARY KEY (day, installation_actor)
+      ) WITHOUT ROWID;
+      INSERT INTO product_installation_first_seen VALUES
+        ('actor-a', date('now', '-31 days'), '3.0.2'),
+        ('actor-b', date('now', '-31 days'), '3.0.2'),
+        ('actor-c', date('now', '-8 days'), '3.0.2'),
+        ('actor-d', date('now', '-1 day'), '3.0.2');
+      INSERT INTO product_installation_daily VALUES
+        (date('now', '-30 days'), 'actor-a'),
+        (date('now', '-24 days'), 'actor-a'),
+        (date('now', '-1 day'), 'actor-a'),
+        (date('now', '-7 days'), 'actor-c');
+    `)
+    const rows = database.prepare(dashboardTest.RETENTION_COHORTS_SQL).all('-89 days')
+    assert.deepEqual(rows.map(({ cohortUsers, retainedD1, retainedD7, retainedD30 }) => ({
+      cohortUsers: Number(cohortUsers),
+      retainedD1: retainedD1 === null ? null : Number(retainedD1),
+      retainedD7: retainedD7 === null ? null : Number(retainedD7),
+      retainedD30: retainedD30 === null ? null : Number(retainedD30),
+    })), [
+      { cohortUsers: 1, retainedD1: null, retainedD7: null, retainedD30: null },
+      { cohortUsers: 1, retainedD1: 1, retainedD7: 0, retainedD30: null },
+      { cohortUsers: 2, retainedD1: 1, retainedD7: 1, retainedD30: 1 },
+    ])
+  } finally {
+    database.close()
   }
 })
 

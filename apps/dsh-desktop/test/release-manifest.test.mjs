@@ -7,6 +7,7 @@ import test from 'node:test'
 
 import {
   assertSigningConfiguration,
+  collectReleaseArtifactNames,
   collectWindowsExecutablePaths,
   createReleaseManifest,
   defaultReleaseMetadata,
@@ -83,6 +84,20 @@ test('release manifest hashes every publishable artifact and retains release com
       requireSigning: true,
       signatureVerifier: validSignature,
     })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('release artifact collection rejects a bare unpacked application copied beside the installer', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-release-bare-app-'))
+  try {
+    await writeReleaseFiles(directory)
+    await writeFile(join(directory, 'DeepSeek Harness Desktop.exe'), 'incomplete unpacked application')
+    await assert.rejects(
+      collectReleaseArtifactNames(directory),
+      /unexpected top-level Windows executable/u,
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -177,6 +192,7 @@ test('signing configuration permits unsigned development but requires a certific
 })
 
 test('official Desktop tag releases require signing only when certificate material is configured', async () => {
+  const desktopPackage = JSON.parse(await readFile(join(import.meta.dirname, '..', 'package.json'), 'utf8'))
   const workflow = await readFile(
     join(import.meta.dirname, '..', '..', '..', '.github', 'workflows', 'desktop-release.yml'),
     'utf8',
@@ -197,13 +213,24 @@ test('official Desktop tag releases require signing only when certificate materi
   assert.match(workflow, /body_path: apps\/dsh-desktop\/dist\/release-notes\.md/u)
   assert.match(workflow, /apps\/dsh-desktop\/dist\/\$\{\{ steps\.release\.outputs\.updater_channel \}\}\.yml/u)
   assert.doesNotMatch(workflow, /apps\/dsh-desktop\/dist\/\*\.yml/u)
+  const unsignedCandidate = workflow.indexOf('- name: Package unsigned direct-start candidate')
+  const directStartGate = workflow.indexOf('- name: Verify direct-start matrix before signing')
+  const signedPackage = workflow.indexOf('- name: Package the selected release channel')
+  assert.ok(unsignedCandidate >= 0 && unsignedCandidate < directStartGate && directStartGate < signedPackage)
+  assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY: 'false'/u)
+  assert.equal(
+    desktopPackage.scripts['test:fresh-relaunch:e2e'],
+    'node scripts/verify-packaged-fresh-second-launch.mjs',
+  )
   for (const releaseGate of [
     'test:directory-picker:e2e',
     'test:terminal:e2e',
     'test:window-chrome:e2e',
     'test:profile-reset:e2e',
     'test:update-shutdown:e2e',
-    'test:migration-matrix:e2e',
+    'test:direct-start-matrix:e2e',
+    'test:fresh-relaunch:e2e',
+    'verify-packaged-orphaned-managed-link.mjs',
   ]) {
     assert.equal(workflow.includes(releaseGate), true, `release workflow is missing ${releaseGate}`)
   }

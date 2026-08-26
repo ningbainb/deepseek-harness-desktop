@@ -317,16 +317,25 @@ if (!settingsBridge.includes('"particle-theme"')) {
 await access(join(resources, 'app.asar'))
 await access(join(resources, 'app-icon.png'))
 const telemetryConfiguration = JSON.parse(await readFile(join(resources, 'telemetry-config.json'), 'utf8'))
+const telemetryConfigurationKeys = telemetryConfiguration !== null && typeof telemetryConfiguration === 'object'
+  ? Object.keys(telemetryConfiguration).sort()
+  : []
 if (
   telemetryConfiguration === null
   || typeof telemetryConfiguration !== 'object'
   || Array.isArray(telemetryConfiguration)
-  || Object.keys(telemetryConfiguration).length !== 1
+  || telemetryConfigurationKeys.length !== 2
+  || telemetryConfigurationKeys[0] !== 'endpoint'
+  || telemetryConfigurationKeys[1] !== 'officialBuild'
   || typeof telemetryConfiguration.endpoint !== 'string'
+  || typeof telemetryConfiguration.officialBuild !== 'boolean'
 ) {
   throw new Error('packaged anonymous metrics configuration is invalid')
 }
 if (telemetryConfiguration.endpoint.length > 0) {
+  if (telemetryConfiguration.officialBuild !== true) {
+    throw new Error('packaged anonymous metrics endpoint requires an official build')
+  }
   const telemetryEndpoint = new URL(telemetryConfiguration.endpoint)
   if (
     telemetryEndpoint.protocol !== 'https:'
@@ -338,6 +347,8 @@ if (telemetryConfiguration.endpoint.length > 0) {
   ) {
     throw new Error('packaged anonymous metrics endpoint is invalid')
   }
+} else if (telemetryConfiguration.officialBuild !== false) {
+  throw new Error('packaged anonymous metrics official build is missing its endpoint')
 }
 const updateShutdownProtocol = await readFile(join(resources, 'update-shutdown-v1'), 'utf8')
 if (updateShutdownProtocol.trim() !== 'dsh-desktop-update-shutdown-protocol=1') {

@@ -482,8 +482,9 @@ function assertInventory(inventory) {
   }
   let files = 0
   let bytes = 0
-  let previous = undefined
   const seen = new Set()
+  const directories = new Set()
+  const lastChildByParent = new Map()
   for (const entry of inventory.entries) {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       throw new Error('user plugin archive inventory entry is invalid')
@@ -492,12 +493,27 @@ function assertInventory(inventory) {
       throw new Error('user plugin archive inventory path is invalid')
     }
     if (seen.has(entry.path)) throw new Error('user plugin archive inventory has duplicate paths')
-    seen.add(entry.path)
-    const sortKey = `${entry.path}\0${entry.kind}`
-    if (previous !== undefined && previous > sortKey) throw new Error('user plugin archive inventory is not deterministic')
-    previous = sortKey
     if (!['directory', 'file', 'symlink'].includes(entry.kind) || !Number.isInteger(entry.mode)) {
       throw new Error('user plugin archive inventory entry is invalid')
+    }
+    if (entry.path === '') {
+      if (seen.size !== 0) throw new Error('user plugin archive inventory is not deterministic')
+      seen.add(entry.path)
+      if (entry.kind === 'directory') directories.add(entry.path)
+    } else {
+      const separator = entry.path.lastIndexOf('/')
+      const parent = separator === -1 ? '' : entry.path.slice(0, separator)
+      const child = separator === -1 ? entry.path : entry.path.slice(separator + 1)
+      if (child.length === 0 || !directories.has(parent)) {
+        throw new Error('user plugin archive inventory is not deterministic')
+      }
+      const previousChild = lastChildByParent.get(parent)
+      if (previousChild !== undefined && previousChild >= child) {
+        throw new Error('user plugin archive inventory is not deterministic')
+      }
+      seen.add(entry.path)
+      lastChildByParent.set(parent, child)
+      if (entry.kind === 'directory') directories.add(entry.path)
     }
     if (entry.kind === 'file') {
       if (!Number.isInteger(entry.size) || entry.size < 0 || !SHA256_PATTERN.test(entry.sha256)) {
@@ -578,6 +594,39 @@ function assertJournal(value) {
   ) {
     throw new Error('user plugin archive journal is invalid')
   }
+  const affectedExternalFiles = value.affectedExternalFiles ?? []
+  if (!Array.isArray(affectedExternalFiles) || affectedExternalFiles.length > 4_096) {
+    throw new Error('user plugin archive external repair metadata is invalid')
+  }
+  const seenExternalFiles = new Set()
+  const normalizedExternalFiles = affectedExternalFiles.map((entry) => {
+    if (
+      entry === null
+      || typeof entry !== 'object'
+      || Array.isArray(entry)
+      || !ID_PATTERN.test(entry.rootId)
+      || typeof entry.relativePath !== 'string'
+      || entry.relativePath.length === 0
+      || entry.relativePath.length > 320
+      || entry.relativePath.includes('\\')
+      || entry.relativePath.includes('\0')
+      || isAbsolute(entry.relativePath)
+      || entry.relativePath.split('/').some((part) => part === '' || part === '.' || part === '..')
+      || (entry.beforeSha256 !== null && !SHA256_PATTERN.test(entry.beforeSha256))
+      || (entry.candidateSha256 !== null && !SHA256_PATTERN.test(entry.candidateSha256))
+    ) {
+      throw new Error('user plugin archive external repair metadata is invalid')
+    }
+    const key = `${entry.rootId}\0${entry.relativePath}`
+    if (seenExternalFiles.has(key)) throw new Error('user plugin archive external repair metadata is duplicated')
+    seenExternalFiles.add(key)
+    return {
+      rootId: entry.rootId,
+      relativePath: entry.relativePath,
+      beforeSha256: entry.beforeSha256,
+      candidateSha256: entry.candidateSha256,
+    }
+  })
   return immutable({
     schemaVersion: value.schemaVersion,
     transactionId: value.transactionId,
@@ -586,6 +635,7 @@ function assertJournal(value) {
     phase: value.phase,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    affectedExternalFiles: normalizedExternalFiles,
   })
 }
 
@@ -617,6 +667,11 @@ export class UserPluginArchiveTransaction {
   /** Restore exact archived profile inputs and node_modules bytes/tree. */
   async rollback() {
     return this.#archive._rollback(this.transactionId)
+  }
+
+  /** Retain path-free hashes for external plugin files affected by repair. */
+  async recordAffectedExternalFiles(entries) {
+    return this.#archive._recordAffectedExternalFiles(this.transactionId, entries)
   }
 }
 
@@ -872,6 +927,7 @@ export class UserPluginArchive {
       phase: 'intent',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      affectedExternalFiles: [],
     })
     await this.#writeJournal(journal)
     await this.#writeActiveJournal(transactionId)
@@ -1050,6 +1106,7 @@ export class UserPluginArchive {
           snapshotId: active.snapshotId,
           operation: active.operation,
           phase: active.phase,
+          affectedExternalFiles: active.affectedExternalFiles,
         },
       })
     })
@@ -1140,6 +1197,24 @@ export class UserPluginArchive {
       }
       const applied = await this.#writePhase(journal, 'applied')
       return immutable({ transactionId: applied.transactionId, snapshotId: applied.snapshotId, phase: applied.phase })
+    })
+  }
+
+  _recordAffectedExternalFiles(transactionId, entries) {
+    return this.#enqueue(async () => {
+      const journal = await this.#readActiveJournal()
+      if (journal === undefined || journal.transactionId !== transactionId) {
+        throw new Error('user plugin archive transaction is not active')
+      }
+      if (journal.phase !== 'archived') {
+        throw new Error(`user plugin archive transaction cannot record repair metadata from ${journal.phase}`)
+      }
+      const written = await this.#writeJournal({ ...journal, affectedExternalFiles: entries })
+      return immutable({
+        transactionId: written.transactionId,
+        snapshotId: written.snapshotId,
+        affectedExternalFiles: written.affectedExternalFiles,
+      })
     })
   }
 

@@ -144,6 +144,43 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
   assert.doesNotMatch(serialized, /<dsh-home>|file:/u)
 })
 
+test('startup diagnostics preserve safe boot and direct-attempt correlation separately from runtime restart attempts', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    controller: {
+      status: {
+        state: 'ready',
+        pid: 4321,
+        restartAttempt: 2,
+      },
+    },
+    startupAttempt: {
+      bootId: 'abcdef0123456789',
+      startupAttempt: 3,
+      directAttempt: 3,
+      profileName: 'desktop',
+      runtimePid: 4321,
+      phase: 'full-repaired',
+      event: 'ready',
+      failureCategory: 'PROFILE_REPAIRABLE',
+      durationMs: 12_345,
+    },
+  })
+
+  assert.equal(diagnostics.runtime.pid, 4321)
+  assert.equal(diagnostics.runtime.restartAttempt, 2)
+  assert.deepEqual(diagnostics.startup.attempt, {
+    bootId: 'abcdef0123456789',
+    startupAttempt: 3,
+    directAttempt: 3,
+    profileName: 'desktop',
+    runtimePid: 4321,
+    phase: 'full-repaired',
+    event: 'ready',
+    failureCategory: 'PROFILE_REPAIRABLE',
+    durationMs: 12_345,
+  })
+})
+
 test('diagnostic projections never serialize plugin-recovery raw error, prompt, session, or tool data', async () => {
   const diagnostics = await collectStartupDiagnostics({
     controller: { status: { state: 'crashed', error: 'session: RUNTIME_PRIVATE_SESSION' } },
@@ -184,6 +221,39 @@ test('diagnostic projections never serialize plugin-recovery raw error, prompt, 
   assert.match(serialized, /compatibility-undeclared/u)
   assert.doesNotMatch(serialized, /RECOVERY_PRIVATE_(?:PROMPT|TOOL_OUTPUT|SESSION|INCIDENT|PATH|REQUEST|REASON|LOG)/u)
   assert.doesNotMatch(serialized, /C:\\Users\\Alice/u)
+})
+
+test('repair diagnostics contain only the persisted bounded status summary', async () => {
+  const privateValue = 'REPAIR_PRIVATE_PROMPT_AND_KEY'
+  const diagnostics = await collectStartupDiagnostics({
+    controller: { status: { state: 'ready' } },
+    repairIncidentStore: {
+      latest: async () => ({
+        fingerprint: 'b'.repeat(64),
+        state: 'rolled-back',
+        createdAt: '2026-08-22T01:02:03.000Z',
+        updatedAt: '2026-08-22T01:03:04.000Z',
+        modelAttempts: [{ provider: 'configured', model: 'repair-model', outcome: 'failed', prompt: privateValue }],
+        changedFiles: ['plugins/example/index.mjs'],
+        checks: ['plugin-example-test'],
+        toolActions: [{ arguments: privateValue }],
+        apiKey: privateValue,
+      }),
+    },
+  })
+
+  assert.deepEqual(diagnostics.repair, {
+    available: true,
+    fingerprint: 'b'.repeat(64),
+    state: 'rolled-back',
+    result: 'rolled-back',
+    createdAt: '2026-08-22T01:02:03.000Z',
+    updatedAt: '2026-08-22T01:03:04.000Z',
+    models: [{ provider: 'configured', model: 'repair-model', outcome: 'failed' }],
+    changedFiles: ['plugins/example/index.mjs'],
+    checks: ['plugin-example-test'],
+  })
+  assert.doesNotMatch(JSON.stringify(diagnostics), /REPAIR_PRIVATE|prompt|apiKey|arguments/u)
 })
 
 test('a stalled recovery or inventory collector is recorded instead of blocking startup diagnostic export', async () => {

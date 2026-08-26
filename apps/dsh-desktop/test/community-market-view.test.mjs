@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { selectCommunityMarketPlugins } from '../src/ui/community-market-view.mjs'
+import {
+  communityMarketInstallPresentation,
+  selectCommunityMarketPlugins,
+} from '../src/ui/community-market-view.mjs'
 
 const plugins = [
   { id: 'one', name: 'dsh-one', displayName: 'dsh-one', npm: 'dsh-one', category: 'tools', owner: 'Alice', description: { zh: '浏览器工具' }, downloads: 30, stars: 2, added: '2026-07-01' },
@@ -32,4 +35,25 @@ test('market view supports deterministic sort and clamps pagination', () => {
 
   const popular = selectCommunityMarketPlugins(plugins, { sort: 'popular', page: 1, pageSize: 3 })
   assert.deepEqual(popular.items.map((item) => item.id), ['one', 'three', 'two'])
+})
+
+test('market install presentation gives immediate, durable progress and retry states', () => {
+  assert.deepEqual(communityMarketInstallPresentation({ phase: 'installing' }), {
+    kind: 'installing',
+    label: '安装中…',
+    status: '正在下载并安装；完成后会自动刷新。',
+    disabled: true,
+  })
+  assert.deepEqual(communityMarketInstallPresentation({ phase: 'error' }), {
+    kind: 'error',
+    label: '重试',
+    status: '安装失败，原配置已恢复。可重试或导出诊断。',
+    disabled: false,
+  })
+  assert.deepEqual(communityMarketInstallPresentation({ installed: true, phase: 'installing' }), {
+    kind: 'installed',
+    label: '已安装',
+    status: '插件已安装并通过启动检查。',
+    disabled: true,
+  })
 })

@@ -23,6 +23,8 @@ const SHA512_PATTERN = /^sha512-[A-Za-z0-9+/]+=*$/u
 // rather than the SRI-style `sha512-...` runtime-integrity representation.
 const UPDATER_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/u
 const SIGNATURE_STATUSES = new Set(['valid', 'unsigned', 'not-applicable'])
+const WINDOWS_INSTALLER_PATTERN = /^DeepSeek-Harness-Desktop-Setup-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-x64\.exe$/u
+const WINDOWS_INSTALLER_BLOCKMAP_PATTERN = /^DeepSeek-Harness-Desktop-Setup-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-x64\.exe\.blockmap$/u
 
 export { RELEASE_MANIFEST_NAME, RELEASE_MANIFEST_SCHEMA_VERSION }
 
@@ -150,11 +152,20 @@ export async function verifyWindowsSignature(path, {
 }
 
 function isReleaseArtifact(name) {
-  return RELEASE_ARTIFACT_NAMES.has(name) || name.endsWith('.exe') || name.endsWith('.blockmap')
+  return RELEASE_ARTIFACT_NAMES.has(name)
+    || WINDOWS_INSTALLER_PATTERN.test(name)
+    || WINDOWS_INSTALLER_BLOCKMAP_PATTERN.test(name)
 }
 
 export async function collectReleaseArtifactNames(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
+  const unexpectedExecutables = entries
+    .filter((entry) => entry.isFile() && extname(entry.name).toLowerCase() === '.exe' && !WINDOWS_INSTALLER_PATTERN.test(entry.name))
+    .map((entry) => entry.name)
+    .toSorted()
+  if (unexpectedExecutables.length > 0) {
+    throw new Error(`unexpected top-level Windows executable; publish only the Setup installer: ${unexpectedExecutables.join(', ')}`)
+  }
   const artifacts = entries
     .filter((entry) => entry.isFile() && isReleaseArtifact(entry.name))
     .map((entry) => entry.name)

@@ -2,7 +2,6 @@ export const STARTUP_PHASES = Object.freeze([
   'application-ready',
   'package-resolution',
   'profile-ready',
-  'compatibility-ready',
   'shell-ready',
   'runtime-ready',
   'renderer-loaded',

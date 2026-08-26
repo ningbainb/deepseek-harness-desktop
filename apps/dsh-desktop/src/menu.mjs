@@ -10,7 +10,6 @@ export function createApplicationMenuTemplate({
   openExtensions,
   openTerminal,
   openLogs,
-  openMigrationAssistant,
   openPrivacy = () => shell.openExternal(PRIVACY_POLICY_URL),
   openProject = () => shell.openExternal(GITHUB_PROJECT_URL),
   checkForUpdates,
@@ -57,9 +56,6 @@ export function createApplicationMenuTemplate({
       label: '运行时 / Runtime',
       submenu: [
         { label: '重启 DSH / Restart DSH', accelerator: 'CmdOrCtrl+Shift+R', click: action(() => controller.restart()) },
-        ...(typeof openMigrationAssistant === 'function'
-          ? [{ label: '检查自动迁移 / Check Automatic Migration', click: action(openMigrationAssistant) }]
-          : []),
         { label: '打开日志 / Open Logs', click: action(openLogs) },
       ],
     },

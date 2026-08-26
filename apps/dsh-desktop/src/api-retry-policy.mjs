@@ -1,8 +1,3 @@
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
-import { parseDocument } from 'yaml'
-
 const RETRYABLE_CODES = Object.freeze([
   'EMPTY_RESPONSE',
   'RATE_LIMIT',
@@ -63,30 +58,4 @@ export function withDefaultApiRetryPolicies(value) {
     }
   }
   return { changed: paths.length > 0, settings, paths }
-}
-
-/** Persist missing provider policies while preserving YAML comments and unrelated values. */
-export async function ensureApiRetryPolicies({ dshHome }) {
-  const path = join(dshHome, 'settings.yaml')
-  let source
-  try {
-    source = await readFile(path, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return { changed: false, path }
-    throw error
-  }
-  const document = parseDocument(source)
-  if (document.errors.length > 0) throw document.errors[0]
-  const result = withDefaultApiRetryPolicies(document.toJS())
-  if (!result.changed) return { changed: false, path }
-  for (const policyPath of result.paths) document.setIn(policyPath, copyPolicy())
-  const output = String(document)
-  const temporary = `${path}.desktop-retry-${process.pid}-${Date.now()}.tmp`
-  try {
-    await writeFile(temporary, output, { encoding: 'utf8', mode: 0o600 })
-    await rename(temporary, path)
-  } finally {
-    await rm(temporary, { force: true }).catch(() => {})
-  }
-  return { changed: true, path }
 }

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createCouplingAudit, renderCouplingAuditMarkdown } from './audit-dsh-coupling.mjs'
+import { canonicalText, createCouplingAudit, renderCouplingAuditMarkdown } from './audit-dsh-coupling.mjs'
+
+test('coupling evidence is stable across Windows line endings', () => {
+  const lf = 'inject = [slots, locale]\nregisterHostService(remote)\n'
+  const crlf = lf.replaceAll('\n', '\r\n')
+  assert.equal(canonicalText(crlf), lf)
+})
 
 test('DSH coupling audit classifies every import and required seam category', async () => {
   const [audit, concurrentAudit] = await Promise.all([

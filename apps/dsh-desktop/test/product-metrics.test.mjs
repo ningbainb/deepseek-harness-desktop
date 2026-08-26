@@ -59,9 +59,31 @@ test('update status transitions are deduplicated and retain manual origin', () =
   recorder.observeUpdateStatus({ phase: 'installing' })
 
   assert.deepEqual(events, [
-    { name: 'update_result', outcome: 'available', detail: 'manual', bucket: 'none' },
-    { name: 'update_result', outcome: 'downloaded', detail: 'manual', bucket: 'none' },
-    { name: 'update_result', outcome: 'install-requested', detail: 'manual', bucket: 'none' },
+    { name: 'update_available', outcome: 'available', detail: 'manual', bucket: 'none' },
+    { name: 'update_downloaded', outcome: 'downloaded', detail: 'manual', bucket: 'none' },
+    { name: 'update_install_requested', outcome: 'requested', detail: 'manual', bucket: 'none' },
+  ])
+})
+
+test('update completion and dock funnel actions stay fixed and bounded', () => {
+  const { events, recorder } = createRecorder()
+  recorder.recordUpdateCompleted()
+  recorder.recordDockImpression()
+  recorder.recordDockNudgeShown()
+  recorder.recordDockNudgeShown()
+  recorder.recordDockNudgeDismissed('escape')
+  recorder.recordDockClick()
+  recorder.recordDockOpened(true)
+  recorder.recordDockOpened(false)
+
+  assert.deepEqual(events, [
+    { name: 'update_completed', outcome: 'completed', detail: 'receipt', bucket: 'none' },
+    { name: 'dock_entry_impression', outcome: 'shown', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_nudge_shown', outcome: 'shown', detail: 'first-three-launches', bucket: 'none' },
+    { name: 'dock_nudge_dismissed', outcome: 'dismissed', detail: 'escape', bucket: 'none' },
+    { name: 'dock_entry_click', outcome: 'clicked', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_opened', outcome: 'opened', detail: 'settings-adjacent', bucket: 'none' },
+    { name: 'dock_opened', outcome: 'failed', detail: 'settings-adjacent', bucket: 'none' },
   ])
 })
 
@@ -98,4 +120,35 @@ test('metrics failures are isolated from product operations', async () => {
   })
   assert.doesNotThrow(() => recorder.recordSurface('help'))
   assert.equal(await recorder.trackExtensionOperation('remove', async () => 'removed'), 'removed')
+})
+
+test('direct startup and automatic repair milestones are bounded and deduplicated', () => {
+  const { events, recorder } = createRecorder()
+  recorder.recordFullStartFailed({ detail: 'plugin-startup', durationMs: 7_000 })
+  recorder.recordRepairAgentStarted('default-model')
+  recorder.recordRepairAgentStarted('default-model')
+  recorder.recordRepairAgentSucceeded({ detail: 'default-model', durationMs: 20_000 })
+  recorder.recordDirectStartReady({ detail: 'repaired', durationMs: 31_000 })
+  recorder.recordDirectStartReady({ detail: 'repaired', durationMs: 32_000 })
+
+  assert.deepEqual(events, [
+    { name: 'full_start_failed', outcome: 'failed', detail: 'plugin-startup', bucket: '5-15s' },
+    { name: 'repair_agent_started', outcome: 'started', detail: 'default-model', bucket: 'none' },
+    { name: 'repair_agent_succeeded', outcome: 'succeeded', detail: 'default-model', bucket: '15-60s' },
+    { name: 'direct_start_ready', outcome: 'ready', detail: 'repaired', bucket: '15-60s' },
+  ])
+})
+
+test('fallback and installation metrics expose categories but never private contents', () => {
+  const { events, recorder } = createRecorder()
+  recorder.recordRepairAgentFailed({ detail: 'model-unavailable', durationMs: 10 })
+  recorder.recordBuiltinsFallbackReady({ detail: 'repair-failed', durationMs: 70_000 })
+  recorder.recordInstallationRepairRequired('integrity-failed')
+
+  assert.deepEqual(events, [
+    { name: 'repair_agent_failed', outcome: 'failed', detail: 'model-unavailable', bucket: 'under-2s' },
+    { name: 'builtins_fallback_ready', outcome: 'ready', detail: 'repair-failed', bucket: 'over-60s' },
+    { name: 'installation_repair_required', outcome: 'blocked', detail: 'integrity-failed', bucket: 'none' },
+  ])
+  assert.equal(JSON.stringify(events).includes('Users'), false)
 })

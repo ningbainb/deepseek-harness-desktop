@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
@@ -7,7 +6,6 @@ import { resolve } from 'node:path'
 import { _electron as electron } from 'playwright'
 
 import { AGGREGATED_BUNDLES, BUILTIN_BUNDLES, RETIRED_MANAGED_PACKAGES } from '../src/profile.mjs'
-import { MIGRATION_COMPLETION_SCHEMA_VERSION, MIGRATION_SCHEMA_VERSION } from '../src/migration-assistant.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const executablePath = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -34,21 +32,6 @@ async function waitForRuntimeWindow(app, timeoutMs) {
     await new Promise((resolveWait) => setTimeout(resolveWait, 100))
   }
   throw new Error('runtime window did not appear before the profile migration E2E timeout')
-}
-
-async function seedCurrentApplicationMigration({ profileDir, userData }) {
-  const migrationDirectory = resolve(userData, 'migration-assistant')
-  await mkdir(migrationDirectory, { recursive: true })
-  await writeFile(resolve(migrationDirectory, 'completion.json'), `${JSON.stringify({
-    schemaVersion: MIGRATION_COMPLETION_SCHEMA_VERSION,
-    migrationSchemaVersion: MIGRATION_SCHEMA_VERSION,
-    state: 'complete',
-    targetVersion: '3.0.0',
-    sourceVersion: '3.0.0',
-    journalId: 'profile-migration-e2e-current',
-    profileIdentitySha256: createHash('sha256').update(profileDir).digest('hex'),
-    completedAt: '2026-08-21T00:00:00.000Z',
-  }, null, 2)}\n`)
 }
 
 async function launchOnce({ dshHome, userData }) {
@@ -150,7 +133,6 @@ async function createLegacyFixture(root, skinId) {
   // 2.3-2.7 application migration matrix. Mark the app-level 3.0 schema as
   // already complete so the old plugin fixture is not misclassified as an
   // unsupported pre-2.3 Desktop installation.
-  await seedCurrentApplicationMigration({ profileDir, userData })
 
   return {
     dshHome,
@@ -194,7 +176,7 @@ async function verifyInvalidLegacySkinFallsBack() {
   assert.equal(repairedRecovery.policyVersion, 4)
   assert.equal(repairedRecovery.safeMode, false)
   assert.deepEqual(repairedRecovery.disabledDependencies, {})
-  assert.equal(repairedRecovery.incidents[0].resolution, 'legacy-false-positive-repaired')
+  assert.equal(repairedRecovery.incidents[0].resolution, 'restored-by-direct-start')
 
   const migratedProfilePatch = await readFile(fixture.profilePatchPath, 'utf8')
   const migratedHomePatch = await readFile(fixture.homePatchPath, 'utf8')

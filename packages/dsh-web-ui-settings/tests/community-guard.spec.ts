@@ -15,11 +15,17 @@ describe('isCommunityPluginEntry', () => {
     })).toBe(true)
   })
 
+  it('does not use publisher or repository scheme as an install allowlist', () => {
+    expect(isCommunityPluginEntry({
+      id: 'x', name: 'X', nameEn: 'X', author: '', repo: 'git+ssh://git@example.invalid/x.git',
+    })).toBe(true)
+  })
+
   it('rejects malformed entries', () => {
     expect(isCommunityPluginEntry(null)).toBe(false)
     expect(isCommunityPluginEntry({ id: 'x' })).toBe(false)
-    expect(isCommunityPluginEntry({ id: 'x', name: 'X', nameEn: 'X', author: '', repo: 'https://github.com/a/b' })).toBe(false)
-    expect(isCommunityPluginEntry({ id: 'x', name: 'X', nameEn: 'X', author: 'a', repo: 'not-a-url' })).toBe(false)
+    expect(isCommunityPluginEntry({ id: 'x', name: 'X', nameEn: 'X', author: 42, repo: 'https://github.com/a/b' })).toBe(false)
+    expect(isCommunityPluginEntry({ id: 'x', name: 'X', nameEn: 'X', author: 'a', repo: 42 })).toBe(false)
     expect(isCommunityPluginEntry({ id: 'x', name: 'X', nameEn: 'X', author: 'a', repo: 'https://github.com/a/b', npm: 42 })).toBe(false)
   })
 })

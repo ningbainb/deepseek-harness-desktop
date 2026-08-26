@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-ui",
-  "version": "3.0.1",
+  "version": "3.0.9",
   "private": true,
   "description": "DeepSeek Harness Web GUI 皮肤集合 + 主题库预览页（仿 Codex-Dream-Skin / DreamSkin.cc）。每个皮肤是符合官方标准（turtle-ui 式 setup）的独立可安装插件包。",
   "scripts": {
@@ -26,7 +26,8 @@
     "community-plugin-quality:write": "node scripts/generate-community-plugin-quality-report.mjs --write",
     "community-plugin-quality:check": "node scripts/generate-community-plugin-quality-report.mjs --check",
     "test:scripts": "node --test scripts/*.test.mjs",
-    "verify": "pnpm typecheck && pnpm test && pnpm test:scripts && pnpm runtime-deps:check && pnpm dsh-imports:check && pnpm dsh-audit:check && pnpm runtime-support:check && pnpm runtime-support-matrix:check && pnpm community-plugin-quality:check && pnpm sync-shared:check && pnpm release:notes:check && pnpm website:check && pnpm aggregate:check && pnpm gallery:check && pnpm skin-center:check && pnpm community:check && pnpm docs:check",
+    "desktop-version:check": "node scripts/verify-desktop-version-floor.mjs",
+    "verify": "pnpm typecheck && pnpm test && pnpm test:scripts && pnpm desktop-version:check && pnpm runtime-deps:check && pnpm dsh-imports:check && pnpm dsh-audit:check && pnpm runtime-support:check && pnpm runtime-support-matrix:check && pnpm community-plugin-quality:check && pnpm sync-shared:check && pnpm release:notes:check && pnpm website:check && pnpm aggregate:check && pnpm gallery:check && pnpm skin-center:check && pnpm community:check && pnpm docs:check",
     "skin:new": "node scripts/dsh-skin-new",
     "pr:review": "node scripts/pr-review.mjs",
     "gallery:build": "node scripts/gallery-build",

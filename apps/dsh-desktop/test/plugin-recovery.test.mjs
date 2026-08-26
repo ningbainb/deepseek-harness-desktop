@@ -18,6 +18,44 @@ import {
 import { DesktopProfileBaselineQuarantine } from '../src/profile-baseline-quarantine.mjs'
 import { BUILTIN_BUNDLES, ensureDesktopProfile } from '../src/profile.mjs'
 
+test('diagnostic-only recovery observes no Runtime events and cannot auto-disable a plugin', async () => {
+  const controller = new EventEmitter()
+  controller.status = { state: 'starting' }
+  const store = new EventEmitter()
+  store.getState = async () => ({ safeMode: false, disabledPlugins: [] })
+  const recovery = new DesktopPluginRecovery({
+    controller,
+    pluginManager: {},
+    store,
+    ensureProfile: async () => {},
+    automatic: false,
+  })
+
+  await recovery.initialize()
+  assert.equal(controller.listenerCount('line'), 0)
+  assert.equal(controller.listenerCount('status'), 0)
+  controller.emit('status', { state: 'crashed', error: 'private plugin startup error' })
+  assert.deepEqual(await recovery.getState(), {
+    safeMode: false,
+    disabledPlugins: [],
+    baselineQuarantineAvailable: false,
+    busy: false,
+    recoveryStage: 0,
+  })
+  await recovery.dispose()
+})
+
+test('Electron startup leaves baseline quarantine and compatibility mutation out of the load path', async () => {
+  const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
+  const bootstrap = source.slice(source.indexOf('export async function startElectronApp'))
+
+  assert.doesNotMatch(bootstrap, /new DesktopProfileBaselineQuarantine\(/u)
+  assert.doesNotMatch(bootstrap, /recoverProfileAfterPluginInspectionFailure\(/u)
+  assert.doesNotMatch(bootstrap, /pluginManager\.reconcileCompatibility\(/u)
+  assert.match(bootstrap, /pluginManager\.inspectCompatibility\(/u)
+  assert.match(bootstrap, /automatic: false/u)
+})
+
 test('plugin failure classifier identifies a missing dependency through a Unicode Windows path', () => {
   const result = classifyPluginFailure([
     "Cannot find package 'schemastery'",
@@ -1079,7 +1117,7 @@ test('2.2 repairs the legacy unknown-timeout safe mode without touching plugin f
   }
 })
 
-test('2.2 preserves a user-requested safe mode for one-click recovery', async () => {
+test('direct startup restores plugins left disabled by an older release without a Runtime cycle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-recovery-user-safe-mode-'))
   const profileDir = join(root, 'profile')
   const stateDir = join(root, 'recovery')
@@ -1134,6 +1172,7 @@ test('2.2 preserves a user-requested safe mode for one-click recovery', async ()
       store,
       ensureProfile: async () => {},
       builtInBundles: BUILTIN_BUNDLES,
+      automatic: false,
     })
 
     await recovery.initialize()
@@ -1141,16 +1180,23 @@ test('2.2 preserves a user-requested safe mode for one-click recovery', async ()
     assert.equal(state.safeMode, true)
     assert.deepEqual(state.disabledPlugins, [packageName])
 
-    assert.deepEqual(await recovery.restoreDisabledAndRestart(), { restored: [packageName] })
+    assert.deepEqual(await recovery.restoreForDirectStartup(), {
+      restored: [packageName],
+      changed: true,
+    })
     const restoredState = await recovery.getState()
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-    assert.equal(stops, 1)
-    assert.equal(starts, 1)
+    assert.equal(stops, 0)
+    assert.equal(starts, 0)
     assert.equal(restoredState.safeMode, false)
     assert.deepEqual(restoredState.disabledPlugins, [])
-    assert.equal(restoredState.currentIncident.resolution, 'restored-by-user')
+    assert.equal(restoredState.currentIncident.resolution, 'restored-by-direct-start')
     assert.equal(manifest.dependencies[packageName], '1.0.0')
     assert.equal(manifest.dsh.profile.bundles.includes(packageName), true)
+    assert.equal(
+      JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).policyVersion,
+      4,
+    )
     await recovery.dispose()
   } finally {
     await rm(root, { recursive: true, force: true })

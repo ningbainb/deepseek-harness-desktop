@@ -2,11 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createDesktopClient,
+  DESKTOP_CLIENT_API_VERSION,
   runDeepLink,
   taskDeepLink,
 } from '../src/index.js'
 
 describe('Desktop Client SDK v1', () => {
+  it('advertises the additive Dock API release', () => {
+    expect(DESKTOP_CLIENT_API_VERSION).toBe('1.1.0')
+  })
+
   it('is a quiet unavailable facade in ordinary DSH web', async () => {
     const client = createDesktopClient({ globalObject: {} })
     expect(await client.getDesktopInfo()).toEqual({ available: false, reason: 'unavailable' })
@@ -14,6 +19,8 @@ describe('Desktop Client SDK v1', () => {
     expect(await client.getRuntimeStatus()).toEqual({ available: false, reason: 'unavailable' })
     expect(await client.showNotification({ category: 'task', id: 'task:ordinary-web', title: 'Done', body: 'No desktop' })).toEqual({ available: false, reason: 'unavailable' })
     expect(await client.openDesktopSurface('extensions')).toBe(false)
+    expect(await client.getDockEntryState()).toEqual({ available: false, reason: 'unavailable' })
+    expect(await client.dismissDockNudge('close')).toBe(false)
     expect(await client.openWorkspaceFile({ root: '/workspace', path: 'README.md' })).toEqual({ available: false, reason: 'unavailable' })
     expect(client.subscribeRuntimeStatus(() => {})).not.toThrow()
   })
@@ -23,7 +30,7 @@ describe('Desktop Client SDK v1', () => {
     const onDeepLink = vi.fn()
     const bridge = {
       getInfo: vi.fn(async () => ({ appId: 'desktop', productName: 'Desktop', version: '2.7.0', platform: 'win32' })),
-      getContract: vi.fn(async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: ['notifications.show', 'workspace-files.open', 'extensions.manage', 'updates.read'] })),
+      getContract: vi.fn(async () => ({ apiVersion: '1.4.0', surface: 'main', capabilities: ['notifications.show', 'workspace-files.open', 'extensions.open', 'updates.read'] })),
       getStatus: vi.fn(async () => ({
         state: 'ready',
         restartAttempt: 0,
@@ -33,6 +40,9 @@ describe('Desktop Client SDK v1', () => {
       onDeepLink: vi.fn((listener) => { listener({ href: 'dsh://task/task-1' }); return () => {} }),
       showNotification: vi.fn(async () => ({ shown: true })),
       toolAction: vi.fn(async () => true),
+      getDockEntryState: vi.fn(async () => ({ available: true, showNudge: true })),
+      dismissDockNudge: vi.fn(async () => ({ dismissed: true })),
+      openExtensionDock: vi.fn(async () => ({ opened: true })),
       helpAction: vi.fn(async () => true),
       openWorkspaceFile: vi.fn(async () => ({ opened: true })),
     }
@@ -50,9 +60,13 @@ describe('Desktop Client SDK v1', () => {
     expect(onDeepLink).toHaveBeenCalledWith('dsh://task/task-1')
     expect(await client.showNotification({ category: 'run', id: 'run:1', title: 'Done', body: 'Run complete' })).toEqual({ shown: true })
     expect(await client.openDesktopSurface('extensions')).toBe(true)
+    expect(await client.getDockEntryState()).toEqual({ available: true, showNudge: true })
+    expect(await client.dismissDockNudge('escape')).toBe(true)
     expect(await client.openDesktopSurface('updates')).toBe(true)
     expect(await client.openWorkspaceFile({ root: 'C:/work', path: 'src/main.ts' })).toEqual({ opened: true })
     expect(bridge.openWorkspaceFile).toHaveBeenCalledWith({ root: 'C:/work', path: 'src/main.ts' })
+    expect(bridge.openExtensionDock).toHaveBeenCalledTimes(1)
+    expect(bridge.dismissDockNudge).toHaveBeenCalledWith('escape')
     expect('bridge' in client).toBe(false)
   })
 
@@ -110,16 +124,24 @@ describe('Desktop Client SDK v1', () => {
       getContract: vi.fn(async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: [] })),
       showNotification: vi.fn(async () => ({ shown: true })),
       toolAction: vi.fn(async () => true),
+      getDockEntryState: vi.fn(async () => ({ available: true, showNudge: true })),
+      dismissDockNudge: vi.fn(async () => ({ dismissed: true })),
+      openExtensionDock: vi.fn(async () => ({ opened: true })),
       helpAction: vi.fn(async () => true),
       openWorkspaceFile: vi.fn(async () => ({ opened: true })),
     }
     const client = createDesktopClient({ globalObject: { dshDesktop: bridge } })
     expect(await client.showNotification({ category: 'task', id: 'task-1', title: 'Done', body: 'No bridge call' })).toEqual({ available: false, reason: 'unavailable' })
     expect(await client.openDesktopSurface('extensions')).toBe(false)
+    expect(await client.getDockEntryState()).toEqual({ available: false, reason: 'unavailable' })
+    expect(await client.dismissDockNudge('close')).toBe(false)
     expect(await client.openDesktopSurface('updates')).toBe(false)
     expect(await client.openWorkspaceFile({ root: 'C:/work', path: 'README.md' })).toEqual({ available: false, reason: 'unavailable' })
     expect(bridge.showNotification).not.toHaveBeenCalled()
     expect(bridge.toolAction).not.toHaveBeenCalled()
+    expect(bridge.getDockEntryState).not.toHaveBeenCalled()
+    expect(bridge.dismissDockNudge).not.toHaveBeenCalled()
+    expect(bridge.openExtensionDock).not.toHaveBeenCalled()
     expect(bridge.helpAction).not.toHaveBeenCalled()
     expect(bridge.openWorkspaceFile).not.toHaveBeenCalled()
   })

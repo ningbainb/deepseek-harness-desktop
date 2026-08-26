@@ -379,6 +379,7 @@ export class PluginRecoveryStore extends EventEmitter {
   clearRecoveryMode(resolution = 'restored-by-user') {
     return this.#enqueue(async () => {
       await this.#initialize()
+      this.state.policyVersion = RECOVERY_POLICY_VERSION
       this.state.safeMode = false
       this.state.disabledDependencies = {}
       const incident = this.state.incidents.find((item) => item.id === this.state.currentIncidentId)
@@ -635,6 +636,7 @@ export class DesktopPluginRecovery extends EventEmitter {
     cancelSchedule = clearTimeout,
     log = async () => {},
     baselineQuarantine,
+    automatic = true,
   }) {
     super()
     if (!controller || !pluginManager || !store || typeof ensureProfile !== 'function') {
@@ -649,6 +651,8 @@ export class DesktopPluginRecovery extends EventEmitter {
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
     this.log = log
+    if (typeof automatic !== 'boolean') throw new TypeError('automatic recovery policy must be a boolean')
+    this.automatic = automatic
     if (
       baselineQuarantine !== undefined
       && (
@@ -677,37 +681,39 @@ export class DesktopPluginRecovery extends EventEmitter {
 
   async initialize() {
     await this.store.getState()
-    const baselineActive = await this.#baselineQuarantineAvailable()
-    if (baselineActive) await this.#reconcilePersistedBaseline()
+    if (this.automatic) {
+      const baselineActive = await this.#baselineQuarantineAvailable()
+      if (baselineActive) await this.#reconcilePersistedBaseline()
 
-    // A persisted baseline intentionally keeps all user loaders isolated.
-    // Do not let the pre-v2 legacy repair put dependencies back into that
-    // profile before the user has explicitly chosen Restore.
-    const legacyRepair = baselineActive
-      ? undefined
-      : await this.store.getLegacyAutoSafeModeRepair()
-    if (legacyRepair) {
-      let prepared
-      try {
-        prepared = await this.#prepareDisabledDependencyRestore(legacyRepair.disabledDependencies)
-        await this.ensureProfile()
-        for (const transaction of prepared.transactions) transaction.commit()
-        await this.store.completeLegacyAutoSafeModeRepair({
-          success: true,
-          restoredPlugins: prepared.restoredPlugins,
-        })
-        await this.#log(`[plugin-recovery] repaired legacy unknown-timeout safe mode; restored=${prepared.restoredPlugins.join(',') || 'none'}`)
-      } catch (error) {
-        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
-          await transaction.rollback().catch(() => {})
+      // A persisted baseline intentionally keeps all user loaders isolated.
+      // Do not let the pre-v2 legacy repair put dependencies back into that
+      // profile before the user has explicitly chosen Restore.
+      const legacyRepair = baselineActive
+        ? undefined
+        : await this.store.getLegacyAutoSafeModeRepair()
+      if (legacyRepair) {
+        let prepared
+        try {
+          prepared = await this.#prepareDisabledDependencyRestore(legacyRepair.disabledDependencies)
+          await this.ensureProfile()
+          for (const transaction of prepared.transactions) transaction.commit()
+          await this.store.completeLegacyAutoSafeModeRepair({
+            success: true,
+            restoredPlugins: prepared.restoredPlugins,
+          })
+          await this.#log(`[plugin-recovery] repaired legacy unknown-timeout safe mode; restored=${prepared.restoredPlugins.join(',') || 'none'}`)
+        } catch (error) {
+          for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+            await transaction.rollback().catch(() => {})
+          }
+          await this.ensureProfile().catch(() => {})
+          await this.store.completeLegacyAutoSafeModeRepair({ success: false, error })
+          await this.#log(`[plugin-recovery] legacy safe-mode repair needs user action: ${asMessage(error instanceof Error ? error.message : error)}`)
         }
-        await this.ensureProfile().catch(() => {})
-        await this.store.completeLegacyAutoSafeModeRepair({ success: false, error })
-        await this.#log(`[plugin-recovery] legacy safe-mode repair needs user action: ${asMessage(error instanceof Error ? error.message : error)}`)
       }
+      this.controller.on('line', this.onLine)
+      this.controller.on('status', this.onStatus)
     }
-    this.controller.on('line', this.onLine)
-    this.controller.on('status', this.onStatus)
     this.store.on('change', this.onStoreChange)
     return this.getState()
   }
@@ -1075,36 +1081,6 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
   }
 
-  disableCurrentAndRestart() {
-    return this.#enqueue(async () => {
-      const state = await this.store.getState()
-      const name = state.currentIncident?.pluginName
-      if (!name) throw new Error('当前没有可停用的故障插件')
-      await this.controller.stop()
-      const transaction = await this.pluginManager.setEnabled(name, false)
-      try {
-        await this.ensureProfile()
-        await this.store.setSafeMode(false)
-        await this.controller.start()
-        transaction.commit()
-        if (transaction.result.dependencySpec) {
-          await this.store.rememberDisabledDependencies({ [name]: transaction.result.dependencySpec })
-        }
-        await this.store.resolveIncident(state.currentIncident.id, 'disabled-by-user')
-        return transaction.result
-      } catch (error) {
-        await transaction.rollback()
-        await this.ensureProfile()
-        await this.controller.start().catch(() => {})
-        throw error
-      }
-    })
-  }
-
-  enterSafeModeAndRestart() {
-    return this.#enqueue(() => this.#enterSafeMode())
-  }
-
   restoreDisabledAndRestart() {
     return this.#enqueue(async () => {
       const disabledDependencies = await this.store.getDisabledDependencies()
@@ -1137,16 +1113,32 @@ export class DesktopPluginRecovery extends EventEmitter {
     })
   }
 
-  prepareSafeMode() {
+  /** Restore plugins left disabled by an older release before direct startup. */
+  restoreForDirectStartup() {
     return this.#enqueue(async () => {
-      this.recoveryStage = 2
-      const transaction = await this.pluginManager.enterSafeMode()
-      transaction.commit()
-      await this.store.rememberDisabledDependencies(transaction.result.disabledDependencies)
-      await this.store.setSafeMode(true)
-      await this.ensureProfile()
-      await this.#log(`[plugin-recovery] launch safe mode enabled; disabled=${transaction.result.disabled.join(',') || 'none'}`)
-      return transaction.result
+      const state = await this.store.getState()
+      const disabledDependencies = await this.store.getDisabledDependencies()
+      if (!state.safeMode && Object.keys(disabledDependencies).length === 0) {
+        return Object.freeze({ restored: Object.freeze([]), changed: false })
+      }
+      let prepared
+      try {
+        prepared = await this.#prepareDisabledDependencyRestore(disabledDependencies)
+        await this.ensureProfile()
+        for (const transaction of prepared.transactions) transaction.commit()
+        await this.store.clearRecoveryMode('restored-by-direct-start')
+        await this.#log(`[plugin-recovery] restored prior disabled plugins for direct startup: ${prepared.restoredPlugins.join(',') || 'none'}`)
+        return Object.freeze({
+          restored: Object.freeze([...prepared.restoredPlugins]),
+          changed: true,
+        })
+      } catch (error) {
+        for (const transaction of [...(prepared?.transactions ?? [])].reverse()) {
+          await transaction.rollback().catch(() => {})
+        }
+        await this.ensureProfile().catch(() => {})
+        throw error
+      }
     })
   }
 

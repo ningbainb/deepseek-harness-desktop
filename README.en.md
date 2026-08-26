@@ -36,6 +36,41 @@ The installer includes the main runtime components, so you do not need to separa
 
 [🌐 Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 Documentation](docs/desktop.md) · [📝 Changelog](CHANGELOG.md)
 
+### Latest release: 3.0.9
+
+`desktop-v3.0.9` uses direct loading and zero-click automatic repair: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+
+| Version | Highlights |
+| --- | --- |
+| **3.0.9** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, shows repair progress, and safely handles missing models or Tools capability without startup choices. |
+| **3.0.7** | First stable direct-start and zero-click repair release; preserved same-Home state, the complete plugin graph, and transactional rollback boundaries. |
+| **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
+| **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
+| **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, and Candidate execution fixtures. Its historical anonymous-metrics behavior is replaced by the 3.0 default-off policy. |
+| **2.5.0** | Adds the Runtime Adapter and upstream compatibility defenses, secure `.dshpreset` and Web Profile migration, atomic plugin batches, strict deep-link/file ingress, and structured notifications. |
+| **2.4.0** | Added reliable update-shutdown receipt v2, split Main/Extension Dock permissions, Desktop Contract v1, and Task Board Host-file storage v2. |
+| **2.3.0** | Adds a one-time GitHub Star and community prompt; recognizes external PowerShell/CMD/Node hosts, EncodedCommand payloads, and Windows short paths during preflight; supports direct 0.1.9 upgrades; and coexists with the official web client through an isolated profile and port fallback. |
+| **2.2.0** | Hides Windows terminal descendants, cleans up attributed app/plugin background processes, migrates recognized dependencies and legacy safe-mode false positives, reuses the runtime port, and adds visible one-click safe-mode recovery. |
+| **2.1.0** | Adds measured mainland-China update mirrors, snapshot/isolation/safe-mode plugin recovery, unified skin persistence, reliable update-process cleanup, quiet background commands, Unicode-workspace restart protection, and a visible Tools menu entry for Extension Dock. |
+| **2.0.0** | Restores queued messages after cancellation, bounds incomplete-runtime failures, adds the Skills menu, model API recovery, sticky reasoning controls, and live SSH monitoring, and aligns Desktop-owned surfaces with the native Harness visual system. |
+| **0.1.9** | Fixes conversation-bubble and full-response copying; downloads updates in the background; refreshes the startup and update surfaces with a particle whale and frosted glass; and adds guarded community-plugin compatibility checks, offline switching, rollback, and performance limits. |
+| **0.1.8** | Bundles ChatGPT OAuth, OpenAI Codex models, a model-aware reasoning-effort slider, and Help-menu community and feedback actions; keeps `dshmarket` as the only default store and repairs blank patches plus stale store and skin links during migration. |
+| **0.1.7** | Introduces a deep-ocean startup experience with state-driven progress and a 32px macOS-inspired frosted-glass window bar; bounds large-file preview memory, Git polling, and SSH transfer work; and strengthens first-install cold-start tolerance plus release gates. |
+| **0.1.6** | Bundles Tencent's official QQ Bot and QR Connector. Bind, refresh, cancel, rebind, or unbind from Extension Dock, then connect QQ direct messages and group chats to the desktop Harness. AppSecret is protected by Windows credential encryption and supplied only to the DSH child process. |
+| **0.1.5** | Synchronizes native title-bar colors with light/dark mode, keeps full-screen dialogs inside the safe viewport, fixes packaged skin discovery and switching, and bundles `dshmarket` plus `dsh-plugin-hub`. |
+| **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
+| **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
+
+### 3.0.9 Direct Start and Automatic Repair
+
+- **No startup choices**: fresh users enter the built-in environment, while existing users read their current `DSH_HOME`, profile, conversations, sessions, settings, tasks, skins, and every plugin directly.
+- **Full profile first**: a failed complete-profile start is retried once unchanged. Desktop does not pre-emptively disable a plugin or block startup because publisher, registry, or compatibility metadata is absent.
+- **Model-backed repair**: an attributable plugin or configuration failure may invoke a model the user has already configured. It works in a private transaction workspace, and only a candidate that passes registered checks can be applied atomically.
+- **Startup converges without a key**: when no model or usable key exists, Desktop does not invoke a cloud model; it shows the unavailable repair state, continues to same-Home built-ins fallback, and follows the Runtime Tools capability safely.
+- **Automatic convergence**: a rejected candidate, missing model, or failed repaired start rolls back and starts built-in plugins from the same Home. Conversations and settings are never moved into a temporary profile.
+- **Status rather than decisions**: the startup surface shows only loading, repair, and verification progress. Logs and redacted diagnostics remain in the advanced settings area.
+- **Packaged matrix gate**: preserved Homes from 2.3 through 2.7 and 3.0.1, a clean install, and injected failures must pass against the unsigned unpacked candidate before an installer is built.
+
 > If this project is useful to you, consider giving it a **Star ⭐**.  
 > Your support helps more Windows users discover DeepSeek Harness Desktop.
 
@@ -141,7 +176,7 @@ Plugin installation, updates, and runtime lifecycle are managed by the desktop h
 
 ## 🧠 Codex Models and Reasoning Effort
 
-Built-in **Codex Connect** can complete ChatGPT OAuth through the system browser and enable supported OpenAI Codex models inside Harness.
+3.0.9 uses the official `llm-pi-ai/openai-codex` authorization flow built into DSH RC.1 to complete ChatGPT OAuth and enable supported OpenAI Codex models inside Harness; it no longer loads the legacy `dsh-codex-connect` plugin that conflicts with native providers. The "ChatGPT Login" action in Settings starts OAuth with one click and continues in the system browser; the grant is only read or written by the official credential service and stays in the local DSH Home, so the frontend only learns whether you are signed in and never receives an access token or refresh token. It does not replace your current model by default, take over global search, or enable remote image tools.
 
 When switching models, the desktop app shows the reasoning-effort levels supported by the active model and automatically handles valid configuration.
 

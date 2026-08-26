@@ -1,7 +1,7 @@
-/** Copy-first, atomic HostTaskStore v3 with v2 rollback/fallback semantics. */
+/** Read-compatible, atomically written HostTaskStore v3. */
 
 import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import {
@@ -75,10 +75,10 @@ function cloneSnapshot(value: TaskStoreV3Snapshot): TaskStoreV3Snapshot {
 }
 
 /**
- * Host-owned v3 ledger. The first v3 write copies v2, verifies the copy by
- * parsing and hashing it, writes a marker, and leaves the v2 source untouched.
- * An unreadable v3 file is preserved beside the ledger; once the migration
- * marker exists, the stale v2 snapshot is never re-copied over it.
+ * Host-owned v3 ledger. Loading a legacy v2 ledger is read-only: it is
+ * normalized in memory and remains untouched on disk. The first real user or
+ * scheduler mutation atomically publishes v3. An unreadable v3 file is also
+ * left byte-for-byte unchanged until a real mutation replaces it.
  */
 export class HostTaskStoreV3 {
   private document: TaskLedgerDocumentV3 | undefined
@@ -120,7 +120,7 @@ export class HostTaskStoreV3 {
         ...cloneSnapshot(snapshot),
         revision: current.revision + 1,
         updatedAt: this.now(),
-        migration: current.migration,
+        migration: migrationForWrite(current.migration),
       })
       await this.publish(next)
       this.document = next
@@ -151,7 +151,7 @@ export class HostTaskStoreV3 {
           evidences: working.evidences,
           revision: current.revision + 1,
           updatedAt: this.now(),
-          migration: working.migration,
+          migration: migrationForWrite(working.migration),
         })
         await this.publish(next)
         this.document = next
@@ -176,7 +176,7 @@ export class HostTaskStoreV3 {
         evidences: [],
         revision: current.revision + 1,
         updatedAt: this.now(),
-        migration: current.migration,
+        migration: migrationForWrite(current.migration),
       })
       await this.publish(next)
       this.document = next
@@ -213,101 +213,34 @@ export class HostTaskStoreV3 {
       this.document = parsed
       return parsed
     }
-    if (raw !== undefined) {
-      // Preserve the unreadable bytes beside the ledger before any migration
-      // or later publish can replace them, mirroring the v2 store's handling.
-      await rename(this.options.path, `${this.options.path}.corrupt-${this.now()}-${this.randomId()}`)
-    }
-    if (await this.hasCompletedMigrationMarker()) {
-      // The marker proves the v2→v3 copy already ran, so the remaining v2
-      // source is a stale pre-migration snapshot. Re-copying it over a
-      // damaged or missing post-migration ledger would silently lose every
-      // task created since; start from an empty, recoverable ledger instead.
-      return this.emptyLedgerAfterMigration(raw === undefined ? 'v3-missing-after-migration' : 'invalid-v3-after-migration')
-    }
-    return this.migrateFromV2(raw === undefined ? undefined : 'invalid-v3')
+    if (raw !== undefined) return this.emptyLedgerForInvalidV3()
+    return this.loadLegacyV2()
   }
 
-  /**
-   * The marker is written only after a v3 candidate has been published and
-   * verified. Any readable file at its path therefore proves the copy-first
-   * migration completed; only a missing marker (or a fixture directory that
-   * intentionally blocks the write) leaves the retry path open.
-   */
-  private async hasCompletedMigrationMarker(): Promise<boolean> {
-    try {
-      await readFile(`${this.options.path}.migration.json`, 'utf8')
-      return true
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException)?.code
-      if (code === 'ENOENT' || code === 'EISDIR') return false
-      // Unreadable for other reasons (for example permissions): fail closed
-      // rather than risk re-copying a stale v2 over a completed migration.
-      return true
-    }
-  }
-
-  private emptyLedgerAfterMigration(reason: string): TaskLedgerDocumentV3 {
+  private emptyLedgerForInvalidV3(): TaskLedgerDocumentV3 {
     const at = this.now()
     const fallback = migrateV2DocumentToV3(
       { schemaVersion: 2, revision: 0, updatedAt: at, tasks: [] },
       at,
-      { status: 'failed', at, marker: TASK_BOARD_V3_MIGRATION_MARKER, reason: reason.slice(0, 500) },
+      { status: 'failed', at, marker: TASK_BOARD_V3_MIGRATION_MARKER, reason: 'invalid-v3' },
     )
     this.document = fallback
     return structuredClone(fallback)
   }
 
-  private async migrateFromV2(reason: string | undefined): Promise<TaskLedgerDocumentV3> {
+  private async loadLegacyV2(): Promise<TaskLedgerDocumentV3> {
     const v2Path = this.options.v2Path ?? this.options.path.replace(/tasks-v3\.json$/u, 'tasks-v2.json')
     const v2Raw = await readText(v2Path)
     const v2 = v2Raw === undefined ? undefined : parseLedgerDocumentV2(v2Raw)
     const at = this.now()
-    const backupPath = `${v2Path}.v2-backup-${at}-${this.randomId()}`
-    let migrationStatus: 'complete' | 'failed' | 'not-needed' = 'not-needed'
-    let migrationReason: string | undefined
-    let backup: string | undefined
-    let published = false
-    if (v2 !== undefined) {
-      try {
-        await mkdir(dirname(this.options.path), { recursive: true })
-        await copyFile(v2Path, backupPath)
-        backup = backupPath
-        const candidate = migrateV2DocumentToV3(v2, at, {
-          status: 'complete',
-          at,
-          marker: TASK_BOARD_V3_MIGRATION_MARKER,
-          v2Backup: backupPath,
-        })
-        await this.publish(candidate)
-        published = true
-        const verified = parseLedgerDocumentV3(await readFile(this.options.path, 'utf8'))
-        if (verified === undefined || ledgerDocumentV3Hash(verified) !== ledgerDocumentV3Hash(candidate)) {
-          throw new Error('v3 migration verification failed')
-        }
-        migrationStatus = 'complete'
-        await writeMarker(this.options.path, { marker: TASK_BOARD_V3_MIGRATION_MARKER, from: 2, at, status: 'complete' })
-        this.document = verified
-        return structuredClone(verified)
-      } catch (error) {
-        migrationStatus = 'failed'
-        migrationReason = error instanceof Error ? error.message : String(error)
-        // A marker failure must not leave a seemingly complete v3 file that
-        // wins on the next startup. Remove only the just-published candidate;
-        // the v2 source and its copy-first backup remain untouched.
-        if (published) await rm(this.options.path, { force: true }).catch(() => {})
-        // Keep the v2 backup; an operator can recover it without guessing.
-      }
-    }
     const fallback = migrateV2DocumentToV3(
       v2 ?? { schemaVersion: 2, revision: 0, updatedAt: at, tasks: [] },
       at,
       {
-        status: migrationStatus,
+        status: v2 === undefined ? 'not-needed' : 'pending-write',
         at,
         marker: TASK_BOARD_V3_MIGRATION_MARKER,
-        ...(backup === undefined ? {} : { v2Backup: backup }),
-        ...(reason === undefined && migrationReason === undefined ? {} : { reason: (migrationReason ?? reason)?.slice(0, 500) }),
+        ...(v2Raw !== undefined && v2 === undefined ? { reason: 'invalid-v2' } : {}),
       },
     )
     this.document = fallback
@@ -341,6 +274,11 @@ export class HostTaskStoreV3 {
   }
 }
 
+function migrationForWrite(migration: TaskLedgerDocumentV3['migration']): TaskLedgerDocumentV3['migration'] {
+  if (migration?.status !== 'pending-write') return migration
+  return { ...migration, status: 'complete' }
+}
+
 function isDocument(value: unknown): value is TaskLedgerDocumentV3 {
   return typeof value === 'object' && value !== null && (value as { schemaVersion?: unknown }).schemaVersion === 3
 }
@@ -352,10 +290,6 @@ async function readText(path: string): Promise<string | undefined> {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined
     throw error
   }
-}
-
-async function writeMarker(path: string, marker: unknown): Promise<void> {
-  await writeFile(`${path}.migration.json`, `${JSON.stringify(marker)}\n`, { encoding: 'utf8', mode: 0o600 })
 }
 
 /** Backwards-compatible name for callers that treat the v3 store as the HostTaskStore. */
