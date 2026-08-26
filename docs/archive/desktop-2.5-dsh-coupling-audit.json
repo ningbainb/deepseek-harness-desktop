@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "desktopVersion": "3.0.9",
   "upstreamVersion": "0.1.1-rc.1",
-  "lockfileSha256": "7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b",
+  "lockfileSha256": "c52cd4a5c0552a614512f32106d26f778150fc82e911b17a23acd77f00625c19",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -3103,13 +3103,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 167,
+      "line": 201,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 167,
+      "line": 201,
       "operation": "profileDir"
     },
     {
@@ -4358,6 +4358,18 @@
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/automatic-repair-runner.test.mjs",
       "line": 38,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/automatic-repair-runner.test.mjs",
+      "line": 155,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/automatic-repair-runner.test.mjs",
+      "line": 183,
       "operation": "profileDir"
     },
     {
@@ -7915,13 +7927,13 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2127,
+      "line": 2170,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2129,
+      "line": 2172,
       "operation": "start"
     },
     {

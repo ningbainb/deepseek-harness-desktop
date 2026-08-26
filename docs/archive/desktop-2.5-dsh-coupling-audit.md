@@ -4,7 +4,7 @@ Authoritative Desktop version: 3.0.9.
 
 Stable DSH package version: 0.1.1-rc.1.
 
-Lockfile SHA-256: `7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b`.
+Lockfile SHA-256: `c52cd4a5c0552a614512f32106d26f778150fc82e911b17a23acd77f00625c19`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -397,8 +397,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 115 | profileDir |
 | profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 127 | profileDir |
 | profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 127 | profileDir |
-| profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 167 | profileDir |
-| profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 167 | profileDir |
+| profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 201 | profileDir |
+| profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 201 | profileDir |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 76 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 77 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 78 | resolveRuntimePackages |
@@ -607,6 +607,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1044 | profileDir |
 | profile-home | apps/dsh-desktop/src/user-plugin-archive.mjs | 1088 | profileDir |
 | profile-home | apps/dsh-desktop/test/automatic-repair-runner.test.mjs | 38 | profileDir |
+| profile-home | apps/dsh-desktop/test/automatic-repair-runner.test.mjs | 155 | profileDir |
+| profile-home | apps/dsh-desktop/test/automatic-repair-runner.test.mjs | 183 | profileDir |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 8 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 8 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 16 | ensureDesktopProfile |
@@ -1199,8 +1201,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | shared/tests/dsh-home.spec.ts | 25 | DSH_HOME |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 912 | recover |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1261 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2127 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2129 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2170 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2172 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 190 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 202 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 209 | start |

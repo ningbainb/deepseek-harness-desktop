@@ -31,7 +31,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b"
+    "sha256": "c52cd4a5c0552a614512f32106d26f778150fc82e911b17a23acd77f00625c19"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
