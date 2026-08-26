@@ -11,6 +11,7 @@ import {
 export const UPDATE_STARTUP_DELAY_MS = 15_000
 export const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 export const UPDATE_INSTALL_LAUNCH_TIMEOUT_MS = 10_000
+export const UPDATE_INSTALL_PREPARATION_TIMEOUT_MS = 30_000
 
 const MAX_RELEASE_NOTES_LENGTH = 7_000
 
@@ -79,6 +80,7 @@ export class DesktopUpdateController extends EventEmitter {
     downloadRouter,
     updateChannel = DEFAULT_UPDATE_CHANNEL,
     installLaunchTimeoutMs = UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
+    installPreparationTimeoutMs = UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
     setTimeoutFn = setTimeout,
     setIntervalFn = setInterval,
     clearTimeoutFn = clearTimeout,
@@ -95,6 +97,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.downloadRouter = downloadRouter
     this.updateChannel = normalizeUpdateChannel(updateChannel)
     this.installLaunchTimeoutMs = installLaunchTimeoutMs
+    this.installPreparationTimeoutMs = installPreparationTimeoutMs
     this.setTimeoutFn = setTimeoutFn
     this.setIntervalFn = setIntervalFn
     this.clearTimeoutFn = clearTimeoutFn
@@ -107,6 +110,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.startupTimer = undefined
     this.intervalTimer = undefined
     this.installTimer = undefined
+    this.installPreparationTimer = undefined
     this.listeners = []
     this.status = Object.freeze({ phase: 'idle', currentVersion, visible: false })
   }
@@ -133,6 +137,8 @@ export class DesktopUpdateController extends EventEmitter {
     if (this.startupTimer) this.clearTimeoutFn(this.startupTimer)
     if (this.intervalTimer) this.clearIntervalFn(this.intervalTimer)
     if (this.installTimer) this.clearTimeoutFn(this.installTimer)
+    if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
+    this.installPreparationTimer = undefined
     for (const [event, listener] of this.listeners) this.updater?.removeListener(event, listener)
     this.listeners = []
     this.started = false
@@ -241,7 +247,25 @@ export class DesktopUpdateController extends EventEmitter {
     this.installing = true
     this.#publish({ ...this.status, phase: 'installing', visible: true })
     try {
-      await this.beforeInstall()
+      const preparation = Promise.resolve().then(() => this.beforeInstall())
+      await new Promise((resolve, reject) => {
+        const finish = (callback, value) => {
+          if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
+          this.installPreparationTimer = undefined
+          callback(value)
+        }
+        preparation.then(
+          (value) => finish(resolve, value),
+          (error) => finish(reject, error),
+        )
+        this.installPreparationTimer = this.setTimeoutFn(() => {
+          finish(
+            reject,
+            new Error(`update preparation did not finish before the timeout (${this.installPreparationTimeoutMs}ms)`),
+          )
+        }, this.installPreparationTimeoutMs)
+        this.installPreparationTimer?.unref?.()
+      })
       if (!this.installing) return false
       this.updater.quitAndInstall(false, true)
       if (!this.installing) return false
@@ -265,6 +289,8 @@ export class DesktopUpdateController extends EventEmitter {
     this.installing = false
     if (this.installTimer) this.clearTimeoutFn(this.installTimer)
     this.installTimer = undefined
+    if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
+    this.installPreparationTimer = undefined
     const shouldShow = forceVisible || recoverInstall || this.manualCheck || this.downloading
     this.checking = false
     this.manualCheck = false

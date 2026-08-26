@@ -410,8 +410,14 @@ export async function applyWindowChrome({ webContents, iconDataUrl, showHelpMenu
 
 export function installWindowChrome({ browserWindow, iconDataUrl, showHelpMenu = false, showToolsMenu = false, onError = () => {} }) {
   const { webContents } = browserWindow
+  const readFlag = (value) => typeof value === 'function' ? value() : value
   const apply = () => {
-    void applyWindowChrome({ webContents, iconDataUrl, showHelpMenu, showToolsMenu }).catch(onError)
+    void applyWindowChrome({
+      webContents,
+      iconDataUrl,
+      showHelpMenu: readFlag(showHelpMenu),
+      showToolsMenu: readFlag(showToolsMenu),
+    }).catch(onError)
   }
   const reapplyOverlayTheme = () => {
     if (!browserWindow.isDestroyed?.()) setWindowChromeTheme(browserWindow, getWindowChromeTheme(browserWindow))

@@ -115,7 +115,7 @@ import { hasExistingDesktopState, initialUpdateChannel } from './release-channel
 import { installUpdateSurface } from './update-surface.mjs'
 import { DesktopTrayLifecycle, restoreDesktopWindow } from './tray-lifecycle.mjs'
 import { UserPluginArchive } from './user-plugin-archive.mjs'
-import { getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
+import { applyWindowChrome, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
@@ -457,6 +457,7 @@ export async function startElectronApp(metadata) {
     }
   }
   let mainWindow
+  let mainWindowChromeReady = false
   let extensionWindow
   let terminalSurface
   let terminalPanelPromise
@@ -647,8 +648,8 @@ export async function startElectronApp(metadata) {
   const removeMainWindowChrome = installWindowChrome({
     browserWindow: mainWindow,
     iconDataUrl: windowChromeIconDataUrl,
-    showHelpMenu: true,
-    showToolsMenu: true,
+    showHelpMenu: () => mainWindowChromeReady,
+    showToolsMenu: () => mainWindowChromeReady,
     onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
   })
   const removeConversationPolish = installConversationPolish({
@@ -1522,6 +1523,13 @@ export async function startElectronApp(metadata) {
         diagnostics: catalog.diagnostics.map((item) => ({ error: item.error })),
       }
     },
+  })
+  mainWindowChromeReady = true
+  await applyWindowChrome({
+    webContents: mainWindow.webContents,
+    iconDataUrl: windowChromeIconDataUrl,
+    showHelpMenu: true,
+    showToolsMenu: true,
   })
 
   const createExtensionWindow = async () => {

@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.0.8 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface, loads the existing Home and all plugins directly, and handles startup failures with verified transactional repair or same-Home built-ins fallback.
+> DeepSeek Harness Desktop 3.0.9 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface, loads the existing Home and all plugins directly, and handles startup failures with verified transactional repair or same-Home built-ins fallback.
 
 ## What it is
 
@@ -15,8 +15,8 @@
 
 ## Download
 
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.0.8-x64.exe
-- v3.0.8 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.0.8
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.0.9-x64.exe
+- v3.0.9 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.0.9
 
 ## Source and documentation
 
@@ -28,8 +28,8 @@
 ## Key facts
 
 - Supported systems: Windows 10 and Windows 11, x64
-- Current release: v3.0.8
-- v3.0.8 loads the current DSH Home, persistent profile, conversations, sessions, settings, and all installed plugins directly; it retries the full profile unchanged, may invoke an already configured model in a bounded private repair transaction, applies only verified candidates, and otherwise starts built-in plugins from the same Home without a startup choice screen. With no model or usable key, it does not invoke a cloud model; it reports the unavailable repair path and continues to same-Home built-ins fallback. Request-side Tools capability handling safely follows the pinned Runtime contract.
+- Current release: v3.0.9
+- v3.0.9 loads the current DSH Home, persistent profile, conversations, sessions, settings, and all installed plugins directly; it retries the full profile unchanged, may invoke an already configured model in a bounded private repair transaction, applies only verified candidates, and otherwise starts built-in plugins from the same Home without a startup choice screen. With no model or usable key, it does not invoke a cloud model; it reports the unavailable repair path and continues to same-Home built-ins fallback. Request-side Tools capability handling safely follows the pinned Runtime contract.
 - Published assets include `SHA256SUMS.txt` and `release-manifest.json`; the manifest reports the actual per-asset signature state. A local or source build may be unsigned and does not establish the state of a published asset
 - Desktop telemetry is disabled by default. Diagnostics are generated only after user confirmation to a selected local location and are redacted to exclude secrets, user content, full prompts, full sessions, tool results, project content, paths, and SSH private keys
 - The public website does not automatically report installer clicks; installer links remain direct GitHub Release downloads

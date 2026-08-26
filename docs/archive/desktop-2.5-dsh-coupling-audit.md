@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 3.0.8.
+Authoritative Desktop version: 3.0.9.
 
 Stable DSH package version: 0.1.1-rc.1.
 
@@ -404,20 +404,20 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 78 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 140 | runtimeHome |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 141 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 527 | runtimeHome |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 935 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 949 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 968 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 970 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1011 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1119 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1124 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1129 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1258 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1784 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1816 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1880 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1886 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 528 | runtimeHome |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 936 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 950 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 969 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 971 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1012 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1120 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1125 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1130 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1259 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1792 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1824 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1888 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1894 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 92 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 94 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 94 | profileDir |
@@ -1197,30 +1197,30 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | shared/tests/dsh-home.spec.ts | 20 | DSH_HOME |
 | profile-home | shared/tests/dsh-home.spec.ts | 21 | DSH_HOME |
 | profile-home | shared/tests/dsh-home.spec.ts | 25 | DSH_HOME |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 911 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1260 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2119 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2121 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 169 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 181 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 188 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 231 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 236 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 243 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 262 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 267 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 274 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 302 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 309 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 318 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 362 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 369 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 396 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 529 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 531 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 583 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 590 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 610 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 912 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1261 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2127 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2129 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 190 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 202 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 209 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 252 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 257 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 264 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 283 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 288 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 295 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 323 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 330 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 339 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 383 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 390 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 417 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 550 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 552 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 604 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 611 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 631 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/menu.mjs | 58 | restart |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 916 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 924 | start |
@@ -1282,7 +1282,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 386 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 489 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 498 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/updater.test.mjs | 71 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/updater.test.mjs | 74 | start |
 | runtime-lifecycle | packages/dsh-particle-theme/src/client/index.ts | 70 | start |
 | runtime-lifecycle | packages/dsh-particle-theme/tests/controller.spec.ts | 35 | start |
 | runtime-lifecycle | packages/dsh-task-board/src/client/index.ts | 186 | start |

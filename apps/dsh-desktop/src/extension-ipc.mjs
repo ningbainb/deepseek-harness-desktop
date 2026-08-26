@@ -6,6 +6,26 @@ import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/ski
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 
+export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
+
+async function awaitWithTimeout(value, timeoutMs, label) {
+  const boundedTimeout = Number.isFinite(timeoutMs)
+    ? Math.max(0, timeoutMs)
+    : EXTENSION_QUIESCE_TIMEOUT_MS
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${boundedTimeout}ms`))
+    }, boundedTimeout)
+    timer?.unref?.()
+  })
+  try {
+    return await Promise.race([value, timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 const CHANNELS = [
   'extensions:list',
   'extensions:plugin-check',
@@ -66,6 +86,7 @@ export function registerExtensionIpc({
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
   onRuntimeMaintenanceChange = () => {},
+  quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
 }) {
   if (typeof surfaceRegistry?.assert !== 'function') {
     throw new TypeError('extension IPC requires a desktop surface registry')
@@ -636,22 +657,23 @@ export function registerExtensionIpc({
     for (const channel of CHANNELS) ipcMain.removeHandler(channel)
     await pluginMutationQueue
   }
-  unregister.quiesce = async (timeoutMs = 10_000) => {
+  unregister.quiesce = async ({ timeoutMs = quiesceTimeoutMs } = {}) => {
     acceptingPluginMutations = false
-    let timer
-    const timeoutPromise = new Promise((resolve) => {
-      timer = setTimeout(resolve, timeoutMs)
-      timer?.unref?.()
-    })
-    try {
-      await Promise.race([pluginMutationQueue, timeoutPromise])
-    } finally {
-      if (timer) clearTimeout(timer)
-    }
+    await awaitWithTimeout(
+      typeof qqBotBinding.quiesce === 'function' ? qqBotBinding.quiesce() : undefined,
+      timeoutMs,
+      'extension shutdown quiesce timed out while waiting for QQ Bot operations',
+    )
+    await awaitWithTimeout(
+      pluginMutationQueue,
+      timeoutMs,
+      'extension shutdown quiesce timed out while waiting for plugin mutations',
+    )
   }
   unregister.resume = () => {
     if (disposed) return false
     acceptingPluginMutations = true
+    if (typeof qqBotBinding.resume === 'function') qqBotBinding.resume()
     return true
   }
   return unregister

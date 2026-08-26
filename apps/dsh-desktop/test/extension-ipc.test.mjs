@@ -1224,3 +1224,45 @@ test('QQ Bot bind and unbind wait for plugin mutations while cancellation stays 
   assert.deepEqual(qqCalls, ['cancel', 'bind'])
   await unregister()
 })
+
+test('extension shutdown quiesce times out instead of waiting forever for a plugin mutation', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  let releaseRemoval
+  let removalEntered
+  const removalBarrier = new Promise((resolve) => { releaseRemoval = resolve })
+  const removalSignal = new Promise((resolve) => { removalEntered = resolve })
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      remove: async () => {
+        removalEntered()
+        await removalBarrier
+        return { name: '@community/active', restartRequired: true }
+      },
+    },
+    controller: { stop: async () => {}, start: async () => {} },
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+  })
+
+  const active = ipcMain.handlers.get('extensions:plugin-remove')(undefined, '@community/active')
+  await removalSignal
+  await assert.rejects(
+    unregister.quiesce({ timeoutMs: 10 }),
+    /plugin mutations timed out after 10ms/u,
+  )
+
+  releaseRemoval()
+  await active
+  await unregister()
+})

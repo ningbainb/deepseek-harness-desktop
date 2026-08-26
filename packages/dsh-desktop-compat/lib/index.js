@@ -1044,7 +1044,6 @@ const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
 		tests: ["apps/dsh-desktop/test/tools-capability.test.mjs"],
 		reason: "Add a route-level auto/native/none request-side tools capability while preserving ordinary chat and stable tool-history failure semantics.",
 		removeWhen: "The upstream adapter exposes a request-side tools capability contract with the same route-level behavior.",
-		lastVerified: "2026-08-24"
 	},
 	{
 		id: "session-startup-corruption",
