@@ -12,7 +12,7 @@ import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 
-const ACTIONS = new Set(['retry', 'repair', 'disable-plugin', 'safe-mode', 'open-logs', 'export-diagnostics', 'upgrade-migration', 'exit'])
+const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
 const HELP_ACTIONS = new Set([
   'community',
   'downloads',
