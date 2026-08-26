@@ -1,4 +1,0 @@
-# Desktop-managed patch state for the representative 2.5 profile.
-- id: runtime-provider-adapter
-  config:
-    providerId: dsh-cli-provider-v1

@@ -27,6 +27,8 @@ jobs:
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:directory-picker:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:runtime-provider:e2e
       - run: pnpm --filter @deepseek-ai/dsh-desktop test:preset-deep-link:e2e
+      - name: Verify direct-start and deterministic repair integration
+        run: pnpm --filter @deepseek-ai/dsh-desktop exec node --test test/packaged-direct-start-matrix.test.mjs test/repair-agent-integration.test.mjs test/session-preservation.test.mjs
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:scripts

@@ -9,7 +9,7 @@ export const EXTERNAL_PLUGIN_SOURCE_SCHEMA_VERSION = 1
 /**
  * A source type describes the transport that pnpm will consume. `npm`, `git`,
  * and `https` are deliberately unresolved: resolving them must not download,
- * execute, or inspect unapproved third-party code.
+ * execute, or inspect third-party code.
  */
 export const EXTERNAL_PLUGIN_SOURCE_TYPES = Object.freeze([
   'directory',
@@ -763,8 +763,9 @@ export function createExternalPluginSourceSummary(descriptor) {
 /**
  * Resolve user-selected local sources, or classify an explicit pnpm remote
  * source without touching the network. It performs no installation,
- * mutation, compatibility judgement, or loading; the caller must obtain a
- * separate trust decision before passing the result to a free-mode session.
+ * mutation, compatibility judgement, or loading. Recovery sessions may add
+ * their own permission policy, while normal explicit installs use the
+ * descriptor directly.
  */
 export class ExternalPluginSourceResolver {
   constructor({ baseDir = process.cwd() } = {}) {
@@ -857,6 +858,47 @@ export class ExternalPluginSourceResolver {
     })
     return assertExternalPluginDescriptor(descriptor)
   }
+}
+
+/**
+ * Re-resolve a user-selected source immediately before installation. This is
+ * a technical consistency check only: it neither asks for nor records a trust
+ * decision, and it does not judge publisher or declared compatibility.
+ */
+export async function revalidateExternalPluginSource(descriptor, { resolver } = {}) {
+  const original = assertExternalPluginDescriptor(descriptor)
+  const sourceResolver = resolver ?? new ExternalPluginSourceResolver({
+    baseDir: REMOTE_SOURCE_TYPES.has(original.sourceType) ? process.cwd() : original.canonicalPath,
+  })
+  if (sourceResolver === null || typeof sourceResolver?.resolve !== 'function') {
+    throw new TypeError('external plugin source revalidation requires a resolver')
+  }
+  const reference = REMOTE_SOURCE_TYPES.has(original.sourceType)
+    ? original.installSpec
+    : original.canonicalPath
+  let refreshed
+  try {
+    refreshed = assertExternalPluginDescriptor(await sourceResolver.resolve(reference))
+  } catch (error) {
+    throw sourceError(
+      'external-plugin-source-revalidation-failed',
+      'external plugin source could not be revalidated before installation',
+      error,
+    )
+  }
+  if (
+    refreshed.sourceId !== original.sourceId
+    || refreshed.candidateId !== original.candidateId
+    || refreshed.contentFingerprint !== original.contentFingerprint
+    || refreshed.sourceType !== original.sourceType
+    || refreshed.package.name !== original.package.name
+  ) {
+    throw sourceError(
+      'external-plugin-source-changed',
+      'external plugin source changed before installation',
+    )
+  }
+  return original
 }
 
 /**

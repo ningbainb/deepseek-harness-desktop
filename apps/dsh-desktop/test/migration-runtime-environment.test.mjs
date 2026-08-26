@@ -3,53 +3,38 @@ import test from 'node:test'
 
 import { desktopRuntimeEnvironmentFor } from '../src/electron-app.mjs'
 
-test('migration worker always disables background automation before a Runtime starts', () => {
-  const credentials = { appId: 'desktop-app', appSecret: 'desktop-secret' }
+test('the primary Runtime receives the requested automation and permission policy directly', () => {
   assert.deepEqual(desktopRuntimeEnvironmentFor({
-    qqBotCredentials: credentials,
+    credentialEnvironment: { DEEPSEEK_API_KEY: 'legacy-key' },
+    qqBotCredentials: { appId: 'desktop-app', appSecret: 'desktop-secret' },
     backgroundAutomation: true,
-    migrationWorker: false,
+    fullUser: true,
   }), {
+    DEEPSEEK_API_KEY: 'legacy-key',
     QQBOT_APPID: 'desktop-app',
     QQBOT_SECRET: 'desktop-secret',
     DSH_DESKTOP_BACKGROUND_AUTOMATION: '1',
-    DSH_PERMISSION_MODE: 'workspace-write',
+    DSH_PERMISSION_MODE: 'danger-full-access',
   })
-  assert.deepEqual(desktopRuntimeEnvironmentFor({
-    qqBotCredentials: credentials,
-    backgroundAutomation: true,
-    migrationWorker: true,
-  }), {
-    QQBOT_APPID: 'desktop-app',
-    QQBOT_SECRET: 'desktop-secret',
+  assert.deepEqual(desktopRuntimeEnvironmentFor({ backgroundAutomation: false }), {
+    QQBOT_APPID: '',
+    QQBOT_SECRET: '',
     DSH_DESKTOP_BACKGROUND_AUTOMATION: '0',
     DSH_PERMISSION_MODE: 'workspace-write',
   })
 })
 
-test('the confirmed primary or isolated recovery Runtime receives full-user Agent and tool permissions', () => {
-  assert.deepEqual(desktopRuntimeEnvironmentFor({
-    backgroundAutomation: true,
-    migrationWorker: false,
-    fullUser: true,
-  }), {
-    QQBOT_APPID: '',
-    QQBOT_SECRET: '',
-    DSH_DESKTOP_BACKGROUND_AUTOMATION: '1',
-    DSH_PERMISSION_MODE: 'danger-full-access',
-  })
+test('permission mode rejects non-boolean fullUser values', () => {
+  assert.throws(() => desktopRuntimeEnvironmentFor({ fullUser: 'yes' }), /must be a boolean/u)
+})
 
-  assert.deepEqual(desktopRuntimeEnvironmentFor({
-    backgroundAutomation: true,
-    migrationWorker: false,
-  }), {
-    QQBOT_APPID: '',
-    QQBOT_SECRET: '',
-    DSH_DESKTOP_BACKGROUND_AUTOMATION: '1',
-    DSH_PERMISSION_MODE: 'workspace-write',
-  })
+test('credential compatibility environment rejects runtime controls and non-string values', () => {
   assert.throws(
-    () => desktopRuntimeEnvironmentFor({ fullUser: true, migrationWorker: true }),
-    /migration worker cannot run with full-user permissions/u,
+    () => desktopRuntimeEnvironmentFor({ credentialEnvironment: { DSH_HOME: 'wrong-home' } }),
+    /credential environment/u,
+  )
+  assert.throws(
+    () => desktopRuntimeEnvironmentFor({ credentialEnvironment: { DEEPSEEK_API_KEY: 42 } }),
+    /credential environment/u,
   )
 })

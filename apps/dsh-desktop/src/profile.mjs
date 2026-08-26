@@ -27,6 +27,8 @@ export const BUILTIN_BUNDLES = Object.freeze([
   'reasoning-slider',
 ])
 
+export const DESKTOP_REPAIR_BUNDLE = '@linxin666/dsh-desktop-repair'
+
 // Packages expanded by @linxin666/dsh-web-ui-all. Older desktop profiles
 // listed some of these as top-level bundles as well, which makes Cordis
 // register their patch ids twice. Keep the packages installed for the
@@ -219,6 +221,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   ...BUILTIN_RUNTIME_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
+  DESKTOP_REPAIR_BUNDLE,
 ].toSorted())
 
 // DSH v0.1.1-rc.1 exposes these runtime modules as peers. Keep them explicit so the
@@ -263,6 +266,21 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
 const ROOT_CONFIG = '[]\n'
 export const DESKTOP_PROFILE_BOOTSTRAP_ERROR = 'desktop-profile-bootstrap-invalid'
+export const DESKTOP_PROFILE_FAILURE_CATEGORIES = Object.freeze({
+  PROFILE_REPAIRABLE: 'PROFILE_REPAIRABLE',
+  INSTALLATION_FAILURE: 'INSTALLATION_FAILURE',
+  PERMISSION_FAILURE: 'PERMISSION_FAILURE',
+  UNKNOWN_FATAL: 'UNKNOWN_FATAL',
+})
+const INSTALLATION_FAILURE_CODES = new Set([
+  'DSH_DESKTOP_INSTALLATION_INCOMPLETE',
+  'MANAGED_GIT_INSTALL_INVALID',
+  'MANAGED_GIT_INSTALL_UNAVAILABLE',
+  'runtime-file-integrity-not-in-matrix',
+  'runtime-lockfile-not-in-matrix',
+  'runtime-matrix-unavailable',
+  'runtime-patch-evidence-not-in-matrix',
+])
 export const DESKTOP_PATCH_START = '# --- dsh-desktop managed (auto-generated; do not edit) ---'
 export const DESKTOP_PATCH_END = '# --- end dsh-desktop managed ---'
 export const SKIN_PATCH_START = '# --- dsh-skin managed (auto-generated; do not edit) ---'
@@ -278,6 +296,13 @@ const LEGACY_DESKTOP_PATCH_CONFIG = `- id: directory-picker
 `
 export const DESKTOP_PATCH_CONFIG = `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- insert:
+    - id: authorization
+      name: '@deepseek-ai/dsh-authorization'
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex: {}
 - id: llm-deepseek
   config:
     retryPolicy:
@@ -326,15 +351,29 @@ export function materializeFilesystemPath(path) {
 }
 
 export function createDesktopProfileManifest(existing = {}) {
-  const existingBundles = existing.dsh?.profile?.bundles
+  const existingDsh = existing.dsh !== null && typeof existing.dsh === 'object' && !Array.isArray(existing.dsh)
+    ? existing.dsh
+    : {}
+  const existingProfile = existingDsh.profile !== null
+    && typeof existingDsh.profile === 'object'
+    && !Array.isArray(existingDsh.profile)
+    ? existingDsh.profile
+    : {}
+  const existingBundles = existingProfile.bundles
   const existingDependencies = existing.dependencies ?? {}
-  const communityBundles = Array.isArray(existingBundles)
-    ? existingBundles.filter((name) =>
-         !BUILTIN_BUNDLES.includes(name)
-         && !DEPENDENCY_ONLY_BUNDLES.includes(name)
-         && !AGGREGATED_BUNDLES.includes(name)
-         && !isRetiredManagedPackage(name))
-    : []
+  const managedBundles = new Set([
+    ...BUILTIN_BUNDLES,
+    ...DEPENDENCY_ONLY_BUNDLES,
+    ...AGGREGATED_BUNDLES,
+    DESKTOP_REPAIR_BUNDLE,
+  ])
+  const seenBundles = new Set(BUILTIN_BUNDLES)
+  const communityBundles = []
+  for (const name of Array.isArray(existingBundles) ? existingBundles : []) {
+    if (managedBundles.has(name) || isRetiredManagedPackage(name) || seenBundles.has(name)) continue
+    seenBundles.add(name)
+    communityBundles.push(name)
+  }
   const dependencies = Object.fromEntries(
     Object.entries(existingDependencies)
       .filter(([name]) =>
@@ -342,12 +381,55 @@ export function createDesktopProfileManifest(existing = {}) {
   )
 
   return {
+    ...existing,
     name: 'dsh-profile-desktop',
     private: true,
     dependencies,
     dsh: {
+      ...existingDsh,
       profile: {
+        ...existingProfile,
         bundles: [...BUILTIN_BUNDLES, ...communityBundles],
+      },
+    },
+  }
+}
+
+function errorChain(error) {
+  const chain = []
+  const seen = new Set()
+  let current = error
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    seen.add(current)
+    chain.push(current)
+    current = current.cause
+  }
+  return chain
+}
+
+/** Classify only bounded startup facts; no error messages or paths are returned. */
+export function classifyDesktopProfileBootstrapFailure(error) {
+  const chain = errorChain(error)
+  if (chain.some((entry) => ['EACCES', 'EPERM'].includes(entry?.code))) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE
+  }
+  if (chain.some((entry) => INSTALLATION_FAILURE_CODES.has(entry?.code))) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE
+  }
+  if (chain.some((entry) => entry?.code === DESKTOP_PROFILE_BOOTSTRAP_ERROR)) {
+    return DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE
+  }
+  return DESKTOP_PROFILE_FAILURE_CATEGORIES.UNKNOWN_FATAL
+}
+
+export function createDesktopRepairProfileManifest() {
+  return {
+    name: 'dsh-profile-desktop-repair',
+    private: true,
+    dependencies: {},
+    dsh: {
+      profile: {
+        bundles: [DESKTOP_REPAIR_BUNDLE],
       },
     },
   }
@@ -761,6 +843,15 @@ async function readDesktopManagedPackageJson(path) {
   }
 }
 
+function validateDesktopPatchSyntax(source, label) {
+  if (typeof source !== 'string' || source.trim() === '') return
+  try {
+    parse(source)
+  } catch (error) {
+    throw profileBootstrapError(`desktop profile ${label} is invalid`, error)
+  }
+}
+
 async function writeIfChanged(path, content) {
   try {
     if ((await readFile(path, 'utf8')) === content) return false
@@ -865,16 +956,15 @@ async function linkManagedPackage({
       && installed.version === packaged?.version
     const declaredByLegacyProfile = typeof legacyDependencySpec === 'string'
       && legacyDependencySpec.length > 0
-    const migratableLegacyCopy = metadata.isDirectory()
-      && installed?.name === packageName
+    const migratableLegacyInstall = (metadata.isDirectory() || metadata.isSymbolicLink())
       && packaged?.name === packageName
+      && (installed === undefined || installed.name === packageName)
       && (matchingLegacyVersion || declaredByLegacyProfile)
-    if (!ownedLink && !ownedCopy && !migratableLegacyCopy) {
+    if (!ownedLink && !ownedCopy && !migratableLegacyInstall) {
       // An unrecorded managed-package path is part of the Desktop profile
-      // bootstrap surface.  It can be left behind by a hand-installed or
-      // partially downloaded dependency tree, so let the caller take the
-      // reversible profile-baseline path rather than failing before runtime
-      // recovery is initialized.
+      // bootstrap surface. Adopt only an exact package identity or a dangling
+      // link already declared by the older Desktop manifest. Unrelated local
+      // packages remain untouched.
       throw profileBootstrapError(`refusing to replace unmanaged package at ${target}`)
     }
     await rm(target, { recursive: true, force: true })
@@ -920,12 +1010,29 @@ async function retireManagedPackage({ packageName, profileDir, previous }) {
 export async function ensureDesktopProfile({
   dshHome,
   packageRoots = resolveRuntimePackages(),
-  profileName = 'desktop',
+  profileName,
+  mode = 'full',
 } = {}) {
   if (typeof dshHome !== 'string' || dshHome.length === 0) {
     throw new TypeError('dshHome must be a non-empty absolute path')
   }
-  const profileDir = join(dshHome, 'profiles', profileName)
+  if (!['full', 'builtins', 'repair'].includes(mode)) {
+    throw new TypeError('desktop profile mode must be full, builtins, or repair')
+  }
+  const managedProfileName = {
+    full: 'desktop',
+    builtins: 'desktop-builtins',
+    repair: 'desktop-repair',
+  }[mode]
+  const selectedProfileName = profileName ?? managedProfileName
+  if (typeof selectedProfileName !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(selectedProfileName)) {
+    throw new TypeError('desktop profile name is invalid')
+  }
+  if (mode !== 'full' && profileName !== undefined && profileName !== managedProfileName) {
+    throw new TypeError('managed fallback profile name cannot be overridden')
+  }
+  const preserveUserProfile = mode === 'full'
+  const profileDir = join(dshHome, 'profiles', selectedProfileName)
   await mkdir(profileDir, { recursive: true })
   const manifestPath = join(profileDir, 'package.json')
   const recordPath = join(profileDir, '.dsh-desktop-links.json')
@@ -937,7 +1044,9 @@ export async function ensureDesktopProfile({
     await readDesktopProfileJson(manifestPath, 'manifest'),
     'manifest',
   )
-  const manifest = createDesktopProfileManifest(existing)
+  const manifest = mode === 'repair'
+    ? createDesktopRepairProfileManifest()
+    : createDesktopProfileManifest(preserveUserProfile ? existing : {})
   const activePackageRoots = new Map(packageRoots)
   for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
@@ -959,37 +1068,44 @@ export async function ensureDesktopProfile({
     if (error?.code === 'ENOENT') return ''
     throw error
   })
+  if (!preserveUserProfile) existingPatch = ''
+  validateDesktopPatchSyntax(existingPatch, 'profile patch')
   if (isSemanticallyEmptyPatch(existingPatch)) existingPatch = ''
   const homePatchPath = join(dshHome, 'cordis.patch.yml')
   let homePatch = await readFile(homePatchPath, 'utf8').catch((error) => {
     if (error?.code === 'ENOENT') return undefined
     throw error
   })
+  validateDesktopPatchSyntax(homePatch, 'home patch')
   const originalHomePatch = homePatch
-  const legacySkinMigration = await migrateLegacySkinState({
-    profilePatch: existingPatch,
-    homePatch,
-    dshHome,
-    profileDir,
-  })
-  existingPatch = legacySkinMigration.profilePatch
-  homePatch = legacySkinMigration.homePatch
-  changed = legacySkinMigration.stateChanged || changed
+  if (preserveUserProfile) {
+    const legacySkinMigration = await migrateLegacySkinState({
+      profilePatch: existingPatch,
+      homePatch,
+      dshHome,
+      profileDir,
+    })
+    existingPatch = legacySkinMigration.profilePatch
+    homePatch = legacySkinMigration.homePatch
+    changed = legacySkinMigration.stateChanged || changed
+  }
   // DSH requires a top-level patch array. Repair only documents with no
   // semantic entries: blank/comment-only files, empty arrays, and legacy empty
   // mappings. Non-empty or malformed user configuration remains untouched.
   if (homePatch !== undefined && isSemanticallyEmptyPatch(homePatch) && homePatch !== ROOT_CONFIG) {
     homePatch = ROOT_CONFIG
   }
-  if (homePatch !== originalHomePatch) {
+  if (preserveUserProfile && homePatch !== originalHomePatch) {
     changed = (await writeIfChanged(homePatchPath, homePatch)) || changed
   }
-  let managedPatch
-  try {
-    const qqBotEnabled = readQqBotPatchEnabled(existingPatch) ?? false
-    managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch), qqBotEnabled)
-  } catch (error) {
-    throw profileBootstrapError('desktop profile patch is invalid', error)
+  let managedPatch = ROOT_CONFIG
+  if (mode !== 'repair') {
+    try {
+      const qqBotEnabled = readQqBotPatchEnabled(existingPatch) ?? false
+      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch), qqBotEnabled)
+    } catch (error) {
+      throw profileBootstrapError('desktop profile patch is invalid', error)
+    }
   }
   changed = (await writeIfChanged(patchPath, managedPatch)) || changed
   changed = (await writeIfChanged(join(profileDir, 'pnpm-workspace.yaml'), WORKSPACE_CONFIG)) || changed

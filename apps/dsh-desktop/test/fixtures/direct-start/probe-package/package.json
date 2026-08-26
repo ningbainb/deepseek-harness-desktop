@@ -1,0 +1,7 @@
+{
+  "name": "@fixture/direct-start-session-probe",
+  "version": "0.0.0-test",
+  "type": "module",
+  "main": "index.mjs",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

@@ -267,8 +267,8 @@ test('controller reaches ready state from streamed output and stops cleanly', as
     environmentProvider: () => ({
       QQBOT_APPID: 'desktop-app',
       QQBOT_SECRET: 'runtime-only',
-      // This is the exact additional environment supplied by the native-
-      // confirmed, isolated Free Mode launch path.  It must survive the
+      // This is the exact additional environment supplied by the confirmed
+      // primary Runtime launch path. It must survive the
       // controller's child-environment construction rather than merely being
       // recorded in Desktop state.
       DSH_PERMISSION_MODE: 'danger-full-access',
@@ -305,6 +305,30 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   await controller.stop()
   assert.equal(controller.status.state, 'stopped')
   assert.equal(controller.getWorkspaceFileOpenToken(), undefined)
+  assert.equal(child.killed, true)
+})
+
+test('forceStop reclaims a partially started child without waiting for normal shutdown', async () => {
+  const child = new FakeChild()
+  let terminated = 0
+  const controller = new DshRuntimeController({
+    cliPath: 'dsh-bin.js',
+    cwd: process.cwd(),
+    dshHome: 'C:\\same-home',
+    spawnProcess: () => child,
+    terminateProcessTree: async target => {
+      terminated += 1
+      target.kill('SIGKILL')
+    },
+    startupTimeoutMs: 2_000,
+    platform: 'linux',
+  })
+
+  const starting = controller.start()
+  await controller.forceStop()
+  await assert.rejects(starting, /cancelled by force stop/u)
+  assert.equal(controller.status.state, 'stopped')
+  assert.equal(terminated, 1)
   assert.equal(child.killed, true)
 })
 

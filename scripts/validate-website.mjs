@@ -154,7 +154,9 @@ export function collectPrivacyErrors(html) {
   const errors = []
   const requiredMarkers = [
     ['privacy canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/privacy\.html["']/i],
-    ['default-off disclosure', /默认关闭，不自动上传/u],
+    ['official anonymous analytics disclosure', /官方包默认进行匿名产品分析/u],
+    ['anonymous retention actor disclosure', /稳定匿名安装哈希/u],
+    ['country-only and no-IP boundary', /国家级代码，不保存 IP/u],
     ['user-confirmed export', /仅在用户主动确认后导出/u],
     ['user-selected destination', /用户选择的位置/u],
     ['diagnostic archive format', /JSON\/ZIP/u],

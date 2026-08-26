@@ -12,7 +12,10 @@ import {
   AGGREGATED_BUNDLES,
   BUILTIN_BUNDLES,
   BUILTIN_SKIN_IDS,
+  classifyDesktopProfileBootstrapFailure,
+  CODEX_PROVIDER_CONFLICTS,
   DESKTOP_PATCH_CONFIG,
+  DESKTOP_PROFILE_FAILURE_CATEGORIES,
   DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES,
   DEPENDENCY_ONLY_BUNDLES,
   DESKTOP_PLUGIN_COMPAT_PACKAGES,
@@ -47,6 +50,33 @@ function aggregateLoaderPackageNames(source) {
   return [...packageNames].toSorted()
 }
 
+test('profile bootstrap failure classification is bounded and follows wrapped causes', () => {
+  const invalid = Object.assign(new Error('invalid profile'), {
+    code: 'desktop-profile-bootstrap-invalid',
+  })
+  const wrapped = new Error('provider operation failed', { cause: invalid })
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(wrapped),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+  )
+  for (const code of ['EACCES', 'EPERM']) {
+    assert.equal(
+      classifyDesktopProfileBootstrapFailure(Object.assign(new Error('permission'), { code })),
+      DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE,
+    )
+  }
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(
+      Object.assign(new Error('installation incomplete'), { code: 'DSH_DESKTOP_INSTALLATION_INCOMPLETE' }),
+    ),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.INSTALLATION_FAILURE,
+  )
+  assert.equal(
+    classifyDesktopProfileBootstrapFailure(new Error('unknown')),
+    DESKTOP_PROFILE_FAILURE_CATEGORIES.UNKNOWN_FATAL,
+  )
+})
+
 test('packaged paths point at physical asar-unpacked files', () => {
   assert.equal(
     materializeFilesystemPath('C:\\app\\resources\\app.asar\\node_modules\\pkg'),
@@ -72,6 +102,116 @@ test('profile manifest preserves community bundles after managed bundles', () =>
   assert.deepEqual(manifest.dsh.profile.bundles, [...BUILTIN_BUNDLES, '@community/example'])
   assert.equal(manifest.dependencies['@community/example'], '1.2.3')
   assert.equal(manifest.name, 'dsh-profile-desktop')
+})
+
+test('profile manifest preserves versionless historical fields, dependency specs, and user bundle order', () => {
+  const existing = {
+    name: 'dsh-profile-desktop',
+    private: false,
+    type: 'module',
+    scripts: {
+      prepare: 'node user-prepare.mjs',
+      custom: 'node custom.mjs',
+    },
+    pnpm: {
+      overrides: {
+        react: '18.3.1',
+      },
+      onlyBuiltDependencies: ['sharp'],
+    },
+    dependencies: {
+      '@user/local-link': 'link:C:/plugins/local-link',
+      '@user/file-plugin': 'file:../file-plugin',
+      '@user/workspace-plugin': 'workspace:*',
+      '@user/git-plugin': 'git+https://example.invalid/user/plugin.git#main',
+      '@user/old-plugin': '1.4.2',
+    },
+    optionalDependencies: {
+      '@user/optional': '^2.0.0',
+    },
+    dsh: {
+      customRuntimeField: { enabled: true },
+      profile: {
+        label: '用户自己的桌面配置',
+        bundles: [
+          '@user/local-link',
+          '@user/old-plugin',
+          '@user/local-link',
+        ],
+      },
+    },
+    userMetadata: {
+      source: 'historical-versionless-profile',
+    },
+  }
+
+  const result = createDesktopProfileManifest(existing)
+
+  assert.equal(Object.hasOwn(result, 'version'), false)
+  assert.equal(result.name, 'dsh-profile-desktop')
+  assert.equal(result.private, true)
+  assert.equal(result.type, existing.type)
+  assert.deepEqual(result.scripts, existing.scripts)
+  assert.deepEqual(result.pnpm, existing.pnpm)
+  assert.deepEqual(result.optionalDependencies, existing.optionalDependencies)
+  assert.deepEqual(result.userMetadata, existing.userMetadata)
+  assert.deepEqual(result.dependencies, existing.dependencies)
+  assert.equal(result.dsh.customRuntimeField, existing.dsh.customRuntimeField)
+  assert.equal(result.dsh.profile.label, existing.dsh.profile.label)
+  assert.deepEqual(result.dsh.profile.bundles, [
+    ...BUILTIN_BUNDLES,
+    '@user/local-link',
+    '@user/old-plugin',
+  ])
+})
+
+test('builtins mode uses the same Home but a separate profile with no user bundles or dependencies', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-mode-'))
+  const fullProfileDir = join(dshHome, 'profiles', 'desktop')
+  try {
+    await mkdir(fullProfileDir, { recursive: true })
+    const original = {
+      name: 'historical-profile',
+      dependencies: { '@user/plugin': 'link:C:/user/plugin' },
+      dsh: { profile: { bundles: ['@user/plugin'] } },
+      userField: { preserved: true },
+    }
+    await writeFile(join(fullProfileDir, 'package.json'), `${JSON.stringify(original, null, 2)}\n`)
+
+    const builtins = await ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'builtins' })
+    assert.equal(builtins.profileDir, join(dshHome, 'profiles', 'desktop-builtins'))
+    assert.deepEqual(builtins.manifest.dependencies, {})
+    assert.deepEqual(builtins.manifest.dsh.profile.bundles, BUILTIN_BUNDLES)
+    assert.equal('userField' in builtins.manifest, false)
+    assert.deepEqual(JSON.parse(await readFile(join(fullProfileDir, 'package.json'), 'utf8')), original)
+  } finally {
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('profile mode names are bounded and repair mode has its own managed directory', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-repair-mode-'))
+  try {
+    const repair = await ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'repair' })
+    assert.equal(repair.profileDir, join(dshHome, 'profiles', 'desktop-repair'))
+    assert.deepEqual(repair.manifest.dependencies, {})
+    assert.deepEqual(repair.manifest.dsh.profile.bundles, ['@linxin666/dsh-desktop-repair'])
+    assert.equal(await readFile(join(repair.profileDir, 'cordis.patch.yml'), 'utf8'), '[]\n')
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome, packageRoots: new Map(), mode: 'isolated' }),
+      /profile mode/u,
+    )
+  } finally {
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('host-only repair bundle remains dormant in the normal full profile', () => {
+  const manifest = createDesktopProfileManifest({
+    dsh: { profile: { bundles: ['@linxin666/dsh-desktop-repair', '@user/plugin'] } },
+  })
+  assert.equal(manifest.dsh.profile.bundles.includes('@linxin666/dsh-desktop-repair'), false)
+  assert.equal(manifest.dsh.profile.bundles.includes('@user/plugin'), true)
 })
 
 test('profile manifest removes bundles already supplied by the web UI aggregate', () => {
@@ -133,6 +273,21 @@ test('desktop profile uses the RC.1 native Codex provider plus the native market
   assert.doesNotMatch(DESKTOP_PATCH_CONFIG, /id: dsh-market/u)
   assert.match(DESKTOP_PATCH_CONFIG, /id: llm-deepseek[\s\S]*maxRetries: 4/u)
   assert.match(DESKTOP_PATCH_CONFIG, /retryableCodes:[\s\S]*STREAM_CLOSED/u)
+})
+
+test('desktop profile mounts authorization and activates the native Codex model catalog', () => {
+  assert.equal(
+    [...DESKTOP_PATCH_CONFIG.matchAll(/name: '@deepseek-ai\/dsh-authorization'/gu)].length,
+    1,
+  )
+  assert.match(
+    DESKTOP_PATCH_CONFIG,
+    /- id: llm-pi-ai[\s\S]*?providers:\s*\n\s+openai-codex: \{\}/u,
+  )
+  for (const packageName of ['dsh-codex', 'dsh-codex-auth', 'dsh-codex-connect']) {
+    assert.equal(CODEX_PROVIDER_CONFLICTS.includes(packageName), true)
+    assert.equal(MANAGED_RUNTIME_PACKAGES.includes(packageName), false)
+  }
 })
 
 test('desktop profile includes the official QQ Bot bundle', () => {
@@ -344,6 +499,42 @@ test('profile bootstrap retargets a recorded Desktop link after the install root
     assert.equal(await realpath(target), await realpath(nextRoot))
     const records = JSON.parse(await readFile(join(first.profileDir, '.dsh-desktop-links.json'), 'utf8'))
     assert.equal(records[packageName].source, nextRoot)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap adopts an unrecorded Desktop link declared by an older profile', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-unrecorded-link-'))
+  const dshHome = join(root, 'home')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const packageName = '@linxin666/dsh-desktop-repair'
+  const oldRoot = join(root, 'old-build', 'desktop-repair')
+  const nextRoot = join(root, 'installed', 'desktop-repair')
+  const target = join(profileDir, 'node_modules', ...packagePathSegments(packageName))
+  try {
+    for (const packageRoot of [oldRoot, nextRoot]) {
+      await mkdir(packageRoot, { recursive: true })
+      await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: packageName, version: '0.1.0' }))
+    }
+    await mkdir(dirname(target), { recursive: true })
+    await symlink(oldRoot, target, process.platform === 'win32' ? 'junction' : 'dir')
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: { [packageName]: `link:${oldRoot.replaceAll('\\', '/')}` },
+      dsh: { profile: { bundles: BUILTIN_BUNDLES } },
+    }, null, 2)}\n`)
+
+    const result = await ensureDesktopProfile({
+      dshHome,
+      packageRoots: new Map([[packageName, nextRoot]]),
+    })
+
+    assert.equal(result.changed, true)
+    assert.equal(await realpath(target), await realpath(nextRoot))
+    const records = JSON.parse(await readFile(join(profileDir, '.dsh-desktop-links.json'), 'utf8'))
+    assert.deepEqual(records[packageName], { mode: 'link', source: nextRoot })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -631,6 +822,55 @@ test('profile bootstrap repairs semantically empty patch documents without repla
   }
 })
 
+test('profile bootstrap leaves a missing root patch absent when the pinned runtime succeeds without it', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-missing-root-patch-'))
+  try {
+    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    await assert.rejects(
+      readFile(join(root, 'cordis.patch.yml'), 'utf8'),
+      (error) => error?.code === 'ENOENT',
+    )
+    const composed = spawnSync(
+      process.execPath,
+      [resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, DSH_HOME: root },
+        timeout: 20_000,
+      },
+    )
+    assert.equal(composed.status, 0, composed.stderr)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('profile bootstrap classifies malformed profile and root patch YAML as repairable', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-malformed-patch-'))
+  const profileDir = join(root, 'profiles', 'desktop')
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'cordis.patch.yml'), '{invalid')
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome: root, packageRoots: new Map() }),
+      (error) => error?.code === 'desktop-profile-bootstrap-invalid'
+        && classifyDesktopProfileBootstrapFailure(error) === DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+    )
+    assert.equal(await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8'), '{invalid')
+
+    await writeFile(join(profileDir, 'cordis.patch.yml'), '[]\n')
+    await writeFile(join(root, 'cordis.patch.yml'), '{invalid')
+    await assert.rejects(
+      ensureDesktopProfile({ dshHome: root, packageRoots: new Map() }),
+      (error) => error?.code === 'desktop-profile-bootstrap-invalid'
+        && classifyDesktopProfileBootstrapFailure(error) === DESKTOP_PROFILE_FAILURE_CATEGORIES.PROFILE_REPAIRABLE,
+    )
+    assert.equal(await readFile(join(root, 'cordis.patch.yml'), 'utf8'), '{invalid')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('profile bootstrap removes standalone legacy skin loaders and retires owned links', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-standalone-skin-migration-'))
   const dshHome = join(root, 'home')
@@ -822,6 +1062,7 @@ test('official DSH CLI composes the isolated desktop profile', async () => {
     assert.doesNotMatch(result.stdout, /- id: dsh-plugin-hub/)
     assert.match(result.stdout, /- id: llm-pi-ai/)
     assert.match(result.stdout, /name: '@deepseek-ai\/dsh-llm-pi-ai'/)
+    assert.match(result.stdout, /- id: llm-pi-ai[\s\S]*?providers:\s*\n\s+openai-codex: \{\}/u)
     assert.doesNotMatch(result.stdout, /name: dsh-codex-connect/)
     assert.match(result.stdout, /- id: reasoning-slider/)
     assert.match(result.stdout, /- id: im-qqbot[\s\S]*?disabled: true/)

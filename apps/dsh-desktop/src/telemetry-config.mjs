@@ -7,9 +7,11 @@ function exactConfiguration(value) {
   return value !== null
     && typeof value === 'object'
     && !Array.isArray(value)
-    && Object.keys(value).length === 1
+    && Object.keys(value).length === 2
     && Object.hasOwn(value, 'endpoint')
     && typeof value.endpoint === 'string'
+    && Object.hasOwn(value, 'officialBuild')
+    && typeof value.officialBuild === 'boolean'
 }
 
 function validEndpoint(value, { allowLocalHttp = false } = {}) {
@@ -33,13 +35,8 @@ export async function resolveTelemetryEndpoint({
   resourcesPath,
   readFile = readFileDefault,
   testEndpoint,
-  explicitlyEnabled = false,
 }) {
   if (testEndpoint !== undefined) return validEndpoint(testEndpoint, { allowLocalHttp: true })
-  // Desktop 3.0 never enables collection merely because an official build
-  // happens to contain an endpoint. A future opt-in surface must pass this
-  // explicit flag after recording the user's choice locally.
-  if (explicitlyEnabled !== true) return undefined
   if (isPackaged !== true || typeof resourcesPath !== 'string' || resourcesPath.length === 0) return undefined
   let configuration
   try {
@@ -47,7 +44,7 @@ export async function resolveTelemetryEndpoint({
   } catch {
     return undefined
   }
-  if (!exactConfiguration(configuration) || configuration.endpoint.length === 0) return undefined
+  if (!exactConfiguration(configuration) || configuration.officialBuild !== true || configuration.endpoint.length === 0) return undefined
   return validEndpoint(configuration.endpoint)
 }
 

@@ -18,12 +18,16 @@ export async function runPackagedDesktop({
   requireStartupTimings = true,
   windowsHide = true,
   forceRendererAccessibility = false,
+  seedPrimaryRuntimePermission = true,
   onSpawn,
 }) {
   if (!appPath || !userData || !dshHome) throw new TypeError('appPath, userData, and dshHome are required')
   if (typeof requireStartupTimings !== 'boolean') throw new TypeError('requireStartupTimings must be a boolean')
   if (typeof windowsHide !== 'boolean') throw new TypeError('windowsHide must be a boolean')
   if (typeof forceRendererAccessibility !== 'boolean') throw new TypeError('forceRendererAccessibility must be a boolean')
+  if (typeof seedPrimaryRuntimePermission !== 'boolean') {
+    throw new TypeError('seedPrimaryRuntimePermission must be a boolean')
+  }
   if (onSpawn !== undefined && typeof onSpawn !== 'function') throw new TypeError('onSpawn must be a function when provided')
   let output = ''
   let child
@@ -46,7 +50,7 @@ export async function runPackagedDesktop({
   }
 
   try {
-    await seedPrimaryRuntimePermissionForTest({ userData })
+    if (seedPrimaryRuntimePermission) await seedPrimaryRuntimePermissionForTest({ userData })
     const startedAt = performance.now()
     child = spawn(appPath, forceRendererAccessibility ? ['--force-renderer-accessibility'] : [], {
       env: {

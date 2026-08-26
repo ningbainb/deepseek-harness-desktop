@@ -36,10 +36,46 @@ QQ 群：**1105158177**
 
 [🌐 产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ 下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 使用文档](docs/desktop.md) · [📝 更新日志](CHANGELOG.md)
 
+### 最新版：3.0.9
+
+`desktop-v3.0.9` 使用“直接载入 + 零点击自动修复”启动策略：[查看完整发布说明](docs/launch/release-notes.md) · [查看兼容性和运行时政策](docs/compatibility-policy.md) · [查看升级与回滚](docs/upgrade-and-rollback.md)。发布资产包含 `SHA256SUMS.txt`、`release-manifest.json` 与频道元数据；签名状态以同一 Release 的 manifest 为准。
+
+| 版本 | 主要更新 |
+| --- | --- |
+| **3.0.9** | 直接读取同一 Home 的原有数据和全部插件；完整启动原样重试后可用已配置模型做有界事务修复，验证失败自动回滚，最终在同一 Home 使用内置插件；无模型或可用 Key 时不调用云端模型并明确回退；启动页显示修复过程，Tools 能力按当前 Runtime 安全处理。 |
+| **3.0.7** | 直接启动与零点击自动修复的首个稳定版本；保留同一 Home 的数据、完整插件图和事务回滚边界。 |
+| **3.0.1** | 冻结 SDK/Contract/Provider/Schema，Stable/Beta 分离，受控 Runtime matrix 与 patch 政策，隐私脱敏 JSON/ZIP 诊断包，签名与 release manifest 发布基础设施；遥测默认关闭。 |
+| **2.7.0** | 修复 Windows 8% Runtime 启动故障并升级到 DSH rc.7；新增托盘后台自动化、Host 持久任务调度、插件兼容声明/锁、browser-safe Desktop SDK、安全工作区外部打开和 Candidate Matrix。 |
+| **2.6.0** | Task Board v3 引入 Project、Task Run、Evidence 与 Git Worktree 审核流；Runtime Provider 缺少可选能力时显式回退 shared-workspace，并加入 Candidate 执行兼容夹具。该版本的匿名统计行为仅作历史记录，已由 3.0 的默认关闭政策取代。 |
+| **2.5.0** | 新增 Runtime Adapter 与上游兼容防线、安全 `.dshpreset` 和 Web Profile 迁移、原子插件批量事务、严格 Deep Link/文件关联与结构化通知。 |
+| **2.4.0** | 新增可靠更新关停回执 v2、主界面/扩展坞权限拆分、Desktop Contract v1，以及 Task Board Host 文件存储 v2。 |
+| **2.3.0** | 新增只出现一次的 GitHub Star 动画引导与“加入社群”反馈入口；安装预检可识别外部 PowerShell/CMD/Node 宿主、EncodedCommand 与 Windows 短路径，兼容 0.1.9 直接升级，并通过独立 profile 与端口回退和官方 Web 端共存。 |
+| **2.2.0** | 隐藏 Windows 终端及其后代窗口；升级时自动清理旧应用和插件后台、迁移可识别旧依赖与旧安全模式误判；重启复用端口，安全模式支持可见提示与一键恢复。 |
+| **2.1.0** | 新增国内更新镜像自动测速与回退、插件快照/自动隔离/安全模式三层容灾；统一皮肤持久化，修复升级文件占用、隐藏命令框、中文工作区重启循环，并从工具菜单直接打开扩展坞。 |
+| **2.0.0** | 修复取消后排队消息滞留与运行时损坏循环；新增 Skills 菜单、模型 API 有界重试、思考区吸顶和 SSH 实时监控；统一 Harness 原生视觉并完善粒子鲸鱼启动页。 |
+| **0.1.9** | 修复对话气泡与整段内容复制；更新改为后台下载并加入毛玻璃更新面板与粒子鲸鱼启动页；新增社区插件适配检测、离线切换、失败回滚与性能保护。 |
+| **0.1.8** | 内置 ChatGPT OAuth 与 OpenAI Codex 模型、模型推理强度滑块、帮助菜单社群与建议入口；默认只保留 `dshmarket`，并修复空补丁、旧市场和皮肤链接迁移。 |
+| **0.1.7** | 全新深海启动界面与状态驱动进度；32px macOS 风格磨砂玻璃窗口栏；收紧大文件预览内存、Git 轮询和 SSH 传输边界，并提升首次安装后的冷启动容错与发布门禁。 |
+| **0.1.6** | 内置腾讯官方 QQ Bot 与扫码 Connector；在扩展坞完成二维码绑定、刷新、取消、重新绑定和解绑，QQ 私聊与群聊可直接接入桌面版 Harness。AppSecret 使用 Windows 凭据保护加密，只注入 DSH 子进程。 |
+| **0.1.5** | 原生标题栏跟随亮色/暗色主题；全屏弹窗避开标题栏安全区；修复安装版皮肤发现与切换，并内置 `dshmarket` 和 `dsh-plugin-hub`。 |
+| **0.1.4** | 桌宠迁移到全局 Shell Overlay，首页和设置页均可见；恢复五张 Web UI 插件配置卡；皮肤中心完整展示安装版随附的九套皮肤。 |
+| **0.1.3** | 加入稳定版 GitHub Release 更新检查、双语更新说明、用户确认下载、任务栏进度和二次确认安装。 |
+
+### 3.0.9 直接启动与自动修复
+
+- **不再让用户选启动方式**：新用户直接进入内置环境；老用户直接读取当前 `DSH_HOME`、Profile、对话、Session、设置、任务、皮肤和全部插件，不创建迁移计划或隔离 Home。
+- **完整启动优先**：完整 Profile 失败时原样重试一次，不先停用插件，也不把“外来插件”当作启动阻断条件。
+- **模型自动修复**：确认为插件或配置问题后，可调用用户已经配置的模型在私有事务工作区生成候选；只有通过注册检查的修改才会原子应用。
+- **无 Key 也可完成启动收敛**：没有模型或可用 Key 时不会调用云端模型，页面明确显示无模型状态并继续同 Home 内置插件回退；Tools capability 按当前 Runtime 能力安全处理。
+- **失败自动收敛**：候选无效、没有可用模型或修复后仍失败时自动回滚，并从同一个 Home 启动内置插件；聊天和设置不搬家。
+- **状态页不做选择题**：启动界面只显示“正在载入”“正在自动修复”“正在验证”等状态。日志和脱敏诊断位于设置的高级区域。
+- **发布前跑真实矩阵**：2.3–2.7、3.0.1 与干净安装 Home 加上故障注入，必须在未签名的 unpacked 候选上通过 direct-start matrix，之后才能生成安装器。
+
 > 如果这个项目对你有帮助，欢迎点一个 **Star ⭐**。  
 > 你的支持可以让更多 Windows 用户发现 DeepSeek Harness Desktop。
 
 ---
+
 
 ## ✨ 为什么选择 DeepSeek Harness Desktop
 
@@ -141,7 +177,7 @@ QQ 群：**1105158177**
 
 ## 🧠 Codex 模型与推理强度
 
-内置 **Codex Connect**，可以通过系统浏览器完成 ChatGPT OAuth，并在 Harness 中使用支持的 OpenAI Codex 模型。
+3.0.9 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程完成 ChatGPT OAuth，并在 Harness 中使用支持的 OpenAI Codex 模型；不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取"是否已登录"，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
 
 模型切换时，桌面端会根据模型实际能力展示可用的推理强度档位，并自动处理对应配置。
 

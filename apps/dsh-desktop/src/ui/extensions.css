@@ -229,7 +229,11 @@ button.market-reload { min-height: 26px; padding: 0 3px; border-color: transpare
 .market-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
 .market-stats { display: flex; align-items: center; gap: 9px; color: var(--harness-text-tertiary); font: 9px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .market-install { min-width: 64px; }
+.market-install[data-state="installing"] { cursor: progress; }
 .market-installed { color: var(--harness-success); font-size: 10px; }
+.market-operation-state { margin: -1px 0 0; padding: 7px 9px; border-radius: 8px; color: var(--harness-text-secondary); background: var(--harness-bg-subtle); font-size: 10px; line-height: 1.45; }
+.market-operation-state.installing { color: var(--harness-accent); }
+.market-operation-state.error { color: var(--harness-danger); background: color-mix(in srgb, var(--harness-danger) 7%, var(--harness-bg)); }
 .market-empty { grid-column: 1 / -1; margin: 0; padding: 56px 20px; border: 1px dashed var(--harness-border-strong); border-radius: 15px; color: var(--harness-text-tertiary); text-align: center; font-size: 11px; }
 .market-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
 .market-pagination[hidden] { display: none; }

@@ -15,7 +15,7 @@ export const TASK_BOARD_V3_MIGRATION_MARKER = 'dsh.taskBoard.v3.migrated'
 
 export interface TaskLedgerMigrationState {
   from: 2
-  status: 'complete' | 'failed' | 'not-needed'
+  status: 'pending-write' | 'complete' | 'failed' | 'not-needed'
   at: number
   marker: string
   v2Backup?: string
@@ -148,6 +148,8 @@ export function inspectLedgerDocumentV3(raw: string): TaskLedgerV3Inspection {
     return normalized === undefined ? [] : [normalized]
   })
   if (evidences.length !== row.evidences.length) return { kind: 'invalid' }
+  const migration = row.migration === undefined ? undefined : parseMigrationState(row.migration)
+  if (row.migration !== undefined && migration === undefined) return { kind: 'invalid' }
   return {
     kind: 'valid',
     document: {
@@ -157,8 +159,30 @@ export function inspectLedgerDocumentV3(raw: string): TaskLedgerV3Inspection {
     projects,
     tasks,
     evidences,
-    ...(typeof row.migration === 'object' && row.migration !== null ? { migration: row.migration as TaskLedgerMigrationState } : {}),
+    ...(migration === undefined ? {} : { migration }),
     },
+  }
+}
+
+function parseMigrationState(value: unknown): TaskLedgerMigrationState | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const row = value as Record<string, unknown>
+  if (
+    row.from !== 2
+    || !['pending-write', 'complete', 'failed', 'not-needed'].includes(row.status as string)
+    || typeof row.at !== 'number'
+    || !Number.isFinite(row.at)
+    || row.marker !== TASK_BOARD_V3_MIGRATION_MARKER
+    || (row.v2Backup !== undefined && typeof row.v2Backup !== 'string')
+    || (row.reason !== undefined && typeof row.reason !== 'string')
+  ) return undefined
+  return {
+    from: 2,
+    status: row.status as TaskLedgerMigrationState['status'],
+    at: row.at,
+    marker: TASK_BOARD_V3_MIGRATION_MARKER,
+    ...(row.v2Backup === undefined ? {} : { v2Backup: row.v2Backup as string }),
+    ...(row.reason === undefined ? {} : { reason: (row.reason as string).slice(0, 500) }),
   }
 }
 

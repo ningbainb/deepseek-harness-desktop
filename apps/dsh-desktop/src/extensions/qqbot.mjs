@@ -155,6 +155,17 @@ function errorMessage(error) {
   return String(error instanceof Error ? error.message : error).slice(0, 1_000)
 }
 
+class QqBotOperationCanceledError extends Error {
+  constructor() {
+    super('QQ Bot operation was canceled')
+    this.name = 'QqBotOperationCanceledError'
+  }
+}
+
+function isQqBotOperationCanceled(error) {
+  return error instanceof QqBotOperationCanceledError
+}
+
 async function rollbackStateChange({ label, error, steps, restartRuntime, restartRequired }) {
   const rollbackErrors = []
   for (const step of [...steps].reverse()) {
@@ -208,6 +219,8 @@ export class QqBotBindingService extends EventEmitter {
     this.stopQr = undefined
     this.operationPromise = undefined
     this.generation = 0
+    this.quiesced = false
+    this.disposed = false
   }
 
   status() {
@@ -229,8 +242,44 @@ export class QqBotBindingService extends EventEmitter {
     )
   }
 
+  #operationIsCurrent(generation) {
+    return !this.disposed && !this.quiesced && generation === this.generation
+  }
+
+  #assertOperationCurrent(generation) {
+    if (!this.#operationIsCurrent(generation)) throw new QqBotOperationCanceledError()
+  }
+
+  #trackOperation(operation) {
+    this.operationPromise = operation
+    void operation.then(
+      () => {
+        if (this.operationPromise === operation) this.operationPromise = undefined
+      },
+      () => {
+        if (this.operationPromise === operation) this.operationPromise = undefined
+      },
+    )
+    return operation
+  }
+
+  #invalidateQr({ publish = false } = {}) {
+    const stop = this.stopQr
+    const wasBinding = this.binding
+    this.binding = false
+    this.qrImage = undefined
+    this.stopQr = undefined
+    this.generation += 1
+    try {
+      stop?.()
+    } catch (error) {
+      this.onEventError(error)
+    }
+    if (publish && wasBinding) this.#publish('canceled')
+  }
+
   start() {
-    if (this.credentials || this.binding || this.settling) return this.status()
+    if (this.disposed || this.quiesced || this.credentials || this.binding || this.settling) return this.status()
     this.binding = true
     this.qrImage = undefined
     const generation = ++this.generation
@@ -258,7 +307,7 @@ export class QqBotBindingService extends EventEmitter {
           this.qrImage = undefined
           this.stopQr = undefined
           this.#publish('saving')
-          this.operationPromise = this.#complete(credentials?.[0], generation)
+          this.#trackOperation(this.#complete(credentials?.[0], generation))
         },
         onFailure: (error) => {
           if (current()) this.#fail(error)
@@ -300,31 +349,36 @@ export class QqBotBindingService extends EventEmitter {
       const normalized = assertCredentials(credentials)
       await this.credentialStore.save(normalized)
       rollbackSteps.push(() => this.credentialStore.clear())
+      this.#assertOperationCurrent(generation)
       const profileChanged = await this.setProfileEnabled(true)
       if (profileChanged) {
         restartRequired = true
         rollbackSteps.push(() => this.setProfileEnabled(false))
       }
+      this.#assertOperationCurrent(generation)
       this.setRuntimeCredentials(normalized)
       restartRequired = true
       rollbackSteps.push(() => this.setRuntimeCredentials(undefined))
-      if (generation !== this.generation) return
+      this.#assertOperationCurrent(generation)
       this.#publish('restarting')
       await this.restartRuntime()
-      if (generation === this.generation) {
-        this.credentials = normalized
-        this.settling = false
-        this.operationPromise = undefined
-        this.#publish('bound')
-      }
+      this.#assertOperationCurrent(generation)
+      this.credentials = normalized
+      this.settling = false
+      this.#publish('bound')
     } catch (error) {
+      const canceled = isQqBotOperationCanceled(error) || !this.#operationIsCurrent(generation)
       const restoredError = await rollbackStateChange({
         label: 'QQ Bot binding',
         error,
         steps: rollbackSteps,
         restartRuntime: this.restartRuntime,
-        restartRequired,
+        restartRequired: restartRequired && !canceled,
       })
+      if (canceled) {
+        this.settling = false
+        return
+      }
       if (generation === this.generation) this.#fail(restoredError)
     }
   }
@@ -335,7 +389,6 @@ export class QqBotBindingService extends EventEmitter {
     this.settling = false
     this.qrImage = undefined
     this.stopQr = undefined
-    this.operationPromise = undefined
     this.generation += 1
     stop?.()
     this.#publish('error', { error: error instanceof Error ? error.message : String(error) })
@@ -343,58 +396,81 @@ export class QqBotBindingService extends EventEmitter {
 
   cancel() {
     if (!this.binding) return this.status()
-    const stop = this.stopQr
-    this.binding = false
-    this.qrImage = undefined
-    this.stopQr = undefined
-    this.generation += 1
-    stop?.()
-    this.#publish('canceled')
+    this.#invalidateQr({ publish: true })
     return this.status()
   }
 
-  async unbind() {
+  async #unbind(previousOperation) {
     this.settling = true
-    await this.operationPromise?.catch(() => {})
-    this.settling = true
-    this.cancel()
+    await previousOperation?.catch(() => {})
+    if (this.quiesced || this.disposed) {
+      this.settling = false
+      return this.status()
+    }
+    if (this.binding) this.#invalidateQr()
+    const generation = this.generation
     const previousCredentials = this.credentials
     const rollbackSteps = []
     let restartRequired = false
     try {
       await this.credentialStore.clear()
       if (previousCredentials) rollbackSteps.push(() => this.credentialStore.save(previousCredentials))
+      this.#assertOperationCurrent(generation)
       const profileChanged = await this.setProfileEnabled(false)
       if (profileChanged) {
         restartRequired = true
         rollbackSteps.push(() => this.setProfileEnabled(true))
       }
+      this.#assertOperationCurrent(generation)
       this.setRuntimeCredentials(undefined)
       restartRequired = true
       rollbackSteps.push(() => this.setRuntimeCredentials(previousCredentials))
+      this.#assertOperationCurrent(generation)
       this.#publish('restarting')
       await this.restartRuntime()
+      this.#assertOperationCurrent(generation)
       this.credentials = undefined
       this.settling = false
-      this.operationPromise = undefined
       this.#publish('unbound')
       return this.status()
     } catch (error) {
+      const canceled = isQqBotOperationCanceled(error) || !this.#operationIsCurrent(generation)
       const restoredError = await rollbackStateChange({
         label: 'QQ Bot unbind',
         error,
         steps: rollbackSteps,
         restartRuntime: this.restartRuntime,
-        restartRequired,
+        restartRequired: restartRequired && !canceled,
       })
       this.settling = false
-      this.operationPromise = undefined
+      if (canceled) return this.status()
       throw restoredError
     }
   }
 
-  dispose() {
-    this.cancel()
+  unbind() {
+    const previousOperation = this.operationPromise
+    return this.#trackOperation(this.#unbind(previousOperation))
+  }
+
+  async quiesce() {
+    this.quiesced = true
+    this.#invalidateQr()
+    const operation = this.operationPromise
+    await operation?.catch(() => {})
+    this.settling = false
+    return this.status()
+  }
+
+  resume() {
+    if (this.disposed) return false
+    this.quiesced = false
+    return true
+  }
+
+  async dispose() {
+    this.disposed = true
+    await this.quiesce()
     this.removeAllListeners()
   }
 }

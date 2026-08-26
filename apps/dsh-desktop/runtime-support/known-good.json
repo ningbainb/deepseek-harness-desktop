@@ -10,8 +10,8 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "3.0.1",
-    "rootVersion": "3.0.1",
+    "version": "3.0.9",
+    "rootVersion": "3.0.9",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
@@ -31,7 +31,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a"
+    "sha256": "7ec1e1afca5dc7cd6463c3f685b76d9293b8011a5ee433bd7e50a4efe4b6846b"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
@@ -66,12 +66,13 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "de3d81e33a478eb6e8444b9c23a96f7a1c617db9c347f8223c9f2d7046fe9a36",
+    "sha256": "c87567f86e35aa69576a81985ba68a34137202bde50a1e62e4debd28b2b74fd6",
     "ids": [
       "cancellation-presentation",
       "desktop-skin-profile-isolation",
       "queued-turn-continuation",
-      "tool-call-arguments-envelope"
+      "tool-call-arguments-envelope",
+      "tools-capability-request-side"
     ]
   },
   "clientSlots": {

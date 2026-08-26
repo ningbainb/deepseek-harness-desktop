@@ -41,3 +41,6 @@ REVIEW-PROMPT.md
 
 # pnpm 11 项目内包存储（本地依赖缓存，不入库）
 .pnpm-store/
+
+# Wrangler local D1/Worker state (generated locally, never product source)
+apps/dsh-telemetry-worker/.wrangler/

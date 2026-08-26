@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 
 import {
+  ActiveRuntimeProvider,
   DshRuntimeProvider,
   RUNTIME_CAPABILITY_IDS,
   RUNTIME_PROVIDER_ERROR_CODES,
@@ -184,4 +185,43 @@ test('support evidence is clone-safe and detached from caller mutation', () => {
   assert.equal(second.lockfileSha256, 'b'.repeat(64))
   assert.equal(second.runtimeIdentity.packageName, '@deepseek-ai/dsh')
   assert.equal(second.provider.providerId, 'dsh-cli-provider-v1')
+})
+
+test('active provider switches profiles without changing Home and forwards only active status', async () => {
+  const full = createProvider().provider
+  const builtinsController = new FakeController()
+  const builtins = createProvider({
+    controller: builtinsController,
+    profileName: 'desktop-builtins',
+    upstreamVersion: '0.1.0-rc.8',
+    ensureProfile: async () => ({ profileDir: 'C:\\dsh-home\\profiles\\desktop-builtins' }),
+  }).provider
+  const active = new ActiveRuntimeProvider({ providers: [full, builtins], activeProfileName: 'desktop' })
+  const statuses = []
+  active.on('status', status => statuses.push([active.profileName, status.state]))
+
+  await active.start()
+  await active.stop()
+  active.activate('desktop-builtins')
+  await active.start()
+
+  assert.equal(active.dshHome, 'C:\\dsh-home')
+  assert.equal(active.profileName, 'desktop-builtins')
+  assert.equal(active.probe().upstreamVersion, '0.1.0-rc.8')
+  assert.equal(active.resolveProfilePaths().profileDir, 'C:\\dsh-home\\profiles\\desktop-builtins')
+  assert.deepEqual(statuses, [
+    ['desktop', 'ready'],
+    ['desktop', 'stopped'],
+    ['desktop-builtins', 'stopped'],
+    ['desktop-builtins', 'ready'],
+  ])
+})
+
+test('active provider refuses profiles from another Home', () => {
+  const full = createProvider().provider
+  const foreign = createProvider({ dshHome: 'D:\\foreign', profileName: 'desktop-builtins' }).provider
+  assert.throws(
+    () => new ActiveRuntimeProvider({ providers: [full, foreign], activeProfileName: 'desktop' }),
+    /same DSH Home/u,
+  )
 })

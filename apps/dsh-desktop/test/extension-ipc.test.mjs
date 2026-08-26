@@ -272,7 +272,7 @@ test('Extension Dock can revoke durable full-user trust only through a zero-argu
   await unregister()
 })
 
-test('full access plugin installation confirms a private descriptor and commits the persistent Desktop profile', async () => {
+test('user-selected plugin installation skips trust approval and commits the persistent Desktop profile', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
   const qqBotBinding = new EventEmitter()
@@ -320,10 +320,7 @@ test('full access plugin installation confirms a private descriptor and commits 
       events.push(['resolve', request])
       return descriptor
     },
-    confirmFullAccessPlugin: async (value) => {
-      events.push(['confirm', value])
-      return true
-    },
+    confirmFullAccessPlugin: async () => assert.fail('user-selected installs must not request trust approval'),
     revalidateFullAccessPlugin: async (value) => {
       events.push(['revalidate', value])
       return descriptor
@@ -340,7 +337,6 @@ test('full access plugin installation confirms a private descriptor and commits 
   assert.deepEqual(result, { ...transaction.result, isolated: false })
   assert.deepEqual(events, [
     ['resolve', { spec: 'C:\\plugins\\free-plugin' }],
-    ['confirm', descriptor],
     ['revalidate', descriptor],
     'stop',
     ['install-persistent', descriptor],
@@ -352,7 +348,7 @@ test('full access plugin installation confirms a private descriptor and commits 
   unregister()
 })
 
-test('community market resolves an opaque catalog ID and uses one native-confirmed full-access transaction', async () => {
+test('community market resolves an opaque catalog ID and installs it without an approval prompt', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
   const qqBotBinding = new EventEmitter()
@@ -391,9 +387,10 @@ test('community market resolves an opaque catalog ID and uses one native-confirm
       resolveInstall: async (id) => { events.push(['catalog-resolve', id]); return 'github:owner/plugin' },
     },
     resolveFullAccessPlugin: async (request) => { events.push(['resolve', request]); return descriptor },
-    confirmFullAccessPlugin: async (value, context) => { events.push(['confirm', value, context]); return true },
+    confirmFullAccessPlugin: async () => assert.fail('market installs must not request trust approval'),
     revalidateFullAccessPlugin: async (value) => { events.push(['revalidate', value]); return descriptor },
     completeFullAccessPlugin: async (value) => events.push(['complete', value]),
+    onRuntimeMaintenanceChange: (active) => events.push(['maintenance', active]),
   })
 
   assert.equal(await ipcMain.handlers.get('extensions:market-list')(), publicCatalog)
@@ -404,8 +401,8 @@ test('community market resolves an opaque catalog ID and uses one native-confirm
   assert.deepEqual(events, [
     'list',
     ['catalog-resolve', 'opaque-market-id'],
+    ['maintenance', true],
     ['resolve', { spec: 'github:owner/plugin' }],
-    ['confirm', descriptor, { mode: 'market' }],
     ['revalidate', descriptor],
     'stop',
     ['install', descriptor],
@@ -413,6 +410,7 @@ test('community market resolves an opaque catalog ID and uses one native-confirm
     'start',
     'commit',
     ['complete', descriptor],
+    ['maintenance', false],
   ])
 
   unregister()
@@ -452,10 +450,10 @@ test('a failed full-access source revalidation leaves Runtime and the profile un
     dshHome: 'C:\\dsh',
     qqBotBinding,
     resolveFullAccessPlugin: async () => { events.push('resolve'); return descriptor },
-    confirmFullAccessPlugin: async () => { events.push('confirm'); return true },
+    confirmFullAccessPlugin: async () => assert.fail('revalidation must happen without trust approval'),
     revalidateFullAccessPlugin: async () => {
       events.push('revalidate')
-      throw new Error('source changed after native confirmation')
+      throw new Error('source changed before installation')
     },
   })
 
@@ -465,9 +463,9 @@ test('a failed full-access source revalidation leaves Runtime and the profile un
       allowUnknown: false,
       fullAccess: true,
     }),
-    /source changed after native confirmation/u,
+    /source changed before installation/u,
   )
-  assert.deepEqual(events, ['resolve', 'confirm', 'revalidate'])
+  assert.deepEqual(events, ['resolve', 'revalidate'])
   unregister()
 })
 
@@ -534,7 +532,7 @@ test('a failed persistent full-access activation rolls back the profile before r
   unregister()
 })
 
-test('full access plugin confirmation refusal leaves the runtime and plugin manager untouched', async () => {
+test('legacy confirmation callbacks cannot block a user-selected plugin install', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
   const qqBotBinding = new EventEmitter()
@@ -560,7 +558,14 @@ test('full access plugin confirmation refusal leaves the runtime and plugin mana
     shell: {},
     getWindow: () => undefined,
     pluginManager: {
-      installFullAccessExternal: async () => events.push('install'),
+      installFullAccessExternal: async () => {
+        events.push('install')
+        return {
+          result: { name: '@external/free-plugin', fullAccess: true },
+          commit: async () => events.push('commit'),
+          rollback: async () => events.push('rollback'),
+        }
+      },
     },
     controller: {
       stop: async () => events.push('stop'),
@@ -578,17 +583,19 @@ test('full access plugin confirmation refusal leaves the runtime and plugin mana
       events.push('confirm')
       return false
     },
+    revalidateFullAccessPlugin: async () => {
+      events.push('revalidate')
+      return descriptor
+    },
   })
 
-  await assert.rejects(
-    ipcMain.handlers.get('extensions:plugin-install')(undefined, {
-      spec: 'C:\\plugins\\free-plugin.tgz',
-      allowUnknown: false,
-      fullAccess: true,
-    }),
-    /not approved/u,
-  )
-  assert.deepEqual(events, ['resolve', 'confirm'])
+  const installed = await ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+    spec: 'C:\\plugins\\free-plugin.tgz',
+    allowUnknown: false,
+    fullAccess: true,
+  })
+  assert.deepEqual(installed, { name: '@external/free-plugin', fullAccess: true, isolated: false })
+  assert.deepEqual(events, ['resolve', 'revalidate', 'stop', 'install', 'ensure', 'start', 'commit'])
   unregister()
 })
 
@@ -1215,5 +1222,47 @@ test('QQ Bot bind and unbind wait for plugin mutations while cancellation stays 
   await removal
   assert.deepEqual(await ipcMain.handlers.get('extensions:qqbot-bind')(), { binding: true })
   assert.deepEqual(qqCalls, ['cancel', 'bind'])
+  await unregister()
+})
+
+test('extension shutdown quiesce times out instead of waiting forever for a plugin mutation', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  let releaseRemoval
+  let removalEntered
+  const removalBarrier = new Promise((resolve) => { releaseRemoval = resolve })
+  const removalSignal = new Promise((resolve) => { removalEntered = resolve })
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      remove: async () => {
+        removalEntered()
+        await removalBarrier
+        return { name: '@community/active', restartRequired: true }
+      },
+    },
+    controller: { stop: async () => {}, start: async () => {} },
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+  })
+
+  const active = ipcMain.handlers.get('extensions:plugin-remove')(undefined, '@community/active')
+  await removalSignal
+  await assert.rejects(
+    unregister.quiesce({ timeoutMs: 10 }),
+    /plugin mutations timed out after 10ms/u,
+  )
+
+  releaseRemoval()
+  await active
   await unregister()
 })

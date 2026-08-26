@@ -1,5 +1,33 @@
 const MARKET_SORTS = new Set(['popular', 'newest', 'name'])
 
+export function communityMarketInstallPresentation({ installed = false, phase = 'idle' } = {}) {
+  if (installed) {
+    return Object.freeze({
+      kind: 'installed',
+      label: '已安装',
+      status: '插件已安装并通过启动检查。',
+      disabled: true,
+    })
+  }
+  if (phase === 'installing') {
+    return Object.freeze({
+      kind: 'installing',
+      label: '安装中…',
+      status: '正在下载并安装；完成后会自动刷新。',
+      disabled: true,
+    })
+  }
+  if (phase === 'error') {
+    return Object.freeze({
+      kind: 'error',
+      label: '重试',
+      status: '安装失败，原配置已恢复。可重试或导出诊断。',
+      disabled: false,
+    })
+  }
+  return Object.freeze({ kind: 'idle', label: '安装', status: '', disabled: false })
+}
+
 function searchableText(plugin) {
   return [
     plugin.name,

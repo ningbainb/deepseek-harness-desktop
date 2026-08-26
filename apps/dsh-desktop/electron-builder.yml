@@ -56,10 +56,10 @@ win:
 nsis:
   include: build/installer.nsh
   artifactName: DeepSeek-Harness-Desktop-Setup-${version}-${arch}.${ext}
-  oneClick: true
+  oneClick: false
   perMachine: false
   allowElevation: false
-  allowToChangeInstallationDirectory: false
+  allowToChangeInstallationDirectory: true
   packElevateHelper: false
   createDesktopShortcut: always
   createStartMenuShortcut: true

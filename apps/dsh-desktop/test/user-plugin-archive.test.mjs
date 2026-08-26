@@ -133,6 +133,24 @@ test('archives raw profile artifacts and hand-edited node_modules bytes, then ro
   }
 })
 
+test('reads snapshots whose inventory uses the canonical depth-first directory order', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-user-plugin-archive-order-'))
+  try {
+    const fixture = await createProfileFixture(root)
+    const archive = new UserPluginArchive({ profileDir: fixture.profileDir })
+    const transaction = await archive.begin({ operation: 'depth-first-order' })
+    const snapshot = await archive.inspect(transaction.snapshotId)
+
+    assert.deepEqual(
+      snapshot.nodeModules.inventory.entries.slice(0, 3).map((entry) => entry.path),
+      ['', '@community', '@community/hand-edited-plugin'],
+    )
+    assert.equal((await archive.listSnapshots()).length, 1)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('safe copy transfer retains a fallback archive and can roll back modified plugin bytes', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-user-plugin-archive-copy-'))
   try {

@@ -25,8 +25,8 @@ Any main-surface plugin can use this single SDK method after capability detectio
 
 Desktop `1.3` also offers `requestPluginInstall({ source })` behind the `plugins.install.request` Contract capability. It hands a remote npm, git, or HTTPS plugin reference to Desktop:
 
-- The source is validated in Electron main against the same remote-reference rules the Recovery Shell enforces. Local filesystem references, `git+file:`, and malformed values are rejected before anything opens.
-- The call itself installs nothing. Desktop opens Extension Dock on the plugins tab with the source pre-filled; the install form, the `fullAccess` confirmation, and the native approval dialog own every later decision, including the transactional rollback on failure.
+- The source is validated in Electron main against the persistent plugin installer's remote-reference rules. Local filesystem references, `git+file:`, and malformed values are rejected before anything opens.
+- The call itself installs nothing. Desktop opens Extension Dock on the plugins tab with the source pre-filled; the user's install action owns the persistent transaction and rollback on failure.
 - A marketplace panel can therefore stay a pure index: it never spawns `pnpm`/`dsh` itself and never bypasses the Extension Dock's install-time protections.
 
 ## Compatibility and SemVer

@@ -5,7 +5,12 @@ import {
   checkRuntimeSupport,
   createRuntimeSupportManifest,
   lockfileIntegrity,
+  textSha256,
 } from './generate-runtime-support.mjs'
+
+test('text evidence hashes are stable across Windows line endings', () => {
+  assert.equal(textSha256('first\nsecond\n'), textSha256('first\r\nsecond\r\n'))
+})
 
 test('Known Good manifest derives exact runtime, integrity, capabilities, and patch evidence', async () => {
   const manifest = await createRuntimeSupportManifest()
@@ -32,6 +37,7 @@ test('Known Good manifest derives exact runtime, integrity, capabilities, and pa
     'desktop-skin-profile-isolation',
     'queued-turn-continuation',
     'tool-call-arguments-envelope',
+    'tools-capability-request-side',
   ])
   assert.equal(manifest.compatPatches.registry, 'packages/dsh-desktop-compat/src/patch-registry.ts')
   assert.match(manifest.compatPatches.sha256, /^[a-f0-9]{64}$/u)

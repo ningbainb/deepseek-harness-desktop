@@ -14,3 +14,14 @@ test('Extension Dock presents declared Desktop compatibility requirements and ru
   assert.match(source, /'capability-missing'/u)
   assert.match(source, /'surface-unsupported'/u)
 })
+
+test('Extension Dock does not expose the retired permission reconfirmation control', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8'),
+  ])
+  for (const source of [html, script]) {
+    assert.doesNotMatch(source, /revoke-full-user-trust/u)
+    assert.doesNotMatch(source, /下次启动.*重新确认/u)
+  }
+})

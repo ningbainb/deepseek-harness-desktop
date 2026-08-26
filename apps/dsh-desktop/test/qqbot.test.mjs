@@ -383,3 +383,39 @@ test('a renderer event delivery failure cannot roll back a committed binding', a
   assert.deepEqual(reported, ['extension window closed'])
   assert.ok(delivered.includes('bound'))
 })
+
+test('quiescing a settling bind rolls back and prevents a late runtime restart', async () => {
+  let callbacks
+  let releaseSave
+  const saveBarrier = new Promise((resolve) => { releaseSave = resolve })
+  const calls = []
+  const service = new QqBotBindingService({
+    credentialStore: {
+      save: async () => {
+        calls.push('save')
+        await saveBarrier
+      },
+      clear: async () => { calls.push('clear') },
+    },
+    startQrConnect: (value) => { callbacks = value; return () => {} },
+    setProfileEnabled: async (enabled) => { calls.push(`profile:${enabled}`) },
+    setRuntimeCredentials: (value) => { calls.push(`runtime:${value ? 'set' : 'clear'}`) },
+    restartRuntime: async () => { calls.push('restart') },
+  })
+
+  service.start()
+  callbacks.onSuccess([{ appId: '123456789', appSecret: 'secret' }])
+  await tick()
+  const quiescing = service.quiesce()
+  releaseSave()
+  await quiescing
+
+  assert.deepEqual(calls, ['save', 'clear'])
+  assert.deepEqual(service.status(), {
+    bound: false,
+    binding: false,
+    pending: false,
+    appId: undefined,
+    qrImage: undefined,
+  })
+})
