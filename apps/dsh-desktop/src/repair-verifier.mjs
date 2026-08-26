@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 
 const CHECK_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u
@@ -44,7 +44,12 @@ export function runRegisteredRepairCommand(command, workspace, {
     let timedOut = false
     const timer = schedule(() => {
       timedOut = true
-      child.kill('SIGKILL')
+      if (process.platform === 'win32' && Number.isInteger(child.pid) && child.pid > 0) {
+        try {
+          execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {})
+        } catch {}
+      }
+      try { child.kill('SIGKILL') } catch {}
     }, timeoutMs)
     timer?.unref?.()
     child.once('error', () => {

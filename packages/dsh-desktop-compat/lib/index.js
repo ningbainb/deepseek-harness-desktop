@@ -656,6 +656,57 @@ function installToolCallArgumentNormalization(ctx) {
 	}), { global: true });
 }
 //#endregion
+//#region src/transcript-balance.ts
+function extractToolCallsFromAssistantMessage(message) {
+	const results = [];
+	if (message.role !== "assistant") return results;
+	const candidateToolCalls = message.tool_calls;
+	if (Array.isArray(candidateToolCalls)) {
+		for (const call of candidateToolCalls) if (typeof call?.id === "string" && call.id.length > 0) results.push({
+			id: call.id,
+			name: call.name ?? call.function?.name
+		});
+	}
+	if (Array.isArray(message.content)) {
+		for (const block of message.content) if (block && typeof block === "object" && block.type === "tool-call") {
+			const toolCallBlock = block;
+			if (typeof toolCallBlock.id === "string" && toolCallBlock.id.length > 0) results.push({
+				id: toolCallBlock.id,
+				name: toolCallBlock.name
+			});
+		}
+	}
+	return results;
+}
+function balanceTranscriptMessages(messages) {
+	if (!Array.isArray(messages) || messages.length === 0) return { messages: messages ?? [] };
+	const lastMessage = messages.at(-1);
+	if (lastMessage?.role === "assistant") {
+		const trailingCalls = extractToolCallsFromAssistantMessage(lastMessage);
+		if (trailingCalls.length > 0) return {
+			messages: messages.slice(0, -1),
+			diagnostic: {
+				outcome: "stripped-trailing-assistant",
+				droppedCallIds: trailingCalls.map((c) => c.id),
+				droppedMessagesCount: 1
+			}
+		};
+	}
+	return { messages };
+}
+function installTranscriptBalanceGuard(ctx) {
+	ctx.on("llm/stream", (options, next) => {
+		if (options && Array.isArray(options.messages)) {
+			const balanced = balanceTranscriptMessages(options.messages);
+			if (balanced.diagnostic) {
+				ctx.logger?.warn?.(`[dsh-desktop-compat] transcript balance: dropped trailing assistant message with ${balanced.diagnostic.droppedCallIds.length} incomplete tool call(s)`);
+				options.messages = balanced.messages;
+			}
+		}
+		return next();
+	}, { global: true });
+}
+//#endregion
 //#region src/workspace-file-open-route.ts
 /** Desktop-owned, loopback-only authority for native workspace-file opening. */
 const DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH = "/desktop/workspace-file-open-target";
@@ -1004,6 +1055,16 @@ const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
 		reason: "Skip only a confirmed invalid zstd frame header while preserving every original session artifact.",
 		removeWhen: "The upstream JSONL persistence backend isolates an invalid session artifact during metadata enumeration.",
 		lastVerified: "2026-08-25"
+	},
+	{
+		id: "transcript-tool-call-balance",
+		appliesTo: ["0.1.1-rc.1"],
+		upstreamReference: "@deepseek-ai/dsh-agent-loop 0.1.1-rc.1 buildRequest interrupted assistant tool_calls transcript projection",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/transcript-balance.spec.ts"],
+		reason: "Strip trailing incomplete assistant messages with unresponded tool calls from outbound stream requests without mutating disk session logs.",
+		removeWhen: "The upstream agent loop strips or repairs interrupted assistant tool calls before assembling outbound LLM messages.",
+		lastVerified: "2026-08-26"
 	}
 ], { enforceFreshness: false });
 //#endregion
@@ -1019,6 +1080,7 @@ const inject = [
 function apply(ctx) {
 	new DesktopSkinStateService(ctx);
 	installToolCallArgumentNormalization(ctx);
+	installTranscriptBalanceGuard(ctx);
 	ctx.effect(() => registerDesktopWorkspaceFileOpenRoute(ctx), "dsh-desktop-compat: workspace native-open authority");
 	if (process.env.DSH_DESKTOP_BACKGROUND_AUTOMATION === "1") ctx.inject([
 		"agents",
@@ -1048,4 +1110,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { DESKTOP_COMPAT_PATCHES, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, apply, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, inject, installToolCallArgumentNormalization, name, normalizeCancellationDecision, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };
+export { DESKTOP_COMPAT_PATCHES, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, apply, balanceTranscriptMessages, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, inject, installToolCallArgumentNormalization, installTranscriptBalanceGuard, name, normalizeCancellationDecision, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };

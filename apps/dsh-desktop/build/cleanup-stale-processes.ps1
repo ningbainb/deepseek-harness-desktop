@@ -650,6 +650,14 @@ namespace DshInstaller
           $validated = Read-ValidatedShutdownReceipt $receiptPath $token $runningMain.ProcessId
           break
         }
+        if (Wait-ForProcessExit $runningMain.ProcessId 0) {
+          $currentTargets = @(Get-InstallProcesses)
+          if ($currentTargets.Count -eq 0) {
+            Write-Output "receipt-early-exit pid=$($runningMain.ProcessId)"
+            Remove-Item -LiteralPath $receiptPath -Force -ErrorAction SilentlyContinue
+            Complete-Preflight
+          }
+        }
         Start-Sleep -Milliseconds 100
       } while ($receiptWait.ElapsedMilliseconds -lt $receiptShutdownTimeoutMs)
 

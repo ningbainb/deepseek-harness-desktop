@@ -274,4 +274,14 @@ export const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
     removeWhen: 'The upstream JSONL persistence backend isolates an invalid session artifact during metadata enumeration.',
     lastVerified: '2026-08-25',
   },
+  {
+    id: 'transcript-tool-call-balance',
+    appliesTo: ['0.1.1-rc.1'],
+    upstreamReference: '@deepseek-ai/dsh-agent-loop 0.1.1-rc.1 buildRequest interrupted assistant tool_calls transcript projection',
+    owner: 'desktop-platform',
+    tests: ['packages/dsh-desktop-compat/tests/transcript-balance.spec.ts'],
+    reason: 'Strip trailing incomplete assistant messages with unresponded tool calls from outbound stream requests without mutating disk session logs.',
+    removeWhen: 'The upstream agent loop strips or repairs interrupted assistant tool calls before assembling outbound LLM messages.',
+    lastVerified: '2026-08-26',
+  },
 ] satisfies readonly DesktopCompatPatch[], { enforceFreshness: false })

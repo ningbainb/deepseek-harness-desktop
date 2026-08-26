@@ -636,9 +636,18 @@ export function registerExtensionIpc({
     for (const channel of CHANNELS) ipcMain.removeHandler(channel)
     await pluginMutationQueue
   }
-  unregister.quiesce = async () => {
+  unregister.quiesce = async (timeoutMs = 10_000) => {
     acceptingPluginMutations = false
-    await pluginMutationQueue
+    let timer
+    const timeoutPromise = new Promise((resolve) => {
+      timer = setTimeout(resolve, timeoutMs)
+      timer?.unref?.()
+    })
+    try {
+      await Promise.race([pluginMutationQueue, timeoutPromise])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
   }
   unregister.resume = () => {
     if (disposed) return false

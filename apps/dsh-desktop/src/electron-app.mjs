@@ -445,6 +445,17 @@ export async function startElectronApp(metadata) {
   let updateShutdownRequest = initialUpdateShutdownRequest
   let updateShutdownRequested = initialUpdateShutdownRequest !== undefined
   let requestUpdateShutdown
+  const pendingUpdateShutdownRequests = []
+  const enqueueUpdateShutdownRequest = (request) => {
+    if (!request) return
+    updateShutdownRequest = request
+    updateShutdownRequested = true
+    if (requestUpdateShutdown) {
+      requestUpdateShutdown(request)
+    } else {
+      pendingUpdateShutdownRequests.push(request)
+    }
+  }
   let mainWindow
   let extensionWindow
   let terminalSurface
@@ -480,9 +491,7 @@ export async function startElectronApp(metadata) {
   app.on('second-instance', (_event, commandLine, _workingDirectory, additionalData) => {
     const request = parseUpdateShutdownRequest(commandLine, additionalData)
     if (request !== undefined) {
-      updateShutdownRequest = request
-      updateShutdownRequested = true
-      requestUpdateShutdown?.(request)
+      enqueueUpdateShutdownRequest(request)
       return
     }
     enqueueCommandLineIngress(commandLine)
@@ -2214,25 +2223,35 @@ export async function startElectronApp(metadata) {
   })
   mainWindow.on('close', (event) => closeBehaviorController?.handleWindowClose(event))
 
+  const writeShutdownReceipt = async (token) => {
+    if (!token) return
+    try {
+      await writeUpdateShutdownReceipt({
+        token,
+        pid: process.pid,
+        runtimeStopped: shutdownLifecycle.runtimeStopped,
+        extensionsQuiesced: shutdownLifecycle.operationsQuiesced,
+      })
+      await logStore.append(`[shutdown] update receipt v2 written for pid=${process.pid}`)
+    } catch (error) {
+      await logStore.append(`[shutdown] update receipt v2 failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   requestUpdateShutdown = (request = updateShutdownRequest) => {
-    if (quitInProgress) return
     closeBehaviorController?.beginExplicitQuit()
+    if (quitInProgress) {
+      if (shutdownLifecycle.runtimeStopped) {
+        void writeShutdownReceipt(request?.token).finally(() => {
+          app.quit()
+        })
+      }
+      return
+    }
     quitInProgress = true
     void shutdownLifecycle.shutdown()
       .then(async () => {
-        if (request?.token) {
-          try {
-            await writeUpdateShutdownReceipt({
-              token: request.token,
-              pid: process.pid,
-              runtimeStopped: shutdownLifecycle.runtimeStopped,
-              extensionsQuiesced: shutdownLifecycle.operationsQuiesced,
-            })
-            await logStore.append(`[shutdown] update receipt v2 written for pid=${process.pid}`)
-          } catch (error) {
-            await logStore.append(`[shutdown] update receipt v2 failed: ${error instanceof Error ? error.message : String(error)}`)
-          }
-        }
+        await writeShutdownReceipt(request?.token)
         app.quit()
       })
       .catch((error) => {
@@ -2242,6 +2261,10 @@ export async function startElectronApp(metadata) {
         void logStore.append(`[shutdown] installer request deferred because runtime stop failed: ${message}`).catch(() => {})
       })
   }
+  for (const pendingRequest of pendingUpdateShutdownRequests) {
+    requestUpdateShutdown(pendingRequest)
+  }
+  pendingUpdateShutdownRequests.length = 0
   if (updateShutdownRequested) requestUpdateShutdown(updateShutdownRequest)
 
   let autoUpdater
@@ -2263,6 +2286,7 @@ export async function startElectronApp(metadata) {
     }),
     log: (line) => void logStore.append(line),
   }) : undefined
+  let appQuitStarted = false
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
     getWindow: () => mainWindow,
@@ -2272,6 +2296,7 @@ export async function startElectronApp(metadata) {
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
     beforeInstall: async () => {
+      appQuitStarted = true
       if (productTelemetry.enabled && typeof updateController?.status?.version === 'string') {
         await updateAnalyticsReceiptStore.recordInstallRequested({
           sourceVersion: desktopVersion,
@@ -2286,7 +2311,11 @@ export async function startElectronApp(metadata) {
       productMetrics.recordSessionEnd()
       await productTelemetry.shutdown()
     },
-    onInstallFailure: async () => {
+    onInstallFailure: async (error) => {
+      if (appQuitStarted || quitInProgress || updateShutdownRequested) {
+        await logStore.append(`[updater] install recovery suppressed because app quit is in progress: ${error instanceof Error ? error.message : String(error)}`)
+        return
+      }
       quitInProgress = false
       closeBehaviorController?.cancelExplicitQuit()
       const recovered = await shutdownLifecycle.recover()

@@ -12,6 +12,7 @@ import {
 } from './recovery.ts'
 import { DesktopSkinStateService } from './skin-state.ts'
 import { installToolCallArgumentNormalization } from './tool-call-normalization.ts'
+import { installTranscriptBalanceGuard } from './transcript-balance.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
 
 export const name = 'desktop-compat'
@@ -21,6 +22,7 @@ export const inject = ['llm', 'tools', 'webServer', 'workspaceRegistry']
 export function apply(ctx: Context): void {
   new DesktopSkinStateService(ctx)
   installToolCallArgumentNormalization(ctx)
+  installTranscriptBalanceGuard(ctx)
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
     'dsh-desktop-compat: workspace native-open authority',
@@ -101,6 +103,13 @@ export {
   type ToolCallNormalizationDiagnostic,
   type ToolCallNormalizationReason,
 } from './tool-call-normalization.ts'
+
+export {
+  balanceTranscriptMessages,
+  extractToolCallsFromAssistantMessage,
+  installTranscriptBalanceGuard,
+  type TranscriptBalanceDiagnostic,
+} from './transcript-balance.ts'
 
 export {
   DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH,

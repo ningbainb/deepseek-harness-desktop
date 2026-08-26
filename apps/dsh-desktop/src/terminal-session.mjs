@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, posix, win32 } from 'node:path'
 
@@ -269,9 +270,15 @@ export class DesktopTerminalSession {
 
   #stopCurrent() {
     const pty = this.#pty
+    const shellPid = pty?.pid
     this.#generation += 1
     this.#clearCurrent()
     try { pty?.kill() } catch {}
+    if (process.platform === 'win32' && Number.isInteger(shellPid) && shellPid > 0) {
+      try {
+        execFile('taskkill.exe', ['/PID', String(shellPid), '/T', '/F'], { windowsHide: true }, () => {})
+      } catch {}
+    }
   }
 
   dispose() {

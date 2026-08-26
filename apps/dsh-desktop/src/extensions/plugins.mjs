@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, win32 } from 'node:path'
 import { readFile, rename, rm, writeFile } from 'node:fs/promises'
@@ -434,8 +434,20 @@ export function createPnpmEnvironment({
   return childEnvironment
 }
 
-export function runPnpm({ pnpmCli, profileDir, args, executable = process.execPath, pathEntries = [] }) {
+export function runPnpm({
+  pnpmCli,
+  profileDir,
+  args,
+  executable = process.execPath,
+  pathEntries = [],
+  timeoutMs = 15 * 60 * 1000,
+  signal,
+}) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('pnpm execution aborted'))
+      return
+    }
     const environment = createPnpmEnvironment({ pathEntries })
     const child = spawn(executable, [pnpmCli, ...args], {
       cwd: profileDir,
@@ -444,12 +456,40 @@ export function runPnpm({ pnpmCli, profileDir, args, executable = process.execPa
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
+    let timer
+    const killChildTree = () => {
+      if (child.exitCode !== null) return
+      if (process.platform === 'win32' && Number.isInteger(child.pid) && child.pid > 0) {
+        execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {})
+      } else {
+        child.kill('SIGTERM')
+      }
+    }
+    if (timeoutMs > 0 && Number.isFinite(timeoutMs)) {
+      timer = setTimeout(() => {
+        killChildTree()
+        reject(new Error(`pnpm timed out after ${timeoutMs}ms`))
+      }, timeoutMs)
+      timer?.unref?.()
+    }
+    const onAbort = () => {
+      killChildTree()
+      reject(new Error('pnpm execution aborted'))
+    }
+    signal?.addEventListener?.('abort', onAbort, { once: true })
+
     let output = ''
     const append = (chunk) => { output = `${output}${chunk.toString('utf8')}`.slice(-20_000) }
     child.stdout.on('data', append)
     child.stderr.on('data', append)
-    child.once('error', reject)
+    child.once('error', (error) => {
+      if (timer) clearTimeout(timer)
+      signal?.removeEventListener?.('abort', onAbort)
+      reject(error)
+    })
     child.once('exit', (code) => {
+      if (timer) clearTimeout(timer)
+      signal?.removeEventListener?.('abort', onAbort)
       if (code === 0) resolve(output)
       else reject(new Error(`pnpm exited with code ${String(code)}\n${output}`))
     })
