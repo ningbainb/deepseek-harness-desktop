@@ -9,6 +9,7 @@ export const DIRECT_STARTUP_STATES = Object.freeze([
   'ready-full',
   'ready-builtins',
   'installation-repair-required',
+  'system-startup-failed',
 ])
 
 /** Safe reasons that may be shown after the full profile falls back. */
@@ -22,6 +23,7 @@ export const DIRECT_STARTUP_REASONS = Object.freeze([
   'profile-permission',
   'profile-installation',
   'profile-failed',
+  'rollback-failed',
 ])
 
 const DIRECT_STARTUP_REASON_SET = new Set(DIRECT_STARTUP_REASONS)
@@ -35,6 +37,7 @@ const DIRECT_STARTUP_SUMMARIES = Object.freeze({
   'ready-full': '启动完成',
   'ready-builtins': '已使用内置插件启动',
   'installation-repair-required': '正在修复应用安装',
+  'system-startup-failed': '启动未能完成',
 })
 
 /** Project internal startup progress into a fixed, non-interactive view. */

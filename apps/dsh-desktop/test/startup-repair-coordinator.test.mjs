@@ -218,3 +218,42 @@ test('rollback failure is contained and builtins still becomes ready', async () 
   assert.equal(result.state, 'ready-builtins')
   assert.equal(result.rollbackFailed, true)
 })
+
+test('builtins fallback start failure surfaces a dedicated outcome before rejecting', async () => {
+  const calls = []
+  const outcomes = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 2, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', failures: 1, calls })
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => false,
+    onOutcome: async (outcome) => { outcomes.push(outcome) },
+  })
+
+  await assert.rejects(coordinator.start(), /bounded fake startup failure/u)
+  assert.deepEqual(outcomes, [{
+    state: 'builtins-start-failed',
+    profileName: 'desktop-builtins',
+  }])
+})
+
+test('a converged builtins fallback publishes its terminal outcome including rollback failure', async () => {
+  const calls = []
+  const outcomes = []
+  const full = fakeProvider({ profileName: 'desktop', failures: 3, calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => true,
+    runRepair: async () => ({
+      status: 'applied',
+      async rollback() { calls.push(['rollback']); throw new Error('bounded rollback failure') },
+    }),
+    onOutcome: async (outcome) => { outcomes.push(outcome) },
+  })
+
+  const result = await coordinator.start()
+
+  assert.equal(result.state, 'ready-builtins')
+  assert.deepEqual(outcomes, [{ state: 'ready-builtins', provider: builtins, fullAttempts: 2, rollbackFailed: true }])
+})

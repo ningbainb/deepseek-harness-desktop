@@ -1,11 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u
 const SAFE_NAME_PATTERN = /^[a-zA-Z0-9@._/+:-]{1,128}$/u
 const SAFE_CODE_PATTERN = /^[A-Z0-9_-]{1,64}$/u
 const TERMINAL_STATES = new Set(['applied', 'rolled-back', 'exhausted'])
+const MAX_STALE_LOCK_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+function defaultIsProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    // A live process owned by another user surfaces as EPERM on Windows.
+    return error?.code === 'EPERM'
+  }
+}
 const TRANSITIONS = new Map([
   ['created', new Set(['claimed'])],
   ['claimed', new Set(['running', 'exhausted'])],
@@ -141,13 +153,21 @@ function assertIncident(value, fingerprint) {
 }
 
 export class RepairIncidentStore {
-  constructor({ userDataDir, now = Date.now } = {}) {
+  constructor({ userDataDir, now = Date.now, staleLockTtlMs = 15 * 60 * 1000, isProcessAlive = defaultIsProcessAlive } = {}) {
     if (typeof userDataDir !== 'string' || !isAbsolute(userDataDir)) {
       throw new TypeError('repair incident userDataDir must be absolute')
     }
     if (typeof now !== 'function') throw new TypeError('repair incident clock must be a function')
+    if (!Number.isInteger(staleLockTtlMs) || staleLockTtlMs < 1 || staleLockTtlMs > MAX_STALE_LOCK_TTL_MS) {
+      throw new TypeError('repair incident stale lock TTL must be between 1ms and 7 days')
+    }
+    if (typeof isProcessAlive !== 'function') {
+      throw new TypeError('repair incident process liveness probe must be a function')
+    }
     this.rootDir = join(userDataDir, 'repair-agent', 'incidents')
     this.now = now
+    this.staleLockTtlMs = staleLockTtlMs
+    this.isProcessAlive = isProcessAlive
     this.queue = Promise.resolve()
   }
 
@@ -197,22 +217,68 @@ export class RepairIncidentStore {
     return assertIncident(value, value.fingerprint)
   }
 
+  /**
+   * A claim.lock survives a crashed process forever unless stale claims are
+   * reclaimable. A lock is stale when its owning pid is gone or its recorded
+   * start time exceeds the TTL; unparsable legacy locks fall back to file age.
+   */
+  async #staleClaimLock(lockPath) {
+    let raw
+    try {
+      raw = await readFile(lockPath, 'utf8')
+    } catch {
+      return false
+    }
+    let owner
+    try {
+      owner = JSON.parse(raw)
+    } catch {
+      owner = undefined
+    }
+    const startedAt = Number(owner?.startedAt)
+    if (!Number.isFinite(startedAt)) {
+      try {
+        const metadata = await stat(lockPath)
+        return this.now() - metadata.mtimeMs > this.staleLockTtlMs
+      } catch {
+        return false
+      }
+    }
+    if (!this.isProcessAlive(Number(owner?.pid))) return true
+    return this.now() - startedAt > this.staleLockTtlMs
+  }
+
+  async #acquireClaimLock(directory) {
+    const lockPath = join(directory, 'claim.lock')
+    try {
+      return await open(lockPath, 'wx', 0o600)
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error
+      if (!await this.#staleClaimLock(lockPath)) return undefined
+      const reclaimed = await rm(lockPath, { force: true })
+        .then(() => open(lockPath, 'wx', 0o600))
+        .then((handle) => ({ handle }), () => undefined)
+      return reclaimed?.handle ?? undefined
+    }
+  }
+
   claim(input) {
     return this.#enqueue(async () => {
       const evidence = fingerprintEvidence(input)
       const fingerprint = sha256(JSON.stringify(evidence))
       const directory = this.#directory(fingerprint)
       await mkdir(directory, { recursive: true })
-      let claimHandle
-      try {
-        claimHandle = await open(join(directory, 'claim.lock'), 'wx', 0o600)
-      } catch (error) {
-        if (error?.code !== 'EEXIST') throw error
+      const claimHandle = await this.#acquireClaimLock(directory)
+      if (claimHandle === undefined) {
         const existing = await this.#read(fingerprint)
         if (existing === undefined) throw new Error('repair incident claim is incomplete')
         return immutable({ claimed: false, incident: existing })
       }
-      await claimHandle.close()
+      try {
+        await claimHandle.writeFile(`${JSON.stringify({ pid: process.pid, startedAt: this.now() })}\n`, 'utf8')
+      } finally {
+        await claimHandle.close()
+      }
       const createdAt = this.#at()
       const incident = await this.#write({
         schemaVersion: 1,

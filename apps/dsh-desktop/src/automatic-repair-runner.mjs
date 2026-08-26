@@ -140,10 +140,10 @@ export class AutomaticRepairRunner {
 
   async #recordResult(fingerprint, repairResult) {
     for (const attempt of repairResult.attempts ?? []) {
-      await this.incidentStore.recordModelAttempt?.(fingerprint, attempt)
+      await Promise.resolve(this.incidentStore.recordModelAttempt?.(fingerprint, attempt)).catch(() => {})
     }
     for (const action of repairResult.actions ?? []) {
-      await this.incidentStore.recordToolAction?.(fingerprint, action)
+      await Promise.resolve(this.incidentStore.recordToolAction?.(fingerprint, action)).catch(() => {})
     }
   }
 
@@ -155,6 +155,38 @@ export class AutomaticRepairRunner {
     }
   }
 
+  /**
+   * Profile manifests that cannot be parsed or resolved must still produce a
+   * recorded incident instead of silently escaping automatic repair. The
+   * incident deliberately uses an empty bundle digest and a dedicated error
+   * code so unresolvable-profile failures form their own budget bucket.
+   */
+  async #failWithUnresolvedProfile() {
+    const resolveFailure = Object.assign(new Error('repair profile roots unresolved'), {
+      code: 'PROFILE_ROOTS_UNRESOLVED',
+    })
+    let claimed
+    try {
+      claimed = await this.incidentStore.claim({
+        desktopVersion: this.desktopVersion,
+        runtimeVersion: this.runtimeVersion,
+        phase: 'full-start',
+        error: resolveFailure,
+        bundles: [],
+      })
+    } catch {
+      claimed = undefined
+    }
+    if (claimed?.claimed === true) {
+      const fingerprint = claimed.incident.fingerprint
+      await this.incidentStore
+        .transition(fingerprint, 'exhausted', 'profile-unresolved')
+        .catch(() => {})
+      return immutable({ status: 'failed', reason: 'profile-unresolved', fingerprint })
+    }
+    return immutable({ status: 'failed', reason: 'profile-unresolved' })
+  }
+
   async run({
     failures = [],
     defaultToolsCapability = 'auto',
@@ -163,10 +195,15 @@ export class AutomaticRepairRunner {
     const failure = Array.isArray(failures) && failures.length > 0
       ? failures.at(-1)
       : Object.assign(new Error('full startup failed'), { code: 'UNCLASSIFIED' })
-    const resolved = await this.resolveRoots({
-      profileDir: this.profileDir,
-      builtInBundles: this.builtInBundles,
-    })
+    let resolved
+    try {
+      resolved = await this.resolveRoots({
+        profileDir: this.profileDir,
+        builtInBundles: this.builtInBundles,
+      })
+    } catch {
+      return this.#failWithUnresolvedProfile()
+    }
     const claimed = await this.incidentStore.claim({
       desktopVersion: this.desktopVersion,
       runtimeVersion: this.runtimeVersion,
@@ -229,10 +266,10 @@ export class AutomaticRepairRunner {
         await this.#exhaust(fingerprint, transaction, detail)
         return immutable({ status: 'failed', reason: detail })
       }
-      await this.incidentStore.recordVerification?.(fingerprint, {
+      await Promise.resolve(this.incidentStore.recordVerification?.(fingerprint, {
         changedFiles: verifiedFiles,
         checks: repairResult.checksRequested ?? [],
-      })
+      })).catch(() => {})
       await this.incidentStore.transition(fingerprint, 'verified')
       try {
         await transaction.apply()

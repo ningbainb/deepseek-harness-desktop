@@ -48,6 +48,10 @@ const BUILTINS_FALLBACK_COPY = Object.freeze({
     title: '已使用内置插件启动',
     body: '应用数据目录未能完成启动，应用已使用内置插件启动；原有对话和设置仍在。',
   },
+  'rollback-failed': {
+    title: '插件修复已回滚',
+    body: '自动修复启动失败后已恢复原插件文件，但部分文件未能完全复原；应用已使用内置插件启动。可在设置页导出脱敏诊断了解详情。',
+  },
 })
 
 const BUILTINS_FALLBACK_REASON_SET = new Set(Object.keys(BUILTINS_FALLBACK_COPY))

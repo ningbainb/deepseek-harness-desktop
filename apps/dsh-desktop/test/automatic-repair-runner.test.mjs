@@ -139,3 +139,67 @@ test('passes the checked tools capability and bounded fallback list into the rep
     toolsCapability: 'native',
   }])
 })
+
+test('an unresolvable profile manifest records a dedicated incident instead of escaping repair', async () => {
+  const calls = []
+  const incident = { fingerprint: 'b'.repeat(64) }
+  const incidentStore = {
+    incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint,
+    async claim(input) { calls.push(['claim', input]); return { claimed: true, incident } },
+    async transition(fingerprint, state, detail) { calls.push(['transition', state, detail]) },
+  }
+  const runner = new AutomaticRepairRunner({
+    incidentStore,
+    desktopVersion: '3.0.9',
+    runtimeVersion: '0.1.1-rc.1',
+    profileDir: 'C:\\home\\profiles\\desktop',
+    builtInBundles: ['@builtin/core'],
+    resolveRoots: async () => {
+      throw new Error('repair profile manifest is unreadable')
+    },
+    createTransaction: async () => { throw new Error('transaction must not be created') },
+    repairRuntime: { async run() { throw new Error('model runtime must not start') } },
+    createVerifier: () => ({ async verify() { throw new Error('verification must not run') } }),
+  })
+
+  const repaired = await runner.run({ failures: [new Error('startup failed')] })
+
+  assert.deepEqual(repaired, { status: 'failed', reason: 'profile-unresolved', fingerprint: incident.fingerprint })
+  const claimInput = calls[0][1]
+  assert.equal(claimInput.error.code, 'PROFILE_ROOTS_UNRESOLVED')
+  assert.deepEqual(claimInput.bundles, [])
+  assert.deepEqual(calls.slice(1).map(call => call.slice(0, 2)), [['transition', 'exhausted']])
+})
+
+test('a claimed-but-unwritable incident store still reports the unresolved profile deterministically', async () => {
+  const runner = new AutomaticRepairRunner({
+    incidentStore: {
+      incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\x',
+      async claim() { throw new Error('incident directory is not writable') },
+      transition: async () => {},
+    },
+    desktopVersion: '3.0.9',
+    runtimeVersion: '0.1.1-rc.1',
+    profileDir: 'C:\\home\\profiles\\desktop',
+    builtInBundles: [],
+    resolveRoots: async () => { throw new Error('unreadable manifest') },
+    createTransaction: async () => ({}),
+    repairRuntime: { run: async () => ({}) },
+    createVerifier: () => ({ verify: async () => ({}) }),
+  })
+
+  const repaired = await runner.run({ failures: [] })
+  assert.deepEqual(repaired, { status: 'failed', reason: 'profile-unresolved' })
+})
+
+test('telemetry bookkeeping failures never fail an otherwise applied candidate', async () => {
+  const { runner } = fixture()
+  runner.incidentStore.recordModelAttempt = async () => { throw new Error('recordModelAttempt failed') }
+  runner.incidentStore.recordToolAction = async () => { throw new Error('recordToolAction failed') }
+  runner.incidentStore.recordVerification = async () => { throw new Error('recordVerification failed') }
+
+  const repaired = await runner.run({ failures: [new Error('startup failed')] })
+
+  assert.equal(repaired.status, 'applied')
+  await repaired.commit()
+})

@@ -106,3 +106,47 @@ test('candidate start failure is classified and reclaimed', async () => {
   assert.deepEqual(result, { ok: false, status: 'failed', category: 'candidate-start-failed' })
   assert.deepEqual(calls, ['probe-start', 'probe-stop'])
 })
+
+test('repair command children receive only allowlisted environment variables', async () => {
+  const { runRegisteredRepairCommand, verifierChildEnvironment } = await import('../src/repair-verifier.mjs')
+  const seen = []
+  const fakeSpawn = (executable, args, options) => {
+    seen.push(options.env)
+    return {
+      pid: 4242,
+      once(event, handler) {
+        if (event === 'exit') setImmediate(() => handler(0))
+      },
+      kill() {},
+    }
+  }
+
+  const outcome = await runRegisteredRepairCommand(
+    { executable: 'C:/node.exe', args: ['cli.mjs'], cwd: 'packages/example' },
+    'C:/incident/staging',
+    { spawnProcess: fakeSpawn, timeoutMs: 1000 },
+  )
+
+  assert.equal(outcome.ok, true)
+  const childEnv = seen[0]
+  assert.equal(childEnv.DSH_DESKTOP_REPAIR_JOB, undefined)
+  assert.equal(childEnv.apiKey ?? childEnv.API_KEY, undefined)
+  assert.equal(childEnv.GITHUB_TOKEN, undefined)
+  assert.equal(childEnv.AWS_SECRET_ACCESS_KEY, undefined)
+  assert.equal(childEnv.CI, '1')
+  assert.equal(typeof childEnv.PATH, 'string')
+  assert.equal(childEnv.DSH_DESKTOP_REPAIR_MODE, undefined)
+
+  const filtered = verifierChildEnvironment({
+    PATH: 'C:/bin',
+    SystemRoot: 'C:/Windows',
+    DEEPSEEK_API_KEY: 'sk-secret',
+    ANTHROPIC_AUTH_TOKEN: 'token',
+    DSH_DESKTOP_REPAIR_MODE: '1',
+    NPM_TOKEN: 'npm-secret',
+  })
+  assert.deepEqual(Object.keys(filtered).toSorted(), [
+    'CI', 'PATH', 'SystemRoot',
+    'npm_config_audit', 'npm_config_fund', 'npm_config_offline',
+  ].toSorted())
+})
