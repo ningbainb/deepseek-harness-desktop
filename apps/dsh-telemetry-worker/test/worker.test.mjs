@@ -177,6 +177,23 @@ test('rejects oversized, malformed, and unknown input', async () => {
   assert.equal(invalidEnum.status, 400)
 })
 
+test('accepts the macos operating system family and still rejects unknown ones', async () => {
+  const database = new FakeDatabase()
+  const accepted = await worker.fetch(requestFor({
+    schema: 1,
+    events: [{ ...VALID_EVENT, os: 'macos' }],
+  }), enabledEnvironment(database))
+  assert.equal(accepted.status, 204)
+  assert.equal(database.batches.length, 1)
+  assert.ok(database.batches[0][0].values.includes('macos'))
+
+  const rejected = await worker.fetch(requestFor({
+    schema: 1,
+    events: [{ ...VALID_EVENT, os: 'macos-27' }],
+  }), enabledEnvironment())
+  assert.equal(rejected.status, 400)
+})
+
 test('groups identical events and binds only aggregate dimensions', async () => {
   const database = new FakeDatabase()
   const now = new Date('2026-08-19T23:59:59.000Z')
