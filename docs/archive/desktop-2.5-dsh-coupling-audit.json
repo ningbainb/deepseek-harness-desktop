@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "desktopVersion": "3.0.1",
   "upstreamVersion": "0.1.1-rc.1",
-  "lockfileSha256": "5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a",
+  "lockfileSha256": "1ca1c0f7747e72989e51a77adc14264e83284b1da8cb8d940d5065ed644906a2",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -4036,13 +4036,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-controller.mjs",
-      "line": 419,
+      "line": 457,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-controller.mjs",
-      "line": 420,
+      "line": 458,
       "operation": "DSH_PROFILE"
     },
     {
@@ -6628,7 +6628,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 288,
+      "line": 289,
       "operation": "DSH_PROFILE"
     },
     {
@@ -8218,109 +8218,103 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 282,
+      "line": 283,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 305,
+      "line": 306,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 344,
+      "line": 345,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 386,
+      "line": 387,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 392,
+      "line": 393,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 394,
+      "line": 395,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 402,
+      "line": 403,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 419,
+      "line": 420,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 457,
+      "line": 458,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 505,
+      "line": 506,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 538,
+      "line": 539,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 546,
+      "line": 547,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 567,
+      "line": 568,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 577,
+      "line": 578,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 596,
+      "line": 597,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 618,
+      "line": 619,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 644,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 648,
+      "line": 645,
       "operation": "start"
     },
     {
@@ -8332,38 +8326,38 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 661,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 691,
+      "line": 650,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 696,
+      "line": 662,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 692,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
       "line": 697,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 739,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 745,
+      "line": 698,
       "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 740,
+      "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
@@ -8375,25 +8369,55 @@
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
       "line": 747,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 763,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 793,
+      "line": 748,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 831,
+      "line": 764,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 794,
       "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 832,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 930,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 935,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1035,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1038,
+      "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",

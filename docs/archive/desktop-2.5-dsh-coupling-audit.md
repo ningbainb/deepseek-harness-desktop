@@ -4,7 +4,7 @@ Authoritative Desktop version: 3.0.1.
 
 Stable DSH package version: 0.1.1-rc.1.
 
-Lockfile SHA-256: `5e97bbb68ab761e93d9d4ed0c0878755b9c6e94fdd45158230bd54175883f02a`.
+Lockfile SHA-256: `1ca1c0f7747e72989e51a77adc14264e83284b1da8cb8d940d5065ed644906a2`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -558,8 +558,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/profile.mjs | 1039 | profileDir |
 | profile-home | apps/dsh-desktop/src/profile.mjs | 1090 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/src/profile.mjs | 1139 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 419 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 420 | DSH_PROFILE |
+| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 457 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 458 | DSH_PROFILE |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 193 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 197 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 198 | profileDir |
@@ -990,7 +990,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/qqbot.test.mjs | 25 | profileDir |
 | profile-home | apps/dsh-desktop/test/qqbot.test.mjs | 27 | profileDir |
 | profile-home | apps/dsh-desktop/test/qqbot.test.mjs | 32 | profileDir |
-| profile-home | apps/dsh-desktop/test/runtime-controller.test.mjs | 288 | DSH_PROFILE |
+| profile-home | apps/dsh-desktop/test/runtime-controller.test.mjs | 289 | DSH_PROFILE |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 24 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 25 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 91 | profileDir |
@@ -1255,36 +1255,40 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 69 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/migration-runtime-bridge.test.mjs | 41 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/migration-runtime-bridge.test.mjs | 86 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 282 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 305 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 344 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 386 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 392 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 394 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 402 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 419 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 457 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 505 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 538 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 546 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 567 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 577 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 596 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 618 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 644 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 648 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 283 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 306 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 345 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 387 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 393 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 395 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 403 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 420 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 458 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 506 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 539 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 547 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 568 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 578 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 597 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 619 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 645 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 649 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 661 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 691 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 696 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 697 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 739 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 745 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 650 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 662 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 692 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 697 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 698 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 740 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 746 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 747 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 763 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 793 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 831 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 747 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 748 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 764 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 794 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 832 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 930 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 935 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1035 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1038 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 568 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 608 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 711 | stop |
