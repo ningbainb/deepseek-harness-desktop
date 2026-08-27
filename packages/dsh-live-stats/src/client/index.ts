@@ -91,4 +91,26 @@ export function apply(ctx: ClientContext): void {
     order: 100,
     inject: () => ({}),
   }, TpsLineDockEntry))
+
+  // LLM Balance & Usage Center: sidebar entry + center-column overview.
+  // Lazy-import so the balance modules are only bundled on first use.
+  ctx.effect(() => {
+    let disposeSidebar: (() => void) | undefined
+    let disposeView: (() => void) | undefined
+
+    void Promise.all([
+      import('./balance-controller.ts'),
+      import('./balance-sidebar.ts'),
+      import('./balance-mount.tsx'),
+    ]).then(([{ BalanceController }, { mountBalanceSidebarEntry }, { mountBalanceView }]) => {
+      const controller = new BalanceController()
+      disposeSidebar = mountBalanceSidebarEntry(controller)
+      disposeView = mountBalanceView(controller)
+    }).catch(() => {})
+
+    return () => {
+      disposeSidebar?.()
+      disposeView?.()
+    }
+  }, 'live-stats: balance center')
 }

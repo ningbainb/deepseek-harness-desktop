@@ -6,6 +6,7 @@
 
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { RepairStatusCard } from './RepairStatusCard.tsx'
 import css from './web-ui-settings.module.css'
 
@@ -28,9 +29,13 @@ export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode 
     <div className={css.section}>
       <h2 className={css.heading} title={t('title')}>{t('title')}</h2>
       <p className={css.lede} title={t('description')}>{t('description')}</p>
-      <RepairStatusCard t={t} />
+      <SafePluginBoundary pluginName="repair-status-card">
+        <RepairStatusCard t={t} />
+      </SafePluginBoundary>
       <ul className={css.subcards}>
-        {renderSlot('web-ui.plugin.item', {})}
+        <SafePluginBoundary pluginName="web-ui-plugin-items">
+          {renderSlot('web-ui.plugin.item', {})}
+        </SafePluginBoundary>
       </ul>
     </div>
   )

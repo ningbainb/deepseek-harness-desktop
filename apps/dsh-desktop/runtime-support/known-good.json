@@ -31,7 +31,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "9e00018d6308920a3bee312d36ff5924afa54c02cbc16063e25a518e5d05c861"
+    "sha256": "389a529b3c2401c246b05d3303e8594c18ed8b89471832460922a7d676db2410"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
@@ -66,7 +66,7 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "af2e8caf44dbb8b626705c46b4638501bbf91a0fe2ff2305b4a472ce794b7a73",
+    "sha256": "4aae66924fa00e2438274fa9c39761c85dee223dcfd9774f3907255043fe216d",
     "ids": [
       "cancellation-presentation",
       "desktop-skin-profile-isolation",

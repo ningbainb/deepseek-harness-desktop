@@ -36,8 +36,10 @@ test('Known Good manifest derives exact runtime, integrity, capabilities, and pa
     'cancellation-presentation',
     'desktop-skin-profile-isolation',
     'queued-turn-continuation',
+    'session-startup-corruption',
     'tool-call-arguments-envelope',
     'tools-capability-request-side',
+    'transcript-tool-call-balance',
   ])
   assert.equal(manifest.compatPatches.registry, 'packages/dsh-desktop-compat/src/patch-registry.ts')
   assert.match(manifest.compatPatches.sha256, /^[a-f0-9]{64}$/u)

@@ -983,6 +983,21 @@ export async function startElectronApp(metadata) {
         '[startup] profile-ready=' + Math.round(performance.now() - profileStartedAt) + 'ms packages=' + runtimePackages.size + ' mode=' + mode,
       )
       return result
+    } catch (error) {
+      if (mode === 'builtins' || mode === 'repair') {
+        await logStore.append(`[startup] profile init for ${mode} failed: ${error.message}; attempting clean rebuild`).catch(() => {})
+        const targetProfileDir = join(dshHome, 'profiles', mode === 'repair' ? 'desktop-repair' : 'desktop-builtins')
+        const corruptedBackup = `${targetProfileDir}.corrupt-${Date.now()}`
+        try {
+          await rename(targetProfileDir, corruptedBackup).catch(() => {})
+          const retryResult = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
+          await logStore.append(`[startup] clean rebuild for ${mode} profile succeeded`).catch(() => {})
+          return retryResult
+        } catch (retryError) {
+          await logStore.append(`[startup] clean rebuild for ${mode} profile failed: ${retryError.message}`).catch(() => {})
+        }
+      }
+      throw error
     } finally {
       if (mode === 'full') releaseDesktopProfileIngress()
     }
@@ -1581,15 +1596,15 @@ export async function startElectronApp(metadata) {
     return extensionWindow
   }
 
-  const syncSecondaryWindowTheme = (window, theme) => {
+  function syncSecondaryWindowTheme(window, theme) {
     if (!window || window.isDestroyed()) return
     setWindowChromeTheme(window, theme)
     const script = `document.documentElement.dataset.dshDesktopTheme = ${JSON.stringify(theme)}; document.documentElement.dataset.dshDesktopChromeTheme = ${JSON.stringify(theme)}`
     void window.webContents.executeJavaScript(script).catch(() => {})
   }
-  const syncCommunityWindowTheme = (theme) => syncSecondaryWindowTheme(communityWindow, theme)
-  const syncExtensionWindowTheme = (theme) => syncSecondaryWindowTheme(extensionWindow, theme)
-  const syncTerminalPanelTheme = (theme) => terminalSurface?.setTheme(theme)
+  function syncCommunityWindowTheme(theme) { syncSecondaryWindowTheme(communityWindow, theme) }
+  function syncExtensionWindowTheme(theme) { syncSecondaryWindowTheme(extensionWindow, theme) }
+  function syncTerminalPanelTheme(theme) { terminalSurface?.setTheme(theme) }
 
   const createCommunityWindow = () => {
     productMetrics.recordSurface('community')
@@ -1755,29 +1770,50 @@ export async function startElectronApp(metadata) {
     if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
     void inspectCompatibilityAfterReady()
     activeOrigin = new URL(status.url).origin
+
+    const maxAttempts = 5
+    let lastError
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
+      try {
+        await mainWindow.loadURL(status.url)
+        if (sessionRecoverySkippedCount > 0) {
+          await notificationService.show(
+            sessionRecoveryNotification(sessionRecoverySkippedCount),
+            { force: true },
+          ).catch(() => {})
+        }
+        deepLinkRouter.setReady(true)
+        const rendererLoadedAt = performance.now()
+        productMetrics.recordDirectStartReady({
+          detail: existingHomeAtLaunch ? 'existing-home' : 'fresh-home',
+          durationMs: rendererLoadedAt - applicationStartedAt,
+        })
+        void logStore.append(`[startup] renderer-loaded=${Math.round(rendererLoadedAt - runtimeReadyAt)}ms attempt=${attempt}`)
+        void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
+        if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
+          await startupRuntimePromise
+          console.log(`desktop smoke ready: ${activeOrigin}`)
+          app.quit()
+        }
+        return
+      } catch (error) {
+        lastError = error
+        void logStore.append(`[renderer] load attempt ${attempt}/${maxAttempts} failed: ${error.message}`)
+        if (attempt < maxAttempts) {
+          const delayMs = attempt * 500
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+      }
+    }
+
+    void logStore.append(`[renderer] all ${maxAttempts} load attempts failed: ${lastError?.message}; restarting runtime`)
     try {
-      await mainWindow.loadURL(status.url)
-      if (sessionRecoverySkippedCount > 0) {
-        await notificationService.show(
-          sessionRecoveryNotification(sessionRecoverySkippedCount),
-          { force: true },
-        ).catch(() => {})
-      }
-      deepLinkRouter.setReady(true)
-      const rendererLoadedAt = performance.now()
-      productMetrics.recordDirectStartReady({
-        detail: existingHomeAtLaunch ? 'existing-home' : 'fresh-home',
-        durationMs: rendererLoadedAt - applicationStartedAt,
-      })
-      void logStore.append(`[startup] renderer-loaded=${Math.round(rendererLoadedAt - runtimeReadyAt)}ms`)
-      void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
-      if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
-        await startupRuntimePromise
-        console.log(`desktop smoke ready: ${activeOrigin}`)
-        app.quit()
-      }
-    } catch (error) {
-      void logStore.append(`[renderer] ${error.message}`)
+      await runtimeProvider.stop()
+      await runtimeProvider.start()
+    } catch (restartError) {
+      void logStore.append(`[renderer] fallback restart failed: ${restartError.message}`)
       void loadStartup().catch(() => {})
     }
   }

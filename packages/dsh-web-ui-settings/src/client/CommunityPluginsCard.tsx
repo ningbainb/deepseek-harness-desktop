@@ -1,11 +1,11 @@
 /**
  * The community plugin index card. Renders inside the Web UI plugin group:
  * every entry points at a contributor's own repository — this package only
- * indexes them, it never vendors their code. The body is a plain link list
- * (no settings form), so the card works without any settings namespace.
+ * indexes them, it never vendors their code. The body provides rich search,
+ * categorization and direct repository access.
  */
 
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { CommunityPluginKey } from './locales.ts'
 import { COMMUNITY_PLUGINS, type CommunityPluginEntry } from './generated/community.ts'
 import { isCommunityPluginEntry } from './community-guard.ts'
@@ -19,6 +19,22 @@ export interface CommunityPluginsCardProps {
   plugins?: readonly CommunityPluginEntry[]
 }
 
+const CATEGORIES = [
+  { id: 'all', label: '全部' },
+  { id: 'agent', label: 'AI 预设' },
+  { id: 'tui', label: '终端交互' },
+  { id: 'tool', label: '实用工具' },
+] as const
+
+function matchCategory(plugin: CommunityPluginEntry, category: string): boolean {
+  if (category === 'all') return true
+  const text = `${plugin.id} ${plugin.name} ${plugin.description ?? ''} ${plugin.descriptionEn ?? ''}`.toLowerCase()
+  if (category === 'agent') return text.includes('agent') || text.includes('智能体') || text.includes('预设')
+  if (category === 'tui') return text.includes('tui') || text.includes('terminal') || text.includes('终端')
+  if (category === 'tool') return text.includes('summary') || text.includes('toggle') || text.includes('导出') || text.includes('检查')
+  return true
+}
+
 /**
  * Render the community plugin index card.
  * @param props - locale copy and the (default-generated) entry list.
@@ -26,8 +42,21 @@ export interface CommunityPluginsCardProps {
  */
 export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNode {
   const { t } = props
-  const plugins = (props.plugins ?? COMMUNITY_PLUGINS).filter(isCommunityPluginEntry)
+  const allPlugins = (props.plugins ?? COMMUNITY_PLUGINS).filter(isCommunityPluginEntry)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [activeCategory, setActiveCategory] = useState<string>('all')
+
+  const filteredPlugins = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return allPlugins.filter((plugin) => {
+      if (!matchCategory(plugin, activeCategory)) return false
+      if (q === '') return true
+      const fullText = `${plugin.name} ${plugin.nameEn} ${plugin.author} ${plugin.description ?? ''} ${plugin.descriptionEn ?? ''} ${plugin.npm ?? ''}`.toLowerCase()
+      return fullText.includes(q)
+    })
+  }, [allPlugins, search, activeCategory])
+
   return (
     <li className={open ? `${css.groupCard} ${css.groupCardOpen}` : css.groupCard}>
       <button
@@ -58,13 +87,38 @@ export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNod
       {open
         ? (
           <div className={css.body}>
+            <div className={css.filterBar}>
+              <input
+                type="search"
+                className={css.searchInput}
+                placeholder="搜索社区插件名称、作者或功能…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="搜索社区插件"
+              />
+              <div className={css.categoryChips} role="tablist" aria-label="分类筛选">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    className={activeCategory === cat.id ? `${css.categoryChip} ${css.categoryChipActive}` : css.categoryChip}
+                    onClick={() => setActiveCategory(cat.id)}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <ul className={css.entries}>
-              {plugins.length === 0
+              {filteredPlugins.length === 0
                 ? <li className={css.empty} role="status">{t('empty')}</li>
-                : plugins.map((plugin) => (
+                : filteredPlugins.map((plugin) => (
                   <li key={plugin.id} className={css.entry}>
                     <span className={css.entryHead}>
-                      <span className={css.entryName} title={plugin.name}>{plugin.name}</span>
+                      <span className={css.entryName} title={plugin.name}>
+                        {plugin.name}
+                        <span className={css.entryBadge}>社区精选</span>
+                      </span>
                       <span className={css.entryAuthor} title={plugin.author}>{t('author')}: {plugin.author}</span>
                     </span>
                     {plugin.description ? <p className={css.entryDescription}>{plugin.description}</p> : null}
@@ -82,4 +136,4 @@ export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNod
         : null}
     </li>
   )
-}
+}

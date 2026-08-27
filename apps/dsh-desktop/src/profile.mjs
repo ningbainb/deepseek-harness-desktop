@@ -410,7 +410,7 @@ function errorChain(error) {
 /** Classify only bounded startup facts; no error messages or paths are returned. */
 export function classifyDesktopProfileBootstrapFailure(error) {
   const chain = errorChain(error)
-  if (chain.some((entry) => ['EACCES', 'EPERM'].includes(entry?.code))) {
+  if (chain.some((entry) => ['EACCES', 'EPERM', 'EBUSY'].includes(entry?.code))) {
     return DESKTOP_PROFILE_FAILURE_CATEGORIES.PERMISSION_FAILURE
   }
   if (chain.some((entry) => INSTALLATION_FAILURE_CODES.has(entry?.code))) {

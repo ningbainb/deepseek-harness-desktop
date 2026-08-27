@@ -229,15 +229,80 @@
   background: var(--dsw-alias-bg-layer-1);
 }
 
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.15));
+  background: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.05));
+  color: var(--dsw-alias-label-primary, #ffffff);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 120ms ease;
+}
+
+.searchInput:focus {
+  border-color: var(--dsw-alias-brand-primary, #3b82f6);
+}
+
+.categoryChips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.categoryChip {
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #94a3b8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.categoryChip:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--dsw-alias-label-primary, #ffffff);
+}
+
+.categoryChipActive {
+  background: var(--dsw-alias-brand-primary, #3b82f6);
+  border-color: var(--dsw-alias-brand-primary, #3b82f6);
+  color: #ffffff;
+}
+
+.entryBadge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  margin-left: 6px;
+}
+
 .entryHead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  min-width: 0;
 }
 
 .entryName {
+  font-size: 13px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
   overflow: hidden;
@@ -316,6 +381,18 @@
   align-items: center;
   justify-content: center;
 }
+
+.dockEntry[data-wide='rail'] {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  margin-inline: auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 
 .dockTrigger {
   display: inline-flex;

@@ -4,7 +4,7 @@ Authoritative Desktop version: 3.1.0.
 
 Stable DSH package version: 0.1.1-rc.1.
 
-Lockfile SHA-256: `c52cd4a5c0552a614512f32106d26f778150fc82e911b17a23acd77f00625c19`.
+Lockfile SHA-256: `389a529b3c2401c246b05d3303e8594c18ed8b89471832460922a7d676db2410`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -336,7 +336,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-task-board/src/client/index.ts | 80 | remote |
 | host-service | packages/dsh-tool-describe-image/src/client/index.ts | 61 | locale |
 | host-service | packages/dsh-tool-describe-image/src/index.ts | 27 | tools |
-| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 62 | web-ui-plugins |
+| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 64 | web-ui-plugins |
 | host-service | packages/skins/skin-center/src/client/index.ts | 63 | remote |
 | profile-home | apps/dsh-desktop/scripts/capture-startup.mjs | 39 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/direct-start-matrix-runner.mjs | 110 | profileDir |
@@ -411,15 +411,16 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 959 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 978 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 980 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1021 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1129 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1134 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1139 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1268 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1819 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1851 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1915 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1921 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 993 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1036 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1144 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1149 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1154 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1283 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1856 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1888 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1952 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1958 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 92 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 94 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 94 | profileDir |
@@ -1200,9 +1201,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | shared/tests/dsh-home.spec.ts | 21 | DSH_HOME |
 | profile-home | shared/tests/dsh-home.spec.ts | 25 | DSH_HOME |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 921 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1270 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2154 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2156 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1285 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1813 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1814 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2191 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2193 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 190 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 202 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 209 | start |
@@ -1223,7 +1226,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 604 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 611 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 631 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/menu.mjs | 58 | restart |
+| runtime-lifecycle | apps/dsh-desktop/src/menu.mjs | 59 | restart |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 916 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 924 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 1034 | stop |
@@ -1323,9 +1326,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-remote-web-ui/src/client/index.ts | 160 | web-ui.plugin.item |
 | slot | packages/dsh-task-board/src/client/index.ts | 110 | web-ui.plugin.item |
 | slot | packages/dsh-tool-describe-image/src/client/index.ts | 92 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 77 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 85 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 97 | sidebar.footer.action |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 79 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 87 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 99 | sidebar.footer.action |
 | slot | packages/skins/skin-center/src/client/index.ts | 101 | web-ui.plugin.item |
 | workspace | gallery/bundles.js | 7 | list |
 | workspace | gallery/bundles.js | 13 | list |

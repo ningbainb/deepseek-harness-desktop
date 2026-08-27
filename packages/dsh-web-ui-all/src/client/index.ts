@@ -16,6 +16,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import './sidebar-rail.module.css'
+import { installTurnNavigator } from './turn-navigator.ts'
 
 /** Column shims: element selector → attribute to stamp. */
 const COLUMN_SHIMS: ReadonlyArray<readonly [selector: string, attribute: string]> = [
@@ -23,15 +24,6 @@ const COLUMN_SHIMS: ReadonlyArray<readonly [selector: string, attribute: string]
   ['[class*="centerCol"]', 'data-pane="conversation"'],
   ['[class*="detailsCol"]', 'data-pane="details"'],
 ]
-
-/** Stamp one attribute of the form `name="value"` onto an element, if found. */
-function stamp(el: Element | null, attribute: string): void {
-  if (el === null) return
-  const eq = attribute.indexOf('=')
-  const name = attribute.slice(0, eq)
-  const value = attribute.slice(eq + 1).replace(/^"|"$/g, '')
-  el.setAttribute(name, value)
-}
 
 /** One pass over the current DOM. Returns false once every stamp is already in place. */
 function applyShims(): boolean {
@@ -46,12 +38,51 @@ function applyShims(): boolean {
       changed = true
     }
   }
-  // The frame is the grid item that parents the sidebar column.
-  const frame = document.querySelector('[class*="sidebarCol"]')?.parentElement ?? null
+
+  const sidebarEl = document.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
+  const frame = sidebarEl?.parentElement ?? null
   if (frame !== null && frame.getAttribute('data-dsh-frame') !== '') {
     frame.setAttribute('data-dsh-frame', '')
     changed = true
   }
+
+  // Detect whether the sidebar is collapsed into a narrow rail (<= 80px wide, collapsed class, or containing rail markers)
+  const isCollapsed = sidebarEl !== null && (
+    (sidebarEl.offsetWidth > 0 && sidebarEl.offsetWidth <= 80) ||
+    sidebarEl.classList.contains('hHd-Xa_collapsed') ||
+    sidebarEl.className.includes('collapsed') ||
+    sidebarEl.querySelector('[class*="collapsed"]') !== null ||
+    sidebarEl.querySelector('[data-rail="rail"], [data-wide="rail"]') !== null
+  )
+
+  if (frame !== null) {
+    if (isCollapsed && !frame.hasAttribute('data-sidebar-collapsed')) {
+      frame.setAttribute('data-sidebar-collapsed', '')
+      changed = true
+    } else if (!isCollapsed && frame.hasAttribute('data-sidebar-collapsed')) {
+      frame.removeAttribute('data-sidebar-collapsed')
+      changed = true
+    }
+  }
+
+  if (sidebarEl !== null) {
+    if (isCollapsed && !sidebarEl.hasAttribute('data-sidebar-collapsed')) {
+      sidebarEl.setAttribute('data-sidebar-collapsed', '')
+      changed = true
+    } else if (!isCollapsed && sidebarEl.hasAttribute('data-sidebar-collapsed')) {
+      sidebarEl.removeAttribute('data-sidebar-collapsed')
+      changed = true
+    }
+  }
+
+  if (isCollapsed && !document.body.hasAttribute('data-sidebar-collapsed')) {
+    document.body.setAttribute('data-sidebar-collapsed', '')
+    changed = true
+  } else if (!isCollapsed && document.body.hasAttribute('data-sidebar-collapsed')) {
+    document.body.removeAttribute('data-sidebar-collapsed')
+    changed = true
+  }
+
   return changed
 }
 
@@ -90,10 +121,22 @@ export function apply(ctx: Context): void {
     // the pass short-circuits once every attribute is in place. Writes only
     // the same attribute values, so this never fights React.
     const observer = new MutationObserver(schedulePass)
-    observer.observe(document.body, { childList: true, subtree: true })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-wide', 'data-rail'] })
+
+    let resizeObserver: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(schedulePass)
+      const sidebar = document.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]')
+      if (sidebar) resizeObserver.observe(sidebar)
+    }
+
     return () => {
       observer.disconnect()
+      resizeObserver?.disconnect()
       shimScheduled = false
     }
   })
+
+  // Conversation turn navigator: floating ↑ ↓ ⤓ buttons in the chat pane.
+  ctx.effect(() => installTurnNavigator(), 'dsh-web-ui-all: turn navigator')
 }

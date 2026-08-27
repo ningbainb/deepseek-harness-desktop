@@ -7,7 +7,10 @@
 :global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > button),
 :global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [data-dsh-taskboard-entry]),
 :global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [data-dsh-ssh-entry]),
-:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']) {
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [data-dsh-balance-entry]),
+:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']),
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']),
+:global([data-pane='sidebar'] [class*='entryRow'][data-rail='rail']) {
   width: 36px;
   min-width: 36px;
   margin-inline: auto;
@@ -15,16 +18,40 @@
   box-sizing: border-box;
 }
 
-:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow'][data-rail='rail']) {
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']),
+:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='entryRow']),
+:global([data-pane='sidebar'] [class*='entryRow'][data-rail='rail']) {
+  display: flex;
+  flex-direction: column-reverse;
   align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
+
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] [class*='dockEntry']),
+:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='dockEntry']),
+:global([data-pane='sidebar'] [class*='dockEntry'][data-wide='rail']) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  margin-inline: auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* The shell keeps the remote entry row and the dock entry side by side in a
    wide footer. In the rail, stack the footer seats so the phone, update, and
    dock icons share one center line while preserving the sidebar package's
    native collapsed width and centering rules. */
-:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [class*='footArea'] > [class*='footerActions']) {
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [class*='footArea'] > [class*='footerActions']),
+:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']),
+:global([data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']:has([data-rail='rail'])),
+:global([data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']:has([data-wide='rail'])) {
   box-sizing: border-box;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-}
+}

@@ -27,6 +27,8 @@ import {
 } from './locales.ts'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
+export { SafePluginBoundary } from './SafePluginBoundary.tsx'
+export type { SafePluginBoundaryProps, SafePluginBoundaryState } from './SafePluginBoundary.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {

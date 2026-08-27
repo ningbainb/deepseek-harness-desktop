@@ -137,7 +137,7 @@ function renderDirectProcess(state, reason) {
   document.body.dataset.directState = state
 }
 function startingState(state) {
-  return state === 'starting' || state === 'restarting'
+  return state === 'starting' || state === 'restarting' || state === 'ready'
 }
 
 function updateStartupStall(state, stateChanged) {

@@ -433,7 +433,12 @@
 
 .entryRow[data-rail='rail'] {
   flex-direction: column-reverse;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
+  width: 36px;
+  min-width: 36px;
+  margin-inline: auto;
 }
 
 /* ── update panel extras ─────────────────────────────────────────────── */

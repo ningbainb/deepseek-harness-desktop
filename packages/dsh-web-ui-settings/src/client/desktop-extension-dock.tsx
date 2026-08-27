@@ -53,9 +53,13 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
   useEffect(() => {
     let active = true
     void getDockEntryState().then((state) => {
-      if (!active || state.available !== true) return
-      setAvailable(true)
-      setShowNudge(state.showNudge)
+      if (!active) return
+      if (state.available === true) {
+        setAvailable(true)
+        setShowNudge(state.showNudge === true)
+      } else {
+        setAvailable(false)
+      }
     }).catch(() => {})
     return () => { active = false }
   }, [])
@@ -107,7 +111,10 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
     setOpening(true)
     void dismissDockNudge('clicked').catch(() => {})
     try {
-      setFailed(!await openDesktopSurface('extensions'))
+      const opened = await openDesktopSurface('extensions')
+      if (!opened) {
+        setFailed(true)
+      }
     } catch {
       setFailed(true)
     } finally {

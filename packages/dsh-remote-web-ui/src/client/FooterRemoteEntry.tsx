@@ -29,3 +29,4 @@ export function FooterRemoteEntry(props: FooterRemoteEntryProps) {
     />
   )
 }
+

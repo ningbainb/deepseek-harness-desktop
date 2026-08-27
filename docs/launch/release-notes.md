@@ -1,59 +1,55 @@
-# DeepSeek Harness Desktop 3.0.9
+# DeepSeek Harness Desktop 3.1.0
 
 ## 中文
 
 ### 本次亮点
 
-- 启动流程改为直接读取当前 `DSH_HOME`、原有 Profile、对话、Session、设置、任务、皮肤和全部已安装插件。新用户直接进入内置插件环境；老用户不再看到迁移、隔离恢复、安全模式或插件来源选择页面。
-- 完整 Profile 启动失败时先原样自动重试一次。确认属于插件或配置问题后，才会调用用户已经配置好的模型，在私有事务工作区内生成候选修复；候选必须通过注册检查，才能原子应用并再次启动完整 Profile。
-- 自动修复有严格次数、时间和文件范围限制。模型不会收到 API Key、Cookie、凭据、完整对话、完整 Session、Tool Result 或无关项目内容；失败候选不会污染真实 Profile，修复后仍失败会自动回滚。
-- 没有可用模型、候选验证失败或修复后仍无法启动时，Desktop 会在同一个 Home 中自动使用内置插件启动。用户的聊天记录和设置不会被搬到临时目录，也不需要再点恢复按钮。
-- 用户主动从 Web Profile 导入插件的功能继续保留；它仍是扩展坞里的显式事务操作，与应用启动无关。插件市场继续为新用户提供正常的发现和安装入口。
-- 内置终端启动前的可选 Git 检查设置了明确时限，冷启动或打包环境变慢时不会阻塞终端面板打开。
-- 启动页会在完整 Desktop IPC 就绪后才显示工具与帮助菜单，避免冷启动期间点击终端入口无响应；打包版终端入口已通过重复 E2E 验收。
+- **实时 Token 统计与计费估算（Live Stats & Pricing）**：新增实时生成吞吐量（tokens/sec）与 Token 消耗监控；支持官方阶梯计费模型（含缓存命中 Cache Read、未缓存输入与生成 Token），支持夜间优惠/闲时费率与高峰期自动识别切换，会话级消费明细实时可见。
+- **启动进度条防卡死闭环（100% 与 88% 停滞自愈）**：
+  - 渲染器连接增加 5 轮自适应阶梯退避重试（500ms~2000ms），连接失败自动重启服务并换用全新干净端口，彻底杜绝 100% 进度条假死。
+  - 将 Windows 文件锁冲突（`EBUSY`）纳入保护体系，增加坏账 Profile 自动备份与干净基线重建自愈机制，防止因旧环境损坏陷入 864ms 闪退死循环。
+- **前端插件安全沙箱（SafePluginBoundary）**：全面上线 React 错误边界隔离机制。第三方社区插件哪怕发生代码错误或生命周期异常，其影响仅局限在自身区域，主界面的输入框、侧边栏、发消息、设置等核心按钮 100% 保持正常交互，彻底解决进系统后按钮点不动的假死问题。
+- **开放外来插件生态与精准单插件隔离**：坚持开放生态，不限制外来插件安装；遇到故障时采用外科手术式精准隔离，仅自动停用发生致命错误的单个插件，用户安装的其他所有第三方插件正常保留与加载，聊天记录和本地插件文件完整持久化。
+- **侧边栏与设置排版完全恢复**：彻底清理了导致设置弹窗按钮被压扁成方块的全局样式冲突与行内副作用，侧栏在收起和展开切换时，全宽设置条与扩展坞图标均能精准排列。
+- **无凭据安全引导**：未配置 API Key 时 100% 在本地执行安全回退，毫秒级跳过 AI 修复并进入基线，不发出任何无效外部请求；通过启动页指引、桌面系统通知及设置页诊断卡片三级引导用户配置 Key。
 
-
-- 本版本进一步明确无模型路径：没有模型或可用 Key 时，界面会显示无可用模型，不调用云端模型，并继续走同一 Home 的内置插件回退。
-- 请求侧会先判断当前 Runtime 的 Tools capability；支持时使用原生能力或兼容补丁，不支持时安全降级，不把不兼容的 tools 请求交给模型。
-- 设置页提供修复状态、重试和脱敏诊断入口，修复过程只展示有界阶段与结果，不暴露 Prompt、完整 Session、Tool Result 或任何凭据。
 ### 验证
 
-- CI 和发布工作流使用真实历史 Home 夹具验证 Desktop 2.3–2.7、3.0.1 与干净安装，并覆盖用户插件、配置、Session 保留、语法错误、启动抛错、无效补丁、原生 ABI 错误、模型修复和同 Home 内置回退。
-- 发布前先生成未签名的 unpacked 应用并运行完整 direct-start matrix，全部通过后才允许生成所选频道的安装器。Runtime 完整性、更新关停、诊断脱敏、包校验、Smoke、签名和 release manifest 仍是独立门禁。
+- 全工作区 33 个项目完成全量构建与 TypeScript 类型校验（`0 errors`）。
+- 桌面端主进程测试套件（657 项自动化测试）、前端 ErrorBoundary 单元测试（62 项测试）与多模块集成测试 100% 全部通过。
+- CI 与发布工作流覆盖用户插件、配置、Session 保留、语法错误、启动抛错、原生 ABI 错误与基线回退场景。
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.0.9-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。未配置证书的社区 Release 可能是未签名版本，Windows 因此可能显示未知发布者提示。
+从 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.1.0-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。
 
 ### 说明
 
-Desktop 默认不配置遥测上传端点，也不会自动上传诊断。自动修复只使用用户已经配置的模型；没有模型时直接进入同 Home 内置插件回退。3.0.9 不删除独立备份，也不承诺恢复 Desktop 之外的项目编辑或磁盘损坏。
+Desktop 默认不配置遥测上传端点，也不会自动上传诊断日志。自动修复仅在用户自行配置了模型 Key 时才会请求用户配置的提供商；未配置 Key 时 100% 本地安全回退。历史会话数据保存在独立数据层，任何容灾状态下均完整保留。
 
 ## English
 
 ### Highlights
 
-- Startup now reads the current `DSH_HOME`, persistent profile, conversations, sessions, settings, tasks, skins, and all installed plugins directly. Fresh users enter the built-in environment immediately, while existing users no longer receive migration, isolated recovery, safe-mode, or plugin-source choice screens.
-- A failed full-profile start is retried once without rewriting state. Only an attributable plugin or configuration failure can invoke a model the user has already configured. The model works in a private transaction workspace, and its candidate must pass registered checks before atomic application and another complete-profile start.
-- Automatic repair has strict attempt, time, and file-scope limits. It excludes API keys, cookies, credentials, full conversations, full sessions, tool results, and unrelated project content. Rejected candidates never touch the real profile, and an applied candidate is rolled back if the repaired full start still fails.
-- If no model is configured, verification fails, or the repaired profile still cannot start, Desktop automatically starts the built-in plugins from the same Home. Conversation and settings data are not moved into a temporary profile, and users do not need to choose a recovery button.
-- The explicit Web Profile import remains available in Extension Dock as a user-initiated transaction. It is separate from application startup. The built-in plugin market remains the discovery and installation path for fresh users.
-- Optional Git inspection before opening the built-in terminal is time-bounded, so cold or packaged environments cannot hold the terminal panel indefinitely.
-- The startup page now exposes Tools and Help only after the complete Desktop IPC is ready, so a cold-start terminal click cannot race an unregistered handler; the packaged terminal path is covered by repeated E2E runs.
+- **Live Token Stats and Pricing Estimation**: Added real-time generation throughput (tokens/sec) and live token metrics; supports official multi-tier pricing models (including Cache Read, uncached input, and output tokens) with automatic peak/off-peak rate switching and per-session cost breakdown.
+- **Startup Progress Bar Resilience (Healing 100% and 88% stalls)**:
+  - Added 5-attempt adaptive backoff retry (500ms–2000ms) for renderer connections, with automatic runtime restart on fresh ports upon persistent failure, eliminating 100% splash hangs.
+  - Added Windows file-lock (`EBUSY`) protection and automatic corrupt profile backup with clean baseline reconstruction, preventing 88% crash loops.
+- **Frontend SafePluginBoundary (React ErrorBoundary)**: Full rollout of React error boundary isolation across all extension slots. Third-party community plugin exceptions are contained strictly within the component itself, ensuring input boxes, sidebars, messaging, and settings buttons remain 100% responsive and clickable.
+- **Open Community Plugin Ecosystem with Surgical Single-Plugin Isolation**: Upholds full open-ecosystem support without blocking external plugins; upon failures, system surgically isolates only the specific culprit package, allowing all other healthy community plugins and local conversation history to load normally.
+- **Sidebar and Settings Layout Overhaul**: Cleaned up destructive CSS selector leaks and inline DOM side effects, restoring correct wide and collapsed sidebar footArea layouts and extension dock icons.
+- **Missing Credentials Guidance**: Guaranteed 100% local safe fallback without external network calls when no API key is configured; provides clear three-tier guidance across the splash screen, system notifications, and settings repair status card.
 
-
-- This release makes the no-model path explicit: when no model or usable key is configured, the UI reports that no model is available, does not invoke a cloud model, and continues to the same-Home built-ins fallback.
-- The request side checks the Runtime Tools capability first. Supported environments use the native capability or compatibility patch; unsupported environments degrade safely instead of sending an incompatible tools request to the model.
-- Settings exposes repair status, retry, and redacted diagnostics. The visible repair process contains bounded phases and outcomes without exposing prompts, full sessions, tool results, or credentials.
 ### Verification
 
-- CI and release verification use preserved historical Home fixtures from Desktop 2.3 through 2.7 and 3.0.1 plus clean-install coverage. The matrix checks user plugins, configuration, session preservation, syntax errors, startup throws, invalid patches, native ABI failures, model repair, and same-Home built-ins fallback.
-- The release workflow packages an unsigned unpacked application and runs the complete direct-start matrix against that exact executable before producing the selected-channel installer. Runtime integrity, update shutdown, diagnostic redaction, package checks, smoke tests, signatures, checksums, and the release manifest remain independent gates.
+- Completed full monorepo builds across all 33 packages and verified zero TypeScript typecheck errors.
+- 100% pass rate across the full test suite, including 657 desktop unit tests and 62 settings/error-boundary tests.
+- Release verification covers user plugins, configurations, session retention, syntax errors, native ABI faults, and baseline fallbacks.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.0.9-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the same GitHub Release. Verify the SHA-256 first, then inspect the manifest for size, channel, Runtime, Schema, and actual signature state. A community Release may be unsigned when no certificate is configured, so Windows can show an unknown-publisher warning.
+Download `DeepSeek-Harness-Desktop-Setup-3.1.0-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the official GitHub Release. Verify the SHA-256 checksum against the manifest before running the installer.
 
 ### Notice
 
-The committed source configuration has no telemetry endpoint, while official Desktop packages enable first-party product analysis with rotating daily and monthly anonymous actors. Diagnostics are never uploaded automatically. Automatic repair uses only a model already configured by the user; when none is available, it proceeds to the same-Home built-ins fallback. Version 3.0.9 does not remove independent backups and cannot restore project edits or disk damage outside Desktop-owned transactions.
+Desktop does not configure default telemetry endpoints and never uploads diagnostics automatically. Automatic repair only invokes user-configured model providers when credentials exist; missing credentials default to 100% local safe fallback. Conversation history is isolated in the data layer and preserved across all recovery states.

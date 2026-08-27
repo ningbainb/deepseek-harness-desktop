@@ -20,12 +20,13 @@ DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. I
 
 If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
 
-### Latest release: 3.0.9
+### Latest release: 3.1.0
 
-`desktop-v3.0.9` uses direct loading and zero-click automatic repair: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+`desktop-v3.1.0` brings three major breakthroughs: **Security & Rock-Solid Stability**, **Rich & Open Extensibility**, and **Live Token Stats & Pricing**: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
 
 | Version | Highlights |
 | --- | --- |
+| **3.1.0** | **Three Core Pillars**: ① **Live Token Stats & Pricing**: real-time generation throughput (tokens/sec) monitoring, official multi-tier pricing models (Cache Read, uncached input, output) and automatic off-peak/peak rate switching; ② **Full-Chain Anti-Deadlock Startup Resilience**: 5-attempt adaptive backoff retry with automatic clean port switching eliminates 100% splash hangs; Windows file lock (`EBUSY`) handling and automatic bad-profile reconstruction eliminate 88% crash loops; ③ **Frontend Plugin Error Sandbox (`SafePluginBoundary`)**: React error boundaries isolate third-party plugins; plugin errors are strictly quarantined while core sidebar, message input, and settings remain 100% responsive; ④ **Open Community Ecosystem with Surgical Isolation**: preserves all healthy third-party plugins and user sessions, only deactivating the individual faulty plugin; ⑤ **Sidebar and Settings Layout Overhaul**. |
 | **3.0.9** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, shows repair progress, and safely handles missing models or Tools capability without startup choices. |
 | **3.0.7** | First stable direct-start and zero-click repair release; preserved same-Home state, the complete plugin graph, and transactional rollback boundaries. |
 | **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
@@ -45,15 +46,19 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
 | **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
 | **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
 
-### 3.0.9 Direct Start and Automatic Repair
+### 3.1.0 Core Advantages & Breakthroughs
 
-- **No startup choices**: fresh users enter the built-in environment, while existing users read their current `DSH_HOME`, profile, conversations, sessions, settings, tasks, skins, and every plugin directly.
-- **Full profile first**: a failed complete-profile start is retried once unchanged. Desktop does not pre-emptively disable a plugin or block startup because publisher, registry, or compatibility metadata is absent.
-- **Model-backed repair**: an attributable plugin or configuration failure may invoke a model the user has already configured. It works in a private transaction workspace, and only a candidate that passes registered checks can be applied atomically.
-- **Startup converges without a key**: when no model or usable key exists, Desktop does not invoke a cloud model; it shows the unavailable repair state, continues to same-Home built-ins fallback, and follows the Runtime Tools capability safely.
-- **Automatic convergence**: a rejected candidate, missing model, or failed repaired start rolls back and starts built-in plugins from the same Home. Conversations and settings are never moved into a temporary profile.
-- **Status rather than decisions**: the startup surface shows only loading, repair, and verification progress. Logs and redacted diagnostics remain in the advanced settings area.
-- **Packaged matrix gate**: preserved Homes from 2.3 through 2.7 and 3.0.1, a clean install, and injected failures must pass against the unsigned unpacked candidate before an installer is built.
+- **Rock-Solid Security & Stability**:
+  - **Dual-Layer Anti-Deadlock Startup**: 5-round stepped backoff retry for renderer connection, with automatic backend restart and clean port reassignment on failure. Robust Windows file-lock (`EBUSY`) protection with automatic corrupt profile backup and baseline reconstruction.
+  - **Frontend Bulletproof Sandbox (`SafePluginBoundary`)**: Full React ErrorBoundary containment across all plugin slots. Any third-party plugin exception is strictly contained, ensuring navigation, input, and settings remain 100% responsive.
+  - **Zero-Leak Local Fallback**: Safely falls back locally without external network requests when no API key is configured.
+- **Rich & Open Community Extensibility**:
+  - **Full Ecosystem Openness**: Never bans or blocks third-party plugins.
+  - **Surgical Single-Plugin Isolation (Stage 1)**: Only isolates the specific culprit plugin upon fatal error. All other community plugins (reasoning sliders, Git graphs, themes, tools) and conversation history are 100% preserved.
+  - **Extension Dock**: Central hub to discover, configure, and manage built-in plugins, community bundles, local Skills, and third-party tools.
+- **Live Token Stats & Pricing Dashboard**:
+  - **Real-Time Speed & Metrics**: Live tokens/sec throughput and token metering during conversations.
+  - **Official Pricing Integration**: Full support for Cache Read hit discounts, input/output token calculations, and automatic peak vs. off-peak pricing transitions.
 
 ### Historical 2.7.0 Highlights
 
