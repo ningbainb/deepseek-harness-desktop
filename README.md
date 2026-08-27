@@ -349,6 +349,16 @@ DeepSeek Harness Desktop 采用 **BSD-3-Clause** 许可证。
 
 迁入第三方代码时保留对应 LICENSE 与署名；对于仍然活跃维护的第三方项目，优先采用 Fork 或依赖引用方式。
 
+## 📈 Star History
+
+<a href="https://star-history.com/#ningbainb/deepseek-harness-desktop&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
+ </picture>
+</a>
+
 ## ❤️ 友情链接
 
 本项目积极参与并认可 [LINUX DO 社区](https://linux.do)。
