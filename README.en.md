@@ -36,48 +36,13 @@ The installer includes the main runtime components, so you do not need to separa
 
 [🌐 Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 Documentation](docs/desktop.md) · [📝 Changelog](CHANGELOG.md)
 
-### Latest release: 3.1.0
+### 🚀 Latest Release: 3.1.0
 
-`desktop-v3.1.0` brings three major breakthroughs: **Security & Rock-Solid Stability**, **Rich & Open Extensibility**, and **Live Token Stats & Pricing**: [read the full release notes](docs/launch/release-notes.md) · [read the compatibility and runtime policies](docs/compatibility-policy.md) · [read upgrade and rollback](docs/upgrade-and-rollback.md). Release assets include `SHA256SUMS.txt`, `release-manifest.json`, and channel metadata; the manifest records the actual signature state of each asset.
+- **Anti-Deadlock Startup & Self-Healing**: Adaptive backoff retries and Windows file-lock (`EBUSY`) handling eliminate splash hangs and crash loops.
+- **Frontend Plugin Error Sandbox (`SafePluginBoundary`)**: React error boundaries isolate third-party plugins so core navigation and chat remain 100% responsive.
+- **Live Token Stats & Pricing**: Real-time throughput (tokens/sec) monitoring, official tiered pricing, and peak/off-peak rate switching.
 
-| Version | Highlights |
-| --- | --- |
-| **3.1.0** | **Three Core Pillars**: ① **Live Token Stats & Pricing**: real-time generation throughput (tokens/sec) monitoring, official multi-tier pricing models (Cache Read, uncached input, output) and automatic off-peak/peak rate switching; ② **Full-Chain Anti-Deadlock Startup Resilience**: 5-attempt adaptive backoff retry with automatic clean port switching eliminates 100% splash hangs; Windows file lock (`EBUSY`) handling and automatic bad-profile reconstruction eliminate 88% crash loops; ③ **Frontend Plugin Error Sandbox (`SafePluginBoundary`)**: React error boundaries isolate third-party plugins; plugin errors are strictly quarantined while core sidebar, message input, and settings remain 100% responsive; ④ **Open Community Ecosystem with Surgical Isolation**: preserves all healthy third-party plugins and user sessions, only deactivating the individual faulty plugin; ⑤ **Sidebar and Settings Layout Overhaul**. |
-| **3.0.9** | Loads the existing Home and every plugin directly; retries the full profile unchanged, can use a configured model for bounded transactional repair, rolls back rejected candidates, shows repair progress, and safely handles missing models or Tools capability without startup choices. |
-| **3.0.7** | First stable direct-start and zero-click repair release; preserved same-Home state, the complete plugin graph, and transactional rollback boundaries. |
-| **3.0.1** | Freezes SDK/Contract/Provider/Schema boundaries; separates Stable and Beta; adds the controlled Runtime matrix and patch policy, privacy-redacted JSON/ZIP diagnostics, and release-manifest/signing infrastructure; telemetry is disabled by default. |
-| **2.7.0** | Fixes the Windows 8% Runtime startup failure and moves to DSH rc.7; adds tray background automation, Host durable task scheduling, plugin compatibility declarations/lock state, the browser-safe Desktop SDK, safe workspace external opening, and Candidate Matrix. |
-| **2.6.0** | Adds Task Board v3 Projects, Task Runs, derived Evidence, explicit Git Worktree review, capability-based shared-workspace fallback, and Candidate execution fixtures. Its historical anonymous-metrics behavior is replaced by the 3.0 default-off policy. |
-| **2.5.0** | Adds the Runtime Adapter and upstream compatibility defenses, secure `.dshpreset` and Web Profile migration, atomic plugin batches, strict deep-link/file ingress, and structured notifications. |
-| **2.4.0** | Added reliable update-shutdown receipt v2, split Main/Extension Dock permissions, Desktop Contract v1, and Task Board Host-file storage v2. |
-| **2.3.0** | Adds a one-time GitHub Star and community prompt; recognizes external PowerShell/CMD/Node hosts, EncodedCommand payloads, and Windows short paths during preflight; supports direct 0.1.9 upgrades; and coexists with the official web client through an isolated profile and port fallback. |
-| **2.2.0** | Hides Windows terminal descendants, cleans up attributed app/plugin background processes, migrates recognized dependencies and legacy safe-mode false positives, reuses the runtime port, and adds visible one-click safe-mode recovery. |
-| **2.1.0** | Adds measured mainland-China update mirrors, snapshot/isolation/safe-mode plugin recovery, unified skin persistence, reliable update-process cleanup, quiet background commands, Unicode-workspace restart protection, and a visible Tools menu entry for Extension Dock. |
-| **2.0.0** | Restores queued messages after cancellation, bounds incomplete-runtime failures, adds the Skills menu, model API recovery, sticky reasoning controls, and live SSH monitoring, and aligns Desktop-owned surfaces with the native Harness visual system. |
-| **0.1.9** | Fixes conversation-bubble and full-response copying; downloads updates in the background; refreshes the startup and update surfaces with a particle whale and frosted glass; and adds guarded community-plugin compatibility checks, offline switching, rollback, and performance limits. |
-| **0.1.8** | Bundles ChatGPT OAuth, OpenAI Codex models, a model-aware reasoning-effort slider, and Help-menu community and feedback actions; keeps `dshmarket` as the only default store and repairs blank patches plus stale store and skin links during migration. |
-| **0.1.7** | Introduces a deep-ocean startup experience with state-driven progress and a 32px macOS-inspired frosted-glass window bar; bounds large-file preview memory, Git polling, and SSH transfer work; and strengthens first-install cold-start tolerance plus release gates. |
-| **0.1.6** | Bundles Tencent's official QQ Bot and QR Connector. Bind, refresh, cancel, rebind, or unbind from Extension Dock, then connect QQ direct messages and group chats to the desktop Harness. AppSecret is protected by Windows credential encryption and supplied only to the DSH child process. |
-| **0.1.5** | Synchronizes native title-bar colors with light/dark mode, keeps full-screen dialogs inside the safe viewport, fixes packaged skin discovery and switching, and bundles `dshmarket` plus `dsh-plugin-hub`. |
-| **0.1.4** | Moves the pet to the global Shell Overlay so it appears on home and settings screens, restores all five Web UI plugin settings cards, and lists all nine packaged skins in Skin Center. |
-| **0.1.3** | Adds stable GitHub Release checks, bilingual update notes, user-confirmed downloads, taskbar progress, and a second confirmation before installation. |
-
-### 3.1.0 Core Advantages & Breakthroughs
-
-- **Rock-Solid Security & Stability**:
-  - **Dual-Layer Anti-Deadlock Startup**: 5-round stepped backoff retry for renderer connection, with automatic backend restart and clean port reassignment on failure. Robust Windows file-lock (`EBUSY`) protection with automatic corrupt profile backup and baseline reconstruction.
-  - **Frontend Bulletproof Sandbox (`SafePluginBoundary`)**: Full React ErrorBoundary containment across all plugin slots. Any third-party plugin exception is strictly contained, ensuring navigation, input, and settings remain 100% responsive.
-  - **Zero-Leak Local Fallback**: Safely falls back locally without external network requests when no API key is configured.
-- **Rich & Open Community Extensibility**:
-  - **Full Ecosystem Openness**: Never bans or blocks third-party plugins.
-  - **Surgical Single-Plugin Isolation (Stage 1)**: Only isolates the specific culprit plugin upon fatal error. All other community plugins (reasoning sliders, Git graphs, themes, tools) and conversation history are 100% preserved.
-  - **Extension Dock**: Central hub to discover, configure, and manage built-in plugins, community bundles, local Skills, and third-party tools.
-- **Live Token Stats & Pricing Dashboard**:
-  - **Real-Time Speed & Metrics**: Live tokens/sec throughput and token metering during conversations.
-  - **Official Pricing Integration**: Full support for Cache Read hit discounts, input/output token calculations, and automatic peak vs. off-peak pricing transitions.
-
-> If this project is useful to you, consider giving it a **Star ⭐**.  
-> Your support helps more Windows users discover DeepSeek Harness Desktop.
+👉 [Full Release Notes](docs/launch/release-notes.md) · [Changelog](CHANGELOG.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md)
 
 ---
 
@@ -343,13 +308,10 @@ Key behaviors include:
 
 ## 📄 Open Source and Licensing
 
-DeepSeek Harness Desktop is released under the **BSD-3-Clause** license.
+This project is open-sourced under the **[BSD-3-Clause](LICENSE)** license.
 
-| Package | Source | License |
-| --- | --- | --- |
-| dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | Independently developed by zhu1090093659 | BSD-3-Clause (zhu1090093659) |
-
-Imported third-party code should retain its LICENSE and attribution. Active upstream projects should preferably be forked or referenced as dependencies instead of copying source code.
+- Project source code, bundled plugins, themes, and the desktop client follow the BSD-3-Clause license.
+- Imported third-party code and dependencies retain their original licenses and attribution notices.
 
 ## 📈 Star History
 
