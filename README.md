@@ -353,9 +353,9 @@ DeepSeek Harness Desktop 采用 **BSD-3-Clause** 许可证。
 
 <a href="https://star-history.com/#ningbainb/deepseek-harness-desktop&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&legend=top-left" />
  </picture>
 </a>
 
