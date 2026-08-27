@@ -24,6 +24,7 @@ test('direct startup projection has no buttons, choices, or raw failures', () =>
     'ready-full',
     'ready-builtins',
     'installation-repair-required',
+    'system-startup-failed',
   ])
   assert.equal(JSON.stringify(state).includes('secret'), false)
   assert.equal(Object.hasOwn(state, 'actions'), false)
@@ -37,8 +38,19 @@ test('direct startup projection carries only safe fallback reasons', () => {
   const state = projectDirectStartupState({ state: 'ready-builtins', reason: 'missing-credentials' })
   assert.equal(state.reason, 'missing-credentials')
   assert.ok(DIRECT_STARTUP_REASONS.includes('missing-credentials'))
+  assert.ok(DIRECT_STARTUP_REASONS.includes('rollback-failed'))
   assert.throws(
     () => projectDirectStartupState({ state: 'ready-builtins', reason: 'raw-error' }),
     /startup reason/u,
   )
+})
+
+test('a total startup failure projects an honest terminal state without raw errors', () => {
+  const state = projectDirectStartupState({ state: 'system-startup-failed' })
+  assert.deepEqual(state, {
+    schemaVersion: 1,
+    state: 'system-startup-failed',
+    summary: '启动未能完成',
+    interactive: false,
+  })
 })

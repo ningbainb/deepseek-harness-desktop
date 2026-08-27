@@ -403,8 +403,15 @@ function normalizedProbeTimeout(value) {
   return value
 }
 
+// Some builds append a vendor suffix after the version on the same line, for
+// example Apple's `git version 2.50.1 (Apple Git-155)`, which ships with the
+// Xcode Command Line Tools and is therefore what a stock macOS reports. The
+// suffix is tolerated but never returned, and it has to be separated by
+// horizontal whitespace so a malformed version can never be truncated into a
+// valid-looking one. The captured token is still checked against
+// GIT_VERSION_PATTERN, so what this accepts as a version is unchanged.
 function parseGitVersion(output) {
-  const match = /(?:^|\r?\n)git version ([0-9][0-9A-Za-z.-]{0,79})(?:\r?\n|$)/iu.exec(output)
+  const match = /(?:^|\r?\n)git version ([0-9][0-9A-Za-z.-]{0,79})(?:[^\S\r\n][^\r\n]{0,199})?(?:\r?\n|$)/iu.exec(output)
   if (match === null || !GIT_VERSION_PATTERN.test(match[1])) return null
   return match[1]
 }

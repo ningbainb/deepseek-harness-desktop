@@ -161,6 +161,7 @@ function exactFields(value, fields) {
 }
 
 function operatingSystemFamily(platform, release) {
+  if (platform === 'darwin') return 'macos'
   if (platform !== 'win32' || typeof release !== 'string') return 'windows-other'
   const [major, minor, buildText] = release.split('.')
   const build = Number.parseInt(buildText ?? '', 10)

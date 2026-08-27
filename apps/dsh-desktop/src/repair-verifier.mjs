@@ -3,6 +3,56 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 
 const CHECK_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u
 
+/**
+ * Candidate verification runs untrusted plugin scripts in a staging copy, so
+ * the child only receives the OS and package-manager variables those scripts
+ * genuinely need. Secrets, tokens, cookies, cloud credentials, signing keys,
+ * CI secrets, and unrelated user variables never cross this boundary.
+ */
+const VERIFIER_ENV_ALLOWLIST = new Set([
+  // OS essentials (a Windows child without SystemRoot fails to start).
+  'COMPUTERNAME',
+  'COMSPEC',
+  'NUMBER_OF_PROCESSORS',
+  'OS',
+  'PATHEXT',
+  'PROCESSOR_ARCHITECTURE',
+  'ProgramData',
+  'ProgramFiles',
+  'SystemDrive',
+  'SystemRoot',
+  'TEMP',
+  'TMP',
+  'windir',
+  // User path essentials for locating node/pnpm/git shims.
+  'ALLUSERSPROFILE',
+  'APPDATA',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'LOCALAPPDATA',
+  'PATH',
+  'USERDOMAIN',
+  'USERNAME',
+  'USERPROFILE',
+  // pnpm store resolution without touching user registries.
+  'PNPM_HOME',
+])
+const VERIFIER_ENV_OVERRIDES = Object.freeze({
+  CI: '1',
+  npm_config_offline: 'true',
+  npm_config_audit: 'false',
+  npm_config_fund: 'false',
+})
+
+export function verifierChildEnvironment(sourceEnv = process.env) {
+  return Object.freeze({
+    ...Object.fromEntries(
+      Object.entries(sourceEnv ?? {}).filter(([name]) => VERIFIER_ENV_ALLOWLIST.has(name)),
+    ),
+    ...VERIFIER_ENV_OVERRIDES,
+  })
+}
+
 function isWithin(candidate, parent) {
   const path = relative(parent, candidate)
   return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path))
@@ -28,13 +78,7 @@ export function runRegisteredRepairCommand(command, workspace, {
         cwd,
         shell: false,
         windowsHide: true,
-        env: {
-          ...process.env,
-          CI: '1',
-          npm_config_offline: 'true',
-          npm_config_audit: 'false',
-          npm_config_fund: 'false',
-        },
+        env: verifierChildEnvironment(),
         stdio: ['ignore', 'ignore', 'ignore'],
       })
     } catch {

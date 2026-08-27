@@ -17,6 +17,7 @@ import {
   computeRestartDelay,
   createRuntimeInvocation,
   formatRuntimeExit,
+  forceKillChildProcessTree,
   parseDshReadyUrl,
   probeHttpReady,
   terminateChildProcessTree,
@@ -856,4 +857,218 @@ test('controller fails preflight without spawning or scheduling an automatic res
   assert.equal(controller.status.state, 'crashed')
   assert.equal(spawnCalls, 0)
   assert.equal(scheduleCalls, 0)
+})
+
+test('POSIX shutdown signals the runtime process group, not just the direct child', async () => {
+  const signals = []
+  const child = {
+    pid: 43125,
+    exitCode: null,
+    kill: (signal) => signals.push({ direct: signal }),
+  }
+  await terminateChildProcessTree(child, {
+    platform: 'darwin',
+    processKill: (pid, signal) => signals.push({ pid, signal }),
+  })
+  // The negated pid is the whole group: the runtime plus everything it spawned.
+  assert.deepEqual(signals, [{ pid: -43125, signal: 'SIGTERM' }])
+})
+
+test('POSIX shutdown falls back to the direct child when the group cannot be signalled', async () => {
+  for (const code of ['ESRCH', 'EPERM']) {
+    const signals = []
+    const child = {
+      pid: 43125,
+      exitCode: null,
+      kill: (signal) => signals.push({ direct: signal }),
+    }
+    await terminateChildProcessTree(child, {
+      platform: 'darwin',
+      processKill: () => {
+        const error = new Error(code)
+        error.code = code
+        throw error
+      },
+    })
+    // A group that cannot be signalled must never become no signal at all.
+    assert.deepEqual(signals, [{ direct: 'SIGTERM' }], `fallback for ${code}`)
+  }
+})
+
+test('POSIX shutdown propagates unexpected process-kill failures instead of swallowing them', () => {
+  const child = { pid: 43125, exitCode: null, kill: () => {} }
+  // Only ESRCH and EPERM mean "no group to signal". Anything else is a real
+  // fault and must surface, not be mistaken for a completed shutdown. The throw
+  // is synchronous because the POSIX branch never awaits anything.
+  assert.throws(
+    () => terminateChildProcessTree(child, {
+      platform: 'darwin',
+      processKill: () => {
+        const error = new Error('EINVAL')
+        error.code = 'EINVAL'
+        throw error
+      },
+    }),
+    /EINVAL/,
+  )
+})
+
+test('force kill surfaces an unexpected errno rather than reporting a completed kill', () => {
+  const seen = []
+  assert.throws(() => forceKillChildProcessTree(
+    { pid: 43125, exitCode: null, kill: (signal) => seen.push(signal) },
+    {
+      platform: 'darwin',
+      processKill: () => {
+        const error = new Error('EINVAL')
+        error.code = 'EINVAL'
+        throw error
+      },
+    },
+  ), /EINVAL/)
+  // The direct kill is the controller's fallback, not this function's: the
+  // caller has to decide whether an unexpected errno is recoverable.
+  assert.deepEqual(seen, [])
+})
+
+test('a failing force kill is contained: the controller logs it and still kills the child', async () => {
+  const diagnostics = []
+  const child = new FakeChild()
+  const controller = new DshRuntimeController({
+    cliPath: 'dsh-bin.js',
+    cwd: process.cwd(),
+    dshHome: '/isolated-home',
+    platform: 'darwin',
+    spawnProcess: () => child,
+    logStore: { append: async (line) => { diagnostics.push(line) } },
+    probeReady: async () => {},
+    // The graceful path fails, so the escalation runs; the escalation then
+    // throws the way an unexpected errno would.
+    terminateProcessTree: async () => { throw new Error('group shutdown unavailable') },
+    forceTerminateProcessTree: () => {
+      const error = new Error('EINVAL')
+      error.code = 'EINVAL'
+      throw error
+    },
+  })
+  const ready = controller.start()
+  child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+  await ready
+  // A throwing escalation must not reject stop(): timers and catch blocks are
+  // the only callers, and an escape there would take down the app.
+  await controller.stop()
+  assert.equal(child.killed, true)
+  assert.ok(
+    diagnostics.some((line) => line.includes('force kill failed') && line.includes('EINVAL')),
+    `expected a contained force-kill diagnostic, saw ${JSON.stringify(diagnostics)}`,
+  )
+})
+
+test('POSIX shutdown skips the group signal when the child has no usable pid', async () => {
+  for (const pid of [undefined, 0, -1, 1.5]) {
+    const signals = []
+    const child = { pid, exitCode: null, kill: (signal) => signals.push({ direct: signal }) }
+    await terminateChildProcessTree(child, {
+      platform: 'darwin',
+      processKill: () => { throw new Error('process group must not be signalled') },
+    })
+    assert.deepEqual(signals, [{ direct: 'SIGTERM' }], `pid ${String(pid)}`)
+  }
+})
+
+test('Windows shutdown never reaches for a POSIX process group', async () => {
+  const calls = []
+  const child = { pid: 43125, exitCode: null, kill: (signal) => calls.push({ direct: signal }) }
+  await terminateChildProcessTree(child, {
+    platform: 'win32',
+    systemRoot: 'C:\\Windows',
+    execFileFn: (executable, args, options, callback) => {
+      calls.push({ executable, args })
+      callback(null)
+    },
+    // Reaching for a process group on Windows would be the regression this
+    // whole change has to avoid, so the injected kill is a tripwire.
+    processKill: () => { throw new Error('taskkill owns the Windows tree') },
+  })
+  assert.equal(calls.length, 1)
+  // The path separator is whatever `path.join` produces on the host, which is
+  // why only the executable name is asserted here.
+  assert.match(calls[0].executable, /taskkill\.exe$/)
+  assert.deepEqual(calls[0].args, ['/PID', '43125', '/T', '/F'])
+})
+
+test('force kill escalates to the POSIX process group and keeps the Windows direct kill', () => {
+  const posix = []
+  forceKillChildProcessTree(
+    { pid: 43125, exitCode: null, kill: (signal) => posix.push({ direct: signal }) },
+    { platform: 'darwin', processKill: (pid, signal) => posix.push({ pid, signal }) },
+  )
+  assert.deepEqual(posix, [{ pid: -43125, signal: 'SIGKILL' }])
+
+  const windows = []
+  forceKillChildProcessTree(
+    { pid: 43125, exitCode: null, kill: (signal) => windows.push({ direct: signal }) },
+    { platform: 'win32', processKill: () => { throw new Error('not on Windows') } },
+  )
+  assert.deepEqual(windows, [{ direct: 'SIGKILL' }])
+
+  const fallback = []
+  forceKillChildProcessTree(
+    { pid: 43125, exitCode: null, kill: (signal) => fallback.push({ direct: signal }) },
+    {
+      platform: 'darwin',
+      processKill: () => {
+        const error = new Error('ESRCH')
+        error.code = 'ESRCH'
+        throw error
+      },
+    },
+  )
+  assert.deepEqual(fallback, [{ direct: 'SIGKILL' }])
+})
+
+test('force kill leaves an already exited child alone', () => {
+  let touched = false
+  forceKillChildProcessTree(
+    { pid: 43125, exitCode: 0, kill: () => { touched = true } },
+    { platform: 'darwin', processKill: () => { touched = true } },
+  )
+  forceKillChildProcessTree(undefined, { platform: 'darwin' })
+  assert.equal(touched, false)
+})
+
+test('runtime child becomes a process-group leader on POSIX but not on Windows', async () => {
+  const observed = []
+  const run = async (platform) => {
+    const child = new FakeChild()
+    const controller = new DshRuntimeController({
+      cliPath: 'dsh-bin.js',
+      cwd: process.cwd(),
+      dshHome: platform === 'win32' ? 'C:\\isolated-home' : '/isolated-home',
+      platform,
+      spawnProcess: (_executable, _arguments, options) => {
+        observed.push({ platform, detached: options.detached })
+        return child
+      },
+      logStore: { append: async () => {} },
+      probeReady: async () => {},
+      // Terminate for real so stop() resolves on the child's exit instead of
+      // waiting out the shutdown timeout on every platform under test.
+      terminateProcessTree: async (target) => { target.kill() },
+    })
+    const ready = controller.start()
+    child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+    await ready
+    await controller.stop()
+  }
+  await run('darwin')
+  await run('linux')
+  await run('win32')
+  assert.deepEqual(observed, [
+    { platform: 'darwin', detached: true },
+    { platform: 'linux', detached: true },
+    // `detached` on Windows means a new console, and `taskkill /T` already
+    // walks the tree, so the Windows spawn must stay attached.
+    { platform: 'win32', detached: false },
+  ])
 })

@@ -1975,6 +1975,7 @@ export async function startElectronApp(metadata) {
     }),
   })
   let builtinsFallbackDetail = 'full-retry-failed'
+  let builtinsRollbackFailed = false
   let repairToolsCapabilityForJob = 'auto'
   let repairFallbackModelsForJob
   let retryInProgress = false
@@ -1986,11 +1987,24 @@ export async function startElectronApp(metadata) {
   const runAutomaticRepair = async (input) => {
     const repairStartedAt = performance.now()
     productMetrics.recordRepairAgentStarted('default-model')
-    const result = await automaticRepair.run({
-      ...input,
-      defaultToolsCapability: repairToolsCapabilityForJob,
-      fallbackModels: repairFallbackModelsForJob ?? automaticRepair.fallbackModels,
-    })
+    let result
+    try {
+      result = await automaticRepair.run({
+        ...input,
+        defaultToolsCapability: repairToolsCapabilityForJob,
+        fallbackModels: repairFallbackModelsForJob ?? automaticRepair.fallbackModels,
+      })
+    } catch {
+      // The runner owns its internal error boundary; this guard only keeps an
+      // unexpected escape from leaving the started metric without its outcome.
+      builtinsFallbackDetail = 'repair-failed'
+      repairAvailabilityReason = 'repair-failed'
+      productMetrics.recordRepairAgentFailed({
+        detail: 'model-error',
+        durationMs: performance.now() - repairStartedAt,
+      })
+      return Object.freeze({ status: 'failed', reason: 'repair-host-failed' })
+    }
     if (result.status === 'applied') {
       return Object.freeze({
         ...result,
@@ -2113,6 +2127,28 @@ export async function startElectronApp(metadata) {
     },
     runRepair: runAutomaticRepair,
     activateProvider: (provider) => runtimeProvider.activate(provider.profileName),
+    onOutcome: async (outcome) => {
+      // Terminal coordinator outcomes that would otherwise stay inside the
+      // returned promise must remain observable in logs, metrics, and the
+      // startup surface instead of being swallowed by detached consumers.
+      if (outcome?.state === 'builtins-start-failed') {
+        await logStore.append(
+          '[startup] builtins fallback failed to start; no same-Home fallback remains',
+        ).catch(() => {})
+        productMetrics.recordRepairAgentFailed({
+          detail: 'builtins-start-failed',
+          durationMs: performance.now() - applicationStartedAt,
+        })
+        await showDirectStartupState('system-startup-failed').catch(() => {})
+        return
+      }
+      if (outcome?.state === 'ready-builtins' && outcome.rollbackFailed === true) {
+        builtinsRollbackFailed = true
+        await logStore.append(
+          '[startup] repaired full start rolled back; rollback did not fully converge',
+        ).catch(() => {})
+      }
+    },
     classifyFailure: (error) => classifyDesktopProfileBootstrapFailure(error),
     publishAttempt: async (detail) => {
       const safeProfile = typeof detail?.profileName === 'string'
@@ -2157,14 +2193,15 @@ export async function startElectronApp(metadata) {
       if (state === 'rolling-back') await showDirectStartupState('repairing')
       if (state === 'ready-full') await recordDirectStartupState(state)
       if (state === 'ready-builtins') {
-        await showDirectStartupState(state, { reason: builtinsFallbackDetail })
+        const fallbackReason = builtinsRollbackFailed ? 'rollback-failed' : builtinsFallbackDetail
+        await showDirectStartupState(state, { reason: fallbackReason })
         productMetrics.recordBuiltinsFallbackReady({
-          detail: builtinsFallbackDetail,
+          detail: fallbackReason,
           durationMs: performance.now() - applicationStartedAt,
         })
         const latestRepair = await repairIncidentStore.latest().catch(() => undefined)
         await notificationService.show(
-          builtinsFallbackNotification(latestRepair?.fingerprint, builtinsFallbackDetail),
+          builtinsFallbackNotification(latestRepair?.fingerprint, fallbackReason),
         ).catch(() => {})
       }
     },
@@ -2175,7 +2212,13 @@ export async function startElectronApp(metadata) {
     holdRuntime,
   })
   startupRuntimePromise = startup.runtimePromise
-  void startup.runtimePromise?.catch(() => {})
+  void startup.runtimePromise?.catch((error) => {
+    // A rejected coordinator promise (including a failed builtins fallback)
+    // must stay diagnosable instead of vanishing into an anonymous fault page.
+    void logStore.append(
+      `[startup] coordinator terminated: ${error instanceof Error ? error.message : 'unknown'}`,
+    ).catch(() => {})
+  })
   await startup.shellPromise
   if (process.env.DSH_DESKTOP_OPEN_EXTENSIONS === '1') await createExtensionWindow()
   if (process.env.DSH_DESKTOP_OPEN_COMMUNITY === '1') await createCommunityWindow()

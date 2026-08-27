@@ -39,6 +39,7 @@ const directCopy = Object.freeze({
   'ready-full': ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
   'ready-builtins': ['正在载入内置插件', '原有数据保持不变'],
   'installation-repair-required': ['正在修复应用安装', '安装文件修复后会自动继续'],
+  'system-startup-failed': ['启动未能完成', '完整模式和内置模式都无法启动；请查看日志或导出诊断'],
 })
 
 const directReasonCopy = Object.freeze({
@@ -51,6 +52,7 @@ const directReasonCopy = Object.freeze({
   'profile-permission': { heading: '正在修复应用安装', message: '应用数据目录权限阻止了完整启动，应用已使用内置插件启动。', guidance: '请检查应用数据目录权限后再尝试。' },
   'profile-installation': { heading: '正在修复应用安装', message: '应用安装文件阻止了完整启动，应用已使用内置插件启动。', guidance: '请修复或重新安装应用后再尝试。' },
   'profile-failed': { heading: '已使用内置插件启动', message: '应用数据目录未能完成启动，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可检查本地日志了解安装问题，再尝试启动。' },
+  'rollback-failed': { heading: '插件修复已回滚', message: '自动修复启动失败后已恢复原插件文件，但部分文件未能完全复原；应用已使用内置插件启动。', guidance: '可在设置页导出脱敏诊断了解详情，必要时手动恢复插件目录。' },
 })
 function safeDirectReason(value) {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(directReasonCopy, value)
@@ -103,7 +105,7 @@ function directCopyFor(state, reason) {
 
 function renderDirectProcess(state, reason) {
   if (!startupStepsContainer) return
-  startupStepsContainer.hidden = state === 'preparing'
+  startupStepsContainer.hidden = state === 'preparing' || state === 'system-startup-failed'
   const currentStep = {
     'starting-full': 0,
     'retrying-full': 1,
@@ -207,8 +209,11 @@ if (directState && directCopy[directState]) {
     'ready-builtins': 92,
     'ready-full': 100,
     'installation-repair-required': 18,
+    'system-startup-failed': 100,
   }
-  currentState = directState.startsWith('ready-') ? 'ready' : 'starting'
+  currentState = directState.startsWith('ready-') || directState === 'system-startup-failed'
+    ? 'ready'
+    : 'starting'
   document.body.dataset.state = currentState
   title.textContent = heading
   detail.textContent = message

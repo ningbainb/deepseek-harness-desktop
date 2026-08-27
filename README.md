@@ -2,23 +2,39 @@
 
 中文 | [English](README.en.md)
 
-![dsh-web-ui](docs/dsh-web-ui-banner.png)
+![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
-DeepSeek Harness Desktop 是社区维护的开源 Windows AI 编程桌面客户端：它把完整的 DeepSeek Harness Web Surface、官方 DSH 本地主机、插件、Skills、主题和自动更新打包进一个 Windows x64 安装器。支持 Windows 10/11，免费采用 BSD-3-Clause 许可证，安装后无需另配 Node.js。
+## 👥 DeepSeek Harness Desktop 用户交流群
 
-## 社区用户交流群
+QQ 群：**1105158177**
 
-QQ 群：**1105158177** · **[点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
+**[👉 点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
 
 <a href="https://qm.qq.com/q/vehlNjaeye"><img src="website/assets/qq-group-1105158177.jpg" width="280" alt="DeepSeek Harness Desktop QQ 群 1105158177 加群二维码"></a>
 
-## Windows 桌面版
+欢迎加入社群交流：
 
-DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不是重写页面，而是用安全的 Electron 窗口启动官方 `@deepseek-ai/dsh` 本地主机，再原样加载本仓库的全部插件与皮肤。
+- 使用与配置交流
+- 插件与 Skills 分享
+- 模型配置与使用经验
+- 自动化玩法
+- 主题与桌宠
+- 新版本体验与功能建议
 
-[浏览产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载 Windows x64 安装器](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [桌面版技术说明](docs/desktop.md) · [兼容性政策](docs/compatibility-policy.md) · [运行时支持政策](docs/runtime-support-policy.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [发布与交接工作流](docs/launch/desktop-release-workflow.md) · [更新日志](CHANGELOG.md)
+> **GitHub 下载速度较慢？**  
+> 群内会同步提供最新版安装包，也可以直接交流安装与使用问题。
 
-如果这个项目对你有帮助，欢迎在 [GitHub 仓库](https://github.com/ningbainb/deepseek-harness-desktop) 点 Star，帮助更多桌面版用户发现它。
+---
+
+**DeepSeek Harness Desktop** 是社区维护的开源 Windows AI 编程桌面客户端。
+
+它将 **DeepSeek Harness Web、DSH 本地运行环境、Skills、插件、任务自动化、Git、远程开发与桌面扩展能力** 集成到一个 Windows 应用中，让你无需复杂配置，就能获得完整的 Harness AI 编程体验。
+
+支持 **Windows 10 / 11 x64**，采用 **BSD-3-Clause** 许可证。
+
+安装包已包含主要运行组件，无需另外配置 Node.js、Git 或单独安装 DSH。
+
+[🌐 产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ 下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 使用文档](docs/desktop.md) · [📝 更新日志](CHANGELOG.md)
 
 ### 最新版：3.1.0
 
@@ -57,224 +73,292 @@ DeepSeek Harness Desktop 将原版 DSH Web 界面完整装进 Windows EXE：不�
 - **侧边栏与设置排版完全恢复**：彻底清理了全局样式冲突与行内副作用，侧栏在展开/收起状态下均能完美对齐。
 - **无凭据零泄露安全回退**：未配置 API Key 时 100% 在本地执行安全回退，毫秒级跳过 AI 修复并进入基线，不发出任何无效外部网络请求。
 
-### 历史 2.7.0 功能亮点
+> 如果这个项目对你有帮助，欢迎点一个 **Star ⭐**。  
+> 你的支持可以让更多 Windows 用户发现 DeepSeek Harness Desktop。
 
-- **可靠 Windows 启动**：移除 PowerShell 5.1 `-WindowStyle Hidden` 与 Electron Node 模式的冲突，隐藏窗口仍由 `spawn` 的 `windowsHide` 处理；空旧补丁、状态订阅竞态和 IPC 错误不会再把启动页永久留在 8%。
-- **验证过的 Runtime 组合**：内置 `@deepseek-ai/dsh` `0.1.0-rc.7`、`dshmarket` `1.15.0`、Web UI 聚合 `0.2.3`、兼容 rc.7 的 Codex Connect 与 `dsh-live-stats` `0.1.20`，Stable 继续精确锁定而非追随 `latest`。
-- **托盘与后台自动化需显式选择**：默认关闭仍会退出。选择“最小化到托盘并启用后台自动化”后，关闭主窗口才保留 Runtime 和到期任务；显式退出、更新和崩溃路径一律完整停止。
-- **Host 持久任务调度**：Task Board 保存时区、cron 槽位、租约、misfire/running 策略和确定性运行键；启用后台自动化时通过真实 DSH Session 执行并回写 Task Run，Host 不可用时仍回退浏览器调度。
-- **可审计的扩展边界**：扩展坞校验 `dsh.compatibility` 的版本、Desktop API、能力、Surface 与运行时证据，并在 profile 写入 `desktop-plugins.lock.json`。browser-safe SDK 不导入 Electron 或私有 DSH 模块；预览的外部打开仅传工作区根和相对路径，Host 验证后才交给系统。
-- **Candidate Matrix**：候选 DSH 在临时 worktree 中收集矩阵、Stable 支持和离线社区插件质量证据；候选永远不能自动改写 Stable 依赖、lockfile、更新元数据或发布。
+---
 
-### 2.6.0 功能亮点
 
-- **Task Board v3**：任务可关联 Project，明确选择 shared-workspace 或 Git Worktree；旧账本复制迁移到 Host-owned v3，原 v2 文件保留为备份。
-- **可审阅执行结果**：每次执行生成紧凑 Task Run 与派生 Evidence，展示文件、增删统计、有限 diff 预览、Session/运行入口和 Provider 能力证据，不保存完整会话或 Secret。
-- **受控 Git Worktree**：Host 只接受不透明 id，固定 Worktree 根目录、分支命名、realpath、clean/conflict/operation 预检；Commit、Merge、Keep、Discard 都是明确审核动作，Discard 需要二次确认。
-- **安全兼容回退**：Stable Provider 仍可只提供生命周期和 Profile 能力；缺少 Worktree 所需能力时记录原因并使用现有 shared-workspace 执行，不伪造隔离状态。
-- **Candidate 执行门禁**：真实临时 Git 仓库夹具验证 Session CWD、生命周期事件、取消与重启恢复，失败只阻断 Candidate，不改 Stable 图或发布元数据。
-- **历史匿名统计边界**：2.6 的发行行为仅作历史记录；3.0 已改为遥测默认关闭、仅用户主动导出脱敏诊断包。
+## ✨ 为什么选择 DeepSeek Harness Desktop
 
-### 2.5.0 功能亮点
+### 📦 开箱即用
 
-- **Runtime 兼容防线**：Adapter v1、直接 import 边界、Known Good、patch registry 与耦合审计共同保护稳定 DSH 图；Candidate Lite 只生成报告，不自动升级 Stable。
-- **安全 Desktop Preset**：`.dshpreset` v1 在主进程检查完整性、路径、压缩比、脚本、Secret、Git URL 与精确版本，Renderer 只获得审阅计划。
-- **全环境原子回滚**：批量插件、设置、Skills 与任务模板使用一次 Runtime 停止/启动事务；任何包或健康检查失败都会恢复旧环境。
-- **Web Profile 选择性迁移**：迁移前显示可安装、更新、缺失、不兼容、未声明、已满足和 Desktop 管理项；所选插件与可归属的非敏感 Profile 配置在同一事务中应用或回滚。
-- **明确后续动作**：插件变更后突出显示“刷新”；改变 bundle 图时同时提供“Restart DeepSeek Harness”，Preset 进度完整显示提交或恢复状态。
-- **严格系统入口**：`dsh://` 仅允许固定导航路由和安全 ID；`.dshpreset` 双击只打开预览，不把文件路径交给 Renderer，也不会静默安装。
-- **结构化通知**：Desktop Contract 1.1 校验通知分类、ID、文本与 Deep Link，支持去重、限频、前台抑制和白名单点击路由。
-- **稳定版不追 latest**：当前 Runtime 继续精确锁定验证版本；Candidate 失败不会影响主分支、lockfile、发布说明或 updater 元数据。
+下载安装 EXE 后即可启动完整 Harness 环境。
 
-### 2.5.0 体验与更新改进
+无需手动准备 Node.js、Git、pnpm 或 DSH Runtime，桌面端会统一管理所需组件与运行环境。
 
-- **全页粒子主题**：粒子鲸鱼从启动页延伸到主界面，并按普通浏览、输入聚焦、弹窗、减少动态效果和后台状态自动调低密度、透明度与速度；可在「设置 > 插件配置 > 粒子主题」中开关和调整。
-- **可调设置窗口**：设置面板可拖动、从八个边/角缩放并记住上次位置和尺寸；最小尺寸、响应式布局和屏幕约束可避免内容重叠、溢出或移出可见区域。
-- **明确的更新下载路径**：GitHub Releases 是唯一默认下载源；更新窗口提供「前往 GitHub 下载」「加入用户群」「稍后更新」。若 GitHub 下载较慢，可加入 QQ 用户群获取同步安装包。
-- **覆盖更新不再依赖旧卸载器**：安装器会在严格进程与文件锁检查后迁移旧程序并清理精确注册项；即使旧 2.5.0 已带修复标记，也不会再次进入有缺陷的卸载流程。
+### 🤖 完整 AI 编程工作台
 
-![DeepSeek Harness Desktop 2.3.0 GitHub Star 与社群反馈引导](docs/screenshots/desktop-2.3.0-star-community-prompt.png)
+在一个桌面应用中完成：
 
-### 完整桌面能力
+- AI 对话与代码修改
+- 项目文件浏览与编辑
+- Git / SCM 操作
+- Markdown、HTML、代码、Diff、PDF、Office 等文件预览
+- 模型切换与推理强度调整
+- Skills 与插件调用
+- Agent 任务执行
+- Token 与性能统计
+- 多项目开发工作流
 
-- **排队消息可靠续传**：智能体工作时发送的消息继续按 FIFO 顺序排队；取消当前执行后，队列会自动恢复，不丢失、不重复、不乱序。
-- **对话栏 Skills 技能库**：输入框左下角直接搜索已安装技能，支持最近使用、来源与描述展示、方向键导航、Enter 插入和 Esc 关闭。
-- **模型 API 自动恢复**：对限流、超时、断网和可恢复服务端错误执行有界退避重试；恢复后继续当前请求，手动取消仍会立即生效。
-- **SSH 实时监控与安全操作**：每三秒刷新 CPU、内存、磁盘、负载、进程与失败服务；经过确认后可终止进程或重启 systemd 服务。
-- **长思考随时折叠**：思考区展开后，折叠控制会吸附在会话顶部，不必滚回长内容起点。
-- **运行时完整性预检**：启动前检查关键文件，安装不完整时停止重启循环并给出明确的重新安装提示。
-- **更新与安装更可靠**：GitHub 官方源优先，发现新版后后台下载，完成后再确认重启安装；GitHub 下载较慢时可从用户群获取同步安装包，退出时完整回收 DSH 子进程。
-- **Harness 原生视觉统一**：标题栏、扩展坞、启动页和主界面使用一致的系统视觉；全页粒子鲸鱼会按交互场景自动安静下来，并尊重减少动态效果设置。
+### 🧩 Skills 与插件生态
 
-#### Harness 主界面
+支持多种扩展方式：
+
+- DSH Skills
+- Agents Skills
+- 项目 Skills
+- 社区 DSH Bundle
+- 插件市场
+- 桌面扩展
+
+可以直接在 Harness 中搜索、安装和使用扩展能力，将自己的开发工具逐步组合成一套完整工作流。
+
+### ✅ 任务看板与自动化
+
+内置任务看板，可以管理：
+
+**待规划 → 待办 → 进行中 → 已完成 / 已失败**
+
+任务可以交给真实 DSH Agent Session 执行，并记录 Task Run 与 Evidence，方便查看结果和继续处理。
+
+同时支持定时任务与后台调度，适合周期性的开发、维护和自动化工作。
+
+### 🌐 远程开发
+
+桌面版不仅可以操作本机项目，也支持远程开发场景：
+
+- 手机远程控制
+- SSH
+- Web Terminal
+- SFTP
+- 端口转发
+- 多主机集群执行
+- QQ Bot 接入
+
+可以从电脑、手机或聊天工具连接自己的 Harness 工作环境。
+
+### 🎨 个性化桌面体验
+
+除了开发能力，Desktop 还提供完整的桌面化体验：
+
+- 多套主题皮肤
+- 全页粒子主题
+- 鲸鱼娘桌宠
+- 独立窗口
+- 窗口状态保存
+- 桌面通知
+- 托盘能力
+- Stable / Beta 更新频道
+
+---
+
+## 🖥️ Harness AI 编程工作台
+
+桌面版直接运行 DeepSeek Harness Web Surface，并由桌面宿主管理本地 DSH Runtime。
+
+在同一个窗口中即可完成 AI 对话、代码修改、文件管理、Git 操作、任务执行、模型切换和插件扩展。
 
 ![DeepSeek Harness Desktop 主界面与 Skills 技能库](docs/screenshots/13-hero-main.png)
 
-#### 2.3.0 桌面界面
+## 🧩 Skills 与插件
 
-| 粒子鲸鱼启动界面 | 插件与技能扩展坞 |
-| --- | --- |
-| ![DeepSeek Harness Desktop 2.3.0 粒子鲸鱼启动界面](docs/screenshots/desktop-2.3.0-startup.png) | ![DeepSeek Harness Desktop 2.3.0 插件与技能扩展坞](docs/screenshots/desktop-2.3.0-extension-dock.png) |
+输入框可以直接搜索并插入已安装 Skills。
 
-- 内置 dsh-web-ui 0.1.18 套件，保留任务看板、Git 图谱、右侧面板、SSH、移动端远程、实时统计、宠物，并加入独立的全页粒子主题、图像描述与量身 Agent；
-- 内置腾讯官方 QQ Bot，可在扩展坞扫码绑定 QQ 私聊与群聊，无需编辑 YAML 或打开后台终端；
-- 内置 ChatGPT OAuth、OpenAI Codex 模型与推理强度滑块，登录使用系统浏览器，凭据保存在本机；
-- 独立 `desktop` profile，不覆盖既有 DSH 配置，运行时仅监听回环地址；
-- 内置崩溃恢复、日志脱敏与轮转、窗口状态恢复、严格导航与权限策略；
-- 内置 GitHub Release 更新检查，发现新版后在后台下载，完成后再由用户阅读说明并确认重启安装；
-- 扩展坞支持社区 DSH bundle 安装/回滚、内置插件市场，以及项目、DSH、Agents 技能发现与安全导入；
-- 安装包自带官方 DSH、pnpm、固定校验的 MinGit 与原生依赖，无需另外安装 Node.js 或 Git；内置 Git 仅注入 Desktop 子进程，不修改系统 PATH、注册表或权限。
+扩展坞支持：
 
-桌面版已预装任务看板、Git 图谱、右侧面板、移动端远程、远程连接、鲸鱼娘宠物、全页粒子主题、实时令牌统计、官方 ChatGPT 登录、推理强度滑块、插件市场和皮肤中心。下载安装 EXE 即可使用，不需要另外安装 DSH、Node.js、Git 或执行插件命令。
+- 社区 DSH Bundle
+- 插件市场
+- 项目 Skills
+- DSH Skills
+- Agents Skills
 
-## 功能插件
+桌面版使用独立的 `desktop` profile，不会覆盖已有 DSH 配置。
 
-### QQ 机器人扫码接入（桌面版 0.1.6）
+插件安装、更新以及运行时生命周期均由桌面宿主统一管理。
 
-桌面版内置腾讯官方 `@tencent-connect/dsh-qqbot` 0.3.0 和 `@tencent-connect/qqbot-connector` 1.2.0。在扩展坞打开 QQ Bot 卡片即可获取自动刷新的二维码，使用手机 QQ 扫码后，QQ 私聊与群聊便可连接到本机 Harness；同时支持取消、重新绑定和彻底解绑。
+## 🧠 Codex 模型与推理强度
 
-未绑定时插件保持禁用，不会让隐藏的后台进程等待终端扫码，也不会拖慢 Web UI 启动。绑定成功后桌面端会自动启用插件并重启 DSH。AppSecret 由 Electron `safeStorage` 结合 Windows 系统凭据保护加密保存，不会发送到渲染页面、写入日志或明文进入 `cordis.patch.yml`；运行时只通过子进程环境注入。
+3.0.9 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程完成 ChatGPT OAuth，并在 Harness 中使用支持的 OpenAI Codex 模型；不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取"是否已登录"，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
 
-### ChatGPT 登录、Codex 模型与推理强度
+模型切换时，桌面端会根据模型实际能力展示可用的推理强度档位，并自动处理对应配置。
 
-3.0.9 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程，不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取“是否已登录”，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
+## ✅ 任务看板与自动化
 
-内置 `reasoning-slider` 0.0.2，在模型选择器中只展示模型实际支持的推理强度，切换模型时会自动回退到有效档位。顶部帮助菜单同时提供 QQ 群二维码、一键加群与 GitHub 建议入口，所有外链均交由系统浏览器打开。
+通过任务看板统一管理 Agent 工作。
 
-### 任务看板
-
-在侧边栏点击「任务看板」进入。任务按五列状态组织：待规划、待办、进行中、已完成、已失败。点击卡片上的「执行」，任务将由真实的 DSH 智能体会话执行，完成后状态自动回写；需要复盘时，可直接跳转到执行会话查看完整过程。
-
-任务支持定时执行：在详情中配置 cron 表达式（如每天 23:00 自动升级 DSH、每周一 09:00 生成周报），页面保持打开时会在到点后自动开工。任务台账存于当前 DSH profile 的 Host 文件，浏览器旧数据在校验迁移后继续保留用于降级。
-
-| 多列看板 | 定时执行 |
+| 多列任务看板 | 任务详情与定时执行 |
 | --- | --- |
 | ![任务看板](docs/screenshots/09-task-board.png) | ![任务定时执行](docs/screenshots/10-task-board-detail-cron.png) |
 
-### Git 图谱
+任务可以直接交给 DSH Agent Session 执行，并保存 Task Run 与 Evidence。
 
-输入框上方的分支选择器，支持切换分支与查看提交历史；Git 图谱将分支泳道与提交历史可视化，仓库再大也能顺着时间线快速定位变更。
+除了手动任务之外，还支持定时任务和后台调度，可以用于周期性开发、信息处理和维护工作。
+
+## 🌿 Git 图谱
+
+通过分支选择器和 Git 图谱查看分支关系、Commit 历史、当前仓库状态和分支泳道，帮助快速理解项目变化和代码提交历史。
 
 ![Git 图谱](docs/screenshots/04-git-graph.png)
 
-### 右侧面板
+## 📁 文件、预览与 SCM
 
-项目会话打开时，聊天区右侧出现「预览」与「文件/变更」两块面板：
+项目会话右侧提供完整工作面板：
 
-- **文件树**：浏览工作目录，点击文件即在预览面板打开，整行点击展开文件夹，支持按文件名搜索定位；
-- **预览**：多标签预览 markdown、HTML、代码、diff、CSV、PDF、Office、图片与文本等格式，支持源码 / 预览切换、分屏编辑与保存；
-- **变更（SCM）**：真实 git 变更面板，支持 stage / unstage / discard；
-- 面板宽度可拖拽调整，双击把手复位默认宽度，折叠状态与宽度按项目持久化；
-- 11 款皮肤全部适配右侧面板，换肤后面板随之融入主题。
+- **文件树**：浏览和搜索工作区文件
+- **文件预览**：Markdown、HTML、代码、Diff、CSV、PDF、Office、图片和文本
+- **编辑与保存**：源码 / 预览切换以及分屏操作
+- **Git 变更**：查看真实 SCM 状态并执行 Stage / Unstage / Discard
+- **可调布局**：记录不同项目的面板宽度和折叠状态
 
 ![右侧面板](docs/screenshots/19-right-panel.png)
 
-### 鲸鱼娘宠物
+## 📱 手机远程控制
 
-一只常驻界面的鲸鱼娘宠物，会跟随智能体的状态切换动画：思考、等待、工作、庆祝。点击可互动（摸头），投喂小鱼干可提升亲密度，陪伴度从幼鲸一路成长至「深海羁绊」。支持自定义名称、自由拖动位置，也可随时隐藏。
+通过桌面端二维码即可连接当前 Harness 工作区。
 
-| 陪伴工作 | 互动面板 |
+手机端可以查看工作区、新建和查看会话、收发消息、切换模型、调整思考强度，并与桌面端保持同步。
+
+默认可以在局域网环境使用，也可以根据需要启用公网隧道。
+
+| 工作区列表 | 会话列表 |
 | --- | --- |
-| ![鲸鱼娘宠物](docs/screenshots/11-pet-new-chat.png) | ![宠物互动面板](docs/screenshots/12-pet-panel.png) |
+| ![移动端工作区](docs/screenshots/20-mobile-workspaces.png) | ![移动端会话列表](docs/screenshots/21-mobile-sessions.png) |
+| **移动端聊天** | **模型与思考强度** |
+| ![移动端聊天](docs/screenshots/22-mobile-chat.png) | ![模型选择](docs/screenshots/23-mobile-model-sheet.png) |
 
-### 实时令牌统计
+## 🖥️ SSH 远程开发
 
-在输入框下方实时显示生成速度（TPS）、LLM 耗时、上下文占用、缓存命中率以及输入 / 输出 token 数，每次生成的用量一目了然。
+侧边栏内置 SSH 面板，可以直接管理远程服务器，并与 Agent 共用连接配置。
+
+支持：
+
+- Web Terminal
+- SFTP 上传 / 下载
+- 本地端口转发
+- 多主机集群执行
+- 从 `~/.ssh/config` 导入主机
+- 在 Agent 对话中直接调用已配置的远程主机
+
+让 Harness 不仅能操作本机项目，也可以直接参与服务器和远程开发环境中的工作。
+
+## 💬 QQ Bot 接入
+
+桌面版集成腾讯 QQ Bot Connector。
+
+可以通过扩展坞扫码完成连接，让 QQ 私聊和群聊与本机 Harness 联动。
+
+连接信息由桌面宿主管理，无需手动修改复杂配置文件。
+
+## 📊 实时 Token 与性能统计
+
+输入区域下方可以实时查看：
+
+- TPS 生成速度
+- LLM 请求耗时
+- 上下文占用
+- Cache 命中率
+- Input Token
+- Output Token
 
 ![实时令牌统计](docs/screenshots/18-live-stats.png)
 
-### 移动端远程
+## 🎨 主题与皮肤
 
-侧边栏底部的手机图标打开配对面板：扫码配对（或复制链接）后，手机进入独立的移动端界面，远程控制当前 dsh web 工作区——查看与新建会话、收发消息、切换模型与思考强度、调整权限预设，全部与桌面端同步。配对令牌一次性且限时，「停止」可随时吊销所有设备；二维码默认走局域网，也可开启 cloudflared 公网隧道，让手机在任意网络配对。
+桌面版内置多套主题，并支持先预览、再应用。
 
-| 工作区列表 | 会话列表与新建会话 |
-| --- | --- |
-| ![移动端工作区](docs/screenshots/20-mobile-workspaces.png) | ![移动端会话列表](docs/screenshots/21-mobile-sessions.png) |
-| 聊天（折叠的深度思考与工具调用） | 模型与思考强度选择 |
-| ![移动端聊天](docs/screenshots/22-mobile-chat.png) | ![模型选择](docs/screenshots/23-mobile-model-sheet.png) |
-
-### 远程连接
-
-侧边栏「SSH」入口打开远程运维面板。主机支持密钥 / 密码认证，可从 `~/.ssh/config` 一键导入；配置统一存于 `~/.dsh/dsh-ssh.json`。对已配置主机可执行真实操作：
-
-- **Web 终端**：xterm.js 远程终端，实时输出、随窗口自适应；
-- **文件传输**：SFTP 上传 / 下载，带进度条与远程目录浏览；
-- **端口转发**：本地隧道直达远程内网服务（数据库、API、管理后台），仅监听 127.0.0.1；
-- **集群执行**：一条命令并发跑多台主机，按别名 / 环境 / 标签过滤；
-- **Agent 直连**：Agent 与面板共享同一份主机配置，对话中直接说「连一下 xxx 看看状态」即可由智能体执行远程命令。
-
-### 设置中心
-
-全部插件的开关与参数统一收纳于「设置 > 插件配置」，修改即时生效。桌面版会明确开放移动端远程控制、皮肤中心、实时令牌估算、任务看板、宠物和粒子主题六张配置卡，不会因 DSH Host 的设置命名空间过滤而缺项。设置窗口本身可拖动、从边缘或角落缩放，并会记住上次位置和尺寸；小窗口与高 DPI 下会自动重排和滚动，避免内容重叠或移出屏幕。
-
-![插件配置中心](docs/screenshots/02-settings-web-ui-plugins.png)
-
-### 插件市场与扩展坞
-
-桌面 profile 只内置 `dshmarket` 1.3.0 作为默认插件市场。市场安装目标固定为隔离的 `desktop` profile，支持社区 DSH bundle 的发现、安装、事务回滚和保留升级；运行时重启由桌面宿主统一管理，避免市场自行启动第二个 DSH 进程。项目技能、DSH 技能与 Agents 技能也可在扩展坞中发现并经过安全检查后导入。
-
-## 皮肤
-
-皮肤中心提供 11 款可选皮肤（含 Harbor 与 QQ2006），均支持先试穿再应用：试穿即时生效、退出完全还原，确认满意后一键应用。
+当前包括 Harbor、Windows XP / Luna、Minecraft 方块世界、Blue Fantasy、鲸吟、初音未来、Trading Terminal、QQ 怀旧主题等风格。
 
 ![皮肤中心](docs/screenshots/03-settings-skin-center.png)
 
-### Windows XP（Luna）
+### 🐳 鲸鱼娘桌宠
 
-还原 Luna 经典界面：蓝色渐变窗口条、绿色「开始」按钮、Bliss 蓝天桌面，全局直角风格。
+内置鲸鱼娘桌宠。
 
-![Windows XP 皮肤](docs/screenshots/16-skin-xp-light.png)
+桌宠会根据 Agent 的思考、工作、等待和完成状态自动切换不同动画，同时支持互动、命名、拖拽和隐藏。
 
-### Minecraft 方块世界
+| 陪伴工作 | 互动面板 |
+| --- | --- |
+| ![鲸鱼娘桌宠](docs/screenshots/11-pet-new-chat.png) | ![桌宠互动面板](docs/screenshots/12-pet-panel.png) |
 
-以《我的世界》主界面为灵感：像素全景天空盒在界面后方缓慢旋转，按钮为灰石板样式，输入框为木告示牌样式。
+### ✨ 全页粒子主题
 
-![Minecraft 皮肤](docs/screenshots/15-skin-minecraft-light.png)
+粒子鲸鱼主题不仅可以显示在启动页面，也可以直接应用到 Harness 主界面，并根据输入、弹窗、后台状态和系统「减少动态效果」设置自动调整视觉效果。
 
-### Blue Fantasy 蓝色幻想
+---
 
-鲸鱼插画铺于半透明面板之下，靛蓝色调色板贯穿全局，暗色主题下效果尤为突出。
+## ⬇️ 下载与安装
 
-![Blue Fantasy 暗色](docs/screenshots/17-skin-blue-fantasy-dark.png)
+1. 打开 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest)。
+2. 下载 `DeepSeek-Harness-Desktop-Setup-<版本号>-x64.exe`。
+3. 运行安装程序完成安装。
+4. 启动 **DeepSeek Harness Desktop**。
 
-### 鲸吟（Whale Song）
+安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所需原生依赖，不需要额外安装 Node.js 或 Git。
 
-深海鲸语女神主题：无文字纯氛围背景画（蓝发女神与鲸群居左、冰蓝星座网格与金色细线点缀、右侧大量留白）垫在半透明面板之下，冰蓝 / 浅青 / 深海军蓝 / 钴蓝冷色体系贯穿全局，暗色变体为深海夜航调。
+如果 GitHub 下载速度较慢，也可以加入页面顶部的用户交流群获取同步提供的安装包。
 
-![鲸吟 亮色](docs/screenshots/24-skin-whale-song-light.png) · ![鲸吟 暗色](docs/screenshots/25-skin-whale-song-dark.png)
+## 🔄 更新
 
-### 初音未来（Miku）
+DeepSeek Harness Desktop 支持应用内版本检查，发现新版本后可以查看更新内容并选择升级。
 
-电子歌姬主题以青蓝音符、声波状态栏与半透明舞台面板重塑完整界面，同时保持亮色、暗色模式和功能插件可读性。
+提供两个更新频道：
 
-### 交易终端（Trading Terminal）
+- **Stable**：默认频道，适合绝大多数用户。
+- **Beta**：用于体验较新的功能，需要用户主动切换。
 
-带实时行情的炒股皮肤：顶栏滚动跑马灯（A股 / 港股 / 美股 / 指数 / 加密 / 外汇，红涨绿跌），标题栏行情快签，状态栏展示 A股 / 港股 / 美股交易时段与港美股指数。已安装 `dsh-fun-ticker` 时跑马灯跟随你的自选列表（同源代理取数），已安装 `dsh-longbridge` 时指数格渲染长桥券商快照；两个插件都没装也能直接走公共行情源（腾讯 / 币安 / Frankfurter）独立工作，所有路径失败都安全降级为 `--`。
+升级过程中会尽可能保留已有 DSH_HOME、Desktop Profile、社区 Bundle、Skills、皮肤配置与桌宠状态。
 
-![交易终端 亮色](docs/screenshots/26-skin-trading-light.png) · ![交易终端 暗色](docs/screenshots/27-skin-trading-dark.png)
+更多信息：
 
-其余三款：QQ2008 怀旧版（水晶蓝配色与企鹅元素）、同花顺风格（行情元素融入界面）、龙的传人（朱砂龙印主题）。
+- [升级与回滚](docs/upgrade-and-rollback.md)
+- [兼容性政策](docs/compatibility-policy.md)
+- [运行时支持政策](docs/runtime-support-policy.md)
+- [完整发布说明](docs/launch/release-notes.md)
 
-## 下载、校验与升级
+## 🔐 安全与隐私
 
-1. 从 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) 下载最新的 Windows x64 安装包。
-2. 运行 `DeepSeek-Harness-Desktop-Setup-<版本号>-x64.exe` 完成安装；DSH、插件、皮肤、pnpm 和原生依赖均已随安装包提供。
-3. 如需核验文件完整性，请下载同一 Release 中的 `SHA256SUMS.txt` 并比对安装包 SHA-256。
+DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在本机。
 
-GitHub Releases 是应用内置且默认使用的唯一下载源。Stable 是默认频道，Beta 仅在用户明确选择后接收 prerelease；切换频道也不会自动安装更低版本。如果 GitHub 下载速度较慢，可点击更新窗口的「加入用户群」，通过 QQ 群 `1105158177` 获取同步提供的最新安装包；应用不会默认启用或宣传第三方镜像为“更快”线路。
+主要设计包括：
 
-应用会检查稳定版 GitHub Release，展示中英双语更新说明，并提供「前往 GitHub 下载」「加入用户群」「稍后更新」。安装仍需明确确认，覆盖升级不会删除既有 `DSH_HOME`、桌面 profile、社区 bundle、桌宠状态、皮肤配置或已加密的 QQ Bot 凭据。
+- DSH Runtime 默认监听本机回环地址
+- 桌面主界面与扩展能力采用独立权限边界
+- 外部链接通过系统浏览器打开
+- OAuth、QQ Bot 等凭据保存在本机
+- 遥测默认关闭
+- 诊断信息只有在用户主动操作时才会导出
+- 导出的诊断信息会对 Token、Secret、Cookie、路径、Prompt、Session 和 Tool Result 等内容进行脱敏
 
-请从同一 GitHub Release 下载 `SHA256SUMS.txt` 和 `release-manifest.json`，分别核对安装包哈希及该资产记录的签名状态。未配置证书时正式社区版本可以未签名，Windows 可能显示未知发布者或 SmartScreen 提示；配置证书后发布流程会自动强制签名和有效时间戳，配置或验证失败都会阻止发布。manifest 与正式 Release 正文记录实际状态。请只使用本项目 Release 页面提供的安装包；推荐采用默认安装路径，避免过长路径触发传统 Win32 限制。
+## 📚 文档
 
-## 来源与版权
+- [桌面版技术说明](docs/desktop.md)
+- [兼容性政策](docs/compatibility-policy.md)
+- [运行时支持政策](docs/runtime-support-policy.md)
+- [升级与回滚](docs/upgrade-and-rollback.md)
+- [发布与交接工作流](docs/launch/desktop-release-workflow.md)
+- [更新日志](CHANGELOG.md)
+
+## 📄 开源与版权
+
+DeepSeek Harness Desktop 采用 **BSD-3-Clause** 许可证。
 
 | 包 | 来源 | 版权 |
 | --- | --- | --- |
 | dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | 作者 zhu1090093659 个人开发 | BSD-3-Clause（zhu1090093659） |
 
-迁入第三方代码必须保留 LICENSE 与署名；活跃且有上游的第三方优先 fork 或依赖引用，不搬代码。
+迁入第三方代码时保留对应 LICENSE 与署名；对于仍然活跃维护的第三方项目，优先采用 Fork 或依赖引用方式。
 
-## 友情链接
+## ❤️ 友情链接
 
-- 本项目积极参与并认可 [LINUX DO 社区](https://linux.do)。
+本项目积极参与并认可 [LINUX DO 社区](https://linux.do)。
+
+---
+
+<p align="center">
+  <b>让 DeepSeek Harness 在 Windows 上真正成为一个可以每天使用的 AI 编程桌面工作台。</b>
+</p>
+
+<p align="center">
+  如果你喜欢这个项目，欢迎点一个 ⭐ Star。
+</p>

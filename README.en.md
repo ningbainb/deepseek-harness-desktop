@@ -2,23 +2,39 @@
 
 [中文](README.md) | English
 
-![dsh-web-ui](docs/dsh-web-ui-banner.png)
+![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
-DeepSeek Harness Desktop is a community-maintained, open-source Windows AI coding client. One Windows x64 installer bundles the complete DeepSeek Harness Web Surface, the official local DSH host, plugins, Skills, themes, and automatic updates. It supports Windows 10/11, uses the BSD-3-Clause license, and requires no separate Node.js setup.
+## 👥 DeepSeek Harness Desktop Community
 
-## Community QQ Group
+QQ Group: **1105158177**
 
-Group number: **1105158177** · **[Join the QQ group](https://qm.qq.com/q/vehlNjaeye)**
+**[👉 Join the QQ Group](https://qm.qq.com/q/vehlNjaeye)**
 
 <a href="https://qm.qq.com/q/vehlNjaeye"><img src="website/assets/qq-group-1105158177.jpg" width="280" alt="QR code for DeepSeek Harness Desktop QQ group 1105158177"></a>
 
-## Windows Desktop
+Join the community to discuss:
 
-DeepSeek Harness Desktop brings the complete DSH Web surface to a Windows EXE. It does not rewrite the interface: a hardened Electron window launches the official `@deepseek-ai/dsh` host locally and loads every plugin and skin from this repository unchanged.
+- Usage and configuration
+- Plugins and Skills
+- Model setup and usage tips
+- Automation workflows
+- Themes and desktop pets
+- New releases and feature suggestions
 
-[Explore the product site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download the Windows x64 installer](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Desktop technical guide](docs/desktop.md) · [Compatibility policy](docs/compatibility-policy.md) · [Runtime support policy](docs/runtime-support-policy.md) · [Upgrade and rollback](docs/upgrade-and-rollback.md) · [Maintainer release workflow](docs/launch/desktop-release-workflow.md) · [Changelog](CHANGELOG.md)
+> **GitHub downloads slow in your region?**  
+> The community group also provides synchronized copies of the latest installer and a place to get help with installation and usage.
 
-If this project helps you, Star the [GitHub repository](https://github.com/ningbainb/deepseek-harness-desktop) so more desktop users can discover it.
+---
+
+**DeepSeek Harness Desktop** is a community-maintained, open-source Windows AI coding client.
+
+It brings **DeepSeek Harness Web, the local DSH runtime, Skills, plugins, task automation, Git, remote development, and desktop extensions** together in one Windows application, giving you a complete Harness AI coding experience without complicated setup.
+
+Supports **Windows 10 / 11 x64** and is released under the **BSD-3-Clause** license.
+
+The installer includes the main runtime components, so you do not need to separately configure Node.js, Git, or DSH.
+
+[🌐 Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 Documentation](docs/desktop.md) · [📝 Changelog](CHANGELOG.md)
 
 ### Latest release: 3.1.0
 
@@ -60,220 +76,291 @@ If this project helps you, Star the [GitHub repository](https://github.com/ningb
   - **Real-Time Speed & Metrics**: Live tokens/sec throughput and token metering during conversations.
   - **Official Pricing Integration**: Full support for Cache Read hit discounts, input/output token calculations, and automatic peak vs. off-peak pricing transitions.
 
-### Historical 2.7.0 Highlights
+> If this project is useful to you, consider giving it a **Star ⭐**.  
+> Your support helps more Windows users discover DeepSeek Harness Desktop.
 
-- **Reliable Windows startup**: removes the PowerShell 5.1 `-WindowStyle Hidden` conflict with Electron Node mode while retaining spawn-level `windowsHide`; legacy empty patches, status-subscription races, and IPC errors cannot strand the startup surface at 8%.
-- **Verified Runtime composition**: bundles `@deepseek-ai/dsh` `0.1.0-rc.7`, `dshmarket` `1.15.0`, the `0.2.3` Web UI aggregate, rc.7-compatible Codex Connect, and `dsh-live-stats` `0.1.20`; Stable remains exactly pinned rather than following `latest`.
-- **Tray and background automation are opt-in**: closing still quits by default. Choosing **minimize to tray and enable background automation** keeps the Runtime and due tasks after the main window closes; explicit quit, update, safe mode, and crash paths always stop completely.
-- **Host durable task scheduling**: Task Board persists time zones, cron slots, leases, misfire/running policies, and deterministic run keys. With background automation enabled it uses real DSH Sessions and writes back Task Runs, while unavailable Host scheduling still falls back to the browser.
-- **Auditable extension boundary**: Extension Dock evaluates `dsh.compatibility` versions, Desktop API, capabilities, Surfaces, and runtime evidence, then writes `desktop-plugins.lock.json` in the profile. The browser-safe SDK imports neither Electron nor private DSH modules; preview external opening sends only a workspace root and relative path for Host validation before the OS receives it.
-- **Candidate Matrix**: candidate DSH work runs in a temporary worktree and produces matrix, Stable-support, and offline community-plugin-quality evidence; it can never automatically rewrite Stable dependencies, lockfile, updater metadata, or a release.
+---
 
-### 2.6.0 Highlights
+## ✨ Why DeepSeek Harness Desktop
 
-- **Task Board v3**: associate tasks with Projects and choose shared-workspace or Git Worktree isolation; migrate the Host ledger copy-first while preserving the v2 source as a backup.
-- **Reviewable execution results**: every settled execution receives a compact Task Run and derived Evidence with changed files, bounded additions/deletions and diff preview, Session/run links, and provider capability evidence without full history or Secrets.
-- **Controlled Git Worktrees**: Host routes accept opaque ids only and enforce a controlled root, branch naming, realpath, clean/conflict/operation preflights, and explicit Commit, Merge, Keep, or confirmed Discard actions.
-- **Safe compatibility fallback**: Stable may expose only lifecycle and profile capabilities. Missing Worktree capabilities are recorded and use the existing shared-workspace executor instead of claiming isolation.
-- **Candidate execution gates**: a real temporary Git repository fixture checks Session CWD, lifecycle events, cancellation, and restart reconciliation. A failing Candidate is blocked without changing Stable metadata.
-- **Historical metrics boundary**: this describes the 2.6 release behavior only. Desktop 3.0 disables telemetry by default and provides only user-initiated, privacy-redacted diagnostic export.
+### 📦 Ready to Use
 
-### 2.5.0 Highlights
+Install the EXE and launch a complete Harness environment.
 
-- **Runtime compatibility defenses**: Adapter v1, the direct-import boundary, Known Good, patch registry, and coupling audit protect the Stable DSH graph. Candidate Lite reports but never auto-promotes.
-- **Secure Desktop Presets**: `.dshpreset` v1 validates integrity, paths, compression, scripts, Secrets, Git URLs, and exact versions in the main process; renderers receive only a review plan.
-- **Whole-environment rollback**: package batches, settings, Skills, and task templates use one Runtime stop/start transaction, restoring the old environment after any package or health failure.
-- **Selective Web Profile migration**: preview installable, updatable, missing, incompatible, undeclared, satisfied, and Desktop-managed entries; selected packages and attributable non-sensitive profile configuration apply or roll back together.
-- **Explicit follow-up actions**: extension changes prominently offer Refresh, bundle-graph changes also offer Restart DeepSeek Harness, and Preset progress names commit or restoration.
-- **Strict operating-system ingress**: `dsh://` accepts only fixed navigation and safe IDs. Double-clicking `.dshpreset` opens review without exposing the path or silently installing.
-- **Structured notifications**: Desktop Contract 1.1 validates notification category, ID, text, and deep link with deduplication, rate limits, foreground suppression, and allowlisted click routing.
-- **Stable does not follow latest**: the Runtime remains exactly pinned to its verified version, and a failed Candidate cannot affect main, the lockfile, release notes, or updater metadata.
+There is no need to manually prepare Node.js, Git, pnpm, or the DSH Runtime. The desktop app manages the required components and runtime environment for you.
 
-### 2.5.0 Experience and update improvements
+### 🤖 Complete AI Coding Workspace
 
-- **Full-page particle theme**: the particle whale now extends from startup into the main interface and automatically lowers density, opacity, and speed during ordinary browsing, focused editing, dialogs, reduced motion, and background states. Toggle and tune it under **Settings > Plugin config > Particle theme**.
-- **Adjustable settings window**: drag the settings panel, resize it from all eight edges and corners, and reopen it at the last saved position and size. Minimum dimensions, responsive layout, and viewport constraints prevent overlap, overflow, or off-screen placement.
-- **Clear update download paths**: GitHub Releases is the only default source. The update window provides **Download from GitHub**, **Join user group**, and **Update later**. If GitHub is slow, the QQ user group provides a synchronized installer.
-- **In-place updates no longer depend on old uninstallers**: after strict process and file-lock checks, the installer stages the old program and removes only the exact product registrations. Even a marker-bearing early 2.5.0 build cannot re-enter its defective uninstall path.
+Use one desktop app for:
 
-![DeepSeek Harness Desktop 2.3.0 GitHub Star and community feedback prompt](docs/screenshots/desktop-2.3.0-star-community-prompt.png)
+- AI conversations and code changes
+- Project file browsing and editing
+- Git / SCM operations
+- Markdown, HTML, code, Diff, PDF, Office, and other file previews
+- Model switching and reasoning-effort controls
+- Skills and plugin usage
+- Agent task execution
+- Token and performance statistics
+- Multi-project development workflows
 
-### Complete Desktop Capabilities
+### 🧩 Skills and Plugin Ecosystem
 
-- **Reliable queued-message continuation**: messages sent while an agent is working remain in FIFO order; cancelling the active turn re-arms the queue without loss, duplication, or reordering.
-- **Conversation Skills library**: search installed skills beside the input box, inspect their source and description, navigate with the keyboard, insert with Enter, and close with Esc.
-- **Automatic model API recovery**: bounded backoff retries recover from rate limits, timeouts, network loss, and retryable server errors while manual cancellation remains immediate.
-- **Live SSH monitoring and safe operations**: refresh CPU, memory, disk, load, process, and failed-service data every three seconds, then confirm before terminating a process or restarting a systemd service.
-- **Collapsible long reasoning**: the disclosure control stays pinned at the top of the conversation while a long reasoning block is open.
-- **Runtime integrity preflight**: critical packaged files are checked before launch; an incomplete installation stops cleanly with a repair message instead of entering a restart loop.
-- **More reliable updates and installation**: the official GitHub source stays first, new releases download in the background, installation waits for confirmation, and the user group provides a synchronized installer when GitHub is slow. Desktop fully reaps the DSH child process before exit.
-- **Native Harness visual system**: the title bar, Extension Dock, startup surface, and main interface share one restrained system style. The full-page particle whale quiets itself around active work and respects reduced-motion preferences.
+Supports multiple extension paths:
 
-#### Harness Interface
+- DSH Skills
+- Agents Skills
+- Project Skills
+- Community DSH Bundles
+- Plugin Marketplace
+- Desktop extensions
+
+Search, install, and use extensions directly inside Harness to build a development workflow that fits your needs.
+
+### ✅ Task Board and Automation
+
+The built-in Task Board organizes work as:
+
+**Planned → Todo → In Progress → Completed / Failed**
+
+Tasks can be executed through real DSH Agent Sessions and record Task Runs plus Evidence for later review and continuation.
+
+Scheduled tasks and background execution are also supported for recurring development, maintenance, and automation workflows.
+
+### 🌐 Remote Development
+
+The desktop app can work with both local and remote environments through:
+
+- Mobile remote control
+- SSH
+- Web Terminal
+- SFTP
+- Port forwarding
+- Multi-host cluster execution
+- QQ Bot integration
+
+You can connect to your Harness workspace from a PC, phone, or chat client.
+
+### 🎨 Personalized Desktop Experience
+
+Beyond coding features, Desktop also includes:
+
+- Multiple themes and skins
+- Full-page particle themes
+- Whale-girl desktop pet
+- Dedicated desktop windows
+- Window-state persistence
+- Desktop notifications
+- System tray integration
+- Stable / Beta update channels
+
+---
+
+## 🖥️ Harness AI Coding Workspace
+
+The desktop app runs the DeepSeek Harness Web Surface directly while the desktop host manages the local DSH Runtime.
+
+In one window, you can handle AI conversations, code changes, file management, Git operations, task execution, model switching, and plugin extensions.
 
 ![DeepSeek Harness Desktop main interface and Skills library](docs/screenshots/13-hero-main.png)
 
-#### 2.3.0 Desktop Surfaces
+## 🧩 Skills and Plugins
 
-| Particle-whale startup | Plugin and skill Extension Dock |
+Search and insert installed Skills directly from the conversation input.
+
+Extension Dock supports:
+
+- Community DSH Bundles
+- Plugin Marketplace
+- Project Skills
+- DSH Skills
+- Agents Skills
+
+The desktop app uses an isolated `desktop` profile and does not overwrite an existing DSH setup.
+
+Plugin installation, updates, and runtime lifecycle are managed by the desktop host.
+
+## 🧠 Codex Models and Reasoning Effort
+
+3.0.9 uses the official `llm-pi-ai/openai-codex` authorization flow built into DSH RC.1 to complete ChatGPT OAuth and enable supported OpenAI Codex models inside Harness; it no longer loads the legacy `dsh-codex-connect` plugin that conflicts with native providers. The "ChatGPT Login" action in Settings starts OAuth with one click and continues in the system browser; the grant is only read or written by the official credential service and stays in the local DSH Home, so the frontend only learns whether you are signed in and never receives an access token or refresh token. It does not replace your current model by default, take over global search, or enable remote image tools.
+
+When switching models, the desktop app shows the reasoning-effort levels supported by the active model and automatically handles valid configuration.
+
+## ✅ Task Board and Automation
+
+Use the Task Board to manage Agent work in one place.
+
+| Board | Task details and scheduling |
 | --- | --- |
-| ![DeepSeek Harness Desktop 2.3.0 particle-whale startup](docs/screenshots/desktop-2.3.0-startup.png) | ![DeepSeek Harness Desktop 2.3.0 plugin and skill Extension Dock](docs/screenshots/desktop-2.3.0-extension-dock.png) |
+| ![Task Board](docs/screenshots/09-task-board.png) | ![Scheduled task](docs/screenshots/10-task-board-detail-cron.png) |
 
-- Bundles the dsh-web-ui 0.1.18 suite with the task board, Git graph, right panel, SSH, mobile remote, live stats, pet, plus the independent full-page particle theme, Describe Image, and the Liangshen agent;
-- Bundles Tencent's official QQ Bot, with in-dock QR binding for QQ direct messages and group chats — no YAML editing or background terminal required;
-- Bundles ChatGPT OAuth, OpenAI Codex models, and a reasoning-effort slider; sign-in uses the system browser and credentials stay local;
-- Uses an isolated `desktop` profile without overwriting an existing DSH setup, and binds only to loopback;
-- Adds crash recovery, sanitized rotating logs, window-state restore, strict navigation, and denied-by-default permissions;
-- Checks stable GitHub Releases, downloads discovered updates in the background, shows bilingual release notes, and asks before restarting to install;
-- Adds a dock for transactional community DSH bundle management, built-in plugin stores, and safe discovery/import of project, DSH, and Agents skills;
-- Bundles official DSH, pnpm, a pinned and verified MinGit, and native dependencies, so users do not need separate Node.js or Git installations. The bundled Git is injected only into Desktop child processes and never changes the system PATH, registry, or privileges.
+Tasks can be executed through DSH Agent Sessions and save Task Run and Evidence records.
 
-The desktop app already includes the task board, Git graph, right panel, mobile remote control, remote connection, whale-girl pet, full-page particle theme, live token statistics, Codex Connect, the reasoning-effort slider, plugin market, and Skin Center. Install the EXE and start working — no separate DSH, Node.js, or Git setup and no plugin commands are required.
+In addition to manual tasks, scheduled tasks and background execution can be used for recurring development, information processing, and maintenance workflows.
 
-## Feature Plugins
+## 🌿 Git Graph
 
-### QQ Bot QR Binding (Desktop 0.1.6)
-
-The desktop app bundles Tencent's official `@tencent-connect/dsh-qqbot` 0.3.0 and `@tencent-connect/qqbot-connector` 1.2.0. Open the QQ Bot card in Extension Dock to request an auto-refreshing QR code; scan it with mobile QQ to connect direct messages and group chats to the local Harness. The same card supports cancellation, rebinding, and complete unbinding.
-
-The plugin remains disabled until credentials exist, so a hidden background process never waits for terminal QR setup or delays Web UI readiness. Successful binding enables the plugin and restarts DSH automatically. AppSecret is encrypted by Electron `safeStorage` with Windows credential protection; it is never sent to renderer code, written to logs, or stored in plaintext in `cordis.patch.yml`, and is supplied only through the DSH child environment at runtime.
-
-### Codex Models and Reasoning Effort (Desktop 0.1.8)
-
-The desktop app bundles `dsh-codex-connect` 0.1.0-alpha.4.5 for ChatGPT OAuth through the system browser and OpenAI Codex models in Settings. It does not replace the active model, take over global search, or enable the remote image tool by default; an existing Codex Provider stays authoritative, and OAuth credentials remain in the local DSH home.
-
-The bundled `reasoning-slider` 0.0.2 exposes only the reasoning-effort levels a model actually supports and falls back automatically after model switches. The top Help menu also provides a QQ group QR code, one-click community access, and a GitHub suggestion action, with every external link delegated to the system browser.
-
-### Task Board
-
-Open it from the sidebar. Tasks are organized into five columns: Planned, To-do, In Progress, Done, and Failed. Clicking "Run" on a card hands the task to a real DSH agent session; when it finishes, the card status updates automatically. To review what happened, jump directly into the execution session for the full transcript.
-
-Tasks also support scheduled execution: configure a cron expression in the detail view (e.g. auto-upgrade DSH at 23:00 daily, generate a weekly report at 09:00 every Monday), and the open page starts it at the scheduled time. The ledger lives in the active DSH profile's Host file, while verified legacy browser data remains available for fallback.
-
-| Multi-column board | Scheduled execution |
-| --- | --- |
-| ![Task board](docs/screenshots/09-task-board.png) | ![Scheduled task detail](docs/screenshots/10-task-board-detail-cron.png) |
-
-### Git Graph
-
-The branch picker above the input box handles branch switching and commit history browsing; the Git graph visualizes branch lanes and commit history, making it easy to trace changes along the timeline even in large repositories.
+Use the branch selector and Git graph to inspect branch relationships, commit history, repository status, and branch lanes at a glance.
 
 ![Git graph](docs/screenshots/04-git-graph.png)
 
-### Right Panel
+## 📁 Files, Preview, and SCM
 
-When a project session is open, two panels appear to the right of the chat area — "Preview" and "Files/Changes":
+Project conversations include a complete right-side workspace:
 
-- **File tree**: browse the working directory; click a file to open it in the preview panel, click a folder row to expand it, and search for files by name;
-- **Preview**: multi-tab preview for markdown, HTML, code, diff, CSV, PDF, Office, images and plain text, with source/preview switching, split-screen editing and saving;
-- **Changes (SCM)**: a real git changes panel with stage / unstage / discard;
-- Panel widths are draggable (double-click a handle to reset), and the collapsed state plus widths persist per project;
-- All eleven selectable skins adapt the right panel — switching skins restyles the panels to match the theme.
+- **File tree**: browse and search workspace files
+- **File preview**: Markdown, HTML, code, Diff, CSV, PDF, Office, images, and text
+- **Edit and save**: source / preview switching and split-view workflows
+- **Git changes**: inspect real SCM state and run Stage / Unstage / Discard
+- **Adjustable layout**: panel width and collapsed state can persist per project
 
 ![Right panel](docs/screenshots/19-right-panel.png)
 
-### Whale-Girl Pet
+## 📱 Mobile Remote Control
 
-A whale girl who lives at the edge of the interface and switches animations with the agent's state: thinking, waiting, working, celebrating. Click her to interact (pet her head), feed her dried fish to raise affinity, and grow her from a baby whale to "deep-sea bond". She can be renamed, dragged to any position, or hidden whenever you want.
+Scan the desktop QR code to connect a phone to the current Harness workspace.
 
-| Working companion | Interaction panel |
-| --- | --- |
-| ![Whale pet](docs/screenshots/11-pet-new-chat.png) | ![Pet interaction panel](docs/screenshots/12-pet-panel.png) |
+The mobile interface can browse workspaces, create and view sessions, send and receive messages, switch models, adjust reasoning effort, and stay synchronized with the desktop app.
 
-### Live Token Stats
+It works over the local network by default and can optionally use a public tunnel when needed.
 
-Real-time usage shown directly below the input box: generation speed (TPS), LLM time, context usage, cache hit rate, and input / output token counts — the cost of every generation stays visible at a glance.
-
-![Live token stats](docs/screenshots/18-live-stats.png)
-
-### Mobile Remote Control
-
-The phone icon at the bottom of the sidebar opens the pairing panel: scan the QR code (or copy the link) to pair, and the phone lands on a standalone mobile surface that remote-controls the current dsh web workspace — browse and create sessions, send and receive messages, switch models and reasoning effort, and adjust the permission preset, all in sync with the desktop. Pairing tokens are one-time and time-limited; "Stop" revokes every paired device at any time. The QR defaults to the LAN, or turn on the cloudflared public tunnel so the phone can pair from any network.
-
-| Workspaces | Sessions & new session |
+| Workspaces | Sessions |
 | --- | --- |
 | ![Mobile workspaces](docs/screenshots/20-mobile-workspaces.png) | ![Mobile sessions](docs/screenshots/21-mobile-sessions.png) |
-| Chat (folded reasoning & tool calls) | Model & reasoning-effort picker |
-| ![Mobile chat](docs/screenshots/22-mobile-chat.png) | ![Model picker](docs/screenshots/23-mobile-model-sheet.png) |
+| **Mobile chat** | **Model and reasoning effort** |
+| ![Mobile chat](docs/screenshots/22-mobile-chat.png) | ![Model selector](docs/screenshots/23-mobile-model-sheet.png) |
 
-### Remote Connection
+## 🖥️ SSH Remote Development
 
-The "SSH" sidebar entry opens the remote-ops panel. Hosts support key / password auth and one-click import from `~/.ssh/config`; config lives in `~/.dsh/dsh-ssh.json`. Real operations on configured hosts:
+The built-in SSH panel can manage remote servers directly and share connection settings with the Agent.
 
-- **Web terminal**: xterm.js PTY with live output and auto-fit;
-- **File transfer**: SFTP upload / download with progress and a remote directory browser;
-- **Port forwarding**: local tunnels to remote internal services (databases, APIs, admin consoles), bound to 127.0.0.1 only;
-- **Cluster runs**: one command across many hosts concurrently, filtered by alias / environment / tags;
-- **Agent direct control**: agents share the same host config — just say "check xxx" in chat and the agent runs remote commands for you.
+Supported capabilities include:
 
-### Settings Hub
+- Web Terminal
+- SFTP upload / download
+- Local port forwarding
+- Multi-host cluster execution
+- Importing hosts from `~/.ssh/config`
+- Using configured remote hosts directly from Agent conversations
 
-All family plugins' toggles and parameters live under "Settings > Plugin config", and changes apply immediately. The desktop app explicitly exposes all six bundled cards — Remote Control, Skin Center, Live Token Estimates, Task Board, Pet, and Particle Theme — instead of losing entries to the DSH Host settings-namespace filter. The settings window itself can be dragged and resized from an edge or corner, then reopens at its last saved bounds. Responsive reflow and scrolling keep it usable in small windows and at high DPI.
+Harness can therefore work with remote servers and development environments as well as local projects.
 
-![Plugin config hub](docs/screenshots/02-settings-web-ui-plugins.png)
+## 💬 QQ Bot Integration
 
-### Plugin Stores and Extension Dock
+The desktop app integrates the Tencent QQ Bot Connector.
 
-The desktop profile bundles only `dshmarket` 1.3.0 as its default plugin market. Marketplace installs target the isolated `desktop` profile and support community DSH bundle discovery, installation, transactional rollback, and upgrade preservation. Runtime restarts remain owned by the desktop host so the market cannot launch a second DSH process. Project, DSH, and Agents skills can also be discovered in Extension Dock and imported after safety checks.
+Bind it from Extension Dock by scanning a QR code, then connect QQ direct messages and group chats to the local Harness instance.
 
-## Skins
+Connection information is managed by the desktop host without requiring manual configuration-file editing.
 
-The skin center ships eleven selectable skins, including Harbor and QQ2006. Each supports try-on before applying: preview applies instantly and reverts fully on exit; once you are satisfied, apply it with one click.
+## 📊 Live Token and Performance Statistics
 
-![Skin center](docs/screenshots/03-settings-skin-center.png)
+The input area can display:
 
-### Windows XP (Luna)
+- TPS generation speed
+- LLM request latency
+- Context usage
+- Cache hit rate
+- Input Tokens
+- Output Tokens
 
-A faithful recreation of the classic Luna interface: blue gradient window chrome, a green Start button, the Bliss blue-sky desktop, and square corners throughout.
+![Live token statistics](docs/screenshots/18-live-stats.png)
 
-![Windows XP skin](docs/screenshots/16-skin-xp-light.png)
+## 🎨 Themes and Skins
 
-### Minecraft Voxel
+The desktop app includes multiple themes with preview-before-apply support.
 
-Inspired by the Minecraft main menu: a pixel-art panorama skybox rotates slowly behind the interface, buttons adopt the gray stone slab style, and inputs become wooden sign posts.
+Available styles include Harbor, Windows XP / Luna, Minecraft-inspired, Blue Fantasy, Whale Song, Miku, Trading Terminal, QQ nostalgia, and more.
 
-![Minecraft skin](docs/screenshots/15-skin-minecraft-light.png)
+![Skin Center](docs/screenshots/03-settings-skin-center.png)
 
-### Blue Fantasy
+### 🐳 Whale-girl Desktop Pet
 
-Whale artwork lies beneath translucent panes, wrapped in a periwinkle-indigo palette — particularly striking in dark mode.
+The built-in whale-girl desktop pet changes animations based on Agent states such as thinking, working, waiting, and completion.
 
-![Blue Fantasy dark](docs/screenshots/17-skin-blue-fantasy-dark.png)
+It also supports interaction, naming, dragging, and hiding.
 
-### Whale Song
+| Companion mode | Interaction panel |
+| --- | --- |
+| ![Whale-girl pet](docs/screenshots/11-pet-new-chat.png) | ![Pet interaction panel](docs/screenshots/12-pet-panel.png) |
 
-The deep-sea whale-goddess theme: a text-free ambience painting (a blue-haired goddess with a whale pod on the left, an ice-blue constellation grid with gold-thread accents, and generous open water on the right) sits beneath translucent panes, wrapped in an ice-blue / cyan / navy / cobalt palette — with a night-cruise dark variant.
+### ✨ Full-page Particle Theme
 
-![Whale Song light](docs/screenshots/24-skin-whale-song-light.png) · ![Whale Song dark](docs/screenshots/25-skin-whale-song-dark.png)
+The particle-whale theme can be applied not only to the startup page but also to the main Harness interface, automatically adjusting visual effects around input state, dialogs, background activity, and the system reduced-motion preference.
 
-### Hatsune Miku
+---
 
-An electronic-idol surface with cyan notes, a waveform status bar, and translucent stage panels, designed to keep both light/dark modes and every feature plugin readable.
+## ⬇️ Download and Install
 
-### Trading Terminal
+1. Open [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest).
+2. Download `DeepSeek-Harness-Desktop-Setup-<version>-x64.exe`.
+3. Run the installer.
+4. Launch **DeepSeek Harness Desktop**.
 
-A live-data stock-trading skin: a scrolling ticker tape (A-shares / HK / US / indices / crypto / FX, 红涨绿跌), live quote chips in the title bar, and a status bar with A-share / HK / US trading sessions plus HK/US index cells. With `dsh-fun-ticker` installed the tape follows your watchlist (served through its same-origin proxy); with `dsh-longbridge` installed the index cells render the broker snapshot. With neither plugin installed the skin still works standalone on public feeds (Tencent / Binance / Frankfurter) — and every fetch path fails safe to `--` cells.
+The installer already includes DSH, desktop plugins, skins, pnpm, MinGit, and the required native dependencies. Separate Node.js or Git setup is not required.
 
-![Trading Terminal light](docs/screenshots/26-skin-trading-light.png) · ![Trading Terminal dark](docs/screenshots/27-skin-trading-dark.png)
+If GitHub downloads are slow in your region, you can also join the community group at the top of this page to get the synchronized installer.
 
-Three more: QQ2008 Retro (crystal blue with penguin motifs), Tonghuashun Trading (market elements woven into the interface), and Dragon Heir (cinnabar dragon seal theme).
+## 🔄 Updates
 
-## Download, Verification, and Upgrades
+DeepSeek Harness Desktop supports in-app update checks. When a new version is available, you can review the release information and choose whether to upgrade.
 
-1. Download the latest Windows x64 installer from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest).
-2. Run `DeepSeek-Harness-Desktop-Setup-<version>-x64.exe`. DSH, plugins, skins, pnpm, and native dependencies are all included in the installer.
-3. To verify file integrity, download `SHA256SUMS.txt` from the same Release and compare the installer's SHA-256 digest.
+Two update channels are available:
 
-GitHub Releases is the only download source built in and enabled by default. Stable is the default channel; Beta accepts prereleases only after the user explicitly selects it, and changing channels never authorizes an automatic downgrade. If GitHub is slow, use **Join user group** in the update window and obtain the synchronized latest installer from QQ group `1105158177`. The app does not enable or market third-party mirrors as a “faster” route by default.
+- **Stable**: the default channel and the best choice for most users.
+- **Beta**: opt-in access to newer features.
 
-The app checks stable GitHub Releases, displays bilingual update notes, and offers **Download from GitHub**, **Join user group**, and **Update later**. Installation still requires explicit confirmation. In-place upgrades preserve the existing `DSH_HOME`, desktop profile, community bundles, pet state, skin configuration, and encrypted QQ Bot credentials.
+Upgrades are designed to preserve existing DSH_HOME, Desktop Profile, community Bundles, Skills, skin configuration, and desktop-pet state whenever possible.
 
-Download `SHA256SUMS.txt` and `release-manifest.json` from the same GitHub Release to verify the installer hash and inspect the recorded signature state. Local or source builds may be unsigned and do not imply that a published asset is unsigned; when a release requires signing, missing certificate material or a valid timestamp fails the release gate. Use only the installer linked from this project's Release page. The default install path is recommended to avoid legacy Win32 path-length limits.
+More information:
 
-## Sources & Licensing
+- [Upgrade and rollback](docs/upgrade-and-rollback.md)
+- [Compatibility policy](docs/compatibility-policy.md)
+- [Runtime support policy](docs/runtime-support-policy.md)
+- [Full release notes](docs/launch/release-notes.md)
 
-| Package | Origin | License |
+## 🔐 Security and Privacy
+
+DeepSeek Harness Desktop is designed to keep user data and the runtime environment local whenever possible.
+
+Key behaviors include:
+
+- DSH Runtime listens on loopback by default
+- The main desktop surface and extension capabilities use separate permission boundaries
+- External links open in the system browser
+- OAuth, QQ Bot, and other credentials stay local
+- Telemetry is disabled by default
+- Diagnostic information is exported only when the user explicitly requests it
+- Exported diagnostics redact sensitive content such as Tokens, Secrets, Cookies, paths, Prompts, Sessions, and Tool Results
+
+## 📚 Documentation
+
+- [Desktop technical guide](docs/desktop.md)
+- [Compatibility policy](docs/compatibility-policy.md)
+- [Runtime support policy](docs/runtime-support-policy.md)
+- [Upgrade and rollback](docs/upgrade-and-rollback.md)
+- [Maintainer release workflow](docs/launch/desktop-release-workflow.md)
+- [Changelog](CHANGELOG.md)
+
+## 📄 Open Source and Licensing
+
+DeepSeek Harness Desktop is released under the **BSD-3-Clause** license.
+
+| Package | Source | License |
 | --- | --- | --- |
-| dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | Authored by zhu1090093659 | BSD-3-Clause (zhu1090093659) |
+| dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | Independently developed by zhu1090093659 | BSD-3-Clause (zhu1090093659) |
 
-Third-party code merged in must keep its LICENSE and attribution; active third parties with an upstream are forked or referenced as dependencies instead of vendored.
+Imported third-party code should retain its LICENSE and attribution. Active upstream projects should preferably be forked or referenced as dependencies instead of copying source code.
+
+## ❤️ Links
+
+This project actively participates in and supports the [LINUX DO community](https://linux.do).
+
+---
+
+<p align="center">
+  <b>Make DeepSeek Harness a Windows AI coding workspace you can use every day.</b>
+</p>
+
+<p align="center">
+  If you like this project, consider giving it a ⭐ Star.
+</p>

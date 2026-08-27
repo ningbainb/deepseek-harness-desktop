@@ -108,3 +108,11 @@ test('notification clicks route only the already validated structured deep link'
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(routed, [{ kind: 'extensions', href: 'dsh://extensions' }])
 })
+
+test('rollback-failed fallback notification reports the incomplete restore honestly', () => {
+  const notification = builtinsFallbackNotification('c'.repeat(64), 'rollback-failed')
+  assert.equal(notification.title, '插件修复已回滚')
+  assert.match(notification.body, /未能完全复原/u)
+  assert.match(notification.body, /内置插件启动/u)
+  assert.doesNotMatch(JSON.stringify(notification), /secret|api.?key=|C:\\Users/u)
+})

@@ -28,6 +28,7 @@ export class StartupRepairCoordinator {
     publishAttempt = () => {},
     classifyFailure = () => undefined,
     activateProvider = () => {},
+    onOutcome = async () => {},
     stopTimeoutMs = 7_500,
     schedule = setTimeout,
     cancelSchedule = clearTimeout,
@@ -43,6 +44,7 @@ export class StartupRepairCoordinator {
     ) {
       throw new TypeError('startup coordinator callbacks must be functions')
     }
+    if (typeof onOutcome !== 'function') throw new TypeError('startup outcome callback must be a function')
     if (!Number.isInteger(stopTimeoutMs) || stopTimeoutMs < 1 || stopTimeoutMs > 60_000) {
       throw new TypeError('startup stop timeout must be between 1 and 60000 milliseconds')
     }
@@ -53,6 +55,7 @@ export class StartupRepairCoordinator {
     this.publishAttempt = publishAttempt
     this.classifyFailure = classifyFailure
     this.activateProvider = activateProvider
+    this.onOutcome = onOutcome
     this.stopTimeoutMs = stopTimeoutMs
     this.schedule = schedule
     this.cancelSchedule = cancelSchedule
@@ -80,6 +83,14 @@ export class StartupRepairCoordinator {
       await this.publishAttempt(Object.freeze({ ...detail }))
     } catch {
       // Attempt diagnostics are best effort and must never change startup policy.
+    }
+  }
+
+  async #outcome(detail) {
+    try {
+      await this.onOutcome(Object.freeze({ ...detail }))
+    } catch {
+      // Outcome consumers are diagnostics-only and must never change startup policy.
     }
   }
 
@@ -221,17 +232,26 @@ export class StartupRepairCoordinator {
       throw new Error('fallback Runtime must use the same DSH Home')
     }
     await this.#publish('starting-builtins')
-    await this.#startProvider(builtins, {
-      phase: 'builtins',
-      attempt: 1,
-      failureDetails: [],
-    })
-    await this.#publish('ready-builtins')
-    return Object.freeze({
+    try {
+      await this.#startProvider(builtins, {
+        phase: 'builtins',
+        attempt: 1,
+        failureDetails: [],
+      })
+    } catch (error) {
+      // A failed builtins start must stay observable instead of surfacing as an
+      // anonymous crash page; consumers log and record it before rethrowing.
+      await this.#outcome({ state: 'builtins-start-failed', profileName: builtins.profileName })
+      throw error
+    }
+    const outcome = Object.freeze({
       state: 'ready-builtins',
       provider: builtins,
       fullAttempts: 2,
       ...(rollbackFailed ? { rollbackFailed: true } : {}),
     })
+    await this.#outcome(outcome)
+    await this.#publish('ready-builtins')
+    return outcome
   }
 }

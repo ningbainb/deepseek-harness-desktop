@@ -124,3 +124,87 @@ test('latest repair status retains only relative changed files and registered ch
     await rm(root, { recursive: true, force: true })
   }
 })
+
+const STALE_CLAIM_INPUT = {
+  desktopVersion: '3.0.9',
+  runtimeVersion: '0.1.1-rc.1',
+  phase: 'full-start',
+  error: { name: 'Error', code: 'PLUGIN_START_FAILED' },
+  bundles: [],
+}
+
+async function seedClaimLock(root, fingerprint, content) {
+  const { mkdir, writeFile } = await import('node:fs/promises')
+  const directory = join(root, 'repair-agent', 'incidents', fingerprint)
+  await mkdir(directory, { recursive: true })
+  await writeFile(join(directory, 'claim.lock'), content, 'utf8')
+}
+
+test('a claim.lock owned by a dead process is reclaimed so a crash cannot burn the budget forever', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-stale-dead-'))
+  try {
+    const { repairIncidentFingerprint } = await import('../src/repair-incident-store.mjs')
+    const fingerprint = repairIncidentFingerprint(STALE_CLAIM_INPUT)
+    await seedClaimLock(root, fingerprint, `${JSON.stringify({ pid: 4_194_303, startedAt: 5 })}\n`)
+    const store = new RepairIncidentStore({
+      userDataDir: root,
+      now: () => 10_000,
+      isProcessAlive: () => false,
+    })
+    const reclaim = await store.claim(STALE_CLAIM_INPUT)
+    assert.equal(reclaim.claimed, true)
+    const blocked = await new RepairIncidentStore({
+      userDataDir: root,
+      now: () => 10_000,
+    }).claim(STALE_CLAIM_INPUT)
+    assert.equal(blocked.claimed, false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a claim.lock whose owner lives but exceeded the TTL is reclaimed; a fresh live owner is respected', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-stale-ttl-'))
+  try {
+    const { repairIncidentFingerprint } = await import('../src/repair-incident-store.mjs')
+    const fingerprint = repairIncidentFingerprint(STALE_CLAIM_INPUT)
+    await seedClaimLock(root, fingerprint, `${JSON.stringify({ pid: process.pid, startedAt: 100 })}\n`)
+    const store = new RepairIncidentStore({
+      userDataDir: root,
+      now: () => 20 * 60 * 1000,
+      isProcessAlive: () => true,
+      staleLockTtlMs: 15 * 60 * 1000,
+    })
+    const reclaimed = await store.claim(STALE_CLAIM_INPUT)
+    assert.equal(reclaimed.claimed, true)
+
+    await seedClaimLock(root, fingerprint, `${JSON.stringify({ pid: process.pid, startedAt: 19 * 60 * 1000 })}\n`)
+    const freshLiveOwner = new RepairIncidentStore({
+      userDataDir: root,
+      now: () => 20 * 60 * 1000,
+      isProcessAlive: () => true,
+      staleLockTtlMs: 15 * 60 * 1000,
+    })
+    const blocked = await freshLiveOwner.claim(STALE_CLAIM_INPUT)
+    assert.equal(blocked.claimed, false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('an unparsable legacy claim.lock falls back to file age for staleness', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-stale-legacy-'))
+  try {
+    const { repairIncidentFingerprint } = await import('../src/repair-incident-store.mjs')
+    const fingerprint = repairIncidentFingerprint(STALE_CLAIM_INPUT)
+    await seedClaimLock(root, fingerprint, 'leftover garbage from an old build\n')
+    const store = new RepairIncidentStore({
+      userDataDir: root,
+      now: () => Date.now() + 8 * 24 * 60 * 60 * 1000,
+    })
+    const reclaimed = await store.claim(STALE_CLAIM_INPUT)
+    assert.equal(reclaimed.claimed, true)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
