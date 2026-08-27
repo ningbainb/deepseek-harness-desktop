@@ -351,6 +351,16 @@ DeepSeek Harness Desktop is released under the **BSD-3-Clause** license.
 
 Imported third-party code should retain its LICENSE and attribution. Active upstream projects should preferably be forked or referenced as dependencies instead of copying source code.
 
+## 📈 Star History
+
+<a href="https://star-history.com/#ningbainb/deepseek-harness-desktop&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ningbainb/deepseek-harness-desktop&type=Date" />
+ </picture>
+</a>
+
 ## ❤️ Links
 
 This project actively participates in and supports the [LINUX DO community](https://linux.do).
