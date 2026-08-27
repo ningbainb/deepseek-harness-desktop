@@ -341,13 +341,10 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
 
 ## 📄 开源与版权
 
-DeepSeek Harness Desktop 采用 **BSD-3-Clause** 许可证。
+本项目采用 **[BSD-3-Clause](LICENSE)** 许可证开源。
 
-| 包 | 来源 | 版权 |
-| --- | --- | --- |
-| dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | 作者 zhu1090093659 个人开发 | BSD-3-Clause（zhu1090093659） |
-
-迁入第三方代码时保留对应 LICENSE 与署名；对于仍然活跃维护的第三方项目，优先采用 Fork 或依赖引用方式。
+- 本项目代码及内置功能插件、主题皮肤与桌面端均遵循 BSD-3-Clause 开源协议。
+- 迁入与引用的第三方代码及环境依赖均保留其原始开源许可证与作者署名。
 
 ## 📈 Star History
 

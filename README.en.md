@@ -343,13 +343,10 @@ Key behaviors include:
 
 ## 📄 Open Source and Licensing
 
-DeepSeek Harness Desktop is released under the **BSD-3-Clause** license.
+This project is open-sourced under the **[BSD-3-Clause](LICENSE)** license.
 
-| Package | Source | License |
-| --- | --- | --- |
-| dsh-task-board / dsh-git-graph / dsh-aionui-panel / dsh-pet / dsh-particle-theme / dsh-remote-web-ui / dsh-live-stats / dsh-web-ui-settings / dsh-skins / dsh-web-ui-all / skins | Independently developed by zhu1090093659 | BSD-3-Clause (zhu1090093659) |
-
-Imported third-party code should retain its LICENSE and attribution. Active upstream projects should preferably be forked or referenced as dependencies instead of copying source code.
+- Project source code, bundled plugins, themes, and the desktop client follow the BSD-3-Clause license.
+- Imported third-party code and dependencies retain their original licenses and attribution notices.
 
 ## 📈 Star History
 
