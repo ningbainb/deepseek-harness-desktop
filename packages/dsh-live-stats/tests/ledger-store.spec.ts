@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { LedgerStore } from '../src/ledger-store.ts'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -9,7 +9,7 @@ describe('LedgerStore', () => {
     const tempFile = join(tmpdir(), `test-ledger-${Date.now()}.json`)
     if (existsSync(tempFile)) unlinkSync(tempFile)
 
-    const store = new LedgerStore({ filePath: tempFile, autoBootstrap: false })
+    const store = new LedgerStore({ filePath: tempFile })
 
     // Record some token usage: 2000 in + 500 out + 1000 cache = 3500
     store.recordUsage({

@@ -1,4 +1,4 @@
-﻿import type { Context } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-session-projection'
@@ -44,10 +44,16 @@ export const Config: z<Config> = z.object({
 /**
  * Register the replayable live-token projection and balance HTTP routes.
  */
-export function apply(ctx: Context, config: Config = {}): void {
+export function apply(
+  ctx: Context,
+  config: Config = {},
+  deps?: { ledgerFilePath?: string },
+): void {
   let current: () => Config = () => config ?? {}
   let disposeProjection: (() => void) | undefined
-  const ledgerStore = new LedgerStore()
+  const ledgerStore = new LedgerStore(
+    deps?.ledgerFilePath === undefined ? undefined : { filePath: deps.ledgerFilePath },
+  )
 
   const rebuild = (): void => {
     if (disposeProjection !== undefined) {
@@ -67,6 +73,33 @@ export function apply(ctx: Context, config: Config = {}): void {
       source.showCost !== false,
     ))
   }
+
+  // Persist every settled step into the ledger. The projection fold stays
+  // pure (it replays on cold loads), so recording lives in this runtime
+  // subscription; the durable `session:turn:step` dedupe key keeps replays
+  // from double-counting. `onChanged` also fires per streamed delta — the
+  // in-memory watermark skips those without touching the ledger.
+  ctx.effect(() => {
+    const settledWatermarks = new Map<string, string>()
+    return ctx.sessionProjections.onChanged((session, key) => {
+      if (key !== 'liveTokenUsage') return
+      const last = ctx.sessionProjections.stateOf(session, 'liveTokenUsage')?.last
+      if (!last) return
+      const watermark = `${last.turn}:${last.step}`
+      if (settledWatermarks.get(session.id) === watermark) return
+      settledWatermarks.set(session.id, watermark)
+      const model = session.requestContext()?.model ?? session.requestHeader()?.config.model
+      ledgerStore.recordUsage({
+        ...(model === undefined ? {} : { model }),
+        inputTokens: last.buckets.uncachedInputTokens,
+        outputTokens: last.buckets.outputTokens,
+        cacheReadTokens: last.buckets.cacheReadTokens,
+        cacheWriteTokens: last.buckets.cacheWriteTokens,
+        ...(last.tokensPerSecond === undefined ? {} : { tps: last.tokensPerSecond }),
+        dedupeKey: `${session.id}:${watermark}`,
+      })
+    })
+  }, 'live-stats: ledger bridge')
 
   // When webServer is mounted, register balance and stats routes
   ctx.inject(['webServer'], (hostCtx) => {

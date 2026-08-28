@@ -1,14 +1,14 @@
-﻿/**
+/**
  * LLM Token Usage Ledger Store.
  * Aggregates daily token usage, model distributions, and activity heatmaps across
  * all sessions and providers, persisted in the profile state.
  * @module @linxin666/dsh-live-stats/ledger-store
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { estimateTokenCost, resolvePricingConfig } from './pricing.ts'
+import { estimateTokenCost, resolvePricePeriod, resolvePricingConfig } from './pricing.ts'
 
 export interface ModelUsageStats {
   tokens: number
@@ -25,6 +25,8 @@ export interface DailyUsageRecord {
   cacheWriteTokens: number
   estimatedCost: number
   turns: number
+  /** Savings from cache reads priced against uncached input at record time. */
+  cacheSavedCost: number
   byModel: Record<string, ModelUsageStats>
 }
 
@@ -59,9 +61,30 @@ export interface UsageStatsSummary {
   heatmap: HeatmapDay[]
 }
 
+export interface RecordUsageOptions {
+  model?: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  tps?: number
+  timestamp?: number
+  /**
+   * Durable dedupe key (e.g. `sessionId:turn:step`). The projection replays
+   * session events on every cold load; the key keeps a settled step from
+   * being recorded twice across restarts.
+   */
+  dedupeKey?: string
+}
+
+/** Bound the persisted dedupe table so the ledger file stays small. */
+const MAX_DEDUPE_KEYS = 5_000
+
 function resolveStateDirectory(): string {
-  const home = process.env.DSH_HOME ?? process.env.USERPROFILE ?? homedir()
-  const dir = join(home, '.dsh', 'state', 'live-stats')
+  // DSH_HOME already IS the dsh home (the desktop host sets it to ~/.dsh);
+  // only fall back to <user-home>/.dsh when it is unset.
+  const base = process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? homedir(), '.dsh')
+  const dir = join(base, 'state', 'live-stats')
   if (!existsSync(dir)) {
     try {
       mkdirSync(dir, { recursive: true })
@@ -72,34 +95,38 @@ function resolveStateDirectory(): string {
 
 export class LedgerStore {
   private records: Map<string, DailyUsageRecord> = new Map()
+  private dedupeKeys: string[] = []
+  private dedupeSet: Set<string> = new Set()
   private filePath: string
   private peakTps: number = 0
 
-  constructor(options?: { filePath?: string; autoBootstrap?: boolean }) {
+  constructor(options?: { filePath?: string }) {
     this.filePath = options?.filePath ?? join(resolveStateDirectory(), 'usage-ledger.json')
-    this.load(options?.autoBootstrap ?? true)
+    this.load()
   }
 
-  private load(autoBootstrap: boolean): void {
-    if (existsSync(this.filePath)) {
-      try {
-        const raw = readFileSync(this.filePath, 'utf-8')
-        const data = JSON.parse(raw) as { records?: DailyUsageRecord[]; peakTps?: number }
-        if (Array.isArray(data.records)) {
-          for (const rec of data.records) {
-            if (rec?.date) this.records.set(rec.date, rec)
-          }
+  private load(): void {
+    if (!existsSync(this.filePath)) return
+    try {
+      const raw = readFileSync(this.filePath, 'utf-8')
+      const data = JSON.parse(raw) as {
+        records?: DailyUsageRecord[]
+        peakTps?: number
+        steps?: string[]
+      }
+      if (Array.isArray(data.records)) {
+        for (const rec of data.records) {
+          if (rec?.date) this.records.set(rec.date, { ...rec, cacheSavedCost: rec.cacheSavedCost ?? 0 })
         }
-        if (typeof data.peakTps === 'number') {
-          this.peakTps = data.peakTps
-        }
-      } catch {}
-    }
-
-    // If empty and allowed, populate initial historical days based on user session timestamps
-    if (this.records.size === 0 && autoBootstrap) {
-      this.bootstrapFromSessions()
-    }
+      }
+      if (typeof data.peakTps === 'number') {
+        this.peakTps = data.peakTps
+      }
+      if (Array.isArray(data.steps)) {
+        this.dedupeKeys = data.steps.filter((key): key is string => typeof key === 'string')
+        this.dedupeSet = new Set(this.dedupeKeys)
+      }
+    } catch {}
   }
 
   private save(): void {
@@ -108,6 +135,7 @@ export class LedgerStore {
         updatedAt: Date.now(),
         peakTps: this.peakTps,
         records: Array.from(this.records.values()).sort((a, b) => a.date.localeCompare(b.date)),
+        steps: this.dedupeKeys,
       }
       writeFileSync(this.filePath, JSON.stringify(data, null, 2), 'utf-8')
     } catch {}
@@ -120,25 +148,20 @@ export class LedgerStore {
     }
   }
 
-  public recordUsage(options: {
-    model?: string
-    inputTokens: number
-    outputTokens: number
-    cacheReadTokens?: number
-    cacheWriteTokens?: number
-    tps?: number
-    timestamp?: number
-  }): void {
+  /** @returns true when the sample was recorded, false when skipped (zero total or duplicate). */
+  public recordUsage(options: RecordUsageOptions): boolean {
+    if (options.dedupeKey !== undefined && this.dedupeSet.has(options.dedupeKey)) return false
+
     const now = options.timestamp ? new Date(options.timestamp) : new Date()
     const dateStr = now.toISOString().slice(0, 10)
-    const model = options.model || 'DeepSeek-V4-Flash'
+    const model = options.model || 'unknown'
     const input = Math.max(0, options.inputTokens || 0)
     const output = Math.max(0, options.outputTokens || 0)
     const cacheRead = Math.max(0, options.cacheReadTokens || 0)
     const cacheWrite = Math.max(0, options.cacheWriteTokens || 0)
     const total = input + output + cacheRead + cacheWrite
 
-    if (total === 0) return
+    if (total === 0) return false
 
     if (options.tps && options.tps > this.peakTps) {
       this.peakTps = Math.round(options.tps * 10) / 10
@@ -152,6 +175,10 @@ export class LedgerStore {
       cacheWriteTokens: cacheWrite,
     }, pricingSpec, now)
     const cost = costEstimate?.amount ?? 0
+    // Cache reads would otherwise be billed as uncached input; the spread
+    // between the two rates at this period is the real saving.
+    const rates = pricingSpec[resolvePricePeriod(now, pricingSpec.priceMode)]
+    const cacheSaved = cacheRead * Math.max(0, rates.inputPerMillion - rates.cacheReadPerMillion) / 1_000_000
 
     let rec = this.records.get(dateStr)
     if (!rec) {
@@ -164,6 +191,7 @@ export class LedgerStore {
         cacheWriteTokens: 0,
         estimatedCost: 0,
         turns: 0,
+        cacheSavedCost: 0,
         byModel: {},
       }
       this.records.set(dateStr, rec)
@@ -175,6 +203,7 @@ export class LedgerStore {
     rec.cacheReadTokens += cacheRead
     rec.cacheWriteTokens += cacheWrite
     rec.estimatedCost += cost
+    rec.cacheSavedCost += cacheSaved
     rec.turns += 1
 
     if (!rec.byModel[model]) {
@@ -184,42 +213,17 @@ export class LedgerStore {
     rec.byModel[model].cost += cost
     rec.byModel[model].turns += 1
 
-    this.save()
-  }
-
-  private bootstrapFromSessions(): void {
-    try {
-      const home = process.env.DSH_HOME ?? process.env.USERPROFILE ?? homedir()
-      const sessionsRoot = join(home, '.dsh', 'sessions')
-      if (!existsSync(sessionsRoot)) return
-
-      const workspaceDirs = readdirSync(sessionsRoot, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
-
-      for (const ws of workspaceDirs) {
-        const wsPath = join(sessionsRoot, ws.name)
-        const sessionDirs = readdirSync(wsPath, { withFileTypes: true })
-          .filter((d) => d.isDirectory())
-
-        for (const sess of sessionDirs) {
-          const sessPath = join(wsPath, sess.name)
-          const stat = statSync(sessPath)
-
-          // Estimate initial base tokens from session existence
-          const estInput = 1500
-          const estOutput = 650
-          const estCache = 800
-
-          this.recordUsage({
-            model: 'DeepSeek-V4-Flash',
-            inputTokens: estInput,
-            outputTokens: estOutput,
-            cacheReadTokens: estCache,
-            timestamp: stat.mtimeMs,
-          })
-        }
+    if (options.dedupeKey !== undefined) {
+      this.dedupeSet.add(options.dedupeKey)
+      this.dedupeKeys.push(options.dedupeKey)
+      if (this.dedupeKeys.length > MAX_DEDUPE_KEYS) {
+        const dropped = this.dedupeKeys.splice(0, this.dedupeKeys.length - MAX_DEDUPE_KEYS)
+        for (const key of dropped) this.dedupeSet.delete(key)
       }
-    } catch {}
+    }
+
+    this.save()
+    return true
   }
 
   public getSummary(): UsageStatsSummary {
@@ -237,10 +241,7 @@ export class LedgerStore {
       totalCost += rec.estimatedCost
       totalTurns += rec.turns
       cacheSavedTokens += rec.cacheReadTokens
-
-      // Cache read is ~90% cheaper than uncached input, calculating estimated savings
-      const cacheSavings = (rec.cacheReadTokens / 1_000_000) * 0.9
-      cacheSavedCost += cacheSavings
+      cacheSavedCost += rec.cacheSavedCost
 
       for (const [model, stats] of Object.entries(rec.byModel)) {
         if (!modelTotals[model]) {
@@ -252,8 +253,8 @@ export class LedgerStore {
       }
     }
 
-    const todayRec = this.records.get(todayStr) ?? {
-      date: todayStr,
+    const emptyDay = (date: string): DailyUsageRecord => ({
+      date,
       totalTokens: 0,
       inputTokens: 0,
       outputTokens: 0,
@@ -261,8 +262,11 @@ export class LedgerStore {
       cacheWriteTokens: 0,
       estimatedCost: 0,
       turns: 0,
+      cacheSavedCost: 0,
       byModel: {},
-    }
+    })
+
+    const todayRec = this.records.get(todayStr) ?? emptyDay(todayStr)
 
     const models: ModelBreakdownEntry[] = Object.entries(modelTotals).map(([model, stats]) => ({
       model,
@@ -272,33 +276,12 @@ export class LedgerStore {
       turns: stats.turns,
     })).sort((a, b) => b.tokens - a.tokens)
 
-    if (models.length === 0) {
-      models.push({
-        model: 'DeepSeek-V4-Flash',
-        tokens: 0,
-        percentage: 100,
-        cost: 0,
-        turns: 0,
-      })
-    }
-
     const recentDays: DailyUsageRecord[] = []
     const now = new Date()
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400000)
       const dStr = d.toISOString().slice(0, 10)
-      const rec = this.records.get(dStr) ?? {
-        date: dStr,
-        totalTokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        estimatedCost: 0,
-        turns: 0,
-        byModel: {},
-      }
-      recentDays.push(rec)
+      recentDays.push(this.records.get(dStr) ?? emptyDay(dStr))
     }
 
     // 52-week (364 days) GitHub-style heatmap dataset

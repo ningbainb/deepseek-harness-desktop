@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import {
@@ -20,12 +22,14 @@ import {
 
 afterEach(() => { vi.useRealTimers() })
 
-async function harness(): Promise<{ ctx: Context; session: Session }> {
+async function harness(): Promise<{ ctx: Context; session: Session; ledgerFilePath: string }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin({ inject, apply })
-  return { ctx, session: ctx.sessions.create() }
+  // Keep the bridge's ledger writes out of the real user state directory.
+  const ledgerFilePath = join(tmpdir(), `test-projection-ledger-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
+  await ctx.plugin({ inject, apply: (context: Context) => apply(context, {}, { ledgerFilePath }) })
+  return { ctx, session: ctx.sessions.create(), ledgerFilePath }
 }
 
 function projected(ctx: Context, session: Session): LiveTokenUsageProjection {
@@ -667,5 +671,61 @@ describe('liveTokenUsage projection', () => {
       .toThrow('invalid current range')
     expect(JSON.parse(JSON.stringify(state))).toEqual(state)
     expect(() => definition.stateSchema.parse(state)).not.toThrow()
+  })
+})
+
+describe('ledger bridge', () => {
+  it('records each settled step once with the session model', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const { ctx, session, ledgerFilePath } = await harness()
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'abcd' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('request/header', {
+      header: { config: { provider: 'deepseek', model: 'deepseek-chat' }, system: 'abcd' },
+      reason: 'initial',
+    })
+    vi.setSystemTime(2_000)
+    session.append('assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'text-delta', index: 0, text: 'abcd' },
+    })
+    session.append('assistant/chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'usage', usage: { inputTokens: 20, outputTokens: 30, cacheReadTokens: 80 } },
+    })
+    vi.setSystemTime(3_000)
+    session.append('step/end', { turn: 1, step: 1 })
+    // Streaming noise for the next step must not re-record the settled one.
+    session.append('step/start', { turn: 1, step: 2 })
+    session.append('assistant/chunk', {
+      turn: 1,
+      step: 2,
+      chunk: { type: 'text-delta', index: 0, text: 'xy' },
+    })
+
+    const { LedgerStore } = await import('../src/ledger-store.ts')
+    const summary = new LedgerStore({ filePath: ledgerFilePath }).getSummary()
+    expect(summary.todayTurns).toBe(1)
+    expect(summary.totalTokens).toBe(130)
+    expect(summary.models[0]).toMatchObject({ model: 'deepseek-chat', tokens: 130, turns: 1 })
+    expect(summary.cacheSavedTokens).toBe(80)
+    expect(summary.cacheSavedCost).toBeGreaterThan(0)
+
+    // A replayed fold (fresh bridge, same ledger file) must not double-count.
+    const replay = new LedgerStore({ filePath: ledgerFilePath })
+    expect(replay.recordUsage({
+      model: 'deepseek-chat',
+      inputTokens: 20,
+      outputTokens: 30,
+      cacheReadTokens: 80,
+      dedupeKey: `${session.id}:1:1`,
+    })).toBe(false)
+    expect(replay.getSummary().todayTurns).toBe(1)
   })
 })
