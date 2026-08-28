@@ -1,20 +1,23 @@
-import type { Context } from '@deepseek-ai/cordis'
+﻿import type { Context } from '@deepseek-ai/cordis'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import { resolveEstimatorConfig } from './estimator.ts'
 import type { EstimatorConfig } from './estimator.ts'
 import { createLiveTokenUsageProjectionDefinition } from './projection.ts'
 import { resolvePricingConfig } from './pricing.ts'
 import type { PriceMode } from './pricing.ts'
+import { BalanceService } from './balance-service.ts'
+import { LedgerStore } from './ledger-store.ts'
+import { makeLiveStatsRoutes } from './routes.ts'
 
 /** Services required by the host projection plugin. */
 export const inject = ['sessionProjections']
 
 /**
  * Settings namespace of the live-stats capability — the section the web
- * settings surface edits. Spelled here rather than imported so the browser
- * half can spell the same value without depending on a Host package.
+ * settings surface edits.
  */
 export const LIVE_STATS_SETTINGS_NAMESPACE = settingsNamespace('live-stats')
 
@@ -39,23 +42,12 @@ export const Config: z<Config> = z.object({
 })
 
 /**
- * Register the replayable live-token projection.
- *
- * The projection definition freezes its estimator spec into the fold's
- * closure at construction, so a settings edit takes effect by re-registering
- * the definition against the authoritative source. `sessionProjections.register`
- * returns the exact disposer, letting us drop the stale fold and fold the
- * session log afresh with the new parameters — the live-estimate row simply
- * re-derives without a restart.
- * @param ctx - host plugin context carrying sessionProjections.
- * @param config - resolved plugin config (schema defaults applied by the loader).
+ * Register the replayable live-token projection and balance HTTP routes.
  */
 export function apply(ctx: Context, config: Config = {}): void {
-  // The authoritative estimation source: the settings scope once the web
-  // settings surface serves the namespace, the composition entry otherwise
-  // (installSettingsSection swaps it on attach and detach).
   let current: () => Config = () => config ?? {}
   let disposeProjection: (() => void) | undefined
+  const ledgerStore = new LedgerStore()
 
   const rebuild = (): void => {
     if (disposeProjection !== undefined) {
@@ -76,6 +68,18 @@ export function apply(ctx: Context, config: Config = {}): void {
     ))
   }
 
+  // When webServer is mounted, register balance and stats routes
+  ctx.inject(['webServer'], (hostCtx) => {
+    const balanceService = new BalanceService(undefined, hostCtx)
+    const routes = makeLiveStatsRoutes({ service: balanceService, ledger: ledgerStore })
+    hostCtx.effect(() => {
+      const disposers = routes.map((route) => hostCtx.webServer.register(route))
+      return () => {
+        for (const dispose of disposers) dispose()
+      }
+    }, 'live-stats: routes')
+  })
+
   installSettingsSection(ctx, LIVE_STATS_SETTINGS_NAMESPACE, Config, config ?? {}, {
     setSource: (source) => { current = source },
     onChange: rebuild,
@@ -83,8 +87,12 @@ export function apply(ctx: Context, config: Config = {}): void {
   rebuild()
 }
 
+export { BalanceService } from './balance-service.ts'
+export { LedgerStore } from './ledger-store.ts'
+export { makeLiveStatsRoutes, BALANCE_API_PATH, STATS_API_PATH } from './routes.ts'
 export { createLiveTokenUsageProjectionDefinition } from './projection.ts'
 export { resolveEstimatorConfig } from './estimator.ts'
 export { estimateTokenCost, resolvePricePeriod, resolvePricingConfig } from './pricing.ts'
 export type { EstimatorConfig, EstimatorSpec } from './estimator.ts'
 export type { PriceMode, PricePeriod, PricingConfig, PricingSpec, TokenCostEstimate, TokenUsageBuckets } from './pricing.ts'
+export type { DailyUsageRecord, HeatmapDay, ModelBreakdownEntry, UsageStatsSummary } from './ledger-store.ts'

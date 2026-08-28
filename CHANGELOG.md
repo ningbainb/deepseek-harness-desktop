@@ -2,9 +2,19 @@
 
 ## Unreleased
 
-中文：暂无。
+中文：
 
-English: No changes yet.
+- 新增「从其他 AI 工具继续工作」(Context Handoff Import) 核心功能，支持自动只读发现本机 Claude Code 与 Codex 项目和历史会话。
+- 智能提炼关键工作上下文（主要任务、技术决策、关联文件与修改、已执行命令、错误阻碍及最近对话尾部），严格控制 Token 预算（4,000 ~ 8,000 Tokens）。
+- 支持项目目录规范路径匹配、Git 仓库关联与版本变动检查，并通过官方 DSH 会话创建接口安全桥接，直接继续未完成的编码任务。
+- 引入全局凭据脱敏防护与原子导入账本（`external-conversation-imports-v1.json`），支持会话增量更新检测与防重复导入。
+
+English:
+
+- Adds the "Continue from Other AI Tools" (Context Handoff Import) core capability, enabling read-only auto-discovery of local Claude Code and Codex projects and sessions.
+- Intelligently reconstructs essential working context (primary task, technical decisions, referenced/modified files, executed commands, error blockers, and recent conversation tail) with strict token bounds (4,000 - 8,000 tokens).
+- Supports canonical project path matching, Git remote association, and revision change detection, safely bridging into official DSH sessions to continue coding tasks seamlessly.
+- Incorporates centralized secret redaction and an atomic import ledger (`external-conversation-imports-v1.json`) with update detection and duplicate import prevention.
 
 ## 3.0.9 - 2026-08-25
 

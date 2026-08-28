@@ -112,7 +112,11 @@ try {
     }
     return false
   })
-  if (screenshot) await page.screenshot({ path: screenshot })
+  if (screenshot) {
+    // Let the scene's fade-in ramp finish so the capture shows steady state.
+    await page.waitForTimeout(2_600)
+    await page.screenshot({ path: screenshot })
+  }
 
   await page.evaluate(() => {
     const input = document.createElement('input')

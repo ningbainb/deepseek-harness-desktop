@@ -390,6 +390,9 @@ export function registerDesktopIpc({
   getRuntimeOrigin = () => undefined,
   getWorkspaceFileOpenToken = () => undefined,
   openWorkspaceTarget = openWorkspaceFile,
+  conversationImportService,
+  openConversationImport,
+  pickProjectDirectory,
   shell,
 }) {
   if (typeof surfaceRegistry?.assert !== 'function' || typeof surfaceRegistry?.surfaceOf !== 'function') {
@@ -421,6 +424,12 @@ export function registerDesktopIpc({
     'desktop:skills-list',
     'desktop:notification-show',
     'desktop:workspace-file-open',
+    'desktop:conversation-import-open',
+    'desktop:conversation-import-probe',
+    'desktop:conversation-import-scan',
+    'desktop:conversation-import-preview',
+    'desktop:conversation-import-confirm',
+    'desktop:conversation-import-pick-directory',
   ]
   for (const channel of channels) ipcMain.removeHandler(channel)
   const handle = (channel, allowedSurfaces, handler) => {
@@ -559,6 +568,26 @@ export function registerDesktopIpc({
       getRuntimeOrigin,
       getWorkspaceFileOpenToken,
     })
+  })
+  handle('desktop:conversation-import-open', [main, extensions], async () => {
+    return typeof openConversationImport === 'function' ? await openConversationImport() : false
+  })
+  handle('desktop:conversation-import-probe', [main, extensions], async () => {
+    return conversationImportService ? await conversationImportService.probeSources() : []
+  })
+  handle('desktop:conversation-import-scan', [main, extensions], async () => {
+    return conversationImportService ? await conversationImportService.discoverAll() : { sources: [], projects: [] }
+  })
+  handle('desktop:conversation-import-preview', [main, extensions], async (_event, _surface, options) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    return await conversationImportService.createPreviewPlan(options)
+  })
+  handle('desktop:conversation-import-confirm', [main, extensions], async (_event, _surface, planId) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    return await conversationImportService.confirmAndImport(planId)
+  })
+  handle('desktop:conversation-import-pick-directory', [main, extensions], async () => {
+    return typeof pickProjectDirectory === 'function' ? await pickProjectDirectory() : undefined
   })
   const publishStatus = async (status = controller.status) => {
     const window = getWindow()

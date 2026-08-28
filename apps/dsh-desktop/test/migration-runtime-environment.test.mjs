@@ -10,6 +10,10 @@ test('the primary Runtime receives the requested automation and permission polic
     backgroundAutomation: true,
     fullUser: true,
   }), {
+    CI: '1',
+    DSH_DESKTOP_NO_INTERACTIVE: '1',
+    QQBOT_DISABLE_CLI_SETUP: '1',
+    DEBIAN_FRONTEND: 'noninteractive',
     DEEPSEEK_API_KEY: 'legacy-key',
     QQBOT_APPID: 'desktop-app',
     QQBOT_SECRET: 'desktop-secret',
@@ -17,6 +21,10 @@ test('the primary Runtime receives the requested automation and permission polic
     DSH_PERMISSION_MODE: 'danger-full-access',
   })
   assert.deepEqual(desktopRuntimeEnvironmentFor({ backgroundAutomation: false }), {
+    CI: '1',
+    DSH_DESKTOP_NO_INTERACTIVE: '1',
+    QQBOT_DISABLE_CLI_SETUP: '1',
+    DEBIAN_FRONTEND: 'noninteractive',
     QQBOT_APPID: '',
     QQBOT_SECRET: '',
     DSH_DESKTOP_BACKGROUND_AUTOMATION: '0',

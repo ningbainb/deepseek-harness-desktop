@@ -18,6 +18,7 @@ const whaleCanvas = document.querySelector('#whale-canvas')
 const startupStepsContainer = document.querySelector('#startup-steps')
 const startupSteps = [...document.querySelectorAll('[data-startup-step]')]
 const startupGuidance = document.querySelector('#startup-guidance')
+const ticker = document.querySelector('#status-ticker')
 
 const STARTUP_STALL_NOTICE_MS = 30_000
 
@@ -162,6 +163,17 @@ function updateStartupStall(state, stateChanged) {
   }, STARTUP_STALL_NOTICE_MS)
 }
 
+function renderActivity(activity) {
+  if (!ticker) return
+  if (!activity?.text || currentState === 'ready' || currentState === 'crashed') {
+    ticker.hidden = true
+    ticker.textContent = ''
+    return
+  }
+  ticker.hidden = false
+  ticker.textContent = `▸ ${activity.text}`
+}
+
 function render(status) {
   hideDirectProcess()
   const state = copy[status?.state] ? status.state : 'crashed'
@@ -169,6 +181,7 @@ function render(status) {
   const stateChanged = currentState !== state
   latestStatus = status ?? { state }
   currentState = state
+  if (state === 'ready' || state === 'crashed') renderActivity(null)
   updateStartupStall(state, stateChanged)
   document.body.dataset.state = state
   title.textContent = heading
@@ -194,11 +207,9 @@ window.addEventListener('beforeunload', () => {
   if (startupStallTimer !== undefined) window.clearTimeout(startupStallTimer)
 })
 
-const previewState = new URLSearchParams(window.location.search).get('preview')
-const directState = new URLSearchParams(window.location.search).get('directState')
-const directReasonKey = new URLSearchParams(window.location.search).get('directReason')
-const directReason = safeDirectReason(directReasonKey)
-if (directState && directCopy[directState]) {
+function renderDirectState(directState, directReasonKey) {
+  if (!directState || !directCopy[directState]) return
+  const directReason = safeDirectReason(directReasonKey)
   const [heading, message] = directCopyFor(directState, directReason)
   const directProgress = {
     preparing: 8,
@@ -214,12 +225,23 @@ if (directState && directCopy[directState]) {
   currentState = directState.startsWith('ready-') || directState === 'system-startup-failed'
     ? 'ready'
     : 'starting'
+  if (currentState === 'ready') renderActivity(null)
   document.body.dataset.state = currentState
   title.textContent = heading
   detail.textContent = message
   renderProgress(directProgress[directState] ?? 8)
   renderDirectProcess(directState, directReason)
-} else if (previewState && copy[previewState]) {
+}
+
+const previewState = new URLSearchParams(window.location.search).get('preview')
+const initialDirectState = new URLSearchParams(window.location.search).get('directState')
+const initialDirectReasonKey = new URLSearchParams(window.location.search).get('directReason')
+
+if (initialDirectState) {
+  renderDirectState(initialDirectState, initialDirectReasonKey)
+}
+
+if (previewState && copy[previewState]) {
   try {
     const info = await window.dshDesktop.getInfo()
     version.textContent = `DESKTOP ${info.version}`
@@ -230,17 +252,26 @@ if (directState && directCopy[directState]) {
 } else {
   try {
     const statusGate = createStartupStatusGate(render)
-    window.dshDesktop.onStatus(statusGate.live)
+    window.dshDesktop?.onStatus?.(statusGate.live)
+    if (typeof window.dshDesktop?.onStartupActivity === 'function') {
+      window.dshDesktop.onStartupActivity(renderActivity)
+    }
+    if (typeof window.dshDesktop?.onDirectState === 'function') {
+      window.dshDesktop.onDirectState(({ directState, directReason }) => {
+        renderDirectState(directState, directReason)
+      })
+    }
     const [info, initialStatus] = await Promise.all([
-      window.dshDesktop.getInfo(),
-      window.dshDesktop.getStatus(),
+      window.dshDesktop?.getInfo?.().catch(() => ({ version: '3.1.0' })),
+      window.dshDesktop?.getStatus?.().catch(() => ({ state: 'stopped' })),
     ])
-    version.textContent = `DESKTOP ${info.version}`
-    statusGate.initial(initialStatus)
+    if (info?.version) version.textContent = `DESKTOP ${info.version}`
+    if (!initialDirectState && initialStatus) {
+      statusGate.initial(initialStatus)
+    }
   } catch (error) {
-    // The first splash is intentionally loaded before the complete Desktop
-    // IPC surface is registered. Keep showing preparation until the normal
-    // startup load replaces it; do not turn that short gap into an error UI.
-    render({ state: 'stopped' })
+    if (!initialDirectState) {
+      render({ state: 'stopped' })
+    }
   }
 }

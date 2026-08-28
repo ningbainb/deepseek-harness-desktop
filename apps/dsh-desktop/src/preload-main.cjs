@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+﻿const { contextBridge, ipcRenderer } = require('electron')
 
 // Sandboxed Electron preloads cannot require sibling files. Keep this entry
 // self-contained so the bridge is available before the first local page loads.
@@ -21,6 +21,8 @@ const baseApi = {
   showNotification: (notification) => ipcRenderer.invoke('desktop:notification-show', notification),
   openWorkspaceFile: (request) => ipcRenderer.invoke('desktop:workspace-file-open', request),
   onStatus: createSubscription('desktop:status', 'status'),
+  onStartupActivity: createSubscription('desktop:startup-activity', 'startup activity'),
+  onDirectState: createSubscription('desktop:direct-state', 'direct state'),
   onDeepLink: createSubscription('desktop:deep-link', 'deep link'),
 }
 
@@ -43,6 +45,12 @@ const api = Object.freeze({
   setSettingsWindowBounds: (bounds) => ipcRenderer.invoke('desktop:settings-window-bounds-set', bounds),
   settingsOpened: () => ipcRenderer.invoke('desktop:settings-opened'),
   listSkills: () => ipcRenderer.invoke('desktop:skills-list'),
+  openConversationImport: () => ipcRenderer.invoke('desktop:conversation-import-open'),
+  probeConversationSources: () => ipcRenderer.invoke('desktop:conversation-import-probe'),
+  scanConversationSources: () => ipcRenderer.invoke('desktop:conversation-import-scan'),
+  previewConversationImport: (options) => ipcRenderer.invoke('desktop:conversation-import-preview', options),
+  confirmConversationImport: (planId) => ipcRenderer.invoke('desktop:conversation-import-confirm', planId),
+  pickProjectDirectory: () => ipcRenderer.invoke('desktop:conversation-import-pick-directory'),
   onUpdateStatus: createSubscription('desktop:update-status', 'update status'),
 })
 

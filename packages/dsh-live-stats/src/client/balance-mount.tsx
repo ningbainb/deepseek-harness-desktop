@@ -3,10 +3,9 @@
  * Mounts into center column and handles activation/deactivation synchronization.
  */
 import { createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import type { BalanceController } from './balance-controller.ts'
 import { BalanceOverviewView } from './BalanceOverviewView.tsx'
-
-type ReactRoot = { unmount(): void }
 
 export const BALANCE_VIEW_SELECTOR = '[data-dsh-balance-view]'
 const CONVERSATION_COLUMN_SELECTOR = '[data-pane="conversation"], [class*="centerCol"]'
@@ -19,7 +18,7 @@ function conversationColumn(): HTMLElement | undefined {
 }
 
 export function mountBalanceView(controller: BalanceController): () => void {
-  let root: ReactRoot | undefined
+  let root: Root | undefined
   let container: HTMLDivElement | undefined
 
   const ensure = (): void => {
@@ -32,30 +31,24 @@ export function mountBalanceView(controller: BalanceController): () => void {
     }
     const column = conversationColumn()
     if (column === undefined) return
+    // Positioning, stacking and visibility ride the [data-dsh-balance-view]
+    // rules in balance.module.css (aligned with dsh-task-board); the mount
+    // only toggles the root activation attribute.
     container = document.createElement('div')
     container.dataset.dshBalanceView = ''
-    container.style.position = 'absolute'
-    container.style.inset = '0'
-    container.style.zIndex = '90'
-    container.style.display = 'none'
     column.appendChild(container)
-    void import('react-dom/client').then(({ createRoot }) => {
-      if (!container) return
-      root = createRoot(container)
-      ;(root as unknown as { render(e: unknown): void }).render(
-        createElement(BalanceOverviewView, { controller, onClose: () => sync() }),
-      )
-    }).catch(() => {})
+    root = createRoot(container)
+    root.render(
+      createElement(BalanceOverviewView, { controller, onClose: () => sync() }),
+    )
   }
 
   const sync = (): void => {
     const open = controller.getSnapshot().open
     if (open) {
       ensure()
-      if (container) container.style.display = 'flex'
       document.documentElement.setAttribute(ACTIVE_ATTR, '')
     } else {
-      if (container) container.style.display = 'none'
       document.documentElement.removeAttribute(ACTIVE_ATTR)
     }
   }

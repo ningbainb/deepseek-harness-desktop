@@ -1,4 +1,4 @@
-export const DESKTOP_API_VERSION = '1.4.0'
+﻿export const DESKTOP_API_VERSION = '1.4.0'
 
 export const DESKTOP_SURFACES = Object.freeze({
   MAIN: 'main',
@@ -98,8 +98,9 @@ export function desktopContractForSurface(surface, { runtimeProvider } = {}) {
 }
 
 /** Major-version compatibility is the only promise made by Contract v1. */
-export function isDesktopContractCompatible(contract, requiredMajor = 1) {
-  if (typeof contract?.apiVersion !== 'string') return false
-  const major = Number.parseInt(contract.apiVersion.split('.')[0] ?? '', 10)
-  return major === requiredMajor && Array.isArray(contract.capabilities)
+export function isDesktopContractCompatible(contract) {
+  if (contract === null || typeof contract !== 'object' || typeof contract.apiVersion !== 'string') return false
+  if (!Array.isArray(contract.capabilities)) return false
+  const [major] = contract.apiVersion.split('.')
+  return major === '1'
 }

@@ -9,7 +9,7 @@ export const BALANCE_ENTRY_SELECTOR = '[data-dsh-balance-entry]'
 const SURFACE_NAVIGATION_EVENT = 'dsh-web-ui:surface-navigation'
 const SURFACE_ID = 'balance'
 
-const BALANCE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v1.5M8 9.5V11M10 7a2 2 0 00-4 0c0 1.1.9 1.7 2 2a2 2 0 010 4"/></svg>`
+const BALANCE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4 11V7.5"/><path d="M8 11V3.5"/><path d="M12 11V6"/></svg>`
 
 function sidebarRoot(): HTMLElement | undefined {
   const column = document.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
@@ -55,29 +55,37 @@ function updateEntryAmount(entry: HTMLButtonElement, state: ReturnType<BalanceCo
   if (amountSpan) {
     amountSpan.textContent = state.loading ? '…' : `${state.totalBalance} ${state.currency}`
   }
+  entry.title = state.loading ? '大模型用量' : `大模型用量 · 余额 ${state.totalBalance} ${state.currency}`
+  entry.toggleAttribute('data-active', state.open)
 }
 
 function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
-  const family = Array.from(root.children).filter(
-    (el): el is HTMLElement =>
-      el instanceof HTMLElement &&
-      (el.matches('[data-dsh-taskboard-entry]') ||
-       el.matches('[data-dsh-ssh-entry]') ||
-       el.matches('[data-dsh-balance-entry]')),
-  )
-  if (entry.parentElement === root) return true
+  // Anchor directly below the shell's New Session row, ahead of entries
+  // injected by sibling plugins, so the usage entry is always the first
+  // custom row. On current desktop shells the "新开会话" button is a direct
+  // child of the sidebar root sitting right after the logo row (NOT nested
+  // inside it), so prefer the button itself as the anchor; older shells that
+  // nest it in the logo row anchor on that row instead.
+  const newSession = root.querySelector<HTMLButtonElement>('button[class*="newSession"]')
+  const newSessionRow = newSession?.closest('[class*="logoRow"]')
+  const base = newSessionRow instanceof HTMLElement && newSessionRow.parentElement === root
+    ? newSessionRow
+    : newSession !== null && newSession.parentElement === root
+      ? newSession
+      : (() => {
+          const logoRow = root.querySelector<HTMLElement>('[class*="logoRow"]')
+          return logoRow !== null && logoRow.parentElement === root ? logoRow : undefined
+        })()
+  if (base === undefined) return false
 
-  // Balance entry sits after task board and SSH entries
-  const lastSibling = family.filter(el => !el.matches('[data-dsh-balance-entry]')).at(-1)
-  const anchor = lastSibling
-    ? lastSibling.nextElementSibling
-    : (() => {
-        const logoRow = root.querySelector<HTMLElement>('[class*="logoRow"]')
-        const base = logoRow !== null && logoRow.parentElement === root ? logoRow : undefined
-        return base?.nextElementSibling ?? root.children[1] ?? null
-      })()
-
-  root.insertBefore(entry, anchor)
+  // Sibling plugins (task board / ssh / skill center) insert their own rows
+  // right after the New Session row too, pushing this entry down. They only
+  // re-insert when detached, so re-asserting our slot whenever it drifts is
+  // stable: once we sit directly after the base, nobody moves again.
+  if (entry.parentElement === root && entry.previousElementSibling === base) return true
+  // NOTE: base.nextElementSibling may be null (base last) — insertBefore
+  // treats null as "append", which is exactly the slot after base.
+  root.insertBefore(entry, base.nextElementSibling)
   return true
 }
 
@@ -91,30 +99,32 @@ export function mountBalanceSidebarEntry(controller: BalanceController): () => v
     if (root === undefined) return
     if (entry === undefined) {
       entry = createEntry(controller)
-    }
-    placeEntry(root, entry)
-  }
-
-  const bootstrap = (): void => {
-    ensureEntry()
-    if (entry) {
-      unsubState?.()
+      // Subscribe at creation time, not only at bootstrap: when the shell is
+      // not mounted yet on first pass, the observer creates the entry later
+      // and a bootstrap-only subscription would never attach, leaving the
+      // amount and tooltip empty forever.
       unsubState = controller.subscribe((state) => {
         if (entry) updateEntryAmount(entry, state)
       })
       // Kick off initial balance fetch
       void controller.fetchBalance()
     }
+    placeEntry(root, entry)
   }
 
   observer = new MutationObserver(() => {
-    if (!entry?.isConnected) {
+    if (entry === undefined || !entry.isConnected) {
       ensureEntry()
+      return
     }
+    // Re-assert the slot: sibling plugin insertions push this entry down
+    // without disconnecting it, so presence alone is not enough.
+    const root = sidebarRoot()
+    if (root !== undefined) placeEntry(root, entry)
   })
   observer.observe(document.body, { childList: true, subtree: true })
 
-  bootstrap()
+  ensureEntry()
   return () => {
     observer?.disconnect()
     unsubState?.()

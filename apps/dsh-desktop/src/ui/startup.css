@@ -281,6 +281,24 @@ h1 {
   font-size: 11px;
   line-height: 1.5;
 }
+
+.status-ticker {
+  min-height: 18px;
+  margin: 6px 0 0;
+  color: #72d8ed;
+  font-size: 11px;
+  font-family: var(--mono);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.status-ticker[hidden] {
+  display: none !important;
+}
 .startup-steps {
   margin: 14px 0 0;
   padding: 10px 12px;

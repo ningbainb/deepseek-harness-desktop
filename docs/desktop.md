@@ -40,6 +40,7 @@ Official packaged Desktop releases enable first-party anonymous product analysis
 | Renderer bridge | Contract v1.2 capability discovery, structured notifications, browser-safe Desktop client SDK, split main/extension preloads, sender-identity enforcement |
 | OS integration | Strict `dsh://` route allowlist, `.dshpreset` preview association, deduplicated foreground-aware notifications, and main-window-only workspace file opening |
 | Task Board | Host-owned v3 Projects/Task Runs/Evidence ledger, copy-first v2 migration, explicit Worktree review, ID-only Host routes, SSE synchronization, and an opt-in durable Host scheduler with browser fallback |
+| Context handoff import | Read-only discovery for Claude Code and Codex projects/sessions, streaming tolerant JSONL parser, centralized secret redaction, token-bounded Handoff prompt generator, atomic ledger, and legitimate DSH session bridge |
 | Visual system | Solid native/injected title-bar alignment, system-style Extension Dock, bounded particle-whale startup surface, page-aware full-interface particle theme |
 | Security | Sandbox, context isolation, no Node integration, per-window preload APIs, sender registry, loopback navigation allowlist, denied permissions |
 

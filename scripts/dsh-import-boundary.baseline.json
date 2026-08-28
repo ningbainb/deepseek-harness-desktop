@@ -3,7 +3,9 @@
   "policy": "New direct @deepseek-ai/dsh* imports are allowed only in controlled adapter/compat modules.",
   "controlledPrefixes": [
     "apps/dsh-desktop/src/runtime-provider.mjs",
-    "packages/dsh-desktop-compat/src/"
+    "packages/dsh-desktop-compat/src/",
+    "packages/dsh-desktop-repair/src/",
+    "packages/dsh-web-ui-settings/src/chatgpt-auth"
   ],
   "counts": {
     "packages/dsh-aionui-panel/src/client/drag/DragFileInlay.tsx\u0000static-import\u0000@deepseek-ai/dsh-client-ui-conversation/client": 1,
@@ -56,6 +58,7 @@
     "packages/dsh-live-stats/src/client/TpsLine.tsx\u0000static-import\u0000@deepseek-ai/dsh-token-meter/client": 1,
     "packages/dsh-live-stats/src/estimator.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 1,
     "packages/dsh-live-stats/src/estimator.ts\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
+    "packages/dsh-live-stats/src/index.ts\u0000static-import\u0000@deepseek-ai/dsh-host-webserver": 1,
     "packages/dsh-live-stats/src/index.ts\u0000static-import\u0000@deepseek-ai/dsh-session-projection": 1,
     "packages/dsh-live-stats/src/index.ts\u0000static-import\u0000@deepseek-ai/dsh-settings": 1,
     "packages/dsh-live-stats/src/invariant.ts\u0000static-import\u0000@deepseek-ai/dsh-invariants": 1,
@@ -65,10 +68,12 @@
     "packages/dsh-live-stats/src/projection.ts\u0000static-import\u0000@deepseek-ai/dsh-session-projection": 1,
     "packages/dsh-live-stats/src/projection.ts\u0000static-import\u0000@deepseek-ai/dsh-session-projection/types": 1,
     "packages/dsh-live-stats/src/projection.ts\u0000static-import\u0000@deepseek-ai/dsh-token-meter/client": 2,
+    "packages/dsh-live-stats/src/routes.ts\u0000static-import\u0000@deepseek-ai/dsh-host-webserver": 1,
     "packages/dsh-live-stats/tests/estimator.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 1,
     "packages/dsh-live-stats/tests/projection.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 2,
     "packages/dsh-live-stats/tests/projection.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-session": 2,
     "packages/dsh-live-stats/tests/projection.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-session-projection": 1,
+    "packages/dsh-live-stats/tests/routes.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-host-webserver": 1,
     "packages/dsh-live-stats/tests/tps-line.spec.tsx\u0000static-import\u0000@deepseek-ai/dsh-client-runtime/client": 1,
     "packages/dsh-mode-switcher/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-locale/client": 1,
     "packages/dsh-mode-switcher/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-runtime/client": 1,

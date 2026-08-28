@@ -97,6 +97,7 @@ import { RepairRuntimeController } from './repair-runtime-controller.mjs'
 import { RepairTransactionManager } from './repair-transaction.mjs'
 import { createRegisteredRepairChecks, RepairVerifier } from './repair-verifier.mjs'
 import { StartupRepairCoordinator } from './startup-repair-coordinator.mjs'
+import { formatStartupActivity } from './startup-activity.mjs'
 import { assertRuntimeIntegrity, resolveRuntimeCriticalFiles } from './runtime-integrity.mjs'
 import {
   assessRuntimeSupport,
@@ -119,12 +120,14 @@ import { applyWindowChrome, getWindowChromeTheme, installWindowChrome, setWindow
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
+import { ConversationImportService } from './conversation-import/service.mjs'
 
 const SOURCE_DIR = dirname(fileURLToPath(import.meta.url))
 const MAIN_PRELOAD_PATH = join(SOURCE_DIR, 'preload-main.cjs')
 const EXTENSION_PRELOAD_PATH = join(SOURCE_DIR, 'preload-extension.cjs')
 const STARTUP_PATH = join(SOURCE_DIR, 'ui', 'startup.html')
 const EXTENSIONS_PATH = join(SOURCE_DIR, 'ui', 'extensions.html')
+const HANDOFF_PATH = join(SOURCE_DIR, 'ui', 'handoff.html')
 const COMMUNITY_PATH = join(SOURCE_DIR, 'ui', 'community.html')
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
@@ -173,6 +176,10 @@ export function desktopRuntimeEnvironmentFor({
   const normalizedCredentialEnvironment = validateLegacyCredentialEnvironment(credentialEnvironment)
   return Object.freeze({
     ...normalizedCredentialEnvironment,
+    CI: '1',
+    DSH_DESKTOP_NO_INTERACTIVE: '1',
+    QQBOT_DISABLE_CLI_SETUP: '1',
+    DEBIAN_FRONTEND: 'noninteractive',
     ...(qqBotCredentials
       ? { QQBOT_APPID: qqBotCredentials.appId, QQBOT_SECRET: qqBotCredentials.appSecret }
       : { QQBOT_APPID: '', QQBOT_SECRET: '' }),
@@ -459,6 +466,7 @@ export async function startElectronApp(metadata) {
   let mainWindow
   let mainWindowChromeReady = false
   let extensionWindow
+  let handoffWindow
   let terminalSurface
   let terminalPanelPromise
   let dispatchDeepLink
@@ -702,6 +710,19 @@ export async function startElectronApp(metadata) {
   }
   const showDirectStartupState = async (startupState, options = {}) => {
     const projection = await recordDirectStartupState(startupState, options)
+    const currentUrl = mainWindow?.webContents?.getURL() ?? ''
+    const isAlreadyOnStartup = currentUrl.startsWith('file:') && currentUrl.includes('startup.html')
+    if (isAlreadyOnStartup && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.webContents.send('desktop:direct-state', {
+          directState: projection.state,
+          directReason: projection.reason,
+        })
+        return
+      } catch {
+        // Fallback to loadStartupSurface
+      }
+    }
     await loadStartupSurface({
       query: {
         directState: projection.state,
@@ -978,6 +999,9 @@ export async function startElectronApp(metadata) {
       const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
       if (mode === 'full') {
         await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
+      } else if (mode === 'builtins') {
+        const builtinsDir = join(dshHome, 'profiles', 'desktop-builtins')
+        await setQqBotProfileEnabled({ profileDir: builtinsDir, enabled: false }).catch(() => {})
       }
       await logStore.append(
         '[startup] profile-ready=' + Math.round(performance.now() - profileStartedAt) + 'ms packages=' + runtimePackages.size + ' mode=' + mode,
@@ -1174,22 +1198,38 @@ export async function startElectronApp(metadata) {
     }
   }
 
-  const createPrimaryRuntimeController = (profileName) => new DshRuntimeController({
-    cliPath: dshCliPath,
-    cwd: projectRoot,
-    dshHome,
-    profileName,
-    executable: process.execPath,
-    logStore,
-    autoRestart: false,
-    startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
-    pathEntries: runtimePathEntries,
-    patchFiles: [primaryFullUserOverlay],
-    preferredPort: preferredRuntimePort,
-    onReadyPort: (port) => persistRuntimePort(runtimePortStatePath, port),
-    environmentProvider: desktopRuntimeEnvironment,
-    preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
-  })
+  const broadcastStartupActivity = (activity) => {
+    if (!activity || !mainWindow || mainWindow.isDestroyed()) return
+    try {
+      mainWindow.webContents.send('desktop:startup-activity', activity)
+    } catch {
+      // Best-effort
+    }
+  }
+
+  const createPrimaryRuntimeController = (profileName) => {
+    const controller = new DshRuntimeController({
+      cliPath: dshCliPath,
+      cwd: projectRoot,
+      dshHome,
+      profileName,
+      executable: process.execPath,
+      logStore,
+      autoRestart: false,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
+      pathEntries: runtimePathEntries,
+      patchFiles: [primaryFullUserOverlay],
+      preferredPort: preferredRuntimePort,
+      onReadyPort: (port) => persistRuntimePort(runtimePortStatePath, port),
+      environmentProvider: desktopRuntimeEnvironment,
+      preflight: () => assertRuntimeIntegrity({ resolvedFiles: runtimeCriticalFiles }),
+    })
+    controller.on('line', ({ stream, line }) => {
+      const activity = formatStartupActivity(stream, line)
+      if (activity) broadcastStartupActivity(activity)
+    })
+    return controller
+  }
   const runtimeIdentity = {
       packageName: '@deepseek-ai/dsh',
       version: runtimeVersion,
@@ -1388,11 +1428,18 @@ export async function startElectronApp(metadata) {
   })
 
   unregisterStartupIpc()
+  const conversationImportService = new ConversationImportService({
+    dshHome,
+    currentWorkspaceDir: projectRoot,
+  })
   const unregisterIpc = registerDesktopIpc({
     ipcMain,
     surfaceRegistry,
     controller: runtimeProvider,
     runtimeProvider,
+    conversationImportService,
+    openConversationImport: () => createHandoffWindow(),
+    pickProjectDirectory: () => pickProjectDirectory(),
     getWindow: () => mainWindow,
     metadata,
     version: desktopVersion,
@@ -1594,6 +1641,66 @@ export async function startElectronApp(metadata) {
     })
     await extensionWindow.loadFile(EXTENSIONS_PATH, { query: { theme: chromeTheme } })
     return extensionWindow
+  }
+
+  const createHandoffWindow = async () => {
+    productMetrics.recordSurface('conversation-import')
+    if (handoffWindow && !handoffWindow.isDestroyed()) {
+      handoffWindow.show()
+      handoffWindow.focus()
+      return handoffWindow
+    }
+    const chromeTheme = mainWindow && !mainWindow.isDestroyed() ? getWindowChromeTheme(mainWindow) : 'dark'
+    handoffWindow = new BrowserWindow({
+      width: 1040,
+      height: 720,
+      minWidth: 780,
+      minHeight: 560,
+      show: false,
+      parent: mainWindow,
+      title: '从其他 AI 工具继续工作 - DeepSeek Harness',
+      icon: appIcon,
+      backgroundColor: chromeTheme === 'dark' ? '#0f1117' : '#ffffff',
+      ...windowChromeBrowserOptions(chromeTheme),
+      webPreferences: secondaryWindowWebPreferences({ preload: MAIN_PRELOAD_PATH }),
+    })
+    const unregisterHandoffSurface = surfaceRegistry.register(
+      handoffWindow.webContents,
+      DESKTOP_SURFACES.MAIN,
+    )
+    applyWindowIcon(handoffWindow, appIcon)
+    const removeHandoffWindowChrome = installWindowChrome({
+      browserWindow: handoffWindow,
+      iconDataUrl: windowChromeIconDataUrl,
+      onError: (error) => void logStore.append(`[window-chrome] ${error.message}`),
+    })
+    installNavigationPolicy({
+      webContents: handoffWindow.webContents,
+      getRuntimeOrigin: () => undefined,
+      openExternal: (url) => shell.openExternal(url),
+      onError: (error) => logStore.append(`[navigation] ${error instanceof Error ? error.message : String(error)}`),
+    })
+    handoffWindow.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+    handoffWindow.once('ready-to-show', () => handoffWindow?.show())
+    handoffWindow.on('closed', () => {
+      unregisterHandoffSurface()
+      removeHandoffWindowChrome()
+      handoffWindow = undefined
+    })
+    await handoffWindow.loadFile(HANDOFF_PATH, { query: { theme: chromeTheme } })
+    return handoffWindow
+  }
+
+  const pickProjectDirectory = async () => {
+    const parent = handoffWindow || mainWindow
+    const result = await dialog.showOpenDialog(parent, {
+      properties: ['openDirectory'],
+      title: '选择项目目录',
+    })
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0]
+    }
+    return undefined
   }
 
   function syncSecondaryWindowTheme(window, theme) {
@@ -2459,6 +2566,7 @@ export async function startElectronApp(metadata) {
     shell,
     controller: runtimeProvider,
     openExtensions: () => createExtensionWindow(),
+    openConversationImport: () => createHandoffWindow(),
     openTerminal: () => toggleDesktopTerminal(),
     openCommunity: () => createCommunityWindow(),
     openFeedback: () => {
