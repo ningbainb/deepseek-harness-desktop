@@ -22,11 +22,11 @@
 
 请在这里上传 `linuxdo-post-body-1.png`。
 
-请在这里上传 `../screenshots/3.2.0-main-workspace.webp`，图片说明填写：`DeepSeek Harness Desktop 3.2.0 主界面与大模型用量看板`。
+请在这里上传 `../screenshots/3.2.0-workspace.webp`，图片说明填写：`DeepSeek Harness Desktop 3.2.0 主工作区与 AI 编程入口`。
 
 请在这里上传 `linuxdo-post-body-2.png`。
 
-请在这里上传 `../screenshots/3.2.0-value-mode.webp`，图片说明填写：`性价比模式：专家主控与副模型子代理`。
+请在这里上传 `../screenshots/3.2.0-value-mode-setup.webp`，图片说明填写：`性价比模式三步配置：专家主控、副模型与运行策略`。
 
 项目地址：
 

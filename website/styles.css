@@ -57,7 +57,7 @@ h1, h2, h3, p { margin-top: 0; }
 .nav-download svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .hero { position: relative; min-height: 900px; overflow: hidden; isolation: isolate; }
-.hero-backdrop { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(14,27,44,.84), rgba(25,67,113,.38)), url("assets/desktop-3.2.0-main-workspace.webp") center 35% / cover; opacity: .9; }
+.hero-backdrop { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(14,27,44,.84), rgba(25,67,113,.38)), url("assets/desktop-3.2.0-workspace.webp") center 35% / cover; opacity: .9; }
 .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 22% 25%, rgba(235,226,188,.23), transparent 17%), radial-gradient(circle at 63% 25%, rgba(228,223,201,.22), transparent 18%), linear-gradient(180deg, rgba(16,42,75,.05) 0%, rgba(9,13,18,.3) 55%, var(--bg) 100%); }
 .hero-inner { min-height: 900px; padding-top: 190px; display: grid; grid-template-columns: 1.05fr .95fr; gap: 90px; align-items: center; }
 .hero-copy { padding-bottom: 34px; }
@@ -134,7 +134,7 @@ h1 { margin-bottom: 28px; font-family: var(--display); font-size: clamp(46px, 5v
 .feature-copy li::before { content: ""; width: 4px; height: 4px; margin: 0 10px 2px 0; display: inline-block; border-radius: 50%; background: var(--blue); }
 .product-shot { position: relative; margin: 0; border: 1px solid var(--line); border-radius: 10px; background: #111; box-shadow: 0 28px 90px rgba(0,0,0,.28); overflow: hidden; }
 .product-shot::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.03); pointer-events: none; }
-.product-shot img { width: 100%; aspect-ratio: 16/10; object-fit: cover; object-position: left top; transition: transform .6s ease; }
+.product-shot img { display: block; width: 100%; height: auto; aspect-ratio: auto; object-fit: contain; object-position: left top; transition: transform .6s ease; }
 .product-shot:hover img { transform: scale(1.015); }
 .product-shot figcaption { position: absolute; left: 12px; bottom: 12px; z-index: 1; max-width: calc(100% - 24px); padding: 7px 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: rgba(8,12,20,.78); color: #d7deea; font-size: 11px; line-height: 1.4; backdrop-filter: blur(10px); }
 
@@ -335,7 +335,7 @@ footer { padding: 34px 0; border-top: 1px solid var(--line); }
   .hero,.hero-inner{min-height:850px}.hero-inner{padding-top:130px;align-content:start}html:not([data-site-theme="vivid"]) .hero-backdrop{background-position:35% center;opacity:.58}html:not([data-site-theme="vivid"]) .hero::before{background:linear-gradient(180deg,rgba(6,12,20,.7),rgba(7,12,19,.62) 62%,var(--bg) 100%)}.overline{font-size:14px}h1{font-size:44px}.hero-summary{color:rgba(239,243,248,.76);font-size:14px}.hero-buttons{margin-top:30px}.btn{font-size:12px;padding:0 14px}.download-terminal{margin-top:34px}.terminal-command{padding-inline:18px;gap:10px}.terminal-command code{font-size:12px}.terminal-cta{padding:6px 9px;font-size:10px}.terminal-meta{gap:11px;flex-wrap:wrap}
   .foundation{padding:100px 0 120px}.center-heading h2{margin-top:30px;font-size:31px}.center-heading p{font-size:14px}.principle-grid{margin-top:48px}
   .latest-features{padding:0 0 100px}.latest-card{min-height:0;padding:28px 22px}.latest-card h3{font-size:18px}
-  .features{padding-bottom:110px}.section-title{margin-bottom:40px}.section-title h2{font-size:32px}.feature-row{min-height:0;padding:55px 0}.feature-title h3{font-size:20px}.feature-copy>p{font-size:14px;margin:21px 0}.product-shot img{aspect-ratio:16/11}
+  .features{padding-bottom:110px}.section-title{margin-bottom:40px}.section-title h2{font-size:32px}.feature-row{min-height:0;padding:55px 0}.feature-title h3{font-size:20px}.feature-copy>p{font-size:14px;margin:21px 0}
   .theme-showcase{min-height:780px;padding:105px 0 80px}.theme-content h2{font-size:34px}.theme-content>p{font-size:14px}.theme-switch{overflow-x:auto;justify-content:flex-start}.theme-switch button{white-space:nowrap}.theme-frame{padding:3px}
   .mobile-section{padding:100px 0 70px}.mobile-copy h2{font-size:38px}.phones{height:470px;margin-top:10px}.phones figure{width:37%;margin:0 -5%;padding:4px;border-radius:18px}.phones .phone-main{width:43%}.phones img{border-radius:13px}
   .install{padding:100px 0 120px}.install-card{padding:28px 22px}.code-line{padding:0 12px}.code-line code{font-size:11px}

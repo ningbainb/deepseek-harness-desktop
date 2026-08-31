@@ -60,11 +60,13 @@ Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, 
 
 The current release keeps the complete Harness surface and adds visible model roles, usage accounting, and external-project handoff. The screenshots below are captured from the 3.2.0 desktop workflow.
 
-![DeepSeek Harness Desktop 3.2.0 main workspace and large-model usage status](screenshots/3.2.0-main-workspace.webp)
+![DeepSeek Harness Desktop 3.2.0 main workspace and AI coding entry points](screenshots/3.2.0-workspace.webp)
 
-| Value Mode setup and expert controller | Claude Code / Codex project import |
+| Value Mode setup and expert controller | Large-model usage dashboard |
 | --- | --- |
-| ![DeepSeek Harness Desktop 3.2.0 Value Mode setup](screenshots/3.2.0-value-mode.webp) | ![DeepSeek Harness Desktop 3.2.0 external conversation import](screenshots/3.2.0-project-import.webp) |
+| ![DeepSeek Harness Desktop 3.2.0 Value Mode three-step setup](screenshots/3.2.0-value-mode-setup.webp) | ![DeepSeek Harness Desktop 3.2.0 usage dashboard](screenshots/3.2.0-usage-dashboard.webp) |
+
+![DeepSeek Harness Desktop 3.2.0 Claude Code and Codex project import preview](screenshots/3.2.0-project-import-preview.webp)
 
 ### Value Mode routing
 

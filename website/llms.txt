@@ -27,7 +27,7 @@
 
 - Value Mode / 性价比模式: the expert controller model owns task understanding, decomposition, delegation, review, and final synthesis. The subagent worker model completes bounded delegated work. First selection opens a setup guide, preselects the current default model as the expert controller when no explicit controller exists, and requires both model roles plus a strategy before enabling.
 - Value Mode strategies: Saver, Balanced (default), and Powerful. The worker route is bounded to one subagent level, so worker agents do not recursively delegate or invoke expert consultation.
-- Large-model usage dashboard: shows input/output tokens, context usage, cache indicators, request latency, estimated cost, current generation speed, and per-step peak generation speed. TPS is a strict rolling one-second window over valid streaming increments; same-millisecond batches are merged and final usage totals do not create fake instantaneous peaks.
+- Large-model usage dashboard: shows balance, input/output tokens, context usage, cache indicators, request latency, estimated cost, current generation speed, and per-step peak generation speed. TPS is a strict rolling one-second window over valid streaming increments; same-millisecond batches are merged and final usage totals do not create fake instantaneous peaks. A fresh account explicitly shows “暂无数据” until a valid streaming sample exists.
 - Claude Code and Codex project import: read-only discovery of local projects and sessions, preview and project matching, redacted historical context, idempotent import ledger, and a legitimate Harness session bridge. Imported tool calls are historical and non-executable.
 - Complete Harness surface: conversations, tools, model selection, Skills, plugins, Task Board, Git graph, SSH, mobile remote control, QQ Bot, themes, automatic updates, and Windows lifecycle/recovery.
 - Continuity: existing DSH Home, conversations, sessions, settings, and installed plugins are loaded directly through an isolated Desktop profile; the desktop client can coexist with the official Web client.
@@ -57,10 +57,10 @@
 
 ## Latest interface screenshots
 
-- Value Mode setup and expert controller: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode.webp
-- Large-model usage and main workspace: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp
-- Claude Code / Codex project import: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import.webp
-- Import preview and project matching: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-handoff-import.webp
+- Value Mode three-step setup: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp
+- Large-model usage dashboard: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp
+- Claude Code / Codex scanned session preview: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import-preview.webp
+- Main Harness workspace: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp
 
 ## Search terms
 
