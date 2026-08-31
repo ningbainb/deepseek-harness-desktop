@@ -811,6 +811,36 @@ document.querySelector('#open-skill-root').addEventListener('click', () => {
     }
   })
 })
+document.querySelector('#open-conversation-import')?.addEventListener('click', () => {
+  void extensionOperations.run(async () => {
+    try {
+      await window.dshDesktop.openConversationImport()
+    } catch (error) {
+      notify(error.message, true)
+    }
+  })
+})
+document.querySelector('#open-plugins-dir')?.addEventListener('click', () => {
+  void extensionOperations.run(async () => {
+    try {
+      await window.dshDesktop.openProfileDirectory()
+    } catch (error) {
+      notify(error.message, true)
+    }
+  })
+})
+document.querySelector('#reset-profile-env')?.addEventListener('click', async () => {
+  if (!window.confirm('警告：一键重置将清理所有第三方社区插件并恢复官方内置基线，原有插件配置将自动备份。聊天记录与个人设置不受影响。确认重置？')) return
+  await extensionOperations.run(async () => {
+    try {
+      await window.dshDesktop.resetProfile()
+      notify('插件环境已成功重置为初始基线，DSH 已重启')
+      await refresh()
+    } catch (error) {
+      notify(error.message, true)
+    }
+  })
+})
 checkPluginUpdatesButton.addEventListener('click', () => {
   void extensionOperations.run(() => checkPluginUpdates())
 })

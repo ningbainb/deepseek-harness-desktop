@@ -1,0 +1,5 @@
+{"type":"user","id":"cl-1","cwd":"C:\\\\TestProject\\\\ClaudeApp","message":{"role":"user","content":"Add unit tests"},"timestamp":"2026-08-21T12:00:00Z"}
+{"type":"thinking","content":"Internal CoT that should not be imported"}
+{"type":"assistant","id":"cl-2","message":{"role":"assistant","content":[{"type":"text","text":"I will run existing tests first."},{"type":"tool_use","id":"tu-1","name":"run_command","input":{"command":"npm test"}}]},"timestamp":"2026-08-21T12:00:05Z"}
+{"type":"tool_result","id":"tr-1","tool_use_id":"tu-1","content":"PASS test/index.test.js","is_error":false,"timestamp":"2026-08-21T12:00:08Z"}
+{"type":"assistant","id":"cl-3","message":{"role":"assistant","content":"Tests passed successfully."},"timestamp":"2026-08-21T12:00:10Z"}

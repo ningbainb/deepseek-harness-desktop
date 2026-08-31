@@ -26,6 +26,29 @@ test('ProjectMatcher detects exact canonical path match', async () => {
   }
 })
 
+test('ProjectMatcher prefers the current Git root when the recorded CWD is its parent folder', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'matcher-parent-cwd-'))
+  try {
+    const recordedParent = join(tempDir, 'code')
+    const currentRepo = join(recordedParent, 'actual-repo')
+    await mkdir(join(currentRepo, '.git'), { recursive: true })
+
+    const result = await ProjectMatcher.matchProject(
+      { originalCwd: recordedParent },
+      currentRepo,
+    )
+
+    assert.equal(result.status, MATCH_STATUS.GIT_ROOT)
+    assert.equal(result.matchedPath, await import('node:fs/promises').then(({ realpath }) => realpath(currentRepo)))
+    assert.equal(result.isExactMatch, false)
+    assert.equal(result.canImport, true)
+    assert.equal(result.requiresManualSelection, false)
+    assert.match(result.message, /当前 Git 工作区根目录/u)
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})
+
 test('ProjectMatcher detects Git revision changes when HEAD has advanced', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'matcher-git-rev-'))
   try {

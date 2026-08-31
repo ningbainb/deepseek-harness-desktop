@@ -10,3 +10,4 @@ export { DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, createDesktopTaskBoardHostSched
 export { installToolCallArgumentNormalization, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, type ToolCallArgumentNormalization, type ToolCallNormalizationDiagnostic, type ToolCallNormalizationReason, } from './tool-call-normalization.ts';
 export { balanceTranscriptMessages, extractToolCallsFromAssistantMessage, installTranscriptBalanceGuard, type TranscriptBalanceDiagnostic, } from './transcript-balance.ts';
 export { DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, createDesktopWorkspaceFileOpenRoute, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, } from './workspace-file-open-route.ts';
+export { DESKTOP_CONVERSATION_IMPORT_PATH, createDesktopConversationImportRoute, importConversationIntoHost, registerDesktopConversationImportRoute, } from './conversation-import-route.ts';

@@ -147,9 +147,9 @@ export function BalanceOverviewView({ controller, onClose }: BalanceOverviewView
               />
             )}
             <MetricCard
-              label="峰值速率"
-              value={stats?.peakTps ? `${stats.peakTps} tok/s` : '--'}
-              subs={[{ text: '单秒输出 Token 峰值' }]}
+              label="滚动 1 秒峰值"
+              value={stats?.peakTps ? `${stats.peakTps} tok/s` : '暂无数据'}
+              subs={[{ text: '仅统计有效流式样本' }]}
             />
           </div>
 

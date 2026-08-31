@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Context Reconstructor for Conversation Import.
  * Transforms an ExternalConversationV1 into a structured, bounded Handoff Context.
  */
@@ -90,9 +90,13 @@ export class ContextReconstructor {
       recentTailStr,
       '',
       '## Continuation instruction',
-      'Continue this existing task from the imported state.',
-      'First inspect the current workspace before making assumptions.',
-      'The filesystem and Git state are authoritative if they differ from the imported historical context.',
+      `You are continuing this task in DeepSeek Harness migrated from ${sourceName}.`,
+      `Please start your response by greeting the user in Chinese:`,
+      `1. Give a warm greeting with a clear title acknowledging: "**已从 ${sourceName} 成功接力会话「${sessionTitle}」**"`,
+      `2. Concisely summarize the primary task and key progress from the history in 2-3 bullet points.`,
+      `3. If there are modified files or Git commits, mention them briefly.`,
+      `4. Ask the user in a friendly tone what they would like to work on next.`,
+      `First inspect the current workspace before making assumptions. The filesystem and Git state are authoritative if they differ from the imported historical context.`,
       '',
       '</external-agent-handoff>',
     ]

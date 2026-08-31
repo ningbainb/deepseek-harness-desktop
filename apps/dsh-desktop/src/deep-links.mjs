@@ -90,12 +90,22 @@ export class DeepLinkRouter {
     this.queue = operation.catch(() => {})
   }
 
-  /** Dispatch an already-validated main-process route (for example a notification click) without ingress dedupe. */
-  dispatchValidated(value) {
+  /**
+   * Dispatch an already-validated main-process route without ingress dedupe.
+   * Import completion can happen while the renderer is still mounting its
+   * listeners, so callers may opt into the same readiness queue used by
+   * command-line/deep-link ingress.
+   */
+  dispatchValidated(value, { queueUntilReady = false } = {}) {
     if (value === null || typeof value !== 'object' || typeof value.href !== 'string') {
       throw new TypeError('validated deep link is invalid')
     }
     const link = normalizeDeepLink(value.href, this.protocol)
+    if (queueUntilReady && !this.ready) {
+      if (this.pending.length >= this.maxPending) throw new Error('deep link queue is full')
+      this.pending.push(link)
+      return link
+    }
     this.#dispatch(link)
     return link
   }

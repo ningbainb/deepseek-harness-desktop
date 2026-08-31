@@ -45,10 +45,25 @@ const VERIFIER_ENV_OVERRIDES = Object.freeze({
 })
 
 export function verifierChildEnvironment(sourceEnv = process.env) {
+  const filtered = {}
+  const source = sourceEnv ?? {}
+  // Node's Windows process.env proxy reports hasOwnProperty('PATH') as true
+  // even when the only enumerable spelling is Path. Check enumerable keys so
+  // the alias is not discarded in that launch context.
+  const hasCanonicalPath = Object.keys(source).some(name => name === 'PATH')
+  for (const [name, value] of Object.entries(source)) {
+    // Windows exposes the environment's PATH entry as Path in some Node
+    // launch contexts. Normalize only this OS-specific alias; Unix remains
+    // case-sensitive and continues to use the explicit allowlist.
+    const canonicalName = process.platform === 'win32' && name.toLowerCase() === 'path'
+      ? 'PATH'
+      : name
+    if (!VERIFIER_ENV_ALLOWLIST.has(name) && !VERIFIER_ENV_ALLOWLIST.has(canonicalName)) continue
+    if (canonicalName === 'PATH' && name !== 'PATH' && hasCanonicalPath) continue
+    filtered[canonicalName] = value
+  }
   return Object.freeze({
-    ...Object.fromEntries(
-      Object.entries(sourceEnv ?? {}).filter(([name]) => VERIFIER_ENV_ALLOWLIST.has(name)),
-    ),
+    ...filtered,
     ...VERIFIER_ENV_OVERRIDES,
   })
 }
@@ -58,11 +73,28 @@ function isWithin(candidate, parent) {
   return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path))
 }
 
+/**
+ * Bounded one-line diagnostic. Component, operation, error name, truncated
+ * message - never a stack, because these lines are persisted and a stack can
+ * carry tokens, absolute paths or message bodies.
+ */
+function logDiagnostic(log, operation, error) {
+  try {
+    log?.(
+      `[repair-verifier] ${operation} failed: ${String(error?.name ?? 'Error')}: `
+      + String(error?.message ?? error).slice(0, 300),
+    )
+  } catch {
+    // Diagnostics must never change verifier behaviour.
+  }
+}
+
 export function runRegisteredRepairCommand(command, workspace, {
   spawnProcess = spawn,
   timeoutMs = 60_000,
   schedule = setTimeout,
   cancelSchedule = clearTimeout,
+  log,
 } = {}) {
   if (command === null || typeof command !== 'object' || typeof command.executable !== 'string'
     || !isAbsolute(command.executable) || !Array.isArray(command.args)
@@ -81,7 +113,11 @@ export function runRegisteredRepairCommand(command, workspace, {
         env: verifierChildEnvironment(),
         stdio: ['ignore', 'ignore', 'ignore'],
       })
-    } catch {
+    } catch (error) {
+      // Downstream, a spawn failure is indistinguishable from "the repair
+      // command ran and failed". Recording it is what makes that difference
+      // visible in a diagnostics export.
+      logDiagnostic(log, 'spawn', error)
       resolveRun({ ok: false, exitCode: null, timedOut: false })
       return
     }
@@ -91,9 +127,14 @@ export function runRegisteredRepairCommand(command, workspace, {
       if (process.platform === 'win32' && Number.isInteger(child.pid) && child.pid > 0) {
         try {
           execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {})
-        } catch {}
+        } catch (error) {
+          logDiagnostic(log, 'taskkill', error)
+        }
       }
-      try { child.kill('SIGKILL') } catch {}
+      // Both kills are best-effort, but a failure means a repair child may
+      // have survived the timeout - exactly the leftover that later surfaces
+      // as a stale process still holding the profile directory.
+      try { child.kill('SIGKILL') } catch (error) { logDiagnostic(log, 'kill', error) }
     }, timeoutMs)
     timer?.unref?.()
     child.once('error', () => {
@@ -107,14 +148,19 @@ export function runRegisteredRepairCommand(command, workspace, {
   })
 }
 
-export function createRegisteredRepairChecks({ commands, workspace, runCommand = runRegisteredRepairCommand } = {}) {
+export function createRegisteredRepairChecks({
+  commands,
+  workspace,
+  runCommand = runRegisteredRepairCommand,
+  log,
+} = {}) {
   if (!Array.isArray(commands) || typeof workspace !== 'string' || !isAbsolute(workspace)
     || typeof runCommand !== 'function') {
     throw new TypeError('registered repair checks are invalid')
   }
   return new Map(commands.map(command => [
     command.name,
-    () => runCommand(command, workspace),
+    () => runCommand(command, workspace, { log }),
   ]))
 }
 

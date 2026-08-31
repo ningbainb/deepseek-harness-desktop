@@ -25,6 +25,29 @@ const COLUMN_SHIMS: ReadonlyArray<readonly [selector: string, attribute: string]
   ['[class*="detailsCol"]', 'data-pane="details"'],
 ]
 
+/**
+ * The current shell writes rail-only layout declarations directly onto the
+ * footer slot wrapper. It removes the width/flex declarations when the rail
+ * opens again, but older shell builds leave `margin-inline:auto` and
+ * `justify-content:center` behind. Clear only those known rail declarations
+ * while the sidebar is wide so the shell's normal footer layout can resume.
+ */
+function resetExpandedFooterActionStyles(sidebar: HTMLElement, isCollapsed: boolean): boolean {
+  if (isCollapsed) return false
+  let changed = false
+  for (const action of sidebar.querySelectorAll<HTMLElement>('[data-slot="sidebar.footer.action"]')) {
+    if (action.style.getPropertyValue('margin-inline') === 'auto') {
+      action.style.removeProperty('margin-inline')
+      changed = true
+    }
+    if (action.style.getPropertyValue('justify-content') === 'center') {
+      action.style.removeProperty('justify-content')
+      changed = true
+    }
+  }
+  return changed
+}
+
 /** One pass over the current DOM. Returns false once every stamp is already in place. */
 function applyShims(): boolean {
   let changed = false
@@ -46,14 +69,20 @@ function applyShims(): boolean {
     changed = true
   }
 
-  // Detect whether the sidebar is collapsed into a narrow rail (<= 80px wide, collapsed class, or containing rail markers)
+  // Only use stable state owned by the shell itself. Descendant rail markers
+  // are written during the collapse animation and may survive one or more
+  // React commits after the sidebar has already widened again; using them as
+  // the source of truth is what made the footer drift persistently.
+  const sidebarClassName = typeof sidebarEl?.className === 'string' ? sidebarEl.className : ''
   const isCollapsed = sidebarEl !== null && (
     (sidebarEl.offsetWidth > 0 && sidebarEl.offsetWidth <= 80) ||
     sidebarEl.classList.contains('hHd-Xa_collapsed') ||
-    sidebarEl.className.includes('collapsed') ||
-    sidebarEl.querySelector('[class*="collapsed"]') !== null ||
-    sidebarEl.querySelector('[data-rail="rail"], [data-wide="rail"]') !== null
+    /(?:^|\s)collapsed(?:\s|$)/u.test(sidebarClassName)
   )
+
+  if (sidebarEl !== null) {
+    changed = resetExpandedFooterActionStyles(sidebarEl, isCollapsed) || changed
+  }
 
   if (frame !== null) {
     if (isCollapsed && !frame.hasAttribute('data-sidebar-collapsed')) {

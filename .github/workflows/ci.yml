@@ -72,6 +72,9 @@ jobs:
       - name: Runtime dependency check
         run: pnpm runtime-deps:check
 
+      - name: Runtime identity graph check
+        run: pnpm runtime-graph:check
+
       - name: Aggregate package consistency
         run: pnpm aggregate:check
 

@@ -36,15 +36,40 @@ The installer includes the main runtime components, so you do not need to separa
 
 [🌐 Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 Documentation](docs/desktop.md) · [📝 Changelog](CHANGELOG.md)
 
-### 🚀 Latest Release: 3.1.0
+### 🚀 Latest Release: 3.2.0
 
-- **Anti-Deadlock Startup & Self-Healing**: Adaptive backoff retries and Windows file-lock (`EBUSY`) handling eliminate splash hangs and crash loops.
-- **Frontend Plugin Error Sandbox (`SafePluginBoundary`)**: React error boundaries isolate third-party plugins so core navigation and chat remain 100% responsive.
-- **Live Token Stats & Pricing**: Real-time throughput (tokens/sec) monitoring, official tiered pricing, and peak/off-peak rate switching.
+- **Value Mode V2**: An expert controller model understands, decomposes, delegates, reviews, and synthesizes work while a subagent worker model handles bounded subtasks; first selection opens setup guidance.
+- **Large-Model Usage Dashboard**: Input/output tokens, context, cache, latency, cost, and generation speed are visible; peak speed uses a strict rolling one-second algorithm instead of treating aggregate usage as 12,625 tok/s.
+- **Claude Code / Codex Project Import**: Read-only discovery of projects and historical sessions, preview before import, centralized redaction, and non-executable historical tool calls.
+- **More reliable startup and plugins**: Visible startup phases, transactional repair with rollback, and SafePluginBoundary isolation while existing DSH Home data and plugins continue to load directly.
 
 👉 [Full Release Notes](docs/launch/release-notes.md) · [Changelog](CHANGELOG.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md)
 
 ---
+
+## 🚀 Three reasons to try 3.2.0
+
+### 💡 Value Mode: let the expert decide, let the worker execute
+
+When you select **Value Mode**, the desktop client opens a setup guide immediately. Your current default model is preselected as the **expert controller** when no explicit controller exists; you then choose a cheaper or faster **subagent worker model** and a Saver, Balanced, or Powerful strategy. The mode is enabled only after the complete configuration is committed.
+
+The expert controller can handle simple work directly or delegate parallel subtasks when useful. Worker depth is capped at one level, so workers do not recursively delegate or invoke a duplicate expert-analysis path. Controller and worker calls remain distinguishable in the session UI and product metrics.
+
+![DeepSeek Harness Desktop 3.2.0 Value Mode setup and expert controller](docs/screenshots/3.2.0-value-mode.webp)
+
+### 📊 Large-model usage dashboard: make every token explainable
+
+The session status row and usage dashboard show input/output tokens, context usage, cache hits, LLM latency, estimated cost, current generation speed, and per-step peak speed. Streaming increments are merged by millisecond and evaluated in a rolling one-second window; final usage only corrects billed totals and cannot create a fake instantaneous peak.
+
+![DeepSeek Harness Desktop 3.2.0 large-model usage dashboard](docs/screenshots/3.2.0-main-workspace.webp)
+
+### 🔁 Claude Code and Codex: continue existing work
+
+Select a local Claude Code or Codex data directory, review discovered project sessions, and import the selected history into a real Harness workspace and session. The flow is read-only, idempotent, and resumable: API keys, tokens, cookies, and paths are redacted, while imported tool calls remain historical and non-executable.
+
+![DeepSeek Harness Desktop 3.2.0 Claude Code and Codex project import](docs/screenshots/3.2.0-project-import.webp)
+
+See [External Conversation Import](docs/external-conversation-import.md), [Value Mode](packages/dsh-value-mode/README.md), and [Live Stats](packages/dsh-live-stats/README.md) for implementation boundaries.
 
 ## ✨ Why DeepSeek Harness Desktop
 
@@ -126,7 +151,7 @@ The desktop app runs the DeepSeek Harness Web Surface directly while the desktop
 
 In one window, you can handle AI conversations, code changes, file management, Git operations, task execution, model switching, and plugin extensions.
 
-![DeepSeek Harness Desktop main interface and Skills library](docs/screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop 3.2.0 main interface and AI coding workspace](docs/screenshots/3.2.0-main-workspace.webp)
 
 ## 🧩 Skills and Plugins
 
@@ -217,18 +242,18 @@ Bind it from Extension Dock by scanning a QR code, then connect QQ direct messag
 
 Connection information is managed by the desktop host without requiring manual configuration-file editing.
 
-## 📊 Live Token and Performance Statistics
+## 📊 Large-Model Usage Dashboard and Performance Statistics
 
 The input area can display:
 
-- TPS generation speed
+- Rolling one-second generation speed and per-step peak
 - LLM request latency
 - Context usage
 - Cache hit rate
 - Input Tokens
 - Output Tokens
 
-![Live token statistics](docs/screenshots/18-live-stats.png)
+![Large-model usage dashboard and rolling one-second peak](docs/screenshots/3.2.0-main-workspace.webp)
 
 ## 🎨 Themes and Skins
 

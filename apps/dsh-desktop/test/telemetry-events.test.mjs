@@ -203,3 +203,33 @@ test('accepts only the fixed update and dock funnel vocabulary', () => {
     }))
   }
 })
+
+test('accepts only the fixed Value Mode usage vocabulary', () => {
+  const context = normalizeProductContext({
+    version: '3.1.0',
+    platform: 'win32',
+    osRelease: '10.0.22631',
+    locale: 'zh-CN',
+  })
+  for (const [name, outcome, detail] of [
+    ['value_mode_entry', 'selected', 'unconfigured'],
+    ['value_mode_onboarding', 'shown', 'header'],
+    ['value_mode_onboarding', 'failed', 'settings'],
+    ['value_mode_state', 'enabled', 'onboarding'],
+    ['value_mode_state', 'disabled', 'manual'],
+    ['value_mode_strategy', 'selected', 'balanced'],
+    ['value_mode_call', 'started', 'controller'],
+    ['value_mode_call', 'failed', 'subagent'],
+  ]) {
+    assert.doesNotThrow(() => createProductEvent(context, ACTORS, name, {
+      outcome,
+      detail,
+      bucket: 'none',
+    }))
+  }
+  assert.throws(() => createProductEvent(context, ACTORS, 'value_mode_call', {
+    outcome: 'started',
+    detail: 'gpt-5-secret-model',
+    bucket: 'none',
+  }), /invalid product event dimensions/u)
+})

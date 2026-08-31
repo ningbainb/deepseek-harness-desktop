@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
@@ -29,17 +29,33 @@
           <div class="source-badge">Claude Code</div>
           <div class="source-metric"><strong id="claude-session-count">--</strong> 个会话</div>
           <span class="source-status" id="claude-status">检测中...</span>
+          <button type="button" class="secondary small source-folder-btn" id="pick-claude-root-btn">选择 Claude 文件夹</button>
+          <code class="source-root-path" id="claude-root-path">默认 ~/.claude</code>
         </div>
         <div class="source-card" id="source-codex">
           <div class="source-badge">Codex</div>
           <div class="source-metric"><strong id="codex-session-count">--</strong> 个会话</div>
           <span class="source-status" id="codex-status">检测中...</span>
+          <button type="button" class="secondary small source-folder-btn" id="pick-codex-root-btn">选择 Codex 文件夹</button>
+          <code class="source-root-path" id="codex-root-path">默认 ~/.codex</code>
         </div>
       </section>
 
       <!-- Search & Filters -->
       <div class="search-toolbar">
-        <input type="search" id="search-input" placeholder="搜索项目名称、会话标题或目录路径..." autocomplete="off" spellcheck="false">
+        <div class="filter-row">
+          <input type="search" id="search-input" placeholder="搜索项目文件夹、会话标题或路径..." autocomplete="off" spellcheck="false">
+          <select id="project-select" aria-label="按文件夹项目筛选">
+            <option value="all">[全部项目] (All Projects)</option>
+          </select>
+        </div>
+        <div class="batch-toolbar">
+          <button type="button" class="secondary" id="import-selected-btn">导入选中的工作区</button>
+          <button type="button" class="primary" id="import-all-btn">导入全部工作区和会话</button>
+          <button type="button" class="secondary" id="retry-failed-btn" hidden>重试失败会话</button>
+          <button type="button" class="secondary" id="cancel-batch-btn" hidden>取消批量导入</button>
+          <span class="batch-progress" id="batch-progress" aria-live="polite"></span>
+        </div>
       </div>
 
       <!-- Main Layout: Project & Session Explorer -->
@@ -58,9 +74,10 @@
           <div class="preview-card" id="preview-content" hidden>
             <div class="preview-header">
               <span class="source-tag" id="preview-source">Claude Code</span>
-              <h2 id="preview-title">会话标题</h2>
-              <p class="session-meta" id="preview-meta">--</p>
-            </div>
+            <h2 id="preview-title">会话标题</h2>
+            <p class="session-meta" id="preview-meta">--</p>
+            <div class="source-warning" id="source-warning" hidden></div>
+          </div>
 
             <!-- Path Matching Alert -->
             <div class="match-alert" id="match-alert">
@@ -75,29 +92,29 @@
             <!-- Context Summary Stats -->
             <div class="context-metrics">
               <div class="metric-item">
-                <span class="label">预估 Context Token</span>
+                <span class="label">历史事件总数</span>
                 <strong id="metric-tokens">--</strong>
               </div>
               <div class="metric-item">
-                <span class="label">关联文件</span>
+                <span class="label">历史工具调用</span>
                 <strong id="metric-files">--</strong>
               </div>
               <div class="metric-item">
-                <span class="label">历史消息数</span>
+                <span class="label">对话消息条数</span>
                 <strong id="metric-messages">--</strong>
               </div>
             </div>
 
             <!-- Handoff Outline Preview -->
             <div class="handoff-preview-box">
-              <h3>工作上下文提要 (Handoff Context)</h3>
+              <h3>会话历史与工具执行流水预览 (Transcript Events)</h3>
               <pre class="snippet-code" id="preview-snippet"></pre>
             </div>
 
             <!-- Action Bar -->
             <div class="preview-actions">
-              <span class="import-hint">导入后将创建新 DSH 会话并带入完整工作状态</span>
-              <button type="button" class="primary" id="import-btn">创建新会话并继续工作</button>
+              <span class="import-hint">导入后将在 DSH 中创建真实工作区/会话并逐条呈现历史记录</span>
+              <button type="button" class="primary" id="import-btn">导入完整会话到 DSH 工作区</button>
             </div>
           </div>
         </section>

@@ -235,12 +235,12 @@
   outline-offset: 2px;
 }
 
-/* The collapse chevron inside the explorer tab bar (top-right). */
+/* The close button inside the explorer tab bar (top-right). */
 :global(.aionui-collapse-chevron) {
   position: absolute;
   /* In desktop wrappers with the Window Controls Overlay, the native
      window buttons occupy the top-right corner of the webview; shift the
-     chevron below that strip. Browsers report 0px, so layout is
+     close button below that strip. Browsers report 0px, so layout is
      unchanged there (issue #169). */
   top: calc(6px + env(titlebar-area-height, 0px));
   right: 8px;

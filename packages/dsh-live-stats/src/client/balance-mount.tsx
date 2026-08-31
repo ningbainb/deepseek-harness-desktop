@@ -60,6 +60,20 @@ export function mountBalanceView(controller: BalanceController): () => void {
     }
   }
 
+  // The usage view covers the conversation column, so the shell's normal
+  // session click does not otherwise have a chance to reveal the selected
+  // conversation. Close in capture phase before the shell handles the click;
+  // this also covers clicking the already-current session, which emits no
+  // session-change event.
+  const SIDEBAR_ROW_SELECTOR = '[class*="sessionRow"], [class*="projectRow"], [class*="searchResultRow"], [class*="searchResultWorkspace"], [class*="newSession"]'
+  const onClickSidebarRow = (event: MouseEvent): void => {
+    if (!controller.getSnapshot().open) return
+    const target = event.target as HTMLElement | null
+    if (target === null) return
+    if (target.closest(SIDEBAR_ROW_SELECTOR) !== null) controller.setOpen(false)
+  }
+
+  document.addEventListener('click', onClickSidebarRow, true)
   document.addEventListener(SURFACE_NAVIGATION_EVENT, onSurfaceNav)
   const unsub = controller.subscribe(() => sync())
 
@@ -72,6 +86,7 @@ export function mountBalanceView(controller: BalanceController): () => void {
   observer.observe(document.body, { childList: true, subtree: true })
 
   return () => {
+    document.removeEventListener('click', onClickSidebarRow, true)
     document.removeEventListener(SURFACE_NAVIGATION_EVENT, onSurfaceNav)
     unsub()
     observer.disconnect()

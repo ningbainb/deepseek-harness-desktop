@@ -97,3 +97,23 @@ test('ClaudeCodeAdapter supports Chinese non-ASCII project paths and untitled se
     await rm(tempDir, { recursive: true, force: true })
   }
 })
+
+test('ClaudeCodeAdapter preserves tool_result blocks embedded in user records', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'claude-tool-result-test-'))
+  try {
+    const sessionFile = join(tempDir, 'embedded-tool-result.jsonl')
+    const lines = [
+      JSON.stringify({ type: 'user', id: 'u-1', message: { role: 'user', content: 'Inspect the project' } }),
+      JSON.stringify({ type: 'assistant', id: 'a-1', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'call-1', name: 'Read', input: { file_path: 'README.md' } }] } }),
+      JSON.stringify({ type: 'user', id: 'r-1', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: [{ type: 'text', text: 'file contents' }], is_error: false }] } }),
+      JSON.stringify({ type: 'assistant', id: 'a-2', message: { role: 'assistant', content: [{ type: 'text', text: 'Finished.' }] } }),
+    ]
+    await writeFile(sessionFile, lines.join('\n'), 'utf8')
+    const conversation = await new ClaudeCodeAdapter({ rootDir: tempDir }).readConversation(sessionFile)
+    assert.equal(conversation.events.filter((event) => event.type === 'tool_result').length, 1)
+    assert.equal(conversation.events.find((event) => event.type === 'tool_result').toolCallId, 'call-1')
+    assert.equal(conversation.conversation.toolCallCount, 1)
+  } finally {
+    await rm(tempDir, { recursive: true, force: true })
+  }
+})

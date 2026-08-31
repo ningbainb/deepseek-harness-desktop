@@ -1,10 +1,11 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
 import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/skills.mjs'
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
+import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
 
@@ -45,6 +46,8 @@ const CHANNELS = [
   'extensions:skill-import',
   'extensions:skill-open',
   'extensions:skill-root',
+  'extensions:profile-dir-open',
+  'extensions:profile-reset',
   'extensions:qqbot-status',
   'extensions:qqbot-bind',
   'extensions:qqbot-cancel',
@@ -186,36 +189,36 @@ export function registerExtensionIpc({
     }
   }
 
-  const mutatePlugin = (operation) => enqueuePluginMutation(async () => {
-    await controller.stop()
-    let transaction
-    try {
+  // One coordinator owns Runtime safety for every mutation path below. The
+  // individual operations keep their own validation, progress and notification
+  // behaviour; only stop/apply/restore/restart is shared.
+  // Created lazily: the coordinator validates its controller up front, but
+  // registering the IPC surface must stay possible before a runtime controller
+  // exists, which is exactly what the surface-registration tests rely on.
+  let mutationCoordinator
+  const mutation = () => {
+    if (mutationCoordinator === undefined) {
+      mutationCoordinator = createRuntimeMutationCoordinator({ controller, ensureProfile })
+    }
+    return mutationCoordinator
+  }
+
+  const mutatePlugin = (operation) => enqueuePluginMutation(() => mutation().run({
+    label: 'plugin change',
+    apply: async () => {
       const changed = await operation()
-      transaction = changed
+      const transaction = changed
         && typeof changed === 'object'
         && typeof changed.commit === 'function'
         && typeof changed.rollback === 'function'
         ? changed
         : undefined
-      const result = transaction ? transaction.result : changed
-      await ensureProfile()
-      await controller.start()
-      transaction?.commit()
-      return result
-    } catch (error) {
-      try {
-        if (transaction) await transaction.rollback()
-        await ensureProfile()
-        await controller.start()
-      } catch (recoveryError) {
-        throw new Error(
-          `plugin change failed and the previous runtime could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
-          { cause: new AggregateError([error, recoveryError]) },
-        )
+      return {
+        transactions: transaction === undefined ? [] : [transaction],
+        result: transaction ? transaction.result : changed,
       }
-      throw error
-    }
-  })
+    },
+  }))
 
   const installPlugin = (payload, { confirmationMode } = {}) => {
     if (confirmationMode !== undefined && confirmationMode !== 'market') {
@@ -243,65 +246,36 @@ export function registerExtensionIpc({
           spec: request.spec,
         })))
         try {
-          // Local content can change after selection. Electron main
-          // re-resolves and stages the private descriptor immediately
-          // before stopping Runtime or writing the persistent Desktop profile.
-          const installationDescriptor = assertExternalPluginDescriptor(
-            await revalidateFullAccessPlugin(descriptor),
-          )
-          await controller.stop()
-          let transaction
-          try {
-            transaction = await pluginManager.installFullAccessExternal(installationDescriptor)
-            await ensureProfile()
-            await controller.start()
-            await transaction.commit()
-            return Object.freeze({ ...transaction.result, isolated: false })
-          } catch (error) {
-            try {
-              if (transaction) await transaction.rollback()
-              await ensureProfile()
-              await controller.start()
-            } catch (recoveryError) {
-              throw new Error(
-                `full access plugin installation failed and the persistent Desktop profile could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
-                { cause: new AggregateError([error, recoveryError]) },
-              )
-            }
-            throw error
-          }
+          return await mutation().run({
+            label: 'full access plugin installation',
+            // Local content can change after selection. Electron main
+            // re-resolves and stages the private descriptor immediately
+            // before stopping Runtime or writing the persistent Desktop profile.
+            prepare: async () => assertExternalPluginDescriptor(
+              await revalidateFullAccessPlugin(descriptor),
+            ),
+            apply: async (installationDescriptor) => {
+              const transaction = await pluginManager.installFullAccessExternal(installationDescriptor)
+              return { transactions: [transaction], result: transaction.result }
+            },
+            finalize: (plan) => Object.freeze({ ...plan.result, isolated: false }),
+          })
         } finally {
           await completeFullAccessPlugin(descriptor)
         }
       })
     }
 
-    return enqueuePluginMutation(async () => {
+    return enqueuePluginMutation(() => mutation().run({
+      label: 'plugin change',
       // Registry inspection and package-store warming happen while the current
       // DSH process remains available. Only the exact offline switch is downtime.
-      const prepared = await pluginManager.prepare(request.spec, { allowUnknown: request.allowUnknown })
-      await controller.stop()
-      let transaction
-      try {
-        transaction = await pluginManager.applyPrepared(prepared)
-        await ensureProfile()
-        await controller.start()
-        transaction.commit()
-        return transaction.result
-      } catch (error) {
-        try {
-          if (transaction) await transaction.rollback()
-          await ensureProfile()
-          await controller.start()
-        } catch (recoveryError) {
-          throw new Error(
-            `plugin change failed and the previous runtime could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
-            { cause: new AggregateError([error, recoveryError]) },
-          )
-        }
-        throw error
-      }
-    })
+      prepare: () => pluginManager.prepare(request.spec, { allowUnknown: request.allowUnknown }),
+      apply: async (prepared) => {
+        const transaction = await pluginManager.applyPrepared(prepared)
+        return { transactions: [transaction], result: transaction.result }
+      },
+    }))
   }
 
   const installPluginBatch = (payload) => {
@@ -315,38 +289,25 @@ export function registerExtensionIpc({
     ) {
       throw new TypeError('invalid plugin batch install request')
     }
-    return enqueuePluginMutation(async () => {
-      emitProgress('plugin-batch', 'preparing', { total: payload.specs.length })
-      const prepared = await pluginManager.prepareMany(payload.specs, { allowUnknown: payload.allowUnknown })
-      emitProgress('plugin-batch', 'prefetched', { total: prepared.items.length })
-      emitProgress('plugin-batch', 'stopping')
-      await controller.stop()
-      let transaction
-      try {
+    return enqueuePluginMutation(() => mutation().run({
+      label: 'plugin batch',
+      onRuntimeEvent: (event) => emitProgress('plugin-batch', event),
+      prepare: async () => {
+        emitProgress('plugin-batch', 'preparing', { total: payload.specs.length })
+        const prepared = await pluginManager.prepareMany(payload.specs, { allowUnknown: payload.allowUnknown })
+        emitProgress('plugin-batch', 'prefetched', { total: prepared.items.length })
+        return prepared
+      },
+      apply: async (prepared) => {
         emitProgress('plugin-batch', 'applying')
-        transaction = await pluginManager.applyPreparedBatch(prepared)
-        await ensureProfile()
-        emitProgress('plugin-batch', 'starting')
-        await controller.start()
-        transaction.commit()
+        const transaction = await pluginManager.applyPreparedBatch(prepared)
+        return { transactions: [transaction], result: transaction.result }
+      },
+      finalize: (plan) => {
         emitProgress('plugin-batch', 'committed')
-        return transaction.result
-      } catch (error) {
-        emitProgress('plugin-batch', 'rolling-back')
-        try {
-          if (transaction) await transaction.rollback()
-          await ensureProfile()
-          await controller.start()
-          emitProgress('plugin-batch', 'restored')
-        } catch (recoveryError) {
-          throw new Error(
-            `plugin batch failed and the previous runtime could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${String(recoveryError?.message ?? recoveryError).slice(0, 1_000)}`,
-            { cause: new AggregateError([error, recoveryError]) },
-          )
-        }
-        throw error
-      }
-    })
+        return plan?.result
+      },
+    }))
   }
 
   const importPreset = (request) => {
@@ -362,34 +323,46 @@ export function registerExtensionIpc({
       throw new TypeError('invalid confirmed preset import request')
     }
     if (presetService === undefined) throw new Error('preset service is unavailable')
-    return enqueuePluginMutation(async () => {
-      const record = presetService.resolvePlan(request.id)
-      const specs = presetService.packageSpecs(record, request.decisions.packages)
-      emitProgress('preset-import', 'preparing', { total: specs.length })
-      const prepared = specs.length === 0
-        ? undefined
-        : await pluginManager.prepareMany(specs, { allowUnknown: false })
-      if (prepared) presetService.verifyPreparedPackages(record, prepared)
-      emitProgress('preset-import', 'prefetched', { total: prepared?.items.length ?? 0 })
-      const configTransaction = await presetService.stageConfig(record, {
-        settings: request.decisions.settings,
-        taskTemplates: request.decisions.taskTemplates,
-        skills: request.decisions.skills,
-      })
-      let packageTransaction
-      let stopped = false
-      try {
-        emitProgress('preset-import', 'stopping')
-        await controller.stop()
-        stopped = true
+    // Kept in the enclosing scope because the recovery notification needs the
+    // preset identity even when the apply step never returned a plan.
+    let planRecord
+    return enqueuePluginMutation(() => mutation().run({
+      label: 'preset import',
+      onRuntimeEvent: (event) => emitProgress('preset-import', event),
+      prepare: async () => {
+        const record = presetService.resolvePlan(request.id)
+        planRecord = record
+        const specs = presetService.packageSpecs(record, request.decisions.packages)
+        emitProgress('preset-import', 'preparing', { total: specs.length })
+        const prepared = specs.length === 0
+          ? undefined
+          : await pluginManager.prepareMany(specs, { allowUnknown: false })
+        if (prepared) presetService.verifyPreparedPackages(record, prepared)
+        emitProgress('preset-import', 'prefetched', { total: prepared?.items.length ?? 0 })
+        const configTransaction = await presetService.stageConfig(record, {
+          settings: request.decisions.settings,
+          taskTemplates: request.decisions.taskTemplates,
+          skills: request.decisions.skills,
+        })
+        return { prepared, configTransaction }
+      },
+      apply: async ({ prepared, configTransaction }) => {
         emitProgress('preset-import', 'applying')
-        if (prepared) packageTransaction = await pluginManager.applyPreparedBatch(prepared)
+        const packageTransaction = prepared
+          ? await pluginManager.applyPreparedBatch(prepared)
+          : undefined
         await configTransaction.apply()
-        await ensureProfile()
-        emitProgress('preset-import', 'starting')
-        await controller.start()
-        await configTransaction.commit()
-        packageTransaction?.commit()
+        return {
+          // Declared order is the unwind order: config is staged before the
+          // packages and must therefore unwind before them. This preserves the
+          // pre-3.1.0 recovery behaviour exactly.
+          transactions: [configTransaction, packageTransaction].filter(Boolean),
+          result: { packageTransaction },
+        }
+      },
+      finalize: (plan) => {
+        const record = planRecord
+        const packageTransaction = plan?.result?.packageTransaction
         presetService.forgetPlan(request.id)
         emitProgress('preset-import', 'committed')
         void notificationService?.show?.({
@@ -405,34 +378,19 @@ export function registerExtensionIpc({
           activation: Object.freeze({ mode: 'restart', reason: 'preset-environment-changed' }),
           restartRequired: true,
         })
-      } catch (error) {
-        emitProgress('preset-import', 'rolling-back')
-        const recoveryErrors = []
-        try { await configTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        if (packageTransaction) {
-          try { await packageTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        }
-        if (stopped) {
-          try { await ensureProfile() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-          try { await controller.start() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        }
-        if (recoveryErrors.length > 0) {
-          throw new Error(
-            `preset import failed and the previous environment could not be restored: ${String(error?.message ?? error).slice(0, 1_000)}; ${recoveryErrors.map((item) => String(item?.message ?? item).slice(0, 500)).join('; ')}`,
-            { cause: new AggregateError([error, ...recoveryErrors]) },
-          )
-        }
+      },
+      onRecovered: (plan) => {
+        void plan
         emitProgress('preset-import', 'restored')
         void notificationService?.show?.({
           category: 'preset',
-          id: `preset:${record.sha256.slice(0, 24)}:failed`,
+          id: `preset:${planRecord.sha256.slice(0, 24)}:failed`,
           title: 'Preset import failed',
           body: 'The previous Desktop environment was restored.',
           deepLink: 'dsh://preset/preview',
         }).catch(() => {})
-        throw error
-      }
-    })
+      },
+    }))
   }
 
   const handleExtension = (channel, handler) => {
@@ -536,6 +494,25 @@ export function registerExtensionIpc({
     await mkdir(root, { recursive: true })
     return shell.openPath(root)
   })
+  handleExtension('extensions:profile-dir-open', async () => {
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    await mkdir(profileDir, { recursive: true })
+    return shell.openPath(profileDir)
+  })
+  handleExtension('extensions:profile-reset', () => enqueuePluginMutation(async () => {
+    await controller.stop()
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    const timestamp = Date.now()
+    const backupDir = `${profileDir}.backup-${timestamp}`
+    try {
+      await rename(profileDir, backupDir).catch(() => {})
+    } catch {
+      // ignore
+    }
+    await ensureProfile()
+    await controller.start()
+    return Object.freeze({ reset: true, timestamp })
+  }))
   handleExtension('extensions:qqbot-status', () => qqBotBinding.status())
   handleExtension('extensions:qqbot-bind', () => {
     assertPluginMutationIdle()

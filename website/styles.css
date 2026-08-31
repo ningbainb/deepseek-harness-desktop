@@ -57,7 +57,7 @@ h1, h2, h3, p { margin-top: 0; }
 .nav-download svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .hero { position: relative; min-height: 900px; overflow: hidden; isolation: isolate; }
-.hero-backdrop { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(14,27,44,.82), rgba(25,67,113,.35)), url("assets/hero-main.webp") center 35% / cover; opacity: .9; }
+.hero-backdrop { position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, rgba(14,27,44,.84), rgba(25,67,113,.38)), url("assets/desktop-3.2.0-main-workspace.webp") center 35% / cover; opacity: .9; }
 .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 22% 25%, rgba(235,226,188,.23), transparent 17%), radial-gradient(circle at 63% 25%, rgba(228,223,201,.22), transparent 18%), linear-gradient(180deg, rgba(16,42,75,.05) 0%, rgba(9,13,18,.3) 55%, var(--bg) 100%); }
 .hero-inner { min-height: 900px; padding-top: 190px; display: grid; grid-template-columns: 1.05fr .95fr; gap: 90px; align-items: center; }
 .hero-copy { padding-bottom: 34px; }

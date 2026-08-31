@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ModePreset } from './mode-controller.ts'
 import css from './ModeSwitcher.module.css'
 
@@ -14,27 +14,39 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode }: 
   const [modes, setModes] = useState<ModePreset[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const loadModesRef = useRef(loadModes)
+  const switchModeRef = useRef(switchMode)
+
+  useEffect(() => {
+    loadModesRef.current = loadModes
+    switchModeRef.current = switchMode
+  }, [loadModes, switchMode])
 
   useEffect(() => {
     let active = true
-    void loadModes().then((items) => { if (active) setModes(items) }, (reason) => {
+    setError(undefined)
+    void loadModesRef.current().then((items) => {
+      if (active) setModes(items)
+    }, (reason) => {
       if (active) setError(reason instanceof Error ? reason.message : String(reason))
     })
     return () => { active = false }
-  }, [loadModes])
+  }, [sessionId])
 
   if (current === undefined || modes.length < 2) return null
+  const currentMode = modes.find((mode) => mode.id === current)
   return <select
     className={css.select}
-    value={current}
+    value={currentMode === undefined ? '' : current}
     disabled={busy}
     aria-label="切换会话模式"
-    title={error ?? '切换模式；已有对话时会在同一工作区创建新会话'}
+    data-dsh-mode-switcher="true"
+    title={error ?? `${currentMode?.label ?? current}；已有对话时会在同一工作区创建新会话`}
     onChange={(event) => {
       const preset = event.currentTarget.value
       setBusy(true)
       setError(undefined)
-      void switchMode(sessionId, preset).catch((reason) => {
+      void switchModeRef.current(sessionId, preset).catch((reason) => {
         setError(reason instanceof Error ? reason.message : String(reason))
       }).finally(() => { setBusy(false) })
     }}

@@ -323,6 +323,7 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         entries: [
           { label: '内置终端 / Built-in Terminal', action: 'terminal', shortcut: 'Ctrl+Alt+T' },
           { label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: 'Ctrl+Shift+X' },
+          { label: '从其他 AI 工具导入 / Migrate from Other AI Tools', action: 'conversation-import' },
         ],
         invoke: (action) => window.dshDesktop.toolAction(action),
       });

@@ -1,20 +1,36 @@
 # Changelog
 
-## Unreleased
+## 3.2.0 - 2026-09-01
 
 中文：
 
+- 将性价比模式改为专家主控路由：顶层会话使用专家模型，子代理会话统一使用副模型；首次选择自动引导模型、策略和启用配置，并限制子代理深度为 1。
+- 新增主控/副模型调用埋点和使用看板语义，产品只记录固定枚举的粗粒度 Value Mode 使用事件，不采集模型名、Token、Prompt、路径或会话内容。
+- 修复实时 Token 峰值统计：流式增量按事件时间合并并采用严格滚动 1 秒窗口，usage 汇总只修正账单 Token，旧平均速率峰值不再展示。
 - 新增「从其他 AI 工具继续工作」(Context Handoff Import) 核心功能，支持自动只读发现本机 Claude Code 与 Codex 项目和历史会话。
 - 智能提炼关键工作上下文（主要任务、技术决策、关联文件与修改、已执行命令、错误阻碍及最近对话尾部），严格控制 Token 预算（4,000 ~ 8,000 Tokens）。
 - 支持项目目录规范路径匹配、Git 仓库关联与版本变动检查，并通过官方 DSH 会话创建接口安全桥接，直接继续未完成的编码任务。
 - 引入全局凭据脱敏防护与原子导入账本（`external-conversation-imports-v1.json`），支持会话增量更新检测与防重复导入。
+- 新增 Runtime 依赖身份不变量与 CI 守卫（`pnpm runtime-graph:check`，见 ADR 0011）：identity-sensitive 的 `@deepseek-ai/*` 一旦解析出多个版本，CI 直接失败并输出各版本与来源，避免同一 Runtime 加载两份核心包导致工具调用崩溃（"Cannot read properties of undefined (reading 'prepare')"、来源 UNKNOWN）。
+- 引入真实启动阶段模型：Runtime 现在在启动各关键节点发布阶段事件；启动界面除百分比外显示当前阶段与已等待时长；诊断导出包含阶段历史（阶段名、开始时间、耗时、结果），仅凭诊断文件即可回答"卡在哪一步"。百分比动画降级为纯装饰，不再承担启动状态的含义。
+- 收敛插件变更的恢复逻辑：新增 `runtime-mutation-coordinator.mjs`，统一 single / full-access / batch / preset 四条路径的"停止—应用—恢复—重启"流程与错误聚合；恢复再次失败时，原始错误与所有恢复错误都保留在 `AggregateError` 中，不会被其中任意一个掩盖。
+- 修复 `desktop:action` 收到 `launch-builtins` 时直接退出应用的问题：该动作既无实现也无调用方，却会落到退出分支；现已从白名单移除，未知动作会被校验拒绝，退出改为显式分支。
+- 可观测性加固：更新检测触发、设置窗口回调、后台状态读取、修复验证器的子进程启动与终止等原先完全静默的失败，现在会写入长度受限的诊断日志（仅组件、操作、错误名与截断信息，不含堆栈）。
 
 English:
 
+- Routes Value Mode through an expert controller: top-level sessions use the expert model, subagent sessions use the worker model, first selection guides model/strategy/enablement, and worker depth is capped at one.
+- Adds coarse controller/worker usage signals and clearer usage-dashboard semantics; product metrics do not collect model names, tokens, prompts, paths, or conversation content.
+- Fixes live Token peaks by coalescing streaming increments and using a strict rolling one-second window; usage summaries correct billing totals only and legacy average-rate peaks are ignored.
 - Adds the "Continue from Other AI Tools" (Context Handoff Import) core capability, enabling read-only auto-discovery of local Claude Code and Codex projects and sessions.
 - Intelligently reconstructs essential working context (primary task, technical decisions, referenced/modified files, executed commands, error blockers, and recent conversation tail) with strict token bounds (4,000 - 8,000 tokens).
 - Supports canonical project path matching, Git remote association, and revision change detection, safely bridging into official DSH sessions to continue coding tasks seamlessly.
 - Incorporates centralized secret redaction and an atomic import ledger (`external-conversation-imports-v1.json`) with update detection and duplicate import prevention.
+- Adds the Runtime identity invariant and a CI guard (`pnpm runtime-graph:check`, see ADR 0011): if any identity-sensitive `@deepseek-ai/*` package resolves to more than one version, CI fails and reports every version and its declaring importer, preventing one Runtime from loading two copies of a core package (the "Cannot read properties of undefined (reading 'prepare')" crash reported as source: UNKNOWN).
+- Introduces a real startup phase model: the Runtime now publishes phase events at every key startup node, the launch screen shows the current phase and elapsed wait alongside the percentage, and diagnostics exports carry a phase history (name, start, duration, outcome) so an export alone answers "where did it hang". The percentage animation is demoted to decoration and no longer carries startup truth.
+- Consolidates plugin mutation recovery: a new `runtime-mutation-coordinator.mjs` unifies the stop/apply/restore/restart sequence and error aggregation across the single, full-access, batch and preset paths. When recovery itself fails, the original error and every recovery error are preserved in an `AggregateError` instead of one masking the other.
+- Fixes `desktop:action` quitting the application on `launch-builtins`: that action had neither an implementation nor a caller yet still reached the exit branch. It is removed from the allowlist, unknown actions are rejected by validation, and exit is now an explicit branch.
+- Hardens observability: failures that used to vanish silently - update-check trigger, settings-window callback, background-status read, and repair-verifier child spawn/terminate - now write a bounded diagnostic line (component, operation, error name and a truncated message; no stack).
 
 ## 3.0.9 - 2026-08-25
 

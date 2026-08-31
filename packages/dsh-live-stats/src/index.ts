@@ -95,7 +95,7 @@ export function apply(
         outputTokens: last.buckets.outputTokens,
         cacheReadTokens: last.buckets.cacheReadTokens,
         cacheWriteTokens: last.buckets.cacheWriteTokens,
-        ...(last.tokensPerSecond === undefined ? {} : { tps: last.tokensPerSecond }),
+        ...(last.peakTokensPerSecond === undefined ? {} : { peakTps: last.peakTokensPerSecond }),
         dedupeKey: `${session.id}:${watermark}`,
       })
     })
@@ -121,7 +121,7 @@ export function apply(
 }
 
 export { BalanceService } from './balance-service.ts'
-export { LedgerStore } from './ledger-store.ts'
+export { LedgerStore, PEAK_TPS_ALGORITHM_VERSION } from './ledger-store.ts'
 export { makeLiveStatsRoutes, BALANCE_API_PATH, STATS_API_PATH } from './routes.ts'
 export { createLiveTokenUsageProjectionDefinition } from './projection.ts'
 export { resolveEstimatorConfig } from './estimator.ts'

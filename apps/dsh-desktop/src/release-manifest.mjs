@@ -166,6 +166,13 @@ export async function collectReleaseArtifactNames(directory) {
   if (unexpectedExecutables.length > 0) {
     throw new Error(`unexpected top-level Windows executable; publish only the Setup installer: ${unexpectedExecutables.join(', ')}`)
   }
+  const installers = entries
+    .filter((entry) => entry.isFile() && WINDOWS_INSTALLER_PATTERN.test(entry.name))
+    .map((entry) => entry.name)
+    .toSorted()
+  if (installers.length !== 1) {
+    throw new Error(`expected exactly one top-level Setup installer; found ${installers.length === 0 ? 'none' : installers.join(', ')}`)
+  }
   const artifacts = entries
     .filter((entry) => entry.isFile() && isReleaseArtifact(entry.name))
     .map((entry) => entry.name)
@@ -371,6 +378,32 @@ async function verifyChecksumFile(directory, manifest) {
   }
 }
 
+async function writeTextAtomically(path, content) {
+  const temporary = `${path}.tmp-${process.pid}-${Date.now()}`
+  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
+  try {
+    await rename(temporary, path)
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {})
+    throw error
+  }
+  return path
+}
+
+/** Rebuild the publish checksum file from the single installer in the release directory. */
+export async function writeReleaseChecksums(directory) {
+  const normalizedDirectory = resolve(nonEmptyText(directory, 'release directory'))
+  const names = await collectReleaseArtifactNames(normalizedDirectory)
+  const installer = names.find((file) => WINDOWS_INSTALLER_PATTERN.test(file))
+  if (installer === undefined) {
+    throw new Error(`no top-level Setup installer found in ${normalizedDirectory}`)
+  }
+  const content = await readFile(join(normalizedDirectory, installer))
+  return writeTextAtomically(
+    join(normalizedDirectory, 'SHA256SUMS.txt'),
+    `${sha256(content)}  ${installer}\n`,
+  )
+}
 /** Rehash artifacts and re-check signatures without trusting the release manifest itself. */
 export async function verifyReleaseManifest({
   directory,
@@ -476,12 +509,14 @@ async function main() {
   }
   if (argumentsList.includes('--write')) {
     const metadata = await defaultReleaseMetadata({ channel: optionValue(argumentsList, '--channel') ?? DEFAULT_CHANNEL_FROM_ENV })
+    const checksumPath = await writeReleaseChecksums(directory)
     const manifest = await createReleaseManifest({
       directory,
       metadata,
       signatureVerifier: (path) => verifyWindowsSignature(path, { requireTimestamp: configuration.required }),
     })
     const path = await writeReleaseManifest(directory, manifest)
+    console.log(`wrote ${checksumPath}`)
     console.log(`wrote ${path}`)
     return
   }

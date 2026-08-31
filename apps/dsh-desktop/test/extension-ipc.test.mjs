@@ -63,7 +63,6 @@ test('extension IPC rejects a registered main renderer before sensitive work', a
   )
   unregister()
 })
-
 test('extension IPC exposes only renderer-safe QQ Bot state and forwards lifecycle events', async () => {
   const ipcMain = new FakeIpcMain()
   const sent = []
@@ -114,7 +113,6 @@ test('extension IPC exposes only renderer-safe QQ Bot state and forwards lifecyc
   assert.equal(ipcMain.handlers.has('extensions:qqbot-bind'), false)
   assert.equal(qqBotBinding.listenerCount('event'), 0)
 })
-
 test('plugin install prepares before downtime and rolls back a failed runtime start', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
@@ -271,7 +269,6 @@ test('Extension Dock can revoke durable full-user trust only through a zero-argu
   assert.equal(revokeCalls, 1)
   await unregister()
 })
-
 test('user-selected plugin installation skips trust approval and commits the persistent Desktop profile', async () => {
   const ipcMain = new FakeIpcMain()
   const events = []
@@ -1264,5 +1261,63 @@ test('extension shutdown quiesce times out instead of waiting forever for a plug
 
   releaseRemoval()
   await active
+  await unregister()
+})
+
+test('extensions:profile-dir-open opens desktop profile directory', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  let openedPath
+  const shell = {
+    openPath: async (path) => {
+      openedPath = path
+      return ''
+    },
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell,
+    getWindow: () => undefined,
+    pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+    controller: { stop: async () => {}, start: async () => {} },
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+  })
+
+  await ipcMain.handlers.get('extensions:profile-dir-open')()
+  assert.match(openedPath, /profiles[\\/]desktop$/u)
+  await unregister()
+})
+
+test('extensions:profile-reset stops runtime, ensures profile, and restarts runtime', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  const steps = []
+  const controller = {
+    stop: async () => { steps.push('stop') },
+    start: async () => { steps.push('start') },
+  }
+  const ensureProfile = async () => { steps.push('ensureProfile') }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+    controller,
+    ensureProfile,
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+  })
+
+  const result = await ipcMain.handlers.get('extensions:profile-reset')()
+  assert.equal(result.reset, true)
+  assert.deepEqual(steps, ['stop', 'ensureProfile', 'start'])
   await unregister()
 })

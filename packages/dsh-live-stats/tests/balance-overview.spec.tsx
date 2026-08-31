@@ -91,7 +91,7 @@ describe('balance overview surface', () => {
     expect(text).toContain('1.2亿')
     expect(text).toContain('缓存节省')
     expect(text).toContain('约省 ¥0.5')
-    expect(text).toContain('峰值速率')
+    expect(text).toContain('滚动 1 秒峰值')
     expect(text).toContain('45 tok/s')
   })
 

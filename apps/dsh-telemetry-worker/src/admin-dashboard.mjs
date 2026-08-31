@@ -70,22 +70,47 @@ const DESKTOP_SURFACES_SQL = [
 const DESKTOP_EVENTS_SQL = [
   'SELECT event, SUM(count) AS count',
   'FROM metric_daily',
-  "WHERE day >= date('now', ?)",
+  "WHERE day >= date('now', ?) AND event NOT LIKE 'value_mode_%'",
   'GROUP BY event ORDER BY count DESC, event',
 ].join(' ')
 
-const ACTIVE_DAILY_TREND_SQL = [
-  'SELECT day, COUNT(DISTINCT daily_actor) AS count',
-  'FROM product_actor_daily',
-  "WHERE day >= date('now', ?) AND event = 'app_launch'",
-  'GROUP BY day ORDER BY day',
+const VALUE_MODE_USAGE_SQL = [
+  'SELECT event, outcome, detail, SUM(count) AS count',
+  'FROM metric_daily',
+  "WHERE day >= date('now', ?) AND event LIKE 'value_mode_%'",
+  'GROUP BY event, outcome, detail ORDER BY count DESC, event, outcome, detail',
 ].join(' ')
 
-const ACTIVE_MONTHLY_TREND_SQL = [
-  'SELECT month, COUNT(DISTINCT monthly_actor) AS count',
-  'FROM product_actor_monthly',
-  "WHERE month >= substr(date('now', ?), 1, 7) AND event = 'app_launch'",
-  'GROUP BY month ORDER BY month',
+const ACTIVE_HEADLINE_SQL = [
+  'WITH bounds AS (SELECT date(?) AS asOfDay)',
+  'SELECT',
+  '  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day = bounds.asOfDay) AS dau,',
+  "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-6 days') AND bounds.asOfDay) AS wau,",
+  "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-29 days') AND bounds.asOfDay) AS mau,",
+  "  (SELECT COUNT(*) FROM product_installation_first_seen WHERE first_seen_day BETWEEN date(bounds.asOfDay, '-399 days') AND bounds.asOfDay) AS totalInstallations",
+  'FROM bounds',
+].join(' ')
+
+const ACTIVE_DAILY_TREND_SQL = [
+  'WITH RECURSIVE days(day) AS (',
+  'SELECT date(?, ?)',
+  "UNION ALL SELECT date(day, '+1 day') FROM days WHERE day < date(?)",
+  ')',
+  'SELECT days.day, COUNT(DISTINCT activity.installation_actor) AS count',
+  'FROM days',
+  'LEFT JOIN product_installation_daily activity ON activity.day = days.day',
+  'GROUP BY days.day ORDER BY days.day',
+].join(' ')
+
+const ACTIVE_MAU_TREND_SQL = [
+  'WITH RECURSIVE days(day) AS (',
+  'SELECT date(?, ?)',
+  "UNION ALL SELECT date(day, '+1 day') FROM days WHERE day < date(?)",
+  ')',
+  'SELECT days.day, COUNT(DISTINCT activity.installation_actor) AS count',
+  'FROM days',
+  "LEFT JOIN product_installation_daily activity ON activity.day BETWEEN date(days.day, '-29 days') AND days.day",
+  'GROUP BY days.day ORDER BY days.day',
 ].join(' ')
 
 const ACTIVE_COUNTRIES_SQL = [
@@ -457,7 +482,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     }
     .metrics {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       border-top: 1px solid var(--ink);
       border-left: 1px solid var(--ink);
       margin-bottom: 18px;
@@ -622,13 +647,15 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="notice">
       <b>统计口径</b>
-      <span>DAU、MAU、国家和漏斗人数使用周期匿名标识去重；D1、D7、D30 使用独立的稳定匿名安装哈希计算。系统不保存 IP、账号、机器码、硬件信息或原始事件。</span>
+      <span>DAU、WAU、MAU 使用稳定匿名安装实例哈希去重：DAU 为服务端 UTC 当日，WAU 为最近 7 个 UTC 日，MAU 为最近 30 个 UTC 日；累计安装实例统计近 400 个 UTC 日内首次见到的实例。国家、版本和漏斗沿用月度匿名观察口径；多台设备分别计数。系统不保存 IP、账号、机器码、硬件信息或原始事件。</span>
     </section>
 
     <section class="metrics" aria-label="核心指标">
       <article class="metric"><small>下载按钮点击</small><strong id="metric-downloads">--</strong></article>
-      <article class="metric"><small>日活用户</small><strong id="metric-dau">--</strong></article>
-      <article class="metric"><small>月活用户</small><strong id="metric-mau">--</strong></article>
+      <article class="metric"><small>日活跃实例</small><strong id="metric-dau">--</strong></article>
+      <article class="metric"><small>周活跃实例</small><strong id="metric-wau">--</strong></article>
+      <article class="metric"><small>月活跃实例</small><strong id="metric-mau">--</strong></article>
+      <article class="metric"><small>近 400 天累计安装实例</small><strong id="metric-total-installations">--</strong></article>
       <article class="metric"><small>活跃国家或地区</small><strong id="metric-countries">--</strong></article>
     </section>
 
@@ -645,16 +672,16 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="grid equal">
       <article class="panel">
-        <div class="panel-head"><h2>国家与地区用户</h2><span>月匿名用户去重</span></div>
+        <div class="panel-head"><h2>国家与地区活跃实例</h2><span>月度匿名观察去重</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>地区</th><th>用户数</th></tr></thead>
+            <thead><tr><th>地区</th><th>实例数</th></tr></thead>
             <tbody id="country-rows"></tbody>
           </table>
         </div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>版本采用</h2><span>月匿名用户去重</span></div>
+        <div class="panel-head"><h2>版本采用</h2><span>月度匿名观察去重</span></div>
         <div class="panel-body"><div id="version-bars" class="bars"></div></div>
       </article>
     </section>
@@ -670,6 +697,19 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       </article>
     </section>
 
+    <section class="grid equal">
+      <article class="panel">
+        <div class="panel-head"><h2>性价比模式使用</h2><span>选择、引导、启停与路由</span></div>
+        <div class="panel-body"><div id="value-mode-bars" class="bars accent"></div></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>性价比模式口径</h2><span>仅统计固定枚举</span></div>
+        <div class="panel-body">
+          <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.8">专家主控和副模型子代理只记录粗粒度调用次数与结果；模型名称、Provider、提示词、会话内容、Token 和错误原文不会进入产品分析。</p>
+        </div>
+      </article>
+    </section>
+
     <section class="metrics retention-metrics" aria-label="留存率">
       <article class="metric"><small>D1 留存率</small><strong id="metric-retention-d1">--</strong></article>
       <article class="metric"><small>D7 留存率</small><strong id="metric-retention-d7">--</strong></article>
@@ -678,7 +718,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="grid equal">
       <article class="panel">
-        <div class="panel-head"><h2>应用内更新漏斗</h2><span>月匿名用户去重</span></div>
+        <div class="panel-head"><h2>应用内更新漏斗</h2><span>月度匿名观察去重</span></div>
         <div class="panel-body"><div id="update-funnel-bars" class="bars accent"></div></div>
       </article>
       <article class="panel">
@@ -704,7 +744,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     </section>
 
     <footer class="foot">
-      <span>日匿名行保留 35 天，月匿名行保留 13 个月，留存 cohort 与趋势聚合保留 400 天。看板请求不会写入产品统计表。</span>
+      <span>周期匿名观察行按 35 天和 13 个月保留；稳定安装实例活动、留存 cohort 与趋势聚合保留 400 天。累计安装实例指标只覆盖近 400 个 UTC 日。看板请求不会写入产品统计表。</span>
       <span><span id="load-state" class="load-state" data-state="loading">LOADING DATA</span><br><span id="generated-at"></span></span>
     </footer>
   </main>
@@ -751,6 +791,38 @@ const eventLabels = Object.freeze({
   dock_opened: '拓展坞打开',
   extension_operation: '扩展操作',
   app_session_end: '会话结束',
+})
+const valueModeEventLabels = Object.freeze({
+  value_mode_entry: '进入性价比模式',
+  value_mode_onboarding: '性价比模式引导',
+  value_mode_state: '性价比模式启停',
+  value_mode_strategy: '性价比模式策略',
+  value_mode_call: '性价比模式路由调用',
+})
+const valueModeOutcomeLabels = Object.freeze({
+  selected: '已选择',
+  shown: '已展示',
+  completed: '已完成',
+  dismissed: '已关闭',
+  enabled: '已开启',
+  disabled: '已关闭',
+  started: '已发起',
+  failed: '失败',
+})
+const valueModeDetailLabels = Object.freeze({
+  configured: '已有配置',
+  unconfigured: '待配置',
+  hero: '空白会话',
+  header: '会话顶部',
+  settings: '完整设置',
+  onboarding: '配置引导',
+  manual: '手动操作',
+  auto: '自动启用',
+  controller: '专家主控',
+  subagent: '副模型子代理',
+  saver: '更省',
+  balanced: '平衡',
+  powerful: '更强',
 })
 const durationLabels = Object.freeze({
   'under-5m': '5 分钟以内',
@@ -958,7 +1030,9 @@ function renderRetention(rows) {
 function render(data) {
   setText('metric-downloads', formatCount(data.downloads.totalClicks))
   setText('metric-dau', formatCount(data.active.dau))
+  setText('metric-wau', formatCount(data.active.wau))
   setText('metric-mau', formatCount(data.active.mau))
+  setText('metric-total-installations', formatCount(data.active.totalInstallations))
   setText('metric-countries', formatCount(data.active.countries.length))
   setText('metric-retention-d1', formatPercent(data.retention.d1.rate))
   setText('metric-retention-d7', formatPercent(data.retention.d7.rate))
@@ -969,11 +1043,17 @@ function render(data) {
   renderBars('version-bars', data.active.versions, (row) => 'v' + row.version)
   renderBars('surface-bars', data.desktop.surfaces, (row) => surfaceLabels[row.surface] || row.surface)
   renderBars('event-bars', data.desktop.events, (row) => eventLabels[row.event] || row.event)
+  renderBars('value-mode-bars', data.valueMode.usage, (row) => [
+    valueModeEventLabels[row.event] || row.event,
+    valueModeOutcomeLabels[row.outcome] || row.outcome,
+    valueModeDetailLabels[row.detail] || row.detail,
+  ].join(' · '))
   renderBars('update-funnel-bars', data.funnels.updates, (row) => eventLabels[row.event] || row.event)
   renderBars('dock-funnel-bars', data.funnels.dock, (row) => eventLabels[row.event] || row.event)
   renderRetention(data.retention.cohorts)
   renderBars('duration-bars', data.usage.sessionDurations, (row) => durationLabels[row.bucket] || row.bucket)
-  setText('generated-at', '更新于 ' + new Date(data.generatedAt).toLocaleString('zh-CN'))
+  const asOf = data.active.asOfDay ? ' · 数据截至 UTC ' + data.active.asOfDay : ''
+  setText('generated-at', '更新于 ' + new Date(data.generatedAt).toLocaleString('zh-CN') + asOf)
 }
 
 async function load(days) {
@@ -1033,25 +1113,29 @@ function normalizeRows(result, keys) {
 
 async function executeSummary(env, days, seams) {
   if (!env?.METRICS || typeof env.METRICS.prepare !== 'function') throw new Error('database unavailable')
+  const generatedAt = currentDate(seams)
+  const asOfDay = generatedAt.toISOString().slice(0, 10)
   const period = '-' + (days - 1) + ' days'
   const queries = [
-    DOWNLOAD_TOTAL_SQL,
-    DOWNLOAD_TREND_SQL,
-    DOWNLOAD_COUNTRIES_SQL,
-    DOWNLOAD_SOURCES_SQL,
-    DOWNLOAD_VERSIONS_SQL,
-    DESKTOP_LAUNCHES_SQL,
-    DESKTOP_SURFACES_SQL,
-    DESKTOP_EVENTS_SQL,
-    ACTIVE_DAILY_TREND_SQL,
-    ACTIVE_MONTHLY_TREND_SQL,
-    ACTIVE_COUNTRIES_SQL,
-    ACTIVE_VERSIONS_SQL,
-    UPDATE_FUNNEL_SQL,
-    DOCK_FUNNEL_SQL,
-    RETENTION_COHORTS_SQL,
-    SESSION_DURATION_SQL,
-  ].map((sql) => env.METRICS.prepare(sql).bind(period).all())
+    [DOWNLOAD_TOTAL_SQL, [period]],
+    [DOWNLOAD_TREND_SQL, [period]],
+    [DOWNLOAD_COUNTRIES_SQL, [period]],
+    [DOWNLOAD_SOURCES_SQL, [period]],
+    [DOWNLOAD_VERSIONS_SQL, [period]],
+    [DESKTOP_LAUNCHES_SQL, [period]],
+    [DESKTOP_SURFACES_SQL, [period]],
+    [DESKTOP_EVENTS_SQL, [period]],
+    [VALUE_MODE_USAGE_SQL, [period]],
+    [ACTIVE_HEADLINE_SQL, [asOfDay]],
+    [ACTIVE_DAILY_TREND_SQL, [asOfDay, period, asOfDay]],
+    [ACTIVE_MAU_TREND_SQL, [asOfDay, period, asOfDay]],
+    [ACTIVE_COUNTRIES_SQL, [period]],
+    [ACTIVE_VERSIONS_SQL, [period]],
+    [UPDATE_FUNNEL_SQL, [period]],
+    [DOCK_FUNNEL_SQL, [period]],
+    [RETENTION_COHORTS_SQL, [period]],
+    [SESSION_DURATION_SQL, [period]],
+  ].map(([sql, bindings]) => env.METRICS.prepare(sql).bind(...bindings).all())
   const [
     downloadTotal,
     downloadTrend,
@@ -1061,8 +1145,10 @@ async function executeSummary(env, days, seams) {
     desktopLaunches,
     desktopSurfaces,
     desktopEvents,
+    valueModeUsage,
+    activeHeadline,
     activeDailyTrend,
-    activeMonthlyTrend,
+    activeMauTrend,
     activeCountries,
     activeVersions,
     updateFunnel,
@@ -1072,13 +1158,13 @@ async function executeSummary(env, days, seams) {
   ] = await Promise.all(queries)
 
   const normalizedDailyTrend = normalizeRows(activeDailyTrend, ['day', 'count'])
-  const normalizedMonthlyTrend = normalizeRows(activeMonthlyTrend, ['month', 'count'])
+  const normalizedMauTrend = normalizeRows(activeMauTrend, ['day', 'count'])
   const normalizedRetentionCohorts = normalizeRetentionRows(retentionCohorts)
 
   return {
-    schema: 3,
+    schema: 5,
     rangeDays: days,
-    generatedAt: currentDate(seams).toISOString(),
+    generatedAt: generatedAt.toISOString(),
     downloads: {
       totalClicks: normalizedCount(downloadTotal?.results?.[0]?.total),
       trend: normalizeRows(downloadTrend, ['day', 'count']),
@@ -1091,11 +1177,19 @@ async function executeSummary(env, days, seams) {
       surfaces: normalizeRows(desktopSurfaces, ['surface', 'count']),
       events: normalizeRows(desktopEvents, ['event', 'count']),
     },
+    valueMode: {
+      usage: normalizeRows(valueModeUsage, ['event', 'outcome', 'detail', 'count']),
+    },
     active: {
-      dau: normalizedDailyTrend.at(-1)?.count ?? 0,
-      mau: normalizedMonthlyTrend.at(-1)?.count ?? 0,
+      asOfDay,
+      definition: 'app_launch',
+      dau: normalizedCount(activeHeadline?.results?.[0]?.dau),
+      wau: normalizedCount(activeHeadline?.results?.[0]?.wau),
+      mau: normalizedCount(activeHeadline?.results?.[0]?.mau),
+      totalInstallations: normalizedCount(activeHeadline?.results?.[0]?.totalInstallations),
+      totalInstallationsWindowDays: 400,
       dailyTrend: normalizedDailyTrend,
-      monthlyTrend: normalizedMonthlyTrend,
+      mauTrend: normalizedMauTrend,
       countries: normalizeRows(activeCountries, ['countryCode', 'count']),
       versions: normalizeRows(activeVersions, ['version', 'count']),
     },
@@ -1203,7 +1297,11 @@ export const __test = Object.freeze({
   DASHBOARD_PAGE,
   DASHBOARD_SCRIPT,
   DAY_RANGES,
+  ACTIVE_DAILY_TREND_SQL,
+  ACTIVE_HEADLINE_SQL,
+  ACTIVE_MAU_TREND_SQL,
   RETENTION_COHORTS_SQL,
   SESSION_DURATION_SQL,
+  VALUE_MODE_USAGE_SQL,
   executeSummary,
 })

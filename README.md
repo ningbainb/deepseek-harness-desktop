@@ -36,15 +36,40 @@ QQ 群：**1105158177**
 
 [🌐 产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ 下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 使用文档](docs/desktop.md) · [📝 更新日志](CHANGELOG.md)
 
-### 🚀 最新版本：3.1.0
+### 🚀 最新版本：3.2.0
 
-- **全链路启动防卡死与自愈**：自适应握手重试与 Windows 文件锁（`EBUSY`）容错，彻底消灭启动卡死与闪退循环。
-- **前端插件安全沙箱（SafePluginBoundary）**：React 错误边界隔离，插件异常绝不波及主界面，保持核心交互 100% 可用。
-- **实时 Token 统计与计费**：实时吞吐量（tokens/sec）监控，深度适配官方阶梯计费与闲时优惠自动切换。
+- **性价比模式 V2**：专家主控模型负责理解、拆解、派发、复核和汇总，副模型 / 子代理只处理被派发的局部任务；首次选择会自动引导配置。
+- **大模型用量看板**：实时展示输入/输出 Token、上下文、缓存、请求耗时与费用；峰值采用严格滚动 1 秒算法，不再把 usage 汇总误报成 12625 tok/s。
+- **Claude Code / Codex 项目导入**：只读发现项目和历史会话，预览后导入 Harness 工作区；敏感信息脱敏，历史工具调用不会重新执行。
+- **启动与插件稳定性继续加固**：启动阶段可见、事务修复可回滚、第三方插件错误隔离，原有 DSH Home 与插件直接延续。
 
 👉 [查看完整发布说明](docs/launch/release-notes.md) · [查看历史更新日志](CHANGELOG.md) · [升级与回滚指南](docs/upgrade-and-rollback.md)
 
 ---
+
+## 🚀 3.2.0 三个核心能力
+
+### 💡 性价比模式：专家做决策，副模型做执行
+
+选择 **性价比模式** 后，桌面端会立即打开配置引导：默认模型会自动预选为 **专家主控模型**，用户再选择一个更省或更快的 **副模型 / 子代理执行模型**，最后选择“更省 / 智能平衡 / 更强”策略。配置完整后才会启用，不会留下半配置状态。
+
+专家主控可以直接完成简单任务，也可以按需派发并行子任务；副模型的子代理深度固定为 1，不递归派发、不调用重复的“专家分析”路径。每个会话的主控调用和副模型调用都能在界面与埋点中区分。
+
+![DeepSeek Harness Desktop 3.2.0 性价比模式配置与专家主控](docs/screenshots/3.2.0-value-mode.webp)
+
+### 📊 大模型用量看板：看清每一次消耗
+
+会话状态行和用量看板集中呈现 Input / Output Token、上下文占用、Cache 命中、LLM 延迟、估算费用、当前生成速度与步骤内峰值。生成速度只来自有效流式增量：同毫秒批次先合并，在每个时间点统计过去 1 秒窗口；最终 usage 只修正账单 Token，不制造虚假瞬时峰值。
+
+![DeepSeek Harness Desktop 3.2.0 大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-main-workspace.webp)
+
+### 🔁 Claude Code 与 Codex：把已有工作接着做
+
+选择本机的 Claude Code 或 Codex 数据目录，按项目查看可导入的历史会话，确认后生成真正的 Harness 工作区和会话。导入是只读、幂等、可恢复的：API Key、Token、Cookie、路径等敏感字段会脱敏，外部工具调用以历史记录保存且不可执行。
+
+![DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入](docs/screenshots/3.2.0-project-import.webp)
+
+详细边界见 [外部会话导入说明](docs/external-conversation-import.md)；模型角色与路由见 [性价比模式插件](packages/dsh-value-mode/README.zh.md)；峰值算法见 [实时用量看板](packages/dsh-live-stats/README.zh.md)。
 
 
 ## ✨ 为什么选择 DeepSeek Harness Desktop
@@ -127,7 +152,7 @@ QQ 群：**1105158177**
 
 在同一个窗口中即可完成 AI 对话、代码修改、文件管理、Git 操作、任务执行、模型切换和插件扩展。
 
-![DeepSeek Harness Desktop 主界面与 Skills 技能库](docs/screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop 3.2.0 主界面与 AI 编程工作区](docs/screenshots/3.2.0-main-workspace.webp)
 
 ## 🧩 Skills 与插件
 
@@ -218,18 +243,18 @@ QQ 群：**1105158177**
 
 连接信息由桌面宿主管理，无需手动修改复杂配置文件。
 
-## 📊 实时 Token 与性能统计
+## 📊 大模型用量看板与性能统计
 
 输入区域下方可以实时查看：
 
-- TPS 生成速度
+- 滚动 1 秒生成速度与步骤内峰值
 - LLM 请求耗时
 - 上下文占用
 - Cache 命中率
 - Input Token
 - Output Token
 
-![实时令牌统计](docs/screenshots/18-live-stats.png)
+![大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-main-workspace.webp)
 
 ## 🎨 主题与皮肤
 

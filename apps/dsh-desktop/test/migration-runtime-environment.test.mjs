@@ -19,6 +19,7 @@ test('the primary Runtime receives the requested automation and permission polic
     QQBOT_SECRET: 'desktop-secret',
     DSH_DESKTOP_BACKGROUND_AUTOMATION: '1',
     DSH_PERMISSION_MODE: 'danger-full-access',
+    DSH_DESKTOP_PRODUCT_METRICS_BRIDGE: '1',
   })
   assert.deepEqual(desktopRuntimeEnvironmentFor({ backgroundAutomation: false }), {
     CI: '1',
@@ -29,6 +30,7 @@ test('the primary Runtime receives the requested automation and permission polic
     QQBOT_SECRET: '',
     DSH_DESKTOP_BACKGROUND_AUTOMATION: '0',
     DSH_PERMISSION_MODE: 'workspace-write',
+    DSH_DESKTOP_PRODUCT_METRICS_BRIDGE: '1',
   })
 })
 

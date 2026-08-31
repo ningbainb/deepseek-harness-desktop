@@ -64,16 +64,22 @@ describe('Explorer file context menu', () => {
   it('copies an absolute path and inserts the relative file path into the active draft', async () => {
     const stores = fakeStores()
     const addToConversation = vi.fn(() => true)
+    const toggleCollapse = vi.fn()
     const root = createRoot(host)
     act(() => {
       root.render(
         <ExplorerPanel
           stores={stores}
-          onToggleCollapse={() => {}}
+          onToggleCollapse={toggleCollapse}
           onAddToConversation={addToConversation}
         />,
       )
     })
+
+    const closePanel = host.querySelector('button[aria-label="关闭文件面板"]') as HTMLButtonElement
+    expect(closePanel).not.toBeNull()
+    act(() => { closePanel.click() })
+    expect(toggleCollapse).toHaveBeenCalledTimes(1)
 
     const file = host.querySelector('[title="docs/readme.md"]') as HTMLElement
     act(() => {

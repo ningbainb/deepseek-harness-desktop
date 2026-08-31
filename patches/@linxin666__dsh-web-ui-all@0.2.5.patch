@@ -1,3 +1,41 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -53,17 +53,32 @@
+ 		* Register the shim for the page lifetime.
+ 		* @param ctx - client root context.
+ 		*/
+ 		function apply(ctx) {
++			const resetExpandedFooterActions = () => {
++				const sidebar = document.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]');
++				if (!(sidebar instanceof HTMLElement) || sidebar.getBoundingClientRect().width <= 80) return;
++				for (const action of sidebar.querySelectorAll('[data-slot="sidebar.footer.action"]')) {
++					if (!(action instanceof HTMLElement)) continue;
++					if (action.style.getPropertyValue("margin-inline") === "auto") action.style.removeProperty("margin-inline");
++					if (action.style.getPropertyValue("justify-content") === "center") action.style.removeProperty("justify-content");
++				}
++			};
+ 			ctx.effect(() => {
+ 				applyShims();
++				resetExpandedFooterActions();
+-				const observer = new MutationObserver(schedulePass);
++				const observer = new MutationObserver(() => {
++					resetExpandedFooterActions();
++					schedulePass();
++				});
+ 				observer.observe(document.body, {
+ 					childList: true,
+-					subtree: true
++					subtree: true,
++					attributes: true,
++					attributeFilter: ["class", "style", "data-wide", "data-rail"]
+ 				});
+ 				return () => {
+ 					observer.disconnect();
+ 					shimScheduled = false;
+ 				};
+ 			});
+ 		}
 diff --git a/cordis.patch.yml b/cordis.patch.yml
 index d27bfcbc0e20e6b66ca26c0c98826d78213824c5..cfe56bf3c1f5c6673579fc8558b9f82aa49d0f7a 100644
 --- a/cordis.patch.yml
@@ -29,14 +67,3 @@ index d27bfcbc0e20e6b66ca26c0c98826d78213824c5..cfe56bf3c1f5c6673579fc8558b9f82a
  # from ../dsh-aionui-panel
  - insert:
      - id: web-ui-dsh-aionui-panel
-diff --git a/lib/client.js b/lib/client.js
---- a/lib/client.js
-+++ b/lib/client.js
-@@ -58,0 +59,5 @@
-+				const railStyle = document.createElement("style");
-+				railStyle.dataset.plugin = "@linxin666/dsh-web-ui-all";
-+				railStyle.dataset.pluginCss = "@linxin666/dsh-web-ui-all/sidebar-rail.css";
-+				railStyle.textContent = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[class*=footArea]>[class*=footerActions]{box-sizing:border-box;flex-direction:column;align-items:center;gap:4px}";
-+				document.head.appendChild(railStyle);
-@@ -65,0 +71,1 @@
-+					railStyle.remove();

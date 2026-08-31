@@ -67,6 +67,9 @@ export interface RecordUsageOptions {
   outputTokens: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
+  /** Maximum rolling one-second streamed-output rate for this step. */
+  peakTps?: number
+  /** @deprecated Use peakTps. Kept for callers using the pre-rolling API. */
   tps?: number
   timestamp?: number
   /**
@@ -79,6 +82,8 @@ export interface RecordUsageOptions {
 
 /** Bound the persisted dedupe table so the ledger file stays small. */
 const MAX_DEDUPE_KEYS = 5_000
+/** Version of the persisted peak metric; legacy average rates are not trusted. */
+export const PEAK_TPS_ALGORITHM_VERSION = 2
 
 function resolveStateDirectory(): string {
   // DSH_HOME already IS the dsh home (the desktop host sets it to ~/.dsh);
@@ -112,6 +117,7 @@ export class LedgerStore {
       const data = JSON.parse(raw) as {
         records?: DailyUsageRecord[]
         peakTps?: number
+        peakTpsVersion?: number
         steps?: string[]
       }
       if (Array.isArray(data.records)) {
@@ -119,7 +125,10 @@ export class LedgerStore {
           if (rec?.date) this.records.set(rec.date, { ...rec, cacheSavedCost: rec.cacheSavedCost ?? 0 })
         }
       }
-      if (typeof data.peakTps === 'number') {
+      if (data.peakTpsVersion === PEAK_TPS_ALGORITHM_VERSION
+        && typeof data.peakTps === 'number'
+        && Number.isFinite(data.peakTps)
+        && data.peakTps >= 0) {
         this.peakTps = data.peakTps
       }
       if (Array.isArray(data.steps)) {
@@ -133,6 +142,7 @@ export class LedgerStore {
     try {
       const data = {
         updatedAt: Date.now(),
+        peakTpsVersion: PEAK_TPS_ALGORITHM_VERSION,
         peakTps: this.peakTps,
         records: Array.from(this.records.values()).sort((a, b) => a.date.localeCompare(b.date)),
         steps: this.dedupeKeys,
@@ -141,11 +151,17 @@ export class LedgerStore {
     } catch {}
   }
 
-  public recordTps(tps: number): void {
-    if (tps > this.peakTps) {
-      this.peakTps = Math.round(tps * 10) / 10
+  public recordPeakTps(peakTps: number): void {
+    if (!Number.isFinite(peakTps) || peakTps < 0) return
+    if (peakTps > this.peakTps) {
+      this.peakTps = Math.round(peakTps * 10) / 10
       this.save()
     }
+  }
+
+  /** @deprecated Use recordPeakTps. */
+  public recordTps(tps: number): void {
+    this.recordPeakTps(tps)
   }
 
   /** @returns true when the sample was recorded, false when skipped (zero total or duplicate). */
@@ -163,8 +179,9 @@ export class LedgerStore {
 
     if (total === 0) return false
 
-    if (options.tps && options.tps > this.peakTps) {
-      this.peakTps = Math.round(options.tps * 10) / 10
+    const peakTps = options.peakTps ?? options.tps
+    if (peakTps !== undefined && Number.isFinite(peakTps) && peakTps >= 0 && peakTps > this.peakTps) {
+      this.peakTps = Math.round(peakTps * 10) / 10
     }
 
     const pricingSpec = resolvePricingConfig()

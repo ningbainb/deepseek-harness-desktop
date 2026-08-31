@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LedgerStore } from '../src/ledger-store.ts'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { unlinkSync, existsSync } from 'node:fs'
+import { readFileSync, unlinkSync, existsSync, writeFileSync } from 'node:fs'
 
 describe('LedgerStore', () => {
   it('records usage, aggregates totals, models, and calculates 52-week heatmap', () => {
@@ -45,6 +45,47 @@ describe('LedgerStore', () => {
     const today = summary.heatmap[summary.heatmap.length - 1]
     expect(today.count).toBe(5800)
     expect(today.level).toBeGreaterThan(0)
+
+    if (existsSync(tempFile)) unlinkSync(tempFile)
+  })
+
+  it('ignores legacy average-rate peaks and persists the rolling metric version', () => {
+    const tempFile = join(tmpdir(), `test-legacy-ledger-${Date.now()}.json`)
+    const legacyRecord = {
+      date: '2026-08-30',
+      totalTokens: 7,
+      inputTokens: 4,
+      outputTokens: 3,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      estimatedCost: 0.1,
+      turns: 1,
+      cacheSavedCost: 0,
+      byModel: { legacy: { tokens: 7, cost: 0.1, turns: 1 } },
+    }
+    writeFileSync(tempFile, JSON.stringify({
+      updatedAt: Date.now(),
+      peakTps: 12_625,
+      records: [legacyRecord],
+      steps: [],
+    }), 'utf-8')
+
+    const store = new LedgerStore({ filePath: tempFile })
+    expect(store.getSummary().peakTps).toBe(0)
+    expect(store.getSummary().totalTokens).toBe(7)
+
+    expect(store.recordUsage({
+      model: 'new-model',
+      inputTokens: 1,
+      outputTokens: 1,
+      peakTps: 12.4,
+      timestamp: Date.now(),
+    })).toBe(true)
+    expect(store.getSummary().peakTps).toBe(12.4)
+
+    const persisted = JSON.parse(readFileSync(tempFile, 'utf-8')) as { peakTpsVersion?: number }
+    expect(persisted.peakTpsVersion).toBe(2)
+    expect(new LedgerStore({ filePath: tempFile }).getSummary().peakTps).toBe(12.4)
 
     if (existsSync(tempFile)) unlinkSync(tempFile)
   })

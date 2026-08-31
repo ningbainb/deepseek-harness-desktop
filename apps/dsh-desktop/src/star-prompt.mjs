@@ -1,7 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-export const STAR_PROMPT_VERSION = '2.4.0'
+// Bump the once-per-release claim key so the community prompt is shown again
+// after upgrading to the 3.2.0 release, while remaining idempotent thereafter.
+export const STAR_PROMPT_VERSION = '3.2.0'
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {

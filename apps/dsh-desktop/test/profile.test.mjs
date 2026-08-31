@@ -300,6 +300,33 @@ test('desktop profile always mounts the compatibility bundle that owns native wo
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@linxin666/dsh-desktop-compat'), true)
 })
 
+test('desktop profile directly includes Value Mode as a first-class builtin bundle and isolates it from web-ui-all aggregate', () => {
+  assert.equal(BUILTIN_BUNDLES.includes('@linxin666/dsh-value-mode'), true)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@linxin666/dsh-value-mode'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
+  assert.equal(DEPENDENCY_ONLY_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
+})
+
+test('profile manifest adopts pre-installed community Value Mode bundle into builtins without duplication', () => {
+  const manifest = createDesktopProfileManifest({
+    dependencies: {
+      '@linxin666/dsh-value-mode': '0.1.0',
+      '@community/plugin': '1.0.0',
+    },
+    dsh: {
+      profile: {
+        bundles: [
+          '@linxin666/dsh-value-mode',
+          '@community/plugin',
+        ],
+      },
+    },
+  })
+  const valueModeOccurrences = manifest.dsh.profile.bundles.filter((b) => b === '@linxin666/dsh-value-mode').length
+  assert.equal(valueModeOccurrences, 1)
+  assert.equal(manifest.dsh.profile.bundles.includes('@community/plugin'), true)
+})
+
 test('desktop profile receives the independent particle theme from dependency reconciliation exactly once', () => {
   assert.equal(BUILTIN_BUNDLES.includes('@linxin666/dsh-particle-theme'), false)
   assert.equal(AGGREGATED_BUNDLES.includes('@linxin666/dsh-particle-theme'), false)

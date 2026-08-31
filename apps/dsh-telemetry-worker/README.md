@@ -1,6 +1,14 @@
 # Anonymous product metrics service
 
-This Cloudflare Worker accepts only the fixed Desktop product-event schema and official-site download-click schema. It writes aggregate event counts, rotating daily and monthly actor rows, and a bounded stable anonymous installation cohort to D1 so the administration surface can report DAU, MAU, country-level users, version adoption, in-app update conversion, Extension Dock conversion, D1/D7/D30 retention, and session-duration buckets. It does not persist raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, package names, model names, local secrets, accounts, machine codes, or hardware identifiers. Download clicks store only the UTC day, Cloudflare-provided two-letter country code, release version, fixed website position, and count.
+This Cloudflare Worker accepts only the fixed Desktop product-event schema and official-site download-click schema. It writes aggregate event counts, rotating daily and monthly actor rows, and bounded stable anonymous installation activity and cohort rows to D1 so the administration surface can report DAU, WAU, rolling 30-day MAU, the 400-day installation total, monthly-observed country and version counts, in-app update conversion, Extension Dock conversion, D1/D7/D30 retention, session-duration buckets, and Value Mode selection, onboarding, enablement, strategy, and controller/subagent route counts. It does not persist raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, package names, model names, local secrets, accounts, machine codes, hardware identifiers, token counts, or error text. Download clicks store only the UTC day, Cloudflare-provided two-letter country code, release version, fixed website position, and count.
+
+## Metric definitions
+
+- Active activity is an accepted schema 3 `app_launch` event. The client supplies an HMAC-derived `installationActor`; D1 stores only the 64-character pseudonymous value and a day presence row.
+- DAU is the distinct installation-actor count for the current server UTC day. WAU is the distinct count across the current day and six preceding UTC days. MAU is the distinct count across the current day and 29 preceding UTC days. Duplicate launches on the same day are removed by the D1 primary key.
+- The dashboard trend fills every requested UTC day, including zero-activity days. Its MAU trend is a per-day rolling 30-day distinct count rather than a calendar-month count.
+- The installation total counts first-seen installation actors retained in the current 400-day window. It is not a lifetime account-user count; multiple devices count separately, and deleting or resetting local analytics state creates a new anonymous installation identity.
+- Country, version, and funnel breakdowns continue to use the bounded monthly observation actor table so historical schema 2 data remains available. These segment totals are independent observations and do not need to sum to the stable-actor MAU.
 
 ## One-time deployment
 
@@ -56,4 +64,4 @@ Emergency stop, followed by a normal deploy:
 pnpm dlx wrangler@latest deploy --var INGEST_ENABLED:0
 ```
 
-Re-enable ingestion only after resolving the incident. The scheduled Worker job deletes daily actor rows after 35 days, monthly actor rows after 13 months, and stable retention-cohort plus aggregate trend rows after 400 days.
+Re-enable ingestion only after resolving the incident. The scheduled Worker job deletes daily actor rows after 35 days, monthly actor rows after 13 months, and stable installation activity, retention-cohort, and aggregate trend rows after 400 days.

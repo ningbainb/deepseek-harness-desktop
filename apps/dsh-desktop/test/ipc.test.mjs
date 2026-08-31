@@ -23,9 +23,117 @@ test('desktop action validation exposes only diagnostics and exit', () => {
   for (const action of ['open-logs', 'export-diagnostics', 'exit']) {
     assert.equal(normalizeDesktopAction(action), action)
   }
-  for (const action of ['retry', 'repair', 'disable-plugin', 'safe-mode', 'run-command', '../repair', '', 42]) {
+  // 'launch-builtins' was accepted through 3.0.x with no implementation, so it
+  // fell through to the exit branch and quit the application.
+  for (const action of ['launch-builtins', 'retry', 'repair', 'disable-plugin', 'safe-mode', 'run-command', '../repair', '', 42]) {
     assert.throws(() => normalizeDesktopAction(action), /desktop action/)
   }
+})
+
+test('desktop:action quits only for the exit action', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  let exitCalls = 0
+  let logCalls = 0
+  let diagnosticsCalls = 0
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.1.0',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => { logCalls += 1 },
+    exportDiagnostics: async () => { diagnosticsCalls += 1 },
+    exitApp: () => { exitCalls += 1 },
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+  })
+  try {
+    const invoke = (action) => handlers.get('desktop:action')({ sender }, action)
+
+    await invoke('open-logs')
+    assert.equal(logCalls, 1)
+    assert.equal(exitCalls, 0, 'open-logs must not quit the application')
+
+    await invoke('export-diagnostics')
+    assert.equal(diagnosticsCalls, 1)
+    assert.equal(exitCalls, 0, 'export-diagnostics must not quit the application')
+
+    await invoke('exit')
+    assert.equal(exitCalls, 1)
+
+    // The 3.0.x defect this guards: an action with no implementation must be
+    // rejected, never silently treated as a quit request.
+    await assert.rejects(() => invoke('launch-builtins'), /desktop action/u)
+    assert.equal(exitCalls, 1, 'a rejected action must never quit the application')
+  } finally {
+    unregister()
+  }
+})
+
+test('Value Mode telemetry IPC is main-only and accepts only fixed dimensions', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const events = []
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.1.0',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exportDiagnostics: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+    recordValueModeEvent: (event) => {
+      events.push(event)
+      return true
+    },
+  })
+  try {
+    assert.equal(await handlers.get('desktop:value-mode-event')({ sender }, {
+      kind: 'state',
+      state: 'enabled',
+      source: 'onboarding',
+    }), true)
+    assert.deepEqual(events, [{ kind: 'state', state: 'enabled', source: 'onboarding' }])
+    await assert.rejects(
+      handlers.get('desktop:value-mode-event')({ sender }, {
+        kind: 'entry',
+        configured: true,
+        model: 'secret-model',
+      }),
+      (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+    )
+  } finally {
+    unregister()
+  }
+  assert.equal(handlers.has('desktop:value-mode-event'), false)
 })
 
 test('window chrome IPC accepts only supported themes', () => {
@@ -48,6 +156,7 @@ test('window chrome Help IPC accepts only fixed application actions', () => {
 test('window chrome Tools IPC exposes only fixed Desktop tool surfaces', () => {
   assert.equal(normalizeToolAction('extensions'), 'extensions')
   assert.equal(normalizeToolAction('terminal'), 'terminal')
+  assert.equal(normalizeToolAction('conversation-import'), 'conversation-import')
   for (const action of ['run-command', 'open-url', '', 42]) {
     assert.throws(() => normalizeToolAction(action), /Tools action/)
   }
@@ -78,6 +187,10 @@ test('startup IPC serves only the first page read-only contract until full regis
   surfaceRegistry.register(sender, 'main')
   const themes = []
   const unregister = registerDesktopStartupIpc({
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.1.0',
+    platform: 'win32',
+    getStatus: () => ({ state: 'starting', phase: 'runtime-start' }),
     ipcMain,
     surfaceRegistry,
     setWindowChromeTheme: (target, theme) => {
@@ -87,7 +200,10 @@ test('startup IPC serves only the first page read-only contract until full regis
   })
   try {
     assert.deepEqual([...handlers.keys()].toSorted(), [
+      'desktop:action',
       'desktop:contract',
+      'desktop:info',
+      'desktop:status',
       'desktop:update-status',
       'desktop:window-chrome-theme',
     ])
@@ -96,6 +212,16 @@ test('startup IPC serves only the first page read-only contract until full regis
       surface: 'main',
       capabilities: ['updates.read'],
     })
+    assert.deepEqual(await handlers.get('desktop:info')({ sender }), {
+      appId: 'desktop',
+      productName: 'Desktop',
+      version: '3.1.0',
+      platform: 'win32',
+    })
+    assert.deepEqual(
+      await handlers.get('desktop:status')({ sender }),
+      publicRuntimeStatus({ state: 'starting', phase: 'runtime-start' }),
+    )
     assert.deepEqual(
       await handlers.get('desktop:update-status')({ sender }),
       publicUpdateStatus(undefined),
@@ -336,6 +462,96 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
     ['updates'],
   ])
   unregister()
+})
+
+test('conversation import IPC exposes selected-root batch workflow and clone-safe window open result', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const progressEvents = []
+  const callbacks = []
+  let progressListener
+  const service = {
+    setSourceRoot: (kind, root) => {
+      callbacks.push(['set-root', kind, root])
+      return root
+    },
+    subscribeBatchProgress: (listener) => {
+      progressListener = listener
+      return () => { progressListener = undefined }
+    },
+    probeSources: async () => [],
+    discoverAll: async () => ({ sources: [], projects: [] }),
+    createPreviewPlan: async () => ({ planId: 'plan-1' }),
+    confirmAndImport: async () => ({ ok: true }),
+    createBatchPreviewPlan: async (options) => ({ planId: 'batch-1', options }),
+    confirmAndImportBatch: async () => ({ ok: true, firstSessionId: 'session-1', firstWorkspaceId: 'workspace-1' }),
+    cancelBatchImport: (planId) => planId === 'batch-1',
+    searchContent: async () => [],
+  }
+  const sent = []
+  const importWindow = { isDestroyed: () => false, webContents: { send: (...args) => sent.push(args) } }
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const imported = []
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    conversationImportService: service,
+    getConversationImportWindow: () => importWindow,
+    openConversationImport: async () => ({ nativeWindow: true }),
+    pickProjectDirectory: async () => 'C:\\target',
+    pickConversationSourceDirectory: async () => 'C:\\selected-source',
+    onConversationImportConfirmed: async (result) => imported.push(result),
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.1.0',
+    platform: 'win32',
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exportDiagnostics: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+  })
+  try {
+    assert.deepEqual(await handlers.get('desktop:conversation-import-open')({ sender }), { opened: true })
+    assert.deepEqual(
+      await handlers.get('desktop:conversation-import-pick-source-directory')({ sender }, 'claude-code'),
+      { sourceKind: 'claude-code', rootDir: 'C:\\selected-source' },
+    )
+    assert.deepEqual(callbacks, [['set-root', 'claude-code', 'C:\\selected-source']])
+    assert.deepEqual(
+      await handlers.get('desktop:conversation-import-batch-preview')({ sender }, { sourceKind: 'claude-code' }),
+      { planId: 'batch-1', options: { sourceKind: 'claude-code' } },
+    )
+    assert.deepEqual(await handlers.get('desktop:conversation-import-batch-cancel')({ sender }, 'batch-1'), true)
+    assert.deepEqual(await handlers.get('desktop:conversation-import-batch-confirm')({ sender }, 'batch-1'), {
+      ok: true,
+      firstSessionId: 'session-1',
+      firstWorkspaceId: 'workspace-1',
+    })
+    assert.deepEqual(imported, [{
+      ok: true,
+      firstSessionId: 'session-1',
+      firstWorkspaceId: 'workspace-1',
+      sessionId: 'session-1',
+      workspaceId: 'workspace-1',
+    }])
+    progressListener({ phase: 'item-complete', completed: 1, total: 1 })
+    assert.deepEqual(sent, [['desktop:conversation-import-batch-progress', { phase: 'item-complete', completed: 1, total: 1 }]])
+    assert.equal(progressEvents.length, 0)
+  } finally {
+    unregister()
+  }
+  assert.equal(progressListener, undefined)
 })
 
 test('plugin install request IPC accepts only remote references and never installs by itself', async () => {

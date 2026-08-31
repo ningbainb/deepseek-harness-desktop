@@ -1,0 +1,1 @@
+{"version":3,"file":"runtime-telemetry.d.ts","sourceRoot":"","sources":["../../../src/core/runtime-telemetry.ts"],"names":[],"mappings":"AAAA,eAAO,MAAM,mCAAmC,2BAA2B,CAAA;AAE3E,MAAM,MAAM,yBAAyB,GAAG;IACtC,KAAK,EAAE,MAAM,CAAA;IACb,OAAO,EAAE,SAAS,GAAG,QAAQ,CAAA;IAC7B,IAAI,EAAE,YAAY,GAAG,UAAU,CAAA;CAChC,CAAA;AAOD;;;;GAIG;AACH,wBAAgB,6BAA6B,CAC3C,OAAO,EAAE,yBAAyB,GACjC,IAAI,CAQN"}

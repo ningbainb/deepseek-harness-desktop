@@ -1,0 +1,329 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.popover {
+  position: fixed !important;
+  top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px)) !important;
+  right: max(12px, env(safe-area-inset-right, 0px)) !important;
+  left: auto !important;
+  width: min(320px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100dvh - 68px) !important;
+  height: auto !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+/* The desktop chrome reserves space for real modal layers. This compact
+   header popover is fixed independently, so keep its height content-driven. */
+:global(html[data-dsh-desktop-window-chrome="true"]) .root .popover {
+  top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px)) !important;
+  height: auto !important;
+  max-height: calc(100dvh - 68px) !important;
+}
+
+/* Header popovers are portaled to body. Match the desktop layer with one
+   extra ancestor so its full-window height rule cannot win on the portal. */
+:global(html[data-dsh-desktop-window-chrome="true"]) body .popover {
+  top: max(52px, calc(env(safe-area-inset-top, 0px) + 44px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - 68px) !important;
+}
+
+.onboardingPopover {
+  width: min(420px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  padding: 18px !important;
+  gap: 14px !important;
+  border-color: rgba(96, 165, 250, 0.3) !important;
+  border-radius: 14px !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(59, 130, 246, 0.16), transparent 42%),
+    linear-gradient(145deg, #1c2432 0%, #18181b 72%) !important;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(96, 165, 250, 0.06) !important;
+}
+
+/* The blank-session bridge is mounted directly under body, so it does not
+   inherit the `.root` scoping used by the session-header chip. The host may
+   add its modal-layer class to portal nodes; keep this guide content-sized so
+   its footer remains reachable below the desktop title bar. */
+.heroOnboardingPopover {
+  height: auto !important;
+}
+
+.setupHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setupEyebrow {
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.setupTitle {
+  margin: 4px 0 0;
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.setupClose {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.setupClose:hover {
+  border-color: rgba(125, 211, 252, 0.5);
+  background: rgba(125, 211, 252, 0.1);
+  color: #ffffff;
+}
+
+.setupLead {
+  margin: -2px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.setupSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setupStep {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.52);
+  transition: border-color 0.16s, background 0.16s;
+}
+
+.setupStepReady {
+  border-color: rgba(52, 211, 153, 0.3);
+  background: rgba(6, 78, 59, 0.18);
+}
+
+.setupStepNumber {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(96, 165, 250, 0.16);
+  color: #93c5fd;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.setupStepReady .setupStepNumber {
+  background: rgba(52, 211, 153, 0.16);
+  color: #6ee7b7;
+}
+
+.setupStepBody {
+  min-width: 0;
+}
+
+.setupStepHeading {
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.setupStepValue {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #93c5fd;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setupDefaultNote {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.setupModelButton {
+  align-self: center;
+  min-width: 48px;
+}
+
+.setupStrategy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setupStrategyLabel {
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.setupFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.setupHint {
+  min-width: 0;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.setupSubmit {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.setupError {
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.popoverHeader,
+.historyToggle,
+.actionRow,
+.actionStack {
+  min-width: 0;
+}
+
+.popoverHeader,
+.historyToggle,
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.popoverHeader,
+.historyToggle {
+  justify-content: space-between;
+}
+
+.actionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.actionRow {
+  align-items: stretch;
+}
+
+.actionButton {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.historyToggle {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.historyTime {
+  color: #9ca3af;
+}
+
+.savingsValue {
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .popover {
+    top: max(48px, calc(env(safe-area-inset-top, 0px) + 40px)) !important;
+    right: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 60px) !important;
+  }
+
+  :global(html[data-dsh-desktop-window-chrome="true"]) .root .popover {
+    top: max(48px, calc(env(safe-area-inset-top, 0px) + 40px)) !important;
+  }
+
+  :global(html[data-dsh-desktop-window-chrome="true"]) body .popover {
+    top: max(48px, calc(env(safe-area-inset-top, 0px) + 40px)) !important;
+    max-height: calc(100dvh - 60px) !important;
+  }
+
+  .onboardingPopover {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 14px !important;
+  }
+
+  .setupStep {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .setupModelButton {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .setupFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .setupSubmit {
+    width: 100%;
+  }
+}

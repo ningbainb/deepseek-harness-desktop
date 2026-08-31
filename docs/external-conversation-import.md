@@ -1,63 +1,111 @@
-﻿# 从其他 AI 工具继续工作 (Context Handoff Import)
+# External Conversation Import (V2)
 
-DeepSeek Harness Desktop 支持从其他 AI Coding Agent（如 Claude Code、Codex）安全导入会话工作上下文，并生成合法的 DSH 会话继续未完成的任务。
+## 1. Architecture Overview
 
-## 核心架构与设计原则
+DeepSeek Harness provides an external conversation import subsystem that scans, extracts, redacts, and reconstructs full conversational history from external AI programming assistants (Codex and Claude Code) into legitimate DeepSeek Harness workspaces and sessions.
 
-```
-External Agent Sources (Read-Only)
-    │
-    ├── ClaudeCodeAdapter (扫描 ~/.claude/projects, ~/.claude/sessions)
-    │
-    └── CodexAdapter (扫描 ~/.codex/sessions, ~/.codex/history.jsonl)
-            │
-            ↓
-    ExternalConversationV1 (标准化中间 IR)
-            │
-            ↓
-    Import Planner (scan -> preview -> plan -> confirm -> apply -> verify -> commit)
-            │
-    ┌───────┴────────────────────────┐
-    ↓                                ↓
-Project Matcher            Context Reconstructor + ImportTokenBudgeter + Redactor
-(精确 CWD、Git root、      (提炼主要任务、技术决策、关联文件、命令产物、
- 远程仓库匹配、版本比对)    错误拦截、完成状态、最近尾部对话、脱敏、Token 预算)
-    │                                │
-    └───────────────┬────────────────┘
-                    ↓
-            Handoff Context (<external-agent-handoff> 提示词)
-                    ↓
-            DSH Session Bridge (官方通道创建合法会话并写入上下文)
-                    ↓
-            Import Ledger (atomic state/external-conversation-imports-v1.json)
-                    ↓
-            自动导航至主窗口新会话
-```
+The architecture consists of the following components:
 
-## 功能特点
+- **Adapters (CodexAdapter, ClaudeCodeAdapter)**:
+  - Discover local session logs and projects in standard user directories (~/.codex/sessions, ~/.codex/archived_sessions, and ~/.claude/projects).
+  - Parse multiline and streaming JSONL logs while filtering out internal reasoning, world state, and telemetry.
+  - Extract user messages, assistant messages, tool calls, tool results, and system contexts into the canonical ExternalConversationV2 model.
+  - Automatically redact API keys, tokens, bearer headers, and private credentials.
 
-1. **只读安全发现**:
-   - 严格以只读模式访问外部工具数据目录，不对 `~/.claude` 或 `~/.codex` 产生任何写操作。
-   - 内置路径穿越防护与符号链接转义拦截。
+- **Transcript Import Protocol (transcript-protocol.mjs)**:
+  - Defines the schema and transaction model for historical event transformation.
+  - Converts ExternalConversationV2 events into canonical DeepSeek Harness SessionEvent structures (turn/start, user/message, step/start, tool/call, tool/result, assistant/message, step/end, turn/end, session/end-seed).
+  - Tags every historical event with { imported: true, historical: true, executable: false, importId, sourceKind, sourceEventId } to prevent unintentional re-execution.
 
-2. **容错流式解析**:
-   - 逐行流式解析 JSONL，支持最大单行与文件大小上限。
-   - 自动跳过截断尾行、未知事件类型、内部推理（Thinking/Reasoning）链与非用户可见轨迹。
+- **Project Matcher (project-matcher.mjs)**:
+  - Resolves canonical directory paths, Git repository roots, and commit revisions.
+  - Compares original paths with current workspaces with four-tier priority:
+    1. Exact canonical physical directory match;
+    2. Git repository root match (including the common case where the source
+       recorded an umbrella/launch directory above the currently opened repo);
+    3. Git remote URL match;
+    4. Explicit user directory selection.
+  - Explicitly halts import when project directory is invalid or non-existent instead of creating corrupted workspaces.
 
-3. **严格凭据脱敏**:
-   - 自动识别并脱敏 API Key、OAuth Bearer Token、JWT、私钥、密码及环境配置中的敏感数据，替换为 `[REDACTED_*]` 占位符。
+- **Session Bridge (session-bridge.mjs)**:
+  - Coordinates workspace creation/connection and session instantiation using official runtime interfaces (hostContext.workspaces, hostContext.sessions).
+  - Injects historical seed events during session initialization.
+  - Never directly mutates internal SQLite databases or generates fake fallback session identifiers.
 
-4. **项目智能对齐与版本比对**:
-   - 优先通过规范真实路径（Canonical realpath）与 Git Root / Remote 匹配当前工作区。
-   - 智能比对历史会话时的 Git Commit 与当前 HEAD 版本，代码版本变更时自动在上下文注入变动提示。
+- **Import Ledger Store (ledger.mjs)**:
+  - Persists atomic import records with compound keys.
+  - Guarantees idempotency and session reuse when source files have not changed.
+  - Tracks import transaction lifecycles (in_progress, succeeded, failed) and supports resumption.
 
-5. **Token 严格受控**:
-   - 目标 Token 预算控制在 4,000 ~ 8,000 Tokens，硬上限 10,000 Tokens。
-   - 保留核心工作状态结构提要与最近轮次对话尾部，确保为后续对话预留充足上下文空间。
+- **Folder-level batch workflow**:
+  - The handoff window can use the native directory picker to select an arbitrary
+    Claude Code data folder (normally `.claude`) and/or Codex data folder
+    (normally `.codex`; live, legacy rollout, and `archived_sessions` trees are
+    all included). The selected roots are retained in the main process and
+    become the only additional safe-path boundaries for that import.
+  - A batch preview groups every discovered source project by its recorded
+    `cwd`, shows the target DSH path, and asks for a current directory only when
+    the original folder no longer exists. Existing DSH workspaces at the same
+    canonical path are reused; otherwise the official workspace registry creates
+    one workspace.
+  - Confirming a batch creates one independent DSH session per source session.
+    The ledger makes retries idempotent, and per-session progress lets the UI
+    continue after an individual file fails. Failed rows can be retried without
+    re-importing successful rows.
 
-6. **防重复导入与增量检测**:
-   - 使用原子账本（`external-conversation-imports-v1.json`）记录导入指纹。
-   - 当源会话发生更新时，提示用户「源会话有更新」，支持将最新状态导入为新会话。
+---
 
-7. **原生官方会话桥接**:
-   - 完全基于 DSH 官方会话创建通道与事件机制，不直接读写私有持久化文件，不伪造工具执行事件或运行时能力声明。
+## 2. ExternalConversationV2 Data Model
+
+Canonical JSON Schema Structure:
+- schemaVersion: external-conversation-v2
+- source: { kind, sessionId, sourceFile, sourceFingerprint, importedAt }
+- project: { displayName, originalCwd, gitRoot, gitBranch, gitRevision }
+- conversation: { title, startedAt, endedAt, eventCount, visibleMessageCount, toolCallCount }
+- events: Array of TranscriptEvent items:
+  - eventId: Deterministic SHA-256 hash derived from sourceSessionId + sequence + sourceEventId
+  - sequence: 1-indexed strictly monotonic positive integer
+  - type: message | tool_call | tool_result | system
+  - role: user | assistant | tool | system
+  - content: Redacted text content (for message/system)
+  - toolName, toolCallId, toolArgs: Function/tool metadata (for tool_call)
+  - toolResult, toolStatus: Execution result and status (for tool_result)
+  - historical: true
+  - executable: false
+  - timestampQuality: exact | inferred
+  - sourceTimestamp: Epoch millisecond timestamp
+  - sourceEventId: Original record identifier from source file
+
+---
+
+## 3. Security and Safety Boundaries
+
+1. **No Historical Execution**:
+   All imported tool calls and results are strictly tagged with historical: true and executable: false. The DeepSeek Harness runtime treats them as static conversation surface history and will not re-execute shell commands or file writes.
+
+2. **No Reasoning Leakage**:
+   Hidden chain-of-thought, internal reasoning traces, rollout telemetry, and world states from external engines are excluded during parsing and never imported into the DSH session surface.
+
+3. **Strict Path Validation**:
+   Path traversal attempts and non-existent directories are blocked. The system will prompt the user to pick an existing valid directory before any session creation can proceed.
+
+4. **Credential Redaction**:
+   All message contents, tool arguments, error messages, and command outputs pass through the regex-based Redactor pipeline, masking API keys (OpenAI, Anthropic, DeepSeek, GitHub tokens, AWS keys, Bearer tokens, private certificates).
+
+5. **No Direct SQLite Mutation**:
+   All workspace and session creation happens via public runtime service APIs (sessions.create, workspaces.create) or constructor seed options. Direct SQLite modifications are disallowed to ensure database consistency.
+
+6. **Source folders are read-only**:
+   Batch scanning and import only read files below the selected source roots;
+   no source transcript, index, or configuration file is modified. Symlinks that
+   resolve outside an approved root remain blocked by `assertSafePath`.
+
+---
+
+## 4. Runtime Compatibility and Known Capabilities
+
+- **Seeded Session Instantiation**:
+  The DeepSeek Harness session runtime (@deepseek-ai/dsh-session) accepts { seed: readonly SessionEvent[] } in CreateSessionOptions. All events before session/end-seed are seamlessly rendered on the user interface as historical turns.
+
+- **Standalone Desktop Execution**:
+  When running in host desktop mode, DSHSessionBridge invokes host Cordis context services to create workspaces and initialize seeded sessions. When host context is not connected, the bridge returns an explicit capability error without inventing fake session IDs.

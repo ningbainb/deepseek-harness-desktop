@@ -43,15 +43,14 @@
 
 /* The shell keeps the remote entry row and the dock entry side by side in a
    wide footer. In the rail, stack the footer seats so the phone, update, and
-   dock icons share one center line while preserving the sidebar package's
-   native collapsed width and centering rules. */
+   dock icons share one center line. Do not infer the state from descendant
+   data-wide/data-rail markers: those markers are updated during the shell's
+   animation and can remain stale after the sidebar has opened again. */
 :global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [class*='footArea'] > [class*='footerActions']),
-:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']),
-:global([data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']:has([data-rail='rail'])),
-:global([data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']:has([data-wide='rail'])) {
+:global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']) {
   box-sizing: border-box;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-}
+}

@@ -13,10 +13,15 @@ import {
 import { DesktopSkinStateService } from './skin-state.ts'
 import { installToolCallArgumentNormalization } from './tool-call-normalization.ts'
 import { installTranscriptBalanceGuard } from './transcript-balance.ts'
+import { registerDesktopConversationImportRoute } from './conversation-import-route.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
 
 export const name = 'desktop-compat'
-export const inject = ['llm', 'tools', 'webServer', 'workspaceRegistry']
+// The import route resolves the optional log-backed title service through
+// ctx.get(), so a minimal Host composition without sessionTitle can still
+// load Desktop Compat. The normal DSH composition provides the service and
+// the route persists titles through it.
+export const inject = ['llm', 'tools', 'webServer', 'workspaceRegistry', 'sessions']
 
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 export function apply(ctx: Context): void {
@@ -26,6 +31,10 @@ export function apply(ctx: Context): void {
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
     'dsh-desktop-compat: workspace native-open authority',
+  )
+  ctx.effect(
+    () => registerDesktopConversationImportRoute(ctx),
+    'dsh-desktop-compat: conversation import authority',
   )
 
   // Background execution is off by default. Electron passes this exact
@@ -117,3 +126,10 @@ export {
   registerDesktopWorkspaceFileOpenRoute,
   resolveDesktopWorkspaceFileOpenTarget,
 } from './workspace-file-open-route.ts'
+
+export {
+  DESKTOP_CONVERSATION_IMPORT_PATH,
+  createDesktopConversationImportRoute,
+  importConversationIntoHost,
+  registerDesktopConversationImportRoute,
+} from './conversation-import-route.ts'

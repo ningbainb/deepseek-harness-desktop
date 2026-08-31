@@ -282,6 +282,24 @@ h1 {
   line-height: 1.5;
 }
 
+/* The real startup phase. Distinct from the decorative percentage above:
+   this text always comes from a backend lifecycle transition, never from a
+   timer, so it stays truthful after the animation has already reached its
+   ceiling and stopped moving. */
+.status-phase {
+  min-height: 16px;
+  margin: 4px 0 0;
+  color: #9fb6c9;
+  font-size: 11px;
+  font-family: var(--mono);
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+.status-phase[hidden] {
+  display: none !important;
+}
+
 .status-ticker {
   min-height: 18px;
   margin: 6px 0 0;

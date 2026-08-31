@@ -5,7 +5,7 @@ window.__ModuleLoader__.load({
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		//#region \0dsh-css:packages/dsh-web-ui-all/src/client/sidebar-rail.module.css.mjs
-		const css = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>button,[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-taskboard-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-ssh-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-balance-entry],[data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-pane=sidebar] [class*=entryRow][data-rail=rail]{box-sizing:border-box;align-self:center;width:36px;min-width:36px;margin-inline:auto}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-pane=sidebar] [class*=entryRow][data-rail=rail]{flex-direction:column-reverse;justify-content:center;align-items:center;gap:4px;display:flex}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=dockEntry],[data-sidebar-collapsed] [data-pane=sidebar] [class*=dockEntry],[data-pane=sidebar] [class*=dockEntry][data-wide=rail]{justify-content:center;align-self:center;align-items:center;width:36px;min-width:36px;height:36px;margin-inline:auto;display:flex}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[class*=footArea]>[class*=footerActions],[data-sidebar-collapsed] [data-pane=sidebar] [class*=footArea]>[class*=footerActions],[data-pane=sidebar] [class*=footArea]>[class*=footerActions]:has([data-rail=rail]),[data-pane=sidebar] [class*=footArea]>[class*=footerActions]:has([data-wide=rail]){box-sizing:border-box;flex-direction:column;justify-content:center;align-items:center;gap:4px}";
+		const css = "[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>button,[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-taskboard-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-ssh-entry],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[data-dsh-balance-entry],[data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-pane=sidebar] [class*=entryRow][data-rail=rail]{box-sizing:border-box;align-self:center;width:36px;min-width:36px;margin-inline:auto}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-sidebar-collapsed] [data-pane=sidebar] [class*=entryRow],[data-pane=sidebar] [class*=entryRow][data-rail=rail]{flex-direction:column-reverse;justify-content:center;align-items:center;gap:4px;display:flex}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar] [class*=dockEntry],[data-sidebar-collapsed] [data-pane=sidebar] [class*=dockEntry],[data-pane=sidebar] [class*=dockEntry][data-wide=rail]{justify-content:center;align-self:center;align-items:center;width:36px;min-width:36px;height:36px;margin-inline:auto;display:flex}[data-dsh-frame][data-sidebar-collapsed] [data-pane=sidebar]>div>[class*=footArea]>[class*=footerActions],[data-sidebar-collapsed] [data-pane=sidebar] [class*=footArea]>[class*=footerActions]{box-sizing:border-box;flex-direction:column;justify-content:center;align-items:center;gap:4px}";
 		const tagId = "@linxin666/dsh-web-ui-all/sidebar-rail.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -264,6 +264,28 @@ window.__ModuleLoader__.load({
 			["[class*=\"centerCol\"]", "data-pane=\"conversation\""],
 			["[class*=\"detailsCol\"]", "data-pane=\"details\""]
 		];
+		/**
+		* The current shell writes rail-only layout declarations directly onto the
+		* footer slot wrapper. It removes the width/flex declarations when the rail
+		* opens again, but older shell builds leave `margin-inline:auto` and
+		* `justify-content:center` behind. Clear only those known rail declarations
+		* while the sidebar is wide so the shell's normal footer layout can resume.
+		*/
+		function resetExpandedFooterActionStyles(sidebar, isCollapsed) {
+			if (isCollapsed) return false;
+			let changed = false;
+			for (const action of sidebar.querySelectorAll("[data-slot=\"sidebar.footer.action\"]")) {
+				if (action.style.getPropertyValue("margin-inline") === "auto") {
+					action.style.removeProperty("margin-inline");
+					changed = true;
+				}
+				if (action.style.getPropertyValue("justify-content") === "center") {
+					action.style.removeProperty("justify-content");
+					changed = true;
+				}
+			}
+			return changed;
+		}
 		/** One pass over the current DOM. Returns false once every stamp is already in place. */
 		function applyShims() {
 			let changed = false;
@@ -283,7 +305,9 @@ window.__ModuleLoader__.load({
 				frame.setAttribute("data-dsh-frame", "");
 				changed = true;
 			}
-			const isCollapsed = sidebarEl !== null && (sidebarEl.offsetWidth > 0 && sidebarEl.offsetWidth <= 80 || sidebarEl.classList.contains("hHd-Xa_collapsed") || sidebarEl.className.includes("collapsed") || sidebarEl.querySelector("[class*=\"collapsed\"]") !== null || sidebarEl.querySelector("[data-rail=\"rail\"], [data-wide=\"rail\"]") !== null);
+			const sidebarClassName = typeof sidebarEl?.className === "string" ? sidebarEl.className : "";
+			const isCollapsed = sidebarEl !== null && (sidebarEl.offsetWidth > 0 && sidebarEl.offsetWidth <= 80 || sidebarEl.classList.contains("hHd-Xa_collapsed") || /(?:^|\s)collapsed(?:\s|$)/u.test(sidebarClassName));
+			if (sidebarEl !== null) changed = resetExpandedFooterActionStyles(sidebarEl, isCollapsed) || changed;
 			if (frame !== null) {
 				if (isCollapsed && !frame.hasAttribute("data-sidebar-collapsed")) {
 					frame.setAttribute("data-sidebar-collapsed", "");

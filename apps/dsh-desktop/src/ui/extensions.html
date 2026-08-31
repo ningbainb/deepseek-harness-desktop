@@ -113,7 +113,11 @@
         </form>
         <div class="plugin-tools">
           <p id="plugin-update-state">内置插件随桌面版更新；社区插件仅在此处检查。</p>
-          <button type="button" class="secondary" id="check-plugin-updates">检查插件更新</button>
+          <div class="plugin-tool-actions">
+            <button type="button" class="secondary" id="open-conversation-import">导入外部对话 (Claude / Codex)</button>
+            <button type="button" class="secondary" id="open-plugins-dir">打开插件目录</button>
+            <button type="button" class="secondary" id="check-plugin-updates">检查插件更新</button>
+          </div>
         </div>
         <div class="list" id="plugin-list" aria-live="polite"></div>
       </section>
@@ -133,6 +137,10 @@
           </div>
           <button type="button" class="item-action update" id="restore-safe-mode" hidden>恢复历史停用插件并重启</button>
         </article>
+        <div class="recovery-toolbar">
+          <h3>环境自愈与重置</h3>
+          <button type="button" class="item-action danger" id="reset-profile-env">一键重置插件环境（格式化）</button>
+        </div>
         <div class="recovery-toolbar">
           <h3>最近故障</h3>
           <button type="button" class="secondary" id="export-diagnostics">导出诊断包</button>
@@ -159,42 +167,60 @@
           <div><h2>Desktop Preset</h2></div>
           <p>导出或恢复允许的插件、设置、技能与任务模板。Preset 不包含 Secret，也不会静默安装。</p>
         </div>
-        <div class="preset-trust-note">完整性校验只能证明文件未在传输中损坏，不代表发布者身份可信。导入前请逐项审阅。</div>
-        <div class="skill-actions">
-          <button type="button" class="secondary" id="export-preset">导出当前环境</button>
-          <button type="button" class="primary" id="select-preset">选择 .dshpreset</button>
+        <div class="preset-actions">
+          <button type="button" class="primary" id="export-preset">导出当前环境为 Preset</button>
+          <button type="button" class="secondary" id="select-preset">选择并导入 Preset…</button>
         </div>
-        <section class="migration-card">
-          <div><h3>Web Profile → Desktop Profile</h3><p>先预览旧 Web Profile 的插件，选择要迁移的项目；缺失、不兼容和 Desktop 管理项不会被静默导入。</p></div>
-          <button type="button" class="secondary" id="preview-migration">查看迁移内容</button>
-        </section>
-        <section class="preset-plan" id="migration-plan" hidden>
-          <div class="preset-summary"><div><span class="meta">MIGRATION PREVIEW</span><strong>选择迁移项</strong></div><label class="risk-check"><input type="checkbox" id="migration-allow-unknown">允许迁移未声明兼容范围的插件</label></div>
-          <div class="list preset-list" id="migration-items"></div>
-          <div class="preset-actions"><button type="button" class="primary" id="apply-migration">迁移所选插件</button></div>
-        </section>
-        <section class="preset-plan" id="preset-plan" hidden>
+        <div id="preset-plan" class="preset-plan" hidden>
           <div class="preset-summary">
-            <div><span class="meta">MANIFEST</span><strong id="preset-name">--</strong><p id="preset-description"></p></div>
-            <span class="badge unknown" id="preset-trust">未信任</span>
+            <div>
+              <div class="name-row">
+                <h3 id="preset-name">Preset</h3>
+                <span class="badge" id="preset-trust">未验证</span>
+              </div>
+              <p class="description" id="preset-description"></p>
+            </div>
+            <div class="preset-facts" id="preset-facts"></div>
           </div>
-          <div class="preset-facts" id="preset-facts"></div>
-          <h3>插件计划</h3>
-          <div class="list preset-list" id="preset-packages"></div>
-          <h3>技能与配置</h3>
-          <div class="list preset-list" id="preset-config"></div>
-          <label class="risk-check preset-confirm"><input type="checkbox" id="preset-confirm">我已查看 Manifest、requiredSecrets、冲突和信任摘要，并确认导入</label>
-          <div class="preset-actions"><button type="button" class="primary" id="import-preset">确认并导入</button></div>
-        </section>
-        <section class="preset-progress" id="preset-progress" aria-live="polite" hidden>
-          <span class="meta">IMPORT PROGRESS</span>
-          <ol id="preset-progress-steps"></ol>
-        </section>
+          <div class="preset-section">
+            <h4>包含的社区插件</h4>
+            <div class="list" id="preset-packages"></div>
+          </div>
+          <div class="preset-section">
+            <h4>技能与配置</h4>
+            <div class="list" id="preset-config"></div>
+          </div>
+          <div class="preset-footer">
+            <label class="risk-check"><input type="checkbox" id="preset-confirm">我已确认导入内容，并允许桌面版应用精确插件版本与配置（失败将自动回滚）</label>
+            <button type="button" class="primary" id="import-preset">应用 Preset 并重启</button>
+          </div>
+          <div id="preset-progress" class="preset-progress" hidden>
+            <h4>导入进度</h4>
+            <ol id="preset-progress-steps"></ol>
+          </div>
+        </div>
+
+        <div class="panel-head" style="margin-top: 32px">
+          <div><h3>Web Profile 迁移</h3></div>
+          <p>将历史 Web Profile 中的插件和允许的配置迁移到当前 Desktop Profile。</p>
+        </div>
+        <div class="preset-actions">
+          <button type="button" class="secondary" id="preview-migration">检查可迁移的 Web Profile</button>
+        </div>
+        <div id="migration-plan" class="preset-plan" hidden>
+          <div class="preset-section">
+            <h4>发现的插件与配置</h4>
+            <div class="list" id="migration-items"></div>
+          </div>
+          <div class="preset-footer">
+            <label class="risk-check"><input type="checkbox" id="migration-allow-unknown">允许迁移未声明适配范围的插件</label>
+            <button type="button" class="primary" id="apply-migration">迁移所选内容并重启</button>
+          </div>
+        </div>
       </section>
       </main>
     </div>
-
-    <div class="toast" id="toast" role="status" hidden></div>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="./extensions.mjs"></script>
   </body>
 </html>

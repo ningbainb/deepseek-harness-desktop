@@ -9,6 +9,10 @@ import {
   formatUpdateDetails,
   normalizeReleaseNotes,
 } from '../src/updater.mjs'
+import {
+  requestsDisableUpdates,
+  resolveDesktopProxyConfiguration,
+} from '../src/electron-app.mjs'
 
 const tick = () => new Promise((resolve) => setImmediate(resolve))
 
@@ -90,7 +94,6 @@ test('updater selects beta metadata only when the persisted channel is beta', ()
   assert.equal(beta.updater.allowDowngrade, false)
   beta.controller.dispose()
 })
-
 test('stable ignores beta metadata and never downloads a lower Stable release after beta', async () => {
   const stable = createHarness()
   await stable.controller.check()
@@ -108,7 +111,6 @@ test('stable ignores beta metadata and never downloads a lower Stable release af
   assert.ok(switched.logs.some((line) => line.includes('downgrade')))
   switched.controller.dispose()
 })
-
 test('download failover publishes the active source and suppresses intermediate errors', async () => {
   let retrying = true
   let updater
@@ -405,4 +407,28 @@ test('hung install preparation exits with a bounded error and recovery callback'
   assert.equal(harness.controller.getStatus().phase, 'error')
   assert.match(harness.controller.getStatus().message, /update preparation did not finish before the timeout \(10ms\)/u)
   harness.controller.dispose()
+})
+
+test('requestsDisableUpdates recognizes CLI flags and environment variables', () => {
+  assert.equal(requestsDisableUpdates([], { DSH_DESKTOP_DISABLE_UPDATES: '1' }), true)
+  assert.equal(requestsDisableUpdates(['--disable-updater']), true)
+  assert.equal(requestsDisableUpdates(['--DISABLE-UPDATES']), true)
+  assert.equal(requestsDisableUpdates(['--no-updater']), true)
+  assert.equal(requestsDisableUpdates(['--no-update']), true)
+  assert.equal(requestsDisableUpdates(['--other-flag']), false)
+  assert.equal(requestsDisableUpdates([]), false)
+})
+
+test('resolveDesktopProxyConfiguration extracts proxy rules from argv and environment', () => {
+  assert.deepEqual(resolveDesktopProxyConfiguration(['--proxy-server=http://127.0.0.1:7890']), {
+    proxyRules: 'http://127.0.0.1:7890',
+  })
+  assert.deepEqual(resolveDesktopProxyConfiguration([], {
+    HTTP_PROXY: 'http://proxy.corp:8080',
+    NO_PROXY: 'localhost,127.0.0.1',
+  }), {
+    proxyRules: 'http=http://proxy.corp:8080;https=http://proxy.corp:8080',
+    proxyBypassRules: 'localhost,127.0.0.1',
+  })
+  assert.equal(resolveDesktopProxyConfiguration([], {}), undefined)
 })

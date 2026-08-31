@@ -1,0 +1,3 @@
+- insert:
+    - id: ui-value-mode
+      name: '@linxin666/dsh-value-mode'
