@@ -39,12 +39,28 @@ let electronApp
 try {
   electronApp = await launchDesktop()
   const firstPage = await waitForHarnessPage(electronApp)
-  await firstPage.waitForTimeout(1_600)
-  if (await firstPage.locator('#dsh-desktop-star-prompt[data-open="true"]').isVisible()) {
-    throw new Error('the retired 2.4.0 Star campaign appeared for the current release')
+  const firstPrompt = firstPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
+  await firstPrompt.waitFor({ state: 'visible', timeout: 10_000 })
+  await firstPage.getByRole('button', { name: '去 GitHub 点个 Star' }).waitFor({ state: 'visible' })
+  await firstPage.getByRole('button', { name: '先继续使用', exact: true }).click()
+  await firstPrompt.waitFor({ state: 'hidden' })
+
+  const claimedState = JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8'))
+  if (!claimedState.shownVersions?.includes('3.2.0')) {
+    throw new Error(`3.2.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
   }
 
   await electronApp.close()
+  electronApp = undefined
+  electronApp = await launchDesktop()
+  const thirdPage = await waitForHarnessPage(electronApp)
+  await thirdPage.waitForTimeout(1_600)
+  if (await thirdPage.locator('#dsh-desktop-star-prompt[data-open="true"]').isVisible()) {
+    throw new Error('the 3.2.0 Star prompt appeared more than once for the same user profile')
+  }
+
+  await electronApp.close()
+  electronApp = undefined
   electronApp = await launchDesktop({ preview: true })
   const secondPage = await waitForHarnessPage(electronApp)
   const previewPrompt = secondPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
@@ -53,13 +69,11 @@ try {
   await secondPage.getByRole('button', { name: '先继续使用', exact: true }).click()
   await previewPrompt.waitFor({ state: 'hidden' })
 
-  try {
-    const state = await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8')
-    throw new Error(`preview mode unexpectedly persisted Star prompt state: ${state}`)
-  } catch (error) {
-    if (error?.code !== 'ENOENT') throw error
+  const previewState = JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8'))
+  if (JSON.stringify(previewState) !== JSON.stringify(claimedState)) {
+    throw new Error(`preview mode changed Star prompt state: ${JSON.stringify(previewState)}`)
   }
-  console.log('verified retired Star campaign stays hidden for 2.5.0 and remains previewable without persistence')
+  console.log('verified 3.2.0 Star prompt appears once, persists its claim, and remains previewable without extra persistence')
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })
