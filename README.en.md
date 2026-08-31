@@ -39,7 +39,7 @@ The installer includes the main runtime components, so you do not need to separa
 ### Latest Release: 3.2.0
 
 - **Value Mode V2**: An expert controller model understands, decomposes, delegates, reviews, and synthesizes work while a subagent worker model handles bounded subtasks; first selection opens setup guidance.
-- **Large-Model Usage Dashboard**: Input/output tokens, context, cache, latency, cost, and generation speed are visible; peak speed uses a strict rolling one-second algorithm instead of treating aggregate usage as 12,625 tok/s.
+- **Large-Model Usage Dashboard**: Balance, input/output tokens, context, cache, latency, cost, and generation speed are visible; peak speed uses a strict rolling one-second algorithm instead of treating one aggregate usage event as instantaneous throughput.
 - **Claude Code / Codex Project Import**: Read-only discovery of projects and historical sessions, preview before import, centralized redaction, and non-executable historical tool calls.
 - **More reliable startup and plugins**: Visible startup phases, transactional repair with rollback, and SafePluginBoundary isolation while existing DSH Home data and plugins continue to load directly.
 
@@ -55,19 +55,19 @@ When you select **Value Mode**, the desktop client opens a setup guide immediate
 
 The expert controller can handle simple work directly or delegate parallel subtasks when useful. Worker depth is capped at one level, so workers do not recursively delegate or invoke a duplicate expert-analysis path. Controller and worker calls remain distinguishable in the session UI and product metrics.
 
-![DeepSeek Harness Desktop 3.2.0 Value Mode setup and expert controller](docs/screenshots/3.2.0-value-mode.webp)
+![DeepSeek Harness Desktop 3.2.0 Value Mode three-step setup and expert controller](docs/screenshots/3.2.0-value-mode-setup.webp)
 
 ### Large-model usage dashboard: make every token explainable
 
 The session status row and usage dashboard show input/output tokens, context usage, cache hits, LLM latency, estimated cost, current generation speed, and per-step peak speed. Streaming increments are merged by millisecond and evaluated in a rolling one-second window; final usage only corrects billed totals and cannot create a fake instantaneous peak.
 
-![DeepSeek Harness Desktop 3.2.0 large-model usage dashboard](docs/screenshots/3.2.0-main-workspace.webp)
+![DeepSeek Harness Desktop 3.2.0 large-model usage dashboard](docs/screenshots/3.2.0-usage-dashboard.webp)
 
 ### Claude Code and Codex: continue existing work
 
 Select a local Claude Code or Codex data directory, review discovered project sessions, and import the selected history into a real Harness workspace and session. The flow is read-only, idempotent, and resumable: API keys, tokens, cookies, and paths are redacted, while imported tool calls remain historical and non-executable.
 
-![DeepSeek Harness Desktop 3.2.0 Claude Code and Codex project import](docs/screenshots/3.2.0-project-import.webp)
+![DeepSeek Harness Desktop 3.2.0 Claude Code and Codex project import preview](docs/screenshots/3.2.0-project-import-preview.webp)
 
 See [External Conversation Import](docs/external-conversation-import.md), [Value Mode](packages/dsh-value-mode/README.md), and [Live Stats](packages/dsh-live-stats/README.md) for implementation boundaries.
 
@@ -151,7 +151,7 @@ The desktop app runs the DeepSeek Harness Web Surface directly while the desktop
 
 In one window, you can handle AI conversations, code changes, file management, Git operations, task execution, model switching, and plugin extensions.
 
-![DeepSeek Harness Desktop 3.2.0 main interface and AI coding workspace](docs/screenshots/3.2.0-main-workspace.webp)
+![DeepSeek Harness Desktop 3.2.0 main interface and AI coding workspace](docs/screenshots/3.2.0-workspace.webp)
 
 ## Skills and Plugins
 
@@ -253,7 +253,7 @@ The input area can display:
 - Input Tokens
 - Output Tokens
 
-![Large-model usage dashboard and rolling one-second peak](docs/screenshots/3.2.0-main-workspace.webp)
+![Large-model usage dashboard and rolling one-second peak](docs/screenshots/3.2.0-usage-dashboard.webp)
 
 ## Themes and Skins
 

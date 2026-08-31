@@ -19,12 +19,12 @@
     <meta property="og:url" content="https://ningbainb.github.io/deepseek-harness-desktop/">
     <meta property="og:site_name" content="DeepSeek Harness Desktop">
     <meta property="og:locale" content="zh_CN">
-    <meta property="og:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp">
+    <meta property="og:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp">
     <meta property="og:image:alt" content="DeepSeek Harness Desktop 3.2.0 主界面与 AI 编程工作区">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="DeepSeek Harness Desktop 3.2.0：专家主控的开源 Windows AI 工作台">
     <meta name="twitter:description" content="性价比模式、实时大模型用量看板，以及 Claude Code / Codex 项目导入，全部集成在一个可直接安装的 Windows 桌面客户端中。">
-    <meta name="twitter:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp">
+    <meta name="twitter:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp">
     <title>DeepSeek Harness Desktop 3.2.0 - 性价比模式与大模型用量看板</title>
     <script type="application/ld+json">
       {
@@ -56,11 +56,12 @@
             "codeRepository": "https://github.com/ningbainb/deepseek-harness-desktop",
             "license": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/LICENSE",
             "dateModified": "2026-09-01",
-            "image": "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp",
+            "image": "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp",
             "screenshot": [
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode.webp",
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import.webp",
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp"
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp",
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp",
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import-preview.webp",
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp"
             ],
             "featureList": [
               "完整 Harness Web Surface",
@@ -198,7 +199,7 @@
       } catch {}
     </script>
     <link rel="icon" href="official-whale.svg" type="image/svg+xml">
-    <link rel="preload" as="image" href="assets/desktop-3.2.0-main-workspace.webp" type="image/webp" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/desktop-3.2.0-workspace.webp" type="image/webp" fetchpriority="high">
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" type="module"></script>
   </head>
@@ -337,21 +338,21 @@
             </article>
             <article class="latest-card reveal">
               <span class="latest-index">03</span>
-              <h3>大模型用量看板</h3>
-              <p>实时查看输入/输出 Token、上下文占用、缓存命中、请求耗时和费用；生成速度使用严格滚动 1 秒窗口计算，显示真实步骤峰值，不把 usage 汇总冒充瞬时速率。</p>
-              <small>LIVE USAGE DASHBOARD</small>
+              <h3>用量中心 + 滚动峰值</h3>
+              <p>把余额、Token、缓存节省、请求耗时和费用放在一屏；生成速度严格按有效流式增量统计，滚动 1 秒峰值不会被一次汇总事件放大。</p>
+              <small>TOKENS, COST, ROLLING PEAK</small>
             </article>
             <article class="latest-card reveal">
               <span class="latest-index">04</span>
-              <h3>Claude Code / Codex 项目导入</h3>
-              <p>只读扫描本机项目和历史会话，保留项目上下文与工具记录；路径、Token、API Key 等敏感内容集中脱敏，导入后作为不可执行的历史上下文继续工作。</p>
-              <small>CONTEXT HANDOFF IMPORT</small>
+              <h3>导入预览，安全接续</h3>
+              <p>Claude Code / Codex 项目和会话先扫描、再预览、后确认；敏感字段统一脱敏，历史工具记录保留为不可执行上下文。</p>
+              <small>CLAUDE CODE + CODEX HANDOFF</small>
             </article>
             <article class="latest-card reveal">
               <span class="latest-index">05</span>
-              <h3>原有数据直接打开</h3>
-              <p>桌面版复用当前 DSH Home、会话、设置和插件，独立 Desktop Profile 与端口回退让它可以和官方 Web 端共存。</p>
-              <small>LOSSLESS DESKTOP CONTINUITY</small>
+              <h3>完整 Harness 工作台</h3>
+              <p>会话、工作区、文件、变更、技能、任务看板、SSH 和插件入口都在同一个桌面工作区里，原有 DSH 数据继续沿用。</p>
+              <small>ONE DESKTOP WORKSPACE</small>
             </article>
             <article class="latest-card reveal">
               <span class="latest-index">06</span>
@@ -377,42 +378,42 @@
 
       <section class="features" id="features">
         <div class="container">
-          <div class="section-title reveal"><span>3.2.0 实机界面</span><h2>真实工作流，一眼看懂每个模型在做什么</h2></div>
+          <div class="section-title reveal"><span>3.2.0 实机界面 · 文案与画面一一对应</span><h2>从第一次选择到真正接手工作，每一步都有画面</h2></div>
 
           <article class="feature-row reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">1</span><h3>性价比模式：先选角色，再开始协作</h3></div>
-              <p>用户点选性价比模式后立即看到配置引导，不需要猜“为什么没有生效”。当前默认模型会预选为专家主控，用户再选择副模型和策略；完成后主控模型负责全局判断，副模型按需执行局部任务。</p>
-              <ul><li>专家主控模型 + 副模型子代理</li><li>更省 / 智能平衡 / 更强三档策略</li><li>完整配置后自动启用，失败保持关闭</li></ul>
+              <div class="feature-title"><span class="play-icon">1</span><h3>性价比模式：选择角色，立即开始协作</h3></div>
+              <p>右侧实机画面就是用户选择模式后看到的配置引导：专家主控模型、副模型 / 子代理执行模型、运行策略三步集中确认。没有明确主控时才预选当前默认模型，配置完整后才写入并开启。</p>
+              <ul><li>01 专家主控模型：理解、拆解、复核、汇总</li><li>02 副模型：并行调查、局部实现和重复性工作</li><li>03 运行策略：更省 / 平衡 / 更强，未完成配置保持关闭</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-value-mode.webp" width="1600" height="1028" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 性价比模式配置与专家主控状态"><figcaption>性价比模式配置：专家主控与副模型清晰分工</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-value-mode-setup.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 性价比模式三步配置引导，包含专家主控模型、副模型和运行策略"><figcaption>实机：三步配置引导，未完成配置时保持关闭</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">2</span><h3>大模型用量看板：费用和峰值可解释</h3></div>
-              <p>实时查看输入/输出 Token、上下文、缓存命中、LLM 耗时和当前费用。生成吞吐严格按滚动 1 秒窗口计算，同毫秒批次先合并，usage 汇总只修正账单 Token，不制造夸张的瞬时峰值。</p>
-              <ul><li>会话级输入 / 输出 Token</li><li>滚动 1 秒最新速率与步骤峰值</li><li>没有有效流式样本时显示“暂无数据”</li></ul>
+              <div class="feature-title"><span class="play-icon">2</span><h3>大模型用量看板：消耗、余额和峰值放在一屏</h3></div>
+              <p>点击侧栏“大模型用量”即可进入用量中心。实机首屏展示余额、今日 / 累计 Token、缓存节省、滚动 1 秒峰值、年度热力图和 30 天走势；无有效流式样本时明确显示“暂无数据”，不制造虚假速率。</p>
+              <ul><li>余额、今日 Token、累计 Token、缓存节省</li><li>滚动 1 秒最新速率与步骤内峰值</li><li>热力图与 30 天走势，空数据安全降级</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-main-workspace.webp" width="1600" height="1028" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 主界面和大模型 Token 用量状态栏"><figcaption>从会话状态行读懂 Token、费用与生成速度</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-usage-dashboard.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 大模型用量与数据分析中心，展示余额、Token、缓存和滚动 1 秒峰值"><figcaption>实机：用量中心首屏（无历史数据时显示“暂无数据”）</figcaption></figure>
           </article>
 
           <article class="feature-row reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">3</span><h3>从 Claude Code / Codex 无缝接着做</h3></div>
-              <p>选择本机的 Claude Code 或 Codex 数据目录，按项目扫描历史会话，预览后导入当前 Harness 工作区。导入只读、可重试且幂等，历史工具调用不会被重新执行。</p>
-              <ul><li>自动发现项目、Git 根目录和会话</li><li>Token、API Key、路径等敏感内容统一脱敏</li><li>历史上下文标记为不可执行，安全继续工作</li></ul>
+              <div class="feature-title"><span class="play-icon">3</span><h3>Claude Code / Codex：扫描、选择、预览，再接着做</h3></div>
+              <p>这张深色实机画面对应“已完成扫描并选中会话”的预览态：两种来源并列显示项目和会话，右侧先看迁移上下文，再确认导入 Harness。整个流程只读、可重试且幂等。</p>
+              <ul><li>Claude Code 与 Codex 项目 / 会话并列发现</li><li>选中会话后预览项目匹配与 Transcript Events</li><li>Token、API Key、路径等敏感内容脱敏，历史工具调用不可执行</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-project-import.webp" width="1600" height="1028" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目历史会话导入界面"><figcaption>Claude Code / Codex 项目与历史会话导入</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-project-import-preview.webp" width="1040" height="720" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入扫描结果和选中会话预览"><figcaption>实机：已扫描 7 + 7 会话，选中后预览迁移上下文</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">4</span><h3>完整 Harness 工作台，数据直接延续</h3></div>
-              <p>不是另起炉灶的聊天壳：会话、工具、模型、文件、Git、Skills、任务看板、插件和远程开发都在同一个桌面工作区里。独立 profile 与端口回退让桌面版和官方 Web 端可以并行。</p>
-              <ul><li>原有 DSH Home、设置和插件直接载入</li><li>任务、Git、SSH、移动远程一体化</li><li>插件异常隔离，启动失败可见并可恢复</li></ul>
+              <div class="feature-title"><span class="play-icon">4</span><h3>完整 Harness 工作台：一个窗口接着工作</h3></div>
+              <p>这张主界面实机图展示了桌面版的真实骨架：会话与工作区在左侧，文件 / 变更面板在右侧，模型、技能和发送入口集中在中间。任务看板、SSH、插件和原有 DSH 数据从同一工作台继续使用。</p>
+              <ul><li>会话、工作区、文件、变更导航清晰可见</li><li>模型、技能、插件与任务能力在同一桌面入口</li><li>独立 profile 与端口回退，桌面版可和 Web 端共存</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-handoff-import.webp" width="1600" height="1111" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 外部 AI 会话导入预览与项目匹配界面"><figcaption>预览、匹配、确认：外部会话导入有清晰边界</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-workspace.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 主工作区，展示会话、工作区、文件变更面板和桌面能力入口"><figcaption>实机：主工作区、文件 / 变更面板与能力入口</figcaption></figure>
           </article>
         </div>
       </section>
