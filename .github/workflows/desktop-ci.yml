@@ -37,6 +37,7 @@ jobs:
       - run: pnpm test
       - run: pnpm test:scripts
       - run: pnpm runtime-deps:check
+      - run: pnpm runtime-graph:check
       - run: pnpm dsh-imports:check
       - run: pnpm dsh-audit:check
       - run: pnpm runtime-support:check

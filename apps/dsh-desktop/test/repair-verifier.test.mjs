@@ -137,6 +137,9 @@ test('repair command children receive only allowlisted environment variables', a
   assert.equal(typeof childEnv.PATH, 'string')
   assert.equal(childEnv.DSH_DESKTOP_REPAIR_MODE, undefined)
 
+  const windowsAlias = verifierChildEnvironment({ Path: 'C:/alias-bin' })
+  assert.equal(windowsAlias.PATH, process.platform === 'win32' ? 'C:/alias-bin' : undefined)
+
   const filtered = verifierChildEnvironment({
     PATH: 'C:/bin',
     SystemRoot: 'C:/Windows',

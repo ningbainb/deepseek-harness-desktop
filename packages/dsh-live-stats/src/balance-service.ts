@@ -1,8 +1,17 @@
-/**
+﻿/**
  * LLM Balance Service.
  * Fetches user balance and quota details from the DeepSeek official balance endpoint
  * (https://api.deepseek.com/user/balance) or active provider configuration.
+ *
+ * Adheres to official DeepSeek API specs:
+ * GET https://api.deepseek.com/user/balance
+ * Headers: Authorization: Bearer <API_KEY>, Accept: application/json
  */
+
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
+import type { Context } from '@deepseek-ai/cordis'
 
 export interface BalanceInfo {
   currency: string
@@ -29,20 +38,77 @@ interface CacheEntry {
   timestamp: number
 }
 
-const CACHE_TTL_MS = 60_000 // 60 seconds cache
+const CACHE_TTL_MS = 30_000 // 30 seconds cache
+
+/** Find credentials from user home .dsh directory. */
+function findKeyInUserFiles(): string | undefined {
+  try {
+    const homeCandidates = [
+      process.env.DSH_HOME,
+      process.env.USERPROFILE,
+      homedir(),
+    ].filter((p): p is string => typeof p === 'string' && p.length > 0)
+
+    for (const home of homeCandidates) {
+      const candidates = [
+        join(home, '.dsh', '.credentials.yaml'),
+        join(home, '.dsh', 'credentials.yaml'),
+        join(home, '.credentials.yaml'),
+      ]
+      for (const filePath of candidates) {
+        if (existsSync(filePath)) {
+          const content = readFileSync(filePath, 'utf-8')
+          const match = content.match(/DEEPSEEK_API_KEY:\s*([^\s\r\n]+)/)
+          if (match?.[1]) return match[1].trim()
+        }
+      }
+    }
+  } catch {}
+  return undefined
+}
+
+/** Find active model configuration from user settings.yaml. */
+function findModelInUserSettings(): { model: string; provider: string; baseURL?: string } {
+  try {
+    const homeCandidates = [
+      process.env.DSH_HOME,
+      process.env.USERPROFILE,
+      homedir(),
+    ].filter((p): p is string => typeof p === 'string' && p.length > 0)
+
+    for (const home of homeCandidates) {
+      const filePath = join(home, '.dsh', 'settings.yaml')
+      if (existsSync(filePath)) {
+        const content = readFileSync(filePath, 'utf-8')
+        const modelMatch = content.match(/^\s*model:\s*([^\s\r\n]+)/m)
+        const providerMatch = content.match(/^\s*provider:\s*([^\s\r\n]+)/m)
+        const baseMatch = content.match(/^\s*baseURL:\s*([^\s\r\n]+)/m)
+        return {
+          model: modelMatch?.[1]?.trim() ?? 'DeepSeek-V4-Flash',
+          provider: providerMatch?.[1]?.trim() ?? 'deepseek-official',
+          baseURL: baseMatch?.[1]?.trim(),
+        }
+      }
+    }
+  } catch {}
+  return { model: 'DeepSeek-V4-Flash', provider: 'deepseek-official' }
+}
 
 export class BalanceService {
   private cache: CacheEntry | undefined
-  private apiKey: string | undefined
-  private activeModel: string = 'deepseek-v4-视觉模型 (modlens vision)High'
-  private activeProvider: string = 'deepseek'
+  private explicitApiKey: string | undefined
+  private ctx: Context | undefined
+  private activeModel: string = 'DeepSeek-V4-Flash'
+  private activeProvider: string = 'deepseek-official'
+  private customBaseURL: string | undefined
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey ?? process.env.DEEPSEEK_API_KEY ?? process.env.OPENAI_API_KEY
+  constructor(apiKey?: string, ctx?: Context) {
+    this.explicitApiKey = apiKey
+    this.ctx = ctx
   }
 
   public setApiKey(key: string): void {
-    this.apiKey = key
+    this.explicitApiKey = key
     this.cache = undefined
   }
 
@@ -51,44 +117,113 @@ export class BalanceService {
     this.activeProvider = provider
   }
 
+  private async resolveApiKey(): Promise<string | undefined> {
+    if (this.explicitApiKey && this.explicitApiKey.trim().length > 0) {
+      return this.explicitApiKey.trim()
+    }
+
+    // 1. Try ctx.get('credentials')
+    if (this.ctx) {
+      try {
+        const creds = this.ctx.get('credentials') as { resolve?: (key: string) => Promise<{ value: string } | undefined> } | undefined
+        if (creds && typeof creds.resolve === 'function') {
+          const hit = await creds.resolve('DEEPSEEK_API_KEY')
+          if (hit?.value && hit.value.trim().length > 0) {
+            return hit.value.trim()
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Try process.env
+    if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.trim().length > 0) {
+      return process.env.DEEPSEEK_API_KEY.trim()
+    }
+
+    // 3. Try reading local credentials file
+    const fileKey = findKeyInUserFiles()
+    if (fileKey && fileKey.length > 0) {
+      return fileKey
+    }
+
+    return undefined
+  }
+
+  private resolveModelAndProvider(): { model: string; provider: string; baseURL: string } {
+    let model = this.activeModel
+    let provider = this.activeProvider
+    let baseURL = this.customBaseURL ?? 'https://api.deepseek.com'
+
+    if (this.ctx) {
+      try {
+        const settings = this.ctx.get('settings') as Record<string, any> | undefined
+        if (settings) {
+          const defaultModel = settings['agent-default-model']
+          if (defaultModel?.model) model = defaultModel.model
+          if (defaultModel?.provider) provider = defaultModel.provider
+
+          const deepseekSettings = settings['llm-deepseek']
+          if (deepseekSettings?.baseURL) baseURL = deepseekSettings.baseURL
+        }
+      } catch {}
+    }
+
+    if (model === 'DeepSeek-V4-Flash' || provider === 'deepseek-official') {
+      const fromFile = findModelInUserSettings()
+      if (fromFile.model) model = fromFile.model
+      if (fromFile.provider) provider = fromFile.provider
+      if (fromFile.baseURL) baseURL = fromFile.baseURL
+    }
+
+    return { model, provider, baseURL }
+  }
+
   public async getBalance(forceRefresh = false): Promise<ModelBalanceResponse> {
     const now = Date.now()
     if (!forceRefresh && this.cache && (now - this.cache.timestamp < CACHE_TTL_MS)) {
       return this.cache.data
     }
 
-    const key = this.apiKey ?? process.env.DEEPSEEK_API_KEY
-    if (!key) {
-      // Return a default demo/initial balance if no external key is bound
-      const fallback: ModelBalanceResponse = {
-        ok: true,
-        is_available: true,
+    const { model, provider, baseURL } = this.resolveModelAndProvider()
+    const apiKey = await this.resolveApiKey()
+
+    if (!apiKey) {
+      const response: ModelBalanceResponse = {
+        ok: false,
+        is_available: false,
         currency: 'CNY',
-        totalBalance: '49.19',
-        toppedUpBalance: '49.19',
-        grantedBalance: '0.00',
-        modelName: this.activeModel,
-        provider: this.activeProvider,
+        totalBalance: '--',
+        toppedUpBalance: '--',
+        grantedBalance: '--',
+        modelName: model,
+        provider,
         fetchedAt: now,
+        error: '未检测到 DeepSeek API Key，请在【设置 -> 模型】或环境变量中配置',
       }
-      this.cache = { data: fallback, timestamp: now }
-      return fallback
+      return response
     }
 
     try {
-      const response = await fetch('https://api.deepseek.com/user/balance', {
+      const endpoint = `${baseURL.replace(/\/+$/, '')}/user/balance`
+      const res = await fetch(endpoint, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Authorization': `Bearer ${key.trim()}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
       })
 
-      if (!response.ok) {
-        throw new Error(`API responded with status ${response.status}: ${response.statusText}`)
+      if (!res.ok) {
+        let errorDetail = `HTTP ${res.status} ${res.statusText}`
+        try {
+          const errJson = await res.json() as { error?: { message?: string }; message?: string }
+          if (errJson.error?.message) errorDetail = errJson.error.message
+          else if (errJson.message) errorDetail = errJson.message
+        } catch {}
+        throw new Error(errorDetail)
       }
 
-      const json = await response.json() as {
+      const json = await res.json() as {
         is_available?: boolean
         balance_infos?: BalanceInfo[]
       }
@@ -104,11 +239,11 @@ export class BalanceService {
         ok: true,
         is_available: json.is_available ?? true,
         currency: primary.currency || 'CNY',
-        totalBalance: primary.total_balance || '0.00',
-        toppedUpBalance: primary.topped_up_balance || '0.00',
-        grantedBalance: primary.granted_balance || '0.00',
-        modelName: this.activeModel,
-        provider: this.activeProvider,
+        totalBalance: primary.total_balance ?? '0.00',
+        toppedUpBalance: primary.topped_up_balance ?? '0.00',
+        grantedBalance: primary.granted_balance ?? '0.00',
+        modelName: model,
+        provider,
         fetchedAt: now,
       }
 
@@ -116,7 +251,6 @@ export class BalanceService {
       return result
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err)
-      // Return cached data with error notice if available
       if (this.cache) {
         return {
           ...this.cache.data,
@@ -125,19 +259,18 @@ export class BalanceService {
         }
       }
 
-      const fallback: ModelBalanceResponse = {
+      return {
         ok: false,
-        is_available: true,
+        is_available: false,
         currency: 'CNY',
-        totalBalance: '49.19',
-        toppedUpBalance: '49.19',
-        grantedBalance: '0.00',
-        modelName: this.activeModel,
-        provider: this.activeProvider,
+        totalBalance: '--',
+        toppedUpBalance: '--',
+        grantedBalance: '--',
+        modelName: model,
+        provider,
         fetchedAt: now,
-        error: errorMsg,
+        error: `查询余额失败: ${errorMsg}`,
       }
-      return fallback
     }
   }
 }

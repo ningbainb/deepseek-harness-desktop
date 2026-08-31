@@ -15,7 +15,8 @@ test('packaging registers the bounded dsh protocol and .dshpreset association', 
 
 test('file association ingress previews presets internally without exposing their path to a renderer', async () => {
   const main = await readFile(join(root, 'src', 'electron-app.mjs'), 'utf8')
-  assert.match(main, /presetFileFrom\(commandLine\)/u)
+  const ingress = await readFile(join(root, 'src', 'desktop-ingress.mjs'), 'utf8')
+  assert.match(ingress, /presetFileFrom\(commandLine\)/u)
   assert.match(main, /presetService\.previewFile\(path\)/u)
   assert.match(main, /webContents\.send\('extensions:preset-preview', plan\)/u)
   assert.doesNotMatch(main, /webContents\.send\('extensions:preset-preview',\s*path\)/u)

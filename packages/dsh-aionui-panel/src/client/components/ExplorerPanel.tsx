@@ -19,7 +19,7 @@ import { t } from '../locales.ts'
 import { useStore } from '../hooks/useStore.ts'
 import type { PanelStores } from '../store.ts'
 import { FileTypeIcon } from './FileIcon.tsx'
-import { ChevronRightIcon, CloseIcon, ExpandRightIcon, SearchIcon } from './icons.tsx'
+import { ChevronRightIcon, CloseIcon, SearchIcon } from './icons.tsx'
 import { ScmPanel } from './ScmPanel.tsx'
 import { activateOnKey } from './a11y.ts'
 import { FILE_DRAG_MIME } from '../drag/file-drag.ts'
@@ -69,7 +69,7 @@ export async function copyExplorerPath(path: string): Promise<boolean> {
 /**
  * The whole explorer column content.
  * @param stores - the panel store bundle.
- * @param onToggleCollapse - collapse the column (host chrome).
+ * @param onToggleCollapse - close/collapse the column (host chrome).
  */
 export function ExplorerPanel({
   stores,
@@ -132,10 +132,10 @@ export function ExplorerPanel({
           className="aionui-collapse-chevron"
           style={{ marginLeft: 'auto' }}
           onClick={onToggleCollapse}
-          title={t('explorer.collapse')}
-          aria-label={t('explorer.collapse')}
+          title={t('explorer.close')}
+          aria-label={t('explorer.close')}
         >
-          <ExpandRightIcon size={16} />
+          <CloseIcon size={16} />
         </button>
       </div>
 

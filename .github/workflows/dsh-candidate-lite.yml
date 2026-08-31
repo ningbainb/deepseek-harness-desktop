@@ -125,6 +125,7 @@ jobs:
           pnpm test
           pnpm test:scripts
           pnpm runtime-deps:check
+          pnpm runtime-graph:check
           pnpm dsh-imports:check
           pnpm dsh-audit:check
           pnpm sync-shared:check

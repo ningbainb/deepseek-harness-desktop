@@ -2,7 +2,7 @@
 
 ## 发帖信息
 
-- 标题：`〖开源推广〗把 DeepSeek Harness 网页端无损装进 EXE：插件、皮肤和技能扩展都保留`
+- 标题：`〖开源推广〗DeepSeek Harness Desktop 3.2.0：专家主控、用量看板与 Claude Code/Codex 导入`
 - 版块：`开发调优`
 - 标签：`人工智能`、`软件开发`、`开源推广`、`GitHub`
 
@@ -22,11 +22,11 @@
 
 请在这里上传 `linuxdo-post-body-1.png`。
 
-请在这里上传 `../screenshots/desktop-startup.png`，图片说明填写：`DeepSeek Harness Desktop 主界面`。
+请在这里上传 `../screenshots/3.2.0-main-workspace.webp`，图片说明填写：`DeepSeek Harness Desktop 3.2.0 主界面与大模型用量看板`。
 
 请在这里上传 `linuxdo-post-body-2.png`。
 
-请在这里上传 `../screenshots/desktop-extension-dock.png`，图片说明填写：`插件与技能扩展坞`。
+请在这里上传 `../screenshots/3.2.0-value-mode.webp`，图片说明填写：`性价比模式：专家主控与副模型子代理`。
 
 项目地址：
 
@@ -34,9 +34,9 @@ https://github.com/ningbainb/deepseek-harness-desktop
 
 Windows x64 安装包：
 
-https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v0.1.1
+https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.2.0
 
 安装包 SHA-256：
 
-`349a458d594639045e791838dc32e35e61e48e293b25380cb54c8ec8ea4a49cf`
+请从同一 Release 下载 `SHA256SUMS.txt`，以正式发布资产中的 SHA-256 为准。
 

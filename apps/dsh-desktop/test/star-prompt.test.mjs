@@ -15,7 +15,7 @@ import {
 
 test('star prompt is accessible, animated, dependency-free, and honest about its action', () => {
   const script = createStarPromptSurfaceScript()
-  assert.equal(STAR_PROMPT_VERSION, '2.4.0')
+  assert.equal(STAR_PROMPT_VERSION, '3.2.0')
   assert.match(STAR_PROMPT_CSS, /dsh-star-prompt-burst/u)
   assert.match(STAR_PROMPT_CSS, /dsh-star-prompt-orbit/u)
   assert.match(STAR_PROMPT_CSS, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/u)
@@ -32,17 +32,17 @@ test('star prompt is accessible, animated, dependency-free, and honest about its
   assert.doesNotMatch(script, /api\.github\.com|stargazers_count|fetch\(/u)
 })
 
-test('star prompt claims only version 2.4.0 once, including concurrent calls', async () => {
+test('star prompt claims only version 3.2.0 once, including concurrent calls', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-star-prompt-'))
   const path = join(directory, 'state.json')
   try {
     const store = new StarPromptStore({ path })
-    assert.equal(await store.claim('2.2.0'), false)
-    assert.deepEqual(await Promise.all([store.claim('2.4.0'), store.claim('2.4.0')]), [true, false])
-    assert.equal(await store.claim('2.4.0'), false)
+    assert.equal(await store.claim('3.1.0'), false)
+    assert.deepEqual(await Promise.all([store.claim('3.2.0'), store.claim('3.2.0')]), [true, false])
+    assert.equal(await store.claim('3.2.0'), false)
     assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
       schemaVersion: 1,
-      shownVersions: ['2.4.0'],
+      shownVersions: ['3.2.0'],
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
@@ -55,8 +55,8 @@ test('star prompt recovers a corrupt state file without showing future versions'
   try {
     await writeFile(path, '{broken', 'utf8')
     const store = new StarPromptStore({ path })
-    assert.equal(await store.claim('2.4.0'), true)
-    assert.equal(await store.claim('2.4.0'), false)
+    assert.equal(await store.claim('3.2.0'), true)
+    assert.equal(await store.claim('3.2.0'), false)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

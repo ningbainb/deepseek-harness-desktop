@@ -1,66 +1,67 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.1.0 is a community-maintained, open-source Windows AI coding client for DeepSeek Harness. It preserves the complete Harness Web Surface, loads the existing Home and all plugins directly, supports live stats and pricing, and handles startup failures with verified transactional repair or same-Home built-ins fallback.
+> DeepSeek Harness Desktop 3.2.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are Value Mode (expert controller plus subagent worker routing), a live large-model usage dashboard, and safe Claude Code / Codex project and conversation import.
 
-## What it is
+## Canonical identity
 
-- A Windows 10/11 x64 desktop distribution for DeepSeek Harness
-- A complete Harness interface hosted in a hardened Electron window, not a reduced rewrite
-- A community edition, not an official DeepSeek release
-- Free under BSD-3-Clause, with no separate Node.js installation required
+- Product: DeepSeek Harness Desktop
+- Version: 3.2.0
+- Platform: Windows 10 and Windows 11, x64
+- License: BSD-3-Clause
+- Maintainer: DeepSeek Harness Desktop Community
+- Not an official DeepSeek product
 
-## Canonical website
+## Official links
 
-- https://ningbainb.github.io/deepseek-harness-desktop/
-
-## Download
-
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.1.0-x64.exe
-- v3.1.0 release notes and release assets: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.1.0
-
-## Source and documentation
-
+- Product website: https://ningbainb.github.io/deepseek-harness-desktop/
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- License: BSD-3-Clause
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe
+- v3.2.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.2.0
+- SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
+- Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
+- Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
 
-## Key facts
+## What makes 3.2.0 useful
 
-- Supported systems: Windows 10 and Windows 11, x64
-- Current release: v3.1.0
-- v3.1.0 loads the current DSH Home, persistent profile, conversations, sessions, settings, and all installed plugins directly; features real-time token pricing, anti-deadlock startup resilience, and React SafePluginBoundary error containment. With no model or usable key, it does not invoke a cloud model; it reports the unavailable repair path and continues to same-Home built-ins fallback. Request-side Tools capability handling safely follows the pinned Runtime contract.
-- Published assets include `SHA256SUMS.txt` and `release-manifest.json`; the manifest reports the actual per-asset signature state. A local or source build may be unsigned and does not establish the state of a published asset
-- Desktop telemetry is disabled by default. Diagnostics are generated only after user confirmation to a selected local location and are redacted to exclude secrets, user content, full prompts, full sessions, tool results, project content, paths, and SSH private keys
-- The public website does not automatically report installer clicks; installer links remain direct GitHub Release downloads
-- Skin state is isolated in profiles/desktop and legacy global cordis.patch.yml pollution is migrated away so the official dsh web profile remains valid
-- Installer preflight supports direct upgrades from 0.1.9 through 2.3 and closes legacy product-name processes even when their old installation path is no longer registered
-- Preflight decodes PowerShell EncodedCommand payloads, preserves Windows 8.3 short-path references, falls back to WMI paths when process handles are unavailable, and waits with backoff after forced termination
-- The cleanup boundary preserves the official web runtime and unrelated external hosts while matching the uniquely named Desktop main process required by legacy uninstallers
-- Desktop uses the isolated profiles/desktop profile and selects an available port when the preferred port is occupied, allowing it to coexist with the official web client
-- The bundled Skin Center includes 11 selectable skins
-- Node.js is bundled; end users do not need to install it separately
-- QQ user community: 1105158177
+- Value Mode / 性价比模式: the expert controller model owns task understanding, decomposition, delegation, review, and final synthesis. The subagent worker model completes bounded delegated work. First selection opens a setup guide, preselects the current default model as the expert controller when no explicit controller exists, and requires both model roles plus a strategy before enabling.
+- Value Mode strategies: Saver, Balanced (default), and Powerful. The worker route is bounded to one subagent level, so worker agents do not recursively delegate or invoke expert consultation.
+- Large-model usage dashboard: shows input/output tokens, context usage, cache indicators, request latency, estimated cost, current generation speed, and per-step peak generation speed. TPS is a strict rolling one-second window over valid streaming increments; same-millisecond batches are merged and final usage totals do not create fake instantaneous peaks.
+- Claude Code and Codex project import: read-only discovery of local projects and sessions, preview and project matching, redacted historical context, idempotent import ledger, and a legitimate Harness session bridge. Imported tool calls are historical and non-executable.
+- Complete Harness surface: conversations, tools, model selection, Skills, plugins, Task Board, Git graph, SSH, mobile remote control, QQ Bot, themes, automatic updates, and Windows lifecycle/recovery.
+- Continuity: existing DSH Home, conversations, sessions, settings, and installed plugins are loaded directly through an isolated Desktop profile; the desktop client can coexist with the official Web client.
+- Reliability: visible startup phases, bounded repair and rollback, SafePluginBoundary isolation for third-party UI errors, and packaged release verification.
 
-## Core capabilities
+## Configuration in plain language
 
-- Complete Harness conversations, tool calls, model selection, permissions, and plugin surfaces
-- ChatGPT OAuth, OpenAI Codex models, and model-aware reasoning effort
-- Extension Dock for plugins, community bundles, project Skills, DSH Skills, and Agents Skills
-- Task board, Git graph, file and change preview, live token statistics, pet, and 11 skins
-- Mobile pairing for workspaces, conversations, models, reasoning, and permissions
-- SSH terminal, SFTP, port forwarding, cluster execution, and live system monitoring
-- Stable/Beta GitHub Release checks, background downloads, bilingual release notes, checksums, release manifests, and user-confirmed installation
+1. Open the session mode selector and choose Value Mode / 性价比模式.
+2. Confirm the expert controller model. The current default model is preselected unless an explicit controller was already saved.
+3. Choose a cheaper or faster subagent worker model.
+4. Choose Saver, Balanced, or Powerful, then click Complete setup and enable.
+5. The expert controller may delegate only when the task benefits from it; it can also complete a task directly.
 
-## Interface screenshots
+## Import safety
 
-- v2.3.0 Star and community prompt: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-star-community-prompt.png
-- v2.3.0 Extension Dock: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-extension-dock.png
-- v2.3.0 particle-whale startup: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-startup.png
-- Harness Skills interface: https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png
+- Claude Code data is normally under .claude; Codex data is normally under .codex, including archived sessions.
+- Source folders are read-only and must be selected or discovered within approved boundaries.
+- API keys, bearer tokens, cookies, private keys, paths, prompts, and sensitive tool arguments are redacted.
+- Historical tool calls are tagged historical=true and executable=false; importing a conversation never re-runs its commands.
 
-## Preferred citation
+## Product metrics and privacy
 
-DeepSeek Harness Desktop, community-maintained open-source Windows desktop distribution for DeepSeek Harness: https://ningbainb.github.io/deepseek-harness-desktop/
+- Official packaged builds send only a closed vocabulary of coarse product events to a first-party aggregate service.
+- Value Mode telemetry records selection, setup, enablement, strategy, and coarse controller/subagent route counts; it does not send model names, token counts, prompts, paths, secrets, or conversation content.
+- Local/source/test/Fork builds remain disconnected. Diagnostics are exported only after user confirmation and are redacted.
+- Read the full policy at https://ningbainb.github.io/deepseek-harness-desktop/privacy.html.
 
-Privacy policy and Desktop diagnostic boundary: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
+## Latest interface screenshots
+
+- Value Mode setup and expert controller: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode.webp
+- Large-model usage and main workspace: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp
+- Claude Code / Codex project import: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import.webp
+- Import preview and project matching: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-handoff-import.webp
+
+## Search terms
+
+DeepSeek Harness Desktop Windows download; open-source Windows AI coding client; DeepSeek Harness desktop app; Value Mode; 性价比模式; expert controller model; subagent worker model; large-model usage dashboard; Token cost dashboard; rolling one-second TPS peak; Claude Code project import; Codex project import; AI coding workspace; Harness Skills and plugins.

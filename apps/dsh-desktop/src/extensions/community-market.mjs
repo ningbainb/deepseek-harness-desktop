@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto'
 export const COMMUNITY_MARKET_URL = 'https://awesome-dsh-plugin.com/plugins.json'
 
 const DEFAULT_TIMEOUT_MS = 15_000
-const DEFAULT_MAX_BYTES = 2_000_000
-const MAX_PLUGINS = 5_000
+const DEFAULT_MAX_BYTES = 10_000_000
+const MAX_PLUGINS = 10_000
 const MAX_NAME_LENGTH = 200
 const MAX_OWNER_LENGTH = 100
 const MAX_CATEGORY_LENGTH = 80

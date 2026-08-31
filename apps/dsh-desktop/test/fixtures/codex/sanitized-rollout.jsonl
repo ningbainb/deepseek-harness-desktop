@@ -1,0 +1,9 @@
+{"type":"session_meta","payload":{"id":"00000000-0000-0000-0000-000000000001","cwd":"C:\\\\TestProject\\\\App","timestamp":"2026-08-20T10:00:00Z"}}
+{"type":"turn_context","payload":{"cwd":"C:\\\\TestProject\\\\App","workspace_roots":["C:\\\\TestProject\\\\App"]}}
+{"type":"response_item","payload":{"type":"message","role":"user","id":"msg-1","content":[{"type":"text","text":"Please refactor the parser module"}],"timestamp":"2026-08-20T10:00:01Z"}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","id":"msg-2","content":[{"type":"text","text":"I will inspect the codebase first."}],"timestamp":"2026-08-20T10:00:02Z"}}
+{"type":"response_item","payload":{"type":"function_call","name":"view_file","call_id":"call-1","arguments":{"path":"src/parser.js"},"timestamp":"2026-08-20T10:00:03Z"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"export function parse() {}","timestamp":"2026-08-20T10:00:04Z"}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","id":"msg-3","content":[{"type":"text","text":"Done analyzing file."}],"timestamp":"2026-08-20T10:00:05Z"}}
+INVALID MALFORMED JSON LINE THAT SHOULD BE SKIPPED SAFELY
+{"type":"response_item","payload":{"type":"reasoning","content":"internal thinking that must be filtered out"}}

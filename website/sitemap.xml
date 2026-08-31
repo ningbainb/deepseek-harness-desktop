@@ -3,26 +3,26 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc>
-    <lastmod>2026-08-20</lastmod>
+    <lastmod>2026-09-01</lastmod>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/hero-main.png</image:loc>
-      <image:title>DeepSeek Harness Desktop Skills 技能库界面</image:title>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-main-workspace.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.2.0 大模型用量看板与 AI 编程工作区</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-star-community-prompt.png</image:loc>
-      <image:title>DeepSeek Harness Desktop 2.3.0 GitHub Star 与社群反馈引导</image:title>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.2.0 性价比模式专家主控配置</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-extension-dock.png</image:loc>
-      <image:title>DeepSeek Harness Desktop 2.3.0 插件与技能扩展坞</image:title>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-2.3.0-startup.png</image:loc>
-      <image:title>DeepSeek Harness Desktop 2.3.0 粒子鲸鱼启动界面</image:title>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-handoff-import.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.2.0 外部会话导入预览</image:title>
     </image:image>
   </url>
   <url>
     <loc>https://ningbainb.github.io/deepseek-harness-desktop/privacy.html</loc>
-    <lastmod>2026-08-20</lastmod>
+    <lastmod>2026-09-01</lastmod>
   </url>
 </urlset>

@@ -8,6 +8,7 @@ export function createApplicationMenuTemplate({
   openCommunity,
   openFeedback,
   openExtensions,
+  openConversationImport,
   openTerminal,
   openLogs,
   openPrivacy = () => shell.openExternal(PRIVACY_POLICY_URL),
@@ -79,6 +80,7 @@ export function createApplicationMenuTemplate({
         ...(typeof openTerminal === 'function'
           ? [{ label: '内置终端 / Built-in Terminal', accelerator: 'CmdOrCtrl+Alt+T', click: action(openTerminal) }]
           : []),
+        { label: '从其他 AI 工具继续工作 / Continue from Other AI Tools', accelerator: 'CmdOrCtrl+Shift+I', click: action(openConversationImport) },
         { label: '扩展坞 / Extension Dock', accelerator: 'CmdOrCtrl+Shift+X', click: action(openExtensions) },
       ],
     },

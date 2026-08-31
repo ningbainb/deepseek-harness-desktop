@@ -4,11 +4,11 @@
 
 ![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
-## 👥 DeepSeek Harness Desktop 用户交流群
+## DeepSeek Harness Desktop 用户交流群
 
 QQ 群：**1105158177**
 
-**[👉 点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
+**[点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
 
 <a href="https://qm.qq.com/q/vehlNjaeye"><img src="website/assets/qq-group-1105158177.jpg" width="280" alt="DeepSeek Harness Desktop QQ 群 1105158177 加群二维码"></a>
 
@@ -34,28 +34,53 @@ QQ 群：**1105158177**
 
 安装包已包含主要运行组件，无需另外配置 Node.js、Git 或单独安装 DSH。
 
-[🌐 产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [⬇️ 下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [📖 使用文档](docs/desktop.md) · [📝 更新日志](CHANGELOG.md)
+[产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-### 🚀 最新版本：3.1.0
+### 最新版本：3.2.0
 
-- **全链路启动防卡死与自愈**：自适应握手重试与 Windows 文件锁（`EBUSY`）容错，彻底消灭启动卡死与闪退循环。
-- **前端插件安全沙箱（SafePluginBoundary）**：React 错误边界隔离，插件异常绝不波及主界面，保持核心交互 100% 可用。
-- **实时 Token 统计与计费**：实时吞吐量（tokens/sec）监控，深度适配官方阶梯计费与闲时优惠自动切换。
+- **性价比模式 V2**：专家主控模型负责理解、拆解、派发、复核和汇总，副模型 / 子代理只处理被派发的局部任务；首次选择会自动引导配置。
+- **大模型用量看板**：实时展示输入/输出 Token、上下文、缓存、请求耗时与费用；峰值采用严格滚动 1 秒算法，不再把 usage 汇总误报成 12625 tok/s。
+- **Claude Code / Codex 项目导入**：只读发现项目和历史会话，预览后导入 Harness 工作区；敏感信息脱敏，历史工具调用不会重新执行。
+- **启动与插件稳定性继续加固**：启动阶段可见、事务修复可回滚、第三方插件错误隔离，原有 DSH Home 与插件直接延续。
 
-👉 [查看完整发布说明](docs/launch/release-notes.md) · [查看历史更新日志](CHANGELOG.md) · [升级与回滚指南](docs/upgrade-and-rollback.md)
+[查看完整发布说明](docs/launch/release-notes.md) · [查看历史更新日志](CHANGELOG.md) · [升级与回滚指南](docs/upgrade-and-rollback.md)
 
 ---
 
+## 3.2.0 三个核心能力
 
-## ✨ 为什么选择 DeepSeek Harness Desktop
+### 性价比模式：专家做决策，副模型做执行
 
-### 📦 开箱即用
+选择 **性价比模式** 后，桌面端会立即打开配置引导：默认模型会自动预选为 **专家主控模型**，用户再选择一个更省或更快的 **副模型 / 子代理执行模型**，最后选择“更省 / 智能平衡 / 更强”策略。配置完整后才会启用，不会留下半配置状态。
+
+专家主控可以直接完成简单任务，也可以按需派发并行子任务；副模型的子代理深度固定为 1，不递归派发、不调用重复的“专家分析”路径。每个会话的主控调用和副模型调用都能在界面与埋点中区分。
+
+![DeepSeek Harness Desktop 3.2.0 性价比模式配置与专家主控](docs/screenshots/3.2.0-value-mode.webp)
+
+### 大模型用量看板：看清每一次消耗
+
+会话状态行和用量看板集中呈现 Input / Output Token、上下文占用、Cache 命中、LLM 延迟、估算费用、当前生成速度与步骤内峰值。生成速度只来自有效流式增量：同毫秒批次先合并，在每个时间点统计过去 1 秒窗口；最终 usage 只修正账单 Token，不制造虚假瞬时峰值。
+
+![DeepSeek Harness Desktop 3.2.0 大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-main-workspace.webp)
+
+### Claude Code 与 Codex：把已有工作接着做
+
+选择本机的 Claude Code 或 Codex 数据目录，按项目查看可导入的历史会话，确认后生成真正的 Harness 工作区和会话。导入是只读、幂等、可恢复的：API Key、Token、Cookie、路径等敏感字段会脱敏，外部工具调用以历史记录保存且不可执行。
+
+![DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入](docs/screenshots/3.2.0-project-import.webp)
+
+详细边界见 [外部会话导入说明](docs/external-conversation-import.md)；模型角色与路由见 [性价比模式插件](packages/dsh-value-mode/README.zh.md)；峰值算法见 [实时用量看板](packages/dsh-live-stats/README.zh.md)。
+
+
+## 为什么选择 DeepSeek Harness Desktop
+
+### 开箱即用
 
 下载安装 EXE 后即可启动完整 Harness 环境。
 
 无需手动准备 Node.js、Git、pnpm 或 DSH Runtime，桌面端会统一管理所需组件与运行环境。
 
-### 🤖 完整 AI 编程工作台
+### 完整 AI 编程工作台
 
 在一个桌面应用中完成：
 
@@ -69,7 +94,7 @@ QQ 群：**1105158177**
 - Token 与性能统计
 - 多项目开发工作流
 
-### 🧩 Skills 与插件生态
+### Skills 与插件生态
 
 支持多种扩展方式：
 
@@ -82,7 +107,7 @@ QQ 群：**1105158177**
 
 可以直接在 Harness 中搜索、安装和使用扩展能力，将自己的开发工具逐步组合成一套完整工作流。
 
-### ✅ 任务看板与自动化
+### 任务看板与自动化
 
 内置任务看板，可以管理：
 
@@ -92,7 +117,7 @@ QQ 群：**1105158177**
 
 同时支持定时任务与后台调度，适合周期性的开发、维护和自动化工作。
 
-### 🌐 远程开发
+### 远程开发
 
 桌面版不仅可以操作本机项目，也支持远程开发场景：
 
@@ -106,7 +131,7 @@ QQ 群：**1105158177**
 
 可以从电脑、手机或聊天工具连接自己的 Harness 工作环境。
 
-### 🎨 个性化桌面体验
+### 个性化桌面体验
 
 除了开发能力，Desktop 还提供完整的桌面化体验：
 
@@ -121,15 +146,15 @@ QQ 群：**1105158177**
 
 ---
 
-## 🖥️ Harness AI 编程工作台
+## Harness AI 编程工作台
 
 桌面版直接运行 DeepSeek Harness Web Surface，并由桌面宿主管理本地 DSH Runtime。
 
 在同一个窗口中即可完成 AI 对话、代码修改、文件管理、Git 操作、任务执行、模型切换和插件扩展。
 
-![DeepSeek Harness Desktop 主界面与 Skills 技能库](docs/screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop 3.2.0 主界面与 AI 编程工作区](docs/screenshots/3.2.0-main-workspace.webp)
 
-## 🧩 Skills 与插件
+## Skills 与插件
 
 输入框可以直接搜索并插入已安装 Skills。
 
@@ -145,13 +170,13 @@ QQ 群：**1105158177**
 
 插件安装、更新以及运行时生命周期均由桌面宿主统一管理。
 
-## 🧠 Codex 模型与推理强度
+## Codex 模型与推理强度
 
 3.0.9 使用 DSH RC.1 内置的 `llm-pi-ai/openai-codex` 官方授权流程完成 ChatGPT OAuth，并在 Harness 中使用支持的 OpenAI Codex 模型；不再加载会与原生 Provider 冲突的旧 `dsh-codex-connect` 插件。设置页的「ChatGPT 登录」一次点击启动 OAuth，并由系统浏览器继续；授权 grant 只由官方凭据服务读写并保存在本机 DSH Home，前端只读取"是否已登录"，不会收到 access token 或 refresh token。它不会默认替换当前模型、接管全局搜索或启用远程图片工具。
 
 模型切换时，桌面端会根据模型实际能力展示可用的推理强度档位，并自动处理对应配置。
 
-## ✅ 任务看板与自动化
+## 任务看板与自动化
 
 通过任务看板统一管理 Agent 工作。
 
@@ -163,13 +188,13 @@ QQ 群：**1105158177**
 
 除了手动任务之外，还支持定时任务和后台调度，可以用于周期性开发、信息处理和维护工作。
 
-## 🌿 Git 图谱
+## Git 图谱
 
 通过分支选择器和 Git 图谱查看分支关系、Commit 历史、当前仓库状态和分支泳道，帮助快速理解项目变化和代码提交历史。
 
 ![Git 图谱](docs/screenshots/04-git-graph.png)
 
-## 📁 文件、预览与 SCM
+## 文件、预览与 SCM
 
 项目会话右侧提供完整工作面板：
 
@@ -181,7 +206,7 @@ QQ 群：**1105158177**
 
 ![右侧面板](docs/screenshots/19-right-panel.png)
 
-## 📱 手机远程控制
+## 手机远程控制
 
 通过桌面端二维码即可连接当前 Harness 工作区。
 
@@ -195,7 +220,7 @@ QQ 群：**1105158177**
 | **移动端聊天** | **模型与思考强度** |
 | ![移动端聊天](docs/screenshots/22-mobile-chat.png) | ![模型选择](docs/screenshots/23-mobile-model-sheet.png) |
 
-## 🖥️ SSH 远程开发
+## SSH 远程开发
 
 侧边栏内置 SSH 面板，可以直接管理远程服务器，并与 Agent 共用连接配置。
 
@@ -210,7 +235,7 @@ QQ 群：**1105158177**
 
 让 Harness 不仅能操作本机项目，也可以直接参与服务器和远程开发环境中的工作。
 
-## 💬 QQ Bot 接入
+## QQ Bot 接入
 
 桌面版集成腾讯 QQ Bot Connector。
 
@@ -218,20 +243,20 @@ QQ 群：**1105158177**
 
 连接信息由桌面宿主管理，无需手动修改复杂配置文件。
 
-## 📊 实时 Token 与性能统计
+## 大模型用量看板与性能统计
 
 输入区域下方可以实时查看：
 
-- TPS 生成速度
+- 滚动 1 秒生成速度与步骤内峰值
 - LLM 请求耗时
 - 上下文占用
 - Cache 命中率
 - Input Token
 - Output Token
 
-![实时令牌统计](docs/screenshots/18-live-stats.png)
+![大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-main-workspace.webp)
 
-## 🎨 主题与皮肤
+## 主题与皮肤
 
 桌面版内置多套主题，并支持先预览、再应用。
 
@@ -239,7 +264,7 @@ QQ 群：**1105158177**
 
 ![皮肤中心](docs/screenshots/03-settings-skin-center.png)
 
-### 🐳 鲸鱼娘桌宠
+### 鲸鱼娘桌宠
 
 内置鲸鱼娘桌宠。
 
@@ -249,13 +274,13 @@ QQ 群：**1105158177**
 | --- | --- |
 | ![鲸鱼娘桌宠](docs/screenshots/11-pet-new-chat.png) | ![桌宠互动面板](docs/screenshots/12-pet-panel.png) |
 
-### ✨ 全页粒子主题
+### 全页粒子主题
 
 粒子鲸鱼主题不仅可以显示在启动页面，也可以直接应用到 Harness 主界面，并根据输入、弹窗、后台状态和系统「减少动态效果」设置自动调整视觉效果。
 
 ---
 
-## ⬇️ 下载与安装
+## 下载与安装
 
 1. 打开 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest)。
 2. 下载 `DeepSeek-Harness-Desktop-Setup-<版本号>-x64.exe`。
@@ -266,7 +291,7 @@ QQ 群：**1105158177**
 
 如果 GitHub 下载速度较慢，也可以加入页面顶部的用户交流群获取同步提供的安装包。
 
-## 🔄 更新
+## 更新
 
 DeepSeek Harness Desktop 支持应用内版本检查，发现新版本后可以查看更新内容并选择升级。
 
@@ -284,7 +309,7 @@ DeepSeek Harness Desktop 支持应用内版本检查，发现新版本后可以�
 - [运行时支持政策](docs/runtime-support-policy.md)
 - [完整发布说明](docs/launch/release-notes.md)
 
-## 🔐 安全与隐私
+## 安全与隐私
 
 DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在本机。
 
@@ -298,7 +323,7 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
 - 诊断信息只有在用户主动操作时才会导出
 - 导出的诊断信息会对 Token、Secret、Cookie、路径、Prompt、Session 和 Tool Result 等内容进行脱敏
 
-## 📚 文档
+## 文档
 
 - [桌面版技术说明](docs/desktop.md)
 - [兼容性政策](docs/compatibility-policy.md)
@@ -307,14 +332,14 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
 - [发布与交接工作流](docs/launch/desktop-release-workflow.md)
 - [更新日志](CHANGELOG.md)
 
-## 📄 开源与版权
+## 开源与版权
 
 本项目采用 **[BSD-3-Clause](LICENSE)** 许可证开源。
 
 - 本项目代码及内置功能插件、主题皮肤与桌面端均遵循 BSD-3-Clause 开源协议。
 - 迁入与引用的第三方代码及环境依赖均保留其原始开源许可证与作者署名。
 
-## 📈 Star History
+## Star History
 
 <a href="https://www.star-history.com/?repos=ningbainb%2Fdeepseek-harness-desktop&type=date&legend=top-left">
  <picture>
@@ -324,7 +349,7 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
  </picture>
 </a>
 
-## ❤️ 友情链接
+## 友情链接
 
 本项目积极参与并认可 [LINUX DO 社区](https://linux.do)。
 
@@ -335,5 +360,5 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
 </p>
 
 <p align="center">
-  如果你喜欢这个项目，欢迎点一个 ⭐ Star。
+  如果你喜欢这个项目，欢迎点一个 Star。
 </p>

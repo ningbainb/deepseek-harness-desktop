@@ -7,6 +7,8 @@ const read = (name) => readFile(new URL(`../src/${name}`, import.meta.url), 'utf
 test('main preload exposes product actions without extension mutation channels', async () => {
   const source = await read('preload-main.cjs')
   assert.match(source, /desktop:contract/u)
+  assert.match(source, /createBufferedSubscription/u)
+  assert.match(source, /onDeepLink:\s*createBufferedSubscription/u)
   assert.doesNotMatch(source, /require\(['"]\.\/preload-common\.cjs['"]\)/u)
   assert.match(source, /desktop:update-install/u)
   assert.match(source, /desktop:update-channel-get/u)
@@ -14,6 +16,7 @@ test('main preload exposes product actions without extension mutation channels',
   assert.match(source, /desktop:skills-list/u)
   assert.match(source, /desktop:settings-window-bounds-get/u)
   assert.match(source, /desktop:settings-window-bounds-set/u)
+  assert.match(source, /recordValueModeEvent:.*desktop:value-mode-event/u)
   assert.match(source, /desktop:plugin-install-request/u)
   assert.match(source, /desktop:dock-entry-state/u)
   assert.match(source, /desktop:dock-nudge-dismiss/u)
@@ -42,11 +45,12 @@ test('extension preload exposes extension operations without product update acti
 
 test('Electron binds each renderer window to its dedicated preload', async () => {
   const source = await read('electron-app.mjs')
+  const factory = await read('window-factory.mjs')
   assert.match(source, /preload:\s*MAIN_PRELOAD_PATH/u)
-  assert.match(source, /secondaryWindowWebPreferences\(\{ preload: EXTENSION_PRELOAD_PATH \}\)/u)
+  assert.match(factory, /secondaryWindowWebPreferences\(\{ preload: extensionPreload \}\)/u)
   assert.match(source, /createDesktopTerminalPanel/u)
   assert.match(source, /WebContentsView/u)
-  assert.match(source, /DESKTOP_SURFACES\.COMMUNITY/u)
+  assert.match(factory, /DESKTOP_SURFACES\.COMMUNITY/u)
   assert.match(source, /DesktopUpdateChannelStore/u)
   assert.match(source, /updateChannel,\s*\r?\n\s*downloadRouter/u)
 })

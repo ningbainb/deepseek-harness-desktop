@@ -1,55 +1,53 @@
-# DeepSeek Harness Desktop 3.1.0
+# DeepSeek Harness Desktop 3.2.0
 
 ## 中文
 
 ### 本次亮点
 
-- **实时 Token 统计与计费估算（Live Stats & Pricing）**：新增实时生成吞吐量（tokens/sec）与 Token 消耗监控；支持官方阶梯计费模型（含缓存命中 Cache Read、未缓存输入与生成 Token），支持夜间优惠/闲时费率与高峰期自动识别切换，会话级消费明细实时可见。
-- **启动进度条防卡死闭环（100% 与 88% 停滞自愈）**：
-  - 渲染器连接增加 5 轮自适应阶梯退避重试（500ms~2000ms），连接失败自动重启服务并换用全新干净端口，彻底杜绝 100% 进度条假死。
-  - 将 Windows 文件锁冲突（`EBUSY`）纳入保护体系，增加坏账 Profile 自动备份与干净基线重建自愈机制，防止因旧环境损坏陷入 864ms 闪退死循环。
-- **前端插件安全沙箱（SafePluginBoundary）**：全面上线 React 错误边界隔离机制。第三方社区插件哪怕发生代码错误或生命周期异常，其影响仅局限在自身区域，主界面的输入框、侧边栏、发消息、设置等核心按钮 100% 保持正常交互，彻底解决进系统后按钮点不动的假死问题。
-- **开放外来插件生态与精准单插件隔离**：坚持开放生态，不限制外来插件安装；遇到故障时采用外科手术式精准隔离，仅自动停用发生致命错误的单个插件，用户安装的其他所有第三方插件正常保留与加载，聊天记录和本地插件文件完整持久化。
-- **侧边栏与设置排版完全恢复**：彻底清理了导致设置弹窗按钮被压扁成方块的全局样式冲突与行内副作用，侧栏在收起和展开切换时，全宽设置条与扩展坞图标均能精准排列。
-- **无凭据安全引导**：未配置 API Key 时 100% 在本地执行安全回退，毫秒级跳过 AI 修复并进入基线，不发出任何无效外部请求；通过启动页指引、桌面系统通知及设置页诊断卡片三级引导用户配置 Key。
+- **性价比模式 V2：专家主控 + 副模型子代理**：用户第一次选择性价比模式时立即看到配置引导。当前默认模型会在没有明确主控配置时预选为专家主控，用户再选择副模型和“更省 / 智能平衡 / 更强”策略；只有模型配置、策略和 enabled 状态按顺序成功写入后才会启用。
+- **主控路由真正生效**：顶层会话使用专家主控模型，来自 subagent 的子会话使用副模型。主控按需拆解、派发、复核和汇总；副模型只完成被派发的单项任务，子代理最大深度为 1，不再递归派发或调用重复的专家分析入口。
+- **大模型用量看板与峰值修复**：实时显示输入/输出 Token、上下文、缓存、请求耗时和费用。流式输出按新增 Token 与事件时间形成样本，同毫秒批次先合并，在严格的 1 秒滚动窗口内计算最新速率和步骤峰值；usage 汇总与最终消息只修正账单 Token，不再制造类似 12625 tok/s 的伪峰值。没有流式样本时显示暂无数据，旧账本平均速率峰值不会继续展示。
+- **Claude Code / Codex 项目导入**：只读发现项目和历史会话，支持目录选择、项目匹配、预览、确认、幂等重试和断点恢复。历史工具调用被标记为不可执行，不会重新运行；Token、API Key、Cookie、路径和敏感参数统一经过脱敏。
+- **产品使用数据埋点**：正式包只发送固定枚举的匿名产品事件；Value Mode 只记录选择、引导、启用、策略和主控/子代理路由等粗粒度数据，不发送模型名、Token、Prompt、项目路径、Secret 或会话内容。开发、源码、测试和 Fork 构建保持断开，完整边界见隐私政策。
+- **桌面稳定性和界面打磨**：继续保留完整 Harness Web Surface、原有 DSH Home 和插件；启动阶段可见、事务修复可回滚、插件错误隔离、窄屏浮层自适应，且公开页面统一更新为 3.2.0 实机截图。
 
 ### 验证
 
-- 全工作区 33 个项目完成全量构建与 TypeScript 类型校验（`0 errors`）。
-- 桌面端主进程测试套件（657 项自动化测试）、前端 ErrorBoundary 单元测试（62 项测试）与多模块集成测试 100% 全部通过。
-- CI 与发布工作流覆盖用户插件、配置、Session 保留、语法错误、启动抛错、原生 ABI 错误与基线回退场景。
+- 完成 Value Mode 路由、首次配置引导、自动启用、子代理深度和兼容导出回归测试。
+- 完成实时用量投影、同毫秒合并、滚动 1 秒峰值、usage 修正、旧账本迁移和无流式样本测试。
+- 完成 Claude Code 与 Codex 适配器、项目匹配、脱敏、幂等账本、会话桥接和真实目录导入边界测试。
+- 发布门禁覆盖全量类型检查、工作区测试、脚本校验、桌面端打包目录验证、安装包冒烟、网站/文档/运行时图谱检查。
 
 ### 下载与校验
 
-从 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.1.0-x64.exe`、`SHA256SUMS.txt` 和 `release-manifest.json`。先比对 SHA-256，再查看 manifest 中的大小、频道、Runtime、Schema 与实际签名状态。
+从同一 GitHub Release 下载 DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe、SHA256SUMS.txt 和 release-manifest.json。先用 SHA-256 校验安装包，再检查 manifest 中的文件大小、频道、Runtime、Schema 和实际签名状态。官方发布工作流会先完成验证，再把安装包和校验资产上传到 desktop-v3.2.0。
 
 ### 说明
 
-Desktop 默认不配置遥测上传端点，也不会自动上传诊断日志。自动修复仅在用户自行配置了模型 Key 时才会请求用户配置的提供商；未配置 Key 时 100% 本地安全回退。历史会话数据保存在独立数据层，任何容灾状态下均完整保留。
+性价比模式不会强制每个任务都创建子代理：专家主控会根据任务复杂度决定直接完成还是派发，以避免为了节省模型成本反而增加无意义调用。副模型调用占比用于解释路由结构，不等同于承诺固定金额节省。桌面产品埋点不采集会话内容，诊断包仍只在用户主动确认后导出。DeepSeek Harness Desktop 是社区维护的开源发行版，不是官方 DeepSeek 产品。
 
 ## English
 
 ### Highlights
 
-- **Live Token Stats and Pricing Estimation**: Added real-time generation throughput (tokens/sec) and live token metrics; supports official multi-tier pricing models (including Cache Read, uncached input, and output tokens) with automatic peak/off-peak rate switching and per-session cost breakdown.
-- **Startup Progress Bar Resilience (Healing 100% and 88% stalls)**:
-  - Added 5-attempt adaptive backoff retry (500ms–2000ms) for renderer connections, with automatic runtime restart on fresh ports upon persistent failure, eliminating 100% splash hangs.
-  - Added Windows file-lock (`EBUSY`) protection and automatic corrupt profile backup with clean baseline reconstruction, preventing 88% crash loops.
-- **Frontend SafePluginBoundary (React ErrorBoundary)**: Full rollout of React error boundary isolation across all extension slots. Third-party community plugin exceptions are contained strictly within the component itself, ensuring input boxes, sidebars, messaging, and settings buttons remain 100% responsive and clickable.
-- **Open Community Plugin Ecosystem with Surgical Single-Plugin Isolation**: Upholds full open-ecosystem support without blocking external plugins; upon failures, system surgically isolates only the specific culprit package, allowing all other healthy community plugins and local conversation history to load normally.
-- **Sidebar and Settings Layout Overhaul**: Cleaned up destructive CSS selector leaks and inline DOM side effects, restoring correct wide and collapsed sidebar footArea layouts and extension dock icons.
-- **Missing Credentials Guidance**: Guaranteed 100% local safe fallback without external network calls when no API key is configured; provides clear three-tier guidance across the splash screen, system notifications, and settings repair status card.
+- **Value Mode V2: expert controller plus subagent worker**: The first selection opens setup guidance immediately. When no explicit controller is saved, the current default model is preselected as the expert controller; the user then chooses a worker model and a Saver, Balanced, or Powerful strategy. The mode is enabled only after model routes, strategy, and enabled state are committed successfully in order.
+- **The controller route is now real**: Top-level sessions use the expert controller, while sessions created with the subagent origin use the worker model. The controller may decompose, delegate, review, and synthesize as needed; the worker performs one bounded task, cannot recursively delegate, and does not call a duplicate expert-analysis path.
+- **Large-model usage dashboard and peak fix**: Input/output tokens, context, cache, request latency, and cost remain visible. Streaming output creates samples from valid token increments and event times; same-millisecond batches are coalesced and the latest rate plus per-step peak are computed inside a strict rolling one-second window. Usage summaries and final messages correct billing totals only, so values such as 12,625 tok/s are not fabricated instantaneous peaks. No streamed sample means no fake TPS, and legacy average-rate peaks are ignored.
+- **Claude Code / Codex project import**: Read-only project and historical-session discovery supports directory selection, project matching, preview, confirmation, idempotent retry, and resumable progress. Historical tool calls are non-executable and never run again; tokens, API keys, cookies, paths, and sensitive arguments pass through centralized redaction.
+- **Product usage metrics**: Official packages send only a fixed vocabulary of anonymous product events. Value Mode records coarse selection, setup, enablement, strategy, and controller/worker routing signals; it does not send model names, token counts, prompts, project paths, secrets, or conversation content. Development, source, test, and Fork builds stay disconnected. See the privacy policy for the complete boundary.
+- **Desktop reliability and polish**: The complete Harness Web Surface, existing DSH Home, and installed plugins remain available. Startup phases are visible, transactional repair can roll back, plugin errors are isolated, narrow-screen overlays adapt safely, and public pages now use current 3.2.0 product screenshots.
 
 ### Verification
 
-- Completed full monorepo builds across all 33 packages and verified zero TypeScript typecheck errors.
-- 100% pass rate across the full test suite, including 657 desktop unit tests and 62 settings/error-boundary tests.
-- Release verification covers user plugins, configurations, session retention, syntax errors, native ABI faults, and baseline fallbacks.
+- Value Mode routing, first-use setup, automatic enablement, worker-depth limits, and compatibility exports are covered by regression tests.
+- Live usage projection tests cover same-millisecond coalescing, rolling one-second peaks, usage correction, legacy ledger migration, and missing streaming samples.
+- Claude Code and Codex adapter tests cover project matching, redaction, idempotent ledgers, session bridging, and real-directory import boundaries.
+- Release gates cover the full typecheck, workspace tests, script checks, packaged desktop directory validation, installer smoke tests, website, documentation, and runtime-graph checks.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.1.0-x64.exe`, `SHA256SUMS.txt`, and `release-manifest.json` from the official GitHub Release. Verify the SHA-256 checksum against the manifest before running the installer.
+Download DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe, SHA256SUMS.txt, and release-manifest.json from the same GitHub Release. Verify the installer SHA-256 first, then inspect the manifest for file size, channel, Runtime, schema, and actual signature status. The official release workflow validates the build before uploading the installer and verification assets to desktop-v3.2.0.
 
 ### Notice
 
-Desktop does not configure default telemetry endpoints and never uploads diagnostics automatically. Automatic repair only invokes user-configured model providers when credentials exist; missing credentials default to 100% local safe fallback. Conversation history is isolated in the data layer and preserved across all recovery states.
+Value Mode does not force every task to create a subagent: the expert controller decides whether direct execution or delegation is useful, avoiding extra calls that would undermine the cost goal. Worker-call share explains route structure and is not a promise of a fixed monetary saving. Desktop product metrics do not collect conversation content, and diagnostic archives are still exported only after explicit user confirmation. DeepSeek Harness Desktop is a community-maintained open-source distribution, not an official DeepSeek product.

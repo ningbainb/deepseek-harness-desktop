@@ -9,6 +9,32 @@ packages:
 # turtle-ui convention used by the bundled plugins.
 autoInstallPeers: false
 
+# Runtime dependency classification (Desktop 3.2.0).
+#
+# A. Runtime identity-sensitive — enters the Desktop Runtime and carries
+#    module-level identity (module-scoped Symbol, singleton, registry,
+#    scheduler). Two physical copies in one process silently break tool
+#    dispatch: @deepseek-ai/dsh-tools keys its scheduler with a module-level
+#    Symbol, so a duplicate makes ctx.tools[SCHEDULER] undefined and every
+#    tool call dies with "Cannot read properties of undefined (reading
+#    'prepare')", with no stack and "source: UNKNOWN" in the UI.
+#    These MUST use exact versions, never a caret range.
+#    Source of truth: apps/dsh-desktop `dependencies`, plus a workspace
+#    package's runtime `dependencies`.
+#
+# B. Peer / Host API — declared to express an ABI compatibility range. A range
+#    is acceptable, but the final Desktop Runtime resolution must be unique.
+#
+# C. Build / test only — devDependencies for typecheck, bundling and tests.
+#    tsdown keeps these external (neverBundle in shared/tsdown.client.ts), so
+#    they never enter a Runtime. Ranges are fine here and are deliberately NOT
+#    force-pinned: pinning them buys nothing and churns the lockfile.
+#
+# Enforced by `pnpm runtime-graph:check` (scripts/runtime-graph-check.mjs),
+# which fails CI when any class A package resolves to more than one version.
+# It compares resolved versions rather than specifiers, so cases B and C stay
+# clean even when two importers declare different ranges.
+
 patchedDependencies: { '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.1-rc.1.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.1-rc.1': patches/@deepseek-ai__dsh-llm-pi-ai@0.1.1-rc.1.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch }
 
 # Desktop pins the published aggregate at 0.2.5, while the Aion panel, SSH,

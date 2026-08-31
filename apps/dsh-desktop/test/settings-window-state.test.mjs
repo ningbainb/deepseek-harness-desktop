@@ -20,6 +20,25 @@ test('settings bounds enforce minimum size and stay inside the safe viewport', (
   )
 })
 
+test('an off-screen but numerically valid bounds is pulled back on read', () => {
+  // x=15000 passes the stored-bounds range check (0..16384) yet sits far
+  // outside any display. The settings overlay calls applyBounds() on every
+  // read and on every resize, and that path re-normalizes against the live
+  // viewport, so a stranded panel is always recovered. These two assertions
+  // pin the split: the store accepts the value, the viewport clamps it.
+  assert.deepEqual(
+    normalizeStoredSettingsWindowBounds({ x: 15_000, y: 15_000, width: 800, height: 620 }),
+    { x: 15_000, y: 15_000, width: 800, height: 620 },
+  )
+  assert.deepEqual(
+    normalizeSettingsWindowBounds(
+      { x: 15_000, y: 15_000, width: 800, height: 620 },
+      { width: 1280, height: 792 },
+    ),
+    { x: 468, y: 160, width: 800, height: 620 },
+  )
+})
+
 test('settings bounds reclamp persisted geometry for a smaller viewport', () => {
   assert.deepEqual(
     normalizeSettingsWindowBounds(

@@ -161,24 +161,6 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_NAME: ${{ vars.CSC_NAME }}
-      - name: Write checksums
-        shell: pwsh
-        run: |
-          $installers = @(Get-ChildItem -LiteralPath apps/dsh-desktop/dist -Filter 'DeepSeek-Harness-Desktop-Setup-*.exe' -File)
-          if ($installers.Count -ne 1) {
-            throw "Expected one installer, found $($installers.Count)."
-          }
-          $installer = $installers[0]
-          $hash = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
-          "$hash  $($installer.Name)" | Set-Content -Encoding ascii apps/dsh-desktop/dist/SHA256SUMS.txt
-      - name: Write release manifest
-        run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:write
-        env:
-          DSH_DESKTOP_UPDATE_CHANNEL: ${{ steps.release.outputs.channel }}
-          REQUIRE_SIGNING: ${{ steps.signing.outputs.required }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_NAME: ${{ vars.CSC_NAME }}
       - name: Verify release manifest
         run: pnpm --filter @deepseek-ai/dsh-desktop release:manifest:verify
         env:

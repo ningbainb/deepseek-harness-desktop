@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+    <title>从其他 AI 工具继续工作 - DeepSeek Harness</title>
+    <link rel="stylesheet" href="./harness-base.css">
+    <link rel="stylesheet" href="./handoff.css">
+  </head>
+  <body>
+    <div class="handoff-shell">
+      <header class="handoff-header">
+        <div class="header-content">
+          <p class="eyebrow">CONTEXT HANDOFF &bull; MULTI-AGENT MIGRATION</p>
+          <h1>从其他 AI 工具继续工作</h1>
+          <p class="subtitle">
+            自动发现本机 Claude Code、Codex 的项目会话，智能提取工作状态与上下文，安全迁移至 DeepSeek Harness 继续执行任务。
+          </p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="secondary" id="rescan-btn">重新扫描</button>
+        </div>
+      </header>
+
+      <!-- Sources Overview Bar -->
+      <section class="sources-bar" id="sources-summary" aria-label="工具来源状态">
+        <div class="source-card" id="source-claude">
+          <div class="source-badge">Claude Code</div>
+          <div class="source-metric"><strong id="claude-session-count">--</strong> 个会话</div>
+          <span class="source-status" id="claude-status">检测中...</span>
+          <button type="button" class="secondary small source-folder-btn" id="pick-claude-root-btn">选择 Claude 文件夹</button>
+          <code class="source-root-path" id="claude-root-path">默认 ~/.claude</code>
+        </div>
+        <div class="source-card" id="source-codex">
+          <div class="source-badge">Codex</div>
+          <div class="source-metric"><strong id="codex-session-count">--</strong> 个会话</div>
+          <span class="source-status" id="codex-status">检测中...</span>
+          <button type="button" class="secondary small source-folder-btn" id="pick-codex-root-btn">选择 Codex 文件夹</button>
+          <code class="source-root-path" id="codex-root-path">默认 ~/.codex</code>
+        </div>
+      </section>
+
+      <!-- Search & Filters -->
+      <div class="search-toolbar">
+        <div class="filter-row">
+          <input type="search" id="search-input" placeholder="搜索项目文件夹、会话标题或路径..." autocomplete="off" spellcheck="false">
+          <select id="project-select" aria-label="按文件夹项目筛选">
+            <option value="all">[全部项目] (All Projects)</option>
+          </select>
+        </div>
+        <div class="batch-toolbar">
+          <button type="button" class="secondary" id="import-selected-btn">导入选中的工作区</button>
+          <button type="button" class="primary" id="import-all-btn">导入全部工作区和会话</button>
+          <button type="button" class="secondary" id="retry-failed-btn" hidden>重试失败会话</button>
+          <button type="button" class="secondary" id="cancel-batch-btn" hidden>取消批量导入</button>
+          <span class="batch-progress" id="batch-progress" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <!-- Main Layout: Project & Session Explorer -->
+      <div class="main-layout">
+        <section class="sessions-pane" aria-label="会话列表">
+          <div id="projects-container" class="projects-list">
+            <p class="loading-state">正在扫描外部 AI 工具会话...</p>
+          </div>
+        </section>
+
+        <section class="preview-pane" id="preview-pane" aria-label="上下文预览">
+          <div class="empty-preview" id="empty-preview">
+            <p>请在左侧选择一个会话以预览工作上下文</p>
+          </div>
+
+          <div class="preview-card" id="preview-content" hidden>
+            <div class="preview-header">
+              <span class="source-tag" id="preview-source">Claude Code</span>
+            <h2 id="preview-title">会话标题</h2>
+            <p class="session-meta" id="preview-meta">--</p>
+            <div class="source-warning" id="source-warning" hidden></div>
+          </div>
+
+            <!-- Path Matching Alert -->
+            <div class="match-alert" id="match-alert">
+              <div class="match-info">
+                <strong id="match-status-title">路径匹配状态</strong>
+                <p id="match-status-desc">正在比对项目路径...</p>
+                <div class="revision-note" id="revision-note" hidden></div>
+              </div>
+              <button type="button" class="secondary small" id="pick-dir-btn">更改当前目录</button>
+            </div>
+
+            <!-- Context Summary Stats -->
+            <div class="context-metrics">
+              <div class="metric-item">
+                <span class="label">历史事件总数</span>
+                <strong id="metric-tokens">--</strong>
+              </div>
+              <div class="metric-item">
+                <span class="label">历史工具调用</span>
+                <strong id="metric-files">--</strong>
+              </div>
+              <div class="metric-item">
+                <span class="label">对话消息条数</span>
+                <strong id="metric-messages">--</strong>
+              </div>
+            </div>
+
+            <!-- Handoff Outline Preview -->
+            <div class="handoff-preview-box">
+              <h3>会话历史与工具执行流水预览 (Transcript Events)</h3>
+              <pre class="snippet-code" id="preview-snippet"></pre>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="preview-actions">
+              <span class="import-hint">导入后将在 DSH 中创建真实工作区/会话并逐条呈现历史记录</span>
+              <button type="button" class="primary" id="import-btn">导入完整会话到 DSH 工作区</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="./handoff.mjs"></script>
+  </body>
+</html>

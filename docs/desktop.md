@@ -6,9 +6,9 @@ The desktop application is a thin lifecycle and security layer around the offici
 
 The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, `dsh-codex-connect`, and `reasoning-slider` while preserving community bundles already added to that profile. The native Extension Dock market fetches the public awesome-dsh-plugin index and sends confirmed installs through Desktop's transactional plugin manager; it is not a Runtime bundle. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
 
-## Desktop 3.0 platform policy
+## Desktop 3.2 platform policy
 
-Desktop 3.0.9 is the direct-start and automatic-repair release. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
+Desktop 3.2.0 is the expert-controller, usage-observability, and context-handoff release. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
 
 The Desktop Client SDK and Desktop Contract remain 1.x. Runtime Provider, Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility, Runtime matrix, and compat-patch inputs have machine-readable definitions. The applicable additive-change, deprecation, and major-version rules are in the [compatibility policy](compatibility-policy.md) and [schema versioning guide](schema-versioning.md).
 
@@ -40,6 +40,9 @@ Official packaged Desktop releases enable first-party anonymous product analysis
 | Renderer bridge | Contract v1.2 capability discovery, structured notifications, browser-safe Desktop client SDK, split main/extension preloads, sender-identity enforcement |
 | OS integration | Strict `dsh://` route allowlist, `.dshpreset` preview association, deduplicated foreground-aware notifications, and main-window-only workspace file opening |
 | Task Board | Host-owned v3 Projects/Task Runs/Evidence ledger, copy-first v2 migration, explicit Worktree review, ID-only Host routes, SSE synchronization, and an opt-in durable Host scheduler with browser fallback |
+| Value Mode | Expert controller model for top-level sessions, configured worker model for subagent sessions, first-use setup guide, Saver/Balanced/Powerful strategies, one-level delegation cap, and controller/worker call analytics |
+| Live usage | Input/output token accounting, context/cache/latency/cost projection, valid streaming samples, rolling one-second rate and per-step peak, with legacy average-rate values ignored |
+| Context handoff import | Read-only discovery for Claude Code and Codex projects/sessions, streaming tolerant JSONL parser, centralized secret redaction, token-bounded Handoff prompt generator, atomic ledger, and legitimate DSH session bridge |
 | Visual system | Solid native/injected title-bar alignment, system-style Extension Dock, bounded particle-whale startup surface, page-aware full-interface particle theme |
 | Security | Sandbox, context isolation, no Node integration, per-window preload APIs, sender registry, loopback navigation allowlist, denied permissions |
 
@@ -53,15 +56,27 @@ After a one-time native confirmation, the single primary Runtime runs with `dang
 
 Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. The primary invocation contains exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
-## Desktop 2.0 screenshots
+## Desktop 3.2.0 screenshots
 
-The main Harness surface exposes the searchable Skills library beside the composer while preserving the official conversation, workspace, and tool interfaces.
+The current release keeps the complete Harness surface and adds visible model roles, usage accounting, and external-project handoff. The screenshots below are captured from the 3.2.0 desktop workflow.
 
-![DeepSeek Harness Desktop 2.0 main interface and Skills library](screenshots/13-hero-main.png)
+![DeepSeek Harness Desktop 3.2.0 main workspace and large-model usage status](screenshots/3.2.0-main-workspace.webp)
 
-| Particle-whale startup surface | Plugin and skill Extension Dock |
+| Value Mode setup and expert controller | Claude Code / Codex project import |
 | --- | --- |
-| ![Desktop 2.0 startup surface](screenshots/desktop-startup.png) | ![Desktop 2.0 Extension Dock](screenshots/desktop-extension-dock.png) |
+| ![DeepSeek Harness Desktop 3.2.0 Value Mode setup](screenshots/3.2.0-value-mode.webp) | ![DeepSeek Harness Desktop 3.2.0 external conversation import](screenshots/3.2.0-project-import.webp) |
+
+### Value Mode routing
+
+Selecting Value Mode opens a non-blocking configuration guide. The current default model is preselected as the expert controller when no explicit controller is saved. The user chooses a subagent worker model and a strategy before enabling the mode. Top-level sessions use the expert controller; sessions created with the subagent origin use the worker model. The controller decides whether delegation is worthwhile, and the worker cannot recursively delegate or call expert consultation.
+
+### Usage dashboard semantics
+
+The live stats projection separates billing correction from streaming throughput. A valid output increment plus its event time is the only instantaneous sample. Samples sharing a millisecond are coalesced, and each sample counts the output tokens in the inclusive one-second window ending at that sample. The UI labels the result as a rolling one-second peak; a session with no valid streamed sample shows no fabricated TPS.
+
+### Context handoff semantics
+
+Claude Code and Codex directories are scanned read-only. The user can preview project matching and session rows before confirming import. Imported messages and tool results are historical, marked non-executable, redacted through the central pipeline, and recorded in an idempotent ledger so retries do not duplicate sessions.
 
 ## Performance and size
 

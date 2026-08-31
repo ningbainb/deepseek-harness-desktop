@@ -13,6 +13,7 @@ import {
   defaultReleaseMetadata,
   releaseSigningConfiguration,
   verifyReleaseManifest,
+  writeReleaseChecksums,
   verifyWindowsExecutableSignatures,
   verifyWindowsSignature,
 } from '../src/release-manifest.mjs'
@@ -89,6 +90,39 @@ test('release manifest hashes every publishable artifact and retains release com
   }
 })
 
+
+test('release manifest writer regenerates SHA256SUMS before writing the manifest', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-release-checksums-'))
+  try {
+    const installer = await writeReleaseFiles(directory)
+    const checksumPath = await writeReleaseChecksums(directory)
+    assert.equal(checksumPath, join(directory, 'SHA256SUMS.txt'))
+    await writeFile(checksumPath, 'stale checksum')
+    await writeReleaseChecksums(directory)
+    const checksum = (await readFile(checksumPath, 'utf8')).trim()
+    const expectedDigest = createHash('sha256').update(await readFile(join(directory, installer))).digest('hex')
+    assert.equal(checksum, expectedDigest + '  ' + installer)
+
+    const manifest = await createReleaseManifest({ directory, metadata, signatureVerifier: validSignature })
+    await verifyReleaseManifest({ directory, manifest, signatureVerifier: validSignature })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('release artifact collection rejects multiple setup installers', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-release-multiple-installers-'))
+  try {
+    await writeReleaseFiles(directory)
+    await writeFile(join(directory, 'DeepSeek-Harness-Desktop-Setup-3.0.1-x64.exe'), 'stale installer')
+    await assert.rejects(
+      collectReleaseArtifactNames(directory),
+      /expected exactly one top-level Setup installer/u,
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 test('release artifact collection rejects a bare unpacked application copied beside the installer', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-release-bare-app-'))
   try {
@@ -205,8 +239,11 @@ test('official Desktop tag releases require signing only when certificate materi
   assert.match(workflow, /\$env:WIN_CSC_LINK/u)
   assert.match(workflow, /\$env:CSC_NAME/u)
   assert.match(workflow, /"required=\$required"/u)
-  assert.equal((workflow.match(/REQUIRE_SIGNING: \$\{\{ steps\.signing\.outputs\.required \}\}/gu) ?? []).length, 4)
+  assert.equal((workflow.match(/REQUIRE_SIGNING: \$\{\{ steps\.signing\.outputs\.required \}\}/gu) ?? []).length, 3)
   assert.doesNotMatch(workflow, /REQUIRE_SIGNING: 'true'/u)
+  assert.match(workflow, /pack:win/u)
+  assert.doesNotMatch(workflow, /- name: Write checksums/u)
+  assert.doesNotMatch(workflow, /- name: Write release manifest/u)
   assert.match(workflow, /- name: Write release notes with verified signing status/u)
   assert.match(workflow, /release-manifest\.json/u)
   assert.match(workflow, /\.signature\.status/u)

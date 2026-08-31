@@ -87,6 +87,28 @@ test('update completion and dock funnel actions stay fixed and bounded', () => {
   ])
 })
 
+test('Value Mode metrics record roles and lifecycle without model identity', () => {
+  const { events, recorder } = createRecorder()
+  recorder.recordValueModeEntry(false)
+  recorder.recordValueModeOnboarding('shown', 'header')
+  recorder.recordValueModeStrategy('balanced')
+  recorder.recordValueModeState('enabled', 'onboarding')
+  recorder.recordValueModeCall('started', 'controller')
+  recorder.recordValueModeCall('failed', 'subagent')
+  assert.equal(recorder.recordValueModeEvent({ kind: 'strategy', strategy: 'saver' }), false)
+  assert.equal(recorder.recordValueModeEvent({ kind: 'strategy', strategy: 'secret-model' }), false)
+  assert.deepEqual(events, [
+    { name: 'value_mode_entry', outcome: 'selected', detail: 'unconfigured', bucket: 'none' },
+    { name: 'value_mode_onboarding', outcome: 'shown', detail: 'header', bucket: 'none' },
+    { name: 'value_mode_strategy', outcome: 'selected', detail: 'balanced', bucket: 'none' },
+    { name: 'value_mode_state', outcome: 'enabled', detail: 'onboarding', bucket: 'none' },
+    { name: 'value_mode_call', outcome: 'started', detail: 'controller', bucket: 'none' },
+    { name: 'value_mode_call', outcome: 'failed', detail: 'subagent', bucket: 'none' },
+    { name: 'value_mode_strategy', outcome: 'selected', detail: 'saver', bucket: 'none' },
+  ])
+  assert.equal(JSON.stringify(events).includes('secret-model'), false)
+})
+
 test('fixed product actions and extension outcomes never include extension identity', async () => {
   const { events, recorder } = createRecorder({ times: [0, 31 * 60_000] })
   recorder.recordLaunch('normal')

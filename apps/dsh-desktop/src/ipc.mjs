@@ -7,11 +7,18 @@ import {
   desktopContractForSurface,
 } from './desktop-contract.mjs'
 import { normalizeDesktopNotification } from './notifications.mjs'
+import { isStartupPhase } from './startup-phase.mjs'
 import { parseRemoteExternalPluginReference } from './external-plugin-source.mjs'
 import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
+import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
 
+// 'launch-builtins' was accepted here through 3.0.x. It had no implementation
+// and no caller, so it fell through to the exit branch below - sending it quit
+// the entire application and lost unsaved sessions. It is removed rather than
+// implemented because nothing needs it. Note that an unrecognised action now
+// fails validation instead of reaching the exit branch.
 const ACTIONS = new Set(['open-logs', 'export-diagnostics', 'exit'])
 const HELP_ACTIONS = new Set([
   'community',
@@ -22,7 +29,7 @@ const HELP_ACTIONS = new Set([
   'privacy',
   'updates',
 ])
-const TOOL_ACTIONS = new Set(['extensions', 'terminal'])
+const TOOL_ACTIONS = new Set(['extensions', 'terminal', 'conversation-import'])
 const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])
@@ -184,8 +191,13 @@ export function publicRuntimeStatus(status, recoveryStatus, backgroundStatus) {
   const state = typeof status?.state === 'string' ? status.state : 'stopped'
   const runtimeError = typeof status?.error === 'string' && status.error.length > 0 ? status.error : undefined
   const background = publicBackgroundStatus(backgroundStatus)
+  // The startup phase is additive. Consumers that predate 3.1.0 simply never
+  // read it; consumers that do can tell the user where startup actually is
+  // instead of inferring it from a decorative percentage.
+  const phase = isStartupPhase(status?.phase) ? status.phase : undefined
   return {
     state,
+    ...(phase === undefined ? {} : { phase }),
     errorPresent: runtimeError !== undefined,
     ...(runtimeError === undefined
       ? {}
@@ -227,6 +239,14 @@ export function registerDesktopStartupIpc({
   ipcMain,
   surfaceRegistry,
   setWindowChromeTheme,
+  metadata,
+  version,
+  platform,
+  getStatus,
+  handleAction,
+  openLogs,
+  exportDiagnostics,
+  exitApp,
 } = {}) {
   if (typeof ipcMain?.handle !== 'function' || typeof ipcMain?.removeHandler !== 'function') {
     throw new TypeError('startup IPC requires ipcMain')
@@ -239,8 +259,11 @@ export function registerDesktopStartupIpc({
   }
   const channels = [
     'desktop:contract',
+    'desktop:info',
+    'desktop:status',
     'desktop:window-chrome-theme',
     'desktop:update-status',
+    'desktop:action',
   ]
   for (const channel of channels) ipcMain.removeHandler(channel)
   const assertMain = (event) => surfaceRegistry.assert(event?.sender, DESKTOP_SURFACES.MAIN)
@@ -252,6 +275,20 @@ export function registerDesktopStartupIpc({
       capabilities: Object.freeze(contract.capabilities.filter((capability) => capability === 'updates.read')),
     })
   })
+  ipcMain.handle('desktop:info', (event) => {
+    assertMain(event)
+    return {
+      appId: typeof metadata?.appId === 'string' ? metadata.appId : 'ai.deepseek.harness.desktop',
+      productName: typeof metadata?.productName === 'string' ? metadata.productName : 'DeepSeek Harness Desktop',
+      version: typeof version === 'string' && version.length > 0 ? version : 'unknown',
+      platform: typeof platform === 'string' && platform.length > 0 ? platform : process.platform,
+    }
+  })
+  ipcMain.handle('desktop:status', async (event) => {
+    assertMain(event)
+    const status = typeof getStatus === 'function' ? await getStatus() : { state: 'starting' }
+    return publicRuntimeStatus(status)
+  })
   ipcMain.handle('desktop:window-chrome-theme', (event, rawTheme) => {
     assertMain(event)
     return setWindowChromeTheme(event.sender, normalizeWindowChromeTheme(rawTheme))
@@ -259,6 +296,15 @@ export function registerDesktopStartupIpc({
   ipcMain.handle('desktop:update-status', (event) => {
     assertMain(event)
     return publicUpdateStatus(undefined)
+  })
+  ipcMain.handle('desktop:action', async (event, rawAction) => {
+    assertMain(event)
+    const action = normalizeDesktopAction(rawAction)
+    if (typeof handleAction === 'function') return handleAction(action)
+    if (action === 'open-logs' && typeof openLogs === 'function') return openLogs()
+    if (action === 'export-diagnostics' && typeof exportDiagnostics === 'function') return exportDiagnostics()
+    if (action === 'exit' && typeof exitApp === 'function') return exitApp()
+    return undefined
   })
   return () => {
     for (const channel of channels) ipcMain.removeHandler(channel)
@@ -383,6 +429,7 @@ export function registerDesktopIpc({
   setSettingsWindowBounds = async () => undefined,
   onSettingsOpened = () => {},
   onUpdateCheck = () => {},
+  recordValueModeEvent = () => false,
   listSkills = async () => ({ skills: [] }),
   showNotification = async () => false,
   notificationService,
@@ -390,10 +437,34 @@ export function registerDesktopIpc({
   getRuntimeOrigin = () => undefined,
   getWorkspaceFileOpenToken = () => undefined,
   openWorkspaceTarget = openWorkspaceFile,
+  conversationImportService,
+  openConversationImport,
+  pickProjectDirectory,
+  pickConversationSourceDirectory = pickProjectDirectory,
+  getConversationImportWindow = () => undefined,
+  onConversationImportConfirmed,
+  onConversationImportProgress,
   shell,
+  // Best-effort diagnostics sink for failures that are non-fatal but still
+  // worth knowing about. Absent in tests and during early startup
+  // registration, so every call site must tolerate it being undefined.
+  log,
 }) {
   if (typeof surfaceRegistry?.assert !== 'function' || typeof surfaceRegistry?.surfaceOf !== 'function') {
     throw new TypeError('desktop IPC requires a desktop surface registry')
+  }
+  // Bounded by construction: component, operation, error name and a truncated
+  // message. Never a stack and never a raw error object - those can carry
+  // tokens, absolute paths or message bodies, and this output is persisted.
+  const logDiagnostic = (component, operation, error) => {
+    try {
+      log?.(
+        `[${component}] ${operation} failed: ${String(error?.name ?? 'Error')}: `
+        + String(error?.message ?? error).slice(0, 300),
+      )
+    } catch {
+      // Diagnostics must never change IPC behaviour.
+    }
   }
   const channels = [
     'desktop:contract',
@@ -418,9 +489,21 @@ export function registerDesktopIpc({
     'desktop:settings-window-bounds-get',
     'desktop:settings-window-bounds-set',
     'desktop:settings-opened',
+    'desktop:value-mode-event',
     'desktop:skills-list',
     'desktop:notification-show',
     'desktop:workspace-file-open',
+    'desktop:conversation-import-open',
+    'desktop:conversation-import-probe',
+    'desktop:conversation-import-scan',
+    'desktop:conversation-import-preview',
+    'desktop:conversation-import-confirm',
+    'desktop:conversation-import-pick-directory',
+    'desktop:conversation-import-pick-source-directory',
+    'desktop:conversation-import-batch-preview',
+    'desktop:conversation-import-batch-confirm',
+    'desktop:conversation-import-batch-cancel',
+    'desktop:conversation-import-search-content',
   ]
   for (const channel of channels) ipcMain.removeHandler(channel)
   const handle = (channel, allowedSurfaces, handler) => {
@@ -452,7 +535,7 @@ export function registerDesktopIpc({
   }))
   const getPublicStatus = async (status = controller.status) => {
     let background
-    try { background = getBackgroundStatus() } catch {}
+    try { background = getBackgroundStatus() } catch (error) { logDiagnostic('ipc', 'background-status', error) }
     return publicRuntimeStatus(status, await pluginRecovery?.getState?.(), background)
   }
   handle('desktop:status', [main, extensions], () => getPublicStatus())
@@ -474,7 +557,10 @@ export function registerDesktopIpc({
     const action = normalizeDesktopAction(rawAction)
     if (action === 'open-logs') return openLogs()
     if (action === 'export-diagnostics') return exportDiagnostics()
-    exitApp()
+    // Explicit branch on purpose: quitting must never be the default outcome
+    // for a newly added action. That default is precisely how launch-builtins
+    // used to terminate the application.
+    if (action === 'exit') exitApp()
     return undefined
   })
   handle('desktop:window-chrome-theme', [main, extensions], (event, _surface, rawTheme) => {
@@ -518,7 +604,7 @@ export function registerDesktopIpc({
     return publicUpdateChannel(persisted?.channel ?? persisted ?? channel)
   })
   handle('desktop:update-check', main, () => {
-    try { onUpdateCheck() } catch {}
+    try { onUpdateCheck() } catch (error) { logDiagnostic('ipc', 'update-check', error) }
     return getUpdateController?.()?.check?.({ manual: true })
   })
   handle('desktop:update-install', main, () => getUpdateController?.()?.install?.())
@@ -544,8 +630,12 @@ export function registerDesktopIpc({
   handle('desktop:settings-window-bounds-get', main, () => getSettingsWindowBounds())
   handle('desktop:settings-window-bounds-set', main, (_event, _surface, bounds) => setSettingsWindowBounds(bounds))
   handle('desktop:settings-opened', main, () => {
-    try { onSettingsOpened() } catch {}
+    try { onSettingsOpened() } catch (error) { logDiagnostic('ipc', 'settings-opened', error) }
     return true
+  })
+  handle('desktop:value-mode-event', main, (_event, _surface, rawEvent) => {
+    const event = normalizeValueModeProductEvent(rawEvent)
+    return recordValueModeEvent(event)
   })
   handle('desktop:skills-list', main, () => listSkills())
   handle('desktop:notification-show', [main, extensions], (_event, _surface, value) => {
@@ -560,6 +650,72 @@ export function registerDesktopIpc({
       getWorkspaceFileOpenToken,
     })
   })
+  handle('desktop:conversation-import-open', [main, extensions], async () => {
+    if (typeof openConversationImport !== 'function') return { opened: false }
+    const result = await openConversationImport()
+    // Never return a BrowserWindow across the isolated renderer boundary. A
+    // native window is not cloneable and caused the handoff button to remain
+    // stuck waiting even though the window had already opened.
+    return { opened: result !== false }
+  })
+  handle('desktop:conversation-import-probe', [main, extensions], async () => {
+    return conversationImportService ? await conversationImportService.probeSources() : []
+  })
+  handle('desktop:conversation-import-scan', [main, extensions], async () => {
+    return conversationImportService ? await conversationImportService.discoverAll() : { sources: [], projects: [] }
+  })
+  handle('desktop:conversation-import-preview', [main, extensions], async (_event, _surface, options) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    return await conversationImportService.createPreviewPlan(options)
+  })
+  handle('desktop:conversation-import-confirm', [main, extensions], async (_event, _surface, planId) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    const result = await conversationImportService.confirmAndImport(planId)
+    if (typeof onConversationImportConfirmed === 'function') {
+      await onConversationImportConfirmed(result)
+    }
+    return result
+  })
+  handle('desktop:conversation-import-pick-directory', [main, extensions], async () => {
+    return typeof pickProjectDirectory === 'function' ? await pickProjectDirectory() : undefined
+  })
+  handle('desktop:conversation-import-pick-source-directory', [main, extensions], async (_event, _surface, sourceKind) => {
+    if (sourceKind !== 'claude-code' && sourceKind !== 'codex') {
+      throw new TypeError('sourceKind must be claude-code or codex')
+    }
+    const picker = typeof pickConversationSourceDirectory === 'function'
+      ? pickConversationSourceDirectory
+      : pickProjectDirectory
+    const selected = typeof picker === 'function' ? await picker(sourceKind) : undefined
+    if (!selected) return undefined
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    const rootDir = conversationImportService.setSourceRoot(sourceKind, selected)
+    return { sourceKind, rootDir }
+  })
+  handle('desktop:conversation-import-batch-preview', [main, extensions], async (_event, _surface, options) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    return await conversationImportService.createBatchPreviewPlan(options || {})
+  })
+  handle('desktop:conversation-import-batch-confirm', [main, extensions], async (_event, _surface, planId) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    const result = await conversationImportService.confirmAndImportBatch(planId)
+    if (typeof onConversationImportConfirmed === 'function' && result?.firstSessionId) {
+      await onConversationImportConfirmed({
+        ...result,
+        sessionId: result.firstSessionId,
+        workspaceId: result.firstWorkspaceId,
+      })
+    }
+    return result
+  })
+  handle('desktop:conversation-import-batch-cancel', [main, extensions], async (_event, _surface, planId) => {
+    if (!conversationImportService) return false
+    return conversationImportService.cancelBatchImport(planId)
+  })
+  handle('desktop:conversation-import-search-content', [main, extensions], async (_event, _surface, query) => {
+    if (!conversationImportService) throw new Error('conversation import service is unavailable')
+    return await conversationImportService.searchContent(query)
+  })
   const publishStatus = async (status = controller.status) => {
     const window = getWindow()
     if (window && !window.isDestroyed()) window.webContents.send('desktop:status', await getPublicStatus(status))
@@ -567,9 +723,23 @@ export function registerDesktopIpc({
   const publishStatusSafely = (status) => { void publishStatus(status).catch(() => {}) }
   controller.on('status', publishStatusSafely)
   pluginRecovery?.on?.('status', publishStatusSafely)
+  const removeBatchProgress = conversationImportService?.subscribeBatchProgress?.((payload) => {
+    try {
+      const target = getConversationImportWindow?.() || getWindow?.()
+      if (target && !target.isDestroyed?.()) {
+        target.webContents.send('desktop:conversation-import-batch-progress', payload)
+      }
+      // Keep an optional callback for embedding/test hosts that do not expose
+      // a BrowserWindow getter.
+      onConversationImportProgress?.(payload)
+    } catch (error) {
+      logDiagnostic('conversation-import', 'batch-progress', error)
+    }
+  })
   return () => {
     controller.off('status', publishStatusSafely)
     pluginRecovery?.off?.('status', publishStatusSafely)
+    removeBatchProgress?.()
     for (const channel of channels) ipcMain.removeHandler(channel)
   }
 }

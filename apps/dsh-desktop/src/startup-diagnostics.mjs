@@ -6,6 +6,7 @@ import { strToU8, zipSync } from 'fflate'
 
 import { sanitizeLogLine } from './log-store.mjs'
 import { publicRepairStatus } from './ipc.mjs'
+import { isStartupPhase } from './startup-phase.mjs'
 
 export const STARTUP_DIAGNOSTICS_SCHEMA_VERSION = 1
 export const DIAGNOSTIC_BUNDLE_SCHEMA_VERSION = 1
@@ -288,6 +289,10 @@ function currentRuntimeSummary(controller) {
   const status = controller?.status
   return {
     state: typeof status?.state === 'string' ? status.state : 'unknown',
+    // The phase the runtime was actually in when the export was taken. A hang
+    // that is still open reports the phase it is stuck in, which is the whole
+    // point of exporting it.
+    ...(isStartupPhase(status?.phase) ? { phase: status.phase } : {}),
     ...(Number.isInteger(status?.pid) && status.pid > 0 && status.pid <= MAX_SAFE_PID ? { pid: status.pid } : {}),
     ...(typeof status?.error === 'string' && status.error.length > 0
       ? { errorPresent: true, errorFingerprint: stableErrorFingerprint(status.error) }
@@ -434,6 +439,17 @@ export async function collectStartupDiagnostics({
     ),
   ])
   const startupAttemptSummary = projectStartupAttempt(startupAttempt)
+  // The real phase history: what ran, in what order, how long each phase took
+  // and how it ended. It lives in memory, so this is synchronous, and a
+  // failure here must never turn a completed export into an error.
+  let startupPhases
+  try {
+    startupPhases = typeof controller?.getStartupPhases === 'function'
+      ? controller.getStartupPhases()
+      : undefined
+  } catch {
+    startupPhases = undefined
+  }
   const generatedAt = now()
   const document = {
     schemaVersion: STARTUP_DIAGNOSTICS_SCHEMA_VERSION,
@@ -453,6 +469,9 @@ export async function collectStartupDiagnostics({
       ...(startupAttemptSummary === undefined
         ? {}
         : { attempt: startupAttemptSummary }),
+      // Answers "where did it hang" from the export alone: every phase with
+      // its duration and outcome. Carries no tokens, paths or message text.
+      ...(startupPhases === undefined ? {} : { phases: startupPhases }),
       recentRuntimeLog: typeof recentRuntimeLog === 'string'
         ? summarizeDiagnosticLog(recentRuntimeLog, { limit: MAX_LOG_LENGTH })
         : undefined,

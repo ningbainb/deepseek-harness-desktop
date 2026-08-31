@@ -7,7 +7,7 @@ import { __test } from '../src/admin-dashboard.mjs'
 
 const output = resolve(process.argv[2] ?? 'telemetry-dashboard-preview.png')
 const summary = Object.freeze({
-  schema: 3,
+  schema: 4,
   rangeDays: 30,
   generatedAt: '2026-08-23T08:00:00.000Z',
   downloads: {
@@ -31,10 +31,15 @@ const summary = Object.freeze({
     events: [{ event: 'app_launch', count: 3841 }, { event: 'app_session_end', count: 2860 }],
   },
   active: {
+    asOfDay: '2026-08-23',
+    definition: 'app_launch',
     dau: 486,
+    wau: 1568,
     mau: 2319,
+    totalInstallations: 2941,
+    totalInstallationsWindowDays: 400,
     dailyTrend: [],
-    monthlyTrend: [],
+    mauTrend: [],
     countries: [{ countryCode: 'CN', count: 1784 }, { countryCode: 'US', count: 226 }, { countryCode: 'SG', count: 104 }],
     versions: [{ version: '3.0.2', count: 1964 }, { version: '3.0.1', count: 355 }],
   },

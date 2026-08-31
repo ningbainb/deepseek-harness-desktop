@@ -1,4 +1,5 @@
 import { sessionDurationBucket, startupDurationBucket } from './telemetry-events.mjs'
+import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
 
 const UPDATE_EVENTS = Object.freeze({
   downloading: Object.freeze({ name: 'update_available', outcome: 'available' }),
@@ -202,6 +203,59 @@ export class ProductMetricsRecorder {
       detail: 'settings-adjacent',
       bucket: 'none',
     })
+  }
+
+  recordValueModeEntry(configured) {
+    return this.#record('value_mode_entry', {
+      outcome: 'selected',
+      detail: configured === true ? 'configured' : 'unconfigured',
+      bucket: 'none',
+    })
+  }
+
+  recordValueModeOnboarding(outcome, surface) {
+    return this.#record('value_mode_onboarding', {
+      outcome,
+      detail: surface,
+      bucket: 'none',
+    })
+  }
+
+  recordValueModeState(state, source) {
+    return this.#record('value_mode_state', {
+      outcome: state,
+      detail: source,
+      bucket: 'none',
+    })
+  }
+
+  recordValueModeStrategy(strategy) {
+    return this.#record('value_mode_strategy', {
+      outcome: 'selected',
+      detail: strategy,
+      bucket: 'none',
+    })
+  }
+
+  recordValueModeCall(outcome, role) {
+    return this.#record('value_mode_call', {
+      outcome,
+      detail: role,
+      bucket: 'none',
+    })
+  }
+
+  recordValueModeEvent(value) {
+    let event
+    try {
+      event = normalizeValueModeProductEvent(value)
+    } catch {
+      return false
+    }
+    if (event.kind === 'entry') return this.recordValueModeEntry(event.configured)
+    if (event.kind === 'onboarding') return this.recordValueModeOnboarding(event.outcome, event.surface)
+    if (event.kind === 'state') return this.recordValueModeState(event.state, event.source)
+    return this.recordValueModeStrategy(event.strategy)
   }
 
   async trackExtensionOperation(detail, operation) {

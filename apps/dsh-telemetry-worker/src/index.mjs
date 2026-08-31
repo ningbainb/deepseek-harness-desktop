@@ -179,6 +179,31 @@ const EVENT_POLICY = Object.freeze({
     details: new Set(['install', 'update', 'remove', 'enable', 'disable']),
     buckets: new Set(['none']),
   }),
+  value_mode_entry: Object.freeze({
+    outcomes: new Set(['selected']),
+    details: new Set(['configured', 'unconfigured']),
+    buckets: new Set(['none']),
+  }),
+  value_mode_onboarding: Object.freeze({
+    outcomes: new Set(['shown', 'completed', 'dismissed', 'failed']),
+    details: new Set(['hero', 'header', 'settings']),
+    buckets: new Set(['none']),
+  }),
+  value_mode_state: Object.freeze({
+    outcomes: new Set(['enabled', 'disabled', 'failed']),
+    details: new Set(['onboarding', 'manual', 'auto', 'settings']),
+    buckets: new Set(['none']),
+  }),
+  value_mode_strategy: Object.freeze({
+    outcomes: new Set(['selected']),
+    details: new Set(['saver', 'balanced', 'powerful']),
+    buckets: new Set(['none']),
+  }),
+  value_mode_call: Object.freeze({
+    outcomes: new Set(['started', 'failed']),
+    details: new Set(['controller', 'subagent']),
+    buckets: new Set(['none']),
+  }),
   app_session_end: Object.freeze({
     outcomes: new Set(['closed']),
     details: new Set(['normal']),

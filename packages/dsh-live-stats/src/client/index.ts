@@ -9,6 +9,9 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import { LiveStatsSettingsCard, LiveStatsSettingsCardController, type LiveStatsSettings } from './LiveStatsSettingsCard.tsx'
 import { TpsLineDockEntry } from './TpsLine.tsx'
 import { en, zh, type SettingsCardKey } from './locales.ts'
+import { BalanceController } from './balance-controller.ts'
+import { mountBalanceSidebarEntry } from './balance-sidebar.ts'
+import { mountBalanceView } from './balance-mount.tsx'
 
 export { TpsLine, formatTokensPerSecond } from './TpsLine.tsx'
 export type { LiveStatsSettings, LiveStatsSettingsCardFace, LiveStatsSettingsCardState } from './LiveStatsSettingsCard.tsx'
@@ -93,20 +96,10 @@ export function apply(ctx: ClientContext): void {
   }, TpsLineDockEntry))
 
   // LLM Balance & Usage Center: sidebar entry + center-column overview.
-  // Lazy-import so the balance modules are only bundled on first use.
   ctx.effect(() => {
-    let disposeSidebar: (() => void) | undefined
-    let disposeView: (() => void) | undefined
-
-    void Promise.all([
-      import('./balance-controller.ts'),
-      import('./balance-sidebar.ts'),
-      import('./balance-mount.tsx'),
-    ]).then(([{ BalanceController }, { mountBalanceSidebarEntry }, { mountBalanceView }]) => {
-      const controller = new BalanceController()
-      disposeSidebar = mountBalanceSidebarEntry(controller)
-      disposeView = mountBalanceView(controller)
-    }).catch(() => {})
+    const controller = new BalanceController()
+    const disposeSidebar = mountBalanceSidebarEntry(controller)
+    const disposeView = mountBalanceView(controller)
 
     return () => {
       disposeSidebar?.()

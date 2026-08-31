@@ -1,0 +1,107 @@
+{
+  "name": "@linxin666/dsh-value-mode",
+  "description": "Value Mode (性价比模式) plugin for DeepSeek Harness: uses an expert controller for top-level work and routes delegated subagent tasks to a configured executor model.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./presets/*": "./presets/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && tsdown",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "prepare": "tsdown"
+  },
+  "dependencies": {
+    "schemastery": "^3.18.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.1",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-agent-default-model": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-settings": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.1-rc.1",
+    "@types/node": "^22.20.0",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "^18.3.5",
+    "lightningcss": "^1.32.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "schemastery": "^3.18.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.js.map",
+    "lib/**/*.d.ts",
+    "lib/**/*.d.ts.map",
+    "src",
+    "presets",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "README.i18n.yaml"
+  ],
+  "author": "ningbainb",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ningbainb/deepseek-harness-desktop.git",
+    "directory": "packages/dsh-value-mode"
+  },
+  "bugs": {
+    "url": "https://github.com/ningbainb/deepseek-harness-desktop/issues"
+  },
+  "homepage": "https://github.com/ningbainb/deepseek-harness-desktop/tree/main/packages/dsh-value-mode#readme"
+}

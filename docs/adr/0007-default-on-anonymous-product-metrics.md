@@ -8,7 +8,7 @@ Amended by ADR-0010
 
 DeepSeek Harness Desktop needs coarse product evidence about released-version adoption, startup reliability, update delivery, surface usage, extension operations, and session duration while remaining a free open-source desktop distribution.
 
-The desktop application handles sensitive local conversations, credentials, source trees, paths, logs, and extension metadata. A conventional analytics SDK would introduce a persistent installation identity and a vendor-defined automatic collection surface that is broader than the product questions require.
+The desktop application handles sensitive local conversations, credentials, source trees, paths, logs, and extension metadata. A conventional analytics SDK would introduce a persistent installation identity and a vendor-defined automatic collection surface that is broader than the product questions require. The Value Mode feature also needs coarse evidence about whether users enter its setup flow and whether expert-controller versus subagent-worker routing is being used, without collecting model identity or conversation data.
 
 Official releases need metrics by default and do not expose an application opt-out. Ordinary development, test, source, and Fork builds must not report to the official service.
 
@@ -18,7 +18,7 @@ Official packaged builds send a closed vocabulary of coarse product events from 
 
 The client creates a Desktop-specific local random secret and does not reuse the DeepSeek Harness anonymous user identifier, an account, or hardware data. It sends only HMAC-derived daily and monthly actors that rotate at UTC period boundaries; the secret and a stable installation identifier never leave the device. The queue stays in memory, failed delivery is not retried, and telemetry never blocks product behavior.
 
-The Worker validates exact fields, derives the UTC day, UTC month, and country-level code at ingestion, groups identical records, and stores aggregate event counts plus period-scoped actor rows for unique-user queries. It does not store raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, stack traces, package names, model names, or other free-form values.
+The Worker validates exact fields, derives the UTC day, UTC month, and country-level code at ingestion, groups identical records, and stores aggregate event counts plus period-scoped actor rows for unique-user queries. Value Mode events contain only fixed lifecycle, strategy, and coarse controller/subagent route dimensions. It does not store raw events, client timestamps, IP addresses, user agents, request headers, content, paths, logs, stack traces, package names, model names, token counts, or other free-form values.
 
 Product metrics are enabled whenever an official HTTPS endpoint is present in the packaged resource. The application exposes no user-facing switch. The public privacy policy describes the default behavior and states that installation, launch, or continued use indicates agreement where applicable law permits.
 

@@ -1,0 +1,147 @@
+.subtitle {
+  max-width: 360px;
+  line-height: 1.4;
+}
+
+.optionButton {
+  width: 100%;
+  box-sizing: border-box;
+  color: #ffffff;
+  font: inherit;
+  text-align: left;
+}
+
+.providerLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.providerCount {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: none;
+}
+
+.modelLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.modelName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.modelId {
+  font-size: 11px;
+  color: #9ca3af;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
+.modelDescription {
+  font-size: 11px;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedBadge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  border-radius: 999px;
+  color: #bfdbfe;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.errorPanel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 6px;
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.errorMessage {
+  min-width: 0;
+  color: #fca5a5;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.failurePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  background: rgba(120, 53, 15, 0.18);
+  color: #fcd34d;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.failureTitle {
+  font-weight: 600;
+}
+
+.failureItem {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  color: #fde68a;
+  overflow-wrap: anywhere;
+}
+
+.failureProvider {
+  flex: 0 0 auto;
+  color: #fef3c7;
+  font-weight: 600;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.footerHint {
+  min-width: 0;
+  color: #6b7280;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  color: #ef4444;
+  overflow-wrap: anywhere;
+}

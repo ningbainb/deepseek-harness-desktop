@@ -1,0 +1,119 @@
+/* Layout guardrails shared by the settings card, header popover, and picker. */
+
+.card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.header {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.titleArea {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.titleRow {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.switchArea {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.onboarding {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.modelRow {
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.modelInfo {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.modelValue,
+.modelDesc {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.modelAction {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.strategyGroup {
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.strategyItem {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.popover {
+  box-sizing: border-box;
+  position: fixed;
+  width: min(320px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 48px);
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.modalBackdrop {
+  box-sizing: border-box;
+  padding: 12px;
+}
+
+.modalContent {
+  box-sizing: border-box;
+  width: min(420px, 100%);
+  max-width: 100%;
+  max-height: min(80vh, calc(100vh - 24px));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modelList {
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+}
+
+.interactiveButton {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .modelAction {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .interactiveButton {
+    width: 100%;
+  }
+}

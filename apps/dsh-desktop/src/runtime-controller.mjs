@@ -9,6 +9,12 @@ import {
   isDesktopWorkspaceFileOpenToken,
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import { emitBestEffort } from './best-effort-events.mjs'
+import {
+  STARTUP_OUTCOMES,
+  STARTUP_PHASES,
+  classifyStartupFailure,
+  createStartupPhaseRecorder,
+} from './startup-phase.mjs'
 
 const READY_LINE = /^dsh web:\s+(http:\/\/\S+)/u
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
@@ -327,6 +333,7 @@ export class DshRuntimeController extends EventEmitter {
     this.workspaceFileOpenTokenFactory = workspaceFileOpenTokenFactory
     this.preflight = preflight
     this.now = now
+    this.startupPhases = createStartupPhaseRecorder({ now })
     this.child = undefined
     this.readyPromise = undefined
     this.stopPromise = undefined
@@ -349,8 +356,35 @@ export class DshRuntimeController extends EventEmitter {
   }
 
   #setStatus(state, details = {}, redactionToken = this.workspaceFileOpenToken) {
+    // Phase transitions are derived here rather than at each call site, so a
+    // newly added crash path cannot silently skip them.
+    if (state === 'crashed') {
+      const active = this.startupPhases.current()
+      if (active !== undefined && active !== STARTUP_PHASES.FAILED) {
+        this.startupPhases.complete(
+          active,
+          classifyStartupFailure(details.error) === 'startup-timeout'
+            ? STARTUP_OUTCOMES.TIMEOUT
+            : STARTUP_OUTCOMES.FAILED,
+        )
+      }
+      this.startupPhases.enter(STARTUP_PHASES.FAILED)
+    } else if (state === 'ready') {
+      // READY and FAILED are terminal: they stay the current phase instead of
+      // being closed, so the UI keeps showing a meaningful final state rather
+      // than an empty phase with nowhere to go.
+      this.startupPhases.complete(STARTUP_PHASES.RUNTIME_READY)
+      this.startupPhases.enter(STARTUP_PHASES.READY)
+    }
+    // `phase` is a live getter, not a snapshot. It must answer "where is
+    // startup right now", because phases advance between status transitions:
+    // a single `starting` status spans resolve, spawn and wait-for-ready.
+    const startupPhases = this.startupPhases
     this.status = Object.freeze({
       state,
+      get phase() {
+        return startupPhases.current()
+      },
       url: details.url,
       error: details.error === undefined
         ? undefined
@@ -390,6 +424,18 @@ export class DshRuntimeController extends EventEmitter {
     return this.status.state === 'ready' ? this.workspaceFileOpenToken : undefined
   }
 
+  /**
+   * Diagnostics projection of the real startup lifecycle.
+   *
+   * Carries only phase names, timestamps and durations - no capability
+   * tokens, no credentials, no absolute paths, no message content - so it is
+   * safe to attach to a diagnostics export. This is what lets a support
+   * thread answer "where did it hang" from the export alone.
+   */
+  getStartupPhases() {
+    return this.startupPhases.history()
+  }
+
   start({ preserveRestartAttempt = false } = {}) {
     if (this.stopPromise) {
       const stopping = this.stopPromise
@@ -419,6 +465,8 @@ export class DshRuntimeController extends EventEmitter {
     this.manualStop = false
     // A restart must never reuse an authority accepted by a previous Host.
     this.workspaceFileOpenToken = undefined
+    this.startupPhases.reset()
+    this.startupPhases.enter(STARTUP_PHASES.RUNTIME_RESOLVE)
     this.#setStatus('starting')
 
     const readyPromise = new Promise((resolve, reject) => {
@@ -475,6 +523,8 @@ export class DshRuntimeController extends EventEmitter {
         profileName: this.profileName,
         patchFiles: launchPatchFiles,
       })
+      this.startupPhases.complete(STARTUP_PHASES.RUNTIME_RESOLVE)
+      this.startupPhases.enter(STARTUP_PHASES.RUNTIME_SPAWN)
       const child = this.spawnProcess(
         invocation.executable,
         invocation.args,
@@ -491,6 +541,8 @@ export class DshRuntimeController extends EventEmitter {
         },
       )
       this.child = child
+      this.startupPhases.complete(STARTUP_PHASES.RUNTIME_SPAWN)
+      this.startupPhases.enter(STARTUP_PHASES.RUNTIME_READY)
     } catch (error) {
       this.#failBeforeReady(error)
       return readyPromise

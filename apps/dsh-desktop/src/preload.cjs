@@ -21,6 +21,8 @@ const api = Object.freeze({
   setWindowChromeTheme: (theme) => ipcRenderer.invoke('desktop:window-chrome-theme', theme),
   showNotification: (notification) => ipcRenderer.invoke('desktop:notification-show', notification),
   onStatus: createSubscription('desktop:status', 'status'),
+  onStartupActivity: createSubscription('desktop:startup-activity', 'startup activity'),
+  onDirectState: createSubscription('desktop:direct-state', 'direct state'),
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   checkPluginUpdates: () => ipcRenderer.invoke('extensions:plugin-check'),
   installPlugin: (spec, allowUnknown = false) => ipcRenderer.invoke('extensions:plugin-install', { spec, allowUnknown }),

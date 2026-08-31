@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Live input/output token estimates, generation throughput, and session cost display for DSH Web. It feeds the built-in session status row: input and output token totals update while a response streams, the estimated API cost is shown as a compact `≈¥` amount, and the generation throughput group (`TPS 31.4 tok/s`) renders right after the step counts:
+Live input/output token estimates, rolling one-second generation peak, and session cost display for DSH Web. It feeds the built-in session status row: input and output token totals update while a response streams, the estimated API cost is shown as a compact `≈¥` amount, and the generation throughput group (`TPS 31.4 tok/s`) renders right after the step counts:
 
 ```text
 1 turns · 3 steps API ↑7.9K ↓12 · ≈¥0.05 TPS 31.4 tok/s
@@ -12,7 +12,7 @@ Live input/output token estimates, generation throughput, and session cost displ
 
 ## What it does
 
-- **Host half**: registers the replayable `liveTokenUsage` session projection (`ctx.sessionProjections`). The fold estimates input tokens from the surface log plus header/tool framing, estimates output tokens from streaming chunks, and replaces estimates with provider usage as soon as a `usage` chunk or final message lands. TPS is derived from output tokens over wall-clock time of the active step, and the rate is resident: once any step measured one, the projection keeps reporting it (falling back to the last measured value while a new step has not produced output yet, or after a rate-less step), so the row never flickers out.
+- **Host half**: registers the replayable `liveTokenUsage` session projection (`ctx.sessionProjections`). The fold estimates input tokens from the surface log plus header/tool framing and turns streamed output increments into timestamped samples. Each sample computes the output-token total in `[t-1000ms, t]`; same-millisecond batches are coalesced, and each step records its latest rolling rate and maximum rolling peak. Usage summaries and final messages correct billing buckets only and never create instantaneous samples. The latest rate remains resident when no new sample arrives; no TPS is shown when a step has no valid streamed sample.
 - **Client half**: mounts the cost/TPS row in the conversation composer dock. It reads the host's `liveTokenUsage` projection directly and renders compact input/output token totals plus the current-session estimated cost.
 
 ## Installation
@@ -79,7 +79,7 @@ No system-prompt contribution, so no cache-stability effect.
 
 ## Known Limitations and Deferred Work
 
-- **Heuristic estimates**: input/output totals are character-count heuristics (`~`) until provider usage arrives; exact cache accounting always comes from DSH's durable token-usage projection.
+- **Heuristic estimates**: input/output totals are character-count heuristics (`~`) until provider usage arrives; exact cache accounting always comes from DSH's durable token-usage projection. Rolling peaks accept only positive streamed increments with non-decreasing timestamps.
 - **Web only**: the TPS row renders in DSH Web's composer dock; there is no TUI equivalent yet.
 - **Single active step**: the projection tracks one active step per session and the dock row shows that session's view; concurrent sessions each get their own projection.
 - **Density assumption**: `charsPerToken` defaults to 4 characters, which undercounts CJK text and overcounts pure ASCII; tune it per deployment if estimates drift.

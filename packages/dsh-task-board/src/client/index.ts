@@ -212,6 +212,44 @@ export function apply(ctx: ClientContext): void {
       scheduler.start()
 
       const disposers: Array<() => void> = []
+      const openSessionFromDeepLink = async (sessionId: string): Promise<void> => {
+        const refresh = (sessions as typeof sessions & { refresh?: () => Promise<void> }).refresh
+        // Keep the SessionRuntime receiver when the optional compatibility
+        // method is called. Extracting a class method and invoking it bare
+        // loses `this`, so imported sessions would never trigger a fresh list
+        // pull and the deep-link retry could only report "unknown session".
+        const refreshList = typeof refresh === 'function'
+          ? () => refresh.call(sessions)
+          : undefined
+        let lastError: unknown
+        const deadline = Date.now() + 10_000
+        let attempt = 0
+        while (Date.now() < deadline) {
+          try {
+            sessions.open(sessionId as SessionId)
+            return
+          } catch (error) {
+            lastError = error
+          }
+
+          // The Host commits the new session before the client stream publishes
+          // its next list baseline. Refresh periodically while keeping the
+          // first attempt fast and bounding the total wait.
+          if (refreshList !== undefined && (attempt === 0 || attempt % 3 === 0)) {
+            try {
+              await refreshList()
+            } catch (error) {
+              lastError = error
+            }
+          }
+
+          attempt += 1
+          const remaining = deadline - Date.now()
+          if (remaining <= 0) break
+          await new Promise<void>((resolve) => setTimeout(resolve, Math.min(200, remaining)))
+        }
+        console.error('[dsh-task-board] imported session could not be opened:', lastError)
+      }
       try {
         disposers.push(mountSidebarEntry(controller))
         disposers.push(mountBoard(controller))
@@ -230,7 +268,7 @@ export function apply(ctx: ClientContext): void {
             } else if (link.kind === 'run' && typeof link.id === 'string') {
               controller.openRun(link.id)
             } else if (link.kind === 'session' && typeof link.id === 'string') {
-              sessions.open(link.id as SessionId)
+              void openSessionFromDeepLink(link.id)
             }
           }))
         }

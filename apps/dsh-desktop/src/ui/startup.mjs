@@ -5,6 +5,7 @@ import {
   initialProgressForState,
   phaseIndexForProgress,
 } from './startup-progress.mjs'
+import { STARTUP_PHASE_LABELS, isStartupPhase } from '../startup-phase.mjs'
 import { mountParticleWhale, OFFICIAL_WHALE_PATH } from './whale-particles.mjs'
 
 const title = document.querySelector('#status-title')
@@ -18,6 +19,8 @@ const whaleCanvas = document.querySelector('#whale-canvas')
 const startupStepsContainer = document.querySelector('#startup-steps')
 const startupSteps = [...document.querySelectorAll('[data-startup-step]')]
 const startupGuidance = document.querySelector('#startup-guidance')
+const ticker = document.querySelector('#status-ticker')
+const phaseLine = document.querySelector('#status-phase')
 
 const STARTUP_STALL_NOTICE_MS = 30_000
 
@@ -38,7 +41,7 @@ const directCopy = Object.freeze({
   verifying: ['正在验证修复', '验证通过后会自动继续启动'],
   'ready-full': ['探索界面已经就绪', '正在进入 DeepSeek Harness'],
   'ready-builtins': ['正在载入内置插件', '原有数据保持不变'],
-  'installation-repair-required': ['正在修复应用安装', '安装文件修复后会自动继续'],
+  'installation-repair-required': ['应用安装需要处理', '检测到安装环境或文件完整性异常，请选择操作继续启动'],
   'system-startup-failed': ['启动未能完成', '完整模式和内置模式都无法启动；请查看日志或导出诊断'],
 })
 
@@ -64,6 +67,64 @@ let progress = 0
 let latestStatus = { state: 'stopped' }
 let startupStalled = false
 let startupStallTimer
+// The startup phase is the truth; the percentage is decoration. These track
+// which phase the user is waiting on and for how long, so a slow launch can
+// say where it is instead of showing a frozen number.
+let currentPhase
+let phaseStartedAtMs = 0
+let elapsedTimer
+
+function stopElapsedTicker() {
+  if (elapsedTimer !== undefined) {
+    window.clearInterval(elapsedTimer)
+    elapsedTimer = undefined
+  }
+}
+
+function hidePhase() {
+  stopElapsedTicker()
+  currentPhase = undefined
+  if (!phaseLine) return
+  phaseLine.hidden = true
+  phaseLine.textContent = ''
+}
+
+/**
+ * Render the real startup phase.
+ *
+ * A frozen percentage cannot distinguish "the runtime never spawned" from
+ * "the runtime is up but slow to answer". The phase can, so once startup has
+ * stalled the phase line also reports how long this particular phase has been
+ * open - that is the number a support thread actually needs.
+ */
+function renderPhase(status, stalled) {
+  if (!phaseLine) return
+  const phase = status?.phase
+  if (!isStartupPhase(phase) || !startingState(currentState)) {
+    hidePhase()
+    return
+  }
+  if (phase !== currentPhase) {
+    currentPhase = phase
+    phaseStartedAtMs = Date.now()
+  }
+  const label = STARTUP_PHASE_LABELS[phase]
+  phaseLine.hidden = false
+
+  if (!stalled) {
+    stopElapsedTicker()
+    phaseLine.textContent = label
+    return
+  }
+
+  const update = () => {
+    const seconds = Math.max(0, Math.round((Date.now() - phaseStartedAtMs) / 1000))
+    phaseLine.textContent = `启动时间比平时更长 · 当前阶段：${label} · 已等待：${seconds} 秒`
+  }
+  update()
+  stopElapsedTicker()
+  elapsedTimer = window.setInterval(update, 1_000)
+}
 
 function renderProgress(value) {
   const previousRounded = Math.round(progress)
@@ -162,6 +223,17 @@ function updateStartupStall(state, stateChanged) {
   }, STARTUP_STALL_NOTICE_MS)
 }
 
+function renderActivity(activity) {
+  if (!ticker) return
+  if (!activity?.text || currentState === 'ready' || currentState === 'crashed') {
+    ticker.hidden = true
+    ticker.textContent = ''
+    return
+  }
+  ticker.hidden = false
+  ticker.textContent = `▸ ${activity.text}`
+}
+
 function render(status) {
   hideDirectProcess()
   const state = copy[status?.state] ? status.state : 'crashed'
@@ -169,10 +241,12 @@ function render(status) {
   const stateChanged = currentState !== state
   latestStatus = status ?? { state }
   currentState = state
+  if (state === 'ready' || state === 'crashed') renderActivity(null)
   updateStartupStall(state, stateChanged)
   document.body.dataset.state = state
   title.textContent = heading
   const stalled = startupStalled && startingState(state)
+  renderPhase(status, stalled)
   detail.textContent = status?.restartBlocked === 'repeated-crash'
     ? '已停止重复启动，应用正在准备下一步自动处理'
     : stalled
@@ -192,13 +266,12 @@ window.setInterval(() => {
 
 window.addEventListener('beforeunload', () => {
   if (startupStallTimer !== undefined) window.clearTimeout(startupStallTimer)
+  stopElapsedTicker()
 })
 
-const previewState = new URLSearchParams(window.location.search).get('preview')
-const directState = new URLSearchParams(window.location.search).get('directState')
-const directReasonKey = new URLSearchParams(window.location.search).get('directReason')
-const directReason = safeDirectReason(directReasonKey)
-if (directState && directCopy[directState]) {
+function renderDirectState(directState, directReasonKey) {
+  if (!directState || !directCopy[directState]) return
+  const directReason = safeDirectReason(directReasonKey)
   const [heading, message] = directCopyFor(directState, directReason)
   const directProgress = {
     preparing: 8,
@@ -211,15 +284,35 @@ if (directState && directCopy[directState]) {
     'installation-repair-required': 18,
     'system-startup-failed': 100,
   }
-  currentState = directState.startsWith('ready-') || directState === 'system-startup-failed'
-    ? 'ready'
-    : 'starting'
+  if (directState === 'installation-repair-required') {
+    currentState = 'stopped'
+  } else if (directState === 'system-startup-failed') {
+    currentState = 'ready'
+  } else {
+    currentState = directState.startsWith('ready-')
+      ? 'ready'
+      : 'starting'
+  }
+  if (currentState === 'ready') renderActivity(null)
   document.body.dataset.state = currentState
   title.textContent = heading
   detail.textContent = message
+  // The direct-start flow renders its own step list; a runtime phase line
+  // would compete with it, so keep it hidden in this mode.
+  hidePhase()
   renderProgress(directProgress[directState] ?? 8)
   renderDirectProcess(directState, directReason)
-} else if (previewState && copy[previewState]) {
+}
+
+const previewState = new URLSearchParams(window.location.search).get('preview')
+const initialDirectState = new URLSearchParams(window.location.search).get('directState')
+const initialDirectReasonKey = new URLSearchParams(window.location.search).get('directReason')
+
+if (initialDirectState) {
+  renderDirectState(initialDirectState, initialDirectReasonKey)
+}
+
+if (previewState && copy[previewState]) {
   try {
     const info = await window.dshDesktop.getInfo()
     version.textContent = `DESKTOP ${info.version}`
@@ -230,17 +323,28 @@ if (directState && directCopy[directState]) {
 } else {
   try {
     const statusGate = createStartupStatusGate(render)
-    window.dshDesktop.onStatus(statusGate.live)
+    window.dshDesktop?.onStatus?.(statusGate.live)
+    if (typeof window.dshDesktop?.onStartupActivity === 'function') {
+      window.dshDesktop.onStartupActivity(renderActivity)
+    }
+    if (typeof window.dshDesktop?.onDirectState === 'function') {
+      window.dshDesktop.onDirectState(({ directState, directReason }) => {
+        renderDirectState(directState, directReason)
+      })
+    }
+    const getInfo = window.dshDesktop?.getInfo
+    const getStatus = window.dshDesktop?.getStatus
     const [info, initialStatus] = await Promise.all([
-      window.dshDesktop.getInfo(),
-      window.dshDesktop.getStatus(),
+      typeof getInfo === 'function' ? getInfo().catch(() => undefined) : undefined,
+      typeof getStatus === 'function' ? getStatus().catch(() => undefined) : undefined,
     ])
-    version.textContent = `DESKTOP ${info.version}`
-    statusGate.initial(initialStatus)
+    if (info?.version) version.textContent = `DESKTOP ${info.version}`
+    if (!initialDirectState && initialStatus) {
+      statusGate.initial(initialStatus)
+    }
   } catch (error) {
-    // The first splash is intentionally loaded before the complete Desktop
-    // IPC surface is registered. Keep showing preparation until the normal
-    // startup load replaces it; do not turn that short gap into an error UI.
-    render({ state: 'stopped' })
+    if (!initialDirectState) {
+      render({ state: 'stopped' })
+    }
   }
 }

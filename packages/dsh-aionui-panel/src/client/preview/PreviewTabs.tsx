@@ -3,7 +3,7 @@
  * 12px title), dirty dot (6px, primary), close glyph (16px box, 12px icon),
  * middle-click close, right-click menu (close left/right/others/all), the
  * 32px left/right overflow fade indicators (ResizeObserver + scroll), the
- * new-URL-tab plus, and the panel collapse button.
+ * new-URL-tab plus, and the panel close button.
  * @module dsh-aionui-panel/client/preview/PreviewTabs
  */
 
@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { PreviewTabState } from '../store.ts'
 import { t } from '../locales.ts'
-import { CloseIcon, PlusIcon, ShrinkIcon } from '../components/icons.tsx'
+import { CloseIcon, PlusIcon } from '../components/icons.tsx'
 import { activateOnKey } from '../components/a11y.ts'
 import previewCss from '../styles/preview.module.css'
 
@@ -131,10 +131,10 @@ export function PreviewTabs({
           tabIndex={0}
           onClick={onClosePanel}
           onKeyDown={activateOnKey(onClosePanel)}
-          title={t('preview.collapsePanel')}
-          aria-label={t('preview.collapsePanel')}
+          title={t('preview.closePanel')}
+          aria-label={t('preview.closePanel')}
         >
-          <ShrinkIcon size={14} />
+          <CloseIcon size={14} />
         </div>
       </div>
       {fade.left && <div className={previewCss.tabFadeLeft} style={{ width: FADE_WIDTH }} />}

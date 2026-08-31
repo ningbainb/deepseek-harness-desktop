@@ -1,0 +1,3 @@
+﻿name: Value Mode (性价比模式)
+description: Uses the expert model as the top-level controller and routes delegated subagent work to a configured lower-cost executor model.
+order: 10

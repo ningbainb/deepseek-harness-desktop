@@ -34,12 +34,14 @@ declare module '@deepseek-ai/dsh-token-meter/client' {
     messageTokens: number
   }
 
-  /** Live per-step token estimates plus generation throughput. */
+  /** Live per-step token estimates plus streaming throughput. */
   export interface LiveTokenUsageProjection extends TokenUsageProjection {
     /** True while any active step's buckets are heuristic estimates. */
     estimated: boolean
-    /** Output tokens per second of the active (or latest settled) step. */
+    /** Latest rolling one-second output rate from streamed deltas. */
     tokensPerSecond?: number
+    /** Maximum rolling one-second output rate observed in the latest step. */
+    peakTokensPerSecond?: number
     /** Current-session cost estimate in the projection currency. */
     estimatedCost?: number
     /** Currency code used for the cost estimate. */

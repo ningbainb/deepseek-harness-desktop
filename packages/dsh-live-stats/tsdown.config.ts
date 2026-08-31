@@ -15,6 +15,8 @@ export default clientBundle(
           '@deepseek-ai/dsh-client-ui-conversation',
           '@deepseek-ai/dsh-client-ui-settings',
           '@deepseek-ai/dsh-client-ui-slots',
+          '@deepseek-ai/dsh-credentials',
+          '@deepseek-ai/dsh-host-webserver',
           '@deepseek-ai/dsh-invariants',
           '@deepseek-ai/dsh-llm',
           '@deepseek-ai/dsh-session',

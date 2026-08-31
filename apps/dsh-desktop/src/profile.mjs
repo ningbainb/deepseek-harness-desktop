@@ -22,6 +22,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-base',
   '@linxin666/dsh-desktop-compat',
   '@deepseek-ai/dsh-web-app',
+  '@linxin666/dsh-value-mode',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   'reasoning-slider',
@@ -121,6 +122,7 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
   'remote-web-ui',
   'skin-background',
   'task-board',
+  'value-mode',
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
@@ -145,6 +147,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
+  '@linxin666/dsh-value-mode',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   'dsh-better-sidebar',

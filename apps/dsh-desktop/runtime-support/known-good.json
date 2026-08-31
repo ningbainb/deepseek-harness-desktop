@@ -10,8 +10,8 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "3.1.0",
-    "rootVersion": "3.1.0",
+    "version": "3.2.0",
+    "rootVersion": "3.2.0",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
@@ -31,7 +31,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "389a529b3c2401c246b05d3303e8594c18ed8b89471832460922a7d676db2410"
+    "sha256": "0713074199a8a61a70ec68f9465937f3cc0694084995f3e2c2c9613edd622997"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",

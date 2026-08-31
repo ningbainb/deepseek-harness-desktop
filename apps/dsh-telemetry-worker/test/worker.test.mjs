@@ -18,6 +18,19 @@ const VALID_EVENT = Object.freeze({
   bucket: '2-5s',
 })
 
+const VALID_VALUE_MODE_CALL = Object.freeze({
+  name: 'value_mode_call',
+  appVersion: '3.1.0',
+  channel: 'stable',
+  os: 'windows-11',
+  language: 'zh',
+  dailyActor: 'a'.repeat(64),
+  monthlyActor: 'b'.repeat(64),
+  outcome: 'started',
+  detail: 'controller',
+  bucket: 'none',
+})
+
 const VALID_SCHEMA_3_LAUNCH = Object.freeze({
   name: 'app_launch',
   appVersion: '3.0.2',
@@ -223,6 +236,42 @@ test('accepts the macos operating system family and still rejects unknown ones',
   const rejected = await worker.fetch(requestFor({
     schema: 2,
     events: [{ ...VALID_EVENT, os: 'macos-27' }],
+  }), enabledEnvironment())
+  assert.equal(rejected.status, 400)
+})
+
+test('accepts Value Mode lifecycle and route events without model identity', async () => {
+  const database = new FakeDatabase()
+  const response = await worker.fetch(requestFor({
+    schema: 2,
+    events: [VALID_VALUE_MODE_CALL, {
+      ...VALID_VALUE_MODE_CALL,
+      name: 'value_mode_onboarding',
+      outcome: 'completed',
+      detail: 'header',
+    }],
+  }), enabledEnvironment(database), { now: () => new Date('2026-08-19T23:59:59.000Z') })
+
+  assert.equal(response.status, 204)
+  assert.equal(database.batches.length, 1)
+  assert.equal(database.batches[0].length, 6)
+  assert.deepEqual(database.batches[0][0].values, [
+    '2026-08-19',
+    'value_mode_call',
+    '3.1.0',
+    'stable',
+    'windows-11',
+    'zh',
+    'started',
+    'controller',
+    'none',
+    1,
+  ])
+  assert.doesNotMatch(database.batches[0][0].sql, /model|prompt|token|raw/iu)
+
+  const rejected = await worker.fetch(requestFor({
+    schema: 2,
+    events: [{ ...VALID_VALUE_MODE_CALL, detail: 'gpt-5-secret-model' }],
   }), enabledEnvironment())
   assert.equal(rejected.status, 400)
 })
@@ -491,14 +540,17 @@ test('authenticated admin page is dependency-free and protected by strict browse
   const body = await response.text()
   assert.match(body, /产品数据看板/u)
   assert.match(body, /下载按钮点击/u)
-  assert.match(body, /日活用户/u)
-  assert.match(body, /月活用户/u)
+  assert.match(body, /日活跃实例/u)
+  assert.match(body, /周活跃实例/u)
+  assert.match(body, /月活跃实例/u)
+  assert.match(body, /近 400 天累计安装实例/u)
   assert.match(body, /应用内更新漏斗/u)
   assert.match(body, /拓展坞漏斗/u)
   assert.match(body, /D1 留存率/u)
   assert.match(body, /D7 留存率/u)
   assert.match(body, /D30 留存率/u)
   assert.match(body, /用户使用时长/u)
+  assert.match(body, /性价比模式使用/u)
   assert.match(body, /\/admin\/dashboard\.js/u)
   assert.doesNotMatch(body, /https:\/\/(?:cdn|fonts|unpkg|jsdelivr)\./iu)
   assert.doesNotMatch(body, /correct-horse|session-secret/iu)
@@ -514,9 +566,17 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       { results: [{ version: '2.5.0', count: 42 }] },
       { results: [{ total: 16 }] },
       { results: [{ surface: 'settings', count: 7 }] },
-      { results: [{ event: 'app_launch', count: 16 }] },
-      { results: [{ day: '2026-08-19', count: 11 }] },
-      { results: [{ month: '2026-08', count: 31 }] },
+       { results: [{ event: 'app_launch', count: 16 }] },
+       { results: [{ event: 'value_mode_call', outcome: 'started', detail: 'controller', count: 4 }] },
+       { results: [{ dau: 0, wau: 17, mau: 31, totalInstallations: 45 }] },
+      { results: [
+        { day: '2026-08-18', count: 9 },
+        { day: '2026-08-19', count: 0 },
+      ] },
+      { results: [
+        { day: '2026-08-18', count: 29 },
+        { day: '2026-08-19', count: 31 },
+      ] },
       { results: [{ countryCode: 'CN', count: 21 }] },
       { results: [{ version: '3.0.2', count: 25 }] },
       { results: [{ event: 'update_completed', count: 9 }] },
@@ -538,7 +598,7 @@ test('admin summary returns only bounded aggregate queries for a signed session'
   assert.equal(response.status, 200)
   assert.match(response.headers.get('content-type'), /^application\/json/iu)
   assert.deepEqual(await response.json(), {
-    schema: 3,
+     schema: 5,
     rangeDays: 30,
     generatedAt: '2026-08-19T08:02:00.000Z',
     downloads: {
@@ -553,11 +613,25 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       surfaces: [{ surface: 'settings', count: 7 }],
       events: [{ event: 'app_launch', count: 16 }],
     },
+    valueMode: {
+      usage: [{ event: 'value_mode_call', outcome: 'started', detail: 'controller', count: 4 }],
+    },
     active: {
-      dau: 11,
+      asOfDay: '2026-08-19',
+      definition: 'app_launch',
+      dau: 0,
+      wau: 17,
       mau: 31,
-      dailyTrend: [{ day: '2026-08-19', count: 11 }],
-      monthlyTrend: [{ month: '2026-08', count: 31 }],
+      totalInstallations: 45,
+      totalInstallationsWindowDays: 400,
+      dailyTrend: [
+        { day: '2026-08-18', count: 9 },
+        { day: '2026-08-19', count: 0 },
+      ],
+      mauTrend: [
+        { day: '2026-08-18', count: 29 },
+        { day: '2026-08-19', count: 31 },
+      ],
       countries: [{ countryCode: 'CN', count: 21 }],
       versions: [{ version: '3.0.2', count: 25 }],
     },
@@ -578,13 +652,75 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       sessionDurations: [{ bucket: '5-30m', count: 8 }],
     },
   })
-  assert.equal(database.queries.length, 16)
+  assert.equal(database.queries.length, 18)
+  assert.deepEqual(database.queries.slice(0, 9).map(query => query.values), Array.from({ length: 9 }, () => ['-29 days']))
+  assert.deepEqual(database.queries[9].values, ['2026-08-19'])
+  assert.deepEqual(database.queries[10].values, ['2026-08-19', '-29 days', '2026-08-19'])
+  assert.deepEqual(database.queries[11].values, ['2026-08-19', '-29 days', '2026-08-19'])
+  assert.deepEqual(database.queries.slice(12).map(query => query.values), Array.from({ length: 6 }, () => ['-29 days']))
   for (const query of database.queries) {
-    assert.deepEqual(query.values, ['-29 days'])
     assert.doesNotMatch(query.sql, /ip|city|user.?agent|referrer|raw/iu)
   }
 })
 
+test('activity SQL uses stable installation actors and exact rolling windows', () => {
+  const database = new DatabaseSync(':memory:')
+  try {
+    database.exec("CREATE TABLE product_installation_first_seen (installation_actor TEXT PRIMARY KEY, first_seen_day TEXT NOT NULL, first_version TEXT NOT NULL) WITHOUT ROWID; CREATE TABLE product_installation_daily (day TEXT NOT NULL, installation_actor TEXT NOT NULL, PRIMARY KEY (day, installation_actor)) WITHOUT ROWID;")
+    const firstSeen = database.prepare('INSERT INTO product_installation_first_seen VALUES (?, ?, ?)')
+    for (const [actor, day] of [
+      ['actor-a', '2026-08-13'],
+      ['actor-b', '2026-08-13'],
+      ['actor-c', '2026-08-16'],
+      ['actor-d', '2026-08-19'],
+      ['actor-old', '2026-08-12'],
+      ['actor-ancient', '2025-07-01'],
+    ]) firstSeen.run(actor, day, '3.0.2')
+    const daily = database.prepare('INSERT INTO product_installation_daily VALUES (?, ?)')
+    for (const [day, actor] of [
+      ['2026-08-12', 'actor-old'],
+      ['2026-08-13', 'actor-a'],
+      ['2026-08-13', 'actor-b'],
+      ['2026-08-14', 'actor-a'],
+      ['2026-08-16', 'actor-c'],
+      ['2026-08-19', 'actor-a'],
+      ['2026-08-19', 'actor-d'],
+    ]) daily.run(day, actor)
+
+    const headline = database.prepare(dashboardTest.ACTIVE_HEADLINE_SQL).get('2026-08-19')
+    assert.deepEqual({
+      dau: Number(headline.dau),
+      wau: Number(headline.wau),
+      mau: Number(headline.mau),
+      totalInstallations: Number(headline.totalInstallations),
+    }, { dau: 2, wau: 4, mau: 5, totalInstallations: 5 })
+
+    const bindings = ['2026-08-19', '-6 days', '2026-08-19']
+    const dailyTrend = database.prepare(dashboardTest.ACTIVE_DAILY_TREND_SQL).all(...bindings)
+    assert.deepEqual(dailyTrend.map(row => [row.day, Number(row.count)]), [
+      ['2026-08-13', 2],
+      ['2026-08-14', 1],
+      ['2026-08-15', 0],
+      ['2026-08-16', 1],
+      ['2026-08-17', 0],
+      ['2026-08-18', 0],
+      ['2026-08-19', 2],
+    ])
+
+    const mauTrend = database.prepare(dashboardTest.ACTIVE_MAU_TREND_SQL).all(...bindings)
+    assert.deepEqual(mauTrend.map(row => [row.day, Number(row.count)]), [
+      ['2026-08-13', 3],
+      ['2026-08-14', 3],
+      ['2026-08-15', 3],
+      ['2026-08-16', 4],
+      ['2026-08-17', 4],
+      ['2026-08-18', 4],
+      ['2026-08-19', 5],
+    ])
+  } finally {
+    database.close()
+  }
+})
 test('retention cohort SQL distinguishes mature zero retention from immature cohorts', () => {
   const database = new DatabaseSync(':memory:')
   try {

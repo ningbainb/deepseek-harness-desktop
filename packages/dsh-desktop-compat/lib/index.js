@@ -83,7 +83,7 @@ function hasScheduledPrompt(events, prompt) {
 		return content.some((block) => block !== null && typeof block === "object" && !Array.isArray(block) && block.type === "text" && block.text === prompt);
 	});
 }
-function failure$1(input, error) {
+function failure$2(input, error) {
 	return {
 		kind: "settled",
 		outcome: "failed",
@@ -141,15 +141,15 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 		canOwnTask: (input) => canDesktopRunnerOwnTask(input, options),
 		async run(input) {
 			const project = input.project;
-			if (project === void 0) return failure$1(input, "scheduled task has no registered Desktop project");
-			if ((input.task.isolationMode === "inherit" || input.task.isolationMode === void 0 ? project.defaultIsolation : input.task.isolationMode) === "git-worktree") return failure$1(input, "background scheduling requires a Runtime Provider Worktree adapter; this task requests git-worktree isolation");
+			if (project === void 0) return failure$2(input, "scheduled task has no registered Desktop project");
+			if ((input.task.isolationMode === "inherit" || input.task.isolationMode === void 0 ? project.defaultIsolation : input.task.isolationMode) === "git-worktree") return failure$2(input, "background scheduling requires a Runtime Provider Worktree adapter; this task requests git-worktree isolation");
 			const prompt = input.task.prompt.trim();
-			if (prompt === "") return failure$1(input, "scheduled task prompt is empty");
+			if (prompt === "") return failure$2(input, "scheduled task prompt is empty");
 			const workspace = options.workspaceRegistry.get(project.workspaceId);
-			if (workspace === void 0) return failure$1(input, "scheduled task workspace is no longer registered");
-			if (await workspace.status() !== "ok") return failure$1(input, "scheduled task workspace directory is unavailable");
+			if (workspace === void 0) return failure$2(input, "scheduled task workspace is no longer registered");
+			if (await workspace.status() !== "ok") return failure$2(input, "scheduled task workspace directory is unavailable");
 			const selection = options.defaultModel.currentSelection();
-			if (selection.provider.trim() === "" || selection.model.trim() === "") return failure$1(input, "no default DSH model is configured for background automation");
+			if (selection.provider.trim() === "" || selection.model.trim() === "") return failure$2(input, "no default DSH model is configured for background automation");
 			let handle;
 			try {
 				const sessionId = sessionIdForExecutionKey(input.executionKey, createSessionId);
@@ -204,7 +204,7 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 				const message = boundedError(error);
 				const sessionId = handle?.agent.id;
 				return {
-					...failure$1(input, message),
+					...failure$2(input, message),
 					...sessionId === void 0 ? {} : {
 						sessionId,
 						run: completeRun(input, sessionId, project.workspaceId, "failed", now, message)
@@ -707,6 +707,278 @@ function installTranscriptBalanceGuard(ctx) {
 	}, { global: true });
 }
 //#endregion
+//#region src/conversation-import-route.ts
+/** Loopback-only Host route for importing an external transcript as a DSH session. */
+const DESKTOP_CONVERSATION_IMPORT_PATH = "/desktop/conversation-import";
+const MAX_BODY_BYTES$1 = 32 * 1024 * 1024;
+const MAX_CWD_LENGTH = 32767;
+const MAX_TITLE_LENGTH = 512;
+const MAX_IMPORT_ID_LENGTH = 256;
+const MAX_SESSION_ID_LENGTH = 128;
+const MAX_SEED_EVENTS = 2e4;
+const SAFE_IMPORT_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,255}$/u;
+const SAFE_SESSION_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
+/**
+* Publish an imported session without tying it to the route's Cordis fiber.
+* The route flushes the seed and then detaches this explicit lifecycle, leaving
+* a cold durable session that the normal model/agent API can resume. Minimal
+* test/Host adapters from older releases only expose create(), so keep the
+* compatibility fallback.
+*/
+function createPreparedSession(sessions, id, options) {
+	if (typeof sessions.prepare === "function" && typeof sessions.enter === "function" && typeof sessions.announce === "function") {
+		const session = sessions.prepare(id, options);
+		let detach;
+		try {
+			detach = sessions.enter(session);
+			sessions.announce(session);
+		} catch (error) {
+			try {
+				detach?.();
+			} catch {}
+			throw error;
+		}
+		return {
+			session,
+			detach
+		};
+	}
+	return {
+		session: sessions.create(id, options),
+		detach: void 0
+	};
+}
+function failure$1(code, message) {
+	return {
+		ok: false,
+		error: {
+			code,
+			message
+		}
+	};
+}
+function writeJson$1(response, status, value) {
+	response.writeHead(status, {
+		"content-type": "application/json; charset=utf-8",
+		"cache-control": "no-store",
+		"x-content-type-options": "nosniff"
+	});
+	response.end(JSON.stringify(value));
+}
+function isLoopbackRequest$1(request) {
+	const address = request.socket.remoteAddress;
+	if (address !== "127.0.0.1" && address !== "::1" && address !== "::ffff:127.0.0.1") return false;
+	const host = request.headers.host;
+	if (typeof host !== "string") return false;
+	let hostUrl;
+	try {
+		hostUrl = new URL(`http://${host}`);
+	} catch {
+		return false;
+	}
+	if (![
+		"127.0.0.1",
+		"localhost",
+		"[::1]"
+	].includes(hostUrl.hostname)) return false;
+	if (request.headers["sec-fetch-site"] === "cross-site") return false;
+	const origin = request.headers.origin;
+	if (origin === void 0) return true;
+	try {
+		return new URL(origin).host === hostUrl.host;
+	} catch {
+		return false;
+	}
+}
+function capabilityTokenMatches$1(expected, supplied) {
+	if (!isDesktopWorkspaceFileOpenToken(expected)) return false;
+	const expectedBytes = Buffer.from(expected, "utf8");
+	const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied, "utf8") : Buffer.alloc(0);
+	const padded = Buffer.alloc(expectedBytes.length);
+	suppliedBytes.copy(padded, 0, 0, expectedBytes.length);
+	return suppliedBytes.length === expectedBytes.length && timingSafeEqual(expectedBytes, padded);
+}
+async function readJsonBody$1(request) {
+	const chunks = [];
+	let size = 0;
+	for await (const chunk of request) {
+		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+		size += buffer.length;
+		if (size > MAX_BODY_BYTES$1) return void 0;
+		chunks.push(buffer);
+	}
+	try {
+		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+	} catch {
+		return;
+	}
+}
+function isPlainObject(value) {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+	const prototype = Object.getPrototypeOf(value);
+	return prototype === Object.prototype || prototype === null;
+}
+function persistSessionTitle(ctx, session, title) {
+	let titleService;
+	if (typeof ctx.get === "function") try {
+		const provided = ctx.get("sessionTitle", false);
+		if (provided !== void 0) titleService = provided;
+	} catch {}
+	if (titleService === void 0) try {
+		titleService = ctx.sessionTitle;
+	} catch {
+		titleService = void 0;
+	}
+	if (titleService !== void 0 && typeof titleService.get === "function" && typeof titleService.rename === "function") {
+		const existing = titleService.get(session);
+		if (existing !== void 0) return existing.title || title;
+		const accepted = titleService.rename(session, title);
+		return typeof accepted?.title === "string" && accepted.title.length > 0 ? accepted.title : title;
+	}
+	return title;
+}
+function normalizeRequest$1(value) {
+	if (!isPlainObject(value)) return void 0;
+	const allowed = /* @__PURE__ */ new Set([
+		"projectCwd",
+		"title",
+		"importId",
+		"sessionId",
+		"createdAt",
+		"seed"
+	]);
+	if (Object.keys(value).some((key) => !allowed.has(key))) return void 0;
+	const projectCwd = typeof value.projectCwd === "string" ? value.projectCwd.trim() : "";
+	if (projectCwd.length === 0 || projectCwd.length > MAX_CWD_LENGTH || !isAbsolute(projectCwd)) return void 0;
+	let title;
+	if (value.title !== void 0) {
+		if (typeof value.title !== "string" || value.title.length > MAX_TITLE_LENGTH) return void 0;
+		title = value.title.trim() || void 0;
+	}
+	let importId;
+	if (value.importId !== void 0) {
+		if (typeof value.importId !== "string" || value.importId.length > MAX_IMPORT_ID_LENGTH || !SAFE_IMPORT_ID.test(value.importId)) return void 0;
+		importId = value.importId;
+	}
+	let sessionId;
+	if (value.sessionId !== void 0) {
+		if (typeof value.sessionId !== "string" || value.sessionId.length > MAX_SESSION_ID_LENGTH || !SAFE_SESSION_ID.test(value.sessionId)) return void 0;
+		sessionId = value.sessionId;
+	}
+	let createdAt;
+	if (value.createdAt !== void 0) {
+		if (typeof value.createdAt !== "number" || !Number.isSafeInteger(value.createdAt) || value.createdAt < 0) return void 0;
+		createdAt = value.createdAt;
+	}
+	if (!Array.isArray(value.seed) || value.seed.length > MAX_SEED_EVENTS) return void 0;
+	if (value.seed.some((event) => !isPlainObject(event))) return void 0;
+	return {
+		projectCwd,
+		title,
+		importId,
+		sessionId,
+		createdAt,
+		seed: value.seed
+	};
+}
+async function importConversationIntoHost(ctx, request) {
+	if (request === void 0) return failure$1("bad-request", "conversation import request is invalid");
+	let canonicalCwd;
+	try {
+		if (!(await stat(request.projectCwd)).isDirectory()) return failure$1("invalid-project", "projectCwd is not a directory");
+		canonicalCwd = await realpath(request.projectCwd);
+	} catch {
+		return failure$1("invalid-project", "projectCwd does not exist or is unavailable");
+	}
+	let workspace;
+	try {
+		workspace = await ctx.workspaceRegistry.create(canonicalCwd, basename(canonicalCwd) || "Workspace");
+	} catch (error) {
+		return failure$1("workspace-create-failed", error instanceof Error ? error.message : String(error));
+	}
+	const effectiveTitle = request.title || workspace.title || basename(canonicalCwd);
+	let persistedTitle = effectiveTitle;
+	let detachSession;
+	let session;
+	try {
+		const requestedSessionId = request.sessionId === void 0 ? void 0 : SessionId(request.sessionId);
+		session = requestedSessionId === void 0 ? void 0 : ctx.sessions.get(requestedSessionId);
+		if (session !== void 0 && session.header.cwd !== canonicalCwd) return failure$1("session-conflict", "requested session belongs to a different project directory");
+		if (session === void 0) {
+			const created = createPreparedSession(ctx.sessions, requestedSessionId, {
+				seed: request.seed,
+				meta: {
+					cwd: canonicalCwd,
+					...request.createdAt === void 0 ? {} : { createdAt: request.createdAt },
+					seedLength: request.seed.length
+				}
+			});
+			session = created.session;
+			detachSession = created.detach;
+		}
+		persistedTitle = persistSessionTitle(ctx, session, effectiveTitle);
+		await workspace.attachSession(session.id);
+		await ctx.sessions.flush(session);
+		if (detachSession) {
+			await Promise.resolve(detachSession());
+			detachSession = void 0;
+		}
+	} catch (error) {
+		if (detachSession) try {
+			await Promise.resolve(detachSession());
+		} catch {}
+		return failure$1("session-import-failed", error instanceof Error ? error.message : String(error));
+	}
+	return {
+		ok: true,
+		workspaceId: String(workspace.id),
+		sessionId: String(session.id),
+		projectCwd: canonicalCwd,
+		title: persistedTitle,
+		seedEventCount: request.seed.length,
+		eventCount: session.events.length
+	};
+}
+function createDesktopConversationImportRoute(ctx, { capabilityToken = process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] } = {}) {
+	const expectedCapabilityToken = capabilityToken;
+	return {
+		kind: "exact",
+		path: DESKTOP_CONVERSATION_IMPORT_PATH,
+		handler: async (request, response) => {
+			if (!isLoopbackRequest$1(request)) {
+				writeJson$1(response, 403, failure$1("forbidden", "loopback-only"));
+				return;
+			}
+			if (!capabilityTokenMatches$1(expectedCapabilityToken, request.headers["x-dsh-desktop-workspace-file-open-token"])) {
+				writeJson$1(response, 403, failure$1("forbidden", "desktop capability required"));
+				return;
+			}
+			if (request.method !== "POST") {
+				writeJson$1(response, 405, failure$1("method-not-allowed", "POST is required"));
+				return;
+			}
+			if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+				writeJson$1(response, 415, failure$1("invalid-content-type", "application/json is required"));
+				return;
+			}
+			const requestValue = normalizeRequest$1(await readJsonBody$1(request));
+			if (requestValue === void 0) {
+				writeJson$1(response, 400, failure$1("bad-request", "malformed conversation import request"));
+				return;
+			}
+			try {
+				const result = await importConversationIntoHost(ctx, requestValue);
+				writeJson$1(response, result.ok ? 200 : 422, result);
+			} catch (error) {
+				writeJson$1(response, 500, failure$1("internal-error", error instanceof Error ? error.message : String(error)));
+			}
+		}
+	};
+}
+function registerDesktopConversationImportRoute(ctx) {
+	return ctx.webServer.register(createDesktopConversationImportRoute(ctx, { capabilityToken: process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] }));
+}
+//#endregion
 //#region src/workspace-file-open-route.ts
 /** Desktop-owned, loopback-only authority for native workspace-file opening. */
 const DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH = "/desktop/workspace-file-open-target";
@@ -1074,7 +1346,8 @@ const inject = [
 	"llm",
 	"tools",
 	"webServer",
-	"workspaceRegistry"
+	"workspaceRegistry",
+	"sessions"
 ];
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 function apply(ctx) {
@@ -1082,6 +1355,7 @@ function apply(ctx) {
 	installToolCallArgumentNormalization(ctx);
 	installTranscriptBalanceGuard(ctx);
 	ctx.effect(() => registerDesktopWorkspaceFileOpenRoute(ctx), "dsh-desktop-compat: workspace native-open authority");
+	ctx.effect(() => registerDesktopConversationImportRoute(ctx), "dsh-desktop-compat: conversation import authority");
 	if (process.env.DSH_DESKTOP_BACKGROUND_AUTOMATION === "1") ctx.inject([
 		"agents",
 		"agentDefaultModel",
@@ -1110,4 +1384,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { DESKTOP_COMPAT_PATCHES, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, apply, balanceTranscriptMessages, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, inject, installToolCallArgumentNormalization, installTranscriptBalanceGuard, name, normalizeCancellationDecision, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };
+export { DESKTOP_COMPAT_PATCHES, DESKTOP_CONVERSATION_IMPORT_PATH, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, apply, balanceTranscriptMessages, createDesktopConversationImportRoute, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, importConversationIntoHost, inject, installToolCallArgumentNormalization, installTranscriptBalanceGuard, name, normalizeCancellationDecision, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerDesktopConversationImportRoute, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };
