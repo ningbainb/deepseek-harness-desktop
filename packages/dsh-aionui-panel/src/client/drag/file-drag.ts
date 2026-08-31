@@ -58,7 +58,7 @@ export function formatDocumentAttachment(fileName: string, content: string, file
   const parts = fileName.split('.')
   const ext = parts.length > 1 ? (parts[parts.length - 1]?.toLowerCase() ?? '') : ''
   const lang = ext === 'txt' || ext === 'log' ? '' : ext
-  const header = filePath ? `📎 [${fileName}](${filePath})` : `📎 **${fileName}**`
+  const header = filePath ? `[${fileName}](${filePath})` : `**${fileName}**`
   const trimmed = content.trim()
   if (trimmed === '') return header
   return `${header}\n\`\`\`${lang}\n${trimmed}\n\`\`\``

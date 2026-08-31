@@ -25,7 +25,7 @@ export const ManualExpertToggle: React.FC<ManualExpertToggleProps> = ({
       onClick={handleClick}
       title={isArmed ? '本次请求将优先使用专家分析（点击取消）' : '点击指示下一次请求使用专家分析'}
     >
-      <span style={{ fontSize: 10 }}>★</span>
+      <span style={{ fontSize: 10 }}>Expert</span>
       <span>{isArmed ? '本次使用专家分析' : '专家分析'}</span>
     </button>
   )
