@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -83,7 +83,7 @@ test('batch import maps one external project to one DSH workspace and keeps ever
     assert.equal(preview.totalSessions, 2)
     assert.equal(preview.canImport, true)
     assert.equal(preview.workspaces.length, 1)
-    assert.equal(preview.workspaces[0].targetPath, targetWorkspace)
+    await assertSameDirectory(preview.workspaces[0].targetPath, targetWorkspace)
 
     const progress = []
     const removeProgress = service.subscribeBatchProgress((event) => progress.push(event))
@@ -188,7 +188,7 @@ test('batch import scans a selected Codex folder and groups sessions by their or
     assert.equal(preview.totalSessions, 3)
     assert.equal(preview.canImport, true)
     assert.equal(preview.workspaces.length, 1)
-    assert.equal(preview.workspaces[0].targetPath, targetWorkspace)
+    await assertSameDirectory(preview.workspaces[0].targetPath, targetWorkspace)
 
     const result = await service.confirmAndImportBatch(preview.planId)
     assert.equal(result.ok, true)
@@ -200,3 +200,17 @@ test('batch import scans a selected Codex folder and groups sessions by their or
     await rm(tempDir, { recursive: true, force: true })
   }
 })
+
+async function assertSameDirectory(actual, expected) {
+  assert.equal(typeof actual, 'string')
+  const [actualStats, expectedStats] = await Promise.all([
+    stat(actual),
+    stat(expected),
+  ])
+  assert.equal(actualStats.isDirectory(), true)
+  assert.equal(expectedStats.isDirectory(), true)
+  // Windows may expose the same temporary directory through its long name
+  // or its 8.3 alias. Compare the filesystem identity, not the spelling.
+  assert.equal(actualStats.dev, expectedStats.dev)
+  assert.equal(actualStats.ino, expectedStats.ino)
+}

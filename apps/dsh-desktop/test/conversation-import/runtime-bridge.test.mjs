@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -54,7 +54,14 @@ test('DSHSessionBridge imports through the real runtime route and maps the durab
     assert.equal(request.options.method, 'POST')
     assert.equal(request.options.headers[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_HEADER], CAPABILITY_TOKEN)
     const body = JSON.parse(request.options.body)
-    assert.equal(body.projectCwd, await import('node:fs/promises').then(({ realpath }) => realpath(project)))
+    const [actualProject, expectedProject] = await Promise.all([
+      stat(body.projectCwd),
+      stat(project),
+    ])
+    // Windows may spell the same temporary directory with a long name or an
+    // 8.3 alias. The bridge contract is the physical project directory.
+    assert.equal(actualProject.dev, expectedProject.dev)
+    assert.equal(actualProject.ino, expectedProject.ino)
     assert.equal(body.seed[0].seq, 0)
     assert.equal(body.seed[0].type, 'turn/start')
   } finally {
