@@ -114,7 +114,13 @@ import { UpdateAnalyticsReceiptStore } from './update-analytics-receipt.mjs'
 import { DesktopUpdateChannelStore } from './update-channel-preferences.mjs'
 import { hasExistingDesktopState, initialUpdateChannel } from './release-channel.mjs'
 import { installUpdateSurface } from './update-surface.mjs'
-import { DesktopTrayLifecycle, restoreDesktopWindow } from './tray-lifecycle.mjs'
+import {
+  DesktopTrayLifecycle,
+  preserveDarwinMainWindowOnClose,
+  restoreDarwinMainWindowOnActivate,
+  restoreDesktopWindow,
+  shouldQuitWhenAllWindowsClosed,
+} from './tray-lifecycle.mjs'
 import { UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
@@ -2298,7 +2304,16 @@ export async function startElectronApp(metadata) {
     getBypassReason: closeBypassReason,
     log: (error) => logStore.append(`[close-behavior] ${error.message}`),
   })
-  mainWindow.on('close', (event) => closeBehaviorController?.handleWindowClose(event))
+  mainWindow.on('close', (event) => {
+    const intercepted = closeBehaviorController?.handleWindowClose(event)
+    if (!intercepted) {
+      preserveDarwinMainWindowOnClose({
+        window: mainWindow,
+        event,
+        explicitQuit: closeBehaviorController?.explicitQuit,
+      })
+    }
+  })
 
   const writeShutdownReceipt = async (token) => {
     if (!token) return
@@ -2442,6 +2457,7 @@ export async function startElectronApp(metadata) {
   refreshApplicationMenu = installApplicationMenu({
     Menu,
     app,
+    platform: process.platform,
     shell,
     controller: runtimeProvider,
     openExtensions: () => createExtensionWindow(),
@@ -2491,5 +2507,10 @@ export async function startElectronApp(metadata) {
     closeBehaviorController?.beginExplicitQuit()
   })
   app.on('quit', finalizeRendererIpc)
-  app.on('window-all-closed', () => app.quit())
+  app.on('activate', () => {
+    restoreDarwinMainWindowOnActivate({ window: mainWindow })
+  })
+  app.on('window-all-closed', () => {
+    if (shouldQuitWhenAllWindowsClosed()) app.quit()
+  })
 }
