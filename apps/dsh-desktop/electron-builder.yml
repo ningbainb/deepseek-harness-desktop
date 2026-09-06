@@ -28,8 +28,6 @@ extraResources:
     to: runtime-support/supported-runtimes.json
   - from: runtime-support/known-good.json
     to: runtime-support/known-good.json
-  - from: build/bundled-managed-git/managed-git/current
-    to: managed-git/current
 
 directories:
   output: dist
@@ -43,6 +41,9 @@ files:
 
 win:
   icon: build/icon.ico
+  extraResources:
+    - from: build/bundled-managed-git/managed-git/current
+      to: managed-git/current
   target:
     - target: nsis
       arch:
@@ -64,6 +65,32 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: DeepSeek Harness Desktop
+
+mac:
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  # Unsigned contributor preview: skip signing instead of ad-hoc or Developer ID.
+  # G1 / stage 3 will replace identity: null after a real certificate exists.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  forceCodeSigning: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  minimumSystemVersion: '11.0'
+  darkModeSupport: true
+  artifactName: DeepSeek-Harness-Desktop-${version}-${arch}.${ext}
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+
+dmg:
+  artifactName: DeepSeek-Harness-Desktop-${version}-${arch}.${ext}
+  title: DeepSeek Harness Desktop ${version}
 
 publish:
   provider: github
