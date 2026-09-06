@@ -41,6 +41,8 @@
     "pack:dir": "pnpm prepare:bundled-git && node src/release-manifest.mjs --assert-signing && electron-builder --dir",
     "pack:verify": "node scripts/verify-package.mjs",
     "pack:verify:dir": "node scripts/verify-package.mjs --allow-missing-update-metadata",
+    "pack:verify:mac": "node scripts/verify-package.mjs --platform darwin --arch arm64",
+    "pack:verify:mac:dir": "node scripts/verify-package.mjs --platform darwin --arch arm64 --allow-missing-update-metadata",
     "pack:smoke": "node scripts/verify-packaged-smoke.mjs",
     "test:profile-reset:e2e": "node scripts/verify-packaged-profile-reset.mjs",
     "prepare:release-directory": "node scripts/prepare-release-directory.mjs",

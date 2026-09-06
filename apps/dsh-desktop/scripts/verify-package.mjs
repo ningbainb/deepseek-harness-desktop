@@ -6,6 +6,12 @@ import YAML from 'yaml'
 import sharp from 'sharp'
 
 import afterPack from './after-pack.cjs'
+import {
+  macBundleRootFromResources,
+  parseVerifyPackageArguments,
+  resolvePackagedResourcesPath,
+  verifyMacPackagedSurface,
+} from './verify-package-mac.mjs'
 
 import { selectManagedGitRelease, verifyManagedGitInstall } from '../src/managed-git.mjs'
 import { MANAGED_GIT_MANIFEST } from '../src/managed-git-manifest.mjs'
@@ -26,13 +32,18 @@ import {
 } from '../src/runtime-support-policy.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const argumentsList = process.argv.slice(2)
-const allowMissingUpdateMetadata = argumentsList.includes('--allow-missing-update-metadata')
-const resourcesArgument = argumentsList.find((argument) => !argument.startsWith('--'))
-const resources = resolve(resourcesArgument || join(appDir, 'dist', 'win-unpacked', 'resources'))
+const parsedArguments = parseVerifyPackageArguments(process.argv.slice(2))
+const allowMissingUpdateMetadata = parsedArguments.allowMissingUpdateMetadata
+const TARGET_PLATFORM = Object.freeze({
+  platform: parsedArguments.platform,
+  arch: parsedArguments.arch,
+})
+const resources = await resolvePackagedResourcesPath({
+  appDir,
+  parsed: parsedArguments,
+})
 const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
 const { packageSupportsPlatform } = afterPack
-const TARGET_PLATFORM = Object.freeze({ platform: 'win32', arch: 'x64' })
 const ELECTRON_LOCALES = Object.freeze(['en-US.pak', 'zh-CN.pak', 'zh-TW.pak'])
 const requiredPackages = [
   ...DSH_BOOT_RUNTIME_PACKAGES,
@@ -96,11 +107,13 @@ for (const packageRoot of packagedPackageDirectories) {
   }
 }
 
-const electronLocales = (await readdir(join(resources, '..', 'locales')))
-  .filter(file => file.endsWith('.pak'))
-  .toSorted()
-if (JSON.stringify(electronLocales) !== JSON.stringify([...ELECTRON_LOCALES].toSorted())) {
-  throw new Error(`packaged Electron locales differ from the supported set: ${electronLocales.join(', ')}`)
+if (TARGET_PLATFORM.platform === 'win32') {
+  const electronLocales = (await readdir(join(resources, '..', 'locales')))
+    .filter(file => file.endsWith('.pak'))
+    .toSorted()
+  if (JSON.stringify(electronLocales) !== JSON.stringify([...ELECTRON_LOCALES].toSorted())) {
+    throw new Error(`packaged Electron locales differ from the supported set: ${electronLocales.join(', ')}`)
+  }
 }
 const packagedRuntimeFileHashes = await verifyRuntimeFileEvidence({
   cliPath: join(unpackedModules, '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
@@ -123,19 +136,21 @@ const packagedRuntimeAssessment = assessRuntimeSupport(packagedRuntimeMatrix, {
 if (!STABLE_RUNTIME_MATRIX_STATUSES.includes(packagedRuntimeAssessment.status)) {
   throw new Error(`packaged Runtime support matrix is not Stable eligible: ${packagedRuntimeAssessment.reason}`)
 }
-const packagedManagedGitRelease = selectManagedGitRelease(MANAGED_GIT_MANIFEST, {
-  platform: 'win32',
-  arch: 'x64',
-})
-if (packagedManagedGitRelease === null) throw new Error('packaged managed Git release is missing')
-const packagedManagedGit = await verifyManagedGitInstall({
-  userDataDirectory: resources,
-  release: packagedManagedGitRelease,
-})
-if (packagedManagedGit.version !== packagedManagedGitRelease.version) {
-  throw new Error('packaged managed Git version does not match its reviewed manifest')
+if (TARGET_PLATFORM.platform === 'win32') {
+  const packagedManagedGitRelease = selectManagedGitRelease(MANAGED_GIT_MANIFEST, {
+    platform: 'win32',
+    arch: 'x64',
+  })
+  if (packagedManagedGitRelease === null) throw new Error('packaged managed Git release is missing')
+  const packagedManagedGit = await verifyManagedGitInstall({
+    userDataDirectory: resources,
+    release: packagedManagedGitRelease,
+  })
+  if (packagedManagedGit.version !== packagedManagedGitRelease.version) {
+    throw new Error('packaged managed Git version does not match its reviewed manifest')
+  }
+  await access(join(resources, 'managed-git', 'current', 'LICENSE.txt'))
 }
-await access(join(resources, 'managed-git', 'current', 'LICENSE.txt'))
 await access(join(unpackedModules, 'pnpm', 'bin', 'pnpm.mjs'))
 for (const relativePath of CRITICAL_RUNTIME_FILES) {
   await access(join(unpackedModules, ...relativePath.split('/')))
@@ -247,8 +262,10 @@ if (sshClientBytes > 250_000 || sshClient.includes('CoreBrowserTerminal')) {
 }
 await access(join(unpackedModules, '@xterm', 'xterm', 'lib', 'xterm.js'))
 await access(join(unpackedModules, '@xterm', 'addon-fit', 'lib', 'addon-fit.js'))
-await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty.node'))
-await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty', 'conpty.dll'))
+if (TARGET_PLATFORM.platform === 'win32') {
+  await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty.node'))
+  await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty', 'conpty.dll'))
+}
 const aggregatePatch = await readFile(
   join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'cordis.patch.yml'),
   'utf8',
@@ -393,16 +410,31 @@ for (const runtimeSupportResource of [
     throw new Error(`packaging config is missing the Runtime support resource ${runtimeSupportResource}`)
   }
 }
-const extraResourceEntries = [
-  ...(Array.isArray(packagingConfig.extraResources) ? packagingConfig.extraResources : []),
-  ...(Array.isArray(packagingConfig.win?.extraResources) ? packagingConfig.win.extraResources : []),
-]
-if (!extraResourceEntries.some((entry) => entry.to === 'managed-git/current')) {
-  throw new Error('packaging config is missing the bundled managed Git resource')
+if (TARGET_PLATFORM.platform === 'win32') {
+  const extraResourceEntries = [
+    ...(Array.isArray(packagingConfig.extraResources) ? packagingConfig.extraResources : []),
+    ...(Array.isArray(packagingConfig.win?.extraResources) ? packagingConfig.win.extraResources : []),
+  ]
+  if (!extraResourceEntries.some((entry) => entry.to === 'managed-git/current')) {
+    throw new Error('packaging config is missing the bundled managed Git resource')
+  }
+  if (Array.isArray(packagingConfig.extraResources)
+    && packagingConfig.extraResources.some((entry) => entry.to === 'managed-git/current')) {
+    throw new Error('bundled managed Git must stay a Windows extra resource')
+  }
+} else if (packagingConfig.mac?.extraResources?.some((entry) => entry.to === 'managed-git/current')) {
+  throw new Error('macOS packaging config must not bundle MinGit')
 }
-if (Array.isArray(packagingConfig.extraResources)
-  && packagingConfig.extraResources.some((entry) => entry.to === 'managed-git/current')) {
-  throw new Error('bundled managed Git must stay a Windows extra resource')
+
+if (TARGET_PLATFORM.platform === 'darwin') {
+  await verifyMacPackagedSurface({
+    bundleRoot: macBundleRootFromResources(resources),
+    resources,
+    unpackedModules,
+    appId: packagingConfig.appId,
+    productName: packagingConfig.productName,
+    electronLanguages: packagingConfig.electronLanguages,
+  })
 }
 
 console.log(`verified ${requiredPackages.length} packaged runtime packages in ${resources}`)
