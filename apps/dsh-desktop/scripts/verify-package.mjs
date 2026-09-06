@@ -411,8 +411,16 @@ for (const runtimeSupportResource of [
   }
 }
 if (TARGET_PLATFORM.platform === 'win32') {
-  if (!packagingConfig.extraResources?.some((entry) => entry.to === 'managed-git/current')) {
+  const extraResourceEntries = [
+    ...(Array.isArray(packagingConfig.extraResources) ? packagingConfig.extraResources : []),
+    ...(Array.isArray(packagingConfig.win?.extraResources) ? packagingConfig.win.extraResources : []),
+  ]
+  if (!extraResourceEntries.some((entry) => entry.to === 'managed-git/current')) {
     throw new Error('packaging config is missing the bundled managed Git resource')
+  }
+  if (Array.isArray(packagingConfig.extraResources)
+    && packagingConfig.extraResources.some((entry) => entry.to === 'managed-git/current')) {
+    throw new Error('bundled managed Git must stay a Windows extra resource')
   }
 } else if (packagingConfig.mac?.extraResources?.some((entry) => entry.to === 'managed-git/current')) {
   throw new Error('macOS packaging config must not bundle MinGit')
