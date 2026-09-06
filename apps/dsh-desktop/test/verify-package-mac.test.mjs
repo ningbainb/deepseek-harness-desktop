@@ -15,6 +15,7 @@ import {
   packagedResourcesPathFromArgument,
   parseVerifyPackageArguments,
   plistArrayContains,
+  mappedMacLocaleDirectories,
   requiredMacLocaleDirectories,
   resolvePackagedResourcesPath,
   verifyMacPackagedSurface,
@@ -220,15 +221,16 @@ test('resolvePackagedResourcesPath uses an explicit path and falls back to mac-a
 
 test('mac locales map electronLanguages to .lproj directories and keep gender variants', () => {
   assert.deepEqual(
-    requiredMacLocaleDirectories(['en-US', 'zh-CN', 'zh-TW']),
+    mappedMacLocaleDirectories(['en-US', 'zh-CN', 'zh-TW']),
     ['en.lproj', 'zh_CN.lproj', 'zh_TW.lproj'],
   )
-  const required = requiredMacLocaleDirectories()
-  assert.equal(isAllowedMacLocaleDirectory('en.lproj', required), true)
-  assert.equal(isAllowedMacLocaleDirectory('en_FEMININE.lproj', required), true)
-  assert.equal(isAllowedMacLocaleDirectory('zh_CN_NEUTER.lproj', required), true)
-  assert.equal(isAllowedMacLocaleDirectory('af.lproj', required), false)
-  assert.equal(isAllowedMacLocaleDirectory('en-US.pak', required), false)
+  assert.deepEqual(requiredMacLocaleDirectories(['en-US', 'zh-CN', 'zh-TW']), ['en.lproj'])
+  const mapped = mappedMacLocaleDirectories()
+  assert.equal(isAllowedMacLocaleDirectory('en.lproj', mapped), true)
+  assert.equal(isAllowedMacLocaleDirectory('en_FEMININE.lproj', mapped), true)
+  assert.equal(isAllowedMacLocaleDirectory('zh_CN_NEUTER.lproj', mapped), true)
+  assert.equal(isAllowedMacLocaleDirectory('af.lproj', mapped), false)
+  assert.equal(isAllowedMacLocaleDirectory('en-US.pak', mapped), false)
 })
 
 test('Info.plist must identify the app and register dsh plus dshpreset', () => {
@@ -269,6 +271,12 @@ test('mac packaged surface accepts a darwin-arm64 app bundle without MinGit', as
       appId: APP_ID,
       productName: PRODUCT_FILENAME,
     })
+    const englishOnly = await createMacFixture(join(root, 'en-only'), { locales: ['en.lproj'] })
+    await verifyMacPackagedSurface({
+      ...englishOnly,
+      appId: APP_ID,
+      productName: PRODUCT_FILENAME,
+    })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -296,6 +304,13 @@ test('mac packaged surface requires pty.node and spawn-helper and no foreign pre
       verifyMacPackagedSurface({ ...foreign, appId: APP_ID }),
       /foreign prebuilds: darwin-x64, win32-x64/u,
     )
+
+    const emptyForeign = await createMacFixture(join(root, 'empty-foreign'))
+    await mkdir(
+      join(emptyForeign.unpackedModules, 'node-pty', 'prebuilds', 'win32-x64'),
+      { recursive: true },
+    )
+    await verifyMacPackagedSurface({ ...emptyForeign, appId: APP_ID })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -319,11 +334,11 @@ test('mac packaged surface rejects bundled MinGit, extra locales, and oversize a
     )
 
     const missingLocale = await createMacFixture(join(root, 'missing-locale'), {
-      locales: ['en.lproj', 'zh_CN.lproj'],
+      locales: ['zh_CN.lproj', 'zh_TW.lproj'],
     })
     await assert.rejects(
       verifyMacPackagedSurface({ ...missingLocale, appId: APP_ID }),
-      /missing locale zh_TW\.lproj/u,
+      /missing locale en\.lproj/u,
     )
 
     const oversize = await createMacFixture(join(root, 'oversize'))
