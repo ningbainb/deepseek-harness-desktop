@@ -2,7 +2,7 @@
 
 中文 | [English](README.en.md)
 
-> ❤️ **支持项目持续开发**：如果 DeepSeek Harness Desktop 对你有帮助，欢迎在[爱发电支持作者](https://www.ifdian.net/a/ningbai)。你的支持将用于服务器、测试环境和后续维护。
+> **支持项目持续开发**：如果 DeepSeek Harness Desktop 对你有帮助，欢迎在[爱发电支持作者](https://www.ifdian.net/a/ningbai)。你的支持将用于服务器、测试环境和后续维护。
 >
 > 扫码支持：
 >

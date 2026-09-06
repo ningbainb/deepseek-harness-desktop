@@ -347,7 +347,7 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
           {visibleItems.map(item => (
             <button type="button" role="listitem" key={item.id} className={item.id === selectedId ? styles.itemSelected : styles.item} onClick={() => select(item)}>
               <span className={styles.itemContent}>{item.content}</span>
-              <span className={styles.itemMeta}>{item.scope === 'global' ? t('settings.global') : item.scope === 'workspace' ? t('settings.workspace') : t('settings.session')}{item.pinned ? ' · ★' : ''}</span>
+              <span className={styles.itemMeta}>{item.scope === 'global' ? t('settings.global') : item.scope === 'workspace' ? t('settings.workspace') : t('settings.session')}{item.pinned ? ` · ${t('settings.pinned')}` : ''}</span>
             </button>
           ))}
         </div>
