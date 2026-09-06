@@ -50,6 +50,15 @@ const RETIRED_SKIN_CARRIER_ASSETS = ['@linxin666', 'dsh-skins', 'skins']
 const SKIN_CENTER_ROOT = ['@linxin666', 'dsh-client-ui-skin-center', 'skins']
 const SKIN_PREVIEW_BOUNDS = Object.freeze({ width: 1440, height: 900 })
 
+const DEFAULT_PACKING_TARGET = Object.freeze({ platform: 'win32', arch: 'x64' })
+const ELECTRON_BUILDER_ARCH_NAMES = Object.freeze({
+  0: 'ia32',
+  1: 'x64',
+  2: 'armv7l',
+  3: 'arm64',
+  4: 'universal',
+})
+
 function splitPackagePath(relativePath) {
   const parts = relativePath.split(/[\\/]/u)
   if (parts[0]?.startsWith('@')) {
@@ -58,7 +67,61 @@ function splitPackagePath(relativePath) {
   return { packageName: parts[0], packageParts: parts.slice(1) }
 }
 
-function classifyPrunableFile(relativePath) {
+function normalizePackingTarget(target = DEFAULT_PACKING_TARGET) {
+  const platform = typeof target?.platform === 'string' && target.platform.length > 0
+    ? target.platform
+    : DEFAULT_PACKING_TARGET.platform
+  const arch = typeof target?.arch === 'string' && target.arch.length > 0
+    ? target.arch
+    : DEFAULT_PACKING_TARGET.arch
+  return { platform, arch }
+}
+
+function packingTargetFromContext(context = {}) {
+  const rawArch = context.arch
+  const arch = typeof rawArch === 'string'
+    ? rawArch
+    : (ELECTRON_BUILDER_ARCH_NAMES[rawArch] ?? DEFAULT_PACKING_TARGET.arch)
+  return normalizePackingTarget({
+    platform: context.electronPlatformName,
+    arch,
+  })
+}
+
+function packagedNodeModulesRoot(context = {}) {
+  const appOutDir = context.appOutDir
+  const platform = context.electronPlatformName
+  if (platform === 'darwin' || platform === 'mas') {
+    const productFilename = context.packager?.appInfo?.productFilename
+      || 'DeepSeek Harness Desktop'
+    return join(
+      appOutDir,
+      `${productFilename}.app`,
+      'Contents',
+      'Resources',
+      'app.asar.unpacked',
+      'node_modules',
+    )
+  }
+  return join(appOutDir, 'resources', 'app.asar.unpacked', 'node_modules')
+}
+
+function isForeignNodePtyBinary(packagePath, { platform, arch }) {
+  // Keep the historical Windows x64 rule byte-for-byte: only darwin-* and
+  // win32-arm64 prebuilds plus the win10-arm64 ConPTY tree are foreign.
+  if (platform === 'win32' && arch === 'x64') {
+    if (/^prebuilds\/(?:darwin-|win32-arm64)/u.test(packagePath)) return true
+    if (/^third_party\/conpty\/[^/]+\/win10-arm64\//u.test(packagePath)) return true
+    return false
+  }
+  const prebuild = /^prebuilds\/([^/]+)\//u.exec(packagePath)
+  if (prebuild) return prebuild[1] !== `${platform}-${arch}`
+  if (/^third_party\/conpty\//u.test(packagePath)) return platform !== 'win32'
+  return false
+}
+
+function classifyPrunableFile(relativePath, target = DEFAULT_PACKING_TARGET) {
+  const packingTarget = normalizePackingTarget(target)
   const normalized = relativePath.replaceAll('\\', '/')
   const { packageName, packageParts } = splitPackagePath(normalized)
   const fileName = packageParts.at(-1) ?? ''
@@ -80,8 +143,7 @@ function classifyPrunableFile(relativePath) {
 
   if (packageName === 'node-pty') {
     const packagePath = packageParts.join('/')
-    if (/^prebuilds\/(?:darwin-|win32-arm64)/u.test(packagePath)) return 'foreign-native-binary'
-    if (/^third_party\/conpty\/[^/]+\/win10-arm64\//u.test(packagePath)) return 'foreign-native-binary'
+    if (isForeignNodePtyBinary(packagePath, packingTarget)) return 'foreign-native-binary'
   }
 
   if (packageName === 'pnpm') {
@@ -266,7 +328,7 @@ async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32
 
   for (const path of files) {
     const relativePath = relative(nodeModulesRoot, path)
-    const category = classifyPrunableFile(relativePath)
+    const category = classifyPrunableFile(relativePath, target)
     if (category === undefined) continue
     const metadata = await stat(path)
     await rm(path, { force: true })
@@ -300,15 +362,12 @@ async function restoreRequiredPackagedPeers(nodeModulesRoot) {
 }
 
 async function afterPack(context) {
-  if (context.electronPlatformName !== 'win32') return
-  const nodeModulesRoot = join(
-    context.appOutDir,
-    'resources',
-    'app.asar.unpacked',
-    'node_modules',
-  )
+  const platform = context.electronPlatformName
+  if (platform !== 'win32' && platform !== 'darwin') return
+  const target = packingTargetFromContext(context)
+  const nodeModulesRoot = packagedNodeModulesRoot(context)
   const restoredPeers = await restoreRequiredPackagedPeers(nodeModulesRoot)
-  const report = await prunePackagedRuntime(nodeModulesRoot)
+  const report = await prunePackagedRuntime(nodeModulesRoot, target)
   report.restoredPeers = restoredPeers
   const outputPath = join(context.outDir, 'runtime-prune-report.json')
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`)
@@ -322,3 +381,6 @@ module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers
+module.exports.packingTargetFromContext = packingTargetFromContext
+module.exports.packagedNodeModulesRoot = packagedNodeModulesRoot
+module.exports.DEFAULT_PACKING_TARGET = DEFAULT_PACKING_TARGET
