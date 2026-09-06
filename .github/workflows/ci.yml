@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Repository hygiene
+        run: pnpm repo-hygiene:check
+
       - name: Typecheck
         run: pnpm typecheck
 
