@@ -2,7 +2,7 @@
 
 [中文](README.md) | English
 
-> ❤️ **Support ongoing development**: If DeepSeek Harness Desktop helps you, consider [supporting the project on Afdian](https://www.ifdian.net/a/ningbai). Your support helps fund servers, testing, and continued maintenance.
+> **Support ongoing development**: If DeepSeek Harness Desktop helps you, consider [supporting the project on Afdian](https://www.ifdian.net/a/ningbai). Your support helps fund servers, testing, and continued maintenance.
 >
 > Scan to support the project:
 >
