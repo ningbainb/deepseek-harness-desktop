@@ -1,0 +1,122 @@
+diff --git a/apps/dsh-desktop/src/repair-workspace.mjs b/apps/dsh-desktop/src/repair-workspace.mjs
+--- a/apps/dsh-desktop/src/repair-workspace.mjs
++++ b/apps/dsh-desktop/src/repair-workspace.mjs
+@@ -382,0 +383,14 @@
++  async #cleanupStaging() {
++    const errors = []
++    for (const stagingPath of [this.workspace, this.originals]) {
++      try {
++        await rm(stagingPath, { recursive: true, force: true })
++      } catch (error) {
++        errors.push(error)
++      }
++    }
++    if (errors.length > 0) {
++      throw new AggregateError(errors, 'repair workspace staging cleanup failed')
++    }
++  }
++
+@@ -384,1 +398,2 @@
+     await mkdir(this.incidentDir, { recursive: true })
++    try {
+@@ -385,3 +400,3 @@
+     if (await pathState(this.workspace) !== undefined || await pathState(this.originals) !== undefined) {
+-      throw new Error('repair workspace staging directories already exist')
++      await this.#cleanupStaging()
+     }
+@@ -432,2 +447,11 @@
+     })
++    } catch (error) {
++      try {
++        await this.#cleanupStaging()
++      } catch (cleanupError) {
++        throw new Error('repair workspace staging failed and cleanup did not fully converge', {
++          cause: new AggregateError([error, cleanupError]),
++        })
++      }
++      throw error
++    }
+   }
+diff --git a/apps/dsh-desktop/src/extension-ipc.mjs b/apps/dsh-desktop/src/extension-ipc.mjs
+--- a/apps/dsh-desktop/src/extension-ipc.mjs
++++ b/apps/dsh-desktop/src/extension-ipc.mjs
+@@ -1,1 +1,1 @@
+-import { mkdir, rename, rm } from 'node:fs/promises'
++import { mkdir, readdir, rename, rm } from 'node:fs/promises'
+@@ -2,1 +2,1 @@
+-import { join } from 'node:path'
++import { basename, dirname, join } from 'node:path'
+@@ -10,0 +11,23 @@
++const PROFILE_RESET_BACKUP_LIMIT = 3
++
++async function pruneProfileResetBackups(profileDir) {
++  const parent = dirname(profileDir)
++  const profileName = basename(profileDir)
++  const prefix = `${profileName}.backup-`
++  let entries
++  try {
++    entries = await readdir(parent, { withFileTypes: true })
++  } catch (error) {
++    if (error?.code === 'ENOENT') return
++    throw error
++  }
++  const backups = entries
++    .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix) && /^\d+$/u.test(entry.name.slice(prefix.length)))
++    .sort((left, right) => right.name.localeCompare(left.name, 'en'))
++  for (const entry of backups.slice(PROFILE_RESET_BACKUP_LIMIT)) {
++    await rm(join(parent, entry.name), { recursive: true, force: true })
++  }
++}
+@@ -502,14 +526,34 @@
+-  handleExtension('extensions:profile-reset', () => enqueuePluginMutation(async () => {
+-    await controller.stop()
+-    const profileDir = join(dshHome, 'profiles', 'desktop')
+-    const timestamp = Date.now()
+-    const backupDir = `${profileDir}.backup-${timestamp}`
+-    try {
+-      await rename(profileDir, backupDir).catch(() => {})
+-    } catch {
+-      // ignore
+-    }
+-    await ensureProfile()
+-    await controller.start()
+-    return Object.freeze({ reset: true, timestamp })
+-  }))
++  handleExtension('extensions:profile-reset', () => enqueuePluginMutation(async () => {
++    await controller.stop()
++    const profileDir = join(dshHome, 'profiles', 'desktop')
++    const timestamp = Date.now()
++    const backupDir = `${profileDir}.backup-${timestamp}`
++    let moved = false
++    try {
++      try {
++        await rename(profileDir, backupDir)
++        moved = true
++      } catch (error) {
++        if (error?.code !== 'ENOENT') throw error
++      }
++      await ensureProfile()
++      await controller.start()
++    } catch (error) {
++      if (!moved) throw error
++      const rollbackErrors = []
++      try {
++        await rm(profileDir, { recursive: true, force: true })
++      } catch (rollbackError) {
++        rollbackErrors.push(rollbackError)
++      }
++      try {
++        await rename(backupDir, profileDir)
++      } catch (rollbackError) {
++        rollbackErrors.push(rollbackError)
++      }
++      if (rollbackErrors.length > 0) {
++        throw new Error('profile reset failed and rollback did not fully converge', {
++          cause: new AggregateError([error, ...rollbackErrors]),
++        })
++      }
++      throw error
++    }
++    void pruneProfileResetBackups(profileDir).catch(() => {})
++    return Object.freeze({ reset: true, timestamp })
++  }))

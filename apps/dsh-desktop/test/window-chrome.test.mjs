@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   applyWindowChrome,
   createWindowChromeScript,
+  decorateDesktopRuntimeUrl,
   getWindowChromeTheme,
   installWindowChrome,
   WINDOW_CHROME_CSS,
@@ -149,6 +150,20 @@ test('window chrome browser options accept an initial theme for light-only windo
     },
   })
   assert.throws(() => windowChromeBrowserOptions('transparent'), /window chrome theme/)
+})
+
+test('desktop runtime URLs carry the hidden-title-bar geometry contract', () => {
+  const decorated = decorateDesktopRuntimeUrl(
+    'http://127.0.0.1:43125/?preview=1&dsh-desktop-mode=compatibility#session',
+    { platform: 'WIN32' },
+  )
+  const url = new URL(decorated)
+  assert.equal(url.searchParams.get('preview'), '1')
+  assert.equal(url.searchParams.get('dsh-desktop-mode'), 'advanced')
+  assert.equal(url.searchParams.get('dsh-desktop-platform'), 'win32')
+  assert.equal(url.hash, '#session')
+  assert.throws(() => decorateDesktopRuntimeUrl(''), /runtime URL/)
+  assert.throws(() => decorateDesktopRuntimeUrl('http://127.0.0.1:43125', { platform: '' }), /platform/)
 })
 
 test('window chrome script respects a page-declared theme hint', () => {

@@ -1,0 +1,3 @@
+- insert:
+    - id: memory
+      name: '@ningbainb/dsh-memory'

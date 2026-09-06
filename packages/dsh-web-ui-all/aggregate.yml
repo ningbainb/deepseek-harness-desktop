@@ -10,6 +10,10 @@
 # 但更早的声明让设置组在任何卡片之前就位，避免观感上的注册顺序歧义）。
 patchFrom:
   - ../dsh-web-ui-settings
+  - ../dsh-user-scope
+  - ../dsh-model-preferences
+  - ../dsh-personal-prompt
+  - ../dsh-memory
   - ../dsh-aionui-panel
   - ../dsh-task-board
   - ../dsh-git-graph
@@ -20,6 +24,7 @@ patchFrom:
   - ../dsh-live-stats
   - ../dsh-ssh
   - ../dsh-tool-describe-image
+  - ../dsh-chat-artifacts
   - ../dsh-liangshen
   - ../dsh-skins
 self:
@@ -35,8 +40,13 @@ deps:
   - ../dsh-live-stats
   - ../dsh-ssh
   - ../dsh-tool-describe-image
+  - ../dsh-chat-artifacts
   - ../dsh-liangshen
   - ../dsh-web-ui-settings
+  - ../dsh-user-scope
+  - ../dsh-model-preferences
+  - ../dsh-personal-prompt
+  - ../dsh-memory
   - ../dsh-skins
   # skin-center 是 dsh-skins patch 行（ui-skin-center）的宿主，必须与
   # dsh-skins 一样落在 profile 顶层，loader 才能从顶层解析到该行

@@ -1,11 +1,11 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.2.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are Value Mode (expert controller plus subagent worker routing), a live large-model usage dashboard, and safe Claude Code / Codex project and conversation import.
+> DeepSeek Harness Desktop 3.3.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are universal file drag-and-drop with smart Markdown conversion, adaptive image compression, modern session mode switcher, Value Mode (expert controller plus subagent worker routing), a live large-model usage dashboard, and safe Claude Code / Codex project and conversation import.
 
 ## Canonical identity
 
 - Product: DeepSeek Harness Desktop
-- Version: 3.2.0
+- Version: 3.3.0
 - Platform: Windows 10 and Windows 11, x64
 - License: BSD-3-Clause
 - Maintainer: DeepSeek Harness Desktop Community
@@ -17,8 +17,8 @@
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe
-- v3.2.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.2.0
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe
+- v3.3.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.3.0
 - SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
 - Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html

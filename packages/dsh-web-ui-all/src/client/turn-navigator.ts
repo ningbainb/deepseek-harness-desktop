@@ -174,7 +174,10 @@ function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLE
     const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40
     bottomBtn.disabled = atBottom
   }
-  if (counter) counter.textContent = total === 0 ? '–' : `${idx + 1}/${total}`
+  const nextCounterText = total === 0 ? '–' : String(idx + 1) + '/' + String(total)
+  if (counter && counter.textContent !== nextCounterText) {
+    counter.textContent = nextCounterText
+  }
 }
 
 /** Attach click handlers to the navigator buttons. */

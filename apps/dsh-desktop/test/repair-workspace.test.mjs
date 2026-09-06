@@ -136,3 +136,38 @@ test('repair workspace rejects apply when an original changes after staging', as
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('repair workspace cleans failed staging and reclaims stale directories', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-repair-cleanup-'))
+  try {
+    const profileDir = join(root, 'profile')
+    const incidentDir = join(root, 'incident')
+    const missingPlugin = join(root, 'missing-plugin')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), '{"name":"profile"}\n')
+
+    const createWorkspace = (pluginPath) => new RepairWorkspace({
+      incidentDir,
+      profileDir,
+      roots: [
+        { id: 'profile', kind: 'profile', path: profileDir },
+        { id: 'plugin', kind: 'plugin', path: pluginPath, packageName: 'plugin' },
+      ],
+    })
+
+    await assert.rejects(createWorkspace(missingPlugin).stage(), /ENOENT/u)
+    await assert.rejects(lstat(join(incidentDir, 'staging')), { code: 'ENOENT' })
+    await assert.rejects(lstat(join(incidentDir, 'originals')), { code: 'ENOENT' })
+
+    const plugin = join(root, 'plugin')
+    await mkdir(plugin, { recursive: true })
+    await writeFile(join(plugin, 'index.mjs'), 'original\n')
+    await mkdir(join(incidentDir, 'staging', 'stale'), { recursive: true })
+    await mkdir(join(incidentDir, 'originals', 'stale'), { recursive: true })
+
+    const staged = await createWorkspace(plugin).stage()
+    assert.equal(await readFile(join(staged.workspace, 'plugins', 'plugin', 'index.mjs'), 'utf8'), 'original\n')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

@@ -29,10 +29,15 @@ actions, and the update panel that probes and runs the update.
   workspace the desktop was looking at.
 - **Security**: one active one-time token (a refresh invalidates the old
   link; an accepted token cannot be reused; tokens expire). 停止 revokes
-  every paired device and the current token — paired devices are cut off on
-  their next request. When the plugin's `requirePairingForLan` gate is on
-  (default), every non-loopback `/api` request must carry a live paired
-  device cookie, so the QR is the only way into a LAN-exposed dsh web.
+  every paired device and the current token, and closes that device's mobile
+  live stream immediately. The default `remoteApiMode: mobile-only` denies
+  every non-loopback full `/api` request, including requests with a valid
+  paired cookie; the phone uses the separately authorized `/m/api` channel,
+  where Workspace/Session ownership is checked on every resource request.
+  Set
+  `remoteApiMode: legacy-full-api` only for compatibility with old full
+  `/api` clients; that mode does not provide Workspace/Session-level resource
+  isolation. In legacy mode, `requirePairingForLan` remains the pairing gate.
 - **Live status**: the desktop panel mirrors the pairing state in real time
   (waiting → connected → disconnected) over an SSE stream.
 - **Remote update**: the download trigger in the sidebar foot (left of the
@@ -69,10 +74,29 @@ sun/moon toggle in every header flips to the dark palette at any time.
 
 ## Requirements
 
+### Bind and access boundary
+The package owns a small `web-startup` Cordis override through the public
+`@deepseek-ai/dsh-cmdline` / `webStartup` seam; it does not modify official
+DSH source files. The default remains the official loopback posture.
+Passing `dsh web --host 0.0.0.0` is an explicit LAN request recorded at the
+app-owned seam, but the current official DSH web runtime still rejects
+`0.0.0.0` with its safety guard. This package does not bypass that guard,
+so packaged LAN A/B is not a delivery gate for this round.
+The package still keeps non-loopback access behind pairing and the default
+`mobile-only` API channel; `--trusted-host` only expands the
+transport trust list when a deployment intentionally uses another authority.
+For packaged Desktop, the default is also loopback. The
+`DSH_DESKTOP_REMOTE_HOST=0.0.0.0` setting only forwards an explicit
+request; the current official runtime still rejects it. The value is read in
+Electron main and is not renderer-controlled.
+
 - A DSH installation whose `dsh` CLI supports profiles (`dsh --profile`,
   `dsh plugin`) — the profile/bundle mechanism this package rides on.
-- For LAN use the server must be reachable from the phone: start with
-  `dsh web --host 0.0.0.0`. With the default `127.0.0.1` bind the panel
+- LAN use requires a DSH build that explicitly permits all-interface binding.
+  The current official runtime rejects `0.0.0.0` during startup, so the
+  command above is only an optional field-validation path, not a delivery gate
+  for this round. With the default
+  `127.0.0.1` bind the panel
   shows an explicit explanation instead of a dead QR code — unless a public
   base URL is configured (see "Remote access over the internet" below),
   which makes the QR reachable from anywhere without rebinding. The panel's
@@ -80,10 +104,12 @@ sun/moon toggle in every header flips to the dark palette at any time.
   opened at the LAN URL sees a "配对面板仅限本机使用" banner instead —
   open the panel at `http://127.0.0.1` and let the phone use the paired
   link.
-- For the one-click public tunnel (`autoTunnel`), the `cloudflared`
-  platform binary ships with the package (its postinstall downloads it; a
-  runtime download covers installers that skip postinstall scripts). No
-  user-side tooling, account, or domain is needed — a Cloudflare quick
+- For the one-click public tunnel (`autoTunnel`), `cloudflared` is
+  a package dependency. Normal installation prepares its binary in postinstall;
+  if the installer skips scripts or the app runs from a read-only ASAR, the
+  first run downloads it to the profile-local
+  `$DSH_HOME/runtime-bin/cloudflared`. With normal network access no
+  user-side installation, account, or domain is needed — a Cloudflare quick
   tunnel is free and anonymous.
 
 ## Install
@@ -114,7 +140,11 @@ mounts both halves.
 
 ## Use
 
-1. `dsh web --host 0.0.0.0` (the printed LAN URL confirms reachability).
+1. Start `dsh web` on loopback by default. Only a DSH build that
+   explicitly permits all-interface binding should receive
+   `--host 0.0.0.0`; the current official runtime rejects that option.
+   For actual phone acceptance today, use the `autoTunnel` or manual
+   tunnel path below.
 2. Click the phone icon → the panel mints a fresh one-time QR.
 3. Scan with the phone (or open the copied link): the phone binds and
    lands on the **standalone mobile surface at `/m`** — no desktop UI on a
@@ -161,8 +191,10 @@ to the advisory `session.models` / `session.selectModel` pair, creation to
 `session.create` (workspace id only — the phone never names a working
 directory of its own), and the permission picker only ever sends the
 mode-agnostic `/permission` command
-through the already-allowlisted `session.prompt`); the live stream arrives
-over Server-Sent Events on `/m/api/events.mux`.
+through the already-allowlisted `session.prompt`); every live frame is
+re-checked against Session ownership and device revocation aborts the stream
+immediately; the live stream arrives over Server-Sent Events on
+`/m/api/events.mux`.
 
 ### Behavior notes
 
@@ -173,11 +205,13 @@ over Server-Sent Events on `/m/api/events.mux`.
   through its own `/m/api` preferences method when a chat opens. On
   browsers that support `field-sizing: content`, the input grows with the
   draft up to its 120px cap in either mode.
-- Installing this plugin gates non-loopback `/api` access behind pairing
-  (see `requirePairingForLan` in `src/index.ts`). A desktop browser opened
-  via the LAN URL must pair like any remote device; loopback (127.0.0.1)
-  is unaffected. Set `requirePairingForLan: false` in the profile patch to
-  restore the open-LAN behavior while keeping tokens/status/revocation.
+- The default `remoteApiMode: mobile-only` rejects non-loopback full `/api`
+  requests, even with a paired-device cookie. The phone-facing `/m/api`
+  channel performs its own pairing and resource checks; loopback
+  (127.0.0.1) remains unaffected. Set `remoteApiMode: legacy-full-api` only
+  for old full `/api` clients. In that compatibility mode, set
+  `requirePairingForLan: false` only if you intentionally accept open-LAN
+  access; Workspace/Session-level resource isolation is not available there.
 - The QR link is built from the machine's non-internal IPv4 literals; a
   multi-homed host (Wi-Fi + wired, or a proxy/VPN virtual adapter) shows a
   radio picker so you can advertise the network the phone can actually
@@ -194,8 +228,9 @@ over Server-Sent Events on `/m/api/events.mux`.
 
 Turn on `autoTunnel` in the plugin settings card (or set
 `autoTunnel: true` in the profile patch). The plugin then runs its own
-Cloudflare quick tunnel — the `cloudflared` binary ships with the package,
-no install, account, or domain needed — and wires everything itself:
+Cloudflare quick tunnel — `cloudflared` is prepared in the writable
+profile-local runtime directory, with no account or domain needed — and wires
+everything itself:
 
 - the minted `https://xxx.trycloudflare.com` URL becomes the QR base, so a
   phone anywhere can pair. The panel shows the tunnel status (starting /
@@ -240,8 +275,8 @@ releases). Then:
 cloudflared tunnel --url http://127.0.0.1:3080
 #    prints something like: https://xxxx-xxxx-xxxx.trycloudflare.com
 
-# 2. Start dsh web with that host trusted (use --host 0.0.0.0 too when LAN
-#    access should stay available):
+# 2. Start dsh web with that host trusted; keep the server on loopback by
+#    default:
 dsh web --trusted-host xxxx-xxxx-xxxx.trycloudflare.com
 ```
 
@@ -330,13 +365,15 @@ literals the QR links advertise.
 See the Agent Notes `api-gate-and-sidebar-remote-seat` and
 `lan-runtime-connection-fixes` in the harness checkout.
 
-## Manual E2E: LAN pairing round trip
+## Optional manual E2E: LAN pairing round trip
 
-The unit/component specs cover the route family, the gate, and the panel,
-but the pairing loop involves a real browser on a non-loopback origin.
-Repeat this after any change to the wire contract or the connection loop:
+The unit/component specs cover the route family, the gate, and the panel. The
+following field pairing procedure is optional and is not a delivery gate for
+this round. The current official runtime rejects `0.0.0.0` at step 1. Repeat
+it after any change to the wire contract or the connection loop:
 
-1. Start the server on all interfaces with a test workspace root:
+1. On a DSH build whose official host seam permits it, start the server on all
+   interfaces with a test workspace root:
    `dsh web --host 0.0.0.0 --port 3190 --workspace-root /tmp/remote-e2e`.
 2. Open the **loopback** URL (`http://127.0.0.1:3190`) in a browser: the
    phone icon sits in the sidebar foot; the panel mints a QR instantly.
@@ -358,6 +395,9 @@ panel still opens at `http://127.0.0.1`.
 
 ## Known Limitations and Deferred Work
 
+- **LAN binding is protected by the official safety guard**: the current
+  official DSH web runtime rejects `--host 0.0.0.0`; this package does not
+  bypass it. Physical LAN A/B is outside this delivery round.
 - **Revocation is per-request**: a paired phone whose request is already in
   flight when 停止 lands completes that request; the next one 403s.
 - **Device sessions are in-memory**: pairing state (token + devices) resets

@@ -22,6 +22,18 @@ const cookieName = 'dsh_pair'
 const service = {
   config: { cookieName },
   hasDevice: () => true,
+  principalForDevice: () => 'principal-device-1',
+  touchDevice: () => true,
+  onDeviceRevoked: () => () => {},
+} as never
+
+const userScope = {
+  principalForDevice: () => 'principal-device-1',
+  touchDevice: () => true,
+  canAccess: () => ({ allowed: true, reason: 'allowed' }),
+  visibleSessions: () => [{ sessionId: 's-test' }],
+  registerSession: async () => {},
+  run: (_scope: unknown, callback: () => unknown) => callback(),
 } as never
 
 /** The resolved mobile composer preference (tests flip it per case). */
@@ -30,7 +42,7 @@ const mobileEnterToSend = () => true
 /** An ApiProxy stub answering each method with the internal response shape. */
 const apiProxy = {
   workspace: {
-    list: async () => ({ rpcId: 'r', result: { ok: true, value: { items: [] } } }),
+    list: async () => ({ rpcId: 'r', result: { ok: true, value: { items: [], archivedSessionIds: [] } } }),
   },
   sessions: {
     list: async () => ({ rpcId: 'r', result: { ok: true, value: { items: [] } } }),
@@ -70,9 +82,9 @@ async function serve(routes: WebRoute[]): Promise<TestServer> {
   }
 }
 
-async function call(port: number, method: string): Promise<{ status: number; body: string }> {
+async function call(port: number, method: string, payload: unknown = {}): Promise<{ status: number; body: string }> {
   return await new Promise((resolve, reject) => {
-    const body = JSON.stringify({ type: 'client-request', rpcId: 'probe-1', method, payload: {} })
+    const body = JSON.stringify({ type: 'client-request', rpcId: 'probe-1', method, payload })
     const req = httpRequest({
       host: '127.0.0.1', port, path: `/m/api/${method}`, method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${cookieName}=device-1`, 'content-length': Buffer.byteLength(body) },
@@ -90,20 +102,19 @@ async function call(port: number, method: string): Promise<{ status: number; bod
 
 describe('mobile api envelope', () => {
   it('wraps every allowlisted unary method in the server-response envelope', async () => {
-    const server = await serve(makeMobileApiRoutes({ service, apiProxy, mobileEnterToSend }))
+    const server = await serve(makeMobileApiRoutes({ service, apiProxy, userScope, mobileEnterToSend }))
     try {
-      for (const method of [
-        'workspace.list',
-        'session.create',
-        'session.list',
-        'session.history',
-        'session.search',
-        'session.prompt',
-        'session.models',
-        'session.selectModel',
-        'session.rename',
+      for (const [method, payload] of [
+        ['workspace.list', {}],
+        ['session.create', { workspaceId: 'ws-test' }],
+        ['session.list', {}],
+        ['session.history', { sessionId: 's-test' }],
+        ['session.prompt', { sessionId: 's-test', content: 'hello' }],
+        ['session.models', { sessionId: 's-test' }],
+        ['session.selectModel', { sessionId: 's-test', provider: 'fx', model: 'fx-1' }],
+        ['session.rename', { sessionId: 's-test', title: 'hello' }],
       ]) {
-        const { status, body } = await call(server.port, method)
+        const { status, body } = await call(server.port, method, payload)
         expect(status).toBe(200)
         const envelope = JSON.parse(body) as { type?: string; rpcId?: string; result?: { ok?: boolean } }
         expect(envelope.type, method).toBe('server-response')
@@ -115,11 +126,27 @@ describe('mobile api envelope', () => {
     }
   })
 
+  it('does not expose unscoped session.search', async () => {
+    const server = await serve(makeMobileApiRoutes({ service, apiProxy, userScope, mobileEnterToSend }))
+    try {
+      const result = await call(server.port, 'session.search', { query: 'secret' })
+      expect(result.status).toBe(200)
+      expect(JSON.parse(result.body)).toMatchObject({
+        type: 'server-response',
+        rpcId: 'probe-1',
+        result: { ok: false, error: { code: 'forbidden' } },
+      })
+    } finally {
+      await server.close()
+    }
+  })
+
   it('answers mobile.preferences locally from the plugin config', async () => {
     let mobileEnterToSend = true
     const server = await serve(makeMobileApiRoutes({
       service,
       apiProxy,
+      userScope,
       mobileEnterToSend: () => mobileEnterToSend,
     }))
     try {
@@ -149,7 +176,7 @@ describe('mobile api envelope', () => {
       ...apiProxy,
       events: { mux: () => (async function* () { while (true) { await new Promise(() => {}) } })() },
     } as unknown as ApiProxy
-    const routes = makeMobileApiRoutes({ service, apiProxy: blockingProxy, mobileEnterToSend, eventsHeartbeatMs: 25 })
+    const routes = makeMobileApiRoutes({ service, apiProxy: blockingProxy, userScope, mobileEnterToSend, eventsHeartbeatMs: 25 })
     let connections = 0
     const server = createServer((request, response) => {
       const pathname = new URL(request.url ?? '/', 'http://x').pathname

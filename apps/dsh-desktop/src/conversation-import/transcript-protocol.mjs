@@ -10,6 +10,8 @@
 
 import { createHash } from 'node:crypto'
 
+import { Redactor } from './redaction.mjs'
+
 import {
   EVENT_ROLES,
   EVENT_TYPES,
@@ -71,9 +73,9 @@ function finiteTimestamp(value, fallback) {
 }
 
 function safeArguments(value) {
-  if (typeof value === 'string') return truncateText(value, MAX_TOOL_ARGUMENT_CHARS)
+  const sanitized = typeof value === 'string' ? Redactor.redact(value) : Redactor.redactObject(value)
   try {
-    const serialized = JSON.stringify(value ?? {})
+    const serialized = JSON.stringify(sanitized ?? {})
     return typeof serialized === 'string' ? truncateText(serialized, MAX_TOOL_ARGUMENT_CHARS) : '{}'
   } catch {
     return '{}'

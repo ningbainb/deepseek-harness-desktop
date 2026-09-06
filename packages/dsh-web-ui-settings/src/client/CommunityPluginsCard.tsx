@@ -9,6 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import type { CommunityPluginKey } from './locales.ts'
 import { COMMUNITY_PLUGINS, type CommunityPluginEntry } from './generated/community.ts'
 import { isCommunityPluginEntry } from './community-guard.ts'
+import { openExternalUrl } from './open-external.ts'
 import css from './web-ui-settings.module.css'
 
 /** Props the community plugin card binds. */
@@ -124,7 +125,18 @@ export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNod
                     {plugin.description ? <p className={css.entryDescription}>{plugin.description}</p> : null}
                     {plugin.descriptionEn ? <p className={css.entryDescriptionEn}>{plugin.descriptionEn}</p> : null}
                     <span className={css.entryLinks}>
-                      <a className={css.entryLink} href={plugin.repo} target="_blank" rel="noreferrer">{t('repository')}</a>
+                      <a
+                        className={css.entryLink}
+                        href={plugin.repo}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          openExternalUrl(plugin.repo)
+                        }}
+                      >
+                        {t('repository')}
+                      </a>
                       {plugin.npm ? <code className={css.entryNpm}>{plugin.npm}</code> : null}
                     </span>
                   </li>

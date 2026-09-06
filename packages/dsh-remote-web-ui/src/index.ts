@@ -15,8 +15,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { PairingService } from './pairing.ts'
-import { makeGateListener } from './gate.ts'
+import type { UserScopeService } from '@ningbainb/dsh-user-scope'
+import { isSafePairingCookieName, isSecurePublicBaseUrl, PairingService } from './pairing.ts'
+import { makeGateListener, type RemoteApiMode } from './gate.ts'
 import { isTrustedApiRequest, makeRoutes } from './routes.ts'
 import { makeMobileRoutes } from './mobile-routes.ts'
 import { makeMobileApiRoutes } from './mobile-api.ts'
@@ -53,7 +54,29 @@ declare module '@deepseek-ai/cordis' {
 export const name = 'remote-web-ui'
 
 /** Services required before the pairing surfaces can mount. */
-export const inject = ['webServer', 'apiProxy']
+export const inject = ['webServer', 'apiProxy', 'userScope']
+
+/** Structural view of the official session-query service used for scoped mobile search. */
+interface SessionSearchEngine {
+  searchSessions(
+    request: {
+      query: string
+      sessionFilters?: readonly { kind: 'id'; values: readonly string[] }[]
+      eventFilters?: readonly (
+        | { kind: 'type'; values: readonly string[] }
+        | { kind: 'surface'; values: readonly string[] }
+      )[]
+      limit?: number
+    },
+    exec?: { signal?: AbortSignal },
+  ): Promise<{
+    items: readonly {
+      header: { id: string }
+      bestMatch: { sessionId: string; surface: string; type: string; snippet: string }
+    }[]
+    nextCursor?: string
+  }>
+}
 
 /**
  * Settings namespace of the remote-control capability — the section the web
@@ -79,6 +102,8 @@ export interface Config {
    * the fence's open-LAN behavior and use pairing only for tokens/status.
    */
   requirePairingForLan?: boolean
+  /** Full non-loopback /api policy; mobile-only is the safe default. */
+  remoteApiMode?: RemoteApiMode
   /**
    * Public base URL of a tunnel in front of this server (e.g. a Cloudflare
    * Tunnel quick URL `https://xxx.trycloudflare.com` or a named-tunnel
@@ -111,8 +136,9 @@ export const Config: z<Config> = z.object({
   tokenTtlMs: z.number().step(1).min(60_000).default(10 * 60_000),
   offlineAfterMs: z.number().step(1).min(5_000).default(25_000),
   maxDevices: z.number().step(1).min(1).max(64).default(4),
-  cookieName: z.string().min(1).default('dsh_pair'),
+  cookieName: z.string().min(1).max(64).pattern(/^[A-Za-z0-9_-]+$/u).default('dsh_pair'),
   requirePairingForLan: z.boolean().default(true),
+  remoteApiMode: z.union(['mobile-only', 'legacy-full-api']).default('mobile-only'),
   publicBaseUrl: z.string(),
   autoTunnel: z.boolean().default(false),
   mobileEnterToSend: z.boolean().default(true),
@@ -136,6 +162,7 @@ const DEFAULTS: ResolvedConfig = {
   maxDevices: 4,
   cookieName: 'dsh_pair',
   requirePairingForLan: true,
+  remoteApiMode: 'mobile-only',
   publicBaseUrl: undefined,
   autoTunnel: false,
   mobileEnterToSend: true,
@@ -154,6 +181,7 @@ export function apply(ctx: Context, config?: Config): void {
     maxDevices: config?.maxDevices ?? DEFAULTS.maxDevices,
     cookieName: config?.cookieName ?? DEFAULTS.cookieName,
     requirePairingForLan: config?.requirePairingForLan ?? DEFAULTS.requirePairingForLan,
+    remoteApiMode: config?.remoteApiMode ?? DEFAULTS.remoteApiMode,
     publicBaseUrl: config?.publicBaseUrl,
     autoTunnel: config?.autoTunnel ?? DEFAULTS.autoTunnel,
     mobileEnterToSend: config?.mobileEnterToSend ?? DEFAULTS.mobileEnterToSend,
@@ -171,18 +199,50 @@ export function apply(ctx: Context, config?: Config): void {
       maxDevices: value.maxDevices ?? DEFAULTS.maxDevices,
       cookieName: value.cookieName ?? DEFAULTS.cookieName,
       requirePairingForLan: value.requirePairingForLan ?? DEFAULTS.requirePairingForLan,
+      remoteApiMode: value.remoteApiMode ?? DEFAULTS.remoteApiMode,
       publicBaseUrl: value.publicBaseUrl,
       autoTunnel: value.autoTunnel ?? DEFAULTS.autoTunnel,
       mobileEnterToSend: value.mobileEnterToSend ?? DEFAULTS.mobileEnterToSend,
       enabled: value.enabled ?? DEFAULTS.enabled,
     }
   }
+  const userScope = ctx.get('userScope') as UserScopeService | undefined
+  const pairingIdentity = userScope === undefined
+    ? {
+        bindDevice: async (_deviceId: string): Promise<{ principalId: string }> => {
+          throw new Error('user-scope unavailable')
+        },
+      }
+    : {
+        bindDevice: async (deviceId: string): Promise<{ principalId: string }> => {
+          const bound = await userScope.bindDevice(deviceId)
+          return { principalId: bound.principalId }
+        },
+        grantWorkspace: async (principalId: string, workspaceId: string): Promise<void> => {
+          await userScope.grantWorkspace(principalId, workspaceId)
+        },
+        revokeDevice: async (deviceId: string): Promise<boolean> => userScope.revokeDevice(deviceId),
+      }
+  const pairControl = userScope === undefined ? undefined : {
+    grantWorkspace: async (principalId: string, workspaceId: string): Promise<void> => {
+      await userScope.grantWorkspace(principalId, workspaceId)
+    },
+    revokeWorkspace: async (principalId: string, workspaceId: string): Promise<boolean> => {
+      return userScope.revokeWorkspace(principalId, workspaceId)
+    },
+    grantSession: async (principalId: string, sessionId: string): Promise<void> => {
+      await userScope.grantSession(principalId, sessionId)
+    },
+    revokeSession: async (principalId: string, sessionId: string): Promise<boolean> => {
+      return userScope.revokeSession(principalId, sessionId)
+    },
+  }
   const service = new PairingService({
     tokenTtlMs: resolved.tokenTtlMs,
     offlineAfterMs: resolved.offlineAfterMs,
     maxDevices: resolved.maxDevices,
     cookieName: resolved.cookieName,
-  })
+  }, undefined, pairingIdentity)
 
   // ── auto tunnel ─────────────────────────────────────────────────────────
   // The minted public URL becomes the QR base (and the pairing fence's
@@ -236,6 +296,29 @@ export function apply(ctx: Context, config?: Config): void {
   if (apiProxy === undefined) {
     console.warn('remote-web-ui: apiProxy service unavailable — the mobile data channel is disabled')
   }
+  const sessionQuery = ctx.get('sessionQuery') as SessionSearchEngine | undefined
+  const sessionSearch = sessionQuery === undefined ? undefined : async (
+    query: string,
+    sessionIds: readonly string[],
+    signal: AbortSignal,
+  ): Promise<{ items: { sessionId: string; snippet: string }[]; hasMore: boolean }> => {
+    if (sessionIds.length === 0) return { items: [], hasMore: false }
+    const page = await sessionQuery.searchSessions({
+      query,
+      sessionFilters: [{ kind: 'id', values: sessionIds }],
+      eventFilters: [
+        { kind: 'type', values: ['user/message', 'assistant/message'] },
+        { kind: 'surface', values: ['current'] },
+      ],
+      limit: 20,
+    }, { signal })
+    const items = page.items
+      .filter(hit => hit.header.id === hit.bestMatch.sessionId
+        && hit.bestMatch.surface === 'current'
+        && (hit.bestMatch.type === 'user/message' || hit.bestMatch.type === 'assistant/message'))
+      .map(hit => ({ sessionId: hit.header.id, snippet: Array.from(hit.bestMatch.snippet).slice(0, 240).join('') }))
+    return { items, hasMore: page.nextCursor !== undefined }
+  }
   // ── remote update ────────────────────────────────────────────────────────
   // The dsh-web-ui self-update surface: probe the npm registry for family
   // releases and run `pnpm update` in the owning profile. Resolutions anchor
@@ -276,14 +359,18 @@ export function apply(ctx: Context, config?: Config): void {
     },
   })
   const routes = [
-    ...makeRoutes({ service, lanAddresses }),
+    ...makeRoutes({ service, lanAddresses, control: pairControl }),
     ...makeMobileRoutes(),
-    ...(apiProxy !== undefined
-      ? makeMobileApiRoutes({ service, apiProxy, mobileEnterToSend: () => resolve().mobileEnterToSend })
+    ...(apiProxy !== undefined && userScope !== undefined
+      ? makeMobileApiRoutes({ service, apiProxy, userScope, sessionSearch, mobileEnterToSend: () => resolve().mobileEnterToSend })
       : []),
     ...updateRoutes,
   ]
-  const gate = makeGateListener(service, () => resolve().requirePairingForLan, () => resolve().enabled)
+  const gate = makeGateListener(service, {
+    remoteApiMode: () => resolve().remoteApiMode,
+    requirePairingForLan: () => resolve().requirePairingForLan,
+    enabled: () => resolve().enabled,
+  })
   ctx.effect(() => ctx.on('api/gate', gate), 'remote-web-ui: api gate')
   const sync = (): void => {
     const value = resolve()
@@ -291,7 +378,7 @@ export function apply(ctx: Context, config?: Config): void {
       tokenTtlMs: value.tokenTtlMs,
       offlineAfterMs: value.offlineAfterMs,
       maxDevices: value.maxDevices,
-      cookieName: value.cookieName,
+      cookieName: isSafePairingCookieName(value.cookieName) ? value.cookieName : DEFAULTS.cookieName,
     }
     // The auto tunnel owns the public base while enabled: the minted URL
     // lands in the service through the tunnel's phase listener. The manual
@@ -306,7 +393,7 @@ export function apply(ctx: Context, config?: Config): void {
       tunnel.stop()
       // A malformed public base is ignored with a warning — LAN-only behavior
       // stays intact rather than silently minting unusable QR links.
-      if (value.publicBaseUrl !== undefined && !isHttpUrl(value.publicBaseUrl)) {
+      if (value.publicBaseUrl !== undefined && !isSecurePublicBaseUrl(value.publicBaseUrl)) {
         console.warn(`remote-web-ui: ignoring malformed publicBaseUrl ${JSON.stringify(value.publicBaseUrl)} (expected https://host[:port])`)
         service.setPublicBaseUrl(undefined)
       } else {
@@ -349,14 +436,4 @@ export function apply(ctx: Context, config?: Config): void {
     onChange: sync,
   })
   sync()
-}
-
-/** Whether a configured public base is a parseable http(s) URL with a host. */
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== ''
-  } catch {
-    return false
-  }
 }

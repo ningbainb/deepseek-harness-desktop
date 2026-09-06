@@ -30,6 +30,6 @@ test('collapsed footer rail keeps the official footer sizing and centering rules
   assert.doesNotMatch(patch, /\[class\*=footerActions\]\}\{[^}]*justify-content:flex-start/u)
   assert.match(shim, /resetExpandedFooterActionStyles/u)
   assert.doesNotMatch(shim, /querySelector\('\[data-rail="rail"\], \[data-wide="rail"\]'\)/u)
-  assert.match(patch, /data-slot="sidebar\.footer\.action"/u)
-  assert.match(patch, /attributeFilter: \["class", "style", "data-wide", "data-rail"\]/u)
+  assert.match(patch, /data-slot=(?:\\"|")sidebar\.footer\.action(?:\\"|")/u)
+  assert.match(patch, /attributeFilter:\s*\[(?:\s|\+)*"class"(?:\s|\+)*,(?:\s|\+)*"style"(?:\s|\+)*,(?:\s|\+)*"data-wide"(?:\s|\+)*,(?:\s|\+)*"data-rail"(?:\s|\+)*\]/u)
 })

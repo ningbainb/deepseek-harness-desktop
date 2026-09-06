@@ -57,12 +57,9 @@ export async function listSessions(cursor?: string): Promise<SessionPage> {
   return await callUnary<SessionPage>('session.list', cursor === undefined ? {} : { cursor })
 }
 
-/**
- * Create a blank session (entity birth precedes the first message). Name a
- * workspace to attach it there, or a cwd; omitting both uses the host cwd.
- */
+/** Create a blank session in an already authorized workspace. */
 export async function createSession(
-  options: { workspaceId?: string; cwd?: string } = {},
+  options: { workspaceId: string },
 ): Promise<CreatedSession> {
   return await callUnary<CreatedSession>('session.create', options)
 }

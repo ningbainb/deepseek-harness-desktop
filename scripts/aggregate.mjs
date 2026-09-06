@@ -122,11 +122,24 @@ function parsePatchRows(patchPath, errors) {
   const significant = []
   for (const [i, raw] of readFileSync(patchPath, 'utf8').split(/\r?\n/).entries()) {
     const text = raw.trim()
-    if (text && !text.startsWith('#')) significant.push({ text, line: i + 1 })
+    if (text && !text.startsWith('#')) {
+      significant.push({
+        text,
+        line: i + 1,
+        indent: raw.length - raw.trimStart().length,
+      })
+    }
   }
   const rows = []
+  let insertIndent = null
   for (let i = 0; i < significant.length; i++) {
-    const idMatch = significant[i].text.match(/^-\s*id:\s*(\S+)\s*$/)
+    const current = significant[i]
+    if (current.text === '- insert:') {
+      insertIndent = current.indent
+      continue
+    }
+    if (insertIndent !== null && current.indent <= insertIndent) insertIndent = null
+    const idMatch = current.text.match(/^-\s*id:\s*(\S+)\s*$/)
     if (!idMatch) continue
     const next = significant[i + 1]
     if (!next) {
@@ -139,7 +152,11 @@ function parsePatchRows(patchPath, errors) {
       errors.push(`${patchPath}:${next.line}: expected a "name:" line after "- id: ${idMatch[1]}"`)
       continue
     }
-    rows.push({ id: idMatch[1], name: nameMatch[2] ?? nameMatch[1] })
+    rows.push({
+      id: idMatch[1],
+      name: nameMatch[2] ?? nameMatch[1],
+      operation: insertIndent !== null && current.indent > insertIndent ? 'insert' : 'override',
+    })
     i++ // consume the paired name line
   }
   return rows
@@ -184,15 +201,23 @@ function collectRows(pkgDir, entry, via, visited, errors, blocks) {
   blocks.push({ entry, via, rows })
 }
 
-/** Render the aggregate cordis.patch.yml: header + per-source insert blocks. */
+/** Render the aggregate cordis.patch.yml: overrides plus per-source insert blocks. */
 function renderPatch(blocks) {
   const lines = [...PATCH_HEADER]
   for (const block of blocks) {
     const chain = block.via.length ? ` (via ${block.via.join(' -> ')})` : ''
-    lines.push('', `# from ${block.entry}${chain}`, '- insert:')
-    for (const row of block.rows) {
-      lines.push(`    - id: ${row.id}`)
-      lines.push(`      name: '${row.name}'`)
+    lines.push('', `# from ${block.entry}${chain}`)
+    for (const row of block.rows.filter((candidate) => candidate.operation === 'override')) {
+      lines.push(`- id: ${row.id}`)
+      lines.push(`  name: '${row.name}'`)
+    }
+    const inserts = block.rows.filter((candidate) => candidate.operation === 'insert')
+    if (inserts.length > 0) {
+      lines.push('- insert:')
+      for (const row of inserts) {
+        lines.push(`    - id: ${row.id}`)
+        lines.push(`      name: '${row.name}'`)
+      }
     }
   }
   return lines.join('\n') + '\n'

@@ -12,7 +12,7 @@ import {
  * emitted too: the modules node half serves lib/client.js to browsers, so a
  * git-installed package must ship it.
  */
-export default clientBundle('@linxin666/dsh-remote-web-ui', ['src/index.ts', 'src/invariant.ts'], {
+export default clientBundle('@linxin666/dsh-remote-web-ui', ['src/index.ts', 'src/invariant.ts', 'src/startup.ts'], {
   clientOnlyBundle: REMOTE_WEB_UI_CLIENT_ONLY_BUNDLE,
   libExternal: REMOTE_WEB_UI_LIB_EXTERNAL,
   companions: [mobileBundle('@linxin666/dsh-remote-web-ui', 'src/mobile/index.tsx')],

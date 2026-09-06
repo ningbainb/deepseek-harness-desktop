@@ -10,6 +10,7 @@ The dsh web UI plugin group for the DSH settings page: it adds a first-level set
 - **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
 - **One-click Desktop Dock entry**: on supported Desktop hosts, an Extension Dock button appears immediately beside Settings. The first three eligible launches show a non-modal hint; ordinary Web hosts render no Desktop-only entry.
 - **ChatGPT sign-in**: when the RC.1 authorization and OpenAI Codex provider services are present, a first-level settings section starts the official ChatGPT OAuth flow with one click and continues in the system browser.
+- **bai provider onboarding**: the top of the official `Settings → Models` page guides users through registration, top-up, Key creation, and a “Test and save” flow. The Web UI plugins page no longer shows this guide. A successful check discovers `/v1/models` and writes the official `llm-pi-ai` provider profile.
 
 ## Install
 
@@ -35,6 +36,8 @@ Restart `dsh web` for the section to appear in the settings page.
 - The ChatGPT surface calls the official `ctx.authorization` flow for `llm-pi-ai/openai-codex`; it does not read, copy, import, or rewrite the OAuth grant.
 - The local HTTP bridge returns only flow status, bounded notices, prompts, and credential-presence metadata from `describeRecord`. Access tokens, refresh tokens, and stored record payloads never enter the browser bundle or bridge response.
 - Authorization routes use the same loopback, canonical Host, same-origin, and authenticated-proxy checks as the settings bridge. Provider errors are reduced to stable codes before crossing the boundary.
+- The bai provider uses the official `llm-pi-ai` `openai-completions` configuration capability. It does not replace the official `ModelDirectory`; models come from `/v1/models` for the user-owned Key.
+- The bai Key enters the official credential service only through a protected local POST route. The route returns presence, model count, and model names only; it never returns the Key or writes it to settings files, URLs, or logs.
 
 ## Proxy configuration
 
@@ -56,3 +59,4 @@ Keep the token out of profile configuration. The proxy must authenticate before 
 - The Extension Dock shortcut additionally requires a Desktop host advertising the narrow `extensions.open` capability.
 - ChatGPT sign-in requires the host authorization service and a registered `llm-pi-ai/openai-codex` flow. Opening the OAuth page also requires a local Desktop/system-browser environment.
 - Authenticated-proxy mode does not provide authentication itself; deployments without a correctly ordered proxy must leave `trustedProxyHosts` empty.
+- bai balance, top-ups, Key revocation, and account management remain in the bai console; this package does not proxy payments or hold a project-shared Key.

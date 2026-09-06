@@ -354,6 +354,6 @@ function isRemoteFace(value: unknown): value is { $on: (event: string, callback:
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** rc.6-compatible settings binder (bridge fallback over the official scope). */
-    webUiSettings: WebUiSettingsBinder
+    webUiSettings?: WebUiSettingsBinder
   }
 }

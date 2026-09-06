@@ -243,6 +243,26 @@ export function windowChromeBrowserOptions(rawTheme = 'dark') {
   }
 }
 
+/**
+ * Tell browser-side desktop integrations which shell geometry they are
+ * running inside. The main window uses Electron's hidden title bar with a
+ * 32px Win32 overlay; dsh-better-sidebar consumes these stamps to move its
+ * top-right toggle cluster below that overlay. Keep this at the shell
+ * boundary so every runtime reload carries the same contract.
+ */
+export function decorateDesktopRuntimeUrl(rawUrl, { platform = process.platform } = {}) {
+  if (typeof rawUrl !== 'string' || rawUrl.length === 0) {
+    throw new TypeError('desktop runtime URL must be a non-empty string')
+  }
+  if (typeof platform !== 'string' || platform.length === 0) {
+    throw new TypeError('desktop runtime platform must be a non-empty string')
+  }
+  const url = new URL(rawUrl)
+  url.searchParams.set('dsh-desktop-mode', 'advanced')
+  url.searchParams.set('dsh-desktop-platform', platform.toLowerCase())
+  return url.toString()
+}
+
 export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu = false } = {}) {
   const data = JSON.stringify({
     id: WINDOW_CHROME_ID,

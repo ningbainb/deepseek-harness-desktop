@@ -11,7 +11,7 @@
 - **入口**：侧边栏底部靠设置按钮旁的手机图标。
 - **面板**：「移动端远程控制」标题、「扫码或在手机上打开链接，即可远程控制当前工作区」副标题、「手机扫码连接」卡片（含状态区「等待手机连接」+ 状态徽标）、大号二维码、「无法扫码？可以在手机上打开链接」提示，以及三个按钮：停止 / 刷新二维码 / 复制链接。
 - **手机侧**：扫码将手机与一次性、限时令牌绑定，并落地到 **`/m` 独立移动端界面**——一款专为小屏设计的轻客户端（见[截图](#截图)），而不是把桌面 UI 塞进手机。链接携带 `workspace` 参数，手机落地到桌面正在查看的同一工作区。
-- **安全**：一个有效的一次性令牌（刷新会使旧链接失效；已接受的令牌不可复用；令牌会过期）。停止会撤销每一台已配对设备与当前令牌——已配对设备在下一次请求时被切断。当插件 `requirePairingForLan` 门开启（默认）时，每个非 loopback 的 `/api` 请求必须携带有效的已配对设备 cookie，因此二维码是进入暴露在局域网上的 dsh web 的唯一途径。
+- **安全**：一个有效的一次性令牌（刷新会使旧链接失效；已接受的令牌不可复用；令牌会过期）。停止会同步撤销每一台已配对设备与当前令牌，并立即关闭该设备的移动端实时流。当插件 `requirePairingForLan` 门开启（默认）时，每个非 loopback 的完整 `/api` 请求必须携带有效的已配对设备 cookie；默认 `remoteApiMode: mobile-only` 仍拒绝完整 `/api`，手机只进入逐请求做 Workspace/Session 归属检查的 `/m/api` 通道。
 - **实时状态**：桌面面板经 SSE 流实时镜像配对状态（等待 → 已连接 → 已断开）。
 - **远程更新**：侧边栏底部的下载触发按钮（手机图标左侧）打开更新面板，它探测 npm registry 上已安装的 `@linxin666/dsh-*` 全家桶版本。当存在较新版本时，面板自动执行更新（在所属 dsh profile 内 `pnpm update`；pnpm 缺失时依次回退 `corepack pnpm`、`npx --yes pnpm`，Windows 上经 `cmd.exe` 执行以解析 npm 安装的 `.cmd` shim；由仅 loopback 的 `/api/update/status` + `/api/update/run` 端点驱动）并请求重启 dsh web 以生效。本地 link 安装（开发模式）会被探测到，只报告 npm 状态而不更新。
 
@@ -26,9 +26,22 @@
 
 ## 需求
 
+### 绑定与访问边界
+本包通过公开的 `@deepseek-ai/dsh-cmdline` / `webStartup` seam 提供一个很小的
+`web-startup` Cordis override，不修改官方 DSH 源文件。默认行为仍是官方的
+loopback 绑定。
+传入 `dsh web --host 0.0.0.0` 是本包在 app-owned seam 中记录的显式局域网请求；
+但当前官方 DSH web runtime 仍会以安全错误拒绝 `0.0.0.0`。本包不绕过该 guard，
+因此本轮不把打包版的局域网 A/B 作为交付门槛。非 loopback 访问仍放在
+配对门之后，并保留默认的 `mobile-only` API 通道；只有部署明确需要其他
+authority 时，才用 `--trusted-host` 扩展传输层信任列表。
+打包版 Desktop 默认同样只绑定本机。`DSH_DESKTOP_REMOTE_HOST=0.0.0.0` 只会
+传递显式请求；当前官方 runtime 仍拒绝该值，且该环境变量只在 Electron 主进程读取，
+渲染器不能控制监听地址。
+
 - 其 `dsh` CLI 支持 profile（`dsh --profile`、`dsh plugin`）的 DSH 安装——本包所依托的 profile/bundle 机制。
-- 局域网使用必须手机可到达服务器：用 `dsh web --host 0.0.0.0` 启动。默认 `127.0.0.1` 绑定时，面板会显示明确说明而不是死二维码——除非配置了公网 base URL（见下文「通过互联网远程访问」），那会让二维码在无需重新绑定即可从任意位置访问。面板的 mint/stop 端点设计上仅限 loopback：在局域网 URL 打开的桌面浏览器只会看到「配对面板仅限本机使用」横幅——请在 `http://127.0.0.1` 打开面板，让手机使用配对链接。
-- 一键公网隧道（`autoTunnel`）需要 `cloudflared` 平台二进制随包分发（其 postinstall 会下载它；运行时下载覆盖跳过 postinstall 脚本的安装器）。无需用户侧工具、账号或域名——Cloudflare quick tunnel 免费且匿名。
+- 局域网使用的前提是 DSH build 明确允许 all-interface bind；但当前官方 runtime 会在启动阶段拒绝 `0.0.0.0`，因此上面的命令只作为可选现场验证路径，不是本轮交付门槛。默认 `127.0.0.1` 绑定时，面板会显示明确说明而不是死二维码——除非配置了公网 base URL（见下文「通过互联网远程访问」），那会让二维码在无需重新绑定即可从任意位置访问。面板的 mint/stop 端点设计上仅限 loopback：在局域网 URL 打开的桌面浏览器只会看到「配对面板仅限本机使用」横幅——请在 `http://127.0.0.1` 打开面板，让手机使用配对链接。
+- 一键公网隧道（`autoTunnel`）使用 `cloudflared` 依赖。常规安装会由 postinstall 准备二进制；若安装器跳过脚本或运行在只读 ASAR 中，首次运行会下载到 profile-local 的 `$DSH_HOME/runtime-bin/cloudflared`。正常网络下无需用户侧安装、账号或域名——Cloudflare quick tunnel 免费且匿名。
 
 ## 安装
 
@@ -52,7 +65,7 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-remote-web-ui
 
 ## 使用
 
-1. `dsh web --host 0.0.0.0`（打印的局域网 URL 确认可达性）。
+1. 默认以 loopback 启动 `dsh web`；只有使用明确允许 all-interface bind 的 DSH build 时，才传入 `--host 0.0.0.0`。当前官方 runtime 会拒绝该参数，实际手机验收请使用下文的 `autoTunnel` 或手动隧道路径。
 2. 点击手机图标 → 面板铸一枚新的二维码。
 3. 用手机扫码（或打开复制的链接）：手机绑定并落到 **`/m` 独立移动端界面**——不在小屏显示桌面 UI。该界面刻意精简：
    - 直接进入工作区（每个工作区的会话列表上有 新建会话 按钮：它经 host 的 `session.create` 创建附加到该工作区的空白会话，并立即打开新聊天），
@@ -65,12 +78,12 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-remote-web-ui
 4. 桌面徽标实时翻到 已连接；手机离开时回落到离线/断开。
 5. 刷新二维码 使旧链接失效并铸一枚新的。停止 撤销移动端访问：已配对设备下一次请求 403，包括其实时流。
 
-该移动端界面完全自包含在本插件内：`/m` 页面及其数据通道（`/m/api`）由插件自己的路由伺服，**无需任何 harness 源码改动**——手机的 RPC 调用走插件的 `/m/api` 代理（它委托给 host 的 ApiProxy 服务并自己分页 `session.list`），因此被隧道化的 Host 永远不必进入连接插件的信任围栏。手机受其已配对设备 cookie 与显式方法白名单门控（settings/credentials/host-action 域手机永远不可达；模型读写限制于建议性的 `session.models` / `session.selectModel` 对，创建限制于 `session.create`（仅工作区 id——手机绝不自命名工作目录），权限选择器只通过已放行的 `session.prompt` 发送模式无关的 `/permission` 命令）；实时流在 `/m/api/events.mux` 上经 Server-Sent Events 送达。
+该移动端界面完全自包含在本插件内：`/m` 页面及其数据通道（`/m/api`）由插件自己的路由伺服，**无需任何 harness 源码改动**——手机的 RPC 调用走插件的 `/m/api` 代理（它委托给 host 的 ApiProxy 服务，先按当前 paired principal 过滤 Workspace/Session，再在本地分页 `session.list`），因此被隧道化的 Host 永远不必进入连接插件的信任围栏。手机受其已配对设备 cookie 与显式方法白名单门控（settings/credentials/host-action 域手机永远不可达；模型读写限制于建议性的 `session.models` / `session.selectModel` 对，创建限制于 `session.create`（仅工作区 id——手机绝不自命名工作目录），权限选择器只通过已放行的 `session.prompt` 发送模式无关的 `/permission` 命令）；实时流在 `/m/api/events.mux` 上经 Server-Sent Events 送达，所有帧都重新检查 Session 归属，设备 revoke 会立即 abort 该流。
 
 ### 行为说明
 
 - 移动端输入框默认 Enter 发送（Shift+Enter 换行）。在插件设置卡片（或 profile patch）把 `mobileEnterToSend` 设为 false 后，普通 Enter 改为插入换行，只有「发送」按钮会发送；手机打开聊天时经自己的 `/m/api` 偏好方法读取该开关。在支持 `field-sizing: content` 的浏览器上，输入框随草稿自动增高，最高 120px 封顶（两种模式一致）。
-- 安装本插件会门控非 loopback 的 `/api` 访问于配对之后（见 `src/index.ts` 的 `requirePairingForLan`）。经局域网 URL 打开的桌面浏览器必须像任何远程设备一样配对；loopback（127.0.0.1）不受影响。把 profile patch 里 `requirePairingForLan` 设为 false 可恢复开放局域网行为，同时保留令牌/状态/撤销。
+- 默认的 `remoteApiMode: mobile-only` 会继续拒绝完整 `/api`；只有先将其显式设为 `legacy-full-api`，再按需把 `requirePairingForLan` 设为 false，才会恢复开放局域网行为，同时保留令牌/状态/撤销。兼容模式不提供 Workspace/Session 级资源隔离。
 - 二维码链接基于机器的非内部 IPv4 字面量构建；多宿主主机（Wi-Fi + 有线，或代理/VPN 虚拟适配器）会显示单选器供你发布手机实际可达的网络。第一个字面量是默认值。设 `publicBaseUrl` 后，单选器在顶部额外加一项 公网地址——默认二维码改用公网 base，选中局域网字面量会重新铸一枚网内链接。
 - 配置的 `publicBaseUrl` 本身满足可达绑定需求：`dsh web` 绑定 `127.0.0.1`（不带 `--host 0.0.0.0`）仍能经隧道铸出可用的公网二维码链接。
 
@@ -78,7 +91,7 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-remote-web-ui
 
 ### 一键公网隧道（推荐）
 
-在插件设置卡片打开 `autoTunnel`（或设 profile patch `autoTunnel: true`）。插件随后运行自己的 Cloudflare quick tunnel——`cloudflared` 二进制随包分发，无需安装、账号或域名——并自动接通一切：
+在插件设置卡片打开 `autoTunnel`（或设 profile patch `autoTunnel: true`）。插件随后运行自己的 Cloudflare quick tunnel——`cloudflared` 会在可写的 profile-local runtime 目录准备，无需账号或域名——并自动接通一切：
 
 - 铸出的 `https://xxx.trycloudflare.com` URL 成为二维码 base，因此任意地点的手机都能配对。面板显示隧道状态（starting / running / failed 带原因），崩溃按退避自动重启。
 
@@ -100,7 +113,7 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-remote-web-ui
 cloudflared tunnel --url http://127.0.0.1:3080
 #    打印类似：https://xxxx-xxxx-xxxx.trycloudflare.com
 
-# 2. 以该主机为信任启动 dsh web（需要保留局域网访问时也用 --host 0.0.0.0）：
+# 2. 以该主机为信任启动 dsh web；默认保持 loopback 绑定：
 dsh web --trusted-host xxxx-xxxx-xxxx.trycloudflare.com
 ```
 
@@ -146,9 +159,9 @@ pnpm run build
 
 围栏辅助（`isTrustedApiRequest` / `isLoopbackHostname`）在 `src/gate.ts` / `src/routes.ts` 本地重实现：20260810 upstream 把信任围栏移进连接插件并停止导出它们，因此配对路由携带自己限定到二维码链接广告的字面量的副本。见 harness checkout 的 Agent Notes `api-gate-and-sidebar-remote-seat` 与 `lan-runtime-connection-fixes`。
 
-## 手动 E2E：局域网配对往返
+## 可选手动 E2E：局域网配对往返
 
-单元/组件 spec 覆盖路由族、门与面板，但配对循环涉及非 loopback origin 上的真实浏览器。任何 wire 契约或连接循环改动后重复：
+单元/组件 spec 覆盖路由族、门与面板；下面的现场配对步骤是可选验证，不属于本轮交付门槛。当前官方 runtime 会在第 1 步拒绝 `0.0.0.0`；任何 wire 契约或连接循环改动后可重复：
 
 1. 用测试工作区根在所有接口上启动服务器：`dsh web --host 0.0.0.0 --port 3190 --workspace-root /tmp/remote-e2e`。
 2. 在浏览器打开 **loopback** URL（`http://127.0.0.1:3190`）：手机图标在侧边栏底部；面板立即铸一枚二维码。
@@ -160,6 +173,7 @@ pnpm run build
 
 ## 已知限制与待办
 
+- **局域网绑定受官方安全 guard 保护**：当前官方 DSH web runtime 拒绝 `--host 0.0.0.0`；本包不绕过它。物理 LAN A/B 不属于本轮交付范围。
 - **撤销是逐请求的**：已配对手机请求已在 停止 落地时在途，完成该请求；下一个 403。
 - **设备会话在内存中**：配对状态（token + devices）随 `dsh web` 进程重置。
 - **无逐设备管理 UI**：面板显示聚合状态（waiting / connected N / offline）；单设备撤销延后。

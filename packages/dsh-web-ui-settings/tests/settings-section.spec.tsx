@@ -22,6 +22,7 @@ vi.mock('../src/client/compat-settings-scope.ts', () => ({
 import { apply } from '../src/client/index.ts'
 import { ChatGptAuthSection } from '../src/client/ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from '../src/client/WebUIPluginsCard.tsx'
+import { RelayOnboardingCard } from '../src/client/RelayOnboardingCard.tsx'
 import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
 
 afterEach(() => {
@@ -45,8 +46,9 @@ describe('Web UI settings section', () => {
 
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(3)
+    expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(4)
     const [authOptions, AuthComponent] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
       name: 'settings.section',
@@ -65,7 +67,15 @@ describe('Web UI settings section', () => {
     })
     expect(options).not.toHaveProperty('key')
     expect(Component).toBe(WebUIPluginsSection)
-    const [dockOptions, DockComponent] = register.mock.calls[2] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [relayOptions, RelayComponent] = register.mock.calls[2] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
+    expect(relayOptions).toMatchObject({
+      name: 'model-preferences.onboarding',
+      id: 'bai',
+      order: 5,
+      locale: 'relay-onboarding',
+    })
+    expect(RelayComponent).toBe(RelayOnboardingCard)
+    const [dockOptions, DockComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',

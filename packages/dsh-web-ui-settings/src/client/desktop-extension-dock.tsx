@@ -137,7 +137,7 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
         disabled={opening}
         onClick={() => { void openDock() }}
       >
-        <DockIcon />
+        <DockIcon wide={wide} />
       </button>
       {showNudge && nudgePosition && createPortal(
         <div
@@ -171,13 +171,25 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
   )
 }
 
-function DockIcon() {
+function DockIcon({ wide }: { wide?: boolean }) {
+  const size = wide ? 16 : 18
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
-      <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
-      <path d="M17 13.5v7M13.5 17h7" />
+    <svg
+      viewBox="0 0 16 16"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" />
+      <rect x="9" y="2.5" width="4.5" height="4.5" rx="1.2" />
+      <rect x="2.5" y="9" width="4.5" height="4.5" rx="1.2" />
+      <path d="M11.25 9v4.5M9 11.25h4.5" />
     </svg>
   )
 }
+

@@ -89,7 +89,7 @@ import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
 import { parseValueModeRuntimeTelemetryLine } from './value-mode-telemetry.mjs'
-import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from './runtime-controller.mjs'
+import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController, resolveDesktopRuntimeHost } from './runtime-controller.mjs'
 import { ActiveRuntimeProvider, DshRuntimeProvider, RUNTIME_PROVIDER_ID } from './runtime-provider.mjs'
 import { RepairIncidentStore } from './repair-incident-store.mjs'
 import { resolveRepairModelAvailability } from './repair-model-availability.mjs'
@@ -122,7 +122,7 @@ import {
   shouldQuitWhenAllWindowsClosed,
 } from './tray-lifecycle.mjs'
 import { UserPluginArchive } from './user-plugin-archive.mjs'
-import { applyWindowChrome, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
+import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
@@ -1142,6 +1142,7 @@ export async function startElectronApp(metadata) {
     await logStore.append(`[permission] primary Runtime overlay preparation failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
     throw error
   }
+  const desktopRuntimeHost = resolveDesktopRuntimeHost()
   const desktopCapabilities = [...new Set(
     Object.values(DESKTOP_SURFACES).flatMap((surface) => desktopContractForSurface(surface).capabilities),
   )].toSorted()
@@ -1210,6 +1211,7 @@ export async function startElectronApp(metadata) {
       cwd: projectRoot,
       dshHome,
       profileName,
+      runtimeHost: desktopRuntimeHost,
       executable: process.execPath,
       logStore,
       autoRestart: false,
@@ -1770,7 +1772,7 @@ export async function startElectronApp(metadata) {
       if (!mainWindow || mainWindow.isDestroyed()) return
       if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
       try {
-        await mainWindow.loadURL(status.url)
+        await mainWindow.loadURL(decorateDesktopRuntimeUrl(status.url))
         if (sessionRecoverySkippedCount > 0) {
           await notificationService.show(
             sessionRecoveryNotification(sessionRecoverySkippedCount),

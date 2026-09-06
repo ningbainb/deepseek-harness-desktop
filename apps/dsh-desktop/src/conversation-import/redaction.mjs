@@ -18,9 +18,37 @@ const KNOWN_API_KEYS = [
   /\b(?:AIzaSy[a-zA-Z0-9_-]{33})\b/gu,
 ]
 
-const KEY_VALUE_SECRET_PATTERN = /(?:\b(?:api[-_]?key|access[-_]?token|auth[-_]?token|secret[-_]?key|password|passwd|client[-_]?secret|session[-_]?token|private[-_]?key)\b\s*[:=]\s*["']?)([^"'\s\r\n]{6,})(["']?)/giu
+// Keep this list deliberately key-oriented. It is shared by the textual
+// matcher and redactObject, so JSON payloads and nested tool arguments follow
+// the same policy instead of relying on the caller to redact each field.
+const SECRET_KEY_PATTERN = 'api[-_]?key|api[-_]?secret|access[-_]?token|auth[-_]?token|authorization|proxy[-_]?authorization|secret[-_]?key|password|passwd|pwd|client[-_]?secret|session[-_]?token|private[-_]?key|credential|cookie|database[-_]?url|connection[-_]?string|dsn|token'
 
-const ENV_ASSIGNMENT_PATTERN = /(?:^|\n)\s*(?:[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|PRIVATE)[A-Z0-9_]*)\s*=\s*(?:["'][^"'\r\n]+["']|[^\s\r\n]+)/giu
+// Match JSON keys, YAML keys, and shell-like fields with quoted values.
+const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(
+  '(\\b(?:' + SECRET_KEY_PATTERN + ')\\b\\s*(?:["\']\\s*)?[:=]\\s*)(["\'])([\\s\\S]*?)\\2',
+  'giu',
+)
+const UNQUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(
+  '(\\b(?:' + SECRET_KEY_PATTERN + ')\\b\\s*(?:["\']\\s*)?[:=]\\s*)(?!["\'])(?!\\[REDACTED_[A-Z_]+\\])([^\\s,;}\\]]+)',
+  'giu',
+)
+
+// Environment assignments commonly appear with an export prefix or
+// indentation in copied shell output. Include URL/DSN-style names because
+// their values can contain database credentials even when no token is present.
+const ENV_ASSIGNMENT_PATTERN = new RegExp(
+  '(^|[\\r\\n])(\\s*(?:export\\s+)?[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|PRIVATE|CREDENTIAL|COOKIE|DATABASE|DSN)[A-Z0-9_]*\\s*=\\s*)(["\'])([^"\'\\r\\n]*?)\\3',
+  'gim',
+)
+const UNQUOTED_ENV_ASSIGNMENT_PATTERN = new RegExp(
+  '(^|[\\r\\n])(\\s*(?:export\\s+)?[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|PRIVATE|CREDENTIAL|COOKIE|DATABASE|DSN)[A-Z0-9_]*\\s*=\\s*)(?!["\'])([^\\s\\r\\n]+)',
+  'gim',
+)
+
+const SENSITIVE_OBJECT_KEY_PATTERN = new RegExp(
+  '(?:^|[-_])(?:' + SECRET_KEY_PATTERN + ')(?:$|[-_])',
+  'iu',
+)
 
 export class Redactor {
   /**
@@ -46,19 +74,14 @@ export class Redactor {
       result = result.replace(pattern, '[REDACTED_API_KEY]')
     }
 
-    // 4. Key-Value secret pairs (e.g. password=xyz, apiKey: "xyz")
-    result = result.replace(KEY_VALUE_SECRET_PATTERN, (match, secretVal, quote) => {
-      const prefix = match.slice(0, match.length - secretVal.length - (quote ? quote.length : 0))
-      return `${prefix}[REDACTED_SECRET]${quote || ''}`
-    })
+    // 4. Key-Value secret pairs, including JSON keys and quoted values with
+    // spaces. The unquoted form stops at common structural delimiters.
+    result = result.replace(QUOTED_KEY_VALUE_SECRET_PATTERN, '$1$2[REDACTED_SECRET]$2')
+    result = result.replace(UNQUOTED_KEY_VALUE_SECRET_PATTERN, '$1[REDACTED_SECRET]')
 
     // 5. Raw .env assignments
-    result = result.replace(ENV_ASSIGNMENT_PATTERN, (match) => {
-      const equalsIndex = match.indexOf('=')
-      if (equalsIndex === -1) return match
-      const keyPart = match.slice(0, equalsIndex + 1)
-      return `${keyPart} [REDACTED_SECRET]`
-    })
+    result = result.replace(ENV_ASSIGNMENT_PATTERN, '$1$2$3[REDACTED_SECRET]$3')
+    result = result.replace(UNQUOTED_ENV_ASSIGNMENT_PATTERN, '$1$2[REDACTED_SECRET]')
 
     return result
   }
@@ -77,7 +100,9 @@ export class Redactor {
     if (obj !== null && typeof obj === 'object') {
       const sanitized = {}
       for (const [key, value] of Object.entries(obj)) {
-        sanitized[key] = Redactor.redactObject(value, depth + 1)
+        sanitized[key] = SENSITIVE_OBJECT_KEY_PATTERN.test(key)
+          ? '[REDACTED_SECRET]'
+          : Redactor.redactObject(value, depth + 1)
       }
       return sanitized
     }

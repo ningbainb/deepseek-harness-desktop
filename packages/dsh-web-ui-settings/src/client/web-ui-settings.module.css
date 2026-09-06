@@ -107,6 +107,73 @@
   list-style: none;
 }
 
+.dockBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 75%, var(--dsw-alias-brand-primary) 25%);
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-bg-layer-3) 92%, var(--dsw-alias-brand-primary) 8%), var(--dsw-alias-bg-layer-3));
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dockBanner:hover {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 50%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.dockBannerIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.dockBannerContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.dockBannerTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dockBannerDesc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dockBannerAction {
+  appearance: none;
+  flex: none;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent);
+  color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dockBannerAction:hover {
+  background: var(--dsw-alias-brand-primary);
+  color: #fff;
+  border-color: var(--dsw-alias-brand-primary);
+}
+
 .repairCard {
   margin: 2px 0 12px;
   overflow: hidden;
@@ -393,58 +460,60 @@
   justify-content: center;
 }
 
-
 .dockTrigger {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  padding: 0;
-  border: 0;
+  border: none;
   border-radius: 50%;
-  color: var(--dsw-alias-label-secondary);
+  padding: 0;
   background: transparent;
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
-  transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
 .dockTrigger:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .dockTrigger:active:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-active);
 }
 
-.dockTrigger:focus-visible,
-.dockNudgeClose:focus-visible {
+.dockTrigger:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-2), 0 0 0 4px var(--dsw-alias-brand-primary);
 }
 
 .dockTrigger:disabled {
-  opacity: 0.55;
-  cursor: progress;
+  opacity: 0.5;
+  cursor: default;
 }
 
 .dockNudge {
   position: fixed;
   z-index: 2147483000;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  width: min(288px, calc(100vw - 24px));
+  width: min(296px, calc(100vw - 24px));
   box-sizing: border-box;
-  padding: 10px 10px 10px 12px;
+  padding: 10px 12px 10px 14px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-shadow-lv3);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.28), 0 2px 8px -2px rgba(0, 0, 0, 0.12), var(--dsw-shadow-lv3);
   font-size: 13px;
   line-height: 19px;
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
 .dockNudge::after {
@@ -473,16 +542,17 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  margin: -2px -2px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .dockNudgeClose:hover {
@@ -497,18 +567,24 @@
   left: 0;
   width: 230px;
   box-sizing: border-box;
-  padding: 9px 11px;
+  padding: 9px 12px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 9px;
+  border-radius: 10px;
   color: var(--dsw-alias-state-error-primary);
   background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-shadow-lv2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--dsw-shadow-lv3);
   font-size: 12px;
   line-height: 18px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dockTrigger {
+  .dockTrigger,
+  .dockNudge,
+  .dockNudgeClose {
     transition: none;
+    animation: none;
+    transform: none !important;
   }
 }

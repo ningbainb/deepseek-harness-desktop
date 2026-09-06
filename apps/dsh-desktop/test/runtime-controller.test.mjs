@@ -13,6 +13,7 @@ import {
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import {
   DEFAULT_STARTUP_TIMEOUT_MS,
+  DESKTOP_REMOTE_HOST_ENV,
   DshRuntimeController,
   computeRestartDelay,
   createRuntimeInvocation,
@@ -21,6 +22,7 @@ import {
   parseDshReadyUrl,
   probeHttpReady,
   terminateChildProcessTree,
+  resolveDesktopRuntimeHost,
   validateLoopbackUrl,
 } from '../src/runtime-controller.mjs'
 
@@ -133,6 +135,32 @@ test('non-Windows runtime launch remains a direct argv spawn', () => {
     args: ['--expose-internals', '/opt/dsh/bin.js', '--profile', 'desktop', '--port', '43125', '--no-open'],
   })
   assert.equal(invocation.args.filter((argument) => argument === '--no-open').length, 1)
+})
+
+test('desktop LAN binding is explicit, validated, and appended after the default launcher flags', () => {
+  assert.equal(DESKTOP_REMOTE_HOST_ENV, 'DSH_DESKTOP_REMOTE_HOST')
+  assert.equal(resolveDesktopRuntimeHost(undefined), undefined)
+  assert.equal(resolveDesktopRuntimeHost(''), undefined)
+  assert.equal(resolveDesktopRuntimeHost('127.0.0.1'), '127.0.0.1')
+  assert.equal(resolveDesktopRuntimeHost('0.0.0.0'), '0.0.0.0')
+  assert.throws(() => resolveDesktopRuntimeHost('192.168.225.105'), /runtime host/u)
+  const invocation = createRuntimeInvocation({
+    platform: 'linux',
+    executable: '/opt/deepseek-harness',
+    cliPath: '/opt/dsh/bin.js',
+    runtimeHost: '0.0.0.0',
+  })
+  assert.deepEqual(invocation.args.slice(-2), ['--host', '0.0.0.0'])
+  assert.equal(invocation.args.at(-3), '--no-open')
+  assert.throws(
+    () => createRuntimeInvocation({
+      platform: 'linux',
+      executable: '/opt/deepseek-harness',
+      cliPath: '/opt/dsh/bin.js',
+      runtimeHost: '192.168.225.105',
+    }),
+    /runtime host/u,
+  )
 })
 
 test('runtime invocation passes only validated main-process patch overlays after the selected profile', () => {

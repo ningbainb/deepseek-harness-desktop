@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.3.0 - 2026-09-04
+
+中文：
+
+- 新增任意文件拖入会话能力与智能格式化支持：支持拖入文本、代码、配置等文本类文件（<1MB）自动解析并按语言标记为 Markdown 代码块直接插入输入框；支持二进制、PDF、压缩包、Office 文档等插入规范 Markdown 引用链接；支持多文件批量拖入与混合拖入。
+- 原版图片拖入与剪贴板机制隔离修复：精确识别纯图片拖拽与粘贴操作，保留原版 Composer 附件与缩略图预览交互，消除原有双层拖拽遮罩冲突，非图片拖入时阻止冒泡，彻底避免原版触发“不支持的图片格式”错误。
+- 引入智能图像压缩与自适应降采样引擎：在拖拽与剪贴板粘贴（Ctrl+V）中自动检测超限大图，当图片体积或分辨率超过安全界限（2048px / 3MB）时，在浏览器内存中自动按比例降采样并进行阶梯式 JPEG 压缩（0.85 -> 0.72 -> 0.55 -> 0.4），适配上传大小限制，保障会话传输流畅，小图保持原画无损直传。
+- 现代化重构会话顶部模式选择器：重构为精美流线型胶囊下拉与悬浮气泡菜单，提供模式图标、名称、状态标识与功能说明，包含平滑进出过渡动效，完全取代旧版原生 `<select>` 下拉框。
+- 修复侧边栏左下角布局漂移与拓展坞 UI 升级：统一宽屏与折叠 Rail 模式下的左下角设置区对齐几何结构，桌面版原生插件入口无缝归入拓展坞，提升界面整体美观度与易用性。
+
+English:
+
+- Adds universal file drag-and-drop into chat sessions with smart formatting: text, code, and config files (<1MB) are automatically parsed and inserted as language-tagged Markdown code blocks; binary, PDF, archive, and office files are formatted as clean Markdown file link references; supports batch and multi-file drops.
+- Resolves conflicts between generic file drop and native image attachment workflows: purely visual image drops/pastes retain native Composer attachments and thumbnail previews without double overlay flicker, while non-image drops stop propagation to eliminate "Unsupported image format" errors.
+- Introduces an intelligent in-memory image compression and adaptive downsampling engine: automatically detects oversized images in drag-and-drop and clipboard paste (Ctrl+V) pipelines, scaling down dimensions (up to 2048px) and stepping compression quality (0.85 -> 0.72 -> 0.55 -> 0.4) to guarantee image payloads stay under 3MB safe upload limits without manual resizing; smaller images pass through losslessly.
+- Modernizes session top mode switcher: replaces the raw native `<select>` dropdown with a sleek pill selector and floating card popover, displaying distinct icons, status badges, descriptions, and smooth transition animations.
+- Fixes sidebar bottom-left layout drift and enhances extension dock: stabilizes alignment across wide and rail collapsed views, and seamlessly moves desktop native plugin entries into the extension dock.
+
 ## 3.2.0 - 2026-09-01
 
 中文：

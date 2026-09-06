@@ -92,6 +92,24 @@ try {
       return bounds ? { top: bounds.top, bottom: bounds.bottom, height: bounds.height } : undefined
     })(),
     theme: document.documentElement.dataset.dshDesktopChromeTheme,
+    runtimeQuery: (() => {
+      const query = new URL(location.href).searchParams
+      return {
+        mode: query.get('dsh-desktop-mode'),
+        platform: query.get('dsh-desktop-platform'),
+      }
+    })(),
+    sidebarToggles: [...document.querySelectorAll('[data-dsh-panel-host] button')].map((button) => {
+      const rect = button.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        hitChrome: Boolean(hit?.closest('#dsh-desktop-window-chrome')),
+      }
+    }),
     url: location.origin,
   }))
   const requiredChromeEntries = [
@@ -120,6 +138,14 @@ try {
     `Top menus overlap the native caption area: ${JSON.stringify({ menusRight: state.menusRight, viewportWidth })}`,
   )
   assert.equal(state.paddingTop, '32px')
+  assert.equal(state.runtimeQuery.mode, 'advanced')
+  assert.equal(state.runtimeQuery.platform, process.platform)
+  if (state.sidebarToggles.length > 0) {
+    assert.ok(
+      state.sidebarToggles.every((toggle) => toggle.top >= 32 && !toggle.hitChrome),
+      `right-sidebar toggles overlap the native title bar: ${JSON.stringify(state.sidebarToggles)}`,
+    )
+  }
   assert.ok(state.rootBounds && state.rootBounds.top >= 31, `root overlaps title bar: ${JSON.stringify(state.rootBounds)}`)
   assert.ok(state.rootBounds.bottom <= viewportHeight + 1, `root exceeds safe viewport: ${JSON.stringify(state.rootBounds)}`)
   assert.ok(state.frameBounds && state.frameBounds.top >= 31, `frame overlaps title bar: ${JSON.stringify(state.frameBounds)}`)
@@ -252,6 +278,17 @@ try {
   assert.equal(await page.locator('#dsh-desktop-window-chrome').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(7, 17, 23)')
   const assertDialogUsesSafeViewport = async (dialog) => {
     await dialog.waitFor({ state: 'visible' })
+    const handle = await dialog.elementHandle()
+    if (handle) {
+      await page.waitForFunction(
+        (el) => {
+          const top = el.parentElement?.getBoundingClientRect().top
+          return typeof top === 'number' && top >= 31
+        },
+        handle,
+        { timeout: 5000 },
+      ).catch(() => {})
+    }
     const state = await dialog.evaluate((element) => ({
       layerClass: element.parentElement?.className,
       layerTop: element.parentElement?.getBoundingClientRect().top,

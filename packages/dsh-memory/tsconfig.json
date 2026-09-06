@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2024", "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "rewriteRelativeImportExtensions": true,
+    "jsx": "react-jsx", "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "strict": true, "skipLibCheck": true, "isolatedModules": true,
+    "esModuleInterop": true, "forceConsistentCasingInFileNames": true,
+    "noEmit": true, "types": ["node"]
+  },
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.host.json" },
+    { "path": "./tsconfig.client.json" }
+  ]
+}

@@ -1931,7 +1931,7 @@ window.__ModuleLoader__.load({
 				title: isArmed ? "本次请求将优先使用专家分析（点击取消）" : "点击指示下一次请求使用专家分析",
 				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 					style: { fontSize: 10 },
-					children: "★"
+					children: "Expert"
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: isArmed ? "本次使用专家分析" : "专家分析" })]
 			});
 		};

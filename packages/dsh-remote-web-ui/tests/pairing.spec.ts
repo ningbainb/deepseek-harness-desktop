@@ -1,8 +1,8 @@
 /** PairingService semantics: one-time tokens, expiry, refresh, stop, presence. */
 import { describe, expect, it } from 'vitest'
-import { PairingService, UnknownLanAddressError, type PairingConfig } from '../src/pairing.ts'
+import { PairingService, UnknownLanAddressError, type PairingConfig, type PairingIdentity } from '../src/pairing.ts'
 
-function makeService(overrides: Partial<PairingConfig> = {}) {
+function makeService(overrides: Partial<PairingConfig> = {}, identity?: PairingIdentity) {
   let counter = 0
   const service = new PairingService({
     tokenTtlMs: 60_000,
@@ -13,7 +13,7 @@ function makeService(overrides: Partial<PairingConfig> = {}) {
   }, {
     now: () => now,
     randomToken: () => `tok-${String(++counter).padStart(4, '0')}`,
-  })
+  }, identity)
   service.setLanBases([{ address: '192.168.1.5', base: 'http://192.168.1.5:3080' }])
   return service
 }
@@ -59,6 +59,14 @@ describe('PairingService', () => {
     expect(service.accept(token)).toEqual({ ok: false, code: 'invalid' })
   })
 
+  it('refuses a token exactly at its expiry deadline', () => {
+    const service = makeService()
+    const { token } = service.issue()
+    now += 60_000
+    expect(service.accept(token)).toEqual({ ok: false, code: 'invalid' })
+    expect(service.snapshot().tokenId).toBeUndefined()
+  })
+
   it('refuses an unknown token as invalid', () => {
     const service = makeService()
     expect(service.accept('nope')).toEqual({ ok: false, code: 'invalid' })
@@ -67,7 +75,7 @@ describe('PairingService', () => {
   it('throws lan-required when no LAN base is set (no unusable QR)', () => {
     const service = makeService()
     service.setLanBases([])
-    expect(() => service.issue()).toThrow(/--host 0.0.0.0/)
+    expect(() => service.issue()).toThrow(/autoTunnel.*publicBaseUrl/u)
   })
 
   it('mints against a chosen address and refuses unknown literals', () => {
@@ -101,8 +109,15 @@ describe('PairingService', () => {
     })
     // Clearing the public base restores the lan-required condition.
     service.setPublicBaseUrl(undefined)
-    expect(() => service.issue()).toThrow(/--host 0.0.0.0/)
+    expect(() => service.issue()).toThrow(/autoTunnel.*publicBaseUrl/u)
     expect(service.snapshot().phase).toBe('lan-required')
+  })
+
+  it('rejects insecure or non-origin public bases', () => {
+    const service = makeService()
+    expect(() => service.setPublicBaseUrl('http://phone.example.com')).toThrow(/secure public base URL/u)
+    expect(() => service.setPublicBaseUrl('https://phone.example.com/path')).toThrow(/secure public base URL/u)
+    expect(() => service.setPublicBaseUrl('https://user:pass@phone.example.com')).toThrow(/secure public base URL/u)
   })
 
   it('surfaces auto-tunnel status frames and clears them with the feature', () => {
@@ -113,7 +128,7 @@ describe('PairingService', () => {
     service.setTunnelStatus({ state: 'starting' })
     expect(service.snapshot().tunnel).toEqual({ state: 'starting' })
     // The status alone does not make a QR constructible (that is publicBaseUrl).
-    expect(() => service.issue()).toThrow(/--host 0.0.0.0/)
+    expect(() => service.issue()).toThrow(/autoTunnel.*publicBaseUrl/u)
     service.setPublicBaseUrl('https://tunnel.example.com')
     service.setTunnelStatus({ state: 'running', url: 'https://tunnel.example.com' })
     expect(service.snapshot()).toMatchObject({
@@ -196,5 +211,57 @@ describe('PairingService', () => {
     expect(service.hasDevice(bId)).toBe(true)
     expect(service.hasDevice(cId)).toBe(true)
     expect(service.snapshot().deviceCount).toBe(2)
+  })
+
+  it('does not resurrect an async accept after stop or QR refresh', async () => {
+    let resolveBind: ((value: { principalId: string }) => void) | undefined
+    let markStarted: (() => void) | undefined
+    const started = new Promise<void>(resolve => { markStarted = resolve })
+    const revoked: string[] = []
+    const identity: PairingIdentity = {
+      bindDevice: async (deviceId) => {
+        markStarted?.()
+        return await new Promise<{ principalId: string }>(resolve => {
+          resolveBind = (value) => {
+            revoked.push(`bound:${deviceId}`)
+            resolve(value)
+          }
+        })
+      },
+      revokeDevice: async deviceId => {
+        revoked.push(`revoked:${deviceId}`)
+        return true
+      },
+    }
+
+    const stoppedService = makeService({}, identity)
+    const stoppedToken = stoppedService.issue().token
+    const stoppedAccept = stoppedService.acceptAsync(stoppedToken)
+    await started
+    stoppedService.stop()
+    resolveBind?.({ principalId: 'principal-late-stop' })
+    expect(await stoppedAccept).toEqual({ ok: false, code: 'invalid' })
+    expect(stoppedService.snapshot().deviceCount).toBe(0)
+    expect(revoked.some(value => value.startsWith('revoked:'))).toBe(true)
+
+    resolveBind = undefined
+    markStarted = undefined
+    const refreshedStarted = new Promise<void>(resolve => { markStarted = resolve })
+    const refreshedService = makeService({}, {
+      bindDevice: async (deviceId) => {
+        markStarted?.()
+        return await new Promise<{ principalId: string }>(resolve => {
+          resolveBind = resolve
+        })
+      },
+      revokeDevice: async () => true,
+    })
+    const oldToken = refreshedService.issue().token
+    const refreshedAccept = refreshedService.acceptAsync(oldToken)
+    await refreshedStarted
+    refreshedService.issue()
+    resolveBind?.({ principalId: 'principal-late-refresh' })
+    expect(await refreshedAccept).toEqual({ ok: false, code: 'invalid' })
+    expect(refreshedService.snapshot().deviceCount).toBe(0)
   })
 })

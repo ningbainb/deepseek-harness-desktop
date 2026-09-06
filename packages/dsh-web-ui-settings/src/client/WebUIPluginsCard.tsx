@@ -6,8 +6,10 @@
 
 import type { ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { RepairStatusCard } from './RepairStatusCard.tsx'
+import type { WebUIPluginsKey } from './locales.ts'
 import css from './web-ui-settings.module.css'
 
 /** Owner share of a family-plugin card. */
@@ -25,10 +27,35 @@ export type WebUIPluginsSectionProps =
 /** Render the family plugin cards under a static settings heading. */
 export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode {
   const { t, renderSlot } = props
+  const handleOpenDock = (): void => {
+    void openDesktopSurface('extensions').catch(() => {})
+  }
+
   return (
     <div className={css.section}>
       <h2 className={css.heading} title={t('title')}>{t('title')}</h2>
       <p className={css.lede} title={t('description')}>{t('description')}</p>
+      <div className={css.dockBanner} data-testid="desktop-dock-banner">
+        <div className={css.dockBannerIcon} aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+            <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+            <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+            <path d="M17 13.5v7M13.5 17h7" />
+          </svg>
+        </div>
+        <div className={css.dockBannerContent}>
+          <div className={css.dockBannerTitle}>{t('dockBannerTitle' as WebUIPluginsKey)}</div>
+          <div className={css.dockBannerDesc}>{t('dockBannerDesc' as WebUIPluginsKey)}</div>
+        </div>
+        <button
+          type="button"
+          className={css.dockBannerAction}
+          onClick={handleOpenDock}
+        >
+          {t('dockBannerAction' as WebUIPluginsKey)}
+        </button>
+      </div>
       <SafePluginBoundary pluginName="repair-status-card">
         <RepairStatusCard t={t} />
       </SafePluginBoundary>

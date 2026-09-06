@@ -12,8 +12,11 @@
  * a real binary or network.
  */
 
-import { existsSync } from 'node:fs'
-import { bin, install, Tunnel } from 'cloudflared'
+import { existsSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { install, Tunnel, use } from 'cloudflared'
 
 /** The observable tunnel lifecycle the settings/panel surfaces render. */
 export type TunnelPhase = 'stopped' | 'starting' | 'running' | 'failed'
@@ -52,12 +55,18 @@ export interface TunnelManagerOptions {
 
 /** Default binary readiness: download the platform binary on first use. */
 async function defaultEnsureBinary(): Promise<void> {
-  if (existsSync(bin)) return
-  await install(bin)
+  const executable = cloudflaredRuntimePath()
+  // `use()` is process-global inside cloudflared; set it before both the
+  // readiness check and Tunnel.quick so packaged and development runs agree.
+  use(executable)
+  if (hasUsableBinary(executable)) return
+  await install(executable)
+  if (!hasUsableBinary(executable)) throw new Error('cloudflared binary was not installed')
 }
 
 /** Default factory: the cloudflared package's quick tunnel (no account). */
 function defaultFactory(targetUrl: string): TunnelHandle {
+  use(cloudflaredRuntimePath())
   // `--no-autoupdate`: the binary must never upgrade itself out from under
   // the manager (a self-updated binary would break the pinned lifecycle).
   return Tunnel.quick(targetUrl, { '--no-autoupdate': true })
@@ -65,6 +74,30 @@ function defaultFactory(targetUrl: string): TunnelHandle {
 
 /** Node timers. */
 const nodeTimer = { setTimeout, clearTimeout }
+
+const CLOUDFLARED_BINARY_NAME = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
+
+/**
+ * Resolve the writable profile-local binary path used by the packaged app.
+ * The npm package's default path is inside its installation directory, which
+ * is commonly ASAR-backed and therefore read-only after packaging.
+ */
+export function cloudflaredRuntimePath(env: Record<string, string | undefined> = process.env): string {
+  const override = env.CLOUDFLARED_BIN?.trim()
+  if (override !== undefined && override.length > 0) return resolve(override)
+  const home = resolveDshHome(undefined, env)
+  // Keep the fallback aligned with the host's normal DSH_HOME contract even
+  // when the helper is consumed outside a full desktop process.
+  return join(home || homedir(), 'runtime-bin', 'cloudflared', CLOUDFLARED_BINARY_NAME)
+}
+
+function hasUsableBinary(filename: string): boolean {
+  try {
+    return existsSync(filename) && statSync(filename).isFile() && statSync(filename).size > 0
+  } catch {
+    return false
+  }
+}
 
 /**
  * Own the lifecycle of one auto-tunnel: start/stop, URL surfacing, and

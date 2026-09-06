@@ -1,0 +1,7 @@
+diff --git a/apps/dsh-desktop/src/conversation-import/service.mjs b/apps/dsh-desktop/src/conversation-import/service.mjs
+--- a/apps/dsh-desktop/src/conversation-import/service.mjs
++++ b/apps/dsh-desktop/src/conversation-import/service.mjs
+@@ -12,1 +12,2 @@
+-import { ProjectMatcher } from './project-matcher.mjs'
++import { ProjectMatcher } from './project-matcher.mjs'
++import { Redactor } from './redaction.mjs'

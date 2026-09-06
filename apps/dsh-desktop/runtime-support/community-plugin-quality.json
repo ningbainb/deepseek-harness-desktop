@@ -7,7 +7,7 @@
     "normalStartupNetwork": false
   },
   "verifiedAt": "2026-08-20",
-  "desktopVersion": "3.2.0",
+  "desktopVersion": "3.3.0",
   "upstreamVersion": "0.1.1-rc.1",
   "entries": [
     {
@@ -48,7 +48,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-aionui-panel build",
@@ -92,7 +92,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-git-graph build",
@@ -136,12 +136,56 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher build",
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher test",
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-08-20",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@linxin666/dsh-client-ui-model-preferences",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-model-preferences/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "3.3.0",
+        "upstreamVersion": "0.1.1-rc.1",
+        "commands": [
+          "pnpm --filter @linxin666/dsh-client-ui-model-preferences build",
+          "pnpm --filter @linxin666/dsh-client-ui-model-preferences test",
+          "pnpm --filter @linxin666/dsh-client-ui-model-preferences typecheck"
         ]
       },
       "ci": {
@@ -180,7 +224,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-blue-fantasy build",
@@ -223,7 +267,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-center build",
@@ -266,7 +310,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-dragon-heir build",
@@ -309,7 +353,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-harbor build",
@@ -352,7 +396,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-miku build",
@@ -395,7 +439,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-minecraft build",
@@ -438,7 +482,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq2006 build",
@@ -481,7 +525,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq98 build",
@@ -524,7 +568,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-ths build",
@@ -567,7 +611,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-trading build",
@@ -610,7 +654,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-whale-song build",
@@ -653,7 +697,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-xp build",
@@ -714,7 +758,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-task-board build",
@@ -758,7 +802,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-web-ui-settings build",
@@ -802,7 +846,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-compat build",
@@ -846,7 +890,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-repair build",
@@ -890,7 +934,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-liangshen build",
@@ -934,7 +978,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-live-stats build",
@@ -978,7 +1022,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-particle-theme build",
@@ -1022,7 +1066,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-pet build",
@@ -1066,7 +1110,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-remote-web-ui build",
@@ -1110,7 +1154,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-skins build"
@@ -1152,7 +1196,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-ssh build",
@@ -1196,7 +1240,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-tool-describe-image build",
@@ -1240,7 +1284,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-value-mode build",
@@ -1284,7 +1328,7 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.2.0",
+        "desktopVersion": "3.3.0",
         "upstreamVersion": "0.1.1-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-web-ui-all build"
@@ -1305,6 +1349,182 @@
         "compatibilityDeclared": false,
         "buildDeclared": true,
         "testsDeclared": false,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@ningbainb/dsh-chat-artifacts",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-chat-artifacts/package.json",
+      "license": "Apache-2.0",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "3.3.0",
+        "upstreamVersion": "0.1.1-rc.1",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-chat-artifacts build",
+          "pnpm --filter @ningbainb/dsh-chat-artifacts test",
+          "pnpm --filter @ningbainb/dsh-chat-artifacts typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-08-20",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@ningbainb/dsh-memory",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-memory/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "3.3.0",
+        "upstreamVersion": "0.1.1-rc.1",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-memory build",
+          "pnpm --filter @ningbainb/dsh-memory test",
+          "pnpm --filter @ningbainb/dsh-memory typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-08-20",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@ningbainb/dsh-personal-prompt",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-personal-prompt/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "3.3.0",
+        "upstreamVersion": "0.1.1-rc.1",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-personal-prompt build",
+          "pnpm --filter @ningbainb/dsh-personal-prompt test",
+          "pnpm --filter @ningbainb/dsh-personal-prompt typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-08-20",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@ningbainb/dsh-user-scope",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-user-scope/package.json",
+      "license": "Apache-2.0",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "3.3.0",
+        "upstreamVersion": "0.1.1-rc.1",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-user-scope build",
+          "pnpm --filter @ningbainb/dsh-user-scope test",
+          "pnpm --filter @ningbainb/dsh-user-scope typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-08-20",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
         "ciPassed": false,
         "smokePassed": false
       }

@@ -10,8 +10,8 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "3.2.0",
-    "rootVersion": "3.2.0",
+    "version": "3.3.0",
+    "rootVersion": "3.3.0",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
@@ -31,7 +31,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "0713074199a8a61a70ec68f9465937f3cc0694084995f3e2c2c9613edd622997"
+    "sha256": "02e796d1eee8617fc8a0d2d4fdcdef3e25351415108f4e7f020c11ae19f772a3"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
@@ -82,11 +82,15 @@
     "ids": [
       "conversation.composer.dock",
       "conversation.input.dock",
+      "conversation.input.model",
       "conversation.input.selector.context",
       "conversation.session.header.actions",
+      "model-preferences.onboarding",
+      "settings.models.content",
       "settings.section",
       "sidebar.footer.action",
       "sidebar.remote",
+      "tool.call.toolview",
       "web-ui.plugin.item"
     ]
   },

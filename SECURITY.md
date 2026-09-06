@@ -18,5 +18,7 @@ Do not open a public issue for credentials exposure, command execution, navigati
 - Plugin changes run through pnpm without a shell, are serialized, and roll back on validation failure.
 - Skill imports reject symbolic links, overwrite attempts, bundles above 50 MiB, and more than 2,000 entries.
 - Runtime logs are bounded, rotated, and sanitized for common credential patterns.
+- Memory is local to the current DSH profile, is never written automatically from model guesses, and can be explicitly searched, edited, deleted, or cleared; a failed memory store degrades to no memory rather than crossing an owner boundary.
+- Personal Prompt is user-controlled request context: it remains in profile settings, is disabled by default, and is sent to the selected model Provider only when the user enables it. Remote mobile methods are paired and resource-scoped; revocation denies subsequent requests.
 
 Community plugins and skills run with the authority granted by DSH. Review third-party code before installation.

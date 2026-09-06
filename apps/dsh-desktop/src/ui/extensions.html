@@ -16,11 +16,30 @@
           <h1>扩展坞</h1>
         </header>
         <nav aria-label="扩展类型" role="tablist">
-          <button type="button" class="tab active" id="plugins-tab" role="tab" aria-controls="plugins" aria-selected="true" data-tab="plugins"><span>插件</span><small id="plugin-count">0</small></button>
-          <button type="button" class="tab" id="market-tab" role="tab" aria-controls="market" aria-selected="false" tabindex="-1" data-tab="market"><span>市场</span><small id="market-count">--</small></button>
-          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" aria-selected="false" tabindex="-1" data-tab="recovery"><span>插件恢复</span><small id="recovery-count">0</small></button>
-          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" aria-selected="false" tabindex="-1" data-tab="skills"><span>技能</span><small id="skill-count">0</small></button>
-          <button type="button" class="tab" id="presets-tab" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tab="presets"><span>Preset</span><small>V1</small></button>
+          <button type="button" class="tab active" id="plugins-tab" role="tab" aria-controls="plugins" aria-selected="true" data-tab="plugins">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 13.5v7M13.5 17h7"/></svg><span>社区插件</span></span>
+            <small id="plugin-count">0</small>
+          </button>
+          <button type="button" class="tab" id="native-tab" role="tab" aria-controls="native-plugins" aria-selected="false" tabindex="-1" data-tab="native-plugins">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>原生插件</span></span>
+            <small id="native-count">18</small>
+          </button>
+          <button type="button" class="tab" id="market-tab" role="tab" aria-controls="market" aria-selected="false" tabindex="-1" data-tab="market">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>插件市场</span></span>
+            <small id="market-count">--</small>
+          </button>
+          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" aria-selected="false" tabindex="-1" data-tab="recovery">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>插件恢复</span></span>
+            <small id="recovery-count">0</small>
+          </button>
+          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" aria-selected="false" tabindex="-1" data-tab="skills">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>技能</span></span>
+            <small id="skill-count">0</small>
+          </button>
+          <button type="button" class="tab" id="presets-tab" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tab="presets">
+            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><span>Preset</span></span>
+            <small>V1</small>
+          </button>
         </nav>
         <p class="sidebar-note">内置能力受保护，所有改动仅作用于桌面版配置。</p>
       </aside>
@@ -33,34 +52,44 @@
         <div><strong>后续动作</strong><p id="activation-message">扩展状态已改变。</p></div>
         <div class="item-actions"><button type="button" class="primary" id="activation-refresh">刷新</button><button type="button" class="secondary" id="restart-runtime">Restart DeepSeek Harness</button></div>
       </section>
-      <section id="market" class="panel market-panel" role="tabpanel" aria-labelledby="market-tab" hidden>
-        <header class="market-masthead">
-          <div class="market-intro">
-            <p class="market-kicker">AWESOME-DSH-PLUGIN / NATIVE INSTALL</p>
-            <h2>社区插件市场</h2>
-            <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+      <section id="native-plugins" class="panel native-panel" role="tabpanel" aria-labelledby="native-tab" hidden>
+        <header class="native-masthead">
+          <div class="native-intro">
+            <p class="native-kicker">DESKTOP NATIVE / CORE ENGINE</p>
+            <h2>桌面版原生插件</h2>
+            <p>已内置并随 DeepSeek Harness Desktop 统一发布的核心功能模块。深度集成 Electron 宿主能力与本地安全沙箱，提供极速响应、离线可用与自动自愈保护。</p>
           </div>
-          <div class="market-metrics" aria-label="目录状态">
-            <div><strong id="market-total">--</strong><span>可安装条目</span></div>
-            <div><strong id="market-updated">--</strong><span>目录更新</span></div>
+          <div class="native-metrics" aria-label="原生功能状态">
+            <div><strong id="native-total">18</strong><span>内置核心能力</span></div>
+            <div><strong class="native-status-ok">100%</strong><span>受保护运行</span></div>
           </div>
         </header>
-        <div class="market-controls">
-          <label class="market-search" for="market-query"><span>搜索</span><input type="search" id="market-query" placeholder="名称、作者或描述" autocomplete="off" spellcheck="false"></label>
-          <label for="market-category"><span>分类</span><select id="market-category"><option value="all">全部分类</option></select></label>
-          <label for="market-sort"><span>排序</span><select id="market-sort"><option value="popular">下载优先</option><option value="newest">最近收录</option><option value="name">名称</option></select></label>
+        <div class="native-controls">
+          <div class="native-category-chips" role="tablist" aria-label="原生插件分类">
+            <button type="button" class="native-chip active" data-native-category="all">全部能力</button>
+            <button type="button" class="native-chip" data-native-category="ai">AI 核心与调度</button>
+            <button type="button" class="native-chip" data-native-category="system">运行与守护</button>
+            <button type="button" class="native-chip" data-native-category="tools">工具与协同</button>
+            <button type="button" class="native-chip" data-native-category="ui">界面与主题</button>
+          </div>
+          <div class="native-search-wrap">
+            <input type="search" id="native-search" class="native-search-input" placeholder="搜索原生功能、能力或包名…" autocomplete="off" spellcheck="false" aria-label="搜索原生插件">
+          </div>
         </div>
-        <div class="market-results-head"><p id="market-result-state" aria-live="polite">正在读取社区目录</p><button type="button" class="market-reload" id="market-reload">重新读取目录</button></div>
-        <div class="market-grid" id="market-list" aria-live="polite"><p class="market-empty">正在读取目录</p></div>
-        <div class="market-pagination" id="market-pagination" hidden>
-          <button type="button" class="secondary" id="market-previous">上一页</button>
-          <span id="market-page-state">1 / 1</span>
-          <button type="button" class="secondary" id="market-next">下一页</button>
-        </div>
+        <div class="native-results-head"><p id="native-result-state" aria-live="polite">已加载全部原生能力</p></div>
+        <div class="native-grid" id="native-plugin-grid" aria-live="polite"></div>
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
+        <div class="native-shortcut-banner">
+          <div class="native-shortcut-info">
+            <span class="badge builtin">原生保护</span>
+            <strong>桌面版原生插件（18 项内置核心功能）已统一整合至「原生插件」标签页</strong>
+            <p>包含性价比模式、长期记忆、实时监控看板、环境自愈防御等核心能力，随桌面版内置运行。</p>
+          </div>
+          <button type="button" class="primary shortcut-jump-btn" id="jump-to-native">查看原生插件</button>
+        </div>
         <div class="panel-head">
-          <div><h2 id="plugin-heading">插件</h2></div>
+          <div><h2 id="plugin-heading">社区扩展与管理</h2></div>
           <p>安装注册表中的 DSH bundle。安装前请确认来源可信；插件拥有宿主进程权限。</p>
         </div>
         <section class="community-feature" aria-labelledby="community-feature-heading">
@@ -120,6 +149,32 @@
           </div>
         </div>
         <div class="list" id="plugin-list" aria-live="polite"></div>
+      </section>
+
+      <section id="market" class="panel market-panel" role="tabpanel" aria-labelledby="market-tab" hidden>
+        <header class="market-masthead">
+          <div class="market-intro">
+            <p class="market-kicker">AWESOME-DSH-PLUGIN / NATIVE INSTALL</p>
+            <h2>社区插件市场</h2>
+            <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+          </div>
+          <div class="market-metrics" aria-label="目录状态">
+            <div><strong id="market-total">--</strong><span>可安装条目</span></div>
+            <div><strong id="market-updated">--</strong><span>目录更新</span></div>
+          </div>
+        </header>
+        <div class="market-controls">
+          <label class="market-search" for="market-query"><span>搜索</span><input type="search" id="market-query" placeholder="名称、作者或描述" autocomplete="off" spellcheck="false"></label>
+          <label for="market-category"><span>分类</span><select id="market-category"><option value="all">全部分类</option></select></label>
+          <label for="market-sort"><span>排序</span><select id="market-sort"><option value="popular">下载优先</option><option value="newest">最近收录</option><option value="name">名称</option></select></label>
+        </div>
+        <div class="market-results-head"><p id="market-result-state" aria-live="polite">正在读取社区目录</p><button type="button" class="market-reload" id="market-reload">重新读取目录</button></div>
+        <div class="market-grid" id="market-list" aria-live="polite"><p class="market-empty">正在读取目录</p></div>
+        <div class="market-pagination" id="market-pagination" hidden>
+          <button type="button" class="secondary" id="market-previous">上一页</button>
+          <span id="market-page-state">1 / 1</span>
+          <button type="button" class="secondary" id="market-next">下一页</button>
+        </div>
       </section>
 
       <section id="recovery" class="panel" role="tabpanel" aria-labelledby="recovery-tab" hidden>
