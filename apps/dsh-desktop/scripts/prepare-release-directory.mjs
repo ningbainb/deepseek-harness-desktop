@@ -42,11 +42,10 @@ export async function prepareReleaseDirectory(directory = DEFAULT_RELEASE_DIRECT
     removed.push(entry.name)
   }
 
-  const unpackedDirectory = join(normalizedDirectory, 'win-unpacked')
-  const hasUnpackedDirectory = entries.some((entry) => entry.isDirectory() && entry.name === 'win-unpacked')
-  if (hasUnpackedDirectory) {
-    await rm(unpackedDirectory, { recursive: true, force: true })
-    removed.push('win-unpacked')
+  for (const name of ['win-unpacked', 'mac', 'mac-arm64']) {
+    if (!entries.some((entry) => entry.isDirectory() && entry.name === name)) continue
+    await rm(join(normalizedDirectory, name), { recursive: true, force: true })
+    removed.push(name)
   }
   return removed
 }

@@ -105,11 +105,17 @@ export function macBundleRootFromResources(resources) {
   return resolve(join(resources, '..', '..'))
 }
 
-export function requiredMacLocaleDirectories(electronLanguages = ['en-US', 'zh-CN', 'zh-TW']) {
+export function mappedMacLocaleDirectories(electronLanguages = ['en-US', 'zh-CN', 'zh-TW']) {
   return electronLanguages.map((language) => {
     if (language === 'en-US' || language === 'en') return 'en.lproj'
     return `${language.replaceAll('-', '_')}.lproj`
   })
+}
+
+export function requiredMacLocaleDirectories(electronLanguages = ['en-US', 'zh-CN', 'zh-TW']) {
+  // electron-builder 26 keeps en.lproj for en-US, but zh-CN / zh-TW do not
+  // match zh_CN.lproj / zh_TW.lproj, so those folders are optional.
+  return mappedMacLocaleDirectories(electronLanguages).filter((name) => name === 'en.lproj')
 }
 
 export function isAllowedMacLocaleDirectory(name, requiredDirectories) {
@@ -209,6 +215,7 @@ export async function directorySize(root) {
 }
 
 async function verifyMacLocales(localeRoot, electronLanguages) {
+  const mapped = mappedMacLocaleDirectories(electronLanguages)
   const required = requiredMacLocaleDirectories(electronLanguages)
   const entries = await readdir(localeRoot, { withFileTypes: true })
   const localeDirectories = entries
@@ -219,7 +226,7 @@ async function verifyMacLocales(localeRoot, electronLanguages) {
       throw new Error(`packaged macOS app is missing locale ${requiredDirectory}`)
     }
   }
-  const unexpected = localeDirectories.filter((name) => !isAllowedMacLocaleDirectory(name, required))
+  const unexpected = localeDirectories.filter((name) => !isAllowedMacLocaleDirectory(name, mapped))
   if (unexpected.length > 0) {
     throw new Error(`packaged macOS app retains extra locales: ${unexpected.toSorted().join(', ')}`)
   }
@@ -257,7 +264,12 @@ export async function verifyMacPackagedSurface({
     }
     throw error
   }
-  const foreignPrebuilds = prebuildDirectories.filter((name) => name !== 'darwin-arm64')
+  const foreignPrebuilds = []
+  for (const name of prebuildDirectories) {
+    if (name === 'darwin-arm64') continue
+    const leftover = await readdir(join(prebuildRoot, name))
+    if (leftover.length > 0) foreignPrebuilds.push(name)
+  }
   if (foreignPrebuilds.length > 0) {
     throw new Error(`packaged node-pty retains foreign prebuilds: ${foreignPrebuilds.toSorted().join(', ')}`)
   }
