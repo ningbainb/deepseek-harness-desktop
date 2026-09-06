@@ -31,6 +31,36 @@ export function restoreDesktopWindow(window) {
   }
 }
 
+/** Keep the last macOS window available for Dock activation without changing Windows close semantics. */
+export function preserveDarwinMainWindowOnClose({
+  platform = process.platform,
+  window,
+  event,
+  explicitQuit = false,
+} = {}) {
+  if (platform !== 'darwin' || explicitQuit || !window || window.isDestroyed?.() === true) return false
+  if (typeof window.hide !== 'function' || typeof event?.preventDefault !== 'function') return false
+  try {
+    window.hide()
+    event.preventDefault()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Restore the retained main window only for the native macOS activate lifecycle. */
+export function restoreDarwinMainWindowOnActivate({
+  platform = process.platform,
+  window,
+} = {}) {
+  return platform === 'darwin' && restoreDesktopWindow(window)
+}
+
+export function shouldQuitWhenAllWindowsClosed(platform = process.platform) {
+  return platform !== 'darwin'
+}
+
 function fallbackIcon(nativeImage) {
   try {
     const icon = nativeImage?.createEmpty?.()

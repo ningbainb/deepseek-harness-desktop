@@ -18,6 +18,7 @@ export function createApplicationMenuTemplate({
   getCloseBehavior,
   setCloseBehavior,
   onActionError = () => {},
+  platform = 'win32',
 }) {
   const action = (operation) => () => runBestEffort(operation, onActionError)
   const closeBehavior = typeof getCloseBehavior === 'function' ? getCloseBehavior() : 'quit'
@@ -46,14 +47,17 @@ export function createApplicationMenuTemplate({
         ],
       }
     : undefined
+  const applicationMenu = platform === 'darwin'
+    ? { role: 'appMenu' }
+    : {
+        label: '应用 / App',
+        submenu: [
+          ...(closeBehaviorEntry ? [closeBehaviorEntry, { type: 'separator' }] : []),
+          { role: 'quit', label: '退出 / Quit' },
+        ],
+      }
   return [
-    {
-      label: '应用 / App',
-      submenu: [
-        ...(closeBehaviorEntry ? [closeBehaviorEntry, { type: 'separator' }] : []),
-        { role: 'quit', label: '退出 / Quit' },
-      ],
-    },
+    applicationMenu,
     {
       label: '运行时 / Runtime',
       submenu: [
