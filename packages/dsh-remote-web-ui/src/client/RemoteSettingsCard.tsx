@@ -6,8 +6,8 @@
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { PluginSettingsCard, ValueField, BooleanField } from './PluginSettingsCard.tsx'
-import { CardForm, booleanField, numberField, textField, type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts'
+import { PluginSettingsCard, ValueField, BooleanField, ChoiceField } from './PluginSettingsCard.tsx'
+import { CardForm, booleanField, choiceField, numberField, textField, type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts'
 
 /** The remote-control fields this card edits (the namespace's full schema). */
 export interface RemoteSettings {
@@ -23,6 +23,8 @@ export interface RemoteSettings {
   cookieName?: string
   /** Fence flag: whether non-loopback /api requests must carry a live paired-device cookie. */
   requirePairingForLan?: boolean
+  /** Full non-loopback /api policy. */
+  remoteApiMode?: RemoteApiMode
   /** Public (tunneled) base URL the QR link is built from when set. */
   publicBaseUrl?: string
   /** When on, the plugin runs its own Cloudflare quick tunnel automatically. */
@@ -30,6 +32,9 @@ export interface RemoteSettings {
   /** Mobile composer: plain Enter sends; off means Enter inserts a newline. */
   mobileEnterToSend?: boolean
 }
+
+/** Full non-loopback /api policy exposed by the remote plugin. */
+export type RemoteApiMode = 'mobile-only' | 'legacy-full-api'
 
 /** What the remote-control card renders. */
 export interface RemoteSettingsCardState extends CardShell {
@@ -45,6 +50,8 @@ export interface RemoteSettingsCardState extends CardShell {
   cookieName: CardFieldState
   /** LAN fence flag. */
   requirePairingForLan: CardFieldState
+  /** Full non-loopback /api policy. */
+  remoteApiMode: CardFieldState
   /** Public (tunneled) base URL. */
   publicBaseUrl: CardFieldState
   /** Auto public tunnel switch. */
@@ -75,6 +82,7 @@ export class RemoteSettingsCardController {
       numberField('maxDevices'),
       textField('cookieName'),
       booleanField('requirePairingForLan'),
+      choiceField('remoteApiMode', ['mobile-only', 'legacy-full-api']),
       textField('publicBaseUrl'),
       booleanField('autoTunnel'),
       booleanField('mobileEnterToSend'),
@@ -91,6 +99,7 @@ export class RemoteSettingsCardController {
       maxDevices: this.form.field('maxDevices'),
       cookieName: this.form.field('cookieName'),
       requirePairingForLan: this.form.field('requirePairingForLan'),
+      remoteApiMode: this.form.field('remoteApiMode'),
       publicBaseUrl: this.form.field('publicBaseUrl'),
       autoTunnel: this.form.field('autoTunnel'),
       mobileEnterToSend: this.form.field('mobileEnterToSend'),
@@ -126,6 +135,10 @@ export function RemoteSettingsCard(props: RemoteSettingsCardProps) {
     resetLabel: t('settings.reset'),
     invalidLabel: t('settings.invalidNumber'),
     disabled,
+  }
+  const choiceFieldProps = {
+    ...fieldProps,
+    invalidLabel: t('settings.invalidChoice'),
   }
   return (
     <PluginSettingsCard
@@ -198,6 +211,20 @@ export function RemoteSettingsCard(props: RemoteSettingsCardProps) {
         {...state.requirePairingForLan}
         onEdit={(text) => { props.edit('requirePairingForLan', text) }}
         onReset={() => { props.resetField('requirePairingForLan') }}
+      />
+      <ChoiceField
+        id="settings-remote-api-mode"
+        label={t('settings.remoteApiMode')}
+        hint={t('settings.remoteApiModeHint')}
+        inheritLabel={t('settings.inherit')}
+        choices={[
+          { value: 'mobile-only', label: t('settings.remoteApiModeMobileOnly') },
+          { value: 'legacy-full-api', label: t('settings.remoteApiModeLegacyFullApi') },
+        ]}
+        {...choiceFieldProps}
+        {...state.remoteApiMode}
+        onEdit={(text) => { props.edit('remoteApiMode', text) }}
+        onReset={() => { props.resetField('remoteApiMode') }}
       />
       <ValueField
         id="settings-remote-public-base"

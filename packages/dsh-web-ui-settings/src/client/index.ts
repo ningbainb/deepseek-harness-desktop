@@ -11,11 +11,14 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the 'settings.section'
 // entry) and the ctx.settingsScope Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: imports the model options page's additive onboarding slot.
+import type {} from '@linxin666/dsh-client-ui-model-preferences/client'
 // Type-only: pulls the sidebar footer action slot contract.
 import { installParticleThemeClient } from '@linxin666/dsh-particle-theme/src/client/index.ts'
 import { WebUiSettingsBinder } from './compat-settings-scope.ts'
 import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
+import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
 import { DesktopExtensionDockEntry } from './desktop-extension-dock.tsx'
 import {
   chatGptAuthEn,
@@ -25,6 +28,7 @@ import {
   type ChatGptAuthKey,
   type WebUIPluginsKey,
 } from './locales.ts'
+import { relayEn, relayZh, type RelayLocaleKey } from './locales.ts'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
 export { SafePluginBoundary } from './SafePluginBoundary.tsx'
@@ -36,6 +40,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'web-ui-plugins': WebUIPluginsKey
     /** ChatGPT authorization surface copy. */
     'chatgpt-auth': ChatGptAuthKey
+    /** User-owned relay onboarding card copy. */
+    'relay-onboarding': RelayLocaleKey
   }
 
   interface SlotMap {
@@ -70,6 +76,7 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
   ctx.effect(() => ctx.locale.register('chatgpt-auth', { zh: chatGptAuthZh, en: chatGptAuthEn }), 'web-ui-settings: ChatGPT dictionaries')
+  ctx.effect(() => ctx.locale.register('relay-onboarding', { zh: relayZh, en: relayEn }), 'web-ui-settings: relay dictionaries')
 
   // The rc.6 compatibility binder: family plugins read ctx.get('webUiSettings')
   // and fall back to the official settings scope on hosts that expose their
@@ -92,6 +99,13 @@ export function apply(ctx: ClientContext): void {
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
   }, WebUIPluginsSection))
+
+  ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
+    name: 'model-preferences.onboarding',
+    id: 'bai',
+    order: 5,
+    locale: 'relay-onboarding',
+  }, RelayOnboardingCard))
 
   // The highest ordered footer action sits immediately before Settings.
   // Ordinary Web hosts receive no button because the component requires the

@@ -1,53 +1,49 @@
-# DeepSeek Harness Desktop 3.2.0
+# DeepSeek Harness Desktop 3.3.0
 
 ## 中文
 
 ### 本次亮点
 
-- **性价比模式 V2：专家主控 + 副模型子代理**：用户第一次选择性价比模式时立即看到配置引导。当前默认模型会在没有明确主控配置时预选为专家主控，用户再选择副模型和“更省 / 智能平衡 / 更强”策略；只有模型配置、策略和 enabled 状态按顺序成功写入后才会启用。
-- **主控路由真正生效**：顶层会话使用专家主控模型，来自 subagent 的子会话使用副模型。主控按需拆解、派发、复核和汇总；副模型只完成被派发的单项任务，子代理最大深度为 1，不再递归派发或调用重复的专家分析入口。
-- **大模型用量看板与峰值修复**：实时显示输入/输出 Token、上下文、缓存、请求耗时和费用。流式输出按新增 Token 与事件时间形成样本，同毫秒批次先合并，在严格的 1 秒滚动窗口内计算最新速率和步骤峰值；usage 汇总与最终消息只修正账单 Token，不再制造类似 12625 tok/s 的伪峰值。没有流式样本时显示暂无数据，旧账本平均速率峰值不会继续展示。
-- **Claude Code / Codex 项目导入**：只读发现项目和历史会话，支持目录选择、项目匹配、预览、确认、幂等重试和断点恢复。历史工具调用被标记为不可执行，不会重新运行；Token、API Key、Cookie、路径和敏感参数统一经过脱敏。
-- **产品使用数据埋点**：正式包只发送固定枚举的匿名产品事件；Value Mode 只记录选择、引导、启用、策略和主控/子代理路由等粗粒度数据，不发送模型名、Token、Prompt、项目路径、Secret 或会话内容。开发、源码、测试和 Fork 构建保持断开，完整边界见隐私政策。
-- **桌面稳定性和界面打磨**：继续保留完整 Harness Web Surface、原有 DSH Home 和插件；启动阶段可见、事务修复可回滚、插件错误隔离、窄屏浮层自适应，且公开页面统一更新为 3.2.0 实机截图。
+- **任意文件拖拽与智能解析入会**：支持将项目文件、配置、代码及普通文档直接拖入聊天会话。代码与文本文件（<1MB）自动识别语言并格式化为标准 Markdown 代码块插入光标处；二进制、压缩包与大型文档生成安全的引用链接；项目内文件自动转为相对路径。
+- **原版图片拖放机制深度兼容与隔离**：解决通用文件拖放与原版图片附件机制冲突，精确识别纯图片拖拽与粘贴（Ctrl+V），无缝委托给原版 ComposerAttachments 与缩略图预览体系，杜绝双层遮罩冲突和非图片文件误触导致的“不支持的图片格式”报错。
+- **智能图像压缩与自适应降采样引擎**：新增内存级图像预检机制，单图上限安全保护（3MB），超标大图自动按比例下采样至最高 2048px 并执行自适应分级压缩（0.85 -> 0.72 -> 0.55 -> 0.4），既防止超过后端上传尺寸限制导致发送失败，又保持图文分析的细节清晰度，小图无损直通。
+- **现代化模式选择器重构**：会话顶部的模式选择器由原生系统下拉框升级为精美的悬浮式卡片菜单。提供直观的模式图标、色彩指示、功能描述与流畅的动效过渡，大幅提升沉浸感与交互体验。
+- **侧边栏几何对齐与拓展坞整理**：统一侧边栏左下角在展开与折叠 Rail 视图下的布局逻辑，彻底消除 UI 抖动与位置偏差；同时将桌面端原生插件入口规整至拓展坞，视觉更协调。
 
 ### 验证
 
-- 完成 Value Mode 路由、首次配置引导、自动启用、子代理深度和兼容导出回归测试。
-- 完成实时用量投影、同毫秒合并、滚动 1 秒峰值、usage 修正、旧账本迁移和无流式样本测试。
-- 完成 Claude Code 与 Codex 适配器、项目匹配、脱敏、幂等账本、会话桥接和真实目录导入边界测试。
-- 发布门禁覆盖全量类型检查、工作区测试、脚本校验、桌面端打包目录验证、安装包冒烟、网站/文档/运行时图谱检查。
+- 自动化单元测试覆盖文件拖拽分类、纯图片判断算法、尺寸比例计算与压缩保护边界（18 个测试套件，162 个单元测试全部通过）。
+- 端到端回归套件覆盖窗口几何一致性、设置面板、终端、会话模式切换与拓展坞状态（6/6 E2E 套件全部通过）。
+- 运行时矩阵与质量基准自动化校验通过，严格保证无冗余依赖或环境破坏。
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe、SHA256SUMS.txt 和 release-manifest.json。先用 SHA-256 校验安装包，再检查 manifest 中的文件大小、频道、Runtime、Schema 和实际签名状态。官方发布工作流会先完成验证，再把安装包和校验资产上传到 desktop-v3.2.0。
+从同一 GitHub Release 下载 DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe 与对应的 SHA256SUMS.txt。请在安装前使用 SHA-256 哈希值进行完整性校验，以确保软件包来源真实且未被篡改。
 
 ### 说明
 
-性价比模式不会强制每个任务都创建子代理：专家主控会根据任务复杂度决定直接完成还是派发，以避免为了节省模型成本反而增加无意义调用。副模型调用占比用于解释路由结构，不等同于承诺固定金额节省。桌面产品埋点不采集会话内容，诊断包仍只在用户主动确认后导出。DeepSeek Harness Desktop 是社区维护的开源发行版，不是官方 DeepSeek 产品。
+本次更新全面优化了用户与本地文件的交互链路，无论是快速发送代码片段、附加项目文档还是大分辨率截图，均可拖入即用。DeepSeek Harness Desktop 是社区维护的开源发行版，致力于提供高效纯净的本地 AI 开发环境。
 
 ## English
 
 ### Highlights
 
-- **Value Mode V2: expert controller plus subagent worker**: The first selection opens setup guidance immediately. When no explicit controller is saved, the current default model is preselected as the expert controller; the user then chooses a worker model and a Saver, Balanced, or Powerful strategy. The mode is enabled only after model routes, strategy, and enabled state are committed successfully in order.
-- **The controller route is now real**: Top-level sessions use the expert controller, while sessions created with the subagent origin use the worker model. The controller may decompose, delegate, review, and synthesize as needed; the worker performs one bounded task, cannot recursively delegate, and does not call a duplicate expert-analysis path.
-- **Large-model usage dashboard and peak fix**: Input/output tokens, context, cache, request latency, and cost remain visible. Streaming output creates samples from valid token increments and event times; same-millisecond batches are coalesced and the latest rate plus per-step peak are computed inside a strict rolling one-second window. Usage summaries and final messages correct billing totals only, so values such as 12,625 tok/s are not fabricated instantaneous peaks. No streamed sample means no fake TPS, and legacy average-rate peaks are ignored.
-- **Claude Code / Codex project import**: Read-only project and historical-session discovery supports directory selection, project matching, preview, confirmation, idempotent retry, and resumable progress. Historical tool calls are non-executable and never run again; tokens, API keys, cookies, paths, and sensitive arguments pass through centralized redaction.
-- **Product usage metrics**: Official packages send only a fixed vocabulary of anonymous product events. Value Mode records coarse selection, setup, enablement, strategy, and controller/worker routing signals; it does not send model names, token counts, prompts, project paths, secrets, or conversation content. Development, source, test, and Fork builds stay disconnected. See the privacy policy for the complete boundary.
-- **Desktop reliability and polish**: The complete Harness Web Surface, existing DSH Home, and installed plugins remain available. Startup phases are visible, transactional repair can roll back, plugin errors are isolated, narrow-screen overlays adapt safely, and public pages now use current 3.2.0 product screenshots.
+- **Universal file drag-and-drop with smart parsing**: Users can now drag any file directly into the conversation. Text and code files (<1MB) are intelligently categorized with syntax highlighting inserted as Markdown code blocks; binary, archive, and complex documents are linked securely; workspace-relative paths are preserved automatically.
+- **Native image attachment isolation & conflict resolution**: Pure image drops and clipboard pastes (Ctrl+V) are cleanly distinguished and passed to the native ComposerAttachments system with thumbnail previews, eliminating duplicate drop overlays and preventing "Unsupported image format" errors when non-image files are dropped.
+- **Adaptive image compression engine**: Built-in memory-level image inspection prevents payload rejections by capping safe image sizes at 3MB. Oversized images are proportionally downscaled to at most 2048px and iteratively compressed across multiple quality steps (0.85 -> 0.72 -> 0.55 -> 0.4) while preserving text legibility; smaller images remain lossless.
+- **Modern session mode switcher**: The top session mode switcher is completely redesigned from an unstyled native select into a sleek, floating pill menu with category icons, descriptive summaries, and smooth micro-interactions.
+- **Sidebar alignment & extension dock refinement**: Fixed bottom-left sidebar layout drift across expanded and rail modes, and consolidated desktop native plugins into the dedicated extension dock for a clean visual hierarchy.
 
 ### Verification
 
-- Value Mode routing, first-use setup, automatic enablement, worker-depth limits, and compatibility exports are covered by regression tests.
-- Live usage projection tests cover same-millisecond coalescing, rolling one-second peaks, usage correction, legacy ledger migration, and missing streaming samples.
-- Claude Code and Codex adapter tests cover project matching, redaction, idempotent ledgers, session bridging, and real-directory import boundaries.
-- Release gates cover the full typecheck, workspace tests, script checks, packaged desktop directory validation, installer smoke tests, website, documentation, and runtime-graph checks.
+- Comprehensive unit tests validate classification logic, image dimension scaling, and byte limit thresholds (18 test files, 162 unit tests green).
+- End-to-end regression suites verify window chrome geometries, settings windows, terminal functionality, and extension dock interactions (6/6 E2E suites passing).
+- Validated with strict runtime support matrix and code quality gatekeepers.
 
 ### Download and verification
 
-Download DeepSeek-Harness-Desktop-Setup-3.2.0-x64.exe, SHA256SUMS.txt, and release-manifest.json from the same GitHub Release. Verify the installer SHA-256 first, then inspect the manifest for file size, channel, Runtime, schema, and actual signature status. The official release workflow validates the build before uploading the installer and verification assets to desktop-v3.2.0.
+Download DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe and SHA256SUMS.txt from official GitHub Releases. Always verify the SHA-256 checksum before running the installer to ensure complete binary integrity.
 
 ### Notice
 
-Value Mode does not force every task to create a subagent: the expert controller decides whether direct execution or delegation is useful, avoiding extra calls that would undermine the cost goal. Worker-call share explains route structure and is not a promise of a fixed monetary saving. Desktop product metrics do not collect conversation content, and diagnostic archives are still exported only after explicit user confirmation. DeepSeek Harness Desktop is a community-maintained open-source distribution, not an official DeepSeek product.
+This release streamlines local file workflows into conversational coding sessions. DeepSeek Harness Desktop is an open-source community distribution focused on delivering an efficient, reliable local AI development workspace.

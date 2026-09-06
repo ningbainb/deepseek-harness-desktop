@@ -379,11 +379,26 @@ export class RepairWorkspace {
     return Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`)
   }
 
+  async #cleanupStaging() {
+    const errors = []
+    for (const stagingPath of [this.workspace, this.originals]) {
+      try {
+        await rm(stagingPath, { recursive: true, force: true })
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, 'repair workspace staging cleanup failed')
+    }
+  }
+
   async stage() {
     if (this.records !== undefined) throw new Error('repair workspace is already staged')
     await mkdir(this.incidentDir, { recursive: true })
+    try {
     if (await pathState(this.workspace) !== undefined || await pathState(this.originals) !== undefined) {
-      throw new Error('repair workspace staging directories already exist')
+      await this.#cleanupStaging()
     }
     await mkdir(this.workspace, { recursive: false })
     await mkdir(this.originals, { recursive: false })
@@ -430,6 +445,16 @@ export class RepairWorkspace {
         ...(record.packageName === undefined ? {} : { packageName: record.packageName }),
       })),
     })
+    } catch (error) {
+      try {
+        await this.#cleanupStaging()
+      } catch (cleanupError) {
+        throw new Error('repair workspace staging failed and cleanup did not fully converge', {
+          cause: new AggregateError([error, cleanupError]),
+        })
+      }
+      throw error
+    }
   }
 
   resolveCandidatePath(rootId, relativePath) {

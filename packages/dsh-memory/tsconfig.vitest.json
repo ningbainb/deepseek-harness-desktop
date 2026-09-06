@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "composite": true, "noEmit": true, "types": ["node", "vitest/globals"] },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "src/css-modules.d.ts"]
+}

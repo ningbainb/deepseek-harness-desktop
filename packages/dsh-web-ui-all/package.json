@@ -43,8 +43,13 @@
     "@linxin666/dsh-live-stats": "workspace:*",
     "@linxin666/dsh-ssh": "workspace:*",
     "@linxin666/dsh-tool-describe-image": "workspace:*",
+    "@ningbainb/dsh-chat-artifacts": "workspace:*",
     "@linxin666/dsh-liangshen": "workspace:*",
     "@linxin666/dsh-client-ui-web-ui-settings": "workspace:*",
+    "@ningbainb/dsh-user-scope": "workspace:*",
+    "@linxin666/dsh-client-ui-model-preferences": "workspace:*",
+    "@ningbainb/dsh-personal-prompt": "workspace:*",
+    "@ningbainb/dsh-memory": "workspace:*",
     "@linxin666/dsh-skins": "workspace:*",
     "@linxin666/dsh-client-ui-skin-center": "workspace:*"
   }

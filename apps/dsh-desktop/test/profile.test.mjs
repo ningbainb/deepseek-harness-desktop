@@ -981,12 +981,17 @@ test('runtime resolver finds every bundled and desktop support package', async (
   assert.deepEqual(DESKTOP_RUNTIME_OVERRIDE_PACKAGES, [
     '@linxin666/dsh-client-ui-web-ui-settings',
     '@linxin666/dsh-live-stats',
+    '@linxin666/dsh-remote-web-ui',
   ])
   assert.deepEqual(DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES, [
     '@linxin666/dsh-client-ui-aionui-panel',
     '@linxin666/dsh-client-ui-git-graph',
+    '@linxin666/dsh-client-ui-model-preferences',
     '@linxin666/dsh-client-ui-task-board',
     '@linxin666/dsh-ssh',
+    '@ningbainb/dsh-memory',
+    '@ningbainb/dsh-personal-prompt',
+    '@ningbainb/dsh-user-scope',
   ])
   assert.match(
     resolved.get('@linxin666/dsh-client-ui-web-ui-settings'),
@@ -1002,7 +1007,7 @@ test('runtime resolver finds every bundled and desktop support package', async (
     assert.equal(manifest.version, aggregate.version, `${packageName} did not resolve from the aggregate release`)
   }
   for (const packageName of DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES) {
-    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-aionui-panel|dsh-git-graph|dsh-task-board|dsh-ssh)$/u)
+    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-aionui-panel|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-ssh|dsh-user-scope)$/u)
   }
   const aionRoot = resolved.get('@linxin666/dsh-client-ui-aionui-panel')
   assert.match(aionRoot, /packages[\\/]dsh-aionui-panel$/u)

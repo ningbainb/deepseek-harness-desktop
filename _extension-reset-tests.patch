@@ -1,0 +1,94 @@
+diff --git a/apps/dsh-desktop/test/extension-ipc.test.mjs b/apps/dsh-desktop/test/extension-ipc.test.mjs
+--- a/apps/dsh-desktop/test/extension-ipc.test.mjs
++++ b/apps/dsh-desktop/test/extension-ipc.test.mjs
+@@ -1,3 +1,6 @@
+ import assert from 'node:assert/strict'
+ import { EventEmitter } from 'node:events'
+ import test from 'node:test'
++
++import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
+@@ -1323,0 +1326,83 @@
++
++test('extensions:profile-reset preserves the old profile in a backup', async () => {
++  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-success-'))
++  let unregister
++  try {
++    const profileDir = join(dshHome, 'profiles', 'desktop')
++    await mkdir(profileDir, { recursive: true })
++    await writeFile(join(profileDir, 'original.txt'), 'original\n')
++    const ipcMain = new FakeIpcMain()
++    const qqBotBinding = new EventEmitter()
++    qqBotBinding.status = () => ({ bound: false })
++    unregister = registerExtensionIpc({
++      ipcMain,
++      dialog: {},
++      shell: {},
++      getWindow: () => undefined,
++      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
++      controller: { stop: async () => {}, start: async () => {} },
++      ensureProfile: async () => {
++        await mkdir(profileDir, { recursive: true })
++        await writeFile(join(profileDir, 'fresh.txt'), 'fresh\n')
++      },
++      projectRoot: 'C:\\project',
++      dshHome,
++      qqBotBinding,
++    })
++
++    const result = await ipcMain.handlers.get('extensions:profile-reset')()
++    assert.equal(result.reset, true)
++    assert.equal(await readFile(join(profileDir, 'fresh.txt'), 'utf8'), 'fresh\n')
++    const entries = await readdir(join(dshHome, 'profiles'))
++    const backups = entries.filter((name) => name.startsWith('desktop.backup-'))
++    assert.equal(backups.length, 1)
++    assert.equal(await readFile(join(dshHome, 'profiles', backups[0], 'original.txt'), 'utf8'), 'original\n')
++  } finally {
++    await unregister?.()
++    await rm(dshHome, { recursive: true, force: true })
++  }
++})
++
++test('extensions:profile-reset restores the old profile when startup fails', async () => {
++  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-rollback-'))
++  let unregister
++  try {
++    const profileDir = join(dshHome, 'profiles', 'desktop')
++    await mkdir(profileDir, { recursive: true })
++    await writeFile(join(profileDir, 'original.txt'), 'original\n')
++    const ipcMain = new FakeIpcMain()
++    const qqBotBinding = new EventEmitter()
++    qqBotBinding.status = () => ({ bound: false })
++    unregister = registerExtensionIpc({
++      ipcMain,
++      dialog: {},
++      shell: {},
++      getWindow: () => undefined,
++      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
++      controller: {
++        stop: async () => {},
++        start: async () => { throw new Error('runtime start failed') },
++      },
++      ensureProfile: async () => {
++        await mkdir(profileDir, { recursive: true })
++        await writeFile(join(profileDir, 'replacement.txt'), 'replacement\n')
++      },
++      projectRoot: 'C:\\project',
++      dshHome,
++      qqBotBinding,
++    })
++
++    await assert.rejects(
++      ipcMain.handlers.get('extensions:profile-reset')(),
++      /runtime start failed/u,
++    )
++    assert.equal(await readFile(join(profileDir, 'original.txt'), 'utf8'), 'original\n')
++    await assert.rejects(readFile(join(profileDir, 'replacement.txt'), 'utf8'), { code: 'ENOENT' })
++    const entries = await readdir(join(dshHome, 'profiles'))
++    assert.equal(entries.some((name) => name.startsWith('desktop.backup-')), false)
++  } finally {
++    await unregister?.()
++    await rm(dshHome, { recursive: true, force: true })
++  }
++})

@@ -44,3 +44,37 @@ test('Redactor deeply redacts objects and arrays', () => {
   assert.ok(!output.auth.token.includes('sk-abcdefghijklmnopqrstuvwxyz12345'))
   assert.ok(output.auth.token.includes('[REDACTED_API_KEY]') || output.auth.token.includes('[REDACTED_SECRET]'))
 })
+
+test('Redactor handles JSON, shell, URL, and quoted values with spaces', () => {
+  const secrets = [
+    'alpha beta gamma delta',
+    'ALPHAKEYALPHAKEYALPHA',
+    'ALPHATOKENALPHATOKEN',
+    'postgres://svcacct:alphapass@dbhost/primary',
+  ]
+  const sample = [
+    'password: "alpha beta gamma delta"',
+    '{ "api_key": "ALPHAKEYALPHAKEYALPHA" }',
+    'X-Api-Key: "alpha beta gamma delta"',
+    'export MY_SECRET_TOKEN=ALPHATOKENALPHATOKEN',
+    'DATABASE_URL=postgres://svcacct:alphapass@dbhost/primary',
+  ].join('\n')
+
+  const redacted = Redactor.redact(sample)
+  for (const secret of secrets) assert.equal(redacted.includes(secret), false, 'secret leaked: ' + secret)
+  assert.ok(redacted.includes('[REDACTED_SECRET]'))
+})
+
+test('Redactor treats sensitive object keys as secret regardless of value shape', () => {
+  const output = Redactor.redactObject({
+    apiKey: 'alpha beta gamma delta',
+    database_url: 'postgres://svcacct:alphapass@dbhost/primary',
+    nested: { authorization: { token: 'opaque credential object' } },
+    safe: 'keep this value',
+  })
+
+  assert.equal(output.apiKey, '[REDACTED_SECRET]')
+  assert.equal(output.database_url, '[REDACTED_SECRET]')
+  assert.equal(output.nested.authorization, '[REDACTED_SECRET]')
+  assert.equal(output.safe, 'keep this value')
+})

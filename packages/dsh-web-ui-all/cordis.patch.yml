@@ -3,14 +3,31 @@
 # edit aggregate.yml and rerun `node scripts/aggregate.mjs`.
 
 # from self
-- insert:
-    - id: ui-web-ui-compat
-      name: '@linxin666/dsh-web-ui-all'
 
 # from ../dsh-web-ui-settings
 - insert:
     - id: ui-web-ui-settings
       name: '@linxin666/dsh-client-ui-web-ui-settings'
+
+# from ../dsh-user-scope
+- insert:
+    - id: user-scope
+      name: '@ningbainb/dsh-user-scope'
+
+# from ../dsh-model-preferences
+- insert:
+    - id: ui-model-preferences
+      name: '@linxin666/dsh-client-ui-model-preferences'
+
+# from ../dsh-personal-prompt
+- insert:
+    - id: personal-prompt
+      name: '@ningbainb/dsh-personal-prompt'
+
+# from ../dsh-memory
+- insert:
+    - id: memory
+      name: '@ningbainb/dsh-memory'
 
 # from ../dsh-aionui-panel
 - insert:
@@ -43,6 +60,8 @@
       name: '@linxin666/dsh-particle-theme'
 
 # from ../dsh-remote-web-ui
+- id: web-startup
+  name: '@linxin666/dsh-remote-web-ui/startup'
 - insert:
     - id: remote-web-ui
       name: '@linxin666/dsh-remote-web-ui'
@@ -61,6 +80,11 @@
 - insert:
     - id: describe-image
       name: '@linxin666/dsh-tool-describe-image'
+
+# from ../dsh-chat-artifacts
+- insert:
+    - id: chat-artifacts
+      name: '@ningbainb/dsh-chat-artifacts'
 
 # from ../dsh-liangshen
 - insert:

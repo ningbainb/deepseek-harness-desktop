@@ -80,6 +80,17 @@ The live stats projection separates billing correction from streaming throughput
 
 Claude Code and Codex directories are scanned read-only. The user can preview project matching and session rows before confirming import. Imported messages and tool results are historical, marked non-executable, redacted through the central pipeline, and recorded in an idempotent ledger so retries do not duplicate sessions.
 
+### Personalization and remote data boundaries
+
+The optional Personal Prompt and Memory bundles are disabled by default. Memory remains in the local DSH profile, is written only after an explicit user action or confirmation, and can be searched, edited, deleted, or cleared. Personal Prompt profiles remain in profile settings and, when enabled, become request context sent to the currently selected model Provider. Remote mobile access is paired to a device and checked against Workspace and Session ownership; the default non-loopback full `/api` is denied.
+The packaged Desktop Runtime binds to `127.0.0.1` by default. The Electron
+launcher can pass `DSH_DESKTOP_REMOTE_HOST=0.0.0.0` only when the official DSH
+runtime explicitly supports all-interface binding; the current official
+runtime rejects that value for safety, and this project does not bypass the
+guard. For a phone test on the current runtime, use the paired mobile-only
+route through the configured auto-tunnel or a private/manual tunnel. Pairing,
+Workspace/Session ownership, and revoke remain active.
+
 ## Performance and size
 
 Reference measurements on the Windows 11 development machine for version 2.0.0:

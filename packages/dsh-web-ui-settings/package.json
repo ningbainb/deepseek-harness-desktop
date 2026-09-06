@@ -18,7 +18,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-ui-settings"
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@linxin666/dsh-client-ui-model-preferences"
       ],
       "platform": "web"
     }
@@ -36,6 +37,7 @@
   },
   "dependencies": {
     "@linxin666/dsh-desktop-client": "workspace:*",
+    "@linxin666/dsh-client-ui-model-preferences": "workspace:*",
     "@linxin666/dsh-particle-theme": "workspace:*",
     "schemastery": "^3.18.0"
   },

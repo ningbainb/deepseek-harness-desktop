@@ -1,0 +1,1 @@
+{"version":3,"file":"ArtifactToolRow.d.ts","sourceRoot":"","sources":["../../../src/client/ArtifactToolRow.tsx"],"names":[],"mappings":"AAMA,OAAO,KAAK,EAAE,iBAAiB,EAAE,MAAM,wCAAwC,CAAA;AAE/E,OAAO,KAAK,EAAE,WAAW,EAAe,MAAM,kCAAkC,CAAA;AAYhF,KAAK,oBAAoB,GAAG,iBAAiB,GAAG,WAAW,CAAC,gBAAgB,CAAC,CAAA;AAqF7E,6FAA6F;AAC7F,wBAAgB,eAAe,CAAC,EAAE,KAAK,EAAE,CAAC,EAAE,EAAE,oBAAoB,+BA0BjE"}

@@ -1,0 +1,3 @@
+- insert:
+    - id: chat-artifacts
+      name: '@ningbainb/dsh-chat-artifacts'

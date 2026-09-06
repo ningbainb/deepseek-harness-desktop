@@ -10,6 +10,7 @@ import { ContextReconstructor } from './context-reconstructor.mjs'
 import { ExternalSourceDiscoveryService } from './discovery.mjs'
 import { ImportLedgerStore } from './ledger.mjs'
 import { ProjectMatcher } from './project-matcher.mjs'
+import { Redactor } from './redaction.mjs'
 import { IMPORT_LIMITS, IMPORT_STATE, LEDGER_STATUS } from './schema.mjs'
 import { DSHSessionBridge } from './session-bridge.mjs'
 
@@ -526,14 +527,18 @@ export class ConversationImportService {
       },
       reconstructionSummary: reconstruction.summary,
       previewPromptSnippet: reconstruction.promptText ? reconstruction.promptText.slice(0, 1500) : '',
-      eventsPreview: events.slice(0, 20).map((e) => ({
-        sequence: e.sequence,
-        type: e.type,
-        role: e.role,
-        contentPreview: (e.content || (e.toolName ? `${e.toolName}(${JSON.stringify(e.toolArgs || {})})` : '')).slice(0, 120),
-        toolName: e.toolName,
-        sourceTimestamp: e.sourceTimestamp,
-      })),
+      eventsPreview: events.slice(0, 20).map((e) => {
+        const redactedArgs = Redactor.redactObject(e.toolArgs ?? {})
+        const toolPreview = e.toolName ? e.toolName + '(' + JSON.stringify(redactedArgs) + ')' : ''
+        return {
+          sequence: e.sequence,
+          type: e.type,
+          role: e.role,
+          contentPreview: Redactor.redact(e.content || toolPreview).slice(0, 120),
+          toolName: e.toolName,
+          sourceTimestamp: e.sourceTimestamp,
+        }
+      }),
     }
   }
 

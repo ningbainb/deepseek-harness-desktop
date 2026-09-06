@@ -146,7 +146,12 @@ try {
     const window = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().startsWith('http://127.0.0.1:'))
     window.setSize(760, 600)
   })
-  await page.waitForFunction(() => innerWidth <= 760 && innerHeight <= 600)
+  await page.waitForFunction(() => {
+    if (innerWidth > 760 || innerHeight > 600) return false
+    const dialog = document.querySelector('[role="dialog"].dsh-desktop-settings-window')
+    if (!dialog || !dialog.parentElement) return false
+    return dialog.getBoundingClientRect().right <= dialog.parentElement.getBoundingClientRect().right + 1.5
+  })
   state = await panelState(dialog)
   assertContained(state)
   assert.ok(state.box.width >= Math.min(520, state.layer.width - 24) - 1)

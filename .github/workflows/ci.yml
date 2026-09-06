@@ -78,6 +78,9 @@ jobs:
       - name: Aggregate package consistency
         run: pnpm aggregate:check
 
+      - name: Feature preservation baseline check
+        run: pnpm feature-baseline:check
+
       - name: No emoji rule
         run: |
           python3 - <<'PY'

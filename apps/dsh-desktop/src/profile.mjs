@@ -48,11 +48,15 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-client-ui-web-ui-settings',
   '@linxin666/dsh-liangshen',
   '@linxin666/dsh-live-stats',
+  '@ningbainb/dsh-memory',
+  '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-remote-web-ui',
+  '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
+  '@ningbainb/dsh-user-scope',
   'dsh-better-sidebar',
 ].toSorted())
 
@@ -118,7 +122,10 @@ export const CODEX_PROVIDER_CONFLICTS = Object.freeze([
 export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
   'llm-pi-ai',
   'live-stats',
+  'memory',
+  'model-preferences',
   'pet',
+  'personal-prompt',
   'remote-web-ui',
   'skin-background',
   'task-board',
@@ -135,21 +142,25 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-desktop-launcher',
   '@linxin666/dsh-client-ui-mode-switcher',
   '@linxin666/dsh-client-ui-plugin-manager',
+  '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-client-ui-skin-center',
   '@linxin666/dsh-client-ui-skill-explorer',
   '@linxin666/dsh-client-ui-task-board',
   '@linxin666/dsh-client-ui-web-ui-settings',
   '@linxin666/dsh-liangshen',
   '@linxin666/dsh-live-stats',
+  '@ningbainb/dsh-memory',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-particle-theme',
   '@linxin666/dsh-remote-web-ui',
+  '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
   '@linxin666/dsh-value-mode',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
+  '@ningbainb/dsh-user-scope',
   'dsh-better-sidebar',
   'reasoning-slider',
 ].toSorted())
@@ -204,6 +215,7 @@ export const DESKTOP_PLUGIN_COMPAT_PACKAGES = Object.freeze([
 export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-web-ui-settings',
   '@linxin666/dsh-live-stats',
+  '@linxin666/dsh-remote-web-ui',
 ].toSorted())
 
 // These bundles deliberately resolve through the workspace overrides in
@@ -213,8 +225,12 @@ export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
 export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-aionui-panel',
   '@linxin666/dsh-client-ui-git-graph',
+  '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-client-ui-task-board',
+  '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-ssh',
+  '@ningbainb/dsh-user-scope',
 ].toSorted())
 
 // Desktop 2.1 first claimed this package as a managed compatibility link, but
@@ -299,6 +315,8 @@ const LEGACY_DESKTOP_PATCH_CONFIG = `- id: directory-picker
 `
 export const DESKTOP_PATCH_CONFIG = `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- id: web-startup
+  name: '@linxin666/dsh-remote-web-ui/startup'
 - insert:
     - id: authorization
       name: '@deepseek-ai/dsh-authorization'

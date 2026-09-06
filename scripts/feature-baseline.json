@@ -1,0 +1,262 @@
+{
+  "$schema": "./feature-baseline.schema.json",
+  "version": 1,
+  "description": "DeepSeek Harness Desktop & dsh-web-ui 核心功能与内置插件保全基线清单",
+  "plugins": [
+    {
+      "id": "ui-web-ui-settings",
+      "package": "@linxin666/dsh-client-ui-web-ui-settings",
+      "path": "packages/dsh-web-ui-settings",
+      "description": "Web UI 插件主设置组与安全宿主槽位",
+      "patchId": "ui-web-ui-settings",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "user-scope",
+      "package": "@ningbainb/dsh-user-scope",
+      "path": "packages/dsh-user-scope",
+      "description": "用户隔离、工作区作用域与回环凭据守卫",
+      "patchId": "user-scope",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-model-preferences",
+      "package": "@linxin666/dsh-client-ui-model-preferences",
+      "path": "packages/dsh-model-preferences",
+      "description": "模型供应商偏好排序、自定义钉选与模型选择器",
+      "patchId": "ui-model-preferences",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "personal-prompt",
+      "package": "@ningbainb/dsh-personal-prompt",
+      "path": "packages/dsh-personal-prompt",
+      "description": "本机个性化 Prompt Profile 管理与请求上下文注入",
+      "patchId": "personal-prompt",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "memory",
+      "package": "@ningbainb/dsh-memory",
+      "path": "packages/dsh-memory",
+      "description": "用户隔离本机长期记忆持久化与显式确认审批",
+      "patchId": "memory",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-dsh-aionui-panel",
+      "package": "@linxin666/dsh-client-ui-aionui-panel",
+      "path": "packages/dsh-aionui-panel",
+      "description": "AionUI 桌面多端管理侧边面板",
+      "patchId": "ui-dsh-aionui-panel",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-task-board",
+      "package": "@linxin666/dsh-client-ui-task-board",
+      "path": "packages/dsh-task-board",
+      "description": "任务看板与本地工作流卡片面板",
+      "patchId": "ui-task-board",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-git-graph",
+      "package": "@linxin666/dsh-client-ui-git-graph",
+      "path": "packages/dsh-git-graph",
+      "description": "本地 Git 分支树图谱展示面板",
+      "patchId": "ui-git-graph",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-mode-switcher",
+      "package": "@linxin666/dsh-client-ui-mode-switcher",
+      "path": "packages/dsh-mode-switcher",
+      "description": "专家/极简/标准交互模式切换器",
+      "patchId": "ui-mode-switcher",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "pet",
+      "package": "@linxin666/dsh-pet",
+      "path": "packages/dsh-pet",
+      "description": "桌面小宠物与挂件互动",
+      "patchId": "pet",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "particle-theme",
+      "package": "@linxin666/dsh-particle-theme",
+      "path": "packages/dsh-particle-theme",
+      "description": "粒子动态背景交互主题",
+      "patchId": "particle-theme",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "remote-web-ui",
+      "package": "@linxin666/dsh-remote-web-ui",
+      "path": "packages/dsh-remote-web-ui",
+      "description": "移动端扫码安全配对、局域网穿透与轻量控制器",
+      "patchId": "remote-web-ui",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "live-stats",
+      "package": "@linxin666/dsh-live-stats",
+      "path": "packages/dsh-live-stats",
+      "description": "模型 Token / 延迟 / 响应指标实时监控看板",
+      "patchId": "live-stats",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "ssh",
+      "package": "@linxin666/dsh-ssh",
+      "path": "packages/dsh-ssh",
+      "description": "SSH 远程开发与主机配置管理",
+      "patchId": "ssh",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "describe-image",
+      "package": "@linxin666/dsh-tool-describe-image",
+      "path": "packages/dsh-tool-describe-image",
+      "description": "本地多模态图像描述与图生文工具",
+      "patchId": "describe-image",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "liangshen",
+      "package": "@linxin666/dsh-liangshen",
+      "path": "packages/dsh-liangshen",
+      "description": "量身定制交互与功能扩展",
+      "patchId": "liangshen",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    },
+    {
+      "id": "ui-skin-center",
+      "package": "@linxin666/dsh-client-ui-skin-center",
+      "path": "packages/skins/skin-center",
+      "description": "皮肤中心面板与离线主题试穿应用",
+      "patchId": "ui-skin-center",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": false
+    }
+  ],
+  "desktopBuiltins": [
+    "@deepseek-ai/dsh-base",
+    "@linxin666/dsh-desktop-compat",
+    "@deepseek-ai/dsh-web-app",
+    "@linxin666/dsh-value-mode",
+    "@linxin666/dsh-web-ui-all",
+    "@tencent-connect/dsh-qqbot",
+    "reasoning-slider"
+  ],
+  "desktopSurfaces": [
+    {
+      "id": "window-chrome",
+      "name": "桌面自定义窗口边框、阴影与窗口控件",
+      "e2eScript": "scripts/verify-window-chrome.mjs"
+    },
+    {
+      "id": "settings-window",
+      "name": "设置窗口与导航标签系统",
+      "e2eScript": "scripts/verify-settings-window.mjs"
+    },
+    {
+      "id": "directory-picker",
+      "name": "项目文件夹原生选择与工作区导入",
+      "e2eScript": "scripts/verify-directory-picker.mjs"
+    },
+    {
+      "id": "runtime-provider",
+      "name": "运行时环境提供器与调度状态服务",
+      "e2eScript": "scripts/verify-runtime-provider.mjs"
+    },
+    {
+      "id": "preset-deep-link",
+      "name": "预设与协议唤起处理 (dsh://)",
+      "e2eScript": "scripts/verify-preset-deep-link.mjs"
+    },
+    {
+      "id": "terminal",
+      "name": "内置 ConPTY / xterm 终端侧边栏",
+      "e2eScript": "scripts/verify-terminal.mjs"
+    },
+    {
+      "id": "personal-prompt-card",
+      "name": "个性化 Prompt 设置卡片",
+      "uiSelector": "[data-personal-prompt-card=\"true\"]",
+      "e2eScript": "scripts/verify-packaged-personalization.mjs"
+    },
+    {
+      "id": "memory-card",
+      "name": "长期记忆持久化与待确认建议设置卡片",
+      "uiSelector": "[data-memory-card=\"true\"]",
+      "e2eScript": "scripts/verify-packaged-personalization.mjs"
+    },
+    {
+      "id": "value-mode-card",
+      "name": "性价比模式 (Value Mode) 设置卡片",
+      "uiSelector": "[data-value-mode-card=\"true\"]"
+    },
+    {
+      "id": "model-preferences-card",
+      "name": "模型偏好与自定义供应商排序卡片",
+      "e2eScript": "scripts/verify-packaged-model-preferences.mjs"
+    },
+    {
+      "id": "remote-settings-card",
+      "name": "远程移动控制与配对安全卡片",
+      "e2eScript": "scripts/verify-packaged-remote-lan.mjs"
+    }
+  ],
+  "skinCatalog": [
+    "blue-fantasy",
+    "cyber-night",
+    "dragon-heir",
+    "furina",
+    "harbor",
+    "maid-atelier",
+    "matrix",
+    "miku",
+    "minecraft",
+    "mint",
+    "summer-liquid-glass",
+    "trading",
+    "whale-mom",
+    "whale-song",
+    "xp"
+  ]
+}

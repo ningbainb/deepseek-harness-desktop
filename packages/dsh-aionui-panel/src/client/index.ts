@@ -60,6 +60,31 @@ export function apply(ctx: ClientContext): void {
       shell.setDraft(insertPathIntoDraft(draft, path))
       return true
     }
+    const addDraftImages = (sessionId: SessionId | undefined, files: readonly File[]): boolean => {
+      if (sessionId === undefined || files.length === 0) return false
+      const actx = sessions.scope(sessionId)
+      if (actx === undefined) return false
+      const input = conversation.input
+      if (input === undefined) return false
+      const shell = input.for(actx)
+      try {
+        const conv = conversation as unknown as {
+          createDraftImages?: (files: readonly File[]) => Array<{ id: unknown }>
+          releaseDraftImages?: (images: Array<{ id: unknown }>) => void
+        }
+        if (typeof conv?.createDraftImages === 'function') {
+          const images = conv.createDraftImages(files)
+          if (!shell.addImages(images.map((img) => img.id as never))) {
+            conv.releaseDraftImages?.(images)
+            return false
+          }
+          return true
+        }
+      } catch {
+        return false
+      }
+      return false
+    }
     insertPathIntoCurrentDraft = (path: string): boolean => {
       const sessionId = sessions.list.getSnapshot().current as SessionId | undefined
       return insertPath(sessionId, path)
@@ -73,6 +98,9 @@ export function apply(ctx: ClientContext): void {
         inject: (sessionId: SessionId | undefined): DragFileInjected => ({
           insertPath: (path: string): boolean => {
             return insertPath(sessionId, path)
+          },
+          addImages: (files: readonly File[]): boolean => {
+            return addDraftImages(sessionId, files)
           },
         }),
       }, DragFileInlay))

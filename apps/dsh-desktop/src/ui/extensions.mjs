@@ -13,6 +13,12 @@ const pluginList = document.querySelector('#plugin-list')
 const communityPluginList = document.querySelector('#community-plugin-list')
 const skillList = document.querySelector('#skill-list')
 const pluginCount = document.querySelector('#plugin-count')
+const nativeCount = document.querySelector('#native-count')
+const nativeTotal = document.querySelector('#native-total')
+const nativeSearch = document.querySelector('#native-search')
+const nativePluginGrid = document.querySelector('#native-plugin-grid')
+const nativeResultState = document.querySelector('#native-result-state')
+const jumpToNative = document.querySelector('#jump-to-native')
 const skillCount = document.querySelector('#skill-count')
 const marketCount = document.querySelector('#market-count')
 const marketTotal = document.querySelector('#market-total')
@@ -280,6 +286,293 @@ function pluginMarkup(plugin) {
   return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(plugin.name)}</span>${badge}${compatibilityBadge}</div><p class="description">${escapeHtml(description)}</p></div><div class="item-actions">${actions}</div></article>`
 }
 
+const NATIVE_PLUGINS = [
+  {
+    id: 'value-mode',
+    name: '性价比模式 (Value Mode)',
+    packageName: '@linxin666/dsh-value-mode',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '智能专家主控与副模型子代理分流调度，在保证深度思考质量的同时显著降低 Token 消耗。',
+    features: ['专家双模调度', '动态 Token 节约', '开箱即用'],
+    icon: 'sparkles',
+  },
+  {
+    id: 'memory',
+    name: '长期记忆持久化 (Memory)',
+    packageName: '@ningbainb/dsh-memory',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '当前用户本机长期事实与偏好记忆持久化，支持跨会话语义注入与敏感信息自动拦截。',
+    features: ['用户隔离', '显式确认', '凭据拦截'],
+    icon: 'brain',
+  },
+  {
+    id: 'personal-prompt',
+    name: '个性化 Prompt 管理',
+    packageName: '@ningbainb/dsh-personal-prompt',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '本地多 Profile 提示词配置管理，按工作区与全局作用域自动注入模型请求上下文。',
+    features: ['Profile 切换', '上下文注入', '工作区隔离'],
+    icon: 'text',
+  },
+  {
+    id: 'model-preferences',
+    name: '模型偏好与选择器',
+    packageName: '@linxin666/dsh-client-ui-model-preferences',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '自定义供应商排序、模型自定义钉选与一键模型切换器。',
+    features: ['自定义排序', '快捷钉选', '供应商分组'],
+    icon: 'sliders',
+  },
+  {
+    id: 'reasoning-slider',
+    name: '思考强度控制滑块',
+    packageName: 'reasoning-slider',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '为支持思考过程的模型提供直观的思考算力强度与上下文预算无级微调。',
+    features: ['实时算力调节', '思考预算控制', '原生响应'],
+    icon: 'gauge',
+  },
+  {
+    id: 'describe-image',
+    name: '多模态图像描述',
+    packageName: '@linxin666/dsh-tool-describe-image',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '调用多模态视觉能力解析图片内容，生成高精结构化描述与多模态交互。',
+    features: ['图生文', '本地图像识别', '结构化标签'],
+    icon: 'image',
+  },
+  {
+    id: 'desktop-compat',
+    name: '桌面原生兼容层',
+    packageName: '@linxin666/dsh-desktop-compat',
+    category: 'system',
+    categoryLabel: '运行守护',
+    description: '深度对接 Windows/macOS 系统原生文件、受信任工作区打开与后台排程服务。',
+    features: ['安全路径白名单', '后台排程', '上下文修复'],
+    icon: 'shield',
+  },
+  {
+    id: 'desktop-repair',
+    name: '环境自愈与故障隔离',
+    packageName: '@linxin666/dsh-desktop-repair',
+    category: 'system',
+    categoryLabel: '运行守护',
+    description: '三层启动防死锁与配置自愈引擎，异常时自动安全隔离并支持配置快照一键回滚。',
+    features: ['防死锁自愈', '配置快照', '零感知恢复'],
+    icon: 'heart-pulse',
+  },
+  {
+    id: 'user-scope',
+    name: '用户作用域与安全守卫',
+    packageName: '@ningbainb/dsh-user-scope',
+    category: 'system',
+    categoryLabel: '运行守护',
+    description: '本地回环通信身份校验，保障多用户配置隔离、敏感 Token 与工作区私密安全。',
+    features: ['回环隔离', '主体校验', '零泄露防护'],
+    icon: 'lock',
+  },
+  {
+    id: 'dsh-base',
+    name: 'DSH 桌面核心基座',
+    packageName: '@deepseek-ai/dsh-base',
+    category: 'system',
+    categoryLabel: '运行守护',
+    description: 'Cordis 微内核生命周期控制、插件依赖注入总线与高吞吐 IPC 通道。',
+    features: ['Cordis 内核', '生命周期守护', '高性能通信'],
+    icon: 'cpu',
+  },
+  {
+    id: 'live-stats',
+    name: '实时监控看板',
+    packageName: '@linxin666/dsh-live-stats',
+    category: 'system',
+    categoryLabel: '运行守护',
+    description: '毫秒级跟踪模型请求延迟、Token 吞吐速度与会话开销分析。',
+    features: ['毫秒吞吐', 'Token 统计', '网络延迟监控'],
+    icon: 'activity',
+  },
+  {
+    id: 'qqbot',
+    name: 'QQ 机器人官方接入',
+    packageName: '@tencent-connect/dsh-qqbot',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '腾讯官方 QQ Bot 协议驱动，支持扫码绑定私聊与群聊并双向流式收发消息。',
+    features: ['官方驱动', '安全凭据加密', '扫码一键绑定'],
+    icon: 'message',
+  },
+  {
+    id: 'remote-web-ui',
+    name: '远程移动配对控制',
+    packageName: '@linxin666/dsh-remote-web-ui',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '局域网加密配对与手机端快捷控制台，手机扫码即可随时查看进度与发出指令。',
+    features: ['手机即开即用', '局域网极速直连', '安全令牌授权'],
+    icon: 'smartphone',
+  },
+  {
+    id: 'ssh',
+    name: 'SSH 远程开发',
+    packageName: '@linxin666/dsh-ssh',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '轻量管理远程 Linux 主机认证与会话，直接在桌面端穿透操作远程开发环境。',
+    features: ['免密登录', '远程会话', '通道加密'],
+    icon: 'terminal',
+  },
+  {
+    id: 'git-graph',
+    name: 'Git 分支图谱',
+    packageName: '@linxin666/dsh-git-graph',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '当前工作区 Git 提交历史的可视化分支树，支持分支比对与提交详情检查。',
+    features: ['分支树可视化', '提交历史溯源', '无需外部工具'],
+    icon: 'git-branch',
+  },
+  {
+    id: 'task-board',
+    name: '任务看板与工作流',
+    packageName: '@linxin666/dsh-task-board',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '多工作区任务泳道与进度状态卡片，支持与 Worktree 及后台自动化执行联动。',
+    features: ['泳道看板', '多任务协同', '自动化关联'],
+    icon: 'layout',
+  },
+  {
+    id: 'aionui-panel',
+    name: 'AionUI 多端控制面板',
+    packageName: '@linxin666/dsh-client-ui-aionui-panel',
+    category: 'tools',
+    categoryLabel: '工具协同',
+    description: '多端统一管理侧边面板，支持跨端会话监控与统一交互入口。',
+    features: ['多端管理', '侧边面板', '快速呼出'],
+    icon: 'panel',
+  },
+  {
+    id: 'particle-theme',
+    name: '动态粒子交互背景',
+    packageName: '@linxin666/dsh-particle-theme',
+    category: 'ui',
+    categoryLabel: '界面主题',
+    description: '基于 Canvas 与 WebGL 的流体交互粒子背景，鼠标引力跟随与主题色系联动。',
+    features: ['GPU 加速', '粒子引力互动', '主题自适应'],
+    icon: 'sparkle',
+  },
+  {
+    id: 'skin-center',
+    name: '皮肤中心主题库',
+    packageName: '@linxin666/dsh-client-ui-skin-center',
+    category: 'ui',
+    categoryLabel: '界面主题',
+    description: '内置 15 套涵盖二次元、复古、赛博与金融风格的深度定制主题，一键试穿。',
+    features: ['15套专属主题', '即时试穿', '沉浸式视效'],
+    icon: 'palette',
+  },
+  {
+    id: 'pet',
+    name: '桌面桌宠挂件',
+    packageName: '@linxin666/dsh-pet',
+    category: 'ui',
+    categoryLabel: '界面主题',
+    description: '呆萌桌面互动桌宠，陪伴编码会话，支持轻触反馈与不同心情动态动作。',
+    features: ['动态动作', '交互反馈', '低内存占用'],
+    icon: 'smile',
+  },
+  {
+    id: 'mode-switcher',
+    name: '交互模式切换器',
+    packageName: '@linxin666/dsh-mode-switcher',
+    category: 'ui',
+    categoryLabel: '界面主题',
+    description: '极简专注模式与专家全功能模式间的一键切换，适应不同开发场景。',
+    features: ['双模切换', '界面精简', '快捷响应'],
+    icon: 'toggle',
+  },
+  {
+    id: 'liangshen',
+    name: '量身定制体验',
+    packageName: '@linxin666/dsh-liangshen',
+    category: 'ui',
+    categoryLabel: '界面主题',
+    description: '支持个人按需定制快捷操作与交互行为注入。',
+    features: ['个性化定制', '快捷通道', '深度拓展'],
+    icon: 'user-check',
+  },
+]
+
+function nativeIconSvg(icon) {
+  const icons = {
+    sparkles: '<path d="M12 2l2.4 5.6L20 10l-5.6 2.4L12 18l-2.4-5.6L4 10l5.6-2.4z"/>',
+    brain: '<path d="M9.5 2A4.5 4.5 0 0 0 5 6.5a4.5 4.5 0 0 0 .5 2 4.5 4.5 0 0 0-.5 2 4.5 4.5 0 0 0 4.5 4.5h.5v5a2 2 0 0 0 4 0v-5h.5a4.5 4.5 0 0 0 4.5-4.5 4.5 4.5 0 0 0-.5-2 4.5 4.5 0 0 0 .5-2A4.5 4.5 0 0 0 14.5 2c-1.5 0-2.8.7-3.6 1.8A4.5 4.5 0 0 0 9.5 2z"/>',
+    text: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+    sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    gauge: '<circle cx="12" cy="12" r="9"/><path d="M12 12l3-3"/><path d="M8 12a4 4 0 0 1 8 0"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    'heart-pulse': '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+    activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    smartphone: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+    'git-branch': '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+    layout: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+    panel: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/>',
+    sparkle: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    palette: '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
+    smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+    toggle: '<rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="16" cy="12" r="3"/>',
+    'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>',
+  }
+  const content = icons[icon] ?? icons.sparkles
+  return `<svg class="native-card-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${content}</svg>`
+}
+
+function nativePluginMarkup(item, installedPlugin) {
+  const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
+  const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
+  return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>运行正常 · 随桌面版更新 (${escapeHtml(version)})</span></div><span class="native-safe-badge" title="受保护的桌面级原生能力">核心受保护</span></div></article>`
+}
+
+let currentNativeCategory = 'all'
+let cachedInstalledPlugins = []
+
+function renderNativePlugins(installedPlugins = cachedInstalledPlugins) {
+  if (installedPlugins) cachedInstalledPlugins = installedPlugins
+  if (!nativePluginGrid) return
+  const pluginMap = new Map((cachedInstalledPlugins || []).map((p) => [p.name, p]))
+  const q = (nativeSearch?.value || '').trim().toLowerCase()
+
+  const filtered = NATIVE_PLUGINS.filter((item) => {
+    if (currentNativeCategory !== 'all' && item.category !== currentNativeCategory) return false
+    if (!q) return true
+    const haystack = `${item.name} ${item.packageName} ${item.description} ${item.features.join(' ')}`.toLowerCase()
+    return haystack.includes(q)
+  })
+
+  if (nativeTotal) nativeTotal.textContent = NATIVE_PLUGINS.length
+  if (nativeCount) nativeCount.textContent = NATIVE_PLUGINS.length
+  if (nativeResultState) {
+    nativeResultState.textContent = filtered.length === NATIVE_PLUGINS.length
+      ? `已加载全部 ${NATIVE_PLUGINS.length} 项原生核心能力`
+      : `找到 ${filtered.length} 项原生能力`
+  }
+
+  nativePluginGrid.innerHTML = filtered.length
+    ? filtered.map((item) => nativePluginMarkup(item, pluginMap.get(item.packageName))).join('')
+    : '<p class="native-empty">未搜索到匹配的原生核心能力</p>'
+}
+
 function skillMarkup(skill) {
   const shadow = skill.shadowed ? '<span class="badge shadowed">SHADOWED</span>' : ''
   return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(skill.name)}</span>${shadow}</div><p class="description">${escapeHtml(skill.description)}</p></div><button type="button" class="item-action" data-open-skill="${escapeHtml(skill.id)}">${escapeHtml(skill.source)}</button></article>`
@@ -461,6 +754,7 @@ async function refresh() {
       ? inventory.communityPlugins.map(communityPluginMarkup).join('')
       : '<p class="empty">暂无社区推荐</p>'
     renderPlugins(inventory.plugins)
+    renderNativePlugins(inventory.plugins)
     skillList.innerHTML = inventory.skills.length ? inventory.skills.map(skillMarkup).join('') : '<p class="empty">尚未发现技能</p>'
     renderMarket()
     if (extensionOperations.busy) setOperationBusy(true)
@@ -561,6 +855,24 @@ for (const [index, tab] of tabs.entries()) {
     activateTab(tabs[nextIndex], true)
   })
 }
+
+jumpToNative?.addEventListener('click', () => {
+  const nativeTab = document.querySelector('#native-tab')
+  if (nativeTab) activateTab(nativeTab, true)
+})
+
+nativeSearch?.addEventListener('input', () => {
+  renderNativePlugins()
+})
+
+document.querySelectorAll('.native-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.native-chip').forEach((c) => c.classList.remove('active'))
+    chip.classList.add('active')
+    currentNativeCategory = chip.dataset.nativeCategory || 'all'
+    renderNativePlugins()
+  })
+})
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
   const tab = tabs.find((item) => item.dataset.tab === payload?.tab)

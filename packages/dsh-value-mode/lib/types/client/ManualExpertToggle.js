@@ -8,5 +8,5 @@ export const ManualExpertToggle = ({ armed = false, onToggle, }) => {
         setIsArmed(next);
         onToggle?.(next);
     };
-    return (_jsxs("button", { type: "button", className: `${styles.manualToggle} ${isArmed ? styles.manualToggleActive : ''}`, onClick: handleClick, title: isArmed ? '本次请求将优先使用专家分析（点击取消）' : '点击指示下一次请求使用专家分析', children: [_jsx("span", { style: { fontSize: 10 }, children: "\u2605" }), _jsx("span", { children: isArmed ? '本次使用专家分析' : '专家分析' })] }));
+    return (_jsxs("button", { type: "button", className: `${styles.manualToggle} ${isArmed ? styles.manualToggleActive : ''}`, onClick: handleClick, title: isArmed ? '本次请求将优先使用专家分析（点击取消）' : '点击指示下一次请求使用专家分析', children: [_jsx("span", { style: { fontSize: 10 }, children: "Expert" }), _jsx("span", { children: isArmed ? '本次使用专家分析' : '专家分析' })] }));
 };

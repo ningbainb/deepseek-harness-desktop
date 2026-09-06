@@ -128,30 +128,20 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           CSC_NAME: ${{ vars.CSC_NAME }}
       - name: Verify packaged directory picker
-        shell: pwsh
-        run: |
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:directory-picker:e2e
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:directory-picker:e2e
       - name: Verify packaged embedded terminal
-        shell: pwsh
-        run: |
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:terminal:e2e
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:terminal:e2e
       - name: Verify packaged window chrome
-        shell: pwsh
-        run: |
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:window-chrome:e2e
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:window-chrome:e2e
       - name: Verify cleared profile rebuild
-        shell: pwsh
-        run: |
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:profile-reset:e2e
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:profile-reset:e2e
       - name: Verify packaged update shutdown receipt
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:update-shutdown:e2e
+      - name: Verify packaged desktop full regression E2E gate
         shell: pwsh
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:update-shutdown:e2e
+          pnpm --filter @deepseek-ai/dsh-desktop test:regression:e2e:full
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke
       - name: Verify Windows Authenticode signatures

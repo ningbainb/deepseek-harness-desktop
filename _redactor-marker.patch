@@ -1,0 +1,6 @@
+diff --git a/apps/dsh-desktop/src/conversation-import/redaction.mjs b/apps/dsh-desktop/src/conversation-import/redaction.mjs
+--- a/apps/dsh-desktop/src/conversation-import/redaction.mjs
++++ b/apps/dsh-desktop/src/conversation-import/redaction.mjs
+@@ -32,1 +32,1 @@
+-  '(\\b(?:' + SECRET_KEY_PATTERN + ')\\b\\s*(?:["\']\\s*)?[:=]\\s*)(?!["\'])([^\\s,;}\\]]+)',
++  '(\\b(?:' + SECRET_KEY_PATTERN + ')\\b\\s*(?:["\']\\s*)?[:=]\\s*)(?!["\'])(?!\\[REDACTED_[A-Z_]+\\])([^\\s,;}\\]]+)',

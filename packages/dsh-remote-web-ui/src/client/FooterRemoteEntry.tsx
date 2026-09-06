@@ -3,16 +3,16 @@
  *
  * Current dsh web shells declare `sidebar.footer.action` (the seat beside the
  * settings trigger) instead of the legacy `sidebar.remote` seat this plugin
- * was written against. The footer seat supplies `{ wide }` but not the
- * `useWorkspaces` projection hook, so this wrapper substitutes a
- * workspace-agnostic selector: pairing without a deep-linked workspace is
- * fully supported by the host `/api/pair` routes.
+ * was written against. The renderer supplies the same global standard hooks
+ * (`useWorkspaces`/`useSessions`) to both root-scoped seats, so this wrapper
+ * keeps the current workspace in the pair issue payload just like the legacy
+ * entry.
  */
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { RemoteEntry } from './RemoteEntry.tsx'
 
-/** Entry props: the footer seat's column state + the standard locale seat. */
-export type FooterRemoteEntryProps = PropsLocale<'remote'> & { wide: boolean }
+/** Entry props: footer owner props plus the renderer's global standard kit. */
+export type FooterRemoteEntryProps = PropsRuntime<'sidebar.footer.action'> & PropsLocale<'remote'>
 
 /**
  * Render the remote-control trigger + pairing panel from the footer seat.
@@ -23,8 +23,8 @@ export function FooterRemoteEntry(props: FooterRemoteEntryProps) {
   return (
     <RemoteEntry
       wide={props.wide}
-      useWorkspaces={() => undefined as never}
-      useSessions={() => undefined as never}
+      useWorkspaces={props.useWorkspaces}
+      useSessions={props.useSessions}
       t={props.t}
     />
   )

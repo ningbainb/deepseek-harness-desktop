@@ -1,0 +1,6 @@
+# dsh-user-scope bundle patch: inserts the shared host service into the web
+# profile. The package has no browser half; later host plugins depend on the
+# registered `userScope` service through Cordis.
+- insert:
+    - id: user-scope
+      name: '@ningbainb/dsh-user-scope'

@@ -22,6 +22,7 @@ import { makeBridgeRoutes, type BridgeAccess } from './bridge.ts'
 import { makeChatGptAuthRoutes } from './chatgpt-auth-routes.ts'
 import { ChatGptAuthorizationController } from './chatgpt-auth.ts'
 import { mountOnce } from './mount-once.ts'
+import { makeRelayRoutes } from './relay-routes.ts'
 
 /** Default environment variable holding the reverse-proxy shared token. */
 export const DEFAULT_PROXY_TOKEN_ENV = 'DSH_WEB_UI_SETTINGS_PROXY_TOKEN'
@@ -68,6 +69,9 @@ export const inject = ['webServer'] as const
  * @param config - loopback-default bridge and authenticated-proxy config.
  */
 export const apply = mountOnce('@linxin666/dsh-client-ui-web-ui-settings', applyImpl)
+
+export * from './relay-protocol.ts'
+export { makeRelayRoutes } from './relay-routes.ts'
 
 function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
   const access = resolveProxyAccess(config)
@@ -119,5 +123,20 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
         for (const dispose of disposers) dispose()
       }
     }, 'web-ui-settings: ChatGPT authorization bridge')
+  })
+  // The relay route is an explicit BYOK boundary: the browser never receives
+  // the credential service and the Host only returns a model list/presence.
+  // It shares the settings bridge's loopback and optional authenticated-proxy
+  // guard so a remote browser cannot turn this into a general secret writer.
+  ctx.inject(['settings', 'credentials'], (relayCtx) => {
+    relayCtx.effect(() => {
+      const disposers = makeRelayRoutes({
+        settings: relayCtx.settings,
+        credentials: relayCtx.credentials,
+      }, access).map(route => relayCtx.webServer.register(route))
+      return () => {
+        for (const dispose of disposers) dispose()
+      }
+    }, 'web-ui-settings: relay onboarding bridge')
   })
 }

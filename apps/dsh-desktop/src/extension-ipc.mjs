@@ -1,5 +1,5 @@
-import { mkdir, rename, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
 import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/skills.mjs'
@@ -8,6 +8,26 @@ import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
+const PROFILE_RESET_BACKUP_LIMIT = 3
+
+async function pruneProfileResetBackups(profileDir) {
+  const parent = dirname(profileDir)
+  const profileName = basename(profileDir)
+  const prefix = `${profileName}.backup-`
+  let entries
+  try {
+    entries = await readdir(parent, { withFileTypes: true })
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  const backups = entries
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix) && /^\d+$/u.test(entry.name.slice(prefix.length)))
+    .sort((left, right) => right.name.localeCompare(left.name, 'en'))
+  for (const entry of backups.slice(PROFILE_RESET_BACKUP_LIMIT)) {
+    await rm(join(parent, entry.name), { recursive: true, force: true })
+  }
+}
 
 async function awaitWithTimeout(value, timeoutMs, label) {
   const boundedTimeout = Number.isFinite(timeoutMs)
@@ -504,13 +524,37 @@ export function registerExtensionIpc({
     const profileDir = join(dshHome, 'profiles', 'desktop')
     const timestamp = Date.now()
     const backupDir = `${profileDir}.backup-${timestamp}`
+    let moved = false
     try {
-      await rename(profileDir, backupDir).catch(() => {})
-    } catch {
-      // ignore
+      try {
+        await rename(profileDir, backupDir)
+        moved = true
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error
+      }
+      await ensureProfile()
+      await controller.start()
+    } catch (error) {
+      if (!moved) throw error
+      const rollbackErrors = []
+      try {
+        await rm(profileDir, { recursive: true, force: true })
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError)
+      }
+      try {
+        await rename(backupDir, profileDir)
+      } catch (rollbackError) {
+        rollbackErrors.push(rollbackError)
+      }
+      if (rollbackErrors.length > 0) {
+        throw new Error('profile reset failed and rollback did not fully converge', {
+          cause: new AggregateError([error, ...rollbackErrors]),
+        })
+      }
+      throw error
     }
-    await ensureProfile()
-    await controller.start()
+    await pruneProfileResetBackups(profileDir).catch(() => {})
     return Object.freeze({ reset: true, timestamp })
   }))
   handleExtension('extensions:qqbot-status', () => qqBotBinding.status())

@@ -11,7 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { z, type ZodType } from 'zod'
-import { UnknownLanAddressError, type PairingService, type PairingSnapshot } from './pairing.ts'
+import { UnknownLanAddressError, isSecurePublicBaseUrl, type PairingService, type PairingSnapshot } from './pairing.ts'
 import { isLoopbackClient, readCookie } from './gate.ts'
 
 /**
@@ -71,11 +71,23 @@ const MAX_BODY_BYTES = 4096
  * @returns the `host[:port]` authority the fence should trust.
  */
 export function publicHostOf(url: string | undefined): string | undefined {
-  if (url === undefined) return undefined
+  if (!isSecurePublicBaseUrl(url)) return undefined
   try {
     return new URL(url).host
   } catch {
     return undefined
+  }
+}
+
+/** Set Secure when the request authority is the configured HTTPS public origin. */
+function secureCookieFor(request: IncomingMessage, service: PairingService): boolean {
+  const publicBase = service.publicBaseUrl
+  const host = request.headers.host
+  if (!isSecurePublicBaseUrl(publicBase) || typeof host !== 'string') return false
+  try {
+    return new URL('https://' + host).host === new URL(publicBase).host
+  } catch {
+    return false
   }
 }
 
@@ -86,6 +98,13 @@ const COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60
 export const PAIR_PATHS = {
   issue: '/api/pair/issue',
   accept: '/api/pair/accept',
+  devices: '/api/pair/devices',
+  revokeDevice: '/api/pair/device/revoke',
+  renameDevice: '/api/pair/device/rename',
+  grantWorkspace: '/api/pair/workspace/grant',
+  revokeWorkspace: '/api/pair/workspace/revoke',
+  grantSession: '/api/pair/session/grant',
+  revokeSession: '/api/pair/session/revoke',
   stop: '/api/pair/stop',
   heartbeat: '/api/pair/heartbeat',
   status: '/api/pair/status',
@@ -108,6 +127,21 @@ export const acceptPayloadSchema = z.object({
   token: z.string().default(''),
 })
 export const pairActionPayloadSchema = z.object({}).passthrough()
+export const deviceIdPayloadSchema = z.object({
+  deviceId: z.string().min(1),
+})
+export const deviceRenamePayloadSchema = z.object({
+  deviceId: z.string().min(1),
+  displayName: z.string().min(1).max(128),
+})
+export const workspaceGrantPayloadSchema = z.object({
+  principalId: z.string().min(1),
+  workspaceId: z.string().min(1),
+})
+export const sessionGrantPayloadSchema = z.object({
+  principalId: z.string().min(1),
+  sessionId: z.string().min(1),
+})
 
 /**
  * Parse a pair request body through schema. A missing/empty or non-object
@@ -205,6 +239,16 @@ export interface PairRoutesDeps {
   service: PairingService
   /** The LAN IP literals the fence accepts (derived from the bind host). */
   lanAddresses: readonly string[]
+  /** Host-only persistent authorization controls; never mounted on LAN. */
+  control?: PairControl
+}
+
+/** Persistent authorization operations exposed only to the local admin UI. */
+export interface PairControl {
+  grantWorkspace(principalId: string, workspaceId: string): Promise<void>
+  revokeWorkspace(principalId: string, workspaceId: string): Promise<boolean>
+  grantSession(principalId: string, sessionId: string): Promise<void>
+  revokeSession(principalId: string, sessionId: string): Promise<boolean>
 }
 
 /**
@@ -213,7 +257,7 @@ export interface PairRoutesDeps {
  * @returns the exact routes to register on webServer.
  */
 export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
-  const { service, lanAddresses } = deps
+  const { service, lanAddresses, control } = deps
   const events = new PairingEventsStream(service)
 
   /** Loopback-only fence: the desktop panel's control endpoints. */
@@ -307,18 +351,156 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       writeJson(res, 400, { ok: false, code: 'bad-payload' })
       return
     }
-    const result = service.accept(payload.token)
+    const result = await service.acceptAsync(payload.token)
     if (!result.ok) {
-      writeJson(res, result.code === 'used' ? 409 : 404, { ok: false, code: result.code })
+      if (result.code === 'identity-unavailable') writeJson(res, 503, { ok: false, code: 'pairing-unavailable' })
+      else writeJson(res, result.code === 'used' ? 409 : 404, { ok: false, code: result.code })
       return
     }
     res.writeHead(200, {
       'content-type': 'application/json; charset=utf-8',
       'set-cookie': [
-        `${service.config.cookieName}=${result.deviceId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(COOKIE_MAX_AGE_SEC)}`,
+        `${service.config.cookieName}=${result.deviceId}; Path=/; HttpOnly; SameSite=Lax${secureCookieFor(req, service) ? '; Secure' : ''}; Max-Age=${String(COOKIE_MAX_AGE_SEC)}`,
       ],
     })
     res.end(JSON.stringify({ ok: true, deviceId: result.deviceId }))
+  }
+
+  const handleDevices = (req: IncomingMessage, res: ServerResponse): void => {
+    if (!requireMethod(req, res, 'GET')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    writeJson(res, 200, { ok: true, devices: service.devicesSnapshot() })
+  }
+
+  const handleRevokeDevice = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(deviceIdPayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (!service.revokeDevice(payload.deviceId)) {
+      writeJson(res, 404, { ok: false, code: 'not-found' })
+      return
+    }
+    writeJson(res, 200, { ok: true })
+  }
+
+  const handleRenameDevice = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(deviceRenamePayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (!service.renameDevice(payload.deviceId, payload.displayName)) {
+      writeJson(res, 404, { ok: false, code: 'not-found' })
+      return
+    }
+    writeJson(res, 200, { ok: true })
+  }
+
+  const handleGrantWorkspace = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(workspaceGrantPayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (control === undefined) {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+      return
+    }
+    try {
+      await control.grantWorkspace(payload.principalId, payload.workspaceId)
+      writeJson(res, 200, { ok: true })
+    } catch {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+    }
+  }
+
+  const handleRevokeWorkspace = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(workspaceGrantPayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (control === undefined) {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+      return
+    }
+    try {
+      const changed = await control.revokeWorkspace(payload.principalId, payload.workspaceId)
+      writeJson(res, changed ? 200 : 404, changed ? { ok: true } : { ok: false, code: 'not-found' })
+    } catch {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+    }
+  }
+
+  const handleGrantSession = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(sessionGrantPayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (control === undefined) {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+      return
+    }
+    try {
+      await control.grantSession(payload.principalId, payload.sessionId)
+      writeJson(res, 200, { ok: true })
+    } catch {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+    }
+  }
+
+  const handleRevokeSession = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (!requireMethod(req, res, 'POST')) return
+    if (!loopbackFence(req)) {
+      writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    const payload = parsePairPayload(sessionGrantPayloadSchema, await readJsonBody(req))
+    if (payload === undefined) {
+      writeJson(res, 400, { ok: false, code: 'bad-payload' })
+      return
+    }
+    if (control === undefined) {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+      return
+    }
+    try {
+      const changed = await control.revokeSession(payload.principalId, payload.sessionId)
+      writeJson(res, changed ? 200 : 404, changed ? { ok: true } : { ok: false, code: 'not-found' })
+    } catch {
+      writeJson(res, 503, { ok: false, code: 'scope-unavailable' })
+    }
   }
 
   const handleStop = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -379,6 +561,13 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
   return [
     { kind: 'exact', path: PAIR_PATHS.issue, handler: handleIssue },
     { kind: 'exact', path: PAIR_PATHS.accept, handler: handleAccept },
+    { kind: 'exact', path: PAIR_PATHS.devices, handler: handleDevices },
+    { kind: 'exact', path: PAIR_PATHS.revokeDevice, handler: handleRevokeDevice },
+    { kind: 'exact', path: PAIR_PATHS.renameDevice, handler: handleRenameDevice },
+    { kind: 'exact', path: PAIR_PATHS.grantWorkspace, handler: handleGrantWorkspace },
+    { kind: 'exact', path: PAIR_PATHS.revokeWorkspace, handler: handleRevokeWorkspace },
+    { kind: 'exact', path: PAIR_PATHS.grantSession, handler: handleGrantSession },
+    { kind: 'exact', path: PAIR_PATHS.revokeSession, handler: handleRevokeSession },
     { kind: 'exact', path: PAIR_PATHS.stop, handler: handleStop },
     { kind: 'exact', path: PAIR_PATHS.heartbeat, handler: handleHeartbeat },
     { kind: 'exact', path: PAIR_PATHS.status, handler: handleStatus },

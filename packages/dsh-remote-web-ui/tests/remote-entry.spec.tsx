@@ -13,6 +13,7 @@ vi.mock('@deepseek-ai/dsh-client-runtime/client', () => ({
   }),
 }))
 import { RemoteEntry, type RemoteEntryProps } from '../src/client/RemoteEntry.tsx'
+import { FooterRemoteEntry } from '../src/client/FooterRemoteEntry.tsx'
 import { en, type RemoteKey } from '../src/client/locales.ts'
 
 // English dictionary translate stub with {param} interpolation.
@@ -100,10 +101,29 @@ describe('RemoteEntry', () => {
     expect(JSON.parse(String(init.body))).toEqual({ workspaceId: 'ws-1' })
   })
 
+  it('footer entry forwards the renderer workspace hook into pairing', async () => {
+    const fetch = mockFetch({ ok: true, url: 'http://192.168.1.5:3080/?pair=tok-footer', token: 'tok-footer', expiresAt: Date.now() + 60_000 })
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('EventSource', FakeEventSource)
+    render(
+      <FooterRemoteEntry
+        wide={true}
+        useSessions={neverHook}
+        useWorkspaces={(selector: (s: { recentWorkspaceId: string }) => unknown) => selector({ recentWorkspaceId: 'ws-footer' })}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Mobile remote control' }))
+    await waitFor(() => expect(screen.getByText('Waiting for a phone')).toBeTruthy())
+    const issueCalls = fetch.mock.calls.filter(call => call[0] === '/api/pair/issue')
+    expect(issueCalls).toHaveLength(1)
+    expect(JSON.parse(String((issueCalls[0]?.[1] as RequestInit).body))).toEqual({ workspaceId: 'ws-footer' })
+  })
+
   it('shows the lan-required banner instead of a QR when the bind is loopback-only', async () => {
     mount({ ok: false, code: 'lan-required' })
     fireEvent.click(screen.getByRole('button', { name: 'Mobile remote control' }))
-    await waitFor(() => expect(screen.getByText('This feature needs dsh web started with --host 0.0.0.0, or a configured public address')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('No reachable phone address is configured; enable autoTunnel or set a public address')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull()
     expect(document.querySelector('[data-testid="remote-qr"]')).toBeNull()
   })

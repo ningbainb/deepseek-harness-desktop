@@ -1,4 +1,4 @@
-/** The api/gate policy: loopback passes, remote requests need a live cookie. */
+/** The api/gate policy: loopback passes; full remote /api is opt-in legacy mode. */
 import { Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import type { IncomingMessage } from 'node:http'
@@ -59,7 +59,7 @@ describe('makeGateListener', () => {
     const accepted = service.accept(token)
     expect(accepted.ok).toBe(true)
     const deviceId = accepted.ok ? accepted.deviceId : ''
-    const gate = makeGateListener(service)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api' })
     let delegated = false
     const result = gate(request({ host: '192.168.1.5:3080', cookie: `dsh_pair=${deviceId}` }), 'session.list', () => { delegated = true; return true })
     expect(result).toBe(true)
@@ -73,7 +73,7 @@ describe('makeGateListener', () => {
     const accepted = service.accept(token)
     const deviceId = accepted.ok ? accepted.deviceId : ''
     service.stop()
-    const gate = makeGateListener(service)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api' })
     let delegated = false
     const result = gate(request({ host: '192.168.1.5:3080', cookie: `dsh_pair=${deviceId}` }), 'session.list', () => { delegated = true; return true })
     expect(result).toBe(false)
@@ -82,14 +82,14 @@ describe('makeGateListener', () => {
 
   it('vetoes an unknown device id', () => {
     const service = makeService()
-    const gate = makeGateListener(service)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api' })
     const result = gate(request({ host: '192.168.1.5:3080', cookie: 'dsh_pair=unknown' }), 'session.list', () => true)
     expect(result).toBe(false)
   })
 
   it('passes remote requests when requirePairingForLan is off', () => {
     const service = makeService()
-    const gate = makeGateListener(service, false)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api', requirePairingForLan: false })
     const result = gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => true)
     expect(result).toBe(true)
   })
@@ -97,7 +97,10 @@ describe('makeGateListener', () => {
   it('re-reads requirePairingForLan per request', () => {
     const service = makeService()
     let require = true
-    const gate = makeGateListener(service, () => require)
+    const gate = makeGateListener(service, {
+      remoteApiMode: 'legacy-full-api',
+      requirePairingForLan: () => require,
+    })
     let delegated = false
     expect(gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => { delegated = true; return true })).toBe(false)
     require = false
@@ -105,9 +108,24 @@ describe('makeGateListener', () => {
     expect(delegated).toBe(true)
   })
 
+  it('denies a paired device in the default mobile-only full-api mode', () => {
+    const service = makeService()
+    const { token } = service.issue()
+    const accepted = service.accept(token)
+    expect(accepted.ok).toBe(true)
+    const deviceId = accepted.ok ? accepted.deviceId : ''
+    const gate = makeGateListener(service)
+    let delegated = false
+    expect(gate(request({ host: '192.168.1.5:3080', cookie: `dsh_pair=${deviceId}` }), 'session.list', () => {
+      delegated = true
+      return true
+    })).toBe(false)
+    expect(delegated).toBe(false)
+  })
+
   it('vetoes non-loopback requests while the plugin is disabled', () => {
     const service = makeService()
-    const gate = makeGateListener(service, true, () => false)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api', requirePairingForLan: true, enabled: () => false })
     let delegated = false
     const result = gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => { delegated = true; return true })
     expect(result).toBe(false)
@@ -116,16 +134,25 @@ describe('makeGateListener', () => {
 
   it('keeps loopback available while the plugin is disabled', () => {
     const service = makeService()
-    const gate = makeGateListener(service, true, () => false)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api', requirePairingForLan: true, enabled: () => false })
     let delegated = false
     const result = gate(request({ host: '127.0.0.1:3080' }), 'session.list', () => { delegated = true; return true })
     expect(result).toBe(true)
     expect(delegated).toBe(true)
   })
 
+  it('re-reads the full-api mode per request and fails closed by default', () => {
+    const service = makeService()
+    let mode: 'mobile-only' | 'legacy-full-api' = 'mobile-only'
+    const gate = makeGateListener(service, { remoteApiMode: () => mode, requirePairingForLan: false })
+    expect(gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => true)).toBe(false)
+    mode = 'legacy-full-api'
+    expect(gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => true)).toBe(true)
+  })
+
   it('re-enabling restores pairing after stop', () => {
     const service = makeService()
-    const gate = makeGateListener(service, true, () => true)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api', requirePairingForLan: true, enabled: () => true })
     service.stop()
     const { token } = service.issue()
     const accepted = service.accept(token)
@@ -139,8 +166,16 @@ describe('makeGateListener', () => {
 
   it('vetoes a request with an unparsable Host', () => {
     const service = makeService()
-    const gate = makeGateListener(service)
+    const gate = makeGateListener(service, { remoteApiMode: 'legacy-full-api' })
     expect(gate(request({ host: ':::' }), 'session.list', () => true)).toBe(false)
+  })
+
+  it('fails closed when a live gate setting reader throws', () => {
+    const service = makeService()
+    const gate = makeGateListener(service, {
+      remoteApiMode: () => { throw new Error('settings unavailable') },
+    })
+    expect(gate(request({ host: '192.168.1.5:3080' }), 'session.list', () => true)).toBe(false)
   })
 })
 

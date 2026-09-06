@@ -83,6 +83,28 @@ test('Transcript Protocol converts ExternalConversationV2 events to canonical DS
   assert.throws(() => validateImportChunk({ events }, 2), /sequence mismatch/)
 })
 
+test('Transcript Protocol redacts tool arguments before writing session surfaces', () => {
+  const secret = 'ALPHAKEYALPHAKEYALPHA'
+  const events = [createTranscriptEvent({
+    sequence: 1,
+    type: EVENT_TYPES.TOOL_CALL,
+    role: EVENT_ROLES.ASSISTANT,
+    toolName: 'run_command',
+    toolCallId: 'call-redaction',
+    toolArgs: {
+      cmd: 'curl -H "Authorization: Bearer abcdefghijklmnop" https://example.test?api_key=' + secret,
+      password: 'alpha beta gamma delta',
+    },
+    sourceSessionId: 'sess-redaction',
+  })]
+
+  const dshEvents = convertExternalEventsToDshEvents(events, { importId: 'imp-redaction', sourceSessionId: 'sess-redaction' })
+  const serialized = JSON.stringify(dshEvents)
+  assert.equal(serialized.includes(secret), false)
+  assert.equal(serialized.includes('alpha beta gamma delta'), false)
+  assert.match(serialized, /REDACTED_(?:AUTH|SECRET)/u)
+})
+
 test('Transcript Protocol bounds an oversized seed and leaves a valid Session', () => {
   const events = Array.from({ length: 500 }, (_, index) => createTranscriptEvent({
     sequence: index + 1,

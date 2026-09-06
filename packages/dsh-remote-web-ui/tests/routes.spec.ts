@@ -16,6 +16,9 @@ function makeService(): PairingService {
   }, {
     now: () => 1_000_000,
     randomToken: () => 'tok-1',
+  }, {
+    bindDevice: async (deviceId: string) => ({ principalId: `principal-device-${deviceId}` }),
+    grantWorkspace: async () => {},
   })
   service.setLanBases([{ address: '192.168.1.5', base: 'http://192.168.1.5:3080' }])
   return service
@@ -200,6 +203,7 @@ describe('/api/pair routes', () => {
       const accepted = await call(port, 'POST', '/api/pair/accept', { host: 'phone.example.com', body: { token: 'tok-1' } })
       expect(accepted.status).toBe(200)
       expect(accepted.cookies[0]).toMatch(/^dsh_pair=tok-1; Path=\//)
+      expect(accepted.cookies[0]).toContain('; Secure;')
       const heartbeat = await call(port, 'POST', '/api/pair/heartbeat', { host: 'phone.example.com', cookie: 'dsh_pair=tok-1' })
       expect(heartbeat.status).toBe(200)
       const status = await call(port, 'GET', '/api/pair/status', { host: 'phone.example.com', cookie: 'dsh_pair=tok-1' })
@@ -255,6 +259,61 @@ describe('/api/pair routes', () => {
       const badAccept = await call(port, 'POST', '/api/pair/accept', { host: '192.168.1.5:3080', body: { token: 7 } })
       expect(badAccept.status).toBe(400)
       expect(badAccept.body).toEqual({ ok: false, code: 'bad-payload' })
+    } finally {
+      await close()
+    }
+  })
+  it('keeps device and authorization controls loopback-only', async () => {
+    const service = makeService()
+    const calls: string[] = []
+    const control = {
+      grantWorkspace: async (principalId: string, workspaceId: string) => { calls.push(`gw:${principalId}:${workspaceId}`) },
+      revokeWorkspace: async (principalId: string, workspaceId: string) => { calls.push(`rw:${principalId}:${workspaceId}`); return true },
+      grantSession: async (principalId: string, sessionId: string) => { calls.push(`gs:${principalId}:${sessionId}`) },
+      revokeSession: async (principalId: string, sessionId: string) => { calls.push(`rs:${principalId}:${sessionId}`); return true },
+    }
+    const { port, close } = await serve(makeRoutes({ service, lanAddresses: ['192.168.1.5'], control }))
+    try {
+      const issued = await call(port, 'POST', '/api/pair/issue', { body: { workspaceId: 'ws-test' } })
+      expect(issued.status).toBe(200)
+      const accepted = await call(port, 'POST', '/api/pair/accept', { host: '192.168.1.5:3080', body: { token: 'tok-1' } })
+      expect(accepted.status).toBe(200)
+
+      const lanDevices = await call(port, 'GET', '/api/pair/devices', { host: '192.168.1.5:3080' })
+      expect(lanDevices.status).toBe(403)
+      const devices = await call(port, 'GET', '/api/pair/devices')
+      expect(devices.status).toBe(200)
+      expect(devices.body.devices).toEqual([expect.objectContaining({ deviceId: 'tok-1', principalId: 'principal-device-tok-1' })])
+
+      const rename = await call(port, 'POST', '/api/pair/device/rename', { body: { deviceId: 'tok-1', displayName: 'phone' } })
+      expect(rename.status).toBe(200)
+      const grantFromLan = await call(port, 'POST', '/api/pair/workspace/grant', {
+        host: '192.168.1.5:3080',
+        body: { principalId: 'principal-device-tok-1', workspaceId: 'ws-test' },
+      })
+      expect(grantFromLan.status).toBe(403)
+      const grant = await call(port, 'POST', '/api/pair/workspace/grant', {
+        body: { principalId: 'principal-device-tok-1', workspaceId: 'ws-test' },
+      })
+      expect(grant.status).toBe(200)
+      const revokeWorkspace = await call(port, 'POST', '/api/pair/workspace/revoke', {
+        body: { principalId: 'principal-device-tok-1', workspaceId: 'ws-test' },
+      })
+      expect(revokeWorkspace.status).toBe(200)
+      const grantSession = await call(port, 'POST', '/api/pair/session/grant', {
+        body: { principalId: 'principal-device-tok-1', sessionId: 'session-test' },
+      })
+      expect(grantSession.status).toBe(200)
+      const revokeSession = await call(port, 'POST', '/api/pair/session/revoke', {
+        body: { principalId: 'principal-device-tok-1', sessionId: 'session-test' },
+      })
+      expect(revokeSession.status).toBe(200)
+      expect(calls).toEqual([
+        'gw:principal-device-tok-1:ws-test',
+        'rw:principal-device-tok-1:ws-test',
+        'gs:principal-device-tok-1:session-test',
+        'rs:principal-device-tok-1:session-test',
+      ])
     } finally {
       await close()
     }

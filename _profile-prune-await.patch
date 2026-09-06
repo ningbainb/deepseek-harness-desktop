@@ -1,0 +1,6 @@
+diff --git a/apps/dsh-desktop/src/extension-ipc.mjs b/apps/dsh-desktop/src/extension-ipc.mjs
+--- a/apps/dsh-desktop/src/extension-ipc.mjs
++++ b/apps/dsh-desktop/src/extension-ipc.mjs
+@@ -557,1 +557,1 @@
+-    void pruneProfileResetBackups(profileDir).catch(() => {})
++    await pruneProfileResetBackups(profileDir).catch(() => {})

@@ -1,0 +1,55 @@
+/** Chinese copy is the key-set source of truth for the model preferences UI. */
+export declare const zh: {
+    readonly 'command.description': "选择模型（支持自定义置顶和供应商排序）";
+    readonly 'trigger.fallback': "选择模型";
+    readonly 'trigger.aria': "当前模型：{model}";
+    readonly 'trigger.ariaDisabled': "模型选择不可用";
+    readonly 'menu.aria': "模型选择器";
+    readonly 'menu.models': "模型";
+    readonly 'menu.effort': "推理强度";
+    readonly 'menu.pinned': "置顶模型";
+    readonly 'menu.providers': "供应商";
+    readonly 'action.close': "关闭";
+    readonly 'action.reload': "重新加载";
+    readonly 'action.back': "返回模型列表";
+    readonly 'status.loading': "正在加载模型目录…";
+    readonly 'status.selecting': "正在切换模型…";
+    readonly 'status.empty': "当前没有可用模型。";
+    readonly 'status.unavailable': "当前会话不支持模型选择。";
+    readonly 'status.notRoutable': "当前供应商暂不可用，请选择其他模型。";
+    readonly 'status.providerDisabled': "当前供应商已禁用，请选择其他模型。";
+    readonly 'status.providerFailure': "部分供应商加载失败，已加载的模型仍可选择。";
+    readonly 'error.load': "模型目录加载失败。";
+    readonly 'error.select': "模型切换失败，请重试。";
+    readonly 'effort.default': "供应商默认";
+    readonly 'settings.nav': "模型偏好";
+    readonly 'settings.title': "模型偏好";
+    readonly 'settings.description': "自定义模型置顶、供应商顺序和供应商启用状态。不会删除凭据，也不会中断当前请求。";
+    readonly 'settings.pinned': "置顶模型（最多 2 个）";
+    readonly 'settings.pinnedEmpty': "尚未置顶模型";
+    readonly 'settings.unpin': "取消置顶";
+    readonly 'settings.pin': "置顶";
+    readonly 'settings.swapUp': "上移";
+    readonly 'settings.swapDown': "下移";
+    readonly 'settings.providers': "供应商顺序与状态";
+    readonly 'settings.enable': "启用";
+    readonly 'settings.disable': "禁用";
+    readonly 'settings.loading': "正在读取供应商目录…";
+    readonly 'settings.reload': "重新读取";
+    readonly 'settings.save': "保存";
+    readonly 'settings.reset': "恢复默认";
+    readonly 'settings.saved': "已保存";
+    readonly 'settings.unsaved': "有未保存修改";
+    readonly 'settings.conflict': "设置在其他窗口发生变化，请先重新加载或覆盖保存。";
+    readonly 'settings.readonly': "当前设置不可写，偏好只能在本地桌面配置中保存。";
+    readonly 'settings.catalogError': "供应商目录加载失败，仍可保存已有偏好。";
+    readonly 'settings.noProviders': "暂无已配置的供应商。";
+    readonly 'settings.modelInputProvider': "供应商 ID";
+    readonly 'settings.modelInputName': "模型 ID";
+    readonly 'settings.manualPin': "手动添加置顶模型";
+    readonly 'settings.add': "添加";
+};
+export type ModelPreferencesLocaleKey = keyof typeof zh;
+/** English dictionary must keep the Chinese key set complete. */
+export declare const en: Record<ModelPreferencesLocaleKey, string>;
+//# sourceMappingURL=locales.d.ts.map

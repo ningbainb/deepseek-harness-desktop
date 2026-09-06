@@ -4,8 +4,9 @@
  * (no real cloudflared binary or network).
  */
 import { EventEmitter } from 'node:events'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { TunnelManager, type TunnelHandle, type TunnelPhase } from '../src/tunnel.ts'
+import { cloudflaredRuntimePath, TunnelManager, type TunnelHandle, type TunnelPhase } from '../src/tunnel.ts'
 
 /** A fake tunnel process: an EventEmitter the test drives by hand. */
 class FakeTunnel extends EventEmitter implements TunnelHandle {
@@ -78,6 +79,18 @@ async function nextTunnel(h: Harness): Promise<FakeTunnel> {
 }
 
 describe('TunnelManager', () => {
+  it('stores the cloudflared executable under DSH_HOME instead of the packaged module tree', () => {
+    const filename = cloudflaredRuntimePath({ DSH_HOME: 'profile-home', CLOUDFLARED_BIN: undefined })
+    expect(filename).toBe(resolve(filename))
+    expect(filename).toContain('runtime-bin')
+    expect(filename).toContain('cloudflared')
+    expect(filename.endsWith(process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared')).toBe(true)
+  })
+
+  it('honors an explicit cloudflared executable override', () => {
+    expect(cloudflaredRuntimePath({ CLOUDFLARED_BIN: 'custom/cloudflared' })).toBe(resolve('custom/cloudflared'))
+  })
+
   it('mints a URL: starting → running with the URL surfaced', async () => {
     const h = makeHarness()
     h.manager.start('http://127.0.0.1:3080')

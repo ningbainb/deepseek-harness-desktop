@@ -172,7 +172,8 @@ window.__ModuleLoader__.load({
 			if (prevBtn) prevBtn.disabled = idx <= 0 || total === 0;
 			if (nextBtn) nextBtn.disabled = idx >= total - 1 || total === 0;
 			if (bottomBtn) bottomBtn.disabled = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40;
-			if (counter) counter.textContent = total === 0 ? "–" : `${idx + 1}/${total}`;
+			const nextCounterText = total === 0 ? "–" : String(idx + 1) + "/" + String(total);
+			if (counter && counter.textContent !== nextCounterText) counter.textContent = nextCounterText;
 		}
 		/** Attach click handlers to the navigator buttons. */
 		function bindNavigator(nav, scrollRoot, pane) {

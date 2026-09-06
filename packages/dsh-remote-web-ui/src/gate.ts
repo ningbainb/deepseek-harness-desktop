@@ -13,6 +13,7 @@
 
 import type { IncomingMessage } from 'node:http'
 import type { PairingService } from './pairing.ts'
+import { isSafePairingCookieName } from './pairing.ts'
 
 /**
  * Whether a normalized URL hostname names the local loopback authority.
@@ -56,6 +57,7 @@ function isIPv4Loopback(v4: string): boolean {
  * @returns the value, or undefined when absent.
  */
 export function readCookie(header: string | undefined, name: string): string | undefined {
+  if (!isSafePairingCookieName(name)) return undefined
   if (header === undefined) return undefined
   for (const part of header.split(';')) {
     const eq = part.indexOf('=')
@@ -89,30 +91,60 @@ export function isLoopbackClient(request: IncomingMessage): boolean {
   return isLoopbackAddress(socket?.remoteAddress)
 }
 
+/** Full /api exposure policy. The default is deliberately resource-safe. */
+export type RemoteApiMode = 'mobile-only' | 'legacy-full-api'
+
+/** Live gate policy read by the listener on every request. */
+export interface GateOptions {
+  /** Whether non-loopback full /api is denied or kept in legacy mode. */
+  remoteApiMode?: RemoteApiMode | (() => RemoteApiMode)
+  /** Legacy pairing requirement, only meaningful in legacy-full-api mode. */
+  requirePairingForLan?: boolean | (() => boolean)
+  /** Master plugin switch. */
+  enabled?: boolean | (() => boolean)
+}
+
 /**
  * Build the api/gate listener for one pairing service.
  * @param service - the pairing service.
- * @param requirePairingForLan - when false, non-loopback requests pass
- * without a device cookie (the feature then only manages tokens/status;
- * revocation of paired devices still holds). A function is re-read per
- * request, so a settings edit takes effect without a restart. Defaults to true.
- * @param enabled - when false, every non-loopback request is vetoed while
- * loopback stays available. A function is re-read per request so the fence
- * stays mounted for the plugin lifetime and disabling the plugin cannot open
- * a LAN-exposed /api. Defaults to true.
+ * @param options - the live gate policy. A function is re-read per request,
+ * so a settings edit takes effect without a restart. Unknown modes fail closed.
  * @returns the cordis waterfall listener: call `next()` to delegate,
  * return false (without calling it) to veto with 403.
  */
 export function makeGateListener(
   service: PairingService,
-  requirePairingForLan: boolean | (() => boolean) = true,
-  enabled: boolean | (() => boolean) = true,
+  optionsOrRequirePairing: GateOptions | boolean | (() => boolean) = {},
+  legacyEnabled: boolean | (() => boolean) = true,
 ): (request: IncomingMessage, method: string | undefined, next: () => boolean | Promise<boolean>) => boolean | Promise<boolean> {
+  // Keep the old positional form as an explicit legacy-full-api escape hatch
+  // for existing profile tests and callers. New callers must use GateOptions.
+  const options: GateOptions = typeof optionsOrRequirePairing === 'object'
+    ? optionsOrRequirePairing
+    : {
+        remoteApiMode: 'legacy-full-api',
+        requirePairingForLan: optionsOrRequirePairing,
+        enabled: legacyEnabled,
+      }
   return (request, _method, next) => {
     if (isLoopbackClient(request)) return next()
-    const active = typeof enabled === 'function' ? enabled() : enabled
+    let active: boolean
+    let mode: RemoteApiMode
+    let require: boolean
+    try {
+      const enabled = options.enabled ?? true
+      active = typeof enabled === 'function' ? enabled() : enabled
+      const modeValue = options.remoteApiMode ?? 'mobile-only'
+      mode = typeof modeValue === 'function' ? modeValue() : modeValue
+      const pairingValue = options.requirePairingForLan ?? true
+      require = typeof pairingValue === 'function' ? pairingValue() : pairingValue
+    } catch {
+      // A broken live settings source must never turn a remote request into a
+      // pass-through. Loopback remains governed by the Host's own fence.
+      return false
+    }
     if (!active) return false
-    const require = typeof requirePairingForLan === 'function' ? requirePairingForLan() : requirePairingForLan
+    if (mode !== 'legacy-full-api') return false
     if (!require) return next()
     const deviceId = readCookie(request.headers.cookie, service.config.cookieName)
     if (deviceId === undefined) return false

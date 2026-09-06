@@ -20,9 +20,23 @@ const READY_LINE = /^dsh web:\s+(http:\/\/\S+)/u
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
 export const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
 export const DESKTOP_PROFILE_NAME = 'desktop'
+export const DESKTOP_REMOTE_HOST_ENV = 'DSH_DESKTOP_REMOTE_HOST'
+const RUNTIME_HOSTS = new Set(['127.0.0.1', '0.0.0.0'])
 const STABLE_RUNTIME_RESET_MS = 60_000
 const WINDOWS_CONSOLE_PRELOAD_PATH = fileURLToPath(new URL('./windows-console-preload.cjs', import.meta.url))
 const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/iu
+
+export function validateRuntimeHost(value) {
+  if (typeof value !== 'string' || !RUNTIME_HOSTS.has(value)) {
+    throw new TypeError('runtime host must be 127.0.0.1 or 0.0.0.0')
+  }
+  return value
+}
+
+export function resolveDesktopRuntimeHost(value = process.env[DESKTOP_REMOTE_HOST_ENV]) {
+  if (value === undefined || value === '') return undefined
+  return validateRuntimeHost(value)
+}
 
 function validateRuntimeProfileName(value) {
   if (typeof value !== 'string' || !PROFILE_NAME_PATTERN.test(value)) {
@@ -56,7 +70,7 @@ function validateRuntimePatchFiles(value) {
   return Object.freeze(normalized)
 }
 
-function runtimeArguments(cliPath, preferredPort, consolePreloadPath, profileName, patchFiles = []) {
+function runtimeArguments(cliPath, preferredPort, consolePreloadPath, profileName, runtimeHost, patchFiles = []) {
   return [
     '--expose-internals',
     ...(consolePreloadPath ? ['--require', consolePreloadPath] : []),
@@ -67,6 +81,7 @@ function runtimeArguments(cliPath, preferredPort, consolePreloadPath, profileNam
     '--port',
     String(preferredPort),
     '--no-open',
+    ...(runtimeHost ? ['--host', runtimeHost] : []),
   ]
 }
 
@@ -80,6 +95,7 @@ export function createRuntimeInvocation({
   preferredPort = 0,
   profileName = DESKTOP_PROFILE_NAME,
   patchFiles = [],
+  runtimeHost,
   platform = process.platform,
   systemRoot = process.env.SystemRoot,
 } = {}) {
@@ -94,11 +110,13 @@ export function createRuntimeInvocation({
   }
   const normalizedProfileName = validateRuntimeProfileName(profileName)
   const normalizedPatchFiles = validateRuntimePatchFiles(patchFiles)
+  const normalizedRuntimeHost = runtimeHost === undefined ? undefined : validateRuntimeHost(runtimeHost)
   const args = runtimeArguments(
     cliPath,
     preferredPort,
     platform === 'win32' ? WINDOWS_CONSOLE_PRELOAD_PATH : undefined,
     normalizedProfileName,
+    normalizedRuntimeHost,
     normalizedPatchFiles,
   )
   if (platform !== 'win32') return { executable, args }
@@ -286,6 +304,7 @@ export class DshRuntimeController extends EventEmitter {
     systemRoot = process.env.SystemRoot,
     preferredPort = 0,
     profileName = DESKTOP_PROFILE_NAME,
+    runtimeHost,
     onReadyPort = () => {},
     environmentProvider = () => ({}),
     workspaceFileOpenTokenFactory = createWorkspaceFileOpenCapabilityToken,
@@ -317,6 +336,7 @@ export class DshRuntimeController extends EventEmitter {
     this.platform = platform
     this.systemRoot = systemRoot
     this.profileName = validateRuntimeProfileName(profileName)
+    this.runtimeHost = runtimeHost === undefined ? undefined : validateRuntimeHost(runtimeHost)
     if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
       throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
     }
@@ -522,6 +542,7 @@ export class DshRuntimeController extends EventEmitter {
         preferredPort: this.preferredPort,
         profileName: this.profileName,
         patchFiles: launchPatchFiles,
+        runtimeHost: this.runtimeHost,
       })
       this.startupPhases.complete(STARTUP_PHASES.RUNTIME_RESOLVE)
       this.startupPhases.enter(STARTUP_PHASES.RUNTIME_SPAWN)

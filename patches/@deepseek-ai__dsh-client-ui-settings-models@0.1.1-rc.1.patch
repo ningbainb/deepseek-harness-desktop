@@ -1,0 +1,46 @@
+diff --git a/lib/client.js b/lib/client.js
+index fff5f43f9aa239e2c0524103e77398e0988bb7e0..d9f86775ab4aa3f63ee9aebdc5ada417977050c4 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -1790,18 +1790,19 @@ window.__ModuleLoader__.load({
+ 		* @returns the section, or null while the shell has not injected yet.
+ 		*/
+ 		function ModelsSection(props) {
+-			const { controller, useSnapshot, api, schema, t } = props;
++			const { controller, useSnapshot, api, schema, t, renderSlot } = props;
+ 			if (controller === void 0 || useSnapshot === void 0 || api === void 0 || schema === void 0 || t === void 0) return null;
+ 			return (0, react_jsx_runtime.jsx)(Loaded, { injected: {
+ 				controller,
+ 				useSnapshot,
+ 				api,
+ 				schema,
+-				t
++				t,
++				renderSlot
+ 			} });
+ 		}
+ 		function Loaded({ injected }) {
+-			const { controller, api, schema, t } = injected;
++			const { controller, api, schema, t, renderSlot } = injected;
+ 			const state = injected.useSnapshot((snapshot) => snapshot);
+ 			const [editing, setEditing] = (0, react.useState)(void 0);
+ 			const [adding, setAdding] = (0, react.useState)(false);
+@@ -1894,6 +1895,7 @@ window.__ModuleLoader__.load({
+ 						className: ModelsSection_module_css_default["intro"],
+ 						children: t("intro")
+ 					}),
++					renderSlot?.("settings.models.content", {}),
+ 					!state.writable && state.status === "ready" ? (0, react_jsx_runtime.jsx)("p", {
+ 						className: ModelsSection_module_css_default["notice"],
+ 						children: t("readOnly")
+@@ -2786,6 +2788,10 @@ window.__ModuleLoader__.load({
+ 				id: "models",
+ 				order: 10,
+ 				label: () => t("nav"),
++				children: { "settings.models.content": {
++					kind: "list",
++					scope: "root"
++				} },
+ 				inject: injected
+ 			}, ModelsSection));
+ 			ctx.slots.inject("settings.onboarding", () => ctx.slots.register({
