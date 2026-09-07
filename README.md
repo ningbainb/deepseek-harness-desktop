@@ -288,12 +288,18 @@ QQ 群：**1105158177**
 
 ## 下载与安装
 
+### Windows
+
 1. 打开 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest)。
 2. 下载 `DeepSeek-Harness-Desktop-Setup-<版本号>-x64.exe`。
 3. 运行安装程序完成安装。
 4. 启动 **DeepSeek Harness Desktop**。
 
-安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所需原生依赖，不需要额外安装 Node.js 或 Git。
+Windows 安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所需原生依赖，不需要额外安装 Node.js 或 Git。
+
+### macOS 未签名预览（Apple Silicon）
+
+只提供 arm64。下载 `.dmg` 或 `.zip` 后把应用放到 `/Applications`，用 `xattr` 去掉隔离属性；macOS 15 起没有「右键打开」。预览版没有自动更新，mac 端使用系统 Git。完整步骤见 [macOS 未签名预览版安装说明](docs/macos-preview.zh.md)。
 
 如果 GitHub 下载速度较慢，也可以加入页面顶部的用户交流群获取同步提供的安装包。
 
