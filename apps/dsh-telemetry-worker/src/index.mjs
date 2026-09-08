@@ -1,6 +1,6 @@
 import { handleAdminRequest } from './admin-dashboard.mjs'
 
-const MAX_REQUEST_BYTES = 8_192
+const MAX_REQUEST_BYTES = 16_384
 const MAX_BATCH_EVENTS = 20
 const MAX_DOWNLOAD_CLICK_BYTES = 256
 const ADMIN_HOSTNAME = 'guanli.1521003.xyz'
@@ -37,6 +37,9 @@ const LANGUAGES = new Set(['zh', 'en', 'other'])
 const DOWNLOAD_SOURCES = new Set(['nav', 'hero', 'terminal', 'install'])
 
 const EVENT_POLICY = Object.freeze({
+  feature_project: Object.freeze({ outcomes: new Set(['started', 'succeeded', 'failed']), details: new Set(['create', 'connect']), buckets: new Set(['none']) }),
+  feature_attachment: Object.freeze({ outcomes: new Set(['started', 'succeeded', 'failed', 'cancelled']), details: new Set(['file']), buckets: new Set(['none']) }),
+  feature_dock_setting: Object.freeze({ outcomes: new Set(['opened', 'failed']), details: new Set(['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image']), buckets: new Set(['none']) }),
   app_launch: Object.freeze({
     outcomes: new Set(['started']),
     details: new Set(['normal', 'updated', 'deep-link', 'unknown']),
@@ -292,6 +295,11 @@ INSERT OR IGNORE INTO product_installation_daily (
 ) VALUES (?, ?)
 `
 
+const RELEASE_DAILY_INSERT_SQL = `INSERT INTO product_release_daily
+  (day, installation_actor, app_version, event, outcome, detail, count) VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT (day, installation_actor, app_version, event, outcome, detail) DO UPDATE SET count = count + excluded.count`
+const RELEASE_RETENTION_SQL = "DELETE FROM product_release_daily WHERE day < date('now', '-89 days')"
+
 const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-400 days')"
 const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-400 days')"
 const DAILY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_daily WHERE day < date('now', '-35 days')"
@@ -322,11 +330,11 @@ function exactSearchParams(params, fields) {
 }
 
 function validEvent(event, schema = 3) {
-  const fields = schema === 2 ? EVENT_FIELDS_V2 : schema === 3 ? EVENT_FIELDS_V3 : undefined
+  const fields = schema === 2 ? EVENT_FIELDS_V2 : [3, 4].includes(schema) ? EVENT_FIELDS_V3 : undefined
   if (fields === undefined || !exactFields(event, fields)) return false
   if (typeof event.appVersion !== 'string' || !APP_VERSION_PATTERN.test(event.appVersion)) return false
   if (!ACTOR_PATTERN.test(event.dailyActor) || !ACTOR_PATTERN.test(event.monthlyActor)) return false
-  if (schema === 3 && !ACTOR_PATTERN.test(event.installationActor)) return false
+  if ([3, 4].includes(schema) && !ACTOR_PATTERN.test(event.installationActor)) return false
   if (!CHANNELS.has(event.channel) || !OPERATING_SYSTEMS.has(event.os) || !LANGUAGES.has(event.language)) return false
   const policy = EVENT_POLICY[event.name]
   return policy !== undefined
@@ -437,7 +445,7 @@ async function handleProductEvents(request, env, seams) {
   const parsed = await parseBody(request)
   if (parsed.status) return response(parsed.status, parsed.status === 413 ? 'request too large' : 'invalid request')
   const body = parsed.value
-  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3].includes(body.schema) || !Array.isArray(body.events)) {
+  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3, 4].includes(body.schema) || !Array.isArray(body.events)) {
     return response(400, 'invalid request')
   }
   if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event, body.schema))) {
@@ -457,7 +465,19 @@ async function handleProductEvents(request, env, seams) {
       env.METRICS.prepare(MONTHLY_ACTOR_INSERT_SQL).bind(month, event.monthlyActor, ...dimensions),
     )
   }
-  if (body.schema === 3) {
+  if (body.schema === 4) {
+    const observations = new Map()
+    for (const event of body.events) {
+      const values = [day, event.installationActor, event.appVersion, event.name, event.outcome, event.detail]
+      const key = JSON.stringify(values)
+      const current = observations.get(key)
+      if (current) current.count += 1
+      else observations.set(key, { values, count: 1 })
+    }
+    for (const { values, count } of observations.values()) statements.push(env.METRICS.prepare(RELEASE_DAILY_INSERT_SQL).bind(...values, count))
+    statements.push(env.METRICS.prepare("INSERT OR IGNORE INTO product_measurement_coverage (metric, started_day) VALUES ('release-observations', ?)").bind(day))
+  }
+  if ([3, 4].includes(body.schema)) {
     for (const event of uniqueInstallationLaunches(body.events)) {
       statements.push(
         env.METRICS.prepare(INSTALLATION_FIRST_SEEN_INSERT_SQL)
@@ -526,6 +546,7 @@ async function handleScheduled(_controller, env) {
   await env.METRICS.prepare(MONTHLY_ACTOR_RETENTION_SQL).run()
   await env.METRICS.prepare(INSTALLATION_FIRST_SEEN_RETENTION_SQL).run()
   await env.METRICS.prepare(INSTALLATION_DAILY_RETENTION_SQL).run()
+  await env.METRICS.prepare(RELEASE_RETENTION_SQL).run()
 }
 
 export const __test = Object.freeze({
@@ -551,6 +572,8 @@ export const __test = Object.freeze({
   OFFICIAL_WEBSITE_ORIGINS,
   RETENTION_SQL,
   UPSERT_SQL,
+  RELEASE_DAILY_INSERT_SQL,
+  RELEASE_RETENTION_SQL,
   validEvent,
 })
 

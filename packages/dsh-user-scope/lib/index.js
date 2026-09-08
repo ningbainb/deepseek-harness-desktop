@@ -659,7 +659,14 @@ var UserScopeService = class extends Service {
 			allowed: false,
 			reason: "scope-unavailable"
 		};
-		return this.registryValue.access(scope, resource);
+		const decision = this.registryValue.access(scope, resource);
+		if (!decision.allowed && decision.reason === "unknown-resource" && scope.source === "desktop" && scope.principalId === this.localPrincipalValue.id && resource.kind === "workspace") try {
+			if (this.ctx.get("workspaceRegistry")?.list().some((workspace) => String(workspace.id) === resource.workspaceId)) return {
+				allowed: true,
+				reason: "allowed"
+			};
+		} catch {}
+		return decision;
 	}
 	visibleSessions(scope) {
 		if (this.availability !== "ready") return [];

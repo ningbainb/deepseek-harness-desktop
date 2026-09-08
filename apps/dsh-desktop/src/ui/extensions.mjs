@@ -550,8 +550,9 @@ function nativeIconSvg(icon) {
 
 function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
+  const settingsLink = ['value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
-  return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>运行正常 · 随桌面版更新 (${escapeHtml(version)})</span></div><span class="native-safe-badge" title="受保护的桌面级原生能力">核心受保护</span></div></article>`
+  return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>随桌面版维护 (${escapeHtml(version)})</span></div>${settingsLink}<span class="native-safe-badge" title="受保护的桌面级原生能力">内置</span></div></article>`
 }
 
 let currentNativeCategory = 'all'
@@ -749,6 +750,7 @@ function renderNetworkDiagnostics(results) {
 async function refreshRecovery() {
   const state = await window.dshDesktop.getPluginRecoveryState()
   recoveryCount.textContent = state.incidents.length
+  recoveryCount.hidden = state.incidents.length === 0
   recoveryMode.dataset.safe = String(state.safeMode)
   const baselineQuarantineAvailable = state.baselineQuarantineAvailable === true
   recoveryModeLabel.textContent = !state.safeMode
@@ -876,10 +878,39 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 })
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
+// Reuse the product's existing icon set across both navigation and catalog.
+const navigationIcons = { 'relay-tab': 'sliders', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
-function activateTab(tab, focus = false) {
+let settingsRequest = 0
+let activeSettingsTab
+const groupTitles = {
+  plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能'], qqbot: ['扩展能力', 'QQ 机器人'],
+  backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
+}
+function activateTab(tab, focus = false, settingOverride) {
+  try { localStorage.setItem('dsh-dock-tab', tab.id) } catch { /* storage may be unavailable */ }
+  const request = ++settingsRequest
+  const setting = settingOverride ?? tab.dataset.setting
+  activeSettingsTab = setting ? tab : undefined
+  document.querySelector('#workspace-heading').hidden = Boolean(setting)
+  document.querySelector('.content-toolbar').hidden = Boolean(setting)
+  for (const nav of document.querySelectorAll('[data-tab-group]')) nav.hidden = nav.dataset.tabGroup !== tab.dataset.group
+  const [group, title] = groupTitles[tab.dataset.group] ?? ['', '']
+  document.querySelector('#workspace-breadcrumb').textContent = group
+  document.querySelector('#workspace-title').textContent = title
+  document.querySelector('main').scrollTop = 0
+  try { localStorage.setItem('dsh-dock-setting', setting ?? '') } catch { /* optional navigation state */ }
+  const settingState = document.querySelector('#dock-settings-state')
+  document.querySelector('#dock-settings').setAttribute('aria-labelledby', tab.id)
+  settingState.textContent = '正在加载设置…'
+  void window.dshDesktop.selectDockSetting?.(setting ?? null).catch(error => {
+    if (request === settingsRequest) settingState.textContent = error.message || '设置加载失败，请重试。'
+  })
   for (const item of tabs) {
-    const active = item === tab
+    const active = item.closest('.settings-sidebar')
+      ? item.dataset.group === tab.dataset.group
+      : item.dataset.tab === tab.dataset.tab
     item.classList.toggle('active', active)
     item.setAttribute('aria-selected', String(active))
     item.tabIndex = active ? 0 : -1
@@ -891,24 +922,79 @@ function activateTab(tab, focus = false) {
   }
   if (focus) tab.focus()
 }
+document.querySelector('#dock-settings-retry').addEventListener('click', () => {
+  if (activeSettingsTab) activateTab(activeSettingsTab)
+})
 
-for (const [index, tab] of tabs.entries()) {
+for (const tab of tabs) {
   tab.addEventListener('click', () => { activateTab(tab) })
   tab.addEventListener('keydown', (event) => {
+    const peers = [...tab.closest('[role="tablist"]').querySelectorAll('[data-tab]')]
+    const index = peers.indexOf(tab)
     let nextIndex
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
-    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (index + 1) % peers.length
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (index - 1 + peers.length) % peers.length
     if (event.key === 'Home') nextIndex = 0
-    if (event.key === 'End') nextIndex = tabs.length - 1
+    if (event.key === 'End') nextIndex = peers.length - 1
     if (nextIndex === undefined) return
     event.preventDefault()
-    activateTab(tabs[nextIndex], true)
+    activateTab(peers[nextIndex], true)
   })
 }
+const searchEntries = [
+  ['模型接入', '供应商 bai 中转站 登录 账号 充值 API Key', 'relay-tab'],
+  ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
+  ['Prompt', '个人偏好 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
+  ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
+  ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
+  ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
+  ['发现插件', '插件市场 社区 群友作品', 'market-tab'],
+  ['内置能力', '原生插件 保护', 'native-tab'],
+  ['技能', '导入技能 Skill', 'skills-tab'],
+  ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
+  ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
+  ['环境预设', '备份 导入 导出 Preset', 'presets-tab'],
+  ['对话导入', 'Claude Codex 历史', 'conversation-tab'],
+  ['旧配置迁移', 'Web Profile', 'migration-tab'],
+  ['诊断与恢复', '故障 隔离 网络 检查 重置', 'recovery-tab'],
+]
+const dockSearch = document.querySelector('#dock-search')
+const searchResults = document.querySelector('#dock-search-results')
+dockSearch.addEventListener('input', () => {
+  const query = dockSearch.value.trim().toLocaleLowerCase()
+  searchResults.replaceChildren()
+  searchResults.hidden = !query
+  if (!query) return
+  for (const [title, aliases, id, setting] of searchEntries.filter(entry => entry.slice(0, 2).join(' ').toLocaleLowerCase().includes(query))) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = title
+    button.addEventListener('click', () => {
+      activateTab(document.getElementById(id), true, setting)
+      searchResults.hidden = true
+      dockSearch.value = ''
+    })
+    searchResults.append(button)
+  }
+  if (!searchResults.childElementCount) searchResults.textContent = '没有匹配的功能'
+})
+dockSearch.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { searchResults.hidden = true; dockSearch.value = '' }
+  if (event.key === 'ArrowDown') { event.preventDefault(); searchResults.querySelector('button')?.focus() }
+  if (event.key === 'Enter') { event.preventDefault(); searchResults.querySelector('button')?.click() }
+})
 
 jumpToNative?.addEventListener('click', () => {
   const nativeTab = document.querySelector('#native-tab')
   if (nativeTab) activateTab(nativeTab, true)
+})
+
+nativePluginGrid?.addEventListener('click', event => {
+  const button = event.target.closest('[data-open-dock-setting]')
+  if (!button) return
+  const id = button.dataset.openDockSetting
+  const tab = document.getElementById(`${id === 'memory' ? 'personal-prompt' : id}-tab`)
+  if (tab) activateTab(tab, true, id)
 })
 
 nativeSearch?.addEventListener('input', () => {
@@ -939,6 +1025,7 @@ const removePluginPrefillListener = window.dshDesktop.onPluginInstallPrefill?.((
   const tab = tabs.find((item) => item.dataset.tab === 'plugins')
   if (tab) activateTab(tab)
   const input = document.querySelector('#plugin-spec')
+  document.querySelector('#install-plugin').open = true
   input.value = spec
   input.focus()
   notify('已从外部请求填入安装来源，请确认后点击「安装并重启」。')
@@ -1354,6 +1441,15 @@ document.querySelector('#import-preset').addEventListener('click', () => {
   })
 })
 
+let initialTab = document.querySelector('#value-mode-tab')
+let initialSetting
+try {
+  const previousId = localStorage.getItem('dsh-dock-tab')
+  initialTab = tabs.find(tab => tab.id === previousId) ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : initialTab)
+  const previousSetting = previousId === 'memory-tab' ? 'memory' : localStorage.getItem('dsh-dock-setting')
+  if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
+} catch { /* first visit opens model collaboration */ }
+activateTab(initialTab, false, initialSetting)
 await extensionOperations.run(refresh)
 void refreshMarket()
 void extensionOperations.run(() => checkPluginUpdates({ silent: true }))

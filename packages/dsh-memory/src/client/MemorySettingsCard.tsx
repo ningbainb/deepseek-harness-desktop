@@ -10,6 +10,7 @@ import {
 import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import type { MemoryLocaleKey } from './locales.ts'
 import styles from './memory.module.css'
+import { MemoryActivityPanel } from './MemoryActivityPanel.tsx'
 
 interface PendingItem {
   id: string
@@ -26,6 +27,7 @@ interface Draft {
   tags: string
   pinned: boolean
   expiresAt: string
+  expectedUpdatedAt?: number
 }
 
 export type MemorySettingsCardProps = PropsRuntime<'web-ui.plugin.item'>
@@ -50,6 +52,7 @@ function emptyDraft(): Draft {
 function draftOf(item: MemoryPublicItem): Draft {
   return {
     id: item.id,
+    expectedUpdatedAt: item.updatedAt,
     scope: item.scope,
     workspaceId: item.workspaceId ?? '',
     sessionId: item.sessionId ?? '',
@@ -67,6 +70,7 @@ function itemFromDraft(draft: Draft): Record<string, unknown> | undefined {
   if (tags.length > MAX_MEMORY_TAGS) return undefined
   const body: Record<string, unknown> = {
     operation: 'save',
+    ...(draft.expectedUpdatedAt === undefined ? {} : { expectedUpdatedAt: draft.expectedUpdatedAt }),
     ...(draft.id === undefined ? {} : { id: draft.id }),
     scope: draft.scope,
     content,
@@ -92,6 +96,7 @@ function errorMessage(code: unknown, t: (key: MemoryLocaleKey) => string): strin
   if (code === 'sensitive') return t('settings.errorSensitive')
   if (code === 'invalid' || code === 'invalid-target') return t('settings.errorInvalid')
   if (code === 'store-unavailable') return t('settings.errorStore')
+  if (code === 'duplicate') return t('settings.duplicate')
   if (code === 'conflict') return t('settings.errorConflict')
   return t('settings.errorSave')
 }
@@ -160,12 +165,20 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   const liveConfig = useMemo(() => {
     try { return normalizeMemoryConfig(settingsSnapshot.value ?? config) } catch { return config }
   }, [config, settingsSnapshot.value])
+  const dock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('desktop-dock-setting')
+  const [editorOpen, setEditorOpen] = useState(!dock)
+  const [memoryTab, setMemoryTab] = useState<'items' | 'pending'>('items')
+  const [cleanDraft, setCleanDraft] = useState(() => JSON.stringify(emptyDraft()))
   const [enabled, setEnabled] = useState(liveConfig.enabled)
   const [items, setItems] = useState<MemoryPublicItem[]>([])
   const [pending, setPending] = useState<PendingItem[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [filter, setFilter] = useState('')
+  const [scopeFilter, setScopeFilter] = useState<'all' | MemoryScope>('all')
+  const [clearEntries, setClearEntries] = useState<MemoryPublicItem[] | null>(null)
+  const [replacements, setReplacements] = useState<Record<string, string>>({})
+  const [feedback, setFeedback] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -191,12 +204,13 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
       for (let attempt = 0; attempt < 8; attempt += 1) {
         try {
           const [itemValue, pendingValue] = await Promise.all([
-            getJson('/api/dsh-memory/items'),
+            getJson('/api/dsh-memory/items?view=manage&refresh=1'),
             getJson('/api/dsh-memory/pending'),
           ])
           setItems(responseItems(itemValue))
           setPending(responsePending(pendingValue))
           setLoading(false)
+          setFeedback(t('settings.refreshed'))
           return
         } catch (reason) {
           failure = reason
@@ -216,11 +230,14 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
 
   const visibleItems = useMemo(() => {
     const needle = filter.trim().toLocaleLowerCase()
-    if (needle === '') return items
-    return items.filter(item => [item.content, ...item.tags].join(' ').toLocaleLowerCase().includes(needle))
-  }, [filter, items])
+    const scoped = items.filter(item => scopeFilter === 'all' || item.scope === scopeFilter)
+    if (needle === '') return scoped
+    return scoped.filter(item => [item.content, ...item.tags].join(' ').toLocaleLowerCase().includes(needle))
+  }, [filter, items, scopeFilter])
 
   const select = (item: MemoryPublicItem): void => {
+    setEditorOpen(true)
+    setCleanDraft(JSON.stringify(draftOf(item)))
     setSelectedId(item.id)
     setDraft(draftOf(item))
     setSaved(false)
@@ -228,6 +245,8 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   }
 
   const create = (): void => {
+    setEditorOpen(true)
+    setCleanDraft(JSON.stringify(emptyDraft()))
     setSelectedId(undefined)
     setDraft(emptyDraft())
     setSaved(false)
@@ -248,7 +267,12 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
     }
     setSaving(true)
     setError(null)
-    void postJson('/api/dsh-memory/items', body).then(() => {
+    void postJson('/api/dsh-memory/items', body).then(value => {
+      const item = value.item as unknown as MemoryPublicItem
+      setSelectedId(item.id)
+      setDraft(draftOf(item))
+      setCleanDraft(JSON.stringify(draftOf(item)))
+      setFeedback(t('settings.savedTo') + ' ' + t(('settings.' + item.scope) as MemoryLocaleKey))
       setSaved(true)
       setSaving(false)
       load()
@@ -262,9 +286,11 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   const remove = (): void => {
     if (selectedId === undefined || saving) return
     setSaving(true)
-    void postJson('/api/dsh-memory/items', { operation: 'remove', id: selectedId }).then(() => {
+    void postJson('/api/dsh-memory/items', { operation: 'remove', id: selectedId, expectedUpdatedAt: draft.expectedUpdatedAt }).then(() => {
       setSelectedId(undefined)
       setDraft(emptyDraft())
+      setCleanDraft(JSON.stringify(emptyDraft()))
+      setEditorOpen(!dock)
       setSaving(false)
       load()
     }, reason => {
@@ -274,11 +300,14 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   }
 
   const clear = (): void => {
-    if (saving) return
+    if (saving || !clearEntries) return
     setSaving(true)
-    void postJson('/api/dsh-memory/items', { operation: 'clear' }).then(() => {
+    void postJson('/api/dsh-memory/items', { operation: 'clear', entries: clearEntries.map(item => ({ id: item.id, updatedAt: item.updatedAt })) }).then(() => {
+      setClearEntries(null)
       setSelectedId(undefined)
       setDraft(emptyDraft())
+      setCleanDraft(JSON.stringify(emptyDraft()))
+      setEditorOpen(!dock)
       setSaving(false)
       load()
     }, reason => {
@@ -290,7 +319,8 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   const confirm = (entry: PendingItem): void => {
     if (saving) return
     setSaving(true)
-    void postJson('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'confirm' }).then(() => {
+    const replacement = items.find(item => item.id === replacements[entry.id])
+    void postJson('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'confirm', ...(replacement ? { replaceId: replacement.id, expectedUpdatedAt: replacement.updatedAt } : {}) }).then(() => {
       setSaving(false)
       load()
     }, reason => {
@@ -312,15 +342,17 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   }
 
   return (
-    <section className={styles.card} data-memory-card="true">
+    <section className={styles.card} data-memory-card="true" data-dock-owner="memory" data-dock-dirty={editorOpen && JSON.stringify(draft) !== cleanDraft}>
       <header className={styles.header}>
         <div>
           <h3 className={styles.title}>{t('settings.title')}</h3>
           <p className={styles.description}>{t('settings.description')}</p>
         </div>
-        <span className={saved ? styles.badgeSaved : styles.badge}>{saved ? t('settings.saved') : t('settings.unsaved')}</span>
+        <span className={saved ? styles.badgeSaved : styles.badge}>{saving ? t('settings.saving') : saved ? t('settings.saved') : editorOpen && JSON.stringify(draft) !== cleanDraft ? t('settings.unsaved') : t('settings.ready')}</span>
       </header>
       <p className={styles.notice}>{t('settings.ownerNotice')}</p>
+      <MemoryActivityPanel t={t} enabled={enabled} onEdit={select} />
+      {saved && selectedId && <p className={styles.muted} role="status">{t('settings.savedTo')} {t(('settings.' + draft.scope) as MemoryLocaleKey)}{draft.workspaceId || draft.sessionId ? ' · ' + (draft.workspaceId || draft.sessionId) : ''}</p>}
       {!settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
       {settingsSnapshot.status === 'loading' && <p className={styles.muted} role="status">{t('settings.loading')}</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
@@ -330,37 +362,53 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         {t('settings.enabled')}
       </label>
 
-      <section className={styles.section}>
+      {dock && <div className={styles.tabs} role="tablist" aria-label={t('settings.title')} onKeyDown={event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+        event.preventDefault()
+        const next = event.key === 'Home' ? 'items' : event.key === 'End' ? 'pending' : memoryTab === 'items' ? 'pending' : 'items'
+        setMemoryTab(next)
+        event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next === 'items' ? 0 : 1]?.focus()
+      }}>
+        <button type="button" role="tab" tabIndex={memoryTab === 'items' ? 0 : -1} aria-selected={memoryTab === 'items'} onClick={() => setMemoryTab('items')}>{t('settings.items')} · {items.length}</button>
+        <button type="button" role="tab" tabIndex={memoryTab === 'pending' ? 0 : -1} aria-selected={memoryTab === 'pending'} onClick={() => setMemoryTab('pending')}>{t('settings.pending')} · {pending.length}</button>
+      </div>}
+      <section className={styles.section} hidden={dock && memoryTab !== 'items'}>
         <header className={styles.sectionHeader}>
           <strong>{t('settings.items')}</strong>
           <span>{visibleItems.length} {t('settings.count')}</span>
+          {feedback && <small className={styles.muted} role="status">{feedback}</small>}
           <button type="button" className={styles.button} disabled={saving} onClick={load}>{t('settings.reload')}</button>
         </header>
+        <label className={styles.scopeFilter}><span>{t('settings.scopeFilter')}</span><select aria-label={t('settings.scopeFilter')} value={scopeFilter} onChange={event => { setScopeFilter(event.target.value as typeof scopeFilter); setClearEntries(null) }}>{(['all', 'global', 'workspace', 'session'] as const).map(scope => <option key={scope} value={scope}>{t(('settings.' + scope) as MemoryLocaleKey)} · {scope === 'all' ? items.length : items.filter(item => item.scope === scope).length}</option>)}</select></label>
         <div className={styles.filterRow}>
-          <input value={filter} onChange={event => setFilter(event.target.value)} placeholder={t('settings.searchPlaceholder')} aria-label={t('settings.search')} />
+          <input value={filter} onChange={event => { setFilter(event.target.value); setClearEntries(null) }} placeholder={t('settings.searchPlaceholder')} aria-label={t('settings.search')} />
           <button type="button" className={styles.button} disabled={saving || !settingsSnapshot.writable} onClick={create}>{t('settings.new')}</button>
-          <button type="button" className={styles.danger} disabled={saving || items.length === 0 || !settingsSnapshot.writable} onClick={clear}>{t('settings.clear')}</button>
+          <button type="button" className={styles.danger} disabled={saving || visibleItems.length === 0 || !settingsSnapshot.writable} onClick={() => setClearEntries([...visibleItems])}>{t('settings.clearVisible')}</button>
         </div>
+        {clearEntries && <div className={styles.notice} role="alert"><p>{t('settings.clearConfirm')} {clearEntries.length} {t('settings.count')}</p><div className={styles.actions}><button type="button" className={styles.button} onClick={() => setClearEntries(null)}>{t('settings.cancelAction')}</button><button type="button" className={styles.danger} disabled={saving} onClick={clear}>{t('settings.confirmDelete')}</button></div></div>}
         {loading && <p className={styles.muted}>{t('settings.loading')}</p>}
         {!loading && visibleItems.length === 0 && <p className={styles.muted}>{t('settings.noItems')}</p>}
         <div className={styles.itemList} role="list">
           {visibleItems.map(item => (
             <button type="button" role="listitem" key={item.id} className={item.id === selectedId ? styles.itemSelected : styles.item} onClick={() => select(item)}>
               <span className={styles.itemContent}>{item.content}</span>
-              <span className={styles.itemMeta}>{item.scope === 'global' ? t('settings.global') : item.scope === 'workspace' ? t('settings.workspace') : t('settings.session')}{item.pinned ? ` · ${t('settings.pinned')}` : ''}</span>
+              <span className={styles.itemMeta}>{item.scope === 'global' ? t('settings.global') : item.scope === 'workspace' ? t('settings.workspace') : t('settings.session')}{item.workspaceId || item.sessionId ? ' · ' + (item.workspaceId ?? item.sessionId) : ''}{item.pinned ? ` · ${t('settings.pinned')}` : ''}{item.expiresAt !== undefined && item.expiresAt <= Date.now() ? ' · ' + t('settings.expired') : ''}</span>
             </button>
           ))}
         </div>
       </section>
 
-      <section className={styles.section}>
+      <section className={styles.section} hidden={dock && memoryTab !== 'pending'}>
         <header className={styles.sectionHeader}><strong>{t('settings.pending')}</strong><span>{pending.length} {t('settings.count')}</span></header>
         {pending.length === 0 && <p className={styles.muted}>{t('settings.noPending')}</p>}
+        <p className={styles.muted}>{t('settings.pendingHint')}</p>
         <div className={styles.pendingList}>
           {pending.map(entry => (
             <article className={styles.pendingItem} key={entry.id}>
               <p className={styles.pendingContent}>{entry.item.content}</p>
-              <p className={styles.notice}>{t('settings.suggestion')}</p>
+              <p className={styles.notice}>{t('settings.suggestion')} {t(('settings.' + entry.item.scope) as MemoryLocaleKey)} · {new Date(entry.createdAt).toLocaleString()}</p>
+              <label className={styles.field}><span>{t('settings.replacement')}</span><select value={replacements[entry.id] ?? ''} onChange={event => setReplacements(current => ({ ...current, [entry.id]: event.target.value }))}><option value="">{t('settings.newMemory')}</option>{items.filter(item => item.scope === entry.item.scope && item.workspaceId === entry.item.workspaceId && item.sessionId === entry.item.sessionId).map(item => <option key={item.id} value={item.id}>{t('settings.replaceMemory')}: {item.content.slice(0, 80)}</option>)}</select></label>
+              {replacements[entry.id] && <blockquote>{items.find(item => item.id === replacements[entry.id])?.content}</blockquote>}
               <div className={styles.actions}>
                 <button type="button" className={styles.primary} disabled={saving || !settingsSnapshot.writable} onClick={() => confirm(entry)}>{t('settings.confirm')}</button>
                 <button type="button" className={styles.button} disabled={saving || !settingsSnapshot.writable} onClick={() => reject(entry)}>{t('settings.reject')}</button>
@@ -370,7 +418,9 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         </div>
       </section>
 
-      <section className={styles.editor}>
+      <section className={styles.editor} hidden={dock && !editorOpen}>
+        <p className={styles.muted}>{t('settings.targetHint')}</p>
+        {selectedId && <p className={styles.muted}>{t('settings.updated')} {new Date(draft.expectedUpdatedAt ?? 0).toLocaleString()}</p>}
         <header className={styles.sectionHeader}><strong>{selectedId === undefined ? t('settings.new') : selectedId}</strong></header>
         <label className={styles.field}><span>{t('settings.scope')}</span><select value={draft.scope} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, scope: event.target.value as MemoryScope }))}><option value="global">{t('settings.global')}</option><option value="workspace">{t('settings.workspace')}</option><option value="session">{t('settings.session')}</option></select></label>
         {draft.scope === 'workspace' && <label className={styles.field}><span>{t('settings.workspaceId')}</span><input value={draft.workspaceId} maxLength={128} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, workspaceId: event.target.value }))} /></label>}
@@ -379,10 +429,10 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         <label className={styles.field}><span>{t('settings.tags')}</span><input value={draft.tags} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, tags: event.target.value }))} /></label>
         <label className={styles.toggle}><input type="checkbox" checked={draft.pinned} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, pinned: event.target.checked }))} />{t('settings.pinned')}</label>
         <label className={styles.field}><span>{t('settings.expiresAt')}</span><input value={draft.expiresAt} inputMode="numeric" disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, expiresAt: event.target.value }))} /></label>
-        <footer className={styles.actions}>
+        <footer className={styles.actions} data-dock-save-bar={dock || undefined}>
           {selectedId !== undefined && <button type="button" className={styles.danger} disabled={saving || !settingsSnapshot.writable} onClick={remove}>{t('settings.delete')}</button>}
-          <button type="button" className={styles.button} disabled={saving} onClick={() => { setSelectedId(undefined); setDraft(emptyDraft()) }}>{t('settings.cancel')}</button>
-          <button type="button" className={styles.primary} disabled={saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.loading') : t('settings.save')}</button>
+          <button type="button" className={styles.button} disabled={saving} onClick={() => { setSelectedId(undefined); setDraft(emptyDraft()); setCleanDraft(JSON.stringify(emptyDraft())); setEditorOpen(!dock) }}>{t('settings.cancel')}</button>
+          <button type="button" className={styles.primary} data-dock-save="true" disabled={saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
         </footer>
       </section>
     </section>

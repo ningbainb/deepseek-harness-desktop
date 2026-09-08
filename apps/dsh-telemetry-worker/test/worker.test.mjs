@@ -185,7 +185,7 @@ test('returns no-content without touching D1 when ingestion is disabled', async 
 test('rejects oversized, malformed, and unknown input', async () => {
   const environment = enabledEnvironment()
   const oversized = await worker.fetch(requestFor({ schema: 2, events: [VALID_EVENT] }, {
-    headers: { 'content-length': '8193' },
+    headers: { 'content-length': '16385' },
   }), environment)
   assert.equal(oversized.status, 413)
 
@@ -428,7 +428,7 @@ test('download beacon fails closed without touching D1 when ingestion is disable
 test('scheduled retention keeps aggregate trends and retention cohorts on bounded windows', async () => {
   const database = new FakeDatabase()
   await worker.scheduled({}, { METRICS: database }, {})
-  assert.equal(database.runs.length, 6)
+  assert.equal(database.runs.length, 7)
   assert.match(database.runs[0].sql, /DELETE FROM metric_daily/iu)
   assert.match(database.runs[1].sql, /DELETE FROM download_click_daily/iu)
   assert.match(database.runs[2].sql, /DELETE FROM product_actor_daily/iu)
@@ -441,6 +441,7 @@ test('scheduled retention keeps aggregate trends and retention cohorts on bounde
   assert.match(database.runs[3].sql, /-13 months/iu)
   assert.match(database.runs[4].sql, /-400 days/iu)
   assert.match(database.runs[5].sql, /-400 days/iu)
+  assert.match(database.runs[6].sql, /DELETE FROM product_release_daily.*-89 days/iu)
 })
 
 test('management custom domain root redirects to the admin surface only', async () => {

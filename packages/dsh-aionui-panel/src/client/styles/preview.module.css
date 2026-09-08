@@ -784,3 +784,12 @@
   background: color-mix(in srgb, var(--aion-warning) 10%, transparent);
   flex-shrink: 0;
 }
+
+.urlClose {
+  flex: 0 0 28px; width: 28px; height: 28px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--aion-text-primary); cursor: pointer; font-size: 20px;
+}
+.urlClose:hover { background: var(--aion-bg-3); }
+.urlClose:focus-visible { outline: 2px solid var(--aion-primary); outline-offset: -2px; }
+
+:global(body:has([data-dsh-panel-host]) [data-dsh-frame]:has([data-aionui-explorer-col][data-aionui-visible="false"])) .tabBar { padding-right: 84px; }

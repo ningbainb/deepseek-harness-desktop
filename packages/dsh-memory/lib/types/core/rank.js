@@ -2,9 +2,16 @@ import { MAX_MEMORY_INJECTION_ITEMS, MAX_MEMORY_INJECTION_LENGTH, MAX_MEMORY_QUE
 function tokens(value) {
     const result = new Set();
     const normalized = value.normalize('NFKC').toLowerCase().slice(0, MAX_MEMORY_QUERY_LENGTH);
-    const matches = normalized.match(/[\p{Script=Han}]|[\p{L}\p{N}_]+/gu) ?? [];
-    for (const token of matches)
-        result.add(token);
+    const matches = normalized.match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? [];
+    for (const token of matches) {
+        if (/^\p{Script=Han}+$/u.test(token)) {
+            // Han bigrams avoid retrieving unrelated facts on a single common character.
+            for (let index = 0; index < token.length - 1; index++)
+                result.add(token.slice(index, index + 2));
+        }
+        else if (token.length > 1)
+            result.add(token);
+    }
     return result;
 }
 function overlap(query, content) {
@@ -44,16 +51,19 @@ export function rankMemories(items, query) {
         const rank = scopeRank(item, query);
         if (rank === undefined)
             continue;
-        const itemOverlap = overlap(queryTokens, item.content);
-        if (queryTokens.size > 0 && itemOverlap === 0)
+        const contentOverlap = overlap(queryTokens, item.content);
+        const tagOverlap = overlap(queryTokens, item.tags.join(' '));
+        const itemOverlap = contentOverlap + tagOverlap * 2;
+        if ((query.query ?? '').trim() !== '' && itemOverlap === 0)
             continue;
-        ranked.push({ item: { ...item, tags: [...item.tags] }, scopeRank: rank, overlap: itemOverlap });
+        ranked.push({ item: { ...item, tags: [...item.tags] }, scopeRank: rank, overlap: itemOverlap,
+            reason: contentOverlap && tagOverlap ? 'content-and-tag' : tagOverlap ? 'tag' : 'content' });
     }
     ranked.sort((a, b) => {
-        if (a.scopeRank !== b.scopeRank)
-            return b.scopeRank - a.scopeRank;
         if (a.overlap !== b.overlap)
             return b.overlap - a.overlap;
+        if (a.scopeRank !== b.scopeRank)
+            return b.scopeRank - a.scopeRank;
         if (a.item.pinned !== b.item.pinned)
             return a.item.pinned ? -1 : 1;
         if (a.item.updatedAt !== b.item.updatedAt)

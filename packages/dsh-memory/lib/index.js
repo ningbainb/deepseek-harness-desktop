@@ -199,8 +199,9 @@ function toPublicMemoryItem(item) {
 //#region src/core/rank.ts
 function tokens(value) {
 	const result = /* @__PURE__ */ new Set();
-	const matches = value.normalize("NFKC").toLowerCase().slice(0, 4e3).match(/[\p{Script=Han}]|[\p{L}\p{N}_]+/gu) ?? [];
-	for (const token of matches) result.add(token);
+	const matches = value.normalize("NFKC").toLowerCase().slice(0, 4e3).match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? [];
+	for (const token of matches) if (/^\p{Script=Han}+$/u.test(token)) for (let index = 0; index < token.length - 1; index++) result.add(token.slice(index, index + 2));
+	else if (token.length > 1) result.add(token);
 	return result;
 }
 function overlap(query, content) {
@@ -229,20 +230,23 @@ function rankMemories(items, query) {
 	for (const item of items) {
 		const rank = scopeRank(item, query);
 		if (rank === void 0) continue;
-		const itemOverlap = overlap(queryTokens, item.content);
-		if (queryTokens.size > 0 && itemOverlap === 0) continue;
+		const contentOverlap = overlap(queryTokens, item.content);
+		const tagOverlap = overlap(queryTokens, item.tags.join(" "));
+		const itemOverlap = contentOverlap + tagOverlap * 2;
+		if ((query.query ?? "").trim() !== "" && itemOverlap === 0) continue;
 		ranked.push({
 			item: {
 				...item,
 				tags: [...item.tags]
 			},
 			scopeRank: rank,
-			overlap: itemOverlap
+			overlap: itemOverlap,
+			reason: contentOverlap && tagOverlap ? "content-and-tag" : tagOverlap ? "tag" : "content"
 		});
 	}
 	ranked.sort((a, b) => {
-		if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank;
 		if (a.overlap !== b.overlap) return b.overlap - a.overlap;
+		if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank;
 		if (a.item.pinned !== b.item.pinned) return a.item.pinned ? -1 : 1;
 		if (a.item.updatedAt !== b.item.updatedAt) return b.item.updatedAt - a.item.updatedAt;
 		return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0;
@@ -437,6 +441,9 @@ function asWorkspace(value) {
 function asSession(value) {
 	return safeId(value);
 }
+function cloneContext(context) {
+	return { ...context };
+}
 function isExpired(item, now) {
 	return item.expiresAt !== void 0 && item.expiresAt <= now;
 }
@@ -469,7 +476,11 @@ var MemoryService = class {
 	warningSink;
 	cache = /* @__PURE__ */ new Map();
 	loading = /* @__PURE__ */ new Map();
+	loadedAt = /* @__PURE__ */ new Map();
+	generations = /* @__PURE__ */ new Map();
 	pending = /* @__PURE__ */ new Map();
+	activity = /* @__PURE__ */ new Map();
+	ignored = /* @__PURE__ */ new Map();
 	constructor(options) {
 		this.store = options.store ?? new MemoryStore();
 		this.now = options.now ?? (() => Date.now());
@@ -568,14 +579,93 @@ var MemoryService = class {
 		};
 	}
 	/** Read from the already-loaded owner cache; prompt providers never await I/O. */
+	prepare(context, query, enabled) {
+		if (!this.authorizedContext(context) || !context.sessionId) return "";
+		const key = this.activityKey(context);
+		const ranked = (enabled ? this.searchCached(context, query) : [])?.filter((match) => !this.ignored.get(key)?.has(match.item.id));
+		const status = !enabled ? "disabled" : !query.trim() ? "empty-query" : ranked === void 0 ? "loading" : ranked.length ? "ready" : "no-match";
+		let remaining = MAX_MEMORY_INJECTION_LENGTH;
+		const matches = [];
+		for (const match of ranked ?? []) {
+			const length = renderMemoryItems([match]).length;
+			const separator = matches.length ? 1 : 0;
+			if (remaining - separator <= 4) break;
+			matches.push({
+				id: match.item.id,
+				updatedAt: match.item.updatedAt,
+				reason: match.reason ?? "content",
+				truncated: length + separator > remaining || match.item.content.length + 2 > 2e3
+			});
+			remaining -= length + separator;
+			if (remaining <= 0) break;
+		}
+		this.activity.delete(key);
+		this.activity.set(key, {
+			context: cloneContext(context),
+			status,
+			preparedAt: this.now(),
+			matches
+		});
+		while (this.activity.size > 64) this.activity.delete(this.activity.keys().next().value);
+		return renderMemoryItems(ranked ?? []);
+	}
+	recentActivity(context, enabled) {
+		if (!this.authorizedContext(context)) throw new MemoryAccessError();
+		const entry = context.sessionId ? this.activity.get(this.activityKey(context)) : [...this.activity.values()].reverse().find((value) => value.context.scope.principalId === context.scope.principalId && this.authorizedContext(value.context));
+		const key = entry ? this.activityKey(entry.context) : this.activityKey(context);
+		const base = {
+			status: enabled ? entry?.status ?? "none" : "disabled",
+			ignoredCount: this.ignored.get(key)?.size ?? 0,
+			items: [],
+			...entry ? {
+				sessionId: entry.context.sessionId,
+				preparedAt: entry.preparedAt
+			} : {}
+		};
+		if (!entry || !enabled || !this.authorizedContext(entry.context)) return base;
+		const snapshot = this.cache.get(context.scope.principalId);
+		if (!snapshot || this.now() - (this.loadedAt.get(context.scope.principalId) ?? 0) > 1e4) {
+			this.preload(entry.context);
+			return {
+				...base,
+				status: "loading"
+			};
+		}
+		for (const match of entry.matches) {
+			const item = snapshot.items.find((item) => item.id === match.id && item.updatedAt === match.updatedAt);
+			if (item && !isExpired(item, this.now()) && this.targetContext(context, item) && !this.ignored.get(key)?.has(item.id)) base.items.push({
+				item: toPublicMemoryItem(item),
+				reason: match.reason,
+				truncated: match.truncated
+			});
+		}
+		return base;
+	}
+	ignoreForSession(context, id) {
+		if (!this.isLocalManager(context) || !context.sessionId) throw new MemoryAccessError();
+		const key = this.activityKey(context);
+		if (id === null) this.ignored.delete(key);
+		else {
+			if (!isSafeMemoryId(id) || !this.activity.get(key)?.matches.some((item) => item.id === id)) throw new MemoryNotFoundError();
+			const ids = this.ignored.get(key) ?? /* @__PURE__ */ new Set();
+			if (ids.size >= 2e3) throw new MemoryValidationError("too many ignored items", "capacity");
+			ids.add(id);
+			this.ignored.set(key, ids);
+			while (this.ignored.size > 64) this.ignored.delete(this.ignored.keys().next().value);
+		}
+	}
+	activityKey(context) {
+		return JSON.stringify([context.scope.principalId, context.sessionId]);
+	}
 	searchCached(context, query = "") {
 		if (!this.authorizedContext(context)) return void 0;
+		if (query.trim() === "") return [];
 		const snapshot = this.cache.get(context.scope.principalId);
-		if (snapshot === void 0) {
+		if (snapshot === void 0 || this.now() - (this.loadedAt.get(context.scope.principalId) ?? 0) > 1e4) {
 			this.preload(context);
 			return;
 		}
-		return rankMemories(snapshot.items, this.queryFor(context, query));
+		return rankMemories(snapshot.items.filter((item) => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query));
 	}
 	async list(context) {
 		if (!this.authorizedContext(context)) return this.denied("access-denied");
@@ -600,11 +690,15 @@ var MemoryService = class {
 	}
 	async search(context, query) {
 		if (!this.authorizedContext(context)) return this.denied("access-denied");
+		if (query.trim() === "") return {
+			ok: true,
+			value: []
+		};
 		const snapshot = await this.loadPrincipal(context.scope.principalId);
 		if (snapshot === void 0) return this.denied("store-unavailable");
 		return {
 			ok: true,
-			value: rankMemories(snapshot.items, this.queryFor(context, query))
+			value: rankMemories(snapshot.items.filter((item) => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query))
 		};
 	}
 	async save(context, draft, source = "explicit") {
@@ -612,48 +706,105 @@ var MemoryService = class {
 		if (target === void 0) throw new MemoryAccessError("invalid-target");
 		const now = this.now();
 		const item = createMemoryItem(draftInput(target.scope.principalId, draft, source, now));
+		this.invalidate(target.scope.principalId);
 		const snapshot = await this.store.update(target.scope.principalId, (current) => {
 			const index = current.items.findIndex((candidate) => candidate.id === item.id);
+			const existing = current.items[index];
+			if (existing && this.targetContext(context, existing) === void 0) throw new MemoryAccessError();
+			if (draft.expectedUpdatedAt !== void 0 && existing?.updatedAt !== draft.expectedUpdatedAt) throw new MemoryValidationError("memory changed; reload before saving", "conflict");
+			if (current.items.find((candidate) => candidate.id !== item.id && sameTarget(candidate, item) && normalizedContent(candidate.content) === normalizedContent(item.content))) throw new MemoryValidationError("memory already exists", "duplicate");
 			if (index < 0 && current.items.length >= 2e3) throw new MemoryValidationError("memory capacity is full", "capacity");
 			const items = [...current.items];
 			if (index < 0) items.push(item);
 			else items[index] = {
 				...item,
-				createdAt: items[index].createdAt
+				createdAt: items[index].createdAt,
+				updatedAt: Math.max(now, items[index].updatedAt + 1)
 			};
 			return normalizeMemorySnapshot({
 				version: 1,
 				items
 			}, target.scope.principalId);
 		});
-		this.cache.set(target.scope.principalId, snapshot);
+		this.publish(target.scope.principalId, snapshot);
 		return snapshot.items.find((candidate) => candidate.id === item.id) ?? item;
 	}
-	async remove(context, id) {
+	async remove(context, id, expectedUpdatedAt) {
 		if (!isSafeMemoryId(id)) throw new MemoryAccessError("invalid-target");
 		const snapshot = await this.readForMutation(context);
 		const item = snapshot.items.find((candidate) => candidate.id === id);
 		if (item === void 0) return false;
 		if (this.targetContext(context, item) === void 0) throw new MemoryAccessError("access-denied");
-		const next = await this.store.update(context.scope.principalId, (current) => ({
-			version: 1,
-			items: current.items.filter((candidate) => candidate.id !== id)
-		}));
-		this.cache.set(context.scope.principalId, next);
+		this.invalidate(context.scope.principalId);
+		const next = await this.store.update(context.scope.principalId, (current) => {
+			const live = current.items.find((candidate) => candidate.id === id);
+			if (live && this.targetContext(context, live) === void 0) throw new MemoryAccessError();
+			if (expectedUpdatedAt !== void 0 && live?.updatedAt !== expectedUpdatedAt) throw new MemoryValidationError("memory changed", "conflict");
+			return {
+				version: 1,
+				items: current.items.filter((candidate) => candidate.id !== id)
+			};
+		});
+		this.publish(context.scope.principalId, next);
 		return next.items.length !== snapshot.items.length;
 	}
 	async clear(context) {
 		if (!this.authorizedContext(context)) throw new MemoryAccessError();
+		if (!this.isLocalManager(context)) throw new MemoryAccessError();
+		this.invalidate(context.scope.principalId);
 		const next = await this.store.update(context.scope.principalId, () => ({
 			version: 1,
 			items: []
 		}));
-		this.cache.set(context.scope.principalId, next);
+		this.publish(context.scope.principalId, next);
+	}
+	/** Management can inspect all authorized scopes; model retrieval always stays scoped. */
+	async listManaged(context, refresh = false) {
+		if (!this.isLocalManager(context)) return this.denied("access-denied");
+		if (refresh) {
+			await this.loading.get(context.scope.principalId);
+			this.invalidate(context.scope.principalId);
+		}
+		const snapshot = await this.loadPrincipal(context.scope.principalId);
+		if (!snapshot) return this.denied("store-unavailable");
+		return {
+			ok: true,
+			value: snapshot.items.filter((item) => this.targetContext(context, item) !== void 0).map((item) => ({
+				...item,
+				tags: [...item.tags]
+			}))
+		};
+	}
+	async clearSelected(context, entries) {
+		if (!this.isLocalManager(context) || entries.length > 2e3) throw new MemoryAccessError();
+		this.invalidate(context.scope.principalId);
+		const next = await this.store.update(context.scope.principalId, (current) => {
+			for (const entry of entries) {
+				const item = current.items.find((candidate) => candidate.id === entry.id);
+				if (!item || item.updatedAt !== entry.updatedAt) throw new MemoryValidationError("memory changed", "conflict");
+				if (this.targetContext(context, item) === void 0) throw new MemoryAccessError();
+			}
+			const ids = new Set(entries.map((entry) => entry.id));
+			return {
+				version: 1,
+				items: current.items.filter((item) => !ids.has(item.id))
+			};
+		});
+		this.publish(context.scope.principalId, next);
+	}
+	isLocalManager(context) {
+		return this.authorizedContext(context) && context.scope.source === "desktop" && context.scope.principalId === this.desktopScope()?.principalId;
 	}
 	suggest(context, draft) {
 		const target = this.targetContext(context, draft);
 		if (target === void 0) throw new MemoryAccessError("invalid-target");
 		const current = this.pending.get(target.scope.principalId) ?? /* @__PURE__ */ new Map();
+		const repeated = [...current.values()].find((item) => sameTarget(item, draft) && normalizedContent(item.content) === normalizedContent(draft.content));
+		if (repeated) return {
+			id: repeated.id,
+			item: toPublicMemoryItem(repeated),
+			createdAt: repeated.createdAt
+		};
 		if (current.size >= 32) throw new MemoryValidationError("too many pending suggestions", "capacity");
 		const item = createMemoryItem(draftInput(target.scope.principalId, {
 			...draft,
@@ -669,19 +820,24 @@ var MemoryService = class {
 	}
 	listPending(context) {
 		if (!this.authorizedContext(context)) return [];
-		return [...this.pending.get(context.scope.principalId)?.values() ?? []].sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? -1 : 1)).map((item) => ({
+		return [...this.pending.get(context.scope.principalId)?.values() ?? []].filter((item) => this.targetContext(context, item) !== void 0).sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? -1 : 1)).map((item) => ({
 			id: item.id,
 			item: toPublicMemoryItem(item),
 			createdAt: item.createdAt
 		}));
 	}
-	async confirm(context, id) {
+	async confirm(context, id, replacement) {
 		if (!isSafeMemoryId(id)) throw new MemoryNotFoundError();
 		if (!this.authorizedContext(context)) throw new MemoryAccessError("access-denied");
 		const pending = this.pending.get(context.scope.principalId)?.get(id);
 		if (pending === void 0) throw new MemoryNotFoundError();
+		if (replacement) {
+			const existing = (await this.readForMutation(context)).items.find((item) => item.id === replacement.id);
+			if (!existing || !sameTarget(existing, pending)) throw new MemoryAccessError("invalid-target");
+		}
 		const saved = await this.save(context, {
-			id: pending.id,
+			id: replacement?.id ?? pending.id,
+			...replacement ? { expectedUpdatedAt: replacement.updatedAt } : {},
 			scope: pending.scope,
 			...pending.workspaceId === void 0 ? {} : { workspaceId: pending.workspaceId },
 			...pending.sessionId === void 0 ? {} : { sessionId: pending.sessionId },
@@ -752,13 +908,17 @@ var MemoryService = class {
 	}
 	async loadPrincipal(principalId) {
 		const cached = this.cache.get(principalId);
-		if (cached !== void 0) return cached;
+		if (cached !== void 0 && this.now() - (this.loadedAt.get(principalId) ?? 0) <= 1e4) return cached;
 		const active = this.loading.get(principalId);
 		if (active !== void 0) return active;
+		const generation = this.generations.get(principalId) ?? 0;
 		const request = this.store.load(principalId).then((snapshot) => {
+			if ((this.generations.get(principalId) ?? 0) !== generation) return this.cache.get(principalId);
 			this.cache.set(principalId, snapshot);
+			this.loadedAt.set(principalId, this.now());
 			return snapshot;
 		}).catch((error) => {
+			if ((this.generations.get(principalId) ?? 0) === generation) this.cache.delete(principalId);
 			if (error instanceof MemoryStoreError) this.report("store-unavailable");
 			else this.report("store-unavailable");
 		}).finally(() => {
@@ -766,6 +926,15 @@ var MemoryService = class {
 		});
 		this.loading.set(principalId, request);
 		return request;
+	}
+	invalidate(principalId) {
+		this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1);
+		this.cache.delete(principalId);
+	}
+	publish(principalId, snapshot) {
+		this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1);
+		this.cache.set(principalId, snapshot);
+		this.loadedAt.set(principalId, this.now());
 	}
 	denied(code) {
 		this.report(code);
@@ -780,6 +949,12 @@ var MemoryService = class {
 		} catch {}
 	}
 };
+function normalizedContent(value) {
+	return value.normalize("NFKC").trim().replace(/\s+/gu, " ").toLowerCase();
+}
+function sameTarget(a, b) {
+	return a.scope === b.scope && a.workspaceId === b.workspaceId && a.sessionId === b.sessionId;
+}
 //#endregion
 //#region src/core/query.ts
 function textFromEvent(event) {
@@ -1116,6 +1291,8 @@ function draftFromBody(body) {
 	if (pinned !== void 0 && typeof pinned !== "boolean") return void 0;
 	const expiresAt = body.expiresAt;
 	if (expiresAt !== void 0 && (typeof expiresAt !== "number" || !Number.isSafeInteger(expiresAt))) return void 0;
+	const expectedUpdatedAt = body.expectedUpdatedAt;
+	if (expectedUpdatedAt !== void 0 && (typeof expectedUpdatedAt !== "number" || !Number.isSafeInteger(expectedUpdatedAt) || expectedUpdatedAt < 0)) return void 0;
 	const id = body.id;
 	if (id !== void 0 && typeof id !== "string") return void 0;
 	const workspaceId = body.workspaceId;
@@ -1130,7 +1307,8 @@ function draftFromBody(body) {
 		content,
 		...tags === void 0 ? {} : { tags },
 		...pinned === void 0 ? {} : { pinned },
-		...expiresAt === void 0 ? {} : { expiresAt }
+		...expiresAt === void 0 ? {} : { expiresAt },
+		...expectedUpdatedAt === void 0 ? {} : { expectedUpdatedAt }
 	};
 }
 function makeMemoryRoutes(options) {
@@ -1155,7 +1333,7 @@ function makeMemoryRoutes(options) {
 		}
 		if (request.method === "GET" && pathname === "/api/dsh-memory/items") {
 			const query = url.searchParams.get("q") ?? "";
-			const result = query.trim() === "" ? await service.list(context) : await service.search(context, query);
+			const result = url.searchParams.get("view") === "manage" ? await service.listManaged(context, url.searchParams.get("refresh") === "1") : query.trim() === "" ? await service.list(context) : await service.search(context, query);
 			if (!result.ok) {
 				writeJson(response, 503, {
 					ok: false,
@@ -1180,6 +1358,20 @@ function makeMemoryRoutes(options) {
 			});
 			return;
 		}
+		if (request.method === "GET" && pathname === "/api/dsh-memory/activity") {
+			try {
+				writeJson(response, 200, {
+					ok: true,
+					activity: service.recentActivity(context, options.enabled?.() ?? false)
+				});
+			} catch (error) {
+				writeJson(response, 403, {
+					ok: false,
+					code: genericErrorCode(error)
+				});
+			}
+			return;
+		}
 		if (request.method !== "POST") {
 			writeJson(response, 405, {
 				ok: false,
@@ -1193,6 +1385,19 @@ function makeMemoryRoutes(options) {
 				ok: false,
 				code: "invalid-json"
 			});
+			return;
+		}
+		if (pathname === "/api/dsh-memory/activity") {
+			try {
+				if (body.operation !== "ignore" || body.id !== null && typeof body.id !== "string") throw new MemoryAccessError("invalid-target");
+				service.ignoreForSession(context, body.id);
+				writeJson(response, 200, { ok: true });
+			} catch (error) {
+				writeJson(response, 400, {
+					ok: false,
+					code: genericErrorCode(error)
+				});
+			}
 			return;
 		}
 		if (pathname === "/api/dsh-memory/items") {
@@ -1221,14 +1426,18 @@ function makeMemoryRoutes(options) {
 						});
 						return;
 					}
+					if (body.expectedUpdatedAt !== void 0 && (typeof body.expectedUpdatedAt !== "number" || !Number.isSafeInteger(body.expectedUpdatedAt))) throw new MemoryValidationError("invalid revision");
 					writeJson(response, 200, {
 						ok: true,
-						removed: await service.remove(context, body.id)
+						removed: await service.remove(context, body.id, body.expectedUpdatedAt)
 					});
 					return;
 				}
 				if (operation === "clear") {
-					await service.clear(context);
+					if (body.entries !== void 0) {
+						if (!Array.isArray(body.entries) || body.entries.some((entry) => !entry || typeof entry.id !== "string" || !Number.isSafeInteger(entry.updatedAt))) throw new MemoryValidationError("invalid selection");
+						await service.clearSelected(context, body.entries);
+					} else await service.clear(context);
 					writeJson(response, 200, { ok: true });
 					return;
 				}
@@ -1257,9 +1466,13 @@ function makeMemoryRoutes(options) {
 			}
 			try {
 				if (body.operation === "confirm") {
+					if (body.replaceId !== void 0 && (typeof body.replaceId !== "string" || typeof body.expectedUpdatedAt !== "number" || !Number.isSafeInteger(body.expectedUpdatedAt))) throw new MemoryValidationError("invalid replacement");
 					writeJson(response, 200, {
 						ok: true,
-						item: toPublicMemoryItem(await service.confirm(context, id))
+						item: toPublicMemoryItem(await service.confirm(context, id, typeof body.replaceId === "string" ? {
+							id: body.replaceId,
+							updatedAt: body.expectedUpdatedAt
+						} : void 0))
 					});
 					return;
 				}
@@ -1412,7 +1625,10 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		contextForSession
 	})), "memory: model tool");
 	ctx.inject(["webServer"], (webCtx) => {
-		const disposers = makeMemoryRoutes({ service }).map((route) => webCtx.webServer.register(route));
+		const disposers = makeMemoryRoutes({
+			service,
+			enabled: () => currentConfig().enabled
+		}).map((route) => webCtx.webServer.register(route));
 		return () => {
 			for (const dispose of disposers) dispose();
 		};
@@ -1422,13 +1638,12 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	}
 	function resolvedMemoryVariable(scope) {
 		try {
-			if (!currentConfig().enabled || scope === void 0) return "";
+			if (scope === void 0) return "";
 			const entry = sessionScopes.get(scope);
 			if (entry === void 0) return "";
 			const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
 			if (memoryContext === void 0) return "";
-			const ranked = service.searchCached(memoryContext, extractCurrentUserQuery(entry.session));
-			return ranked === void 0 ? "" : renderMemoryItems(ranked);
+			return service.prepare(memoryContext, extractCurrentUserQuery(entry.session), currentConfig().enabled);
 		} catch {
 			return "";
 		}

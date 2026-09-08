@@ -67,7 +67,7 @@ const GIT_POLL_MAX_BACKOFF_MS = GIT_POLL_MS
  * devices. The socket address is authoritative; X-Forwarded-For is never
  * trusted (matching dsh-ssh).
  */
-function isLoopbackRequest(request: IncomingMessage): boolean {
+export function isLoopbackRequest(request: IncomingMessage): boolean {
   const address = request.socket.remoteAddress
   if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
   const host = request.headers.host

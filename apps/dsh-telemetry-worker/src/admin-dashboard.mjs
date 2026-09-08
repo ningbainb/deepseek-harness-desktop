@@ -1,3 +1,4 @@
+import { releaseFilters, releaseSummary } from './release-analytics.mjs'
 import {
   adminConfigured,
   clearedSessionCookie,
@@ -659,6 +660,20 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       <article class="metric"><small>活跃国家或地区</small><strong id="metric-countries">--</strong></article>
     </section>
 
+    <section class="panel" aria-label="发布分析" style="margin-bottom:20px">
+      <div class="panel-head"><h2>发布分析</h2><div>
+        <label>版本 <select id="release-version"><option value="">全部版本</option><option value="3.3.0">v3.3.0</option></select></label>
+        <label>周期 <select id="release-days"><option value="7">7 天</option><option value="30" selected>30 天</option><option value="90">90 天</option></select></label>
+        <button id="release-export" type="button" disabled>导出 CSV</button>
+      </div></div>
+      <div class="panel-body">
+        <p id="release-coverage" role="status">正在读取发布统计…</p>
+        <p>启动实例：<strong id="release-active">--</strong> · 启动成功率：<strong id="release-startup">--</strong> <span id="release-denominator"></span></p>
+        <p style="color:var(--muted);font-size:12px">仅覆盖新版统计协议（schema 4），按稳定匿名安装实例去重，次数包含重复操作。各阶段为独立观察，不代表有序转化。普通文件添加不代表消息已发送或任务已完成。下方旧报表的周期独立控制。</p>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>功能 / 事件</th><th>结果</th><th>细分</th><th>实例数</th><th>次数</th></tr></thead><tbody id="release-rows"></tbody></table></div>
+    </section>
+
     <section class="grid">
       <article class="panel">
         <div class="panel-head"><h2>下载点击趋势</h2><span>UTC 日聚合</span></div>
@@ -753,6 +768,70 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 </html>`
 
 const DASHBOARD_SCRIPT = String.raw`'use strict'
+
+let releaseData
+let releaseRequest = 0
+const releaseLabels = {
+  feature_project: '项目操作', feature_attachment: '普通文件添加', feature_dock_setting: '拓展坞设置',
+  started: '开始', succeeded: '成功', failed: '失败', cancelled: '取消', opened: '已打开', ready: '就绪',
+  create: '新建并连接', connect: '连接已有项目', file: '普通文件', relay: '供应商接入',
+  'value-mode': '性价比模式', 'personal-prompt': '个性化 Prompt', memory: '记忆', 'particle-theme': '粒子主题', 'describe-image': '图像理解',
+}
+function releaseLabel(value) { return releaseLabels[value] || eventLabels[value] || value }
+async function loadRelease() {
+  const sequence = ++releaseRequest
+  const days = element('release-days').value
+  const version = element('release-version').value
+  releaseData = undefined
+  element('release-export').disabled = true
+  element('release-rows').replaceChildren()
+  setText('release-active', '--'); setText('release-startup', '--'); setText('release-denominator', '')
+  setText('release-coverage', '正在读取发布统计…')
+  try {
+    const response = await fetch('/admin/api/release?' + new URLSearchParams({ days, version }), { credentials: 'same-origin' })
+    if (sequence !== releaseRequest) return
+    if (response.status === 401) { location.reload(); return }
+    if (!response.ok) throw new Error('unavailable')
+    const data = await response.json()
+    if (sequence !== releaseRequest) return
+    releaseData = data
+    const select = element('release-version')
+    for (const row of data.versions) {
+      if ([...select.options].some(option => option.value === row.version)) continue
+      const option = document.createElement('option'); option.value = row.version; option.textContent = 'v' + row.version; select.append(option)
+    }
+    setText('release-coverage', data.coverage.from
+      ? '覆盖 UTC ' + data.coverage.from + ' 至 ' + data.coverage.to + (data.coverage.partial ? '；此窗口尚未完整覆盖。' : '；当日数据仍在更新。')
+      : '尚无新版统计记录；等待正式客户端上报。')
+    setText('release-active', numberFormat.format(data.activeInstances))
+    setText('release-startup', data.startup.successRate === null ? '暂无样本' : (data.startup.successRate * 100).toFixed(1) + '%')
+    setText('release-denominator', '（成功 ' + data.startup.ready + ' / 已上报结果 ' + data.startup.denominator + '）')
+    const body = element('release-rows')
+    for (const row of data.events) {
+      const tr = document.createElement('tr')
+      for (const value of [releaseLabel(row.event), releaseLabel(row.outcome), releaseLabel(row.detail), numberFormat.format(row.instances), numberFormat.format(row.count)]) {
+        const td = document.createElement('td'); td.textContent = value; tr.append(td)
+      }
+      body.append(tr)
+    }
+    if (!data.events.length) {
+      const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 5; td.textContent = '所选版本和周期暂无数据'; tr.append(td); body.append(tr)
+    }
+    element('release-export').disabled = !data.events.length
+  } catch {
+    if (sequence === releaseRequest) setText('release-coverage', '发布统计加载失败，请重新选择周期重试。')
+  }
+}
+function exportRelease() {
+  if (!releaseData) return
+  const data = releaseData
+  const rows = [['version','from_utc','to_utc','partial_window','event','outcome','detail','instances','count'],
+    ...data.events.map(row => [data.version || 'all',data.coverage.from,data.coverage.to,data.coverage.partial,row.event,row.outcome,row.detail,row.instances,row.count])]
+  const csv = rows.map(row => row.map(value => '"' + String(value ?? '').replaceAll('"', '""') + '"').join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a'); link.href = url; link.download = 'desktop-release-' + (data.version || 'all') + '-' + data.rangeDays + 'd.csv'; link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 const numberFormat = new Intl.NumberFormat('zh-CN')
 const dateFormat = new Intl.DateTimeFormat('zh-CN', {
@@ -1087,6 +1166,10 @@ for (const button of document.querySelectorAll('[data-days]')) {
   })
 }
 
+element('release-version').addEventListener('change', loadRelease)
+element('release-days').addEventListener('change', loadRelease)
+element('release-export').addEventListener('click', exportRelease)
+loadRelease()
 load('30')
 `
 
@@ -1287,6 +1370,17 @@ export async function handleAdminRequest(request, env, seams = {}) {
     } catch {
       return adminResponse(503, JSON.stringify({ error: 'temporarily unavailable' }), 'application/json; charset=utf-8')
     }
+  }
+
+  if (pathname === '/admin/api/release') {
+    if (request.method !== 'GET') return methodNotAllowed('GET')
+    if (!await hasValidSession(request, env, seams)) return adminResponse(401, JSON.stringify({ error: 'unauthorized' }), 'application/json; charset=utf-8')
+    const filters = releaseFilters(searchParams)
+    if (!filters) return adminResponse(400, JSON.stringify({ error: 'invalid filters' }), 'application/json; charset=utf-8')
+    try {
+      const data = await releaseSummary(env.METRICS, filters, currentDate(seams))
+      return adminResponse(200, JSON.stringify(data), 'application/json; charset=utf-8')
+    } catch { return adminResponse(503, JSON.stringify({ error: 'temporarily unavailable' }), 'application/json; charset=utf-8') }
   }
 
   return adminResponse(404, 'not found')

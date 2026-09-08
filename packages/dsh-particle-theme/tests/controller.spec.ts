@@ -35,6 +35,10 @@ describe('ParticleThemeController', () => {
     controller.start()
     expect(document.querySelectorAll('canvas[data-dsh-particle-theme="whale"]')).toHaveLength(1)
     expect(updates.at(-1)).toBe('normal')
+    window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: true }))
+    expect(updates.at(-1)).toBe('hidden')
+    window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: false }))
+    expect(updates.at(-1)).toBe('normal')
 
     const dialog = document.createElement('div')
     dialog.setAttribute('role', 'dialog')

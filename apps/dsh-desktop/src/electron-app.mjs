@@ -687,6 +687,9 @@ export async function startElectronApp(metadata) {
   })
   const desktopWindowFactory = createDesktopWindowFactory({
     BrowserWindow,
+    dialog,
+    WebContentsView,
+    getRuntimeOrigin: () => activeOrigin,
     appIcon,
     windowChromeIconDataUrl,
     mainPreload: MAIN_PRELOAD_PATH,
@@ -1667,6 +1670,7 @@ export async function startElectronApp(metadata) {
     onSettingsOpened: () => productMetrics.recordSurface('settings'),
     onUpdateCheck: () => productMetrics.recordSurface('updates'),
     recordValueModeEvent: (event) => productMetrics.recordValueModeEvent(event),
+    recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     notificationService,
     shell,
     getRuntimeOrigin: () => activeOrigin,
@@ -1754,6 +1758,7 @@ export async function startElectronApp(metadata) {
   })
   let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
+    selectDockSetting: (id) => desktopWindowFactory.selectDockSetting(id),
     ipcMain,
     surfaceRegistry,
     dialog,
@@ -1778,6 +1783,7 @@ export async function startElectronApp(metadata) {
     revokeFullUserTrust,
     exportDiagnostics,
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
+    recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
   })
   const dispatchDeepLink = async (link) => {

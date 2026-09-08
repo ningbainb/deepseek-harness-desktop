@@ -1,4 +1,6 @@
 export declare const zh: {
+    readonly 'settings.ready': "无待保存修改";
+    readonly 'settings.saving': "保存中…";
     readonly 'settings.title': "个性化 Prompt";
     readonly 'settings.description': "为当前本机 Profile 管理全局或工作区 Prompt。它会作为请求上下文发送给当前模型供应商。";
     readonly 'settings.enabled': "启用个性化 Prompt";

@@ -119,9 +119,11 @@ export function createSettingsWindowScript() {
     let active;
     let persistedBounds;
     let gesture;
+    let frame;
+    let pendingBounds;
 
     const normalize = (input = {}, layer) => {
-      const layerRect = layer.getBoundingClientRect();
+      const layerRect = gesture?.layerRect || layer.getBoundingClientRect();
       const viewportWidth = Math.max(1, Math.round(layerRect.width || innerWidth));
       const viewportHeight = Math.max(1, Math.round(layerRect.height || innerHeight));
       const maximumWidth = Math.max(1, viewportWidth - config.margin * 2);
@@ -176,16 +178,37 @@ export function createSettingsWindowScript() {
       if (!active?.bounds) return;
       void api.setSettingsWindowBounds(active.bounds).catch(() => {});
     };
+    const flushGesture = () => {
+      frame = undefined;
+      if (!pendingBounds || !gesture || !active) return;
+      const bounds = normalize(pendingBounds, active.layer);
+      pendingBounds = undefined;
+      if (gesture.edge === 'move') {
+        active.bounds = bounds;
+        active.dialog.style.transform = 'translate3d(' + (bounds.x - gesture.bounds.x) + 'px,' + (bounds.y - gesture.bounds.y) + 'px,0)';
+      } else applyBounds(bounds);
+    };
     const stopGesture = () => {
       if (!gesture) return;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      flushGesture();
+      if (active) {
+        active.dialog.style.transform = '';
+        active.dialog.style.willChange = '';
+        active.dialog.removeAttribute('data-dsh-settings-dragging');
+        applyBounds(active.bounds);
+      }
       gesture = undefined;
+      window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: false }));
       window.removeEventListener('pointermove', onPointerMove, true);
       window.removeEventListener('pointerup', stopGesture, true);
       window.removeEventListener('pointercancel', stopGesture, true);
+      window.removeEventListener('blur', stopGesture);
       saveBounds();
     };
     const onPointerMove = (event) => {
       if (!gesture || !active) return;
+      if (event.buttons === 0) { stopGesture(); return; }
       const dx = event.clientX - gesture.clientX;
       const dy = event.clientY - gesture.clientY;
       const next = { ...gesture.bounds };
@@ -198,20 +221,28 @@ export function createSettingsWindowScript() {
         if (gesture.edge.includes('w')) { next.x += dx; next.width -= dx; }
         if (gesture.edge.includes('n')) { next.y += dy; next.height -= dy; }
       }
-      applyBounds(next);
+      pendingBounds = next;
+      if (frame === undefined) frame = requestAnimationFrame(flushGesture);
       event.preventDefault();
     };
     const startGesture = (event, edge) => {
       if (event.button !== 0 || !active?.bounds) return;
-      gesture = { edge, clientX: event.clientX, clientY: event.clientY, bounds: { ...active.bounds } };
+      if (edge === 'move' && event.target.closest?.('button, input, select, textarea, a')) return;
+      stopGesture();
+      gesture = { edge, clientX: event.clientX, clientY: event.clientY, bounds: { ...active.bounds }, layerRect: active.layer.getBoundingClientRect() };
+      active.dialog.setAttribute('data-dsh-settings-dragging', 'true');
+      window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: true }));
+      if (edge === 'move') active.dialog.style.willChange = 'transform';
       window.addEventListener('pointermove', onPointerMove, true);
       window.addEventListener('pointerup', stopGesture, true);
       window.addEventListener('pointercancel', stopGesture, true);
+      window.addEventListener('blur', stopGesture);
       event.preventDefault();
       event.stopImmediatePropagation();
     };
     const detachActive = () => {
       if (!active) return;
+      stopGesture();
       for (const handle of active.handles?.values?.() ?? []) handle.remove();
       active = undefined;
     };
@@ -252,7 +283,7 @@ export function createSettingsWindowScript() {
     };
     const observer = new MutationObserver(scan);
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    const onResize = () => { if (active?.bounds) applyBounds(active.bounds); };
+    const onResize = () => { stopGesture(); if (active?.bounds) applyBounds(active.bounds); };
     window.addEventListener('resize', onResize);
     void api.getSettingsWindowBounds().then((bounds) => {
       if (bounds) persistedBounds = bounds;

@@ -11,42 +11,43 @@
   <body>
     <div class="settings-shell">
       <aside class="settings-sidebar">
-        <header>
-        <p class="eyebrow">桌面版设置</p>
-          <h1>扩展坞</h1>
-        </header>
-        <nav aria-label="扩展类型" role="tablist">
-          <button type="button" class="tab active" id="plugins-tab" role="tab" aria-controls="plugins" aria-selected="true" data-tab="plugins">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 13.5v7M13.5 17h7"/></svg><span>社区插件</span></span>
-            <small id="plugin-count">0</small>
-          </button>
-          <button type="button" class="tab" id="native-tab" role="tab" aria-controls="native-plugins" aria-selected="false" tabindex="-1" data-tab="native-plugins">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span>原生插件</span></span>
-            <small id="native-count">18</small>
-          </button>
-          <button type="button" class="tab" id="market-tab" role="tab" aria-controls="market" aria-selected="false" tabindex="-1" data-tab="market">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>插件市场</span></span>
-            <small id="market-count">--</small>
-          </button>
-          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" aria-selected="false" tabindex="-1" data-tab="recovery">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>插件恢复</span></span>
-            <small id="recovery-count">0</small>
-          </button>
-          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" aria-selected="false" tabindex="-1" data-tab="skills">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>技能</span></span>
-            <small id="skill-count">0</small>
-          </button>
-          <button type="button" class="tab" id="presets-tab" role="tab" aria-controls="presets" aria-selected="false" tabindex="-1" data-tab="presets">
-            <span class="tab-title"><svg class="tab-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><span>Preset</span></span>
-            <small>V1</small>
-          </button>
+        <header><h1>拓展坞</h1></header>
+        <label class="dock-search"><span class="sr-only">搜索功能</span><input id="dock-search" type="search" placeholder="搜索功能" autocomplete="off" aria-controls="dock-search-results"></label>
+        <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
+        <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
+          <p class="nav-group-label">AI 设置</p>
+          <button type="button" class="tab" id="relay-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="relay" data-group="models"><span class="tab-title">模型接入</span></button>
+          <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="ai"><span class="tab-title">模型协作</span></button>
+          <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="personal"><span class="tab-title">个人偏好</span></button>
+          <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="vision"><span class="tab-title">图像理解</span></button>
+          <p class="nav-group-label">扩展能力</p>
+          <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
+          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
+          <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
+          <p class="nav-group-label">桌面体验</p>
+          <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
+          <p class="nav-group-label">维护与迁移</p>
+          <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="backup"><span class="tab-title">备份与迁移</span></button>
+          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" data-tab="recovery" data-group="recovery"><span class="tab-title">诊断与恢复</span><small id="recovery-count" hidden>0</small></button>
         </nav>
-        <p class="sidebar-note">内置能力受保护，所有改动仅作用于桌面版配置。</p>
+        <p class="sidebar-note">配置工作方式，管理扩展能力。</p>
       </aside>
 
       <main>
+        <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
+        <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
+          <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
+          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">发现插件 <small id="market-count">--</small></button>
+          <button id="native-tab" type="button" role="tab" data-tab="native-plugins" data-group="plugins" aria-controls="native-plugins">内置能力 <small id="native-count">--</small></button>
+        </nav>
+        <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
+          <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="backup" aria-controls="presets">环境预设</button>
+          <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="backup" aria-controls="conversation-import">对话导入</button>
+          <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="backup" aria-controls="migration">旧配置迁移</button>
+        </nav>
+        <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status">正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary">重新加载</button></section>
         <div class="content-toolbar">
-          <button type="button" class="primary refresh" id="refresh">刷新 Refresh</button>
+          <button type="button" class="secondary refresh" id="refresh">刷新列表</button>
         </div>
       <section class="activation-banner" id="activation-banner" aria-live="polite" hidden>
         <div><strong>后续动作</strong><p id="activation-message">扩展状态已改变。</p></div>
@@ -55,13 +56,13 @@
       <section id="native-plugins" class="panel native-panel" role="tabpanel" aria-labelledby="native-tab" hidden>
         <header class="native-masthead">
           <div class="native-intro">
-            <p class="native-kicker">DESKTOP NATIVE / CORE ENGINE</p>
-            <h2>桌面版原生插件</h2>
-            <p>已内置并随 DeepSeek Harness Desktop 统一发布的核心功能模块。深度集成 Electron 宿主能力与本地安全沙箱，提供极速响应、离线可用与自动自愈保护。</p>
+            <p class="native-kicker">内置能力</p>
+            <h2>内置能力</h2>
+            <p>已内置并随 DeepSeek Harness Desktop 统一发布的核心功能模块。可在此查看能力说明，并前往对应设置。</p>
           </div>
           <div class="native-metrics" aria-label="原生功能状态">
             <div><strong id="native-total">18</strong><span>内置核心能力</span></div>
-            <div><strong class="native-status-ok">100%</strong><span>受保护运行</span></div>
+            <div><strong class="native-status-ok">随版本更新</strong><span>由桌面版维护</span></div>
           </div>
         </header>
         <div class="native-controls">
@@ -80,58 +81,12 @@
         <div class="native-grid" id="native-plugin-grid" aria-live="polite"></div>
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
-        <div class="native-shortcut-banner">
-          <div class="native-shortcut-info">
-            <span class="badge builtin">原生保护</span>
-            <strong>桌面版原生插件（18 项内置核心功能）已统一整合至「原生插件」标签页</strong>
-            <p>包含性价比模式、长期记忆、实时监控看板、环境自愈防御等核心能力，随桌面版内置运行。</p>
-          </div>
-          <button type="button" class="primary shortcut-jump-btn" id="jump-to-native">查看原生插件</button>
-        </div>
+        <div class="native-shortcut-banner"><span>内置能力随桌面版维护</span><button type="button" class="secondary" id="jump-to-native">查看内置能力</button></div>
         <div class="panel-head">
-          <div><h2 id="plugin-heading">社区扩展与管理</h2></div>
+          <div><h2 id="plugin-heading">已安装插件</h2></div>
           <p>安装注册表中的 DSH bundle。安装前请确认来源可信；插件拥有宿主进程权限。</p>
         </div>
-        <section class="community-feature" aria-labelledby="community-feature-heading">
-          <div class="feature-heading">
-            <div>
-              <p class="index">社区</p>
-              <h3 id="community-feature-heading">群友作品</h3>
-            </div>
-            <p>仅展示作者与仓库入口，默认不开启，也不随安装包分发第三方代码或角色素材。</p>
-          </div>
-          <div id="community-plugin-list"></div>
-        </section>
-        <article class="qqbot-card" id="qqbot-card" data-state="unbound">
-          <div class="qqbot-summary">
-            <div>
-              <div class="name-row">
-                <span class="name">QQ 机器人</span>
-                <span class="badge builtin">内置</span>
-              </div>
-              <p class="description">通过腾讯官方 dsh-qqbot 将 QQ 私聊和群聊接入 desktop profile。</p>
-            </div>
-            <div class="qqbot-state"><span class="state-dot"></span><span id="qqbot-state-label">读取状态</span></div>
-          </div>
-          <div class="qqbot-body">
-            <div id="qqbot-unbound">
-              <p class="qqbot-copy">绑定过程会显示一次性二维码。AppSecret 由操作系统加密保存，不会显示在页面或写入 profile 配置。</p>
-              <button type="button" class="primary" id="qqbot-bind">扫码绑定 QQ 机器人</button>
-            </div>
-            <div class="qqbot-scan" id="qqbot-scan" hidden>
-              <div class="qr-frame"><img id="qqbot-qr" alt="QQ 机器人绑定二维码" hidden><div id="qqbot-qr-wait">正在获取二维码</div></div>
-              <div>
-                <p class="qqbot-copy">请使用手机 QQ 扫描二维码完成机器人绑定。二维码过期后会自动刷新。</p>
-                <button type="button" class="secondary" id="qqbot-cancel">取消绑定</button>
-              </div>
-            </div>
-            <div class="qqbot-bound" id="qqbot-bound" hidden>
-              <div><span class="meta">APP ID</span><strong id="qqbot-appid">--</strong></div>
-              <button type="button" class="item-action danger" id="qqbot-unbind">解除绑定</button>
-            </div>
-          </div>
-        </article>
-        <form id="plugin-form">
+        <details class="install-disclosure" id="install-plugin"><summary>安装插件</summary><form id="plugin-form">
           <label for="plugin-spec">插件来源 / NPM 包名</label>
           <div class="field-row">
             <input type="text" id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0 或本地目录/.tgz" autocomplete="off" spellcheck="false" required>
@@ -139,11 +94,11 @@
           </div>
           <label class="risk-check"><input type="checkbox" name="allowUnknown">允许安装未声明 Desktop/DSH 适配范围的插件</label>
           <label class="risk-check"><input type="checkbox" name="fullAccess" checked>主 Runtime 完整权限（默认）：确认来源风险后安装到持久化 Desktop Profile，并按当前 Windows 用户权限运行；不会替换 Desktop 内置组件</label>
-        </form>
+        </form></details>
         <div class="plugin-tools">
           <p id="plugin-update-state">内置插件随桌面版更新；社区插件仅在此处检查。</p>
           <div class="plugin-tool-actions">
-            <button type="button" class="secondary" id="open-conversation-import">导入外部对话 (Claude / Codex)</button>
+
             <button type="button" class="secondary" id="open-plugins-dir">打开插件目录</button>
             <button type="button" class="secondary" id="check-plugin-updates">检查插件更新</button>
           </div>
@@ -154,7 +109,7 @@
       <section id="market" class="panel market-panel" role="tabpanel" aria-labelledby="market-tab" hidden>
         <header class="market-masthead">
           <div class="market-intro">
-            <p class="market-kicker">AWESOME-DSH-PLUGIN / NATIVE INSTALL</p>
+            <p class="market-kicker">发现扩展</p>
             <h2>社区插件市场</h2>
             <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
           </div>
@@ -163,6 +118,16 @@
             <div><strong id="market-updated">--</strong><span>目录更新</span></div>
           </div>
         </header>
+        <section class="community-feature" aria-labelledby="community-feature-heading">
+          <div class="feature-heading">
+            <div>
+              <p class="index">社区</p>
+              <h3 id="community-feature-heading">群友作品</h3>
+            </div>
+            <p>仅展示作者与仓库入口，默认不开启，也不随安装包分发第三方代码或角色素材。</p>
+          </div>
+          <div id="community-plugin-list"></div>
+        </section>
         <div class="market-controls">
           <label class="market-search" for="market-query"><span>搜索</span><input type="search" id="market-query" placeholder="名称、作者或描述" autocomplete="off" spellcheck="false"></label>
           <label for="market-category"><span>分类</span><select id="market-category"><option value="all">全部分类</option></select></label>
@@ -179,7 +144,7 @@
 
       <section id="recovery" class="panel" role="tabpanel" aria-labelledby="recovery-tab" hidden>
         <div class="panel-head">
-          <div><h2>插件恢复</h2></div>
+          <div><h2>诊断与恢复</h2></div>
           <p>查看启动故障、重新启用已隔离插件，或恢复最近一次可用配置。</p>
         </div>
         <div class="recovery-safety">
@@ -224,7 +189,7 @@
 
       <section id="presets" class="panel" role="tabpanel" aria-labelledby="presets-tab" hidden>
         <div class="panel-head">
-          <div><h2>Desktop Preset</h2></div>
+          <div><h2>环境预设</h2></div>
           <p>导出或恢复允许的插件、设置、技能与任务模板。Preset 不包含 Secret，也不会静默安装。</p>
         </div>
         <div class="preset-actions">
@@ -260,7 +225,38 @@
           </div>
         </div>
 
-        <div class="panel-head" style="margin-top: 32px">
+      </section>
+      <section id="qqbot" class="panel" role="tabpanel" aria-labelledby="qqbot-tab" hidden>        <article class="qqbot-card" id="qqbot-card" data-state="unbound">
+          <div class="qqbot-summary">
+            <div>
+              <div class="name-row">
+                <span class="name">QQ 机器人</span>
+                <span class="badge builtin">内置</span>
+              </div>
+              <p class="description">通过腾讯官方 dsh-qqbot 将 QQ 私聊和群聊接入 desktop profile。</p>
+            </div>
+            <div class="qqbot-state"><span class="state-dot"></span><span id="qqbot-state-label">读取状态</span></div>
+          </div>
+          <div class="qqbot-body">
+            <div id="qqbot-unbound">
+              <p class="qqbot-copy">绑定过程会显示一次性二维码。AppSecret 由操作系统加密保存，不会显示在页面或写入 profile 配置。</p>
+              <button type="button" class="primary" id="qqbot-bind">扫码绑定 QQ 机器人</button>
+            </div>
+            <div class="qqbot-scan" id="qqbot-scan" hidden>
+              <div class="qr-frame"><img id="qqbot-qr" alt="QQ 机器人绑定二维码" hidden><div id="qqbot-qr-wait">正在获取二维码</div></div>
+              <div>
+                <p class="qqbot-copy">请使用手机 QQ 扫描二维码完成机器人绑定。二维码过期后会自动刷新。</p>
+                <button type="button" class="secondary" id="qqbot-cancel">取消绑定</button>
+              </div>
+            </div>
+            <div class="qqbot-bound" id="qqbot-bound" hidden>
+              <div><span class="meta">APP ID</span><strong id="qqbot-appid">--</strong></div>
+              <button type="button" class="item-action danger" id="qqbot-unbind">解除绑定</button>
+            </div>
+          </div>
+        </article>
+      </section>
+      <section id="migration" class="panel" role="tabpanel" aria-labelledby="migration-tab" hidden>        <div class="panel-head" style="margin-top: 32px">
           <div><h3>Web Profile 迁移</h3></div>
           <p>将历史 Web Profile 中的插件和允许的配置迁移到当前 Desktop Profile。</p>
         </div>
@@ -277,6 +273,10 @@
             <button type="button" class="primary" id="apply-migration">迁移所选内容并重启</button>
           </div>
         </div>
+      </section>
+      <section id="conversation-import" class="panel" role="tabpanel" aria-labelledby="conversation-tab" hidden>
+        <div class="panel-head"><div><h2>导入已有对话</h2></div><p>将 Claude / Codex 的历史对话导入当前桌面环境。先预览内容，再确认导入。</p></div>
+            <button type="button" class="secondary" id="open-conversation-import">导入外部对话 (Claude / Codex)</button>
       </section>
       </main>
     </div>

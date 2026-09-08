@@ -144,6 +144,7 @@ async function awaitWithTimeout(value, timeoutMs, label) {
 
 const CHANNELS = [
   'extensions:list',
+  'extensions:settings-select',
   'extensions:plugin-check',
   'extensions:plugin-install',
   'extensions:plugin-install-batch',
@@ -178,6 +179,7 @@ const CHANNELS = [
 ]
 
 export function registerExtensionIpc({
+  selectDockSetting = async () => { throw new Error('Dock settings are unavailable') },
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
   dialog,
@@ -206,6 +208,7 @@ export function registerExtensionIpc({
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
+  recordFeatureEvent = () => false,
   onRuntimeMaintenanceChange = () => {},
   quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
   getProfileResetAvailableBytes = profileResetAvailableBytes,
@@ -527,6 +530,17 @@ export function registerExtensionIpc({
   }
 
   handleExtension('extensions:list', scan)
+  handleExtension('extensions:settings-select', async (_event, id) => {
+    if (id !== null && !['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(id)) throw new TypeError('unknown Dock settings page')
+    const record = (outcome) => {
+      if (id !== null) try { recordFeatureEvent({ feature: 'dock-setting', detail: id, outcome }) } catch {}
+    }
+    try {
+      const result = await selectDockSetting(id)
+      record('opened')
+      return result
+    } catch (error) { record('failed'); throw error }
+  })
   handleExtension('extensions:plugin-check', () => pluginManager.checkUpdates())
   handleExtension('extensions:plugin-install', (_event, request) => {
     return trackProductOperation('install', () => installPlugin(request))

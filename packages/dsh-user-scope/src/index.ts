@@ -154,7 +154,18 @@ export class UserScopeService extends Service {
 
   canAccess(scope: AccessScope, resource: AccessResource): AccessDecision {
     if (this.availability !== 'ready') return { allowed: false, reason: 'scope-unavailable' }
-    return this.registryValue.access(scope, resource)
+    const decision = this.registryValue.access(scope, resource)
+    // The official workspace registry is authoritative for local workspace
+    // existence. Session-created fires before workspace attachment, so the
+    // persisted ownership projection can legitimately lack that association.
+    // Remote principals still require the unchanged grant/device policy.
+    if (!decision.allowed && decision.reason === 'unknown-resource' && scope.source === 'desktop' && scope.principalId === this.localPrincipalValue.id && resource.kind === 'workspace') {
+      try {
+        const registry = this.ctx.get('workspaceRegistry') as WorkspaceRegistry | undefined
+        if (registry?.list().some(workspace => String(workspace.id) === resource.workspaceId)) return { allowed: true, reason: 'allowed' }
+      } catch { /* Unavailable registry never grants access. */ }
+    }
+    return decision
   }
 
   visibleSessions(scope: AccessScope): SessionOwnership[] {

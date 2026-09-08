@@ -2,6 +2,7 @@ import type { AccessResource, AccessScope, PrincipalId, SessionId, UserScopeServ
 import { type MemoryItem, type MemoryPublicItem, type MemoryScope, type MemorySnapshot, type MemorySource } from './schema.ts';
 import { type RankedMemory } from './rank.ts';
 import { MemoryStore } from '../store.ts';
+import type { MemoryActivity } from './activity.ts';
 export interface MemoryDraft {
     id?: string;
     scope: MemoryScope;
@@ -11,6 +12,7 @@ export interface MemoryDraft {
     tags?: readonly string[];
     pinned?: boolean;
     expiresAt?: number;
+    expectedUpdatedAt?: number;
 }
 export interface MemoryRequestContext {
     scope: AccessScope;
@@ -78,7 +80,11 @@ export declare class MemoryService {
     private readonly warningSink?;
     private readonly cache;
     private readonly loading;
+    private readonly loadedAt;
+    private readonly generations;
     private readonly pending;
+    private readonly activity;
+    private readonly ignored;
     constructor(options: MemoryServiceOptions);
     desktopScope(): AccessScope | undefined;
     currentScope(): AccessScope | undefined;
@@ -90,15 +96,29 @@ export declare class MemoryService {
     }): MemoryRequestContext | undefined;
     preload(context: MemoryRequestContext): Promise<MemoryReadResult<MemorySnapshot>>;
     /** Read from the already-loaded owner cache; prompt providers never await I/O. */
+    prepare(context: MemoryRequestContext, query: string, enabled: boolean): string;
+    recentActivity(context: MemoryRequestContext, enabled: boolean): MemoryActivity;
+    ignoreForSession(context: MemoryRequestContext, id: string | null): void;
+    private activityKey;
     searchCached(context: MemoryRequestContext, query?: string): RankedMemory[] | undefined;
     list(context: MemoryRequestContext): Promise<MemoryReadResult<MemoryItem[]>>;
     search(context: MemoryRequestContext, query: string): Promise<MemoryReadResult<RankedMemory[]>>;
     save(context: MemoryRequestContext, draft: MemoryDraft, source?: MemorySource): Promise<MemoryItem>;
-    remove(context: MemoryRequestContext, id: string): Promise<boolean>;
+    remove(context: MemoryRequestContext, id: string, expectedUpdatedAt?: number): Promise<boolean>;
     clear(context: MemoryRequestContext): Promise<void>;
+    /** Management can inspect all authorized scopes; model retrieval always stays scoped. */
+    listManaged(context: MemoryRequestContext, refresh?: boolean): Promise<MemoryReadResult<MemoryItem[]>>;
+    clearSelected(context: MemoryRequestContext, entries: {
+        id: string;
+        updatedAt: number;
+    }[]): Promise<void>;
+    private isLocalManager;
     suggest(context: MemoryRequestContext, draft: MemoryDraft): PendingMemorySuggestion;
     listPending(context: MemoryRequestContext): PendingMemorySuggestion[];
-    confirm(context: MemoryRequestContext, id: string): Promise<MemoryItem>;
+    confirm(context: MemoryRequestContext, id: string, replacement?: {
+        id: string;
+        updatedAt: number;
+    }): Promise<MemoryItem>;
     cancel(context: MemoryRequestContext, id: string): boolean;
     toPublic(items: readonly MemoryItem[]): MemoryPublicItem[];
     private queryFor;
@@ -108,6 +128,8 @@ export declare class MemoryService {
     private sessionOwnership;
     private allowed;
     private loadPrincipal;
+    private invalidate;
+    private publish;
     private denied;
     private report;
 }

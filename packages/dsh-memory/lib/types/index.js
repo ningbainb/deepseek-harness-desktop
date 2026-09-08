@@ -4,7 +4,7 @@ import z from 'schemastery';
 import { DEFAULT_MEMORY_CONFIG, normalizeMemoryConfig, assertMemoryConfig, } from "./core/config.js";
 import { MEMORY_SETTINGS_NAMESPACE } from "./core/schema.js";
 import { MemoryService, } from "./core/service.js";
-import { MEMORY_PROMPT_SECTION_TEMPLATE, renderMemoryItems, } from "./core/rank.js";
+import { MEMORY_PROMPT_SECTION_TEMPLATE, } from "./core/rank.js";
 import { extractCurrentUserQuery } from "./core/query.js";
 import { createMemoryTool } from "./tools.js";
 import { makeMemoryRoutes } from "./routes.js";
@@ -140,6 +140,7 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     ctx.inject(['webServer'], webCtx => {
         const routes = makeMemoryRoutes({
             service,
+            enabled: () => currentConfig().enabled,
         });
         const disposers = routes.map(route => webCtx.webServer.register(route));
         return () => { for (const dispose of disposers)
@@ -151,7 +152,7 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     }
     function resolvedMemoryVariable(scope) {
         try {
-            if (!currentConfig().enabled || scope === undefined)
+            if (scope === undefined)
                 return '';
             const entry = sessionScopes.get(scope);
             if (entry === undefined)
@@ -159,8 +160,7 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
             const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
             if (memoryContext === undefined)
                 return '';
-            const ranked = service.searchCached(memoryContext, extractCurrentUserQuery(entry.session));
-            return ranked === undefined ? '' : renderMemoryItems(ranked);
+            return service.prepare(memoryContext, extractCurrentUserQuery(entry.session), currentConfig().enabled);
         }
         catch {
             return '';

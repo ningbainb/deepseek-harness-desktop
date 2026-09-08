@@ -243,6 +243,8 @@ window.__ModuleLoader__.load({
 		}
 		function PersonalPromptCard(props) {
 			const { config, settingsScope, t } = props;
+			const dock = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("desktop-dock-setting");
+			const [editorOpen, setEditorOpen] = (0, react.useState)(!dock);
 			const settingsSnapshot = (0, react.useSyncExternalStore)((listener) => settingsScope.subscribe(listener), () => settingsScope.getSnapshot(), () => settingsScope.getSnapshot());
 			const liveConfig = (0, react.useMemo)(() => {
 				try {
@@ -298,6 +300,7 @@ window.__ModuleLoader__.load({
 				return [...visibleProfiles, profileFromDraft(editor)];
 			}, [editor, visibleProfiles]);
 			const selectProfile = (id) => {
+				setEditorOpen(true);
 				const profile = visibleProfiles.find((item) => item.id === id);
 				if (profile === void 0) return;
 				setSelectedId(id);
@@ -347,6 +350,7 @@ window.__ModuleLoader__.load({
 				}
 			};
 			const create = () => {
+				setEditorOpen(true);
 				const next = newProfile();
 				setSelectedId(next.id);
 				setEditor(next);
@@ -394,6 +398,8 @@ window.__ModuleLoader__.load({
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 				className: personal_prompt_module_css_default.card,
 				"data-personal-prompt-card": "true",
+				"data-dock-dirty": dirty,
+				"data-dock-owner": "personal-prompt",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", {
 						className: personal_prompt_module_css_default.header,
@@ -405,7 +411,7 @@ window.__ModuleLoader__.load({
 							children: t("settings.description")
 						})] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: dirty ? personal_prompt_module_css_default.dirty : personal_prompt_module_css_default.badge,
-							children: dirty ? t("settings.unsaved") : saved ? t("settings.saved") : "OK"
+							children: dirty ? t("settings.unsaved") : saved ? t("settings.saved") : t("settings.ready")
 						})]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
@@ -510,7 +516,7 @@ window.__ModuleLoader__.load({
 							}, profile.id))
 						})
 					] }),
-					editor !== void 0 && editor.scope !== "session" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+					editor !== void 0 && editor.scope !== "session" && editorOpen && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: personal_prompt_module_css_default.editor,
 						"aria-label": t("settings.title"),
 						children: [
@@ -634,7 +640,7 @@ window.__ModuleLoader__.load({
 								className: personal_prompt_module_css_default.muted,
 								children: t("settings.previewEmpty")
 							})] }),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("footer", {
+							!dock && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_jsx_runtime.Fragment, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("footer", {
 								className: personal_prompt_module_css_default.footer,
 								children: [
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -659,24 +665,43 @@ window.__ModuleLoader__.load({
 										children: saving ? t("settings.loading") : t("settings.save")
 									})
 								]
-							})
+							}) })
 						]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("footer", {
 						className: personal_prompt_module_css_default.actions,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-							type: "button",
-							className: personal_prompt_module_css_default.button,
-							disabled: saving,
-							onClick: reload,
-							children: t("settings.reload")
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-							type: "button",
-							className: personal_prompt_module_css_default.primary,
-							disabled: !dirty || saving || !settingsSnapshot.writable,
-							onClick: save,
-							children: t("settings.save")
-						})]
+						"data-dock-save-bar": dock || void 0,
+						children: [
+							dock && editorOpen && editor !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: personal_prompt_module_css_default.danger,
+								disabled: !settingsSnapshot.writable || saving,
+								onClick: remove,
+								children: t("settings.delete")
+							}),
+							dock && dirty && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: personal_prompt_module_css_default.button,
+								disabled: saving,
+								onClick: reload,
+								children: t("settings.discard")
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: personal_prompt_module_css_default.button,
+								disabled: saving,
+								onClick: reload,
+								children: t("settings.reload")
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: personal_prompt_module_css_default.primary,
+								"data-dock-save": "true",
+								disabled: !dirty || saving || !settingsSnapshot.writable,
+								onClick: save,
+								children: saving ? t("settings.saving") : t("settings.save")
+							})
+						]
 					})
 				]
 			});
@@ -684,6 +709,8 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/locales.ts
 		const zh = {
+			"settings.ready": "无待保存修改",
+			"settings.saving": "保存中…",
 			"settings.title": "个性化 Prompt",
 			"settings.description": "为当前本机 Profile 管理全局或工作区 Prompt。它会作为请求上下文发送给当前模型供应商。",
 			"settings.enabled": "启用个性化 Prompt",
@@ -722,6 +749,8 @@ window.__ModuleLoader__.load({
 			"action.close": "关闭"
 		};
 		const en = {
+			"settings.ready": "No unsaved changes",
+			"settings.saving": "Saving…",
 			"settings.title": "Personal Prompt",
 			"settings.description": "Manage global or workspace Prompt Profiles for this local Profile. The selected content is sent to the current model provider as request context.",
 			"settings.enabled": "Enable Personal Prompt",

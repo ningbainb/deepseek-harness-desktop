@@ -101,6 +101,8 @@ function editableProfiles(config: PersonalPromptConfig): PromptProfile[] {
 
 export function PersonalPromptCard(props: PersonalPromptCardProps) {
   const { config, settingsScope, t } = props
+  const dock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('desktop-dock-setting')
+  const [editorOpen, setEditorOpen] = useState(!dock)
   const settingsSnapshot = useSyncExternalStore(
     listener => settingsScope.subscribe(listener),
     () => settingsScope.getSnapshot(),
@@ -157,6 +159,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
   }, [editor, visibleProfiles])
 
   const selectProfile = (id: string): void => {
+    setEditorOpen(true)
     const profile = visibleProfiles.find(item => item.id === id)
     if (profile === undefined) return
     setSelectedId(id)
@@ -209,6 +212,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
   }
 
   const create = (): void => {
+    setEditorOpen(true)
     const next = newProfile()
     setSelectedId(next.id)
     setEditor(next)
@@ -255,13 +259,13 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
   const readOnlySession = editor?.scope === 'session'
 
   return (
-    <section className={styles.card} data-personal-prompt-card="true">
+    <section className={styles.card} data-personal-prompt-card="true" data-dock-dirty={dirty} data-dock-owner="personal-prompt">
       <header className={styles.header}>
         <div>
           <h3 className={styles.title}>{t('settings.title')}</h3>
           <p className={styles.description}>{t('settings.description')}</p>
         </div>
-        <span className={dirty ? styles.dirty : styles.badge}>{dirty ? t('settings.unsaved') : saved ? t('settings.saved') : 'OK'}</span>
+        <span className={dirty ? styles.dirty : styles.badge}>{dirty ? t('settings.unsaved') : saved ? t('settings.saved') : t('settings.ready')}</span>
       </header>
       <p className={styles.notice}>{t('settings.ownerNotice')}</p>
       {!settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
@@ -299,7 +303,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
         </div>
       </section>
 
-      {editor !== undefined && editor.scope !== 'session' && (
+      {editor !== undefined && editor.scope !== 'session' && editorOpen && (
         <section className={styles.editor} aria-label={t('settings.title')}>
           <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.profileName')}</span><input value={editor.name} maxLength={128} disabled={readOnlySession} placeholder={t('settings.profileNamePlaceholder')} onChange={event => editEditor({ name: event.target.value })} /></label>
           <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.scope')}</span><select value={editor.scope} disabled={readOnlySession} onChange={event => { const scope = event.target.value as PromptProfileScope; editEditor({ scope, workspaceId: scope === 'workspace' ? editor.workspaceId : '', sessionId: scope === 'session' ? editor.sessionId : '' }) }}><option value="global">{t('settings.global')}</option><option value="workspace">{t('settings.workspace')}</option><option value="session" disabled>{t('settings.session')}</option></select></label>
@@ -308,14 +312,21 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
           <label className={styles.toggle}><input type="checkbox" checked={editor.enabled} disabled={readOnlySession} onChange={event => editEditor({ enabled: event.target.checked })} />{editor.enabled ? t('settings.enable') : t('settings.disable')}</label>
           <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.content')}</span><textarea value={editor.content} maxLength={MAX_PROMPT_CONTENT_LENGTH} disabled={readOnlySession} placeholder={t('settings.contentPlaceholder')} onChange={event => editEditor({ content: event.target.value })} /><span className={styles.counter}>{editor.content.length} / {MAX_PROMPT_CONTENT_LENGTH}</span></label>
           <div><span className={styles.fieldLabel}>{t('settings.preview')}</span>{preview ? <pre className={styles.preview}>{preview}</pre> : <p className={styles.muted}>{t('settings.previewEmpty')}</p>}</div>
+          {!dock && <>
           <footer className={styles.footer}>
             <button type="button" className={styles.danger} disabled={!settingsSnapshot.writable || saving} onClick={remove}>{t('settings.delete')}</button>
             <button type="button" className={styles.button} disabled={!dirty || saving} onClick={reload}>{t('settings.discard')}</button>
             <button type="button" className={styles.primary} disabled={!dirty || saving || readOnlySession || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.loading') : t('settings.save')}</button>
           </footer>
+          </>}
         </section>
       )}
-      <footer className={styles.actions}><button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.reload')}</button><button type="button" className={styles.primary} disabled={!dirty || saving || !settingsSnapshot.writable} onClick={save}>{t('settings.save')}</button></footer>
+      <footer className={styles.actions} data-dock-save-bar={dock || undefined}>
+        {dock && editorOpen && editor !== undefined && <button type="button" className={styles.danger} disabled={!settingsSnapshot.writable || saving} onClick={remove}>{t('settings.delete')}</button>}
+        {dock && dirty && <button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.discard')}</button>}
+        <button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.reload')}</button>
+        <button type="button" className={styles.primary} data-dock-save="true" disabled={!dirty || saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
+      </footer>
     </section>
   )
 }

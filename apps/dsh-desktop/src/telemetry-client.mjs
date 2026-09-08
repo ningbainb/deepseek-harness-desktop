@@ -3,6 +3,8 @@ import { createProductEvent } from './telemetry-events.mjs'
 const DEFAULT_FLUSH_INTERVAL_MS = 30_000
 const DEFAULT_TIMEOUT_MS = 2_000
 const MAX_BATCH_EVENTS = 20
+const MAX_BATCH_BYTES = 16_384
+const MAX_QUEUED_EVENTS = 200
 
 export class ProductTelemetryClient {
   constructor({
@@ -27,6 +29,7 @@ export class ProductTelemetryClient {
     this.timer = undefined
     this.inFlight = undefined
     this.stopping = false
+    this.droppedEvents = 0
   }
 
   get enabled() {
@@ -39,6 +42,7 @@ export class ProductTelemetryClient {
 
   record(name, dimensions) {
     if (!this.enabled || this.stopping) return false
+    if (this.queue.length >= MAX_QUEUED_EVENTS) { this.droppedEvents += 1; return false }
     const actors = this.actorProvider?.()
     this.queue.push(createProductEvent(this.context, actors, name, dimensions))
     if (this.queue.length >= MAX_BATCH_EVENTS) {
@@ -71,7 +75,7 @@ export class ProductTelemetryClient {
       .then(() => this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ schema: 3, events }),
+        body: JSON.stringify({ schema: 4, events }),
         signal: controller.signal,
       }))
       .then(response => response?.ok === true)
@@ -94,11 +98,19 @@ export class ProductTelemetryClient {
     if (this.inFlight) return this.inFlight
     if (this.queue.length === 0) return Promise.resolve(false)
     this.#clearTimer()
-    const events = this.queue.splice(0, MAX_BATCH_EVENTS)
+    const events = []
+    while (this.queue.length && events.length < MAX_BATCH_EVENTS) {
+      const candidate = [...events, this.queue[0]]
+      if (new TextEncoder().encode(JSON.stringify({ schema: 4, events: candidate })).byteLength > MAX_BATCH_BYTES) break
+      events.push(this.queue.shift())
+    }
     const operation = this.#send(events, timeoutMs)
       .finally(() => {
         if (this.inFlight === operation) this.inFlight = undefined
-        if (this.queue.length > 0 && !this.stopping) this.#armTimer()
+        if (!this.stopping) {
+          if (this.queue.length >= MAX_BATCH_EVENTS) void this.flush()
+          else this.#armTimer()
+        }
       })
     this.inFlight = operation
     return operation
@@ -112,7 +124,15 @@ export class ProductTelemetryClient {
     this.stopping = true
     this.#clearTimer()
     const boundedDeadline = Number.isFinite(deadlineMs) && deadlineMs > 0 ? deadlineMs : 300
-    const operation = this.inFlight ?? this.flush({ timeoutMs: Math.min(this.timeoutMs, boundedDeadline) })
+    const expires = Date.now() + boundedDeadline
+    const operation = (async () => {
+      let delivered = this.inFlight ? await this.inFlight : true
+      while (this.queue.length && Date.now() < expires) {
+        const result = await this.flush({ timeoutMs: Math.min(this.timeoutMs, Math.max(1, expires - Date.now())) })
+        delivered = result && delivered
+      }
+      return delivered
+    })()
     let deadline
     try {
       return await Promise.race([
@@ -129,3 +149,5 @@ export class ProductTelemetryClient {
 }
 
 export const PRODUCT_TELEMETRY_MAX_BATCH_EVENTS = MAX_BATCH_EVENTS
+export const PRODUCT_TELEMETRY_MAX_BATCH_BYTES = MAX_BATCH_BYTES
+export const PRODUCT_TELEMETRY_MAX_QUEUED_EVENTS = MAX_QUEUED_EVENTS

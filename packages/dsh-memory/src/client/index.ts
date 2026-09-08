@@ -2,10 +2,12 @@ import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import { MEMORY_SETTINGS_NAMESPACE } from '../core/schema.ts'
 import { MemorySettingsCard } from './MemorySettingsCard.tsx'
+import { MemoryHeaderStatus } from './MemoryActivityPanel.tsx'
 import { en, zh, type MemoryLocaleKey } from './locales.ts'
 
 export * from './locales.ts'
@@ -56,6 +58,10 @@ export function apply(ctx: ClientContext): void {
         settingsScope,
       }),
     }, MemorySettingsCard))
+    scope.slots.inject('conversation.session.header.actions', () => scope.slots.register({
+      name: 'conversation.session.header.actions', id: 'memory-status', order: -7, locale: 'memory',
+      inject: () => ({ settingsScope }),
+    }, MemoryHeaderStatus))
   })
 }
 

@@ -21,7 +21,6 @@ import {
 } from './core/service.ts'
 import {
   MEMORY_PROMPT_SECTION_TEMPLATE,
-  renderMemoryItems,
 } from './core/rank.ts'
 import { extractCurrentUserQuery } from './core/query.ts'
 import { createMemoryTool } from './tools.ts'
@@ -172,6 +171,7 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   ctx.inject(['webServer'], webCtx => {
     const routes = makeMemoryRoutes({
       service,
+      enabled: () => currentConfig().enabled,
     })
     const disposers = routes.map(route => webCtx.webServer.register(route))
     return () => { for (const dispose of disposers) dispose() }
@@ -184,13 +184,12 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
 
   function resolvedMemoryVariable(scope: ScopeKey | undefined): string {
     try {
-      if (!currentConfig().enabled || scope === undefined) return ''
+      if (scope === undefined) return ''
       const entry = sessionScopes.get(scope)
       if (entry === undefined) return ''
       const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) })
       if (memoryContext === undefined) return ''
-      const ranked = service.searchCached(memoryContext, extractCurrentUserQuery(entry.session))
-      return ranked === undefined ? '' : renderMemoryItems(ranked)
+      return service.prepare(memoryContext, extractCurrentUserQuery(entry.session), currentConfig().enabled)
     } catch {
       return ''
     }

@@ -6,6 +6,7 @@ import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
 import a11y from './value-mode-a11y.module.css'
+import dockStyles from './value-mode-dock.module.css'
 import { reportValueModeTelemetry } from './telemetry.ts'
 
 export interface ValueModeSettingsCardProps {
@@ -23,6 +24,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
   onChange,
   fetchModels,
 }) => {
+  const dock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('desktop-dock-setting')
   const liveConfig = useValueModeConfig(settingsScope, config)
   const defaultExpert = useSettingsValue<ModelRouteSelection | undefined>(defaultModelScope, undefined)
   const resolved = resolveResolvedConfig(liveConfig, defaultExpert)
@@ -67,20 +69,20 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
     : styles.badgeInactive
 
   return (
-    <div className={`${styles.card} ${layout.card}`} data-value-mode-card="true">
+    <div className={`${styles.card} ${layout.card} ${dock ? dockStyles.card : ''}`} data-value-mode-card="true">
       <div className={`${styles.header} ${layout.header}`}>
         <div className={`${styles.titleArea} ${layout.titleArea}`}>
           <div className={`${styles.titleRow} ${layout.titleRow}`}>
-            <span className={`${styles.title} ${layout.title}`}>性价比模式 (Value Mode)</span>
+            <span className={`${styles.title} ${layout.title}`}>{dock ? '模型协作' : '性价比模式'}</span>
             <span className={`${styles.badge} ${statusClass}`}>
               {resolved.enabled ? configured ? '已开启' : '配置不完整' : '已关闭'}
             </span>
           </div>
           <div className={styles.desc}>
-            由专家主控模型理解和拆解任务，再按需派发副模型子代理完成并行调查、文件处理和局部实现，在交付质量与模型成本之间取得平衡。
+            {dock ? '主控统筹任务，执行模型按需协作。' : '由专家主控模型理解和拆解任务，再按需派发副模型子代理完成并行调查、文件处理和局部实现，在交付质量与模型成本之间取得平衡。'}
           </div>
           <div className={`${styles.desc} ${a11y.mutedNote}`}>
-            模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。
+            {dock ? '性价比模式 · 使用已有供应商配置' : '模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。'}
           </div>
         </div>
         <div className={`${styles.switchArea} ${layout.switchArea}`}>
@@ -101,7 +103,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
 
       {saveError && <div className={a11y.error} role="alert">{saveError}</div>}
 
-      {!configured && (
+      {!configured && !dock && (
         <div className={a11y.onboarding}>
           <div className={a11y.onboardingTitle}>首次使用指引</div>
           <div className={a11y.onboardingText}>
@@ -113,13 +115,13 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
       )}
 
       <div className={styles.section}>
-        <div className={styles.sectionTitle}>模型配置</div>
+        <div className={styles.sectionTitle}>{dock ? '模型分工' : '模型配置'}</div>
 
         <div className={`${styles.modelRow} ${layout.modelRow}`}>
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
-            <div className={styles.modelRole}>专家主控模型 (Expert Controller)</div>
+            <div className={styles.modelRole}>{dock ? '主控模型' : '主控模型'}</div>
             <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.expert)}</div>
-            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>负责理解任务、拆分工作、汇总子代理结果并完成最终交付。</div>
+            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>{dock ? '负责规划任务与最终交付。' : '负责理解任务、拆分工作、汇总子代理结果并完成最终交付。'}</div>
           </div>
           <button
             type="button"
@@ -133,9 +135,9 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
 
         <div className={`${styles.modelRow} ${layout.modelRow}`}>
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
-            <div className={styles.modelRole}>副模型 / 子代理执行模型 (Subagent Worker)</div>
+            <div className={styles.modelRole}>{dock ? '执行模型' : '执行模型'}</div>
             <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.executor)}</div>
-            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。</div>
+            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>{dock ? '接收主控分派的任务。' : '只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。'}</div>
           </div>
           <button
             type="button"
@@ -183,6 +185,19 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
         </div>
       </div>
 
+      {dock && <p className={dockStyles.strategyHint}>{resolved.strategy === 'saver' ? '优先直接处理，减少调用与并行任务。' : resolved.strategy === 'powerful' ? '更积极地分派并行任务，主控统一审查。' : '按任务复杂度分派，重要结果由主控复核。'}</p>}
+      <div className={styles.accordion}>
+        <button
+          type="button"
+          className={`${styles.accordionHeader} ${a11y.accordionToggle}`}
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((value) => !value)}
+        >
+          <span>{dock ? '高级设置与成本护栏' : '高级设置与成本护栏'}</span>
+          <span aria-hidden="true">{showAdvanced ? '▲' : '▼'}</span>
+        </button>
+        {showAdvanced && (
+          <div className={styles.accordionBody}>
       <div className={styles.section}>
         <label className={styles.checkboxRow}>
           <input type="checkbox" checked={resolved.allowReview} onChange={(event) => persist({ allowReview: event.target.checked })} />
@@ -194,18 +209,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
         </label>
       </div>
 
-      <div className={styles.accordion}>
-        <button
-          type="button"
-          className={`${styles.accordionHeader} ${a11y.accordionToggle}`}
-          aria-expanded={showAdvanced}
-          onClick={() => setShowAdvanced((value) => !value)}
-        >
-          <span>高级成本护栏 (Advanced Guardrails)</span>
-          <span aria-hidden="true">{showAdvanced ? '▲' : '▼'}</span>
-        </button>
-        {showAdvanced && (
-          <div className={styles.accordionBody}>
+
             <label className={styles.fieldRow}>
               <span className={styles.fieldLabel}>主控最大输出 Token:</span>
               <input type="number" aria-label="主控最大输出 Token" className={`${styles.inputNumber} ${a11y.fieldValue}`} value={resolved.maxOutputTokens} min={256} max={16384} step={256} onChange={(event) => persist({ maxOutputTokens: Number.parseInt(event.target.value, 10) || 4096 })} />
@@ -230,6 +234,10 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
         )}
       </div>
 
+      {dock && !configured && <div className={dockStyles.setupHint}>
+        <span>先选择{resolved.expert.model ? '执行模型' : '主控模型'}，再开启协作。</span>
+        <button type="button" className={`${styles.button} ${styles.buttonPrimary}`} onClick={() => setPickingTarget(resolved.expert.model ? 'executor' : 'expert')}>选择{resolved.expert.model ? '执行模型' : '主控模型'}</button>
+      </div>}
       {pickingTarget && (
         <ModelPicker
           title={pickingTarget === 'executor' ? '选择副模型 / 子代理执行模型' : '选择专家主控模型'}

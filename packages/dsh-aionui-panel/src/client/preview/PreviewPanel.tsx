@@ -101,7 +101,7 @@ export function PreviewPanel({ stores }: { stores: PanelStores }): JSX.Element {
     const stamp = Date.now()
     const tab: PreviewTabState = {
       id: `url:${stamp}`,
-      title: 'new tab',
+      title: t('preview.newUrlTab'),
       root: state.root,
       path: `url:${stamp}`,
       contentType: 'url',
@@ -152,6 +152,10 @@ export function PreviewPanel({ stores }: { stores: PanelStores }): JSX.Element {
             tab={activeTab}
             viewMode={viewMode}
             split={split}
+            onClose={() => {
+              requestClose([activeTab.id])
+              document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
+            }}
             onContentChange={(content) => preview.updateContent(activeTab.id, content)}
             onSave={() => void preview.saveTab(activeTab.id)}
           />

@@ -22,12 +22,14 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-aionui-panel
 
 After installing, **restart `dsh web`** and open a project session to see the "预览" (Preview) and "文件/变更" (Files/Changes) panels to the right of the chat area.
 
+Panel headers reserve space for the sibling workbench controls. Explorer close remains inside its toolbar; replacing the application frame remounts panel content and preserves the panel stores.
+
 ## Usage
 
 When a project session (the current session has a working directory) is open, two panels appear to the right of the chat area:
 
 - **Explorer (rightmost column, default 260px, range 220–500px)**: `File / Changes` two tabs; clicking a row in the file tree expands/collapses a folder, clicking a file opens it in the preview panel, and the top filename search (150ms debounce, clicking a result locates it in the tree without interrupting flow); the `Changes` tab reads the real git status and supports stage / unstage / discard (untracked via delete, tracked via restore, bulk discard asks for confirmation).
-- **Drag a file to the input box**: an internal file-tree row inserts only its workspace-relative path at the draft cursor; this is a reference for the agent to read after send, not a preview or pre-parsed document. An external text/code file below 1 MB inserts a path plus fenced text, while PDF, Word, spreadsheet, archive, binary, and larger files insert a path link only. External oversized images use a one-at-a-time validation, dimension check, decode, compression, and attachment submission pipeline; press Esc to cancel, and a failure remains retryable without refreshing the page.
+- **Drag a file to the input box**: internal file-tree rows insert workspace-relative paths. External non-image files in local sessions upload sequentially into removable attachment cards with pending, ready, failed and retry states, capped at 100 MB per file. Files are stored under `.dsh-attachments/` in the session workspace and sent as real references; PDF, Office and binary contents are not pre-parsed. Images retain the native attachment and large-image validation/compression flows. Older hosts without a file queue retain text insertion and path-reference fallback.
 - **Preview (second column from right, default 480px, range 340–1200px)**: multi-tab preview supporting markdown / html / code / diff / csv / pdf / word / excel / ppt / image / text / url; source/preview toggle, split-screen editing (ratio persisted), save (mtime conflict detection), download, refresh (4-state: dead buttons are not rendered), dirty dot, middle-click close, right-click menu batch close (dirty confirm), and tab-overflow gradient indicator.
 
 Interaction details:
@@ -67,3 +69,7 @@ pnpm -r build
 ## Attribution
 
 This project is a re-implementation of the AionUi (iOfficeAI/AionUi, Apache-2.0) right-panel system: sizes, colors, motions and interaction parameters come from measured research against v2.1.53 (research report and screenshots live in the aionui-research repository), the implementation is entirely new code and does not copy the source in bulk. Upstream copyright belongs to the AionUi project; this project preserves attribution under the Apache-2.0 convention.
+
+## Security model
+
+Attachment uploads accept only same-origin loopback requests for an existing direct session. The host session header supplies the working directory, which is checked against the workspace registry; caller-selected directories, traversal and external symlinks are rejected. Streams are capped at 100 MB and create exclusive new files; failures clean up incomplete copies. File contents are never executed. Removing a card removes the draft reference, not the source file or uploaded copy, preserving historical references. Copies live inside the workspace and may appear in the file tree and Git untracked list; ignore rules are not changed automatically. Unpaired remote access remains rejected.

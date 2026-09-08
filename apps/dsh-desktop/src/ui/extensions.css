@@ -1,5 +1,5 @@
 html,
-body { min-width: 760px; min-height: 620px; }
+body { min-width: 0; min-height: 0; height: 100%; }
 
 body {
   overflow: hidden;
@@ -8,10 +8,11 @@ body {
 
 .settings-shell {
   display: grid;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 176px minmax(0, 1fr);
   width: 100%;
   height: 100%;
-  min-height: calc(100vh - var(--dsh-desktop-window-chrome-height, 0px) - 1px);
+  height: calc(100vh - var(--dsh-desktop-window-chrome-height, 0px) - 1px);
+  min-height: 0;
   margin: 0;
   overflow: hidden;
   background: var(--harness-bg);
@@ -21,7 +22,8 @@ body {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  padding: 24px 12px 16px;
+  padding: 16px 10px 12px;
+  overflow-y: auto;
   border-right: 1px solid var(--harness-border);
   background: var(--harness-bg-subtle);
 }
@@ -34,10 +36,10 @@ nav { display: grid; gap: 4px; }
 nav button.tab {
   display: flex;
   width: 100%;
-  height: 40px;
+  height: 34px;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 5px 10px;
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--harness-text-secondary);
@@ -91,7 +93,7 @@ main {
   position: relative;
   min-width: 0;
   overflow: auto;
-  padding: 58px 24px 36px;
+  padding: 50px 18px 24px;
   scrollbar-color: color-mix(in srgb, var(--harness-text) 22%, transparent) transparent;
   scrollbar-width: thin;
   scrollbar-gutter: stable;
@@ -107,9 +109,10 @@ main::-webkit-scrollbar-thumb {
 
 .content-toolbar {
   position: absolute;
-  top: 18px;
-  right: 24px;
+  top: 10px;
+  right: 18px;
 }
+.content-toolbar .refresh { min-height: 28px; padding: 0 10px; font-size: 11px; }
 
 .activation-banner {
   display: flex;
@@ -217,7 +220,7 @@ form,
   align-items: end;
   margin-bottom: 14px;
   overflow: hidden;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--harness-border-strong);
   border-radius: 18px;
   background:
@@ -226,7 +229,7 @@ form,
 }
 .market-masthead::before { position: absolute; top: 0; right: 0; left: 0; height: 3px; background: var(--harness-accent); content: ''; }
 .market-intro { max-width: 580px; }
-.market-intro h2 { margin: 5px 0 8px; font-size: 24px; font-weight: 620; letter-spacing: -0.035em; }
+.market-intro h2 { margin: 5px 0 8px; font-size: 20px; font-weight: 620; letter-spacing: -0.035em; }
 .market-intro > p:last-child { margin: 0; color: var(--harness-text-secondary); font-size: 12px; line-height: 1.65; }
 .market-kicker { margin: 0; color: var(--harness-accent); font: 600 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.08em; }
 .market-metrics { display: grid; grid-template-columns: repeat(2, minmax(86px, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--harness-border); border-radius: 12px; background: var(--harness-border); }
@@ -335,12 +338,11 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
-  padding: 14px 18px;
-  border: 1px solid color-mix(in srgb, var(--harness-accent) 26%, var(--harness-border));
-  border-radius: 14px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--harness-accent) 8%, var(--harness-bg)) 0%, var(--harness-bg) 100%);
-  box-shadow: 0 4px 14px -3px rgb(0 0 0 / 4%);
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--harness-border);
+  border-radius: 10px;
+  background: var(--harness-bg-subtle);
 }
 .native-shortcut-info {
   display: grid;
@@ -375,7 +377,7 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 
   align-items: end;
   margin-bottom: 16px;
   overflow: hidden;
-  padding: 24px;
+  padding: 16px;
   border: 1px solid var(--harness-border-strong);
   border-radius: 18px;
   background:
@@ -395,7 +397,7 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 
 .native-intro { max-width: 600px; }
 .native-intro h2 {
   margin: 6px 0 8px;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 640;
   letter-spacing: -0.035em;
   color: var(--harness-text);
@@ -660,4 +662,62 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+.nav-group-label { margin: 12px 10px 4px; color: var(--harness-text-tertiary); font-size: 10px; }
+.native-protection-label { justify-self: start; color: var(--harness-text-tertiary); font-size: 10px; }
+.native-safe-badge { color: var(--harness-text-secondary); background: var(--harness-bg-subtle); border-color: var(--harness-border); }
+.settings-sidebar .sidebar-note { padding-top: 18px; }
+/* Task-based navigation: category labels do not add a navigation step. */
+.settings-sidebar { padding-top: 16px; scrollbar-width: thin; }
+.settings-sidebar header { padding: 0 10px 12px; }
+.settings-sidebar h1 { font-size: 18px; font-weight: 650; }
+.settings-sidebar nav { gap: 2px; }
+.settings-sidebar nav button.tab { height: 34px; border-radius: 7px; border: 0; }
+.settings-sidebar nav button.tab.active { box-shadow: inset 2px 0 var(--harness-accent); background: color-mix(in srgb, var(--harness-accent) 15%, transparent); }
+.nav-group-label { margin: 10px 10px 3px; font-size: 11px; line-height: 14px; }
+.settings-sidebar .sidebar-note { padding-top: 10px; font-size: 10px; }
+.settings-sidebar .native-card-icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--harness-text-secondary); }
+.settings-sidebar .active .native-card-icon { color: var(--harness-accent); }
+.dock-search { display: block; margin: 0 4px 2px; }
+.dock-search input { box-sizing: border-box; min-width: 0; width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--harness-border-strong); border-radius: 7px; color: var(--harness-text); background: var(--harness-bg); font: inherit; font-size: 12px; }
+.dock-search-results { padding: 8px 4px; max-height: 240px; overflow: auto; color: var(--harness-text-secondary); font-size: 12px; border-bottom: 1px solid var(--harness-border); }
+.dock-search-results button { width: 100%; margin: 2px 0; text-align: left; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+main { padding: 24px 26px 28px; }
+.workspace-heading { margin-bottom: 20px; padding-right: 74px; }
+.workspace-heading h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; }
+.content-toolbar { top: 31px; right: 26px; }
+nav.page-tabs { display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--harness-border); }
+.page-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 1px 12px; color: var(--harness-text-secondary); background: transparent; font-size: 13px; }
+.page-tabs button.active { border-bottom-color: var(--harness-accent); color: var(--harness-text); font-weight: 600; }
+.page-tabs small { color: var(--harness-text-tertiary); font-size: 11px; }
+.native-shortcut-banner { padding: 0 0 12px; margin: 0 0 18px; border: 0; border-bottom: 1px solid var(--harness-border); border-radius: 0; background: transparent; color: var(--harness-text-secondary); font-size: 12px; }
+.panel-head { display: block; margin-bottom: 18px; }
+.panel-head p { max-width: none; margin: 5px 0 0; font-size: 12px; }
+.panel-head h2 { font-size: 16px; }
+.install-disclosure { margin: 16px 0; border: 1px solid var(--harness-border); border-radius: 8px; }
+.install-disclosure > summary { padding: 10px 14px; cursor: pointer; color: var(--harness-accent); font-weight: 600; }
+.install-disclosure form { border: 0; margin: 0; padding: 4px 14px 14px; }
+.native-masthead, .market-masthead { padding: 0 0 18px; border: 0; background: transparent; box-shadow: none; }
+.native-intro h2, .market-intro h2 { font-size: 19px; }
+.native-metrics { gap: 12px; }
+.native-metrics strong { font-size: 16px; }
+.native-status-ok { color: var(--harness-text-secondary); }
+.native-safe-badge { color: var(--harness-text-secondary); background: transparent; border-color: var(--harness-border); }
+.community-feature { border: 0; background: transparent; margin-bottom: 22px; }
+.feature-heading { padding: 0 0 10px; }
+.qqbot-card { margin-top: 0; border-radius: 8px; }
+.item, .recovery-item { border-radius: 0; box-shadow: none; background: transparent; border: 0; border-bottom: 1px solid var(--harness-border); }
+@media (max-width: 760px) {
+  main { padding: 20px 16px; }
+  .content-toolbar { right: 16px; top: 25px; }
+  nav.page-tabs { gap: 14px; }
+}
+@media (max-width: 760px) {
+  .native-grid { grid-template-columns: 1fr; }
+  .native-masthead { grid-template-columns: 1fr; gap: 12px; }
+  .native-shortcut-banner { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .native-search-wrap { min-width: 0; max-width: none; width: 100%; }
+  .field-row { flex-wrap: wrap; }
 }

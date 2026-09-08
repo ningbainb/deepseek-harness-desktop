@@ -242,13 +242,13 @@ window.__ModuleLoader__.load({
 		};
 		//#endregion
 		//#region \0dsh-css:packages/dsh-value-mode/src/client/value-mode.module.css.mjs
-		const css$4 = ".NEKbHG_card{background:var(--dsh-surface-secondary,#ffffff0a);border:1px solid var(--dsh-border-primary,#ffffff14);color:var(--dsh-text-primary,#fff);border-radius:8px;flex-direction:column;gap:16px;padding:16px;font-size:13px;display:flex}.NEKbHG_header{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.NEKbHG_titleArea{flex-direction:column;gap:4px;display:flex}.NEKbHG_titleRow{align-items:center;gap:8px;display:flex}.NEKbHG_title{color:var(--dsh-text-primary,#fff);font-size:15px;font-weight:600}.NEKbHG_badge{border-radius:4px;padding:2px 6px;font-size:11px;font-weight:500}.NEKbHG_badgeActive{color:#10b981;background:#10b98126;border:1px solid #10b9814d}.NEKbHG_badgeInactive{color:#9ca3af;background:#9ca3af26;border:1px solid #9ca3af4d}.NEKbHG_badgeDegraded{color:#f59e0b;background:#f59e0b26;border:1px solid #f59e0b4d}.NEKbHG_desc{color:var(--dsh-text-secondary,#9ca3af);font-size:12px;line-height:1.5}.NEKbHG_switchArea{align-items:center;gap:8px;display:flex}.NEKbHG_toggleSwitch{cursor:pointer;background:#9ca3af4d;border-radius:11px;width:40px;height:22px;transition:background .2s;position:relative}.NEKbHG_toggleSwitchChecked{background:var(--dsh-brand-primary,#3b82f6)}.NEKbHG_toggleKnob{background:#fff;border-radius:50%;width:18px;height:18px;transition:transform .2s;position:absolute;top:2px;left:2px}.NEKbHG_toggleSwitchChecked .NEKbHG_toggleKnob{transform:translate(18px)}.NEKbHG_section{flex-direction:column;gap:12px;display:flex}.NEKbHG_sectionTitle{color:var(--dsh-text-primary,#fff);font-size:13px;font-weight:600}.NEKbHG_modelRow{background:var(--dsh-surface-tertiary,#ffffff05);border:1px solid var(--dsh-border-secondary,#ffffff0f);border-radius:6px;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;display:flex}.NEKbHG_modelInfo{flex-direction:column;gap:2px;display:flex}.NEKbHG_modelRole{color:var(--dsh-text-primary,#fff);font-size:13px;font-weight:500}.NEKbHG_modelValue{color:var(--dsh-brand-primary,#60a5fa);font-family:monospace;font-size:12px}.NEKbHG_modelDesc{color:var(--dsh-text-tertiary,#6b7280);font-size:11px}.NEKbHG_button{border:1px solid var(--dsh-border-primary,#ffffff1f);background:var(--dsh-surface-primary,#ffffff14);color:var(--dsh-text-primary,#fff);cursor:pointer;border-radius:4px;padding:5px 12px;font-size:12px;font-weight:500;transition:background .15s,border-color .15s}.NEKbHG_button:hover{background:var(--dsh-surface-hover,#ffffff1f);border-color:var(--dsh-border-hover,#fff3)}.NEKbHG_buttonPrimary{background:var(--dsh-brand-primary,#3b82f6);border-color:var(--dsh-brand-primary,#3b82f6);color:#fff}.NEKbHG_buttonPrimary:hover{background:var(--dsh-brand-primary-hover,#2563eb)}.NEKbHG_strategyGroup{grid-template-columns:repeat(3,1fr);gap:8px;display:grid}.NEKbHG_strategyItem{background:var(--dsh-surface-tertiary,#ffffff05);border:1px solid var(--dsh-border-secondary,#ffffff0f);cursor:pointer;border-radius:6px;flex-direction:column;gap:4px;padding:10px;transition:border-color .15s,background .15s;display:flex}.NEKbHG_strategyItemSelected{border-color:var(--dsh-brand-primary,#3b82f6);background:#3b82f614}.NEKbHG_strategyTitle{font-size:13px;font-weight:600}.NEKbHG_strategyDesc{color:var(--dsh-text-secondary,#9ca3af);font-size:11px;line-height:1.4}.NEKbHG_checkboxRow{cursor:pointer;user-select:none;align-items:center;gap:8px;font-size:12px;display:flex}.NEKbHG_accordion{border-top:1px solid var(--dsh-border-secondary,#ffffff0f);padding-top:12px}.NEKbHG_accordionHeader{cursor:pointer;color:var(--dsh-text-secondary,#9ca3af);justify-content:space-between;align-items:center;font-size:12px;display:flex}.NEKbHG_accordionBody{flex-direction:column;gap:10px;margin-top:10px;display:flex}.NEKbHG_fieldRow{justify-content:space-between;align-items:center;display:flex}.NEKbHG_fieldLabel{color:var(--dsh-text-secondary,#9ca3af);font-size:12px}.NEKbHG_inputNumber{border:1px solid var(--dsh-border-primary,#ffffff1f);color:#fff;text-align:right;background:#0003;border-radius:4px;width:90px;padding:4px 8px;font-size:12px}.NEKbHG_headerChip{color:#93c5fd;cursor:pointer;background:#3b82f61a;border:1px solid #3b82f640;border-radius:12px;align-items:center;gap:5px;padding:2px 8px;font-size:12px;transition:background .15s,border-color .15s;display:inline-flex}.NEKbHG_headerChip:hover{background:#3b82f633;border-color:#3b82f666}.NEKbHG_headerChipDisabled{color:#9ca3af;background:#9ca3af1a;border-color:#9ca3af33}.NEKbHG_popover{z-index:1000;background:#18181b;border:1px solid #ffffff26;border-radius:8px;flex-direction:column;gap:10px;width:320px;margin-top:6px;padding:14px;display:flex;position:absolute;top:100%;right:0;box-shadow:0 10px 25px #00000080}.NEKbHG_popoverItem{justify-content:space-between;font-size:12px;display:flex}.NEKbHG_popoverItemLabel{color:#9ca3af}.NEKbHG_popoverItemValue{color:#fff;font-weight:500}.NEKbHG_roleSummary{border-top:1px solid #ffffff0f;border-bottom:1px solid #ffffff0f;flex-direction:column;gap:8px;padding:10px 0;display:flex}.NEKbHG_scopeSwitcher{background:#0000004d;border-radius:6px;gap:2px;padding:2px;display:flex}.NEKbHG_scopeButton{color:#9ca3af;cursor:pointer;text-align:center;background:0 0;border:none;border-radius:4px;flex:1;padding:4px 6px;font-size:11px;transition:all .15s}.NEKbHG_scopeButtonActive{background:var(--dsh-brand-primary,#3b82f6);color:#fff;font-weight:500}.NEKbHG_statsCard{background:#ffffff08;border:1px solid #ffffff0f;border-radius:6px;grid-template-columns:repeat(2,1fr);gap:6px;padding:8px;display:grid}.NEKbHG_statItem{flex-direction:column;gap:2px;display:flex}.NEKbHG_statItemLabel{color:#9ca3af;font-size:10px}.NEKbHG_statItemValue{color:#60a5fa;font-size:13px;font-weight:600}.NEKbHG_statSavingsHighlight{color:#34d399;border-top:1px solid #ffffff0f;grid-column:span 2;justify-content:space-between;align-items:center;padding-top:4px;font-size:11px;display:flex}.NEKbHG_historyBox{border-top:1px solid #ffffff0f;flex-direction:column;gap:6px;max-height:140px;padding-top:8px;display:flex;overflow-y:auto}.NEKbHG_historyItem{background:#ffffff05;border:1px solid #ffffff0a;border-radius:4px;flex-direction:column;gap:2px;padding:6px;display:flex}.NEKbHG_historyHeader{color:#93c5fd;justify-content:space-between;font-size:11px;font-weight:500;display:flex}.NEKbHG_historySummary{color:#9ca3af;text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:1.3;overflow:hidden}.NEKbHG_manualToggle{color:var(--dsh-text-secondary,#9ca3af);cursor:pointer;background:#ffffff0d;border:1px solid #ffffff1a;border-radius:4px;align-items:center;gap:4px;padding:3px 8px;font-size:11px;transition:all .15s;display:inline-flex}.NEKbHG_manualToggleActive{color:#c4b5fd;background:#8b5cf633;border-color:#8b5cf666}.NEKbHG_modalBackdrop{z-index:2000;background:#0009;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.NEKbHG_modalContent{background:#1f2937;border:1px solid #ffffff26;border-radius:8px;flex-direction:column;gap:12px;width:420px;max-height:80vh;padding:16px;display:flex;box-shadow:0 20px 30px #000000b3}.NEKbHG_modelList{flex-direction:column;gap:6px;max-height:320px;display:flex;overflow-y:auto}.NEKbHG_providerGroup{color:#9ca3af;text-transform:uppercase;margin-top:6px;margin-bottom:2px;font-size:11px;font-weight:600}.NEKbHG_modelOption{cursor:pointer;background:#ffffff08;border:1px solid #0000;border-radius:4px;flex-direction:column;gap:2px;padding:8px 10px;transition:background .1s,border-color .1s;display:flex}.NEKbHG_modelOption:hover{background:#ffffff14;border-color:#ffffff26}.NEKbHG_modelOptionSelected{border-color:var(--dsh-brand-primary,#3b82f6);background:#3b82f626}";
-		const tagId$4 = "@linxin666/dsh-value-mode/value-mode.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$4) + "]") === null) {
+		const css$5 = ".NEKbHG_card{background:var(--dsh-surface-secondary,#ffffff0a);border:1px solid var(--dsh-border-primary,#ffffff14);color:var(--dsh-text-primary,#fff);border-radius:8px;flex-direction:column;gap:16px;padding:16px;font-size:13px;display:flex}.NEKbHG_header{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.NEKbHG_titleArea{flex-direction:column;gap:4px;display:flex}.NEKbHG_titleRow{align-items:center;gap:8px;display:flex}.NEKbHG_title{color:var(--dsh-text-primary,#fff);font-size:15px;font-weight:600}.NEKbHG_badge{border-radius:4px;padding:2px 6px;font-size:11px;font-weight:500}.NEKbHG_badgeActive{color:#10b981;background:#10b98126;border:1px solid #10b9814d}.NEKbHG_badgeInactive{color:#9ca3af;background:#9ca3af26;border:1px solid #9ca3af4d}.NEKbHG_badgeDegraded{color:#f59e0b;background:#f59e0b26;border:1px solid #f59e0b4d}.NEKbHG_desc{color:var(--dsh-text-secondary,#9ca3af);font-size:12px;line-height:1.5}.NEKbHG_switchArea{align-items:center;gap:8px;display:flex}.NEKbHG_toggleSwitch{cursor:pointer;background:#9ca3af4d;border-radius:11px;width:40px;height:22px;transition:background .2s;position:relative}.NEKbHG_toggleSwitchChecked{background:var(--dsh-brand-primary,#3b82f6)}.NEKbHG_toggleKnob{background:#fff;border-radius:50%;width:18px;height:18px;transition:transform .2s;position:absolute;top:2px;left:2px}.NEKbHG_toggleSwitchChecked .NEKbHG_toggleKnob{transform:translate(18px)}.NEKbHG_section{flex-direction:column;gap:12px;display:flex}.NEKbHG_sectionTitle{color:var(--dsh-text-primary,#fff);font-size:13px;font-weight:600}.NEKbHG_modelRow{background:var(--dsh-surface-tertiary,#ffffff05);border:1px solid var(--dsh-border-secondary,#ffffff0f);border-radius:6px;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;display:flex}.NEKbHG_modelInfo{flex-direction:column;gap:2px;display:flex}.NEKbHG_modelRole{color:var(--dsh-text-primary,#fff);font-size:13px;font-weight:500}.NEKbHG_modelValue{color:var(--dsh-brand-primary,#60a5fa);font-family:monospace;font-size:12px}.NEKbHG_modelDesc{color:var(--dsh-text-tertiary,#6b7280);font-size:11px}.NEKbHG_button{border:1px solid var(--dsh-border-primary,#ffffff1f);background:var(--dsh-surface-primary,#ffffff14);color:var(--dsh-text-primary,#fff);cursor:pointer;border-radius:4px;padding:5px 12px;font-size:12px;font-weight:500;transition:background .15s,border-color .15s}.NEKbHG_button:hover{background:var(--dsh-surface-hover,#ffffff1f);border-color:var(--dsh-border-hover,#fff3)}.NEKbHG_buttonPrimary{background:var(--dsh-brand-primary,#3b82f6);border-color:var(--dsh-brand-primary,#3b82f6);color:#fff}.NEKbHG_buttonPrimary:hover{background:var(--dsh-brand-primary-hover,#2563eb)}.NEKbHG_strategyGroup{grid-template-columns:repeat(3,1fr);gap:8px;display:grid}.NEKbHG_strategyItem{background:var(--dsh-surface-tertiary,#ffffff05);border:1px solid var(--dsh-border-secondary,#ffffff0f);cursor:pointer;border-radius:6px;flex-direction:column;gap:4px;padding:10px;transition:border-color .15s,background .15s;display:flex}.NEKbHG_strategyItemSelected{border-color:var(--dsh-brand-primary,#3b82f6);background:#3b82f614}.NEKbHG_strategyTitle{font-size:13px;font-weight:600}.NEKbHG_strategyDesc{color:var(--dsh-text-secondary,#9ca3af);font-size:11px;line-height:1.4}.NEKbHG_checkboxRow{cursor:pointer;user-select:none;align-items:center;gap:8px;font-size:12px;display:flex}.NEKbHG_accordion{border-top:1px solid var(--dsh-border-secondary,#ffffff0f);padding-top:12px}.NEKbHG_accordionHeader{cursor:pointer;color:var(--dsh-text-secondary,#9ca3af);justify-content:space-between;align-items:center;font-size:12px;display:flex}.NEKbHG_accordionBody{flex-direction:column;gap:10px;margin-top:10px;display:flex}.NEKbHG_fieldRow{justify-content:space-between;align-items:center;display:flex}.NEKbHG_fieldLabel{color:var(--dsh-text-secondary,#9ca3af);font-size:12px}.NEKbHG_inputNumber{border:1px solid var(--dsh-border-primary,#ffffff1f);color:#fff;text-align:right;background:#0003;border-radius:4px;width:90px;padding:4px 8px;font-size:12px}.NEKbHG_headerChip{color:#93c5fd;cursor:pointer;background:#3b82f61a;border:1px solid #3b82f640;border-radius:12px;align-items:center;gap:5px;padding:2px 8px;font-size:12px;transition:background .15s,border-color .15s;display:inline-flex}.NEKbHG_headerChip:hover{background:#3b82f633;border-color:#3b82f666}.NEKbHG_headerChipDisabled{color:#9ca3af;background:#9ca3af1a;border-color:#9ca3af33}.NEKbHG_popover{z-index:1000;background:#18181b;border:1px solid #ffffff26;border-radius:8px;flex-direction:column;gap:10px;width:320px;margin-top:6px;padding:14px;display:flex;position:absolute;top:100%;right:0;box-shadow:0 10px 25px #00000080}.NEKbHG_popoverItem{justify-content:space-between;font-size:12px;display:flex}.NEKbHG_popoverItemLabel{color:#9ca3af}.NEKbHG_popoverItemValue{color:#fff;font-weight:500}.NEKbHG_roleSummary{border-top:1px solid #ffffff0f;border-bottom:1px solid #ffffff0f;flex-direction:column;gap:8px;padding:10px 0;display:flex}.NEKbHG_scopeSwitcher{background:#0000004d;border-radius:6px;gap:2px;padding:2px;display:flex}.NEKbHG_scopeButton{color:#9ca3af;cursor:pointer;text-align:center;background:0 0;border:none;border-radius:4px;flex:1;padding:4px 6px;font-size:11px;transition:all .15s}.NEKbHG_scopeButtonActive{background:var(--dsh-brand-primary,#3b82f6);color:#fff;font-weight:500}.NEKbHG_statsCard{background:#ffffff08;border:1px solid #ffffff0f;border-radius:6px;grid-template-columns:repeat(2,1fr);gap:6px;padding:8px;display:grid}.NEKbHG_statItem{flex-direction:column;gap:2px;display:flex}.NEKbHG_statItemLabel{color:#9ca3af;font-size:10px}.NEKbHG_statItemValue{color:#60a5fa;font-size:13px;font-weight:600}.NEKbHG_statSavingsHighlight{color:#34d399;border-top:1px solid #ffffff0f;grid-column:span 2;justify-content:space-between;align-items:center;padding-top:4px;font-size:11px;display:flex}.NEKbHG_historyBox{border-top:1px solid #ffffff0f;flex-direction:column;gap:6px;max-height:140px;padding-top:8px;display:flex;overflow-y:auto}.NEKbHG_historyItem{background:#ffffff05;border:1px solid #ffffff0a;border-radius:4px;flex-direction:column;gap:2px;padding:6px;display:flex}.NEKbHG_historyHeader{color:#93c5fd;justify-content:space-between;font-size:11px;font-weight:500;display:flex}.NEKbHG_historySummary{color:#9ca3af;text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:1.3;overflow:hidden}.NEKbHG_manualToggle{color:var(--dsh-text-secondary,#9ca3af);cursor:pointer;background:#ffffff0d;border:1px solid #ffffff1a;border-radius:4px;align-items:center;gap:4px;padding:3px 8px;font-size:11px;transition:all .15s;display:inline-flex}.NEKbHG_manualToggleActive{color:#c4b5fd;background:#8b5cf633;border-color:#8b5cf666}.NEKbHG_modalBackdrop{z-index:2000;background:#0009;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.NEKbHG_modalContent{background:#1f2937;border:1px solid #ffffff26;border-radius:8px;flex-direction:column;gap:12px;width:420px;max-height:80vh;padding:16px;display:flex;box-shadow:0 20px 30px #000000b3}.NEKbHG_modelList{flex-direction:column;gap:6px;max-height:320px;display:flex;overflow-y:auto}.NEKbHG_providerGroup{color:#9ca3af;text-transform:uppercase;margin-top:6px;margin-bottom:2px;font-size:11px;font-weight:600}.NEKbHG_modelOption{cursor:pointer;background:#ffffff08;border:1px solid #0000;border-radius:4px;flex-direction:column;gap:2px;padding:8px 10px;transition:background .1s,border-color .1s;display:flex}.NEKbHG_modelOption:hover{background:#ffffff14;border-color:#ffffff26}.NEKbHG_modelOptionSelected{border-color:var(--dsh-brand-primary,#3b82f6);background:#3b82f626}";
+		const tagId$5 = "@linxin666/dsh-value-mode/value-mode.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$5) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@linxin666/dsh-value-mode";
-			tag.dataset.pluginCss = tagId$4;
-			tag.textContent = css$4;
+			tag.dataset.pluginCss = tagId$5;
+			tag.textContent = css$5;
 			document.head.appendChild(tag);
 		}
 		var value_mode_module_css_default = {
@@ -317,13 +317,13 @@ window.__ModuleLoader__.load({
 		};
 		//#endregion
 		//#region \0dsh-css:packages/dsh-value-mode/src/client/value-mode-polish.module.css.mjs
-		const css$3 = ".I9CORW_card{box-sizing:border-box;width:100%;min-width:0;max-width:100%}.I9CORW_header{flex-wrap:wrap;min-width:0}.I9CORW_titleArea{flex:240px;min-width:0}.I9CORW_titleRow{flex-wrap:wrap;min-width:0}.I9CORW_title{overflow-wrap:anywhere;min-width:0}.I9CORW_switchArea{flex:none;margin-left:auto}.I9CORW_onboarding{box-sizing:border-box;overflow-wrap:anywhere;min-width:0}.I9CORW_modelRow{flex-wrap:wrap;align-items:flex-start;min-width:0}.I9CORW_modelInfo{flex:220px;min-width:0}.I9CORW_modelValue,.I9CORW_modelDesc{overflow-wrap:anywhere;word-break:break-word;min-width:0}.I9CORW_modelAction{flex:none;margin-left:auto}.I9CORW_strategyGroup{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));min-width:0}.I9CORW_strategyItem{box-sizing:border-box;min-width:0}.I9CORW_popover{box-sizing:border-box;width:min(320px,100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 48px);margin:0;position:fixed;overflow:hidden auto}.I9CORW_modalBackdrop{box-sizing:border-box;padding:12px}.I9CORW_modalContent{box-sizing:border-box;width:min(420px,100%);max-width:100%;min-height:0;max-height:min(80vh,100vh - 24px);overflow:hidden}.I9CORW_modelList{flex:auto;min-height:0;max-height:none}.I9CORW_interactiveButton{box-sizing:border-box;min-width:0}@media (width<=560px){.I9CORW_modelAction{width:100%;margin-left:0}.I9CORW_interactiveButton{width:100%}}";
-		const tagId$3 = "@linxin666/dsh-value-mode/value-mode-polish.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
+		const css$4 = ".I9CORW_card{box-sizing:border-box;width:100%;min-width:0;max-width:100%}.I9CORW_header{flex-wrap:wrap;min-width:0}.I9CORW_titleArea{flex:240px;min-width:0}.I9CORW_titleRow{flex-wrap:wrap;min-width:0}.I9CORW_title{overflow-wrap:anywhere;min-width:0}.I9CORW_switchArea{flex:none;margin-left:auto}.I9CORW_onboarding{box-sizing:border-box;overflow-wrap:anywhere;min-width:0}.I9CORW_modelRow{flex-wrap:wrap;align-items:flex-start;min-width:0}.I9CORW_modelInfo{flex:220px;min-width:0}.I9CORW_modelValue,.I9CORW_modelDesc{overflow-wrap:anywhere;word-break:break-word;min-width:0}.I9CORW_modelAction{flex:none;margin-left:auto}.I9CORW_strategyGroup{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));min-width:0}.I9CORW_strategyItem{box-sizing:border-box;min-width:0}.I9CORW_popover{box-sizing:border-box;width:min(320px,100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100vh - 48px);margin:0;position:fixed;overflow:hidden auto}.I9CORW_modalBackdrop{box-sizing:border-box;padding:12px}.I9CORW_modalContent{box-sizing:border-box;width:min(420px,100%);max-width:100%;min-height:0;max-height:min(80vh,100vh - 24px);overflow:hidden}.I9CORW_modelList{flex:auto;min-height:0;max-height:none}.I9CORW_interactiveButton{box-sizing:border-box;min-width:0}@media (width<=560px){.I9CORW_modelAction{width:100%;margin-left:0}.I9CORW_interactiveButton{width:100%}}";
+		const tagId$4 = "@linxin666/dsh-value-mode/value-mode-polish.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$4) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@linxin666/dsh-value-mode";
-			tag.dataset.pluginCss = tagId$3;
-			tag.textContent = css$3;
+			tag.dataset.pluginCss = tagId$4;
+			tag.textContent = css$4;
 			document.head.appendChild(tag);
 		}
 		var value_mode_polish_module_css_default = {
@@ -349,13 +349,13 @@ window.__ModuleLoader__.load({
 		};
 		//#endregion
 		//#region \0dsh-css:packages/dsh-value-mode/src/client/value-mode-picker.module.css.mjs
-		const css$2 = ".ncXPLW_subtitle{max-width:360px;line-height:1.4}.ncXPLW_optionButton{box-sizing:border-box;color:#fff;width:100%;font:inherit;text-align:left}.ncXPLW_providerLabel{color:#9ca3af;text-transform:uppercase;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px;margin-bottom:2px;font-size:11px;font-weight:600;display:flex}.ncXPLW_providerCount{color:#6b7280;text-transform:none;flex:none;font-size:10px;font-weight:500}.ncXPLW_modelLine{justify-content:space-between;align-items:center;gap:8px;min-width:0;display:flex}.ncXPLW_modelName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-weight:500;overflow:hidden}.ncXPLW_modelId{color:#9ca3af;overflow-wrap:anywhere;font-family:monospace;font-size:11px}.ncXPLW_modelDescription{color:#9ca3af;text-overflow:ellipsis;white-space:nowrap;font-size:11px;overflow:hidden}.ncXPLW_selectedBadge{color:#bfdbfe;border:1px solid #60a5fa73;border-radius:999px;flex:none;padding:1px 5px;font-size:10px;font-weight:600;line-height:1.3}.ncXPLW_errorPanel{background:#7f1d1d33;border:1px solid #f8717159;border-radius:6px;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 10px;display:flex}.ncXPLW_errorMessage{color:#fca5a5;overflow-wrap:anywhere;min-width:0;font-size:12px;line-height:1.45}.ncXPLW_failurePanel{color:#fcd34d;background:#78350f2e;border:1px solid #fbbf244d;border-radius:6px;flex-direction:column;gap:5px;padding:8px 10px;font-size:11px;line-height:1.4;display:flex}.ncXPLW_failureTitle{font-weight:600}.ncXPLW_failureItem{color:#fde68a;overflow-wrap:anywhere;gap:6px;min-width:0;display:flex}.ncXPLW_failureProvider{color:#fef3c7;flex:none;font-weight:600}.ncXPLW_footer{justify-content:space-between;align-items:center;gap:10px;margin-top:8px;display:flex}.ncXPLW_footerHint{color:#6b7280;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:11px;overflow:hidden}.ncXPLW_error{color:#ef4444;overflow-wrap:anywhere}";
-		const tagId$2 = "@linxin666/dsh-value-mode/value-mode-picker.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
+		const css$3 = ".ncXPLW_subtitle{max-width:360px;line-height:1.4}.ncXPLW_optionButton{box-sizing:border-box;color:#fff;width:100%;font:inherit;text-align:left}.ncXPLW_providerLabel{color:#9ca3af;text-transform:uppercase;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px;margin-bottom:2px;font-size:11px;font-weight:600;display:flex}.ncXPLW_providerCount{color:#6b7280;text-transform:none;flex:none;font-size:10px;font-weight:500}.ncXPLW_modelLine{justify-content:space-between;align-items:center;gap:8px;min-width:0;display:flex}.ncXPLW_modelName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-weight:500;overflow:hidden}.ncXPLW_modelId{color:#9ca3af;overflow-wrap:anywhere;font-family:monospace;font-size:11px}.ncXPLW_modelDescription{color:#9ca3af;text-overflow:ellipsis;white-space:nowrap;font-size:11px;overflow:hidden}.ncXPLW_selectedBadge{color:#bfdbfe;border:1px solid #60a5fa73;border-radius:999px;flex:none;padding:1px 5px;font-size:10px;font-weight:600;line-height:1.3}.ncXPLW_errorPanel{background:#7f1d1d33;border:1px solid #f8717159;border-radius:6px;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 10px;display:flex}.ncXPLW_errorMessage{color:#fca5a5;overflow-wrap:anywhere;min-width:0;font-size:12px;line-height:1.45}.ncXPLW_failurePanel{color:#fcd34d;background:#78350f2e;border:1px solid #fbbf244d;border-radius:6px;flex-direction:column;gap:5px;padding:8px 10px;font-size:11px;line-height:1.4;display:flex}.ncXPLW_failureTitle{font-weight:600}.ncXPLW_failureItem{color:#fde68a;overflow-wrap:anywhere;gap:6px;min-width:0;display:flex}.ncXPLW_failureProvider{color:#fef3c7;flex:none;font-weight:600}.ncXPLW_footer{justify-content:space-between;align-items:center;gap:10px;margin-top:8px;display:flex}.ncXPLW_footerHint{color:#6b7280;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:11px;overflow:hidden}.ncXPLW_error{color:#ef4444;overflow-wrap:anywhere}";
+		const tagId$3 = "@linxin666/dsh-value-mode/value-mode-picker.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@linxin666/dsh-value-mode";
-			tag.dataset.pluginCss = tagId$2;
-			tag.textContent = css$2;
+			tag.dataset.pluginCss = tagId$3;
+			tag.textContent = css$3;
 			document.head.appendChild(tag);
 		}
 		var value_mode_picker_module_css_default = {
@@ -393,8 +393,32 @@ window.__ModuleLoader__.load({
 			const [reloadToken, setReloadToken] = (0, react.useState)(0);
 			const dialogRef = (0, react.useRef)(null);
 			(0, react.useEffect)(() => {
+				const previous = document.activeElement instanceof HTMLElement ? document.activeElement : void 0;
 				dialogRef.current?.querySelector("button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])")?.focus();
-			}, []);
+				const onKeyDown = (event) => {
+					if (event.key === "Escape") {
+						event.preventDefault();
+						event.stopPropagation();
+						onClose();
+					}
+					if (event.key !== "Tab") return;
+					const controls = [...dialogRef.current?.querySelectorAll("button:not([disabled]), input:not([disabled]), [tabindex=\"0\"]") ?? []];
+					const first = controls[0];
+					const last = controls[controls.length - 1];
+					if (event.shiftKey && document.activeElement === first) {
+						event.preventDefault();
+						last?.focus();
+					} else if (!event.shiftKey && document.activeElement === last) {
+						event.preventDefault();
+						first?.focus();
+					}
+				};
+				document.addEventListener("keydown", onKeyDown, true);
+				return () => {
+					document.removeEventListener("keydown", onKeyDown, true);
+					if (previous?.isConnected) previous.focus();
+				};
+			}, [onClose]);
 			(0, react.useEffect)(() => {
 				let active = true;
 				setLoading(true);
@@ -561,7 +585,7 @@ window.__ModuleLoader__.load({
 					]
 				})
 			});
-			return typeof document === "undefined" ? pickerContent : (0, react_dom.createPortal)(pickerContent, document.body);
+			return typeof document === "undefined" || document.querySelector("[data-dsh-dock-settings]") ? pickerContent : (0, react_dom.createPortal)(pickerContent, document.body);
 		};
 		//#endregion
 		//#region src/client/useValueModeConfig.ts
@@ -593,13 +617,13 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region \0dsh-css:packages/dsh-value-mode/src/client/value-mode-a11y.module.css.mjs
-		const css$1 = ".AMg6Ua_onboarding{box-sizing:border-box;overflow-wrap:anywhere;background:#3b82f614;border:1px dashed #3b82f64d;border-radius:6px;flex-direction:column;gap:6px;min-width:0;padding:12px;display:flex}.AMg6Ua_onboardingTitle{color:#93c5fd;font-size:12px;font-weight:600}.AMg6Ua_onboardingText{color:#bfdbfe;font-size:11px;line-height:1.4}.AMg6Ua_mutedNote{color:#6b7280;font-size:11px}.AMg6Ua_error{box-sizing:border-box;color:#fecaca;overflow-wrap:anywhere;background:#7f1d1d38;border:1px solid #f8717161;border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.45}.AMg6Ua_toggleButton{font:inherit;border:0;flex:none;padding:0}.AMg6Ua_strategyButton{width:100%;color:inherit;font:inherit;text-align:left}.AMg6Ua_accordionToggle{width:100%;color:inherit;font:inherit;text-align:left;background:0 0;border:0;padding:0}.AMg6Ua_fieldValue{flex:none}";
-		const tagId$1 = "@linxin666/dsh-value-mode/value-mode-a11y.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
+		const css$2 = ".AMg6Ua_onboarding{box-sizing:border-box;overflow-wrap:anywhere;background:#3b82f614;border:1px dashed #3b82f64d;border-radius:6px;flex-direction:column;gap:6px;min-width:0;padding:12px;display:flex}.AMg6Ua_onboardingTitle{color:var(--dsh-brand-primary,#93c5fd);font-size:12px;font-weight:600}.AMg6Ua_onboardingText{color:var(--dsh-text-secondary,#bfdbfe);font-size:11px;line-height:1.4}.AMg6Ua_mutedNote{color:var(--dsh-text-tertiary,#6b7280);font-size:11px}.AMg6Ua_error{box-sizing:border-box;color:#fecaca;overflow-wrap:anywhere;background:#7f1d1d38;border:1px solid #f8717161;border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.45}.AMg6Ua_toggleButton{font:inherit;border:0;flex:none;padding:0}.AMg6Ua_strategyButton{width:100%;color:inherit;font:inherit;text-align:left}.AMg6Ua_accordionToggle{width:100%;color:inherit;font:inherit;text-align:left;background:0 0;border:0;padding:0}.AMg6Ua_fieldValue{flex:none}";
+		const tagId$2 = "@linxin666/dsh-value-mode/value-mode-a11y.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@linxin666/dsh-value-mode";
-			tag.dataset.pluginCss = tagId$1;
-			tag.textContent = css$1;
+			tag.dataset.pluginCss = tagId$2;
+			tag.textContent = css$2;
 			document.head.appendChild(tag);
 		}
 		var value_mode_a11y_module_css_default = {
@@ -612,6 +636,22 @@ window.__ModuleLoader__.load({
 			"onboardingTitle": "AMg6Ua_onboardingTitle",
 			"strategyButton": "AMg6Ua_strategyButton",
 			"toggleButton": "AMg6Ua_toggleButton"
+		};
+		//#endregion
+		//#region \0dsh-css:packages/dsh-value-mode/src/client/value-mode-dock.module.css.mjs
+		const css$1 = "._5iPcwq_card{gap:14px}._5iPcwq_card>div:first-child{border-bottom:1px solid var(--dsh-border-primary);padding-bottom:14px}._5iPcwq_card>div:first-child>div:first-child>div:first-child>span:first-child{font-size:24px;font-weight:650}._5iPcwq_card [class*=sectionTitle]{font-size:15px}._5iPcwq_card [class*=modelRow]{border-radius:8px;align-items:center;padding:10px 14px}._5iPcwq_card [class*=modelInfo]{flex-basis:280px;grid-template-columns:90px minmax(0,1fr);gap:5px 12px;display:grid}._5iPcwq_card [class*=modelDesc]{grid-column:1/-1}._5iPcwq_card [class*=modelValue]{color:var(--dsh-text-primary);font-family:inherit;font-size:13px}._5iPcwq_card [class*=modelDesc]{font-size:12px}._5iPcwq_card [class*=strategyGroup]{border:1px solid var(--dsh-border-primary);border-radius:8px;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;overflow:hidden}._5iPcwq_card [class*=strategyItem]{border:0;border-radius:0;padding:12px 8px}._5iPcwq_card button[aria-pressed=true]{color:#fff;background:#4d78e8}._5iPcwq_card [class*=strategyTitle]{font-size:13px}._5iPcwq_card [class*=strategyDesc]{display:none}._5iPcwq_strategyHint{color:var(--dsh-text-secondary);margin:-4px 0 0;font-size:12px}._5iPcwq_card [class*=accordionHeader]{padding:12px 14px}._5iPcwq_setupHint{background:var(--dsh-surface-tertiary);border:1px solid var(--dsh-border-primary);color:var(--dsh-text-secondary);border-radius:8px;justify-content:space-between;align-items:center;gap:12px;padding:14px;display:flex}._5iPcwq_setupHint button{flex-shrink:0}@media (width<=540px){._5iPcwq_card{gap:18px}._5iPcwq_card [class*=strategyGroup],._5iPcwq_card [class*=modelInfo]{grid-template-columns:1fr}._5iPcwq_setupHint{flex-wrap:wrap}}";
+		const tagId$1 = "@linxin666/dsh-value-mode/value-mode-dock.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "@linxin666/dsh-value-mode";
+			tag.dataset.pluginCss = tagId$1;
+			tag.textContent = css$1;
+			document.head.appendChild(tag);
+		}
+		var value_mode_dock_module_css_default = {
+			"card": "_5iPcwq_card",
+			"setupHint": "_5iPcwq_setupHint",
+			"strategyHint": "_5iPcwq_strategyHint"
 		};
 		//#endregion
 		//#region src/client/telemetry.ts
@@ -636,6 +676,7 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/ValueModeSettingsCard.tsx
 		const ValueModeSettingsCard = ({ config, settingsScope, defaultModelScope, onChange, fetchModels }) => {
+			const dock = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("desktop-dock-setting");
 			const liveConfig = useValueModeConfig(settingsScope, config);
 			const defaultExpert = useSettingsValue(defaultModelScope, void 0);
 			const resolved = resolveResolvedConfig(liveConfig, defaultExpert);
@@ -678,7 +719,7 @@ window.__ModuleLoader__.load({
 			};
 			const statusClass = resolved.enabled ? configured ? value_mode_module_css_default.badgeActive : value_mode_module_css_default.badgeDegraded : value_mode_module_css_default.badgeInactive;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: `${value_mode_module_css_default.card} ${value_mode_polish_module_css_default.card}`,
+				className: `${value_mode_module_css_default.card} ${value_mode_polish_module_css_default.card} ${dock ? value_mode_dock_module_css_default.card : ""}`,
 				"data-value-mode-card": "true",
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -690,7 +731,7 @@ window.__ModuleLoader__.load({
 									className: `${value_mode_module_css_default.titleRow} ${value_mode_polish_module_css_default.titleRow}`,
 									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 										className: `${value_mode_module_css_default.title} ${value_mode_polish_module_css_default.title}`,
-										children: "性价比模式 (Value Mode)"
+										children: dock ? "模型协作" : "性价比模式"
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 										className: `${value_mode_module_css_default.badge} ${statusClass}`,
 										children: resolved.enabled ? configured ? "已开启" : "配置不完整" : "已关闭"
@@ -698,11 +739,11 @@ window.__ModuleLoader__.load({
 								}),
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: value_mode_module_css_default.desc,
-									children: "由专家主控模型理解和拆解任务，再按需派发副模型子代理完成并行调查、文件处理和局部实现，在交付质量与模型成本之间取得平衡。"
+									children: dock ? "主控统筹任务，执行模型按需协作。" : "由专家主控模型理解和拆解任务，再按需派发副模型子代理完成并行调查、文件处理和局部实现，在交付质量与模型成本之间取得平衡。"
 								}),
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: `${value_mode_module_css_default.desc} ${value_mode_a11y_module_css_default.mutedNote}`,
-									children: "模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。"
+									children: dock ? "性价比模式 · 使用已有供应商配置" : "模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。"
 								})
 							]
 						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
@@ -725,7 +766,7 @@ window.__ModuleLoader__.load({
 						role: "alert",
 						children: saveError
 					}),
-					!configured && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					!configured && !dock && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: value_mode_a11y_module_css_default.onboarding,
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 							className: value_mode_a11y_module_css_default.onboardingTitle,
@@ -746,7 +787,7 @@ window.__ModuleLoader__.load({
 						children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: value_mode_module_css_default.sectionTitle,
-								children: "模型配置"
+								children: dock ? "模型分工" : "模型配置"
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 								className: `${value_mode_module_css_default.modelRow} ${value_mode_polish_module_css_default.modelRow}`,
@@ -755,7 +796,7 @@ window.__ModuleLoader__.load({
 									children: [
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: value_mode_module_css_default.modelRole,
-											children: "专家主控模型 (Expert Controller)"
+											children: dock ? "主控模型" : "主控模型"
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: `${value_mode_module_css_default.modelValue} ${value_mode_polish_module_css_default.modelValue}`,
@@ -763,7 +804,7 @@ window.__ModuleLoader__.load({
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: `${value_mode_module_css_default.modelDesc} ${value_mode_polish_module_css_default.modelDesc}`,
-											children: "负责理解任务、拆分工作、汇总子代理结果并完成最终交付。"
+											children: dock ? "负责规划任务与最终交付。" : "负责理解任务、拆分工作、汇总子代理结果并完成最终交付。"
 										})
 									]
 								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -781,7 +822,7 @@ window.__ModuleLoader__.load({
 									children: [
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: value_mode_module_css_default.modelRole,
-											children: "副模型 / 子代理执行模型 (Subagent Worker)"
+											children: dock ? "执行模型" : "执行模型"
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: `${value_mode_module_css_default.modelValue} ${value_mode_polish_module_css_default.modelValue}`,
@@ -789,7 +830,7 @@ window.__ModuleLoader__.load({
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 											className: `${value_mode_module_css_default.modelDesc} ${value_mode_polish_module_css_default.modelDesc}`,
-											children: "只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。"
+											children: dock ? "接收主控分派的任务。" : "只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。"
 										})
 									]
 								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -852,23 +893,9 @@ window.__ModuleLoader__.load({
 							]
 						})]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: value_mode_module_css_default.section,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-							className: value_mode_module_css_default.checkboxRow,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-								type: "checkbox",
-								checked: resolved.allowReview,
-								onChange: (event) => persist({ allowReview: event.target.checked })
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "重要改动完成后保留主控复核" })]
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-							className: value_mode_module_css_default.checkboxRow,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-								type: "checkbox",
-								checked: resolved.showExpertActivity,
-								onChange: (event) => persist({ showExpertActivity: event.target.checked })
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "显式显示主控与子代理活动" })]
-						})]
+					dock && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: value_mode_dock_module_css_default.strategyHint,
+						children: resolved.strategy === "saver" ? "优先直接处理，减少调用与并行任务。" : resolved.strategy === "powerful" ? "更积极地分派并行任务，主控统一审查。" : "按任务复杂度分派，重要结果由主控复核。"
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: value_mode_module_css_default.accordion,
@@ -877,13 +904,31 @@ window.__ModuleLoader__.load({
 							className: `${value_mode_module_css_default.accordionHeader} ${value_mode_a11y_module_css_default.accordionToggle}`,
 							"aria-expanded": showAdvanced,
 							onClick: () => setShowAdvanced((value) => !value),
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "高级成本护栏 (Advanced Guardrails)" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: dock ? "高级设置与成本护栏" : "高级设置与成本护栏" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								"aria-hidden": "true",
 								children: showAdvanced ? "▲" : "▼"
 							})]
 						}), showAdvanced && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: value_mode_module_css_default.accordionBody,
 							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: value_mode_module_css_default.section,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+										className: value_mode_module_css_default.checkboxRow,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+											type: "checkbox",
+											checked: resolved.allowReview,
+											onChange: (event) => persist({ allowReview: event.target.checked })
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "重要改动完成后保留主控复核" })]
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+										className: value_mode_module_css_default.checkboxRow,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+											type: "checkbox",
+											checked: resolved.showExpertActivity,
+											onChange: (event) => persist({ showExpertActivity: event.target.checked })
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "显式显示主控与子代理活动" })]
+									})]
+								}),
 								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
 									className: value_mode_module_css_default.fieldRow,
 									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
@@ -964,6 +1009,19 @@ window.__ModuleLoader__.load({
 									})]
 								})
 							]
+						})]
+					}),
+					dock && !configured && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: value_mode_dock_module_css_default.setupHint,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: [
+							"先选择",
+							resolved.expert.model ? "执行模型" : "主控模型",
+							"，再开启协作。"
+						] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: `${value_mode_module_css_default.button} ${value_mode_module_css_default.buttonPrimary}`,
+							onClick: () => setPickingTarget(resolved.expert.model ? "executor" : "expert"),
+							children: ["选择", resolved.expert.model ? "执行模型" : "主控模型"]
 						})]
 					}),
 					pickingTarget && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(ModelPicker, {

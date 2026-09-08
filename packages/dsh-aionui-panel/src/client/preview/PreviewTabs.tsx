@@ -71,7 +71,7 @@ export function PreviewTabs({
   }, [tabs.length])
 
   return (
-    <div className={previewCss.tabBar}>
+    <div className={previewCss.tabBar} data-aionui-preview-toolbar>
       <div ref={scrollRef} className={previewCss.tabScroll}>
         {tabs.length === 0 && <div className={previewCss.noTabs}>{t('preview.noTabs')}</div>}
         {tabs.map((tab) => (

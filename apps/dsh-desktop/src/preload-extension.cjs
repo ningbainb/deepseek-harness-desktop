@@ -21,6 +21,7 @@ const baseApi = {
 }
 
 const api = Object.freeze({
+  selectDockSetting: (id) => ipcRenderer.invoke('extensions:settings-select', id),
   ...baseApi,
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   checkPluginUpdates: () => ipcRenderer.invoke('extensions:plugin-check'),

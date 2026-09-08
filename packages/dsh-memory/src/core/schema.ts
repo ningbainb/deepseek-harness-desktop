@@ -70,7 +70,7 @@ export const MEMORY_SENSITIVE_MESSAGE = '此内容看起来包含凭据，不建
 export class MemoryValidationError extends Error {
   constructor(
     message: string,
-    readonly code: 'invalid' | 'sensitive' | 'capacity' = 'invalid',
+    readonly code: 'invalid' | 'sensitive' | 'capacity' | 'conflict' | 'duplicate' = 'invalid',
   ) {
     super(message)
     this.name = 'MemoryValidationError'

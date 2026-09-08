@@ -55,7 +55,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "6077355374fe654635fd57a1f19d48742323b78d03b21f894e15865558e6a496"
+          "sha256": "7d3e335c387ceb62e2fb326d7edb21fd48683d7c484e5c1881d61b052db8ee9c"
         },
         "slots": [
           "conversation.composer.dock",
@@ -64,6 +64,7 @@
           "conversation.input.selector.context",
           "conversation.session.header.actions",
           "model-preferences.onboarding",
+          "root",
           "settings.models.content",
           "settings.section",
           "sidebar.footer.action",

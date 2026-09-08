@@ -130,11 +130,13 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
   // guard so a remote browser cannot turn this into a general secret writer.
   ctx.inject(['settings', 'credentials'], (relayCtx) => {
     relayCtx.effect(() => {
-      const disposers = makeRelayRoutes({
+      const routes = makeRelayRoutes({
         settings: relayCtx.settings,
         credentials: relayCtx.credentials,
-      }, access).map(route => relayCtx.webServer.register(route))
+      }, access)
+      const disposers = routes.map(route => relayCtx.webServer.register(route))
       return () => {
+        routes.dispose()
         for (const dispose of disposers) dispose()
       }
     }, 'web-ui-settings: relay onboarding bridge')

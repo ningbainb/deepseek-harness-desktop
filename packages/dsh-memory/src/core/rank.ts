@@ -19,13 +19,19 @@ export interface RankedMemory {
   item: MemoryItem
   scopeRank: 1 | 2 | 3
   overlap: number
+  reason?: 'content' | 'tag' | 'content-and-tag'
 }
 
 function tokens(value: string): Set<string> {
   const result = new Set<string>()
   const normalized = value.normalize('NFKC').toLowerCase().slice(0, MAX_MEMORY_QUERY_LENGTH)
-  const matches = normalized.match(/[\p{Script=Han}]|[\p{L}\p{N}_]+/gu) ?? []
-  for (const token of matches) result.add(token)
+  const matches = normalized.match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? []
+  for (const token of matches) {
+    if (/^\p{Script=Han}+$/u.test(token)) {
+      // Han bigrams avoid retrieving unrelated facts on a single common character.
+      for (let index = 0; index < token.length - 1; index++) result.add(token.slice(index, index + 2))
+    } else if (token.length > 1) result.add(token)
+  }
   return result
 }
 
@@ -61,13 +67,16 @@ export function rankMemories(items: readonly MemoryItem[], query: MemoryQuery): 
   for (const item of items) {
     const rank = scopeRank(item, query)
     if (rank === undefined) continue
-    const itemOverlap = overlap(queryTokens, item.content)
-    if (queryTokens.size > 0 && itemOverlap === 0) continue
-    ranked.push({ item: { ...item, tags: [...item.tags] }, scopeRank: rank, overlap: itemOverlap })
+    const contentOverlap = overlap(queryTokens, item.content)
+    const tagOverlap = overlap(queryTokens, item.tags.join(' '))
+    const itemOverlap = contentOverlap + tagOverlap * 2
+    if ((query.query ?? '').trim() !== '' && itemOverlap === 0) continue
+    ranked.push({ item: { ...item, tags: [...item.tags] }, scopeRank: rank, overlap: itemOverlap,
+      reason: contentOverlap && tagOverlap ? 'content-and-tag' : tagOverlap ? 'tag' : 'content' })
   }
   ranked.sort((a, b) => {
-    if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank
     if (a.overlap !== b.overlap) return b.overlap - a.overlap
+    if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank
     if (a.item.pinned !== b.item.pinned) return a.item.pinned ? -1 : 1
     if (a.item.updatedAt !== b.item.updatedAt) return b.item.updatedAt - a.item.updatedAt
     return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0

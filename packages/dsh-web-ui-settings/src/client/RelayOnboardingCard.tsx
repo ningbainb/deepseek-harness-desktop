@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   RELAY_CONFIGURE_PATH,
+  RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH,
+  type RelayConnection, type RelayConnectResponse,
   RELAY_KEYS_URL,
   RELAY_REMOVE_PATH,
   RELAY_SIGN_UP_URL,
@@ -14,7 +16,7 @@ import type { RelayLocaleKey } from './locales.ts'
 import { openExternalUrl } from './open-external.ts'
 import css from './relay-onboarding.module.css'
 
-export type RelayOnboardingCardProps = PropsRuntime<'model-preferences.onboarding'> & PropsLocale<'relay-onboarding'>
+export type RelayOnboardingCardProps = PropsLocale<'relay-onboarding'>
 
 class RelayClientError extends Error {
   constructor(readonly code: string) {
@@ -94,6 +96,8 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
+  const [connection, setConnection] = useState<RelayConnection>({ phase: 'idle' })
+  const connecting = ['starting', 'pending', 'connecting'].includes(connection.phase)
 
   const loadStatus = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -109,11 +113,46 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
     }
   }, [t])
 
-  useEffect(() => { void loadStatus() }, [loadStatus])
+  useEffect(() => {
+    let disposed = false
+    void loadStatus()
+    void postJson<RelayConnectResponse>(RELAY_CONNECT_STATUS_PATH, {}).then(result => { if (!disposed) setConnection(result.connection) }).catch(() => {})
+    return () => { disposed = true }
+  }, [loadStatus])
+
+  useEffect(() => {
+    if (!connecting) return
+    let disposed = false
+    let timer: ReturnType<typeof setTimeout>
+    const poll = async () => {
+      try {
+        const result = await postJson<RelayConnectResponse>(RELAY_CONNECT_STATUS_PATH, {})
+        if (disposed) return
+        setConnection(result.connection)
+        if (result.connection.phase === 'connected') { setApiKey(''); setNotice(t('connected')); await loadStatus() }
+        if (['pending', 'connecting', 'starting'].includes(result.connection.phase)) timer = setTimeout(() => { void poll() }, 1000)
+      } catch { if (!disposed) timer = setTimeout(() => { void poll() }, 2000) }
+    }
+    timer = setTimeout(() => { void poll() }, 1000)
+    return () => { disposed = true; clearTimeout(timer) }
+  }, [connecting, loadStatus, t])
+
+  const connect = async () => {
+    setConnection({ phase: 'starting' }); setError(undefined); setNotice(undefined)
+    try {
+      const result = await postJson<RelayConnectResponse>(RELAY_CONNECT_PATH, {})
+      setConnection(result.connection)
+      if (result.connection.url) openExternalUrl(result.connection.url)
+    } catch { setConnection({ phase: 'failed' }); setError(t('errorConnect')) }
+  }
+  const cancel = async () => {
+    try { const result = await postJson<RelayConnectResponse>(RELAY_CONNECT_CANCEL_PATH, {}); setConnection(result.connection) }
+    catch { setError(t('errorConnect')) }
+  }
 
   const configure = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
-    if (saving || clearing) return
+    if (saving || clearing || connecting) return
     if (apiKey.trim() === '') {
       setError(t('errorInvalidKey'))
       return
@@ -132,7 +171,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   }
 
   const clear = (): void => {
-    if (saving || clearing || typeof window === 'undefined' || !window.confirm(t('confirmClear'))) return
+    if (saving || clearing || connecting || typeof window === 'undefined' || !window.confirm(t('confirmClear'))) return
     setClearing(true)
     setError(undefined)
     setNotice(undefined)
@@ -148,7 +187,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const showClear = status?.profileConfigured === true || status?.credentialConfigured === true
 
   return (
-    <section className={css.card} data-relay-onboarding-card="true">
+    <section className={css.card} data-relay-onboarding-card="true" data-dock-dirty={apiKey.trim() !== '' ? 'true' : undefined}>
       <header className={css.header}>
         <div>
           <h3 className={css.title}>{t('title')}</h3>
@@ -158,6 +197,17 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
       </header>
 
       <p className={css.notice}>{t('notice')}</p>
+
+      <div className={css.actions}>
+        <button type="button" className={css.primary} disabled={!canWrite || connecting || saving || clearing} onClick={() => { void connect() }}>{status?.configured ? t('reconnect') : t('connect')}</button>
+        {connection.phase === 'pending' && <>
+          <button type="button" className={css.secondary} onClick={() => { if (connection.url) openExternalUrl(connection.url) }}>{t('continueBrowser')}</button>
+          <button type="button" className={css.secondary} onClick={() => { void cancel() }}>{t('cancelConnect')}</button>
+        </>}
+      </div>
+      {connecting && <p role="status" className={css.muted}>{connection.phase === 'connecting' ? t('syncingModels') : t('waitingBrowser')}</p>}
+      {connection.phase === 'expired' && <p role="status" className={css.muted}>{t('expiredConnect')}</p>}
+      {connection.phase === 'failed' && <p role="alert" className={css.error}>{t('errorConnect')}</p>}
 
       <section className={css.section}>
         <strong>{t('stepsTitle')}</strong>
@@ -203,6 +253,8 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
         </div>
       </section>
 
+      <details className={css.manual}>
+      <summary>{t('manualConnect')}</summary>
       <form className={css.form} onSubmit={configure}>
         <label className={css.label} htmlFor="dsh-relay-api-key">{t('keyLabel')}</label>
         <input
@@ -214,20 +266,17 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
           autoComplete="off"
           spellCheck={false}
           placeholder={t('keyPlaceholder')}
-          disabled={!canWrite || saving || clearing}
+          disabled={!canWrite || saving || clearing || connecting}
           onChange={event => setApiKey(event.target.value)}
         />
         <div className={css.actions}>
-          <button type="submit" className={css.primary} disabled={!canWrite || saving || clearing}>
+          <button type="submit" data-dock-save="true" className={css.primary} disabled={!canWrite || saving || clearing || connecting}>
             {saving ? t('saving') : t('save')}
           </button>
-          {showClear && (
-            <button type="button" className={css.secondary} disabled={!canWrite || saving || clearing} onClick={clear}>
-              {clearing ? t('clearing') : t('clear')}
-            </button>
-          )}
         </div>
       </form>
+      </details>
+      {showClear && <div className={css.actions}><button type="button" className={css.secondary} disabled={!canWrite || saving || clearing || connecting} onClick={clear}>{clearing ? t('clearing') : t('clear')}</button></div>}
 
       {status !== null && status.modelCount > 0 && (
         <p className={css.models}>

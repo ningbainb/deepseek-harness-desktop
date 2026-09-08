@@ -4,46 +4,44 @@
 
 ### 本次亮点
 
-- **文件拖拽的明确交付语义**：内部文件树拖拽只在草稿光标处插入工作区相对路径引用，不会读取内容或打开预览。外部纯文本与代码文件（<1MB）把路径及围栏文本插入草稿，用户发送后这些文本才进入模型请求；PDF、Word、电子表格、压缩包、二进制与大型文件仅插入路径链接，不代表内容已解析。点击文件打开的 Preview 是独立本地预览，也不会自动把内容送入模型。
-- **原版图片拖放机制深度兼容与隔离**：解决通用文件拖放与原版图片附件机制冲突，精确识别纯图片拖拽与粘贴（Ctrl+V），无缝委托给原版 ComposerAttachments 与缩略图预览体系，杜绝双层遮罩冲突和非图片文件误触导致的“不支持的图片格式”报错。
-- **智能图像压缩与自适应降采样引擎**：新增内存级图像预检机制，单图上限安全保护（3MB），超标大图自动按比例下采样至最高 2048px 并执行自适应分级压缩（0.85 -> 0.72 -> 0.55 -> 0.4），既防止超过后端上传尺寸限制导致发送失败，又保持图文分析的细节清晰度，小图无损直通。
-- **现代化模式选择器重构**：会话顶部的模式选择器由原生系统下拉框升级为精美的悬浮式卡片菜单。提供直观的模式图标、色彩指示、功能描述与流畅的动效过渡，大幅提升沉浸感与交互体验。
-- **侧边栏几何对齐与拓展坞整理**：统一侧边栏左下角在展开与折叠 Rail 视图下的布局逻辑，彻底消除 UI 抖动与位置偏差；同时将桌面端原生插件入口规整至拓展坞，视觉更协调。
+- **拓展坞与设置**：按功能组织侧栏，集中管理模型接入、性价比模式、个性化 Prompt、记忆、粒子主题和图像理解。设置窗口统一主题并居中打开，调整尺寸与间距，性价比模式提供中文说明。拖动窗口合并位置更新，减少连续拖动时的卡顿。
+- **项目与工作区**：创建项目和选择工作区使用统一弹窗，点击源文件夹区域即可打开系统文件夹选择器；已有项目可以直接打开，避免重复创建。
+- **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
+- **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片进行自适应压缩。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
+- **可感知的记忆**：展示当前会话的记忆活动、匹配结果和可操作入口，优化检索与排序。记忆继续按用户和作用域隔离，模型建议需要用户确认后才会保存。
+- **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥；匿名统计可以在设置中关闭。
 
 ### 验证
 
-- 自动化单元测试覆盖文件拖拽分类、纯图片判断算法、尺寸比例计算与压缩保护边界（18 个测试套件，162 个单元测试全部通过）。
-- 端到端回归套件覆盖窗口几何一致性、设置面板、终端、会话模式切换与拓展坞状态（6/6 E2E 套件全部通过）。
-- 运行时矩阵与质量基准自动化校验通过，严格保证无冗余依赖或环境破坏。
+发布流程检查类型、单元测试、功能保全基线、官方 SDK 导入边界及运行时依赖，并对打包后的应用验证启动、文件夹选择器、终端、窗口控件、设置、拓展坞与更新退出。安装包附带发布清单和 SHA-256 校验文件。
 
 ### 下载与校验
 
-从同一 GitHub Release 下载 DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe 与对应的 SHA256SUMS.txt。请在安装前使用 SHA-256 哈希值进行完整性校验，以确保软件包来源真实且未被篡改。
+从本次 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe` 与 `SHA256SUMS.txt`。安装前可用 PowerShell 的 `Get-FileHash -Algorithm SHA256` 核对文件完整性；自动更新元数据与安装包来自同一发布流程。
 
 ### 说明
 
-本次更新全面优化了用户与本地文件的交互链路，无论是快速发送代码片段、附加项目文档还是大分辨率截图，均可拖入即用。DeepSeek Harness Desktop 是社区维护的开源发行版，致力于提供高效纯净的本地 AI 开发环境。
+DeepSeek Harness Desktop 是社区维护的开源桌面发行版。普通文件的读取能力取决于模型可用工具和文件格式；添加附件表示文件已交付，不表示模型已经读完。新版本事件覆盖自升级后开始，不能用历史版本缺失的事件推算转化率。
 
 ## English
 
 ### Highlights
 
-- **Explicit file-drop delivery semantics**: Dragging from the internal file tree inserts only a workspace-relative path reference at the draft cursor; it neither reads the file nor opens Preview. External plain-text and code files below 1 MB insert a path and fenced text into the draft, which reaches the model only after the user sends it. PDF, Word, spreadsheet, archive, binary, and large files insert only a path link and are not claimed as parsed. Opening a file in Preview is a separate local action and does not submit its content to the model.
-- **Native image attachment isolation & conflict resolution**: Pure image drops and clipboard pastes (Ctrl+V) are cleanly distinguished and passed to the native ComposerAttachments system with thumbnail previews, eliminating duplicate drop overlays and preventing "Unsupported image format" errors when non-image files are dropped.
-- **Adaptive image compression engine**: Built-in memory-level image inspection prevents payload rejections by capping safe image sizes at 3MB. Oversized images are proportionally downscaled to at most 2048px and iteratively compressed across multiple quality steps (0.85 -> 0.72 -> 0.55 -> 0.4) while preserving text legibility; smaller images remain lossless.
-- **Modern session mode switcher**: The top session mode switcher is completely redesigned from an unstyled native select into a sleek, floating pill menu with category icons, descriptive summaries, and smooth micro-interactions.
-- **Sidebar alignment & extension dock refinement**: Fixed bottom-left sidebar layout drift across expanded and rail modes, and consolidated desktop native plugins into the dedicated extension dock for a clean visual hierarchy.
+- **Dock and settings**: A grouped sidebar brings provider setup, Value Mode, personal prompts, memory, particles, and image understanding into one place. Settings windows use a consistent theme and centered placement. Compact spacing and coalesced window movement improve everyday interaction, and Value Mode includes Chinese guidance.
+- **Projects and workspaces**: A shared dialog supports project creation and workspace selection. Clicking the source folder area opens the native folder picker, while existing projects can be opened directly without creating duplicates.
+- **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
+- **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
+- **Visible memory activity**: Session memory activity and matches are visible with actions to inspect and manage them. Retrieval and ranking are improved. User and scope isolation remain enforced, and model suggestions require user confirmation before persistence.
+- **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Anonymous metrics can be disabled in settings.
 
 ### Verification
 
-- Comprehensive unit tests validate classification logic, image dimension scaling, and byte limit thresholds (18 test files, 162 unit tests green).
-- End-to-end regression suites verify window chrome geometries, settings windows, terminal functionality, and extension dock interactions (6/6 E2E suites passing).
-- Validated with strict runtime support matrix and code quality gatekeepers.
+The release pipeline checks types, unit tests, feature preservation, official SDK import boundaries, and runtime dependencies. Packaged application checks cover startup, native folder selection, terminal interaction, window controls, settings, the Dock, and update shutdown. Release assets include a manifest and SHA-256 checksums.
 
 ### Download and verification
 
-Download DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe and SHA256SUMS.txt from official GitHub Releases. Always verify the SHA-256 checksum before running the installer to ensure complete binary integrity.
+Download `DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe` and `SHA256SUMS.txt` from this GitHub Release. Use PowerShell `Get-FileHash -Algorithm SHA256` to verify file integrity before installation. Update metadata and the installer are produced by the same release pipeline.
 
 ### Notice
 
-This release streamlines local file workflows into conversational coding sessions. DeepSeek Harness Desktop is an open-source community distribution focused on delivering an efficient, reliable local AI development workspace.
+DeepSeek Harness Desktop is a community-maintained open-source distribution. Reading ordinary files depends on the model's tools and format support; delivery does not mean the model has already read a file. New event coverage begins after upgrading and should not be used to infer missing historical conversion data.

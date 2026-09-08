@@ -12,6 +12,7 @@
  *
  * Usage:
  *   node scripts/run-regression-e2e.mjs          # Core regression
+ *   node scripts/run-regression-e2e.mjs --source # Verify current source and rebuilt plugins
  *   node scripts/run-regression-e2e.mjs --core   # Core regression
  *   node scripts/run-regression-e2e.mjs --full   # Full regression
  */
@@ -23,15 +24,22 @@ import { fileURLToPath } from 'node:url'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const IS_FULL = process.argv.includes('--full')
+const SOURCE_ONLY = process.argv.includes('--source')
+if (SOURCE_ONLY) delete process.env.DSH_DESKTOP_E2E_EXECUTABLE
 
 const defaultPackagedExe = resolve(APP_DIR, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe')
-if (!process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaultPackagedExe)) {
+if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaultPackagedExe)) {
   process.env.DSH_DESKTOP_E2E_EXECUTABLE = defaultPackagedExe
   console.log(`Auto-detected packaged desktop executable: ${defaultPackagedExe}`)
 }
 
 
 const CORE_SUITES = [
+  {
+    name: 'Extension Dock Settings & Compact Layout',
+    script: 'scripts/verify-dock-settings.mjs',
+    args: [],
+  },
   {
     name: 'Network Proxy Routing & Recovery',
     script: 'scripts/verify-proxy-routing.mjs',

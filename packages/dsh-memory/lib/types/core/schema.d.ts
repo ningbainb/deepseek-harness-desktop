@@ -59,8 +59,8 @@ export interface MemoryPublicItem {
 }
 export declare const MEMORY_SENSITIVE_MESSAGE = "\u6B64\u5185\u5BB9\u770B\u8D77\u6765\u5305\u542B\u51ED\u636E\uFF0C\u4E0D\u5EFA\u8BAE\u4FDD\u5B58\u4E3A\u957F\u671F\u8BB0\u5FC6\u3002";
 export declare class MemoryValidationError extends Error {
-    readonly code: 'invalid' | 'sensitive' | 'capacity';
-    constructor(message: string, code?: 'invalid' | 'sensitive' | 'capacity');
+    readonly code: 'invalid' | 'sensitive' | 'capacity' | 'conflict' | 'duplicate';
+    constructor(message: string, code?: 'invalid' | 'sensitive' | 'capacity' | 'conflict' | 'duplicate');
 }
 export declare function isSafeMemoryId(value: unknown): value is string;
 export declare function isMemoryScope(value: unknown): value is MemoryScope;

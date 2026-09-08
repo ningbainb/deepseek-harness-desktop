@@ -21,7 +21,12 @@
       "patchId": "user-scope",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
-      "requiredInDesktop": false
+      "requiredInDesktop": false,
+      "features": [
+        "owner-isolation",
+        "local-official-workspace-registry-check",
+        "remote-device-and-workspace-grants"
+      ]
     },
     {
       "id": "ui-model-preferences",
@@ -243,14 +248,59 @@
     },
     {
       "id": "memory-card",
-      "name": "长期记忆持久化与待确认建议设置卡片",
+      "name": "记忆作用域管理、建议确认与会话引用反馈",
       "uiSelector": "[data-memory-card=\"true\"]",
-      "e2eScript": "scripts/verify-packaged-personalization.mjs"
+      "e2eScript": "scripts/verify-packaged-personalization.mjs",
+      "features": [
+        "managed-scope-filter",
+        "refresh-from-disk",
+        "revision-conflicts",
+        "reviewed-clear",
+        "suggestion-replacement",
+        "session-memory-activity",
+        "session-ignore",
+        "empty-query-guard",
+        "tag-and-phrase-ranking"
+      ]
     },
     {
       "id": "value-mode-card",
       "name": "性价比模式 (Value Mode) 设置卡片",
-      "uiSelector": "[data-value-mode-card=\"true\"]"
+      "uiSelector": "[data-value-mode-card=\"true\"]",
+      "desktopLocation": "extension-dock/value-mode",
+      "e2eScript": "scripts/verify-dock-settings.mjs"
+    },
+    {
+      "id": "dock-settings-navigation",
+      "name": "拓展坞四组导航、六个设置页面与供应商登录接入",
+      "navigationGroups": [
+        "AI 设置",
+        "扩展能力",
+        "桌面体验",
+        "维护与迁移"
+      ],
+      "features": [
+        "function-search",
+        "plugin-subtabs",
+        "personal-subtabs",
+        "backup-subtabs",
+        "qqbot-page",
+        "draft-close-guard",
+        "centered-on-open",
+        "synchronized-theme",
+        "relay-browser-connect",
+        "skip-redundant-view-layout",
+        "frame-coalesced-settings-drag"
+      ],
+      "settings": [
+        "relay",
+        "value-mode",
+        "personal-prompt",
+        "memory",
+        "particle-theme",
+        "describe-image"
+      ],
+      "e2eScript": "scripts/verify-dock-settings.mjs"
     },
     {
       "id": "model-preferences-card",
@@ -267,6 +317,48 @@
       "name": "皮肤中心即时试穿、持久化与背景控制",
       "uiSelector": "body[data-dsh-skin-center]",
       "e2eScript": "scripts/verify-skin-center.mjs"
+    },
+    {
+      "id": "project-create-dialog",
+      "name": "居中项目表单与原生文件夹选择",
+      "uiSelector": "[data-dsh-project-dialog]",
+      "e2eScript": "scripts/verify-directory-picker.mjs",
+      "features": [
+        "editable-project-name",
+        "duplicate-workspace-protection",
+        "native-directory-picker",
+        "browser-picker-preserved",
+        "home-workspace-selector",
+        "existing-workspace-selection",
+        "anonymous-project-outcome-metrics"
+      ]
+    },
+    {
+      "id": "panel-control-coexistence",
+      "name": "侧栏按钮避让与面板重挂载恢复",
+      "uiSelector": "[data-aionui-explorer-toolbar]",
+      "e2eScript": "scripts/verify-directory-picker.mjs",
+      "features": ["non-overlapping-panel-controls", "reopen-explorer", "restore-replaced-frame"]
+    },
+    {
+      "id": "conversation-file-attachments",
+      "name": "会话文件附件队列、重试与移除",
+      "uiSelector": "[data-dsh-file-attachments]",
+      "e2eScript": "scripts/verify-directory-picker.mjs",
+      "features": [
+        "session-owned-stream-upload",
+        "arbitrary-file-types",
+        "per-file-status",
+        "preserve-draft",
+        "cancel-stale-upload",
+        "anonymous-attachment-outcome-metrics"
+      ]
+    },
+    {
+      "id": "embedded-browser-close",
+      "name": "内置浏览器常驻关闭按钮",
+      "uiSelector": "[data-dsh-browser-close]",
+      "e2eScript": "scripts/verify-directory-picker.mjs"
     }
   ],
   "skinCatalog": [

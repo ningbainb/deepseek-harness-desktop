@@ -19,3 +19,5 @@
 独立的配对 principal；客户端不能提交或选择 principal、owner 或 grants。远程
 访问 Session 必须同时满足设备绑定有效、owner 匹配；如果 Session 属于某个
 Workspace，还必须拥有对应 Workspace grant。本地桌面保留 profile 管理视图。
+
+本地桌面访问工作区时，也会核验官方 WorkspaceRegistry 中的真实注册项，以覆盖会话创建先于工作区关联的时序。该补充仅适用于当前本地主体；未知工作区、不可用注册表及远程设备仍按原有规则拒绝，远程设备必须具备对应授权。

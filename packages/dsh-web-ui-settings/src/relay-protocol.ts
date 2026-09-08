@@ -20,6 +20,16 @@ export const RELAY_API_PREFIX = '/api/dsh-relay'
 export const RELAY_STATUS_PATH = RELAY_API_PREFIX + '/status'
 export const RELAY_CONFIGURE_PATH = RELAY_API_PREFIX + '/configure'
 export const RELAY_REMOVE_PATH = RELAY_API_PREFIX + '/remove'
+export const RELAY_CONNECT_PATH = RELAY_API_PREFIX + '/connect'
+export const RELAY_CONNECT_STATUS_PATH = RELAY_API_PREFIX + '/connect/status'
+export const RELAY_CONNECT_CANCEL_PATH = RELAY_API_PREFIX + '/connect/cancel'
+
+export interface RelayConnection {
+  phase: 'idle' | 'starting' | 'pending' | 'connecting' | 'connected' | 'failed' | 'expired' | 'cancelled'
+  url?: string
+  expiresAt?: number
+}
+export type RelayConnectResponse = { ok: true; connection: RelayConnection }
 
 /** User-facing relay destinations. No key is placed in any URL. */
 export const RELAY_HOME_URL = 'https://api.1521003.xyz/'
@@ -58,7 +68,7 @@ export interface RelayErrorResponse {
   code: string
 }
 
-export type RelayResponse = RelayStatusResponse | RelayConfigureResponse | RelayErrorResponse
+export type RelayResponse = RelayStatusResponse | RelayConfigureResponse | RelayErrorResponse | RelayConnectResponse
 
 function safeLabel(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback

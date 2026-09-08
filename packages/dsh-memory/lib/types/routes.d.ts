@@ -8,5 +8,6 @@ export declare const MEMORY_PENDING_PATH: string;
 export declare function isTrustedMemoryRequest(request: IncomingMessage): boolean;
 export declare function makeMemoryRoutes(options: {
     service: MemoryService;
+    enabled?: () => boolean;
 }): WebRoute[];
 //# sourceMappingURL=routes.d.ts.map

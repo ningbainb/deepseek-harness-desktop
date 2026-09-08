@@ -114,21 +114,147 @@ try {
     throw error
   }
   assert.equal(await addWorkspace.count(), 1, 'add workspace button not found')
+  const homeWorkspace = page.getByRole('button', { name: /^(选择工作区|Choose workspace)$/iu }).first()
+  await homeWorkspace.click()
+  const chooseDialog = page.getByRole('dialog', { name: /^(选择工作区|Choose workspace)$/iu })
+  await chooseDialog.waitFor()
+  await chooseDialog.getByRole('button', { name: /^(取消|Cancel)$/iu }).click()
   await addWorkspace.dispatchEvent('click')
 
-  const dialog = page.getByRole('dialog').filter({ hasText: /folder|directory|文件夹|目录/iu })
+  const dialog = page.getByRole('dialog', { name: /创建项目|Create project/iu })
   await dialog.waitFor({ timeout: 10_000 })
-  const dialogText = await dialog.textContent()
-  assert.match(dialogText ?? '', /folder|directory|文件夹|目录/iu)
-  assert.doesNotMatch(dialogText ?? '', /win32 folder dialog worker|directory picker failed/iu)
-  assert.equal(
-    await dialog.getByRole('button', { name: /new folder|新建文件夹/iu }).count(),
-    1,
-    'browse picker should expose folder creation',
-  )
-  await dialog.getByRole('button', { name: /edit path|编辑路径/iu }).click()
-  assert.equal(await dialog.locator('input').count(), 1, 'browse picker should expose a path editor')
-  console.log('verified official in-app directory browser without the native Win32 worker')
+  assert.equal(await dialog.getByRole('textbox').count(), 1)
+  assert.equal(await dialog.getByRole('button', { name: /^(创建项目|Create project)$/iu }).isDisabled(), true)
+  const projectDirectory = resolve(temporary, 'picked-project')
+  await mkdir(projectDirectory)
+  await writeFile(resolve(projectDirectory, 'preview-fixture.txt'), 'Browser close fixture')
+  await electronApp.evaluate(({ dialog }, path) => {
+    globalThis.__pickerCalls = 0
+    dialog.showOpenDialog = async (_parent, options) => {
+      if (!options?.properties?.includes('openDirectory')) throw new Error('expected folder-only system picker')
+      globalThis.__pickerCalls++
+      return globalThis.__pickerCalls === 1 ? { canceled: true, filePaths: [] } : { canceled: false, filePaths: [path] }
+    }
+  }, projectDirectory)
+  const choose = dialog.getByRole('button', { name: /点击选择项目文件夹|Choose a project folder/iu })
+  await choose.click()
+  await choose.waitFor({ state: 'visible' })
+  assert.equal(await dialog.getByRole('textbox').inputValue(), '')
+  await choose.click()
+  await page.waitForFunction(() => document.querySelector('[data-dsh-project-dialog] input')?.value === 'picked-project')
+  await dialog.getByRole('textbox').fill('桌面项目测试')
+  await mkdir(resolve(appDir, '../../.tmp/interaction-qa'), { recursive: true })
+  await dialog.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/create-project.png') })
+  const lightSurface = await dialog.evaluate(element => getComputedStyle(element).backgroundColor)
+  const darkBefore = await page.evaluate(() => {
+    const value = document.body.getAttribute('data-ds-dark-theme')
+    document.body.setAttribute('data-ds-dark-theme', 'true')
+    return value
+  })
+  await page.waitForTimeout(100)
+  const darkSurface = await dialog.evaluate(element => getComputedStyle(element).backgroundColor)
+  assert.notEqual(darkSurface, lightSurface, 'project dialog must follow the app dark theme')
+  await dialog.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/create-project-dark.png') })
+  await page.evaluate(value => {
+    if (value === null) document.body.removeAttribute('data-ds-dark-theme')
+    else document.body.setAttribute('data-ds-dark-theme', value)
+  }, darkBefore)
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find(item => item.webContents.getURL().startsWith('http://127.0.0.1:'))
+    window.webContents.setZoomFactor(1.25)
+  })
+  const fits = await dialog.evaluate(element => {
+    const box = element.getBoundingClientRect()
+    return box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight
+  })
+  assert.equal(fits, true, 'project dialog fits at 125 percent zoom')
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find(item => item.webContents.getURL().startsWith('http://127.0.0.1:'))
+    window.webContents.setZoomFactor(1)
+  })
+  await dialog.getByRole('button', { name: /^(创建项目|Create project)$/iu }).click()
+  await dialog.waitFor({ state: 'hidden', timeout: 30_000 })
+  await page.waitForSelector('[data-dsh-file-attachments]', { timeout: 30_000 })
+  assert.equal(await electronApp.evaluate(() => globalThis.__pickerCalls), 2)
+  await page.waitForFunction(() => document.body.textContent.includes('桌面项目测试'))
+  const panelControls = await page.evaluate(() => {
+    const close = document.querySelector('[data-aionui-explorer-toolbar] button[aria-label="关闭文件面板"]')
+    const toggles = [...document.querySelectorAll('[data-dsh-panel-host] > div:first-child button')]
+    const a = close?.getBoundingClientRect()
+    return { close: a?.toJSON(), toggles: toggles.map(b => ({ label:b.getAttribute('aria-label'), box:b.getBoundingClientRect().toJSON() })), padding: close && getComputedStyle(close.parentElement).paddingRight, count: toggles.length, overlap: a && toggles.some(button => {
+      const b = button.getBoundingClientRect()
+      return b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+    }) }
+  })
+  console.log('panel controls', JSON.stringify(panelControls))
+  assert.ok(panelControls.count > 0, 'sibling panel controls are mounted')
+  assert.equal(panelControls.overlap, false, 'explorer close must not overlap sibling panel controls')
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/panel-controls-fixed.png'), clip: { x: Math.max(0, panelControls.close.x - 120), y: Math.max(0, panelControls.close.y - 4), width: 230, height: 50 } })
+  for (let repeat = 0; repeat < 3; repeat++) {
+    await page.getByRole('button', { name: '关闭文件面板', exact: true }).click()
+    await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+    await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
+  }
+  const composer = page.locator('[data-composer-card] textarea').first()
+  await composer.fill('保留我的草稿')
+  await page.evaluate(() => {
+    const target = document.querySelector('[data-composer-card]')
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['attachment contents'], '说明.txt', { type: 'text/plain' }))
+    transfer.items.add(new File([new Uint8Array([0, 255, 7])], 'sample.bin', { type: 'application/octet-stream' }))
+    target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  })
+  await page.waitForFunction(() => document.querySelectorAll('[data-dsh-file-attachments] [data-state="ready"]').length === 2, { timeout: 30_000 })
+  assert.match(await composer.inputValue(), /保留我的草稿/u)
+  assert.match(await composer.inputValue(), /\.dsh-attachments/u)
+  await page.getByRole('button', { name: '移除 sample.bin', exact: true }).click()
+  assert.doesNotMatch(await composer.inputValue(), /sample\.bin/u)
+  await page.locator('[data-dsh-file-attachments]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/file-attachments.png') })
+  // Open the actual preview surface through its file tree and new URL control.
+  const previewFile = page.getByRole('button', { name: 'preview-fixture.txt', exact: true })
+  await previewFile.dblclick()
+  await page.getByTitle(/新建 URL 预览|New URL preview/iu, { exact: true }).click()
+  await page.getByRole('button', { name: '关闭文件面板', exact: true }).click()
+  const previewControls = await page.evaluate(() => {
+    const button = document.querySelector('[data-aionui-preview-toolbar] [aria-label="关闭预览面板"]')
+    const a = button?.getBoundingClientRect()
+    return { visible: !!a && a.width > 0 && a.height > 0, overlap: !!a && [...document.querySelectorAll('[data-dsh-panel-host] > div:first-child button')].some(b => {
+      const rect = b.getBoundingClientRect()
+      return rect.width > 0 && a.left < rect.right && a.right > rect.left && a.top < rect.bottom && a.bottom > rect.top
+    }) }
+  })
+  assert.equal(previewControls.visible, true)
+  assert.equal(previewControls.overlap, false, 'preview close must avoid sibling controls when explorer is collapsed')
+  await page.locator('[data-aionui-preview-toolbar]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/preview-controls-fixed.png') })
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  const browserClose = page.getByRole('button', { name: /^(关闭浏览器|Close browser)$/iu }).first()
+  await browserClose.waitFor({ timeout: 15_000 })
+  await browserClose.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/browser-close.png') })
+  await browserClose.click()
+  await browserClose.waitFor({ state: 'hidden' })
+  assert.match(await composer.inputValue(), /保留我的草稿/u)
+  await addWorkspace.dispatchEvent('click')
+  await dialog.waitFor()
+  await dialog.getByRole('button', { name: /点击选择项目文件夹|Choose a project folder/iu }).click()
+  await dialog.getByRole('button', { name: /打开已有项目|Open existing project/iu }).waitFor()
+  await dialog.getByRole('button', { name: /^(取消|Cancel)$/iu }).click()
+  // Keep the official browser-only picker coverage: it remains available without the desktop preload.
+  const browserWindow = electronApp.waitForEvent('window')
+  await electronApp.evaluate(({ BrowserWindow }, url) => {
+    const testWindow = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } })
+    void testWindow.loadURL(url)
+  }, page.url())
+  const browserPage = await browserWindow
+  await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: 30_000 })
+  await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).dispatchEvent('click')
+  const browserDialog = browserPage.getByRole('dialog').filter({ hasText: /folder|directory|文件夹|目录/iu })
+  await browserDialog.waitFor({ timeout: 10_000 })
+  assert.doesNotMatch(await browserDialog.textContent() ?? '', /win32 folder dialog worker|directory picker failed/iu)
+  assert.equal(await browserDialog.getByRole('button', { name: /new folder|新建文件夹/iu }).count(), 1)
+  await browserDialog.getByRole('button', { name: /edit path|编辑路径/iu }).click()
+  assert.equal(await browserDialog.locator('input').count(), 1)
+  console.log('verified project modal, native directory selection/cancel, real workspace creation, duplicate protection and mixed file attachments')
+
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })

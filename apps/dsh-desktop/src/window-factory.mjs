@@ -1,8 +1,10 @@
 import { createCommunityQrImage } from './community.mjs'
+import { createDockSettingsView } from './dock-settings-view.mjs'
 import { DESKTOP_SURFACES } from './desktop-contract.mjs'
 import { applyWindowIcon } from './app-icon.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
 import { getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
+import { installWindowMotion, publishWindowMotion } from './window-motion.mjs'
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
 
@@ -29,6 +31,13 @@ export function attachedWindowBounds(parentBounds, childBounds, workArea, gap = 
     width,
     height,
   }
+}
+
+/** Center on the main window's display, including monitors with negative coordinates. */
+export function centeredWindowBounds(childBounds, workArea) {
+  const width = Math.min(childBounds.width, workArea.width)
+  const height = Math.min(childBounds.height, workArea.height)
+  return { x: workArea.x + Math.round((workArea.width - width) / 2), y: workArea.y + Math.round((workArea.height - height) / 2), width, height }
 }
 
 function sameBounds(left, right) {
@@ -159,6 +168,9 @@ export function createMainWindow({ BrowserWindow, appIcon, productName, state, p
  */
 export function createDesktopWindowFactory({
   BrowserWindow,
+  WebContentsView,
+  dialog,
+  getRuntimeOrigin = () => undefined,
   appIcon,
   windowChromeIconDataUrl,
   mainPreload,
@@ -181,6 +193,7 @@ export function createDesktopWindowFactory({
 
   const windows = new Map()
   let communityWindowPromise
+  let dockSettings
 
   const recordSurface = (name) => {
     try { productMetrics?.recordSurface?.(name) } catch { /* metrics are best effort */ }
@@ -201,6 +214,7 @@ export function createDesktopWindowFactory({
     query = {},
   }) => {
     windows.set(key, browserWindow)
+    setWindowChromeTheme(browserWindow, chromeTheme)
     const unregisterSurface = surfaceRegistry.register(browserWindow.webContents, surface)
     applyWindowIcon(browserWindow, appIcon)
     const removeWindowChrome = installWindowChrome({
@@ -242,11 +256,15 @@ export function createDesktopWindowFactory({
     }
     const mainWindow = getMainWindow()
     const chromeTheme = mainWindow && !mainWindow.isDestroyed() ? getWindowChromeTheme(mainWindow) : 'dark'
+    const parentBounds = mainWindow?.getBounds()
+    const workArea = parentBounds && matchingWorkArea(screen, parentBounds)
+    const initialBounds = workArea
+      ? centeredWindowBounds({ width: 960, height: 680 }, workArea)
+      : { width: 960, height: 680 }
     const browserWindow = new BrowserWindow({
-      width: 1120,
-      height: 780,
-      minWidth: 760,
-      minHeight: 620,
+      ...initialBounds,
+      minWidth: 680,
+      minHeight: 480,
       show: false,
       parent: mainWindow,
       title: 'Extension Dock',
@@ -255,7 +273,15 @@ export function createDesktopWindowFactory({
       ...windowChromeBrowserOptions(chromeTheme),
       webPreferences: secondaryWindowWebPreferences({ preload: extensionPreload }),
     })
-    installAttachedWindowPlacement({ parentWindow: mainWindow, childWindow: browserWindow, screen })
+    if (WebContentsView) {
+      setWindowChromeTheme(browserWindow, chromeTheme)
+      dockSettings = createDockSettingsView({ WebContentsView, window: browserWindow, mainWindow, getRuntimeOrigin, dialog, openExternal: url => shell.openExternal(url) })
+      browserWindow.once('closed', () => { dockSettings = undefined })
+    }
+    installWindowMotion(browserWindow, active => {
+      publishWindowMotion(mainWindow.webContents, active)
+      dockSettings?.setInteracting(active)
+    })
     await configureSecondaryWindow({
       key: 'extensions',
       browserWindow,
@@ -354,6 +380,7 @@ export function createDesktopWindowFactory({
   }
 
   const syncTheme = (theme) => {
+    dockSettings?.syncTheme(theme)
     for (const browserWindow of windows.values()) {
       if (!browserWindow || browserWindow.isDestroyed()) continue
       setWindowChromeTheme(browserWindow, theme)
@@ -364,6 +391,10 @@ export function createDesktopWindowFactory({
 
   return Object.freeze({
     createExtensionWindow,
+    selectDockSetting: (id) => {
+      if (!dockSettings) throw new Error('拓展坞设置尚未就绪，请重新打开拓展坞。')
+      return dockSettings.select(id)
+    },
     createHandoffWindow,
     createCommunityWindow,
     syncTheme,

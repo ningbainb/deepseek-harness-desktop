@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 
 import { _electron as electron } from 'playwright'
 
+import { openDockSetting } from './dock-settings-fixture.mjs'
+
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -74,20 +76,19 @@ async function launch() {
 }
 
 async function openSettings(page) {
-  await page.getByRole('button', { name: '设置', exact: true }).click({ force: true })
-  const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
-  await settings.waitFor({ state: 'visible', timeout: 30_000 })
-  await settings.getByText('Web UI 插件', { exact: true }).click()
-  const prompt = page.locator('[data-personal-prompt-card="true"]')
-  const memory = page.locator('[data-memory-card="true"]')
-  await prompt.waitFor({ state: 'visible', timeout: 30_000 })
+  const { dock, settings } = await openDockSetting(app, page, 'memory')
+  const memory = settings.locator('[data-memory-card="true"]')
   await memory.waitFor({ state: 'visible', timeout: 30_000 })
-  return { settings, prompt, memory }
+  await openDockSetting(app, page, 'personal-prompt')
+  const prompt = settings.locator('[data-personal-prompt-card="true"]')
+  await prompt.waitFor({ state: 'visible', timeout: 30_000 })
+  const restored = prompt.getByRole('listitem').filter({ hasText: 'Packaged Prompt' })
+  if (await restored.count()) await restored.click()
+  return { settings: dock, prompt, memory }
 }
 
 async function closeSettings(settings) {
-  await settings.getByRole('button', { name: '关闭', exact: true }).last().evaluate(button => button.click())
-  await settings.waitFor({ state: 'hidden', timeout: 30_000 })
+  await (await app.browserWindow(settings)).evaluate(window => window.close())
 }
 
 async function savePrompt(prompt) {
@@ -137,6 +138,7 @@ try {
   app = first.instance
   const firstSettings = await openSettings(first.page)
   const promptPass = await savePrompt(firstSettings.prompt)
+  await openDockSetting(app, first.page, 'memory')
   const memoryPass = await saveMemory(firstSettings.memory)
   await closeSettings(firstSettings.settings)
   await app.close()
@@ -151,11 +153,14 @@ try {
   assert.equal(await secondSettings.prompt.getByRole('listitem').filter({ hasText: 'Packaged Prompt' }).count(), 1)
   assert.equal(await promptEnabled.isChecked(), true)
   assert.equal(await promptContent.inputValue(), 'Prefer concise Chinese explanations.')
+  await openDockSetting(app, second.page, 'memory')
+  await memoryContent.waitFor({ state: 'visible', timeout: 15_000 })
   assert.equal(await memoryContent.count(), 1)
   const savedMemorySection = secondSettings.memory.locator('section').first()
   assert.equal(await savedMemorySection.getByText('1 条', { exact: true }).count(), 1)
   const restartPass = { promptRestored: true, memoryRestored: true, memoryEnabled: await secondSettings.memory.locator('input[type="checkbox"]').first().isChecked() }
-  await secondSettings.memory.getByRole('button', { name: '清空全部', exact: true }).click()
+  await secondSettings.memory.getByRole('button', { name: '清空当前结果', exact: true }).click()
+  await secondSettings.memory.getByRole('button', { name: '确认删除', exact: true }).click()
   await savedMemorySection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   await savedMemorySection.getByText('还没有记忆。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   const clearPass = { countZero: true, empty: true }
@@ -170,6 +175,7 @@ try {
   const third = await launch()
   app = third.instance
   const thirdSettings = await openSettings(third.page)
+  await openDockSetting(app, third.page, 'memory')
   const thirdSavedSection = thirdSettings.memory.locator('section').first()
   await thirdSavedSection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   await thirdSavedSection.getByText('还没有记忆。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })

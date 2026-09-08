@@ -237,16 +237,10 @@
 
 /* The close button inside the explorer tab bar (top-right). */
 :global(.aionui-collapse-chevron) {
-  position: absolute;
-  /* In desktop wrappers with the Window Controls Overlay, the native
-     window buttons occupy the top-right corner of the webview; shift the
-     close button below that strip. Browsers report 0px, so layout is
-     unchanged there (issue #169). */
-  top: calc(6px + env(titlebar-area-height, 0px));
-  right: 8px;
-  z-index: 30;
-  width: 24px;
-  height: 24px;
+  position: static;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;

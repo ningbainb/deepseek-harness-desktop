@@ -4,11 +4,17 @@ import test from 'node:test'
 
 import {
   attachedWindowBounds,
+  centeredWindowBounds,
   createMainWindow,
   installAttachedWindowPlacement,
   secondaryWindowWebPreferences,
   SECONDARY_WINDOW_PARTITION,
 } from '../src/window-factory.mjs'
+
+test('Dock opens centered on its display, including negative origins and small screens', () => {
+  assert.deepEqual(centeredWindowBounds({ width: 960, height: 680 }, { x: -1920, y: 40, width: 1920, height: 1040 }), { x: -1440, y: 220, width: 960, height: 680 })
+  assert.deepEqual(centeredWindowBounds({ width: 960, height: 680 }, { x: 0, y: 0, width: 800, height: 600 }), { x: 0, y: 0, width: 800, height: 600 })
+})
 
 class FakeWindow extends EventEmitter {
   destroyed = false

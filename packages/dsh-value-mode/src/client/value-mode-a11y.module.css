@@ -13,19 +13,19 @@
 
 .onboardingTitle {
   font-weight: 600;
-  color: #93c5fd;
+  color: var(--dsh-brand-primary, #93c5fd);
   font-size: 12px;
 }
 
 .onboardingText {
   font-size: 11px;
-  color: #bfdbfe;
+  color: var(--dsh-text-secondary, #bfdbfe);
   line-height: 1.4;
 }
 
 .mutedNote {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--dsh-text-tertiary, #6b7280);
 }
 
 .error {

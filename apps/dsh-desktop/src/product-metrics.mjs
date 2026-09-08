@@ -1,5 +1,6 @@
 import { sessionDurationBucket, startupDurationBucket } from './telemetry-events.mjs'
 import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
+import { normalizeFeatureEvent } from './feature-telemetry.mjs'
 
 const UPDATE_EVENTS = Object.freeze({
   downloading: Object.freeze({ name: 'update_available', outcome: 'available' }),
@@ -54,6 +55,13 @@ export class ProductMetricsRecorder {
     if (this.launchRecorded) return false
     this.launchRecorded = true
     return this.#record('app_launch', { outcome: 'started', detail, bucket: 'none' })
+  }
+
+  recordFeatureEvent(value) {
+    try {
+      const { feature, outcome, detail } = normalizeFeatureEvent(value)
+      return this.#record(`feature_${feature.replaceAll('-', '_')}`, { outcome, detail, bucket: 'none' })
+    } catch { return false }
   }
 
   recordRecovery(detail) {

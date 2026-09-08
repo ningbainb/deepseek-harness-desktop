@@ -299,3 +299,6 @@
   color: var(--aion-text-tertiary);
   text-align: center;
 }
+
+/* The sibling workbench keeps two corner controls visible even while closed. */
+:global(body:has([data-dsh-panel-host])) .tabBar { padding-right: 84px; }

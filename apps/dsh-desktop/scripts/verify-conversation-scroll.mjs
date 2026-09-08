@@ -339,6 +339,11 @@ try {
   const second = await launch()
   activeApp = second.instance
   await openSeededSession(second.page, sessionId)
+  const memoryActivity = second.page.locator('[data-memory-activity="true"]')
+  await memoryActivity.locator('summary').click()
+  await memoryActivity.getByText('记忆已关闭，可在个人偏好中开启。', { exact: true }).waitFor()
+  await second.page.keyboard.press('Escape')
+  assert.equal(await memoryActivity.getAttribute('open'), null, 'memory context panel closes with Escape')
   const turns = second.page.locator('[data-chat-flow-kind="user"]')
   assert.equal(await turns.count(), messageCount)
   assert.match(await turns.first().innerText(), /G02\.5 turn 01/u)

@@ -1,9 +1,12 @@
+import { FEATURE_EVENT_POLICY } from './feature-telemetry.mjs'
+
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
 const DIMENSION_FIELDS = Object.freeze(['outcome', 'detail', 'bucket'])
 const ACTOR_FIELDS = Object.freeze(['installationActor', 'dailyActor', 'monthlyActor'])
 const ACTOR_PATTERN = /^[a-f0-9]{64}$/u
 
 const EVENT_POLICY = Object.freeze({
+  ...FEATURE_EVENT_POLICY,
   app_launch: Object.freeze({
     outcomes: new Set(['started']),
     details: new Set(['normal', 'updated', 'deep-link', 'unknown']),

@@ -6,7 +6,7 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   box-sizing: border-box;
   padding: 16px 20px;
@@ -114,6 +114,21 @@
   padding-top: 14px;
   border-top: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
 }
+
+.activity { border: 1px solid var(--dsw-alias-border-l2, #596777); border-radius: 8px; font: 13px/1.5 system-ui, sans-serif; color: var(--dsw-alias-label-primary, inherit); }
+.activity > summary { padding: 8px 12px; cursor: pointer; font-weight: 500; }
+.activityBody { padding: 12px; display: grid; gap: 10px; }
+.activityBody p { margin: 0; overflow-wrap: anywhere; }
+.activityItem { border-top: 1px solid var(--dsw-alias-border-l2, #596777); padding-top: 10px; display: grid; gap: 8px; }
+.headerActivity .activity[open] { position: fixed; top: 76px; right: 16px; z-index: 1000; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 100px); overflow: auto; background: var(--dsw-alias-bg-layer-1, #20242d); box-shadow: 0 8px 32px #0004; }
+.headerActivity summary { white-space: nowrap; }
+
+.section[hidden], .editor[hidden] { display: none; }
+.tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.tabs button { padding: 8px 0; border: 0; border-bottom: 2px solid transparent; color: var(--dsw-alias-label-secondary); background: transparent; font: inherit; cursor: pointer; }
+.tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-brand-primary); font-weight: 600; }
+.tabs button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.itemList:empty, .pendingList:empty { display: none; }
 
 .sectionHeader {
   display: flex;
@@ -410,3 +425,6 @@
     flex-wrap: wrap;
   }
 }
+
+.scopeFilter { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.scopeFilter select { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }

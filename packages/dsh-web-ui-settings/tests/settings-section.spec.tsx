@@ -7,7 +7,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import * as desktop from '@linxin666/dsh-desktop-client'
 
 const particleClient = vi.hoisted(() => vi.fn())
 
@@ -28,9 +29,24 @@ import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('Web UI settings section', () => {
+  it('moves the five forms to the Desktop Dock while preserving other plugin cards', async () => {
+    vi.spyOn(desktop, 'getDockEntryState').mockResolvedValue({ available: true, showNudge: false })
+    const renderSlot = vi.fn((_slot, _owner, options) => <li>{options?.only ?? 'all cards'}</li>)
+    render(<WebUIPluginsSection {...{
+      t: (key: string) => key,
+      close: () => {},
+      getPluginIds: () => ['value-mode', 'memory', 'personal-prompt', 'particle-theme', 'describe-image', 'task-board'],
+      renderSlot,
+    } as Parameters<typeof WebUIPluginsSection>[0]} />)
+    await waitFor(() => expect(screen.getByText('task-board')).toBeTruthy())
+    expect(screen.queryByText('all cards')).toBeNull()
+    expect(screen.queryByText('memory')).toBeNull()
+    expect(screen.getByTestId('desktop-dock-banner')).toBeTruthy()
+  })
   it('registers a list-style rc.7 settings.section and declares the family child slot', () => {
     const register = vi.fn(() => () => {})
     const inject = vi.fn((_name: string, callback: () => unknown) => callback())
@@ -44,11 +60,12 @@ describe('Web UI settings section', () => {
 
     apply(ctx as never)
 
+    expect(localeRegister).toHaveBeenCalledWith('desktop-project', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(4)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'web-ui.plugin.item', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(5)
     const [authOptions, AuthComponent] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
       name: 'settings.section',
@@ -75,7 +92,10 @@ describe('Web UI settings section', () => {
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)
-    const [dockOptions, DockComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [relayDockOptions, RelayDockComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
+    expect(relayDockOptions).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', locale: 'relay-onboarding' })
+    expect(RelayDockComponent).toBe(RelayOnboardingCard)
+    const [dockOptions, DockComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',

@@ -94,6 +94,28 @@ try {
   assert.equal(state.content.overflow, 'auto')
   assertContained(state)
 
+  const dragCoalescing = await dialog.evaluate(async element => {
+    const layer = element.parentElement
+    const original = layer.getBoundingClientRect
+    let layoutReads = 0, styleWrites = 0
+    layer.getBoundingClientRect = function () { layoutReads++; return original.call(this) }
+    const handle = element.querySelector('[data-dsh-settings-drag-handle="true"]')
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, buttons: 1, clientX: 300, clientY: 100 }))
+    const observer = new MutationObserver(records => { styleWrites += records.length })
+    observer.observe(element, { attributes: true, attributeFilter: ['style'] })
+    for (let i = 1; i <= 120; i++) window.dispatchEvent(new PointerEvent('pointermove', { buttons: 1, clientX: 300 + i / 4, clientY: 100 }))
+    await new Promise(resolveFrame => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)))
+    observer.disconnect()
+    window.dispatchEvent(new PointerEvent('pointercancel'))
+    layer.getBoundingClientRect = original
+    return { pointerEvents: 120, layoutReads, styleWrites, released: !element.hasAttribute('data-dsh-settings-dragging') }
+  })
+  assert.ok(dragCoalescing.layoutReads <= 2, JSON.stringify(dragCoalescing))
+  assert.equal(dragCoalescing.styleWrites, 1, JSON.stringify(dragCoalescing))
+  assert.equal(dragCoalescing.released, true)
+  console.log('drag event coalescing ' + JSON.stringify(dragCoalescing))
+  state = await panelState(dialog)
+
   const scrollbarResult = await dialog.evaluate(async (element) => {
     const content = element.querySelector(':scope > nav + div')
     if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')

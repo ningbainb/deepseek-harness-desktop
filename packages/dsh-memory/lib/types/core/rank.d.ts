@@ -12,6 +12,7 @@ export interface RankedMemory {
     item: MemoryItem;
     scopeRank: 1 | 2 | 3;
     overlap: number;
+    reason?: 'content' | 'tag' | 'content-and-tag';
 }
 export declare function memoryScopeMatches(item: MemoryItem, query: Pick<MemoryQuery, 'principalId' | 'workspaceId' | 'sessionId'>): boolean;
 /** Rank only the current principal's live memories with deterministic tie breaks. */

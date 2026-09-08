@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { openDockSetting } from './dock-settings-fixture.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
@@ -136,16 +137,8 @@ try {
   const settingsDialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
   await settingsDialog.waitFor({ state: 'visible' })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'dialog')
-  await settingsDialog.getByRole('button', { name: /^(?:插件|Plugins)$/u }).click()
-  const webUiSettingsButton = settingsDialog.getByRole('button', { name: /Web UI (?:插件|Plugins)/iu })
-  try {
-    await webUiSettingsButton.click({ timeout: 10_000 })
-  } catch (error) {
-    if (screenshot) await page.screenshot({ path: screenshot.replace(/\.png$/iu, '-settings-missing.png') })
-    console.error(`settings dialog without Web UI group:\n${await settingsDialog.innerText().catch(() => '(unavailable)')}`)
-    throw error
-  }
-  const particleSettingsTitle = settingsDialog.getByText(/^(?:鲸鱼粒子主题|Whale particle theme)$/iu)
+  const { dock, settings: dockPage } = await openDockSetting(electronApp, page, 'particle-theme')
+  const particleSettingsTitle = dockPage.getByText(/^(?:鲸鱼粒子主题|Whale particle theme)$/iu)
   await particleSettingsTitle.waitFor({ state: 'visible' })
   await particleSettingsTitle.scrollIntoViewIfNeeded()
   const particleSettingsCard = particleSettingsTitle.locator('xpath=ancestor::li[1]')
@@ -169,6 +162,7 @@ try {
   assert.equal(await readParticleEnabled(), true)
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'dialog')
 
+  await (await electronApp.browserWindow(dock)).evaluate(window => window.close())
   await page.keyboard.press('Escape')
   await settingsDialog.waitFor({ state: 'hidden' })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'normal')

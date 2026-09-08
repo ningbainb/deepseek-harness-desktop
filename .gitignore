@@ -5,6 +5,7 @@ node_modules/
 .npmrc
 
 # 本地工具缓存
+/.tmp/
 *.log
 .DS_Store
 

@@ -93,6 +93,8 @@ function draftFromBody(body: Record<string, unknown>): MemoryDraft | undefined {
   if (pinned !== undefined && typeof pinned !== 'boolean') return undefined
   const expiresAt = body.expiresAt
   if (expiresAt !== undefined && (typeof expiresAt !== 'number' || !Number.isSafeInteger(expiresAt))) return undefined
+  const expectedUpdatedAt = body.expectedUpdatedAt
+  if (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'number' || !Number.isSafeInteger(expectedUpdatedAt) || expectedUpdatedAt < 0)) return undefined
   const id = body.id
   if (id !== undefined && typeof id !== 'string') return undefined
   const workspaceId = body.workspaceId
@@ -108,11 +110,13 @@ function draftFromBody(body: Record<string, unknown>): MemoryDraft | undefined {
     ...(tags === undefined ? {} : { tags }),
     ...(pinned === undefined ? {} : { pinned }),
     ...(expiresAt === undefined ? {} : { expiresAt }),
+    ...(expectedUpdatedAt === undefined ? {} : { expectedUpdatedAt }),
   }
 }
 
 export function makeMemoryRoutes(options: {
   service: MemoryService
+  enabled?: () => boolean
 }): WebRoute[] {
   const { service } = options
 
@@ -131,7 +135,9 @@ export function makeMemoryRoutes(options: {
 
     if (request.method === 'GET' && pathname === MEMORY_ITEMS_PATH) {
       const query = url.searchParams.get('q') ?? ''
-      const result = query.trim() === ''
+      const result = url.searchParams.get('view') === 'manage'
+        ? await service.listManaged(context, url.searchParams.get('refresh') === '1')
+        : query.trim() === ''
         ? await service.list(context)
         : await service.search(context, query)
       if (!result.ok) {
@@ -155,6 +161,12 @@ export function makeMemoryRoutes(options: {
       return
     }
 
+    if (request.method === 'GET' && pathname === MEMORY_API_PREFIX + '/activity') {
+      try { writeJson(response, 200, { ok: true, activity: service.recentActivity(context, options.enabled?.() ?? false) }) }
+      catch (error) { writeJson(response, 403, { ok: false, code: genericErrorCode(error) }) }
+      return
+    }
+
     if (request.method !== 'POST') {
       writeJson(response, 405, { ok: false, code: 'method-not-allowed' })
       return
@@ -162,6 +174,15 @@ export function makeMemoryRoutes(options: {
     const body = await readBody(request)
     if (body === undefined) {
       writeJson(response, 400, { ok: false, code: 'invalid-json' })
+      return
+    }
+
+    if (pathname === MEMORY_API_PREFIX + '/activity') {
+      try {
+        if (body.operation !== 'ignore' || (body.id !== null && typeof body.id !== 'string')) throw new MemoryAccessError('invalid-target')
+        service.ignoreForSession(context, body.id)
+        writeJson(response, 200, { ok: true })
+      } catch (error) { writeJson(response, 400, { ok: false, code: genericErrorCode(error) }) }
       return
     }
 
@@ -183,11 +204,15 @@ export function makeMemoryRoutes(options: {
             writeJson(response, 400, { ok: false, code: 'invalid' })
             return
           }
-          writeJson(response, 200, { ok: true, removed: await service.remove(context, body.id) })
+          if (body.expectedUpdatedAt !== undefined && (typeof body.expectedUpdatedAt !== 'number' || !Number.isSafeInteger(body.expectedUpdatedAt))) throw new MemoryValidationError('invalid revision')
+          writeJson(response, 200, { ok: true, removed: await service.remove(context, body.id, body.expectedUpdatedAt as number | undefined) })
           return
         }
         if (operation === 'clear') {
-          await service.clear(context)
+          if (body.entries !== undefined) {
+            if (!Array.isArray(body.entries) || body.entries.some(entry => !entry || typeof entry.id !== 'string' || !Number.isSafeInteger(entry.updatedAt))) throw new MemoryValidationError('invalid selection')
+            await service.clearSelected(context, body.entries as { id: string; updatedAt: number }[])
+          } else await service.clear(context)
           writeJson(response, 200, { ok: true })
           return
         }
@@ -209,7 +234,8 @@ export function makeMemoryRoutes(options: {
       }
       try {
         if (body.operation === 'confirm') {
-          const item = await service.confirm(context, id)
+          if (body.replaceId !== undefined && (typeof body.replaceId !== 'string' || typeof body.expectedUpdatedAt !== 'number' || !Number.isSafeInteger(body.expectedUpdatedAt))) throw new MemoryValidationError('invalid replacement')
+          const item = await service.confirm(context, id, typeof body.replaceId === 'string' ? { id: body.replaceId, updatedAt: body.expectedUpdatedAt as number } : undefined)
           writeJson(response, 200, { ok: true, item: toPublicMemoryItem(item) })
           return
         }

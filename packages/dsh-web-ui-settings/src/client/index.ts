@@ -20,6 +20,9 @@ import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
 import { DesktopExtensionDockEntry } from './desktop-extension-dock.tsx'
+import { DockSettingsPage, dockSettingFromUrl } from './DockSettingsPage.tsx'
+import { projectCopy } from './ProjectDialog.tsx'
+import { installBrowserClose, installProjectDialog } from './desktop-interactions.tsx'
 import {
   chatGptAuthEn,
   chatGptAuthZh,
@@ -36,6 +39,7 @@ export type { SafePluginBoundaryProps, SafePluginBoundaryState } from './SafePlu
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
+    'desktop-project': keyof typeof projectCopy.zh
     /** Web UI plugin group card copy. */
     'web-ui-plugins': WebUIPluginsKey
     /** ChatGPT authorization surface copy. */
@@ -74,6 +78,13 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  if (!dockSettingFromUrl()) {
+    ctx.effect(() => installBrowserClose(document), 'web-ui-settings: browser close action')
+    ctx.inject?.(['workspaces', 'sessions'], scope => {
+      scope.effect(() => installProjectDialog(scope as ClientContext), 'web-ui-settings: project dialog')
+    })
+  }
+  ctx.effect(() => ctx.locale.register('desktop-project', projectCopy), 'web-ui-settings: project dictionaries')
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
   ctx.effect(() => ctx.locale.register('chatgpt-auth', { zh: chatGptAuthZh, en: chatGptAuthEn }), 'web-ui-settings: ChatGPT dictionaries')
   ctx.effect(() => ctx.locale.register('relay-onboarding', { zh: relayZh, en: relayEn }), 'web-ui-settings: relay dictionaries')
@@ -91,13 +102,14 @@ export function apply(ctx: ClientContext): void {
     locale: 'chatgpt-auth',
   }, ChatGptAuthSection))
 
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
+  if (!dockSettingFromUrl()) ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'web-ui-plugins',
     order: 110,
     label: () => ctx.locale.bind('web-ui-plugins')('title'),
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
+    inject: () => ({ getPluginIds: () => ctx.slots.entriesOfSlot('web-ui.plugin.item').flatMap(entry => entry.options.id ? [entry.options.id] : []) }),
   }, WebUIPluginsSection))
 
   ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
@@ -105,6 +117,10 @@ export function apply(ctx: ClientContext): void {
     id: 'bai',
     order: 5,
     locale: 'relay-onboarding',
+  }, RelayOnboardingCard))
+
+  ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
+    name: 'web-ui.plugin.item', id: 'relay', order: 1, locale: 'relay-onboarding',
   }, RelayOnboardingCard))
 
   // The highest ordered footer action sits immediately before Settings.
@@ -121,4 +137,15 @@ export function apply(ctx: ClientContext): void {
   // The particle installer is document-idempotent, so newer aggregates that
   // do carry that row still end up with exactly one canvas and settings card.
   installParticleThemeClient(ctx, settingsBinder)
+
+  // Only the isolated Dock settings document replaces the root. The main
+  // conversation document continues to use the official application frame.
+  if (dockSettingFromUrl()) {
+    ctx.slots.inject('root', () => ctx.slots.register({
+      name: 'root',
+      priority: -100,
+      locale: 'web-ui-plugins',
+      children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
+    }, DockSettingsPage))
+  }
 }

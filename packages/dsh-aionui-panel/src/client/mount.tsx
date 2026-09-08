@@ -15,16 +15,17 @@ const EXPLORER_COL_SELECTOR = '[data-aionui-explorer-col]'
 const PREVIEW_COL_SELECTOR = '[data-aionui-preview-col]'
 
 /** Wait for one selector (the shell/frame mounts after boot settlement). */
-function waitForElement(selector: string, onFound: (el: HTMLElement) => void): () => void {
+function waitForElement(selector: string, onFound: (el: HTMLElement) => void, onLost: () => void): () => void {
+  let current: HTMLElement | null = null
   let disposed = false
   let observer: MutationObserver | undefined
   const tryFind = (): void => {
     if (disposed) return
     const el = document.querySelector<HTMLElement>(selector)
-    if (el !== null) {
-      observer?.disconnect()
-      onFound(el)
-    }
+    if (el === current) return
+    if (current) onLost()
+    current = el
+    if (el !== null) onFound(el)
   }
   observer = new MutationObserver(() => { tryFind() })
   observer.observe(document.body, { childList: true, subtree: true })
@@ -32,6 +33,8 @@ function waitForElement(selector: string, onFound: (el: HTMLElement) => void): (
   return () => {
     disposed = true
     observer?.disconnect()
+    if (current) onLost()
+    current = null
   }
 }
 
@@ -59,11 +62,11 @@ export function mountPanels(
         onAddToConversation={onAddToConversation}
       />,
     )
-  }))
+  }, () => { explorerRoot?.unmount(); explorerRoot = undefined }))
   disposers.push(waitForElement(PREVIEW_COL_SELECTOR, (el) => {
     previewRoot = createRoot(el)
     previewRoot.render(<PreviewPanel stores={stores} />)
-  }))
+  }, () => { previewRoot?.unmount(); previewRoot = undefined }))
 
   return () => {
     for (const dispose of disposers) dispose()

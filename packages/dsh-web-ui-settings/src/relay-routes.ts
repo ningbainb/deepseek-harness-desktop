@@ -15,10 +15,12 @@ import type { SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { createBridgeRouteGuard, type BridgeAccess } from './bridge.ts'
+import { RelayConnectionController } from './relay-connect.ts'
 import {
   RELAY_API_PREFIX,
   RELAY_BASE_URL,
   RELAY_CONFIGURE_PATH,
+  RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH,
   RELAY_CREDENTIAL_REF,
   RELAY_MAX_MODELS,
   RELAY_PROVIDER_ID,
@@ -241,15 +243,29 @@ function statusFor(code: string): number {
 }
 
 /** Build the guarded routes used by the browser onboarding card. */
-export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): WebRoute[] {
+export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): WebRoute[] & { dispose(): void } {
   const guard = createBridgeRouteGuard(access)
   const fetchImpl = deps.fetchImpl ?? fetch
   let configuring = false
+  const configure = async (key: unknown): Promise<RelayConfigureResponse> => {
+    if (configuring) throw new RelayRouteError('busy')
+    configuring = true
+    try {
+      const apiKey = normalizedApiKey(key)
+      const models = await relayModels(apiKey, fetchImpl)
+      try { await deps.credentials.set(RELAY_CREDENTIAL, apiKey) }
+      catch { throw new RelayRouteError('credential-save-failed') }
+      try { await deps.settings.mutate(settingsNamespace(LLM_SETTINGS_NAMESPACE), providerMutation(models)) }
+      catch { throw new RelayRouteError('settings-save-failed') }
+      return { ok: true, modelCount: models.length, models }
+    } finally { configuring = false }
+  }
+  const connection = new RelayConnectionController(configure)
 
   const handler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     if (!guard(request, response)) return
     const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
-    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REMOVE_PATH].includes(pathname)) {
+    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REMOVE_PATH, RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH].includes(pathname)) {
       writeJson(response, 404, { ok: false, code: 'not-found' })
       return
     }
@@ -259,37 +275,32 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
       return
     }
 
+    if (pathname === RELAY_CONNECT_STATUS_PATH || pathname === RELAY_CONNECT_CANCEL_PATH || pathname === RELAY_CONNECT_PATH) {
+      if (pathname === RELAY_CONNECT_PATH && !(await statusOf(deps)).writable) {
+        writeJson(response, 403, { ok: false, code: 'forbidden' }); return
+      }
+      writeJson(response, 200, { ok: true, connection: pathname === RELAY_CONNECT_PATH ? await connection.start() : pathname === RELAY_CONNECT_CANCEL_PATH ? connection.cancel() : connection.status() })
+      return
+    }
+
     const body = await readJson(request)
     if (body === undefined) {
       writeJson(response, 400, { ok: false, code: 'invalid-json' })
       return
     }
 
-    if (configuring) {
+    if (configuring || ['starting', 'pending', 'connecting'].includes(connection.status().phase)) {
       writeJson(response, 409, { ok: false, code: 'busy' })
       return
     }
-    configuring = true
     try {
       if (pathname === RELAY_CONFIGURE_PATH) {
-        const apiKey = normalizedApiKey(body.apiKey)
-        const models = await relayModels(apiKey, fetchImpl)
-        try {
-          await deps.credentials.set(RELAY_CREDENTIAL, apiKey)
-        } catch {
-          throw new RelayRouteError('credential-save-failed')
-        }
-        try {
-          await deps.settings.mutate(settingsNamespace(LLM_SETTINGS_NAMESPACE), providerMutation(models))
-        } catch {
-          // The credential is deliberately kept: it was validated and can be
-          // reused by a retry after a transient settings/provider failure.
-          throw new RelayRouteError('settings-save-failed')
-        }
-        const result: RelayConfigureResponse = { ok: true, modelCount: models.length, models }
+        const result = await configure(body.apiKey)
         writeJson(response, 200, result)
         return
       }
+
+      configuring = true
 
       // An explicit remove prioritizes erasing the secret. If the provider
       // settings write is temporarily unavailable, the remaining profile is
@@ -313,7 +324,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
     }
   }
 
-  return [{ kind: 'prefix', path: RELAY_API_PREFIX, handler }]
+  return Object.assign([{ kind: 'prefix' as const, path: RELAY_API_PREFIX, handler }], { dispose: () => connection.dispose() })
 }
 
 export { RELAY_MODELS_URL }

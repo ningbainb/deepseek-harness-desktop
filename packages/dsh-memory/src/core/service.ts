@@ -24,6 +24,9 @@ import {
 } from './schema.ts'
 import { memoryScopeMatches, rankMemories, type MemoryQuery, type RankedMemory } from './rank.ts'
 import { MemoryStore, MemoryStoreError } from '../store.ts'
+import { renderMemoryItems } from './rank.ts'
+import { MAX_MEMORY_INJECTION_LENGTH } from './schema.ts'
+import type { MemoryActivity } from './activity.ts'
 
 export interface MemoryDraft {
   id?: string
@@ -34,6 +37,7 @@ export interface MemoryDraft {
   tags?: readonly string[]
   pinned?: boolean
   expiresAt?: number
+  expectedUpdatedAt?: number
 }
 
 export interface MemoryRequestContext {
@@ -157,7 +161,12 @@ export class MemoryService {
   private readonly warningSink?: (warning: MemoryWarning) => void
   private readonly cache = new Map<PrincipalId, MemorySnapshot>()
   private readonly loading = new Map<PrincipalId, Promise<MemorySnapshot | undefined>>()
+  private readonly loadedAt = new Map<PrincipalId, number>()
+  private readonly generations = new Map<PrincipalId, number>()
   private readonly pending = new Map<PrincipalId, Map<string, MemoryItem>>()
+  // Process-local UI state contains identifiers/reasons, never query or prompt text.
+  private readonly activity = new Map<string, { context: MemoryRequestContext; status: MemoryActivity['status']; preparedAt: number; matches: { id: string; updatedAt: number; reason: 'content' | 'tag' | 'content-and-tag'; truncated: boolean }[] }>()
+  private readonly ignored = new Map<string, Set<string>>()
 
   constructor(options: MemoryServiceOptions) {
     this.store = options.store ?? new MemoryStore()
@@ -247,14 +256,70 @@ export class MemoryService {
   }
 
   /** Read from the already-loaded owner cache; prompt providers never await I/O. */
+  prepare(context: MemoryRequestContext, query: string, enabled: boolean): string {
+    if (!this.authorizedContext(context) || !context.sessionId) return ''
+    const key = this.activityKey(context)
+    const all = enabled ? this.searchCached(context, query) : []
+    const ranked = all?.filter(match => !this.ignored.get(key)?.has(match.item.id))
+    const status: MemoryActivity['status'] = !enabled ? 'disabled' : !query.trim() ? 'empty-query' : ranked === undefined ? 'loading' : ranked.length ? 'ready' : 'no-match'
+    let remaining = MAX_MEMORY_INJECTION_LENGTH
+    const matches: { id: string; updatedAt: number; reason: 'content' | 'tag' | 'content-and-tag'; truncated: boolean }[] = []
+    for (const match of ranked ?? []) {
+      const length = renderMemoryItems([match]).length
+      const separator = matches.length ? 1 : 0
+      if (remaining - separator <= 4) break
+      matches.push({ id: match.item.id, updatedAt: match.item.updatedAt, reason: match.reason ?? 'content', truncated: length + separator > remaining || match.item.content.length + 2 > MAX_MEMORY_INJECTION_LENGTH })
+      remaining -= length + separator
+      if (remaining <= 0) break
+    }
+    this.activity.delete(key)
+    this.activity.set(key, { context: cloneContext(context), status, preparedAt: this.now(), matches })
+    while (this.activity.size > 64) this.activity.delete(this.activity.keys().next().value!)
+    return renderMemoryItems(ranked ?? [])
+  }
+
+  recentActivity(context: MemoryRequestContext, enabled: boolean): MemoryActivity {
+    if (!this.authorizedContext(context)) throw new MemoryAccessError()
+    const entry = context.sessionId ? this.activity.get(this.activityKey(context)) : [...this.activity.values()].reverse().find(value => value.context.scope.principalId === context.scope.principalId && this.authorizedContext(value.context))
+    const key = entry ? this.activityKey(entry.context) : this.activityKey(context)
+    const base: MemoryActivity = { status: enabled ? entry?.status ?? 'none' : 'disabled', ignoredCount: this.ignored.get(key)?.size ?? 0, items: [], ...(entry ? { sessionId: entry.context.sessionId, preparedAt: entry.preparedAt } : {}) }
+    if (!entry || !enabled || !this.authorizedContext(entry.context)) return base
+    const snapshot = this.cache.get(context.scope.principalId)
+    if (!snapshot || this.now() - (this.loadedAt.get(context.scope.principalId) ?? 0) > 10_000) {
+      void this.preload(entry.context)
+      return { ...base, status: 'loading' }
+    }
+    for (const match of entry.matches) {
+      const item = snapshot.items.find(item => item.id === match.id && item.updatedAt === match.updatedAt)
+      if (item && !isExpired(item, this.now()) && this.targetContext(context, item) && !this.ignored.get(key)?.has(item.id)) base.items.push({ item: toPublicMemoryItem(item), reason: match.reason, truncated: match.truncated })
+    }
+    return base
+  }
+
+  ignoreForSession(context: MemoryRequestContext, id: string | null): void {
+    if (!this.isLocalManager(context) || !context.sessionId) throw new MemoryAccessError()
+    const key = this.activityKey(context)
+    if (id === null) this.ignored.delete(key)
+    else {
+      if (!isSafeMemoryId(id) || !this.activity.get(key)?.matches.some(item => item.id === id)) throw new MemoryNotFoundError()
+      const ids = this.ignored.get(key) ?? new Set<string>()
+      if (ids.size >= MAX_MEMORY_ITEMS) throw new MemoryValidationError('too many ignored items', 'capacity')
+      ids.add(id); this.ignored.set(key, ids)
+      while (this.ignored.size > 64) this.ignored.delete(this.ignored.keys().next().value!)
+    }
+  }
+
+  private activityKey(context: MemoryRequestContext): string { return JSON.stringify([context.scope.principalId, context.sessionId]) }
+
   searchCached(context: MemoryRequestContext, query = ''): RankedMemory[] | undefined {
     if (!this.authorizedContext(context)) return undefined
+    if (query.trim() === '') return []
     const snapshot = this.cache.get(context.scope.principalId)
-    if (snapshot === undefined) {
+    if (snapshot === undefined || this.now() - (this.loadedAt.get(context.scope.principalId) ?? 0) > 10_000) {
       void this.preload(context)
       return undefined
     }
-    return rankMemories(snapshot.items, this.queryFor(context, query))
+    return rankMemories(snapshot.items.filter(item => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query))
   }
 
   async list(context: MemoryRequestContext): Promise<MemoryReadResult<MemoryItem[]>> {
@@ -282,9 +347,10 @@ export class MemoryService {
 
   async search(context: MemoryRequestContext, query: string): Promise<MemoryReadResult<RankedMemory[]>> {
     if (!this.authorizedContext(context)) return this.denied('access-denied')
+    if (query.trim() === '') return { ok: true, value: [] }
     const snapshot = await this.loadPrincipal(context.scope.principalId)
     if (snapshot === undefined) return this.denied('store-unavailable')
-    return { ok: true, value: rankMemories(snapshot.items, this.queryFor(context, query)) }
+    return { ok: true, value: rankMemories(snapshot.items.filter(item => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query)) }
   }
 
   async save(context: MemoryRequestContext, draft: MemoryDraft, source: MemorySource = 'explicit'): Promise<MemoryItem> {
@@ -292,42 +358,86 @@ export class MemoryService {
     if (target === undefined) throw new MemoryAccessError('invalid-target')
     const now = this.now()
     const item = createMemoryItem(draftInput(target.scope.principalId, draft, source, now))
+    this.invalidate(target.scope.principalId)
     const snapshot = await this.store.update(target.scope.principalId, current => {
       const index = current.items.findIndex(candidate => candidate.id === item.id)
+      const existing = current.items[index]
+      if (existing && this.targetContext(context, existing) === undefined) throw new MemoryAccessError()
+      if (draft.expectedUpdatedAt !== undefined && existing?.updatedAt !== draft.expectedUpdatedAt) throw new MemoryValidationError('memory changed; reload before saving', 'conflict')
+      const duplicate = current.items.find(candidate => candidate.id !== item.id && sameTarget(candidate, item) && normalizedContent(candidate.content) === normalizedContent(item.content))
+      if (duplicate) throw new MemoryValidationError('memory already exists', 'duplicate')
       if (index < 0 && current.items.length >= MAX_MEMORY_ITEMS) throw new MemoryValidationError('memory capacity is full', 'capacity')
       const items = [...current.items]
       if (index < 0) items.push(item)
-      else items[index] = { ...item, createdAt: items[index]!.createdAt }
+      else items[index] = { ...item, createdAt: items[index]!.createdAt, updatedAt: Math.max(now, items[index]!.updatedAt + 1) }
       return normalizeMemorySnapshot({ version: 1, items }, target.scope.principalId)
     })
-    this.cache.set(target.scope.principalId, snapshot)
+    this.publish(target.scope.principalId, snapshot)
     return snapshot.items.find(candidate => candidate.id === item.id) ?? item
   }
 
-  async remove(context: MemoryRequestContext, id: string): Promise<boolean> {
+  async remove(context: MemoryRequestContext, id: string, expectedUpdatedAt?: number): Promise<boolean> {
     if (!isSafeMemoryId(id)) throw new MemoryAccessError('invalid-target')
     const snapshot = await this.readForMutation(context)
     const item = snapshot.items.find(candidate => candidate.id === id)
     if (item === undefined) return false
     if (this.targetContext(context, item) === undefined) throw new MemoryAccessError('access-denied')
-    const next = await this.store.update(context.scope.principalId, current => ({
-      version: 1,
-      items: current.items.filter(candidate => candidate.id !== id),
-    }))
-    this.cache.set(context.scope.principalId, next)
+    this.invalidate(context.scope.principalId)
+    const next = await this.store.update(context.scope.principalId, current => {
+      const live = current.items.find(candidate => candidate.id === id)
+      if (live && this.targetContext(context, live) === undefined) throw new MemoryAccessError()
+      if (expectedUpdatedAt !== undefined && live?.updatedAt !== expectedUpdatedAt) throw new MemoryValidationError('memory changed', 'conflict')
+      return { version: 1, items: current.items.filter(candidate => candidate.id !== id) }
+    })
+    this.publish(context.scope.principalId, next)
     return next.items.length !== snapshot.items.length
   }
 
   async clear(context: MemoryRequestContext): Promise<void> {
     if (!this.authorizedContext(context)) throw new MemoryAccessError()
+    if (!this.isLocalManager(context)) throw new MemoryAccessError()
+    this.invalidate(context.scope.principalId)
     const next = await this.store.update(context.scope.principalId, () => ({ version: 1, items: [] }))
-    this.cache.set(context.scope.principalId, next)
+    this.publish(context.scope.principalId, next)
+  }
+
+  /** Management can inspect all authorized scopes; model retrieval always stays scoped. */
+  async listManaged(context: MemoryRequestContext, refresh = false): Promise<MemoryReadResult<MemoryItem[]>> {
+    if (!this.isLocalManager(context)) return this.denied('access-denied')
+    if (refresh) {
+      await this.loading.get(context.scope.principalId)
+      this.invalidate(context.scope.principalId)
+    }
+    const snapshot = await this.loadPrincipal(context.scope.principalId)
+    if (!snapshot) return this.denied('store-unavailable')
+    return { ok: true, value: snapshot.items.filter(item => this.targetContext(context, item) !== undefined).map(item => ({ ...item, tags: [...item.tags] })) }
+  }
+
+  async clearSelected(context: MemoryRequestContext, entries: { id: string; updatedAt: number }[]): Promise<void> {
+    if (!this.isLocalManager(context) || entries.length > MAX_MEMORY_ITEMS) throw new MemoryAccessError()
+    this.invalidate(context.scope.principalId)
+    const next = await this.store.update(context.scope.principalId, current => {
+      for (const entry of entries) {
+        const item = current.items.find(candidate => candidate.id === entry.id)
+        if (!item || item.updatedAt !== entry.updatedAt) throw new MemoryValidationError('memory changed', 'conflict')
+        if (this.targetContext(context, item) === undefined) throw new MemoryAccessError()
+      }
+      const ids = new Set(entries.map(entry => entry.id))
+      return { version: 1, items: current.items.filter(item => !ids.has(item.id)) }
+    })
+    this.publish(context.scope.principalId, next)
+  }
+
+  private isLocalManager(context: MemoryRequestContext): boolean {
+    return this.authorizedContext(context) && context.scope.source === 'desktop' && context.scope.principalId === this.desktopScope()?.principalId
   }
 
   suggest(context: MemoryRequestContext, draft: MemoryDraft): PendingMemorySuggestion {
     const target = this.targetContext(context, draft)
     if (target === undefined) throw new MemoryAccessError('invalid-target')
     const current = this.pending.get(target.scope.principalId) ?? new Map<string, MemoryItem>()
+    const repeated = [...current.values()].find(item => sameTarget(item, draft) && normalizedContent(item.content) === normalizedContent(draft.content))
+    if (repeated) return { id: repeated.id, item: toPublicMemoryItem(repeated), createdAt: repeated.createdAt }
     if (current.size >= MAX_PENDING_MEMORY_SUGGESTIONS) throw new MemoryValidationError('too many pending suggestions', 'capacity')
     const item = createMemoryItem(draftInput(target.scope.principalId, { ...draft, id: undefined }, 'confirmed-suggestion', this.now()))
     current.set(item.id, item)
@@ -338,11 +448,12 @@ export class MemoryService {
   listPending(context: MemoryRequestContext): PendingMemorySuggestion[] {
     if (!this.authorizedContext(context)) return []
     return [...(this.pending.get(context.scope.principalId)?.values() ?? [])]
+      .filter(item => this.targetContext(context, item) !== undefined)
       .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? -1 : 1))
       .map(item => ({ id: item.id, item: toPublicMemoryItem(item), createdAt: item.createdAt }))
   }
 
-  async confirm(context: MemoryRequestContext, id: string): Promise<MemoryItem> {
+  async confirm(context: MemoryRequestContext, id: string, replacement?: { id: string; updatedAt: number }): Promise<MemoryItem> {
     if (!isSafeMemoryId(id)) throw new MemoryNotFoundError()
     // Check the live owner/device/workspace scope before consulting the
     // process-local pending map. A suggestion id is not an authorization
@@ -351,8 +462,14 @@ export class MemoryService {
     if (!this.authorizedContext(context)) throw new MemoryAccessError('access-denied')
     const pending = this.pending.get(context.scope.principalId)?.get(id)
     if (pending === undefined) throw new MemoryNotFoundError()
+    if (replacement) {
+      const snapshot = await this.readForMutation(context)
+      const existing = snapshot.items.find(item => item.id === replacement.id)
+      if (!existing || !sameTarget(existing, pending)) throw new MemoryAccessError('invalid-target')
+    }
     const saved = await this.save(context, {
-      id: pending.id,
+      id: replacement?.id ?? pending.id,
+      ...(replacement ? { expectedUpdatedAt: replacement.updatedAt } : {}),
       scope: pending.scope,
       ...(pending.workspaceId === undefined ? {} : { workspaceId: pending.workspaceId }),
       ...(pending.sessionId === undefined ? {} : { sessionId: pending.sessionId }),
@@ -433,19 +550,34 @@ export class MemoryService {
 
   private async loadPrincipal(principalId: PrincipalId): Promise<MemorySnapshot | undefined> {
     const cached = this.cache.get(principalId)
-    if (cached !== undefined) return cached
+    if (cached !== undefined && this.now() - (this.loadedAt.get(principalId) ?? 0) <= 10_000) return cached
     const active = this.loading.get(principalId)
     if (active !== undefined) return active
+    const generation = this.generations.get(principalId) ?? 0
     const request = this.store.load(principalId).then(snapshot => {
+      if ((this.generations.get(principalId) ?? 0) !== generation) return this.cache.get(principalId)
       this.cache.set(principalId, snapshot)
+      this.loadedAt.set(principalId, this.now())
       return snapshot
     }).catch(error => {
+      if ((this.generations.get(principalId) ?? 0) === generation) this.cache.delete(principalId)
       if (error instanceof MemoryStoreError) this.report('store-unavailable')
       else this.report('store-unavailable')
       return undefined
     }).finally(() => { this.loading.delete(principalId) })
     this.loading.set(principalId, request)
     return request
+  }
+
+  private invalidate(principalId: PrincipalId): void {
+    this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1)
+    this.cache.delete(principalId)
+  }
+
+  private publish(principalId: PrincipalId, snapshot: MemorySnapshot): void {
+    this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1)
+    this.cache.set(principalId, snapshot)
+    this.loadedAt.set(principalId, this.now())
   }
 
   private denied<T>(code: MemoryWarningCode): MemoryReadResult<T> {
@@ -456,4 +588,9 @@ export class MemoryService {
   private report(code: MemoryWarningCode): void {
     try { this.warningSink?.({ code }) } catch { /* diagnostics never affect the request */ }
   }
+}
+
+function normalizedContent(value: string): string { return value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase() }
+function sameTarget(a: Pick<MemoryItem, 'scope' | 'workspaceId' | 'sessionId'>, b: MemoryDraft): boolean {
+  return a.scope === b.scope && a.workspaceId === b.workspaceId && a.sessionId === b.sessionId
 }

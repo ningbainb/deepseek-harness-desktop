@@ -31,7 +31,7 @@ window.__ModuleLoader__.load({
 		const MAX_MEMORY_CONTENT_LENGTH = 2e3;
 		//#endregion
 		//#region \0dsh-css:packages/dsh-memory/src/client/memory.module.css.mjs
-		const css = ".cPqCCW_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,#ffffff14);background:var(--dsw-alias-bg-layer-3,#ffffff0a);width:100%;color:var(--dsw-alias-label-primary,#fff);border-radius:12px;flex-direction:column;gap:16px;padding:16px 20px;font-family:inherit;font-size:13px;line-height:1.5;transition:border-color .16s,background-color .16s;display:flex}.cPqCCW_card:hover{border-color:var(--dsw-alias-label-dimmed,#ffffff29)}.cPqCCW_header{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.cPqCCW_title{color:var(--dsw-alias-label-primary,#fff);margin:0;font-size:16px;font-weight:600;line-height:1.4}.cPqCCW_description{color:var(--dsw-alias-label-tertiary,#81858c);margin:4px 0 0;font-size:13px;line-height:1.5}.cPqCCW_notice{background:var(--dsw-alias-bg-module-platform,#ffffff08);border:1px solid var(--dsw-alias-border-l2,#ffffff0f);color:var(--dsw-alias-label-tertiary,#81858c);border-radius:8px;margin:0;padding:10px 14px;font-size:12px;line-height:1.5}.cPqCCW_muted{color:var(--dsw-alias-label-tertiary,#81858c);margin:4px 0;font-size:12px}.cPqCCW_badge,.cPqCCW_badgeSaved{white-space:nowrap;border-radius:999px;flex:none;align-items:center;padding:2px 8px;font-size:11px;font-weight:500;line-height:16px;display:inline-flex}.cPqCCW_badge{background:var(--dsw-alias-bg-module-platform,#9ca3af26);color:var(--dsw-alias-label-secondary,#9ca3af);border:1px solid var(--dsw-alias-border-l2,#9ca3af40)}.cPqCCW_badgeSaved{background:var(--dsw-alias-bg-module-success-subtle,#10b98126);color:var(--dsw-alias-label-success,#10b981);border:1px solid #10b9814d}.cPqCCW_toggle{color:var(--dsw-alias-label-primary,#fff);cursor:pointer;user-select:none;align-items:center;gap:8px;font-size:13px;font-weight:500;display:inline-flex}.cPqCCW_toggle input[type=checkbox]{width:16px;height:16px;accent-color:var(--dsw-alias-brand-primary,#3370ff);cursor:pointer;margin:0}.cPqCCW_section{border-top:1px solid var(--dsw-alias-border-l2,#ffffff14);flex-direction:column;gap:10px;padding-top:14px;display:flex}.cPqCCW_sectionHeader{align-items:center;gap:8px;display:flex}.cPqCCW_sectionHeader strong{color:var(--dsw-alias-label-primary,#fff);font-size:13px;font-weight:600}.cPqCCW_sectionHeader>span{color:var(--dsw-alias-label-tertiary,#81858c);margin-right:auto;font-size:12px}.cPqCCW_filterRow{align-items:center;gap:8px;display:flex}.cPqCCW_filterRow input{flex:1;min-width:140px}.cPqCCW_itemList{background:var(--dsw-alias-bg-layer-1,#0000001f);border:1px solid var(--dsw-alias-border-l2,#ffffff14);border-radius:8px;flex-direction:column;gap:3px;max-height:220px;padding:4px;display:flex;overflow-y:auto}.cPqCCW_item,.cPqCCW_itemSelected{appearance:none;box-sizing:border-box;width:100%;color:var(--dsw-alias-label-primary,inherit);cursor:pointer;text-align:left;font:inherit;background:0 0;border:1px solid #0000;border-radius:6px;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;font-size:13px;transition:background-color .12s,border-color .12s;display:flex}.cPqCCW_item:hover{background:var(--dsw-alias-interactive-bg-hover,#ffffff0f)}.cPqCCW_itemSelected{background:var(--dsw-alias-bg-module-platform,#3370ff1a);border-color:var(--dsw-alias-brand-primary,#3370ff)}.cPqCCW_itemContent{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.cPqCCW_itemMeta{color:var(--dsw-alias-label-tertiary,#81858c);white-space:nowrap;flex:none;font-size:11px}.cPqCCW_pendingList{flex-direction:column;gap:8px;display:flex}.cPqCCW_pendingItem{border:1px solid var(--dsw-alias-border-l2,#ffffff14);background:var(--dsw-alias-bg-layer-2,#ffffff05);border-radius:8px;flex-direction:column;gap:8px;padding:12px;display:flex}.cPqCCW_pendingContent{color:var(--dsw-alias-label-primary,#fff);white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px;line-height:1.5}.cPqCCW_editor{background:var(--dsw-alias-bg-layer-2,#ffffff05);border:1px solid var(--dsw-alias-border-l2,#ffffff14);border-radius:10px;flex-direction:column;gap:12px;padding:16px;display:flex}.cPqCCW_editor .cPqCCW_sectionHeader{border-bottom:1px solid var(--dsw-alias-border-l2,#ffffff14);padding-bottom:8px}.cPqCCW_editor .cPqCCW_sectionHeader strong{color:var(--dsw-alias-label-primary,#fff);font-size:14px;font-weight:600}.cPqCCW_field{flex-direction:column;gap:5px;display:flex}.cPqCCW_field>span:first-child{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:12px;font-weight:500}.cPqCCW_field input,.cPqCCW_field select,.cPqCCW_field textarea,.cPqCCW_filterRow input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,#ffffff1a);background:var(--dsw-alias-bg-layer-1,#00000026);width:100%;min-width:0;height:34px;color:var(--dsw-alias-label-primary,#fff);font:inherit;border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5;transition:border-color .16s,box-shadow .16s}.cPqCCW_field select{cursor:pointer}.cPqCCW_field input:focus,.cPqCCW_field select:focus,.cPqCCW_field textarea:focus,.cPqCCW_filterRow input:focus{border-color:var(--dsw-alias-brand-primary,#3370ff);box-shadow:0 0 0 2px var(--dsw-alias-border-l3,#3370ff40);outline:none}.cPqCCW_field input::placeholder,.cPqCCW_field textarea::placeholder,.cPqCCW_filterRow input::placeholder{color:var(--dsw-alias-label-dimmed,#6b7280)}.cPqCCW_field textarea{resize:vertical;height:auto;min-height:110px;padding:10px 12px}.cPqCCW_field input:disabled,.cPqCCW_field select:disabled,.cPqCCW_field textarea:disabled,.cPqCCW_filterRow input:disabled{opacity:.5;cursor:not-allowed}.cPqCCW_counter{color:var(--dsw-alias-label-dimmed,#6b7280);text-align:right;font-variant-numeric:tabular-nums;margin-top:-2px;font-size:11px}.cPqCCW_actions{justify-content:flex-end;align-items:center;gap:8px;margin-top:4px;display:flex}.cPqCCW_button,.cPqCCW_primary,.cPqCCW_danger{appearance:none;box-sizing:border-box;height:32px;font:inherit;cursor:pointer;white-space:nowrap;border-radius:8px;justify-content:center;align-items:center;padding:0 14px;font-size:13px;font-weight:500;transition:all .16s;display:inline-flex}.cPqCCW_button{background:var(--dsw-alias-bg-layer-2,transparent);border:1px solid var(--dsw-alias-border-l2,#ffffff1f);color:var(--dsw-alias-label-primary,#fff)}.cPqCCW_button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#ffffff0f);border-color:var(--dsw-alias-label-dimmed,#fff3)}.cPqCCW_primary{background:var(--dsw-alias-brand-primary,#3370ff);color:#fff;border:1px solid #0000}.cPqCCW_primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,#2860db)}.cPqCCW_danger{border:1px solid var(--dsw-alias-border-l2,#ffffff1f);color:var(--dsw-alias-label-error,#ef4444);background:0 0}.cPqCCW_danger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger,#ef44441a);border-color:var(--dsw-alias-label-error,#ef4444)}.cPqCCW_button:disabled,.cPqCCW_primary:disabled,.cPqCCW_danger:disabled{opacity:.45;cursor:not-allowed}.cPqCCW_error{background:var(--dsw-alias-interactive-bg-hover-danger,#ef44441a);border:1px solid var(--dsw-alias-label-error,#ef44444d);color:var(--dsw-alias-label-error,#ef4444);border-radius:8px;margin:0;padding:8px 12px;font-size:12px;line-height:1.5}@media (width<=520px){.cPqCCW_header,.cPqCCW_sectionHeader{flex-wrap:wrap}.cPqCCW_filterRow{flex-direction:column;align-items:stretch}.cPqCCW_actions{flex-wrap:wrap}}";
+		const css = ".cPqCCW_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,#ffffff14);background:var(--dsw-alias-bg-layer-3,#ffffff0a);width:100%;color:var(--dsw-alias-label-primary,#fff);border-radius:12px;flex-direction:column;gap:12px;padding:16px 20px;font-family:inherit;font-size:13px;line-height:1.5;transition:border-color .16s,background-color .16s;display:flex}.cPqCCW_card:hover{border-color:var(--dsw-alias-label-dimmed,#ffffff29)}.cPqCCW_header{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.cPqCCW_title{color:var(--dsw-alias-label-primary,#fff);margin:0;font-size:16px;font-weight:600;line-height:1.4}.cPqCCW_description{color:var(--dsw-alias-label-tertiary,#81858c);margin:4px 0 0;font-size:13px;line-height:1.5}.cPqCCW_notice{background:var(--dsw-alias-bg-module-platform,#ffffff08);border:1px solid var(--dsw-alias-border-l2,#ffffff0f);color:var(--dsw-alias-label-tertiary,#81858c);border-radius:8px;margin:0;padding:10px 14px;font-size:12px;line-height:1.5}.cPqCCW_muted{color:var(--dsw-alias-label-tertiary,#81858c);margin:4px 0;font-size:12px}.cPqCCW_badge,.cPqCCW_badgeSaved{white-space:nowrap;border-radius:999px;flex:none;align-items:center;padding:2px 8px;font-size:11px;font-weight:500;line-height:16px;display:inline-flex}.cPqCCW_badge{background:var(--dsw-alias-bg-module-platform,#9ca3af26);color:var(--dsw-alias-label-secondary,#9ca3af);border:1px solid var(--dsw-alias-border-l2,#9ca3af40)}.cPqCCW_badgeSaved{background:var(--dsw-alias-bg-module-success-subtle,#10b98126);color:var(--dsw-alias-label-success,#10b981);border:1px solid #10b9814d}.cPqCCW_toggle{color:var(--dsw-alias-label-primary,#fff);cursor:pointer;user-select:none;align-items:center;gap:8px;font-size:13px;font-weight:500;display:inline-flex}.cPqCCW_toggle input[type=checkbox]{width:16px;height:16px;accent-color:var(--dsw-alias-brand-primary,#3370ff);cursor:pointer;margin:0}.cPqCCW_section{border-top:1px solid var(--dsw-alias-border-l2,#ffffff14);flex-direction:column;gap:10px;padding-top:14px;display:flex}.cPqCCW_activity{border:1px solid var(--dsw-alias-border-l2,#596777);color:var(--dsw-alias-label-primary,inherit);border-radius:8px;font:13px/1.5 system-ui,sans-serif}.cPqCCW_activity>summary{cursor:pointer;padding:8px 12px;font-weight:500}.cPqCCW_activityBody{gap:10px;padding:12px;display:grid}.cPqCCW_activityBody p{overflow-wrap:anywhere;margin:0}.cPqCCW_activityItem{border-top:1px solid var(--dsw-alias-border-l2,#596777);gap:8px;padding-top:10px;display:grid}.cPqCCW_headerActivity .cPqCCW_activity[open]{z-index:1000;background:var(--dsw-alias-bg-layer-1,#20242d);width:min(440px,100vw - 32px);max-height:calc(100vh - 100px);position:fixed;top:76px;right:16px;overflow:auto;box-shadow:0 8px 32px #0004}.cPqCCW_headerActivity summary{white-space:nowrap}.cPqCCW_section[hidden],.cPqCCW_editor[hidden]{display:none}.cPqCCW_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);gap:16px;display:flex}.cPqCCW_tabs button{color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;background:0 0;border:0;border-bottom:2px solid #0000;padding:8px 0}.cPqCCW_tabs button[aria-selected=true]{color:var(--dsw-alias-label-primary);border-bottom-color:var(--dsw-alias-brand-primary);font-weight:600}.cPqCCW_tabs button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}.cPqCCW_itemList:empty,.cPqCCW_pendingList:empty{display:none}.cPqCCW_sectionHeader{align-items:center;gap:8px;display:flex}.cPqCCW_sectionHeader strong{color:var(--dsw-alias-label-primary,#fff);font-size:13px;font-weight:600}.cPqCCW_sectionHeader>span{color:var(--dsw-alias-label-tertiary,#81858c);margin-right:auto;font-size:12px}.cPqCCW_filterRow{align-items:center;gap:8px;display:flex}.cPqCCW_filterRow input{flex:1;min-width:140px}.cPqCCW_itemList{background:var(--dsw-alias-bg-layer-1,#0000001f);border:1px solid var(--dsw-alias-border-l2,#ffffff14);border-radius:8px;flex-direction:column;gap:3px;max-height:220px;padding:4px;display:flex;overflow-y:auto}.cPqCCW_item,.cPqCCW_itemSelected{appearance:none;box-sizing:border-box;width:100%;color:var(--dsw-alias-label-primary,inherit);cursor:pointer;text-align:left;font:inherit;background:0 0;border:1px solid #0000;border-radius:6px;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;font-size:13px;transition:background-color .12s,border-color .12s;display:flex}.cPqCCW_item:hover{background:var(--dsw-alias-interactive-bg-hover,#ffffff0f)}.cPqCCW_itemSelected{background:var(--dsw-alias-bg-module-platform,#3370ff1a);border-color:var(--dsw-alias-brand-primary,#3370ff)}.cPqCCW_itemContent{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.cPqCCW_itemMeta{color:var(--dsw-alias-label-tertiary,#81858c);white-space:nowrap;flex:none;font-size:11px}.cPqCCW_pendingList{flex-direction:column;gap:8px;display:flex}.cPqCCW_pendingItem{border:1px solid var(--dsw-alias-border-l2,#ffffff14);background:var(--dsw-alias-bg-layer-2,#ffffff05);border-radius:8px;flex-direction:column;gap:8px;padding:12px;display:flex}.cPqCCW_pendingContent{color:var(--dsw-alias-label-primary,#fff);white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px;line-height:1.5}.cPqCCW_editor{background:var(--dsw-alias-bg-layer-2,#ffffff05);border:1px solid var(--dsw-alias-border-l2,#ffffff14);border-radius:10px;flex-direction:column;gap:12px;padding:16px;display:flex}.cPqCCW_editor .cPqCCW_sectionHeader{border-bottom:1px solid var(--dsw-alias-border-l2,#ffffff14);padding-bottom:8px}.cPqCCW_editor .cPqCCW_sectionHeader strong{color:var(--dsw-alias-label-primary,#fff);font-size:14px;font-weight:600}.cPqCCW_field{flex-direction:column;gap:5px;display:flex}.cPqCCW_field>span:first-child{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:12px;font-weight:500}.cPqCCW_field input,.cPqCCW_field select,.cPqCCW_field textarea,.cPqCCW_filterRow input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,#ffffff1a);background:var(--dsw-alias-bg-layer-1,#00000026);width:100%;min-width:0;height:34px;color:var(--dsw-alias-label-primary,#fff);font:inherit;border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5;transition:border-color .16s,box-shadow .16s}.cPqCCW_field select{cursor:pointer}.cPqCCW_field input:focus,.cPqCCW_field select:focus,.cPqCCW_field textarea:focus,.cPqCCW_filterRow input:focus{border-color:var(--dsw-alias-brand-primary,#3370ff);box-shadow:0 0 0 2px var(--dsw-alias-border-l3,#3370ff40);outline:none}.cPqCCW_field input::placeholder,.cPqCCW_field textarea::placeholder,.cPqCCW_filterRow input::placeholder{color:var(--dsw-alias-label-dimmed,#6b7280)}.cPqCCW_field textarea{resize:vertical;height:auto;min-height:110px;padding:10px 12px}.cPqCCW_field input:disabled,.cPqCCW_field select:disabled,.cPqCCW_field textarea:disabled,.cPqCCW_filterRow input:disabled{opacity:.5;cursor:not-allowed}.cPqCCW_counter{color:var(--dsw-alias-label-dimmed,#6b7280);text-align:right;font-variant-numeric:tabular-nums;margin-top:-2px;font-size:11px}.cPqCCW_actions{justify-content:flex-end;align-items:center;gap:8px;margin-top:4px;display:flex}.cPqCCW_button,.cPqCCW_primary,.cPqCCW_danger{appearance:none;box-sizing:border-box;height:32px;font:inherit;cursor:pointer;white-space:nowrap;border-radius:8px;justify-content:center;align-items:center;padding:0 14px;font-size:13px;font-weight:500;transition:all .16s;display:inline-flex}.cPqCCW_button{background:var(--dsw-alias-bg-layer-2,transparent);border:1px solid var(--dsw-alias-border-l2,#ffffff1f);color:var(--dsw-alias-label-primary,#fff)}.cPqCCW_button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#ffffff0f);border-color:var(--dsw-alias-label-dimmed,#fff3)}.cPqCCW_primary{background:var(--dsw-alias-brand-primary,#3370ff);color:#fff;border:1px solid #0000}.cPqCCW_primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,#2860db)}.cPqCCW_danger{border:1px solid var(--dsw-alias-border-l2,#ffffff1f);color:var(--dsw-alias-label-error,#ef4444);background:0 0}.cPqCCW_danger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger,#ef44441a);border-color:var(--dsw-alias-label-error,#ef4444)}.cPqCCW_button:disabled,.cPqCCW_primary:disabled,.cPqCCW_danger:disabled{opacity:.45;cursor:not-allowed}.cPqCCW_error{background:var(--dsw-alias-interactive-bg-hover-danger,#ef44441a);border:1px solid var(--dsw-alias-label-error,#ef44444d);color:var(--dsw-alias-label-error,#ef4444);border-radius:8px;margin:0;padding:8px 12px;font-size:12px;line-height:1.5}@media (width<=520px){.cPqCCW_header,.cPqCCW_sectionHeader{flex-wrap:wrap}.cPqCCW_filterRow{flex-direction:column;align-items:stretch}.cPqCCW_actions{flex-wrap:wrap}}.cPqCCW_scopeFilter{color:var(--dsw-alias-label-secondary);align-items:center;gap:12px;font-size:12px;display:flex}.cPqCCW_scopeFilter select{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);min-width:0;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;flex:1;padding:7px 10px}";
 		const tagId = "@ningbainb/dsh-memory/memory.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -42,6 +42,9 @@ window.__ModuleLoader__.load({
 		}
 		var memory_module_css_default = {
 			"actions": "cPqCCW_actions",
+			"activity": "cPqCCW_activity",
+			"activityBody": "cPqCCW_activityBody",
+			"activityItem": "cPqCCW_activityItem",
 			"badge": "cPqCCW_badge",
 			"badgeSaved": "cPqCCW_badgeSaved",
 			"button": "cPqCCW_button",
@@ -54,6 +57,7 @@ window.__ModuleLoader__.load({
 			"field": "cPqCCW_field",
 			"filterRow": "cPqCCW_filterRow",
 			"header": "cPqCCW_header",
+			"headerActivity": "cPqCCW_headerActivity",
 			"item": "cPqCCW_item",
 			"itemContent": "cPqCCW_itemContent",
 			"itemList": "cPqCCW_itemList",
@@ -65,11 +69,244 @@ window.__ModuleLoader__.load({
 			"pendingItem": "cPqCCW_pendingItem",
 			"pendingList": "cPqCCW_pendingList",
 			"primary": "cPqCCW_primary",
+			"scopeFilter": "cPqCCW_scopeFilter",
 			"section": "cPqCCW_section",
 			"sectionHeader": "cPqCCW_sectionHeader",
+			"tabs": "cPqCCW_tabs",
 			"title": "cPqCCW_title",
 			"toggle": "cPqCCW_toggle"
 		};
+		//#endregion
+		//#region src/client/MemoryActivityPanel.tsx
+		function MemoryActivityPanel({ t, enabled, sessionId, onEdit }) {
+			const [open, setOpen] = (0, react.useState)(false);
+			const [activity, setActivity] = (0, react.useState)(null);
+			const [error, setError] = (0, react.useState)(false);
+			const [busy, setBusy] = (0, react.useState)(false);
+			const [editing, setEditing] = (0, react.useState)(null);
+			const [content, setContent] = (0, react.useState)("");
+			const [deleting, setDeleting] = (0, react.useState)(null);
+			const requestSequence = (0, react.useRef)(0);
+			const detailsRef = (0, react.useRef)(null);
+			const query = sessionId ? "?sessionId=" + encodeURIComponent(sessionId) : "";
+			const refresh = async () => {
+				const sequence = ++requestSequence.current;
+				try {
+					const response = await fetch("/api/dsh-memory/activity" + query, { cache: "no-store" });
+					const value = await response.json();
+					if (!response.ok || !value.ok) throw new Error("unavailable");
+					if (sequence === requestSequence.current) {
+						setActivity(value.activity);
+						setError(false);
+					}
+				} catch {
+					if (sequence === requestSequence.current) {
+						setActivity(null);
+						setError(true);
+					}
+				}
+			};
+			(0, react.useEffect)(() => {
+				setActivity(null);
+				if (!open) return;
+				refresh();
+				const timer = setInterval(() => {
+					if (document.visibilityState === "visible") refresh();
+				}, 5e3);
+				return () => {
+					clearInterval(timer);
+					requestSequence.current++;
+				};
+			}, [
+				open,
+				sessionId,
+				enabled
+			]);
+			(0, react.useEffect)(() => {
+				setEditing(null);
+				setDeleting(null);
+			}, [sessionId]);
+			const mutate = async (path, body) => {
+				if (busy) return;
+				setBusy(true);
+				setError(false);
+				try {
+					const response = await fetch(path, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify(body)
+					});
+					const value = await response.json();
+					if (!response.ok || !value.ok) throw new Error("unavailable");
+					setEditing(null);
+					setDeleting(null);
+					await refresh();
+				} catch {
+					setError(true);
+				} finally {
+					setBusy(false);
+				}
+			};
+			const activityQuery = activity?.sessionId ? "?sessionId=" + encodeURIComponent(activity.sessionId) : query;
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("details", {
+				ref: detailsRef,
+				className: memory_module_css_default.activity,
+				"data-memory-activity": "true",
+				onToggle: (event) => setOpen(event.currentTarget.open),
+				onKeyDown: (event) => {
+					if (event.key === "Escape" && detailsRef.current) {
+						event.stopPropagation();
+						detailsRef.current.open = false;
+						detailsRef.current.querySelector("summary")?.focus();
+					}
+				},
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("summary", { children: [t(onEdit ? "settings.activity.ready" : "settings.activityTitle"), open && activity ? ` · ${activity.items.length}` : ""] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: memory_module_css_default.activityBody,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: memory_module_css_default.muted,
+							children: t("settings.activityHint")
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+							role: "status",
+							children: [t("settings.activity." + (!enabled ? "disabled" : activity?.status ?? "none")), activity?.preparedAt ? " · " + new Date(activity.preparedAt).toLocaleTimeString() : ""]
+						}),
+						error && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: memory_module_css_default.error,
+							role: "alert",
+							children: t("settings.activityError")
+						}),
+						enabled && activity?.items.map(({ item, reason, truncated }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("article", {
+							className: memory_module_css_default.activityItem,
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: item.content }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+									className: memory_module_css_default.muted,
+									children: [
+										t("settings." + item.scope),
+										" · ",
+										t("settings.reason." + reason),
+										truncated ? " · " + t("settings.truncated") : ""
+									]
+								}),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: memory_module_css_default.actions,
+									children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: memory_module_css_default.button,
+											disabled: busy,
+											onClick: () => void mutate("/api/dsh-memory/activity" + activityQuery, {
+												operation: "ignore",
+												id: item.id
+											}),
+											children: t("settings.ignore")
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: memory_module_css_default.button,
+											disabled: busy,
+											onClick: () => {
+												if (onEdit) onEdit(item);
+												else {
+													setEditing(item);
+													setContent(item.content);
+												}
+											},
+											children: t("settings.edit")
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: memory_module_css_default.danger,
+											disabled: busy,
+											onClick: () => setDeleting(item.id),
+											children: t("settings.delete")
+										})
+									]
+								}),
+								deleting === item.id && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: memory_module_css_default.actions,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										className: memory_module_css_default.button,
+										onClick: () => setDeleting(null),
+										children: t("settings.cancelAction")
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										className: memory_module_css_default.danger,
+										disabled: busy,
+										onClick: () => void mutate("/api/dsh-memory/items", {
+											operation: "remove",
+											id: item.id,
+											expectedUpdatedAt: item.updatedAt
+										}),
+										children: t("settings.confirmDelete")
+									})]
+								})
+							]
+						}, item.id)),
+						editing && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: memory_module_css_default.field,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("textarea", {
+								"aria-label": t("settings.content"),
+								value: content,
+								maxLength: 2e3,
+								onChange: (event) => setContent(event.target.value)
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: memory_module_css_default.actions,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+									className: memory_module_css_default.button,
+									onClick: () => setEditing(null),
+									children: t("settings.cancelAction")
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+									className: memory_module_css_default.primary,
+									disabled: busy || !content.trim(),
+									onClick: () => void mutate("/api/dsh-memory/items", {
+										...editing,
+										operation: "save",
+										content,
+										expectedUpdatedAt: editing.updatedAt
+									}),
+									children: t("settings.save")
+								})]
+							})]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: memory_module_css_default.actions,
+							children: [!!activity?.ignoredCount && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+								type: "button",
+								className: memory_module_css_default.button,
+								disabled: busy,
+								onClick: () => void mutate("/api/dsh-memory/activity" + activityQuery, {
+									operation: "ignore",
+									id: null
+								}),
+								children: [
+									t("settings.restoreIgnored"),
+									" · ",
+									activity.ignoredCount
+								]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: memory_module_css_default.button,
+								disabled: busy,
+								onClick: () => void refresh(),
+								children: t("settings.reload")
+							})]
+						})
+					]
+				})]
+			});
+		}
+		function MemoryHeaderStatus(props) {
+			const snapshot = (0, react.useSyncExternalStore)((listener) => props.settingsScope.subscribe(listener), () => props.settingsScope.getSnapshot());
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: memory_module_css_default.headerActivity,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MemoryActivityPanel, {
+					sessionId: props.sessionId,
+					t: props.t,
+					enabled: snapshot.value?.enabled === true
+				})
+			});
+		}
 		//#endregion
 		//#region src/client/MemorySettingsCard.tsx
 		function emptyDraft() {
@@ -86,6 +323,7 @@ window.__ModuleLoader__.load({
 		function draftOf(item) {
 			return {
 				id: item.id,
+				expectedUpdatedAt: item.updatedAt,
 				scope: item.scope,
 				workspaceId: item.workspaceId ?? "",
 				sessionId: item.sessionId ?? "",
@@ -102,6 +340,7 @@ window.__ModuleLoader__.load({
 			if (tags.length > 10) return void 0;
 			const body = {
 				operation: "save",
+				...draft.expectedUpdatedAt === void 0 ? {} : { expectedUpdatedAt: draft.expectedUpdatedAt },
 				...draft.id === void 0 ? {} : { id: draft.id },
 				scope: draft.scope,
 				content,
@@ -126,6 +365,7 @@ window.__ModuleLoader__.load({
 			if (code === "sensitive") return t("settings.errorSensitive");
 			if (code === "invalid" || code === "invalid-target") return t("settings.errorInvalid");
 			if (code === "store-unavailable") return t("settings.errorStore");
+			if (code === "duplicate") return t("settings.duplicate");
 			if (code === "conflict") return t("settings.errorConflict");
 			return t("settings.errorSave");
 		}
@@ -184,12 +424,20 @@ window.__ModuleLoader__.load({
 					return config;
 				}
 			}, [config, settingsSnapshot.value]);
+			const dock = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("desktop-dock-setting");
+			const [editorOpen, setEditorOpen] = (0, react.useState)(!dock);
+			const [memoryTab, setMemoryTab] = (0, react.useState)("items");
+			const [cleanDraft, setCleanDraft] = (0, react.useState)(() => JSON.stringify(emptyDraft()));
 			const [enabled, setEnabled] = (0, react.useState)(liveConfig.enabled);
 			const [items, setItems] = (0, react.useState)([]);
 			const [pending, setPending] = (0, react.useState)([]);
 			const [selectedId, setSelectedId] = (0, react.useState)();
 			const [draft, setDraft] = (0, react.useState)(emptyDraft);
 			const [filter, setFilter] = (0, react.useState)("");
+			const [scopeFilter, setScopeFilter] = (0, react.useState)("all");
+			const [clearEntries, setClearEntries] = (0, react.useState)(null);
+			const [replacements, setReplacements] = (0, react.useState)({});
+			const [feedback, setFeedback] = (0, react.useState)("");
 			const [loading, setLoading] = (0, react.useState)(true);
 			const [saving, setSaving] = (0, react.useState)(false);
 			const [error, setError] = (0, react.useState)(null);
@@ -213,10 +461,11 @@ window.__ModuleLoader__.load({
 				setError(null);
 				(async () => {
 					for (let attempt = 0; attempt < 8; attempt += 1) try {
-						const [itemValue, pendingValue] = await Promise.all([getJson("/api/dsh-memory/items"), getJson("/api/dsh-memory/pending")]);
+						const [itemValue, pendingValue] = await Promise.all([getJson("/api/dsh-memory/items?view=manage&refresh=1"), getJson("/api/dsh-memory/pending")]);
 						setItems(responseItems(itemValue));
 						setPending(responsePending(pendingValue));
 						setLoading(false);
+						setFeedback(t("settings.refreshed"));
 						return;
 					} catch (reason) {
 						if (!retryableLoadError(reason) || attempt === 7) break;
@@ -233,16 +482,25 @@ window.__ModuleLoader__.load({
 			}, []);
 			const visibleItems = (0, react.useMemo)(() => {
 				const needle = filter.trim().toLocaleLowerCase();
-				if (needle === "") return items;
-				return items.filter((item) => [item.content, ...item.tags].join(" ").toLocaleLowerCase().includes(needle));
-			}, [filter, items]);
+				const scoped = items.filter((item) => scopeFilter === "all" || item.scope === scopeFilter);
+				if (needle === "") return scoped;
+				return scoped.filter((item) => [item.content, ...item.tags].join(" ").toLocaleLowerCase().includes(needle));
+			}, [
+				filter,
+				items,
+				scopeFilter
+			]);
 			const select = (item) => {
+				setEditorOpen(true);
+				setCleanDraft(JSON.stringify(draftOf(item)));
 				setSelectedId(item.id);
 				setDraft(draftOf(item));
 				setSaved(false);
 				setError(null);
 			};
 			const create = () => {
+				setEditorOpen(true);
+				setCleanDraft(JSON.stringify(emptyDraft()));
 				setSelectedId(void 0);
 				setDraft(emptyDraft());
 				setSaved(false);
@@ -261,7 +519,12 @@ window.__ModuleLoader__.load({
 				}
 				setSaving(true);
 				setError(null);
-				postJson("/api/dsh-memory/items", body).then(() => {
+				postJson("/api/dsh-memory/items", body).then((value) => {
+					const item = value.item;
+					setSelectedId(item.id);
+					setDraft(draftOf(item));
+					setCleanDraft(JSON.stringify(draftOf(item)));
+					setFeedback(t("settings.savedTo") + " " + t("settings." + item.scope));
 					setSaved(true);
 					setSaving(false);
 					load();
@@ -276,10 +539,13 @@ window.__ModuleLoader__.load({
 				setSaving(true);
 				postJson("/api/dsh-memory/items", {
 					operation: "remove",
-					id: selectedId
+					id: selectedId,
+					expectedUpdatedAt: draft.expectedUpdatedAt
 				}).then(() => {
 					setSelectedId(void 0);
 					setDraft(emptyDraft());
+					setCleanDraft(JSON.stringify(emptyDraft()));
+					setEditorOpen(!dock);
 					setSaving(false);
 					load();
 				}, (reason) => {
@@ -288,11 +554,20 @@ window.__ModuleLoader__.load({
 				});
 			};
 			const clear = () => {
-				if (saving) return;
+				if (saving || !clearEntries) return;
 				setSaving(true);
-				postJson("/api/dsh-memory/items", { operation: "clear" }).then(() => {
+				postJson("/api/dsh-memory/items", {
+					operation: "clear",
+					entries: clearEntries.map((item) => ({
+						id: item.id,
+						updatedAt: item.updatedAt
+					}))
+				}).then(() => {
+					setClearEntries(null);
 					setSelectedId(void 0);
 					setDraft(emptyDraft());
+					setCleanDraft(JSON.stringify(emptyDraft()));
+					setEditorOpen(!dock);
 					setSaving(false);
 					load();
 				}, (reason) => {
@@ -303,7 +578,14 @@ window.__ModuleLoader__.load({
 			const confirm = (entry) => {
 				if (saving) return;
 				setSaving(true);
-				postJson("/api/dsh-memory/pending/" + encodeURIComponent(entry.id), { operation: "confirm" }).then(() => {
+				const replacement = items.find((item) => item.id === replacements[entry.id]);
+				postJson("/api/dsh-memory/pending/" + encodeURIComponent(entry.id), {
+					operation: "confirm",
+					...replacement ? {
+						replaceId: replacement.id,
+						expectedUpdatedAt: replacement.updatedAt
+					} : {}
+				}).then(() => {
 					setSaving(false);
 					load();
 				}, (reason) => {
@@ -325,6 +607,8 @@ window.__ModuleLoader__.load({
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 				className: memory_module_css_default.card,
 				"data-memory-card": "true",
+				"data-dock-owner": "memory",
+				"data-dock-dirty": editorOpen && JSON.stringify(draft) !== cleanDraft,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", {
 						className: memory_module_css_default.header,
@@ -336,12 +620,27 @@ window.__ModuleLoader__.load({
 							children: t("settings.description")
 						})] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: saved ? memory_module_css_default.badgeSaved : memory_module_css_default.badge,
-							children: saved ? t("settings.saved") : t("settings.unsaved")
+							children: saving ? t("settings.saving") : saved ? t("settings.saved") : editorOpen && JSON.stringify(draft) !== cleanDraft ? t("settings.unsaved") : t("settings.ready")
 						})]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: memory_module_css_default.notice,
 						children: t("settings.ownerNotice")
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(MemoryActivityPanel, {
+						t,
+						enabled,
+						onEdit: select
+					}),
+					saved && selectedId && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+						className: memory_module_css_default.muted,
+						role: "status",
+						children: [
+							t("settings.savedTo"),
+							" ",
+							t("settings." + draft.scope),
+							draft.workspaceId || draft.sessionId ? " · " + (draft.workspaceId || draft.sessionId) : ""
+						]
 					}),
 					!settingsSnapshot.writable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: memory_module_css_default.notice,
@@ -367,8 +666,49 @@ window.__ModuleLoader__.load({
 							onChange: (event) => saveConfig(event.target.checked)
 						}), t("settings.enabled")]
 					}),
+					dock && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: memory_module_css_default.tabs,
+						role: "tablist",
+						"aria-label": t("settings.title"),
+						onKeyDown: (event) => {
+							if (![
+								"ArrowLeft",
+								"ArrowRight",
+								"Home",
+								"End"
+							].includes(event.key)) return;
+							event.preventDefault();
+							const next = event.key === "Home" ? "items" : event.key === "End" ? "pending" : memoryTab === "items" ? "pending" : "items";
+							setMemoryTab(next);
+							event.currentTarget.querySelectorAll("button")[next === "items" ? 0 : 1]?.focus();
+						},
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "tab",
+							tabIndex: memoryTab === "items" ? 0 : -1,
+							"aria-selected": memoryTab === "items",
+							onClick: () => setMemoryTab("items"),
+							children: [
+								t("settings.items"),
+								" · ",
+								items.length
+							]
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "tab",
+							tabIndex: memoryTab === "pending" ? 0 : -1,
+							"aria-selected": memoryTab === "pending",
+							onClick: () => setMemoryTab("pending"),
+							children: [
+								t("settings.pending"),
+								" · ",
+								pending.length
+							]
+						})]
+					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: memory_module_css_default.section,
+						hidden: dock && memoryTab !== "items",
 						children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", {
 								className: memory_module_css_default.sectionHeader,
@@ -379,6 +719,11 @@ window.__ModuleLoader__.load({
 										" ",
 										t("settings.count")
 									] }),
+									feedback && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("small", {
+										className: memory_module_css_default.muted,
+										role: "status",
+										children: feedback
+									}),
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 										type: "button",
 										className: memory_module_css_default.button,
@@ -388,12 +733,39 @@ window.__ModuleLoader__.load({
 									})
 								]
 							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+								className: memory_module_css_default.scopeFilter,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("settings.scopeFilter") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("select", {
+									"aria-label": t("settings.scopeFilter"),
+									value: scopeFilter,
+									onChange: (event) => {
+										setScopeFilter(event.target.value);
+										setClearEntries(null);
+									},
+									children: [
+										"all",
+										"global",
+										"workspace",
+										"session"
+									].map((scope) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("option", {
+										value: scope,
+										children: [
+											t("settings." + scope),
+											" · ",
+											scope === "all" ? items.length : items.filter((item) => item.scope === scope).length
+										]
+									}, scope))
+								})]
+							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 								className: memory_module_css_default.filterRow,
 								children: [
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
 										value: filter,
-										onChange: (event) => setFilter(event.target.value),
+										onChange: (event) => {
+											setFilter(event.target.value);
+											setClearEntries(null);
+										},
 										placeholder: t("settings.searchPlaceholder"),
 										"aria-label": t("settings.search")
 									}),
@@ -407,11 +779,36 @@ window.__ModuleLoader__.load({
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 										type: "button",
 										className: memory_module_css_default.danger,
-										disabled: saving || items.length === 0 || !settingsSnapshot.writable,
-										onClick: clear,
-										children: t("settings.clear")
+										disabled: saving || visibleItems.length === 0 || !settingsSnapshot.writable,
+										onClick: () => setClearEntries([...visibleItems]),
+										children: t("settings.clearVisible")
 									})
 								]
+							}),
+							clearEntries && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: memory_module_css_default.notice,
+								role: "alert",
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", { children: [
+									t("settings.clearConfirm"),
+									" ",
+									clearEntries.length,
+									" ",
+									t("settings.count")
+								] }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: memory_module_css_default.actions,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: memory_module_css_default.button,
+										onClick: () => setClearEntries(null),
+										children: t("settings.cancelAction")
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: memory_module_css_default.danger,
+										disabled: saving,
+										onClick: clear,
+										children: t("settings.confirmDelete")
+									})]
+								})]
 							}),
 							loading && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 								className: memory_module_css_default.muted,
@@ -434,7 +831,12 @@ window.__ModuleLoader__.load({
 										children: item.content
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 										className: memory_module_css_default.itemMeta,
-										children: [item.scope === "global" ? t("settings.global") : item.scope === "workspace" ? t("settings.workspace") : t("settings.session"), item.pinned ? " · ★" : ""]
+										children: [
+											item.scope === "global" ? t("settings.global") : item.scope === "workspace" ? t("settings.workspace") : t("settings.session"),
+											item.workspaceId || item.sessionId ? " · " + (item.workspaceId ?? item.sessionId) : "",
+											item.pinned ? ` · ${t("settings.pinned")}` : "",
+											item.expiresAt !== void 0 && item.expiresAt <= Date.now() ? " · " + t("settings.expired") : ""
+										]
 									})]
 								}, item.id))
 							})
@@ -442,6 +844,7 @@ window.__ModuleLoader__.load({
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: memory_module_css_default.section,
+						hidden: dock && memoryTab !== "pending",
 						children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("header", {
 								className: memory_module_css_default.sectionHeader,
@@ -455,6 +858,10 @@ window.__ModuleLoader__.load({
 								className: memory_module_css_default.muted,
 								children: t("settings.noPending")
 							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: memory_module_css_default.muted,
+								children: t("settings.pendingHint")
+							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: memory_module_css_default.pendingList,
 								children: pending.map((entry) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("article", {
@@ -464,10 +871,38 @@ window.__ModuleLoader__.load({
 											className: memory_module_css_default.pendingContent,
 											children: entry.item.content
 										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
 											className: memory_module_css_default.notice,
-											children: t("settings.suggestion")
+											children: [
+												t("settings.suggestion"),
+												" ",
+												t("settings." + entry.item.scope),
+												" · ",
+												new Date(entry.createdAt).toLocaleString()
+											]
 										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+											className: memory_module_css_default.field,
+											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("settings.replacement") }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("select", {
+												value: replacements[entry.id] ?? "",
+												onChange: (event) => setReplacements((current) => ({
+													...current,
+													[entry.id]: event.target.value
+												})),
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+													value: "",
+													children: t("settings.newMemory")
+												}), items.filter((item) => item.scope === entry.item.scope && item.workspaceId === entry.item.workspaceId && item.sessionId === entry.item.sessionId).map((item) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("option", {
+													value: item.id,
+													children: [
+														t("settings.replaceMemory"),
+														": ",
+														item.content.slice(0, 80)
+													]
+												}, item.id))]
+											})]
+										}),
+										replacements[entry.id] && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("blockquote", { children: items.find((item) => item.id === replacements[entry.id])?.content }),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 											className: memory_module_css_default.actions,
 											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -491,7 +926,20 @@ window.__ModuleLoader__.load({
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: memory_module_css_default.editor,
+						hidden: dock && !editorOpen,
 						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+								className: memory_module_css_default.muted,
+								children: t("settings.targetHint")
+							}),
+							selectedId && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+								className: memory_module_css_default.muted,
+								children: [
+									t("settings.updated"),
+									" ",
+									new Date(draft.expectedUpdatedAt ?? 0).toLocaleString()
+								]
+							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("header", {
 								className: memory_module_css_default.sectionHeader,
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: selectedId === void 0 ? t("settings.new") : selectedId })
@@ -606,6 +1054,7 @@ window.__ModuleLoader__.load({
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("footer", {
 								className: memory_module_css_default.actions,
+								"data-dock-save-bar": dock || void 0,
 								children: [
 									selectedId !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 										type: "button",
@@ -621,15 +1070,18 @@ window.__ModuleLoader__.load({
 										onClick: () => {
 											setSelectedId(void 0);
 											setDraft(emptyDraft());
+											setCleanDraft(JSON.stringify(emptyDraft()));
+											setEditorOpen(!dock);
 										},
 										children: t("settings.cancel")
 									}),
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 										type: "button",
 										className: memory_module_css_default.primary,
+										"data-dock-save": "true",
 										disabled: saving || !settingsSnapshot.writable,
 										onClick: save,
-										children: saving ? t("settings.loading") : t("settings.save")
+										children: saving ? t("settings.saving") : t("settings.save")
 									})
 								]
 							})
@@ -641,10 +1093,47 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/locales.ts
 		const zh = {
+			"settings.all": "全部作用域",
+			"settings.scopeFilter": "查看范围",
+			"settings.clearVisible": "清空当前结果",
+			"settings.clearConfirm": "确认删除当前显示的记忆？此操作无法撤销。",
+			"settings.confirmDelete": "确认删除",
+			"settings.cancelAction": "取消",
+			"settings.refreshed": "已从本地文件刷新",
+			"settings.savedTo": "已保存到",
+			"settings.targetHint": "工作区和会话记忆仅对对应目标生效；目标 ID 必须属于当前用户。",
+			"settings.pendingHint": "建议暂存于本次运行，重启后消失；确认前不会写入记忆文件。",
+			"settings.newMemory": "新增记忆",
+			"settings.replaceMemory": "更新已有记忆",
+			"settings.replacement": "保存方式",
+			"settings.duplicate": "相同作用域中已有这条记忆，请编辑已有条目。",
+			"settings.expired": "已过期，不参与引用",
+			"settings.sourceExplicit": "手动保存",
+			"settings.sourceSuggested": "已确认的模型建议",
+			"settings.updated": "更新于",
+			"settings.refreshDirty": "有未保存的编辑，刷新后仍保留草稿；保存时会检查版本。",
+			"settings.activityTitle": "记忆",
+			"settings.activityHint": "展示最近为会话准备的记忆上下文，不代表模型已经采纳。忽略从后续请求生效，本次运行内保留。",
+			"settings.activity.none": "此会话尚未准备记忆上下文。",
+			"settings.activity.disabled": "记忆已关闭，可在个人偏好中开启。",
+			"settings.activity.empty-query": "本轮没有可用于检索的直接用户文本。",
+			"settings.activity.loading": "正在刷新记忆，请稍后重新查看。",
+			"settings.activity.no-match": "本轮没有相关记忆。",
+			"settings.activity.ready": "最近准备的记忆",
+			"settings.reason.content": "正文匹配",
+			"settings.reason.tag": "标签匹配",
+			"settings.reason.content-and-tag": "正文和标签匹配",
+			"settings.truncated": "受上下文限额影响，仅引用了部分内容",
+			"settings.ignore": "本会话忽略",
+			"settings.restoreIgnored": "恢复本会话忽略项",
+			"settings.edit": "编辑",
+			"settings.activityError": "暂时无法读取或更新记忆，请重试。",
+			"settings.ready": "无待保存修改",
+			"settings.saving": "保存中…",
 			"settings.title": "记忆",
-			"settings.description": "管理只保存在当前用户本机的记忆。模型只能搜索当前直接用户输入，新的记忆必须由你确认后才会持久化。",
+			"settings.description": "保存希望 AI 记住的事实和偏好。按本轮输入检索相关内容，模型建议由你确认后保存。",
 			"settings.enabled": "允许模型在请求中引用记忆",
-			"settings.ownerNotice": "记忆按用户隔离；无法确认用户、工作区或会话归属时不会读取或注入。",
+			"settings.ownerNotice": "记忆保存在本机并按用户隔离。引用内容会随请求发送给当前模型供应商；归属不明时不引用。",
 			"settings.readonly": "当前设置不可写，或此页面不在本机回环环境中。",
 			"settings.loading": "正在读取…",
 			"settings.items": "已保存的记忆",
@@ -684,10 +1173,47 @@ window.__ModuleLoader__.load({
 			"settings.count": "条"
 		};
 		const en = {
+			"settings.all": "All scopes",
+			"settings.scopeFilter": "Show scope",
+			"settings.clearVisible": "Clear current results",
+			"settings.clearConfirm": "Delete the memories currently shown? This cannot be undone.",
+			"settings.confirmDelete": "Confirm delete",
+			"settings.cancelAction": "Cancel",
+			"settings.refreshed": "Reloaded from local storage",
+			"settings.savedTo": "Saved to",
+			"settings.targetHint": "Workspace and session memories apply only to that target. Target IDs must belong to the current user.",
+			"settings.pendingHint": "Suggestions last for this process and disappear on restart. They are not written to memory until confirmed.",
+			"settings.newMemory": "Create memory",
+			"settings.replaceMemory": "Update existing memory",
+			"settings.replacement": "Save as",
+			"settings.duplicate": "This memory already exists in the same scope. Edit the existing item.",
+			"settings.expired": "Expired; excluded from retrieval",
+			"settings.sourceExplicit": "Manually saved",
+			"settings.sourceSuggested": "Confirmed model suggestion",
+			"settings.updated": "Updated",
+			"settings.refreshDirty": "Unsaved edits are preserved when reloading. Saving checks for version conflicts.",
+			"settings.activityTitle": "Memory",
+			"settings.activityHint": "Shows memory context most recently prepared for the session, not proof the model used it. Ignoring applies to subsequent requests during this process.",
+			"settings.activity.none": "No memory context has been prepared for this session.",
+			"settings.activity.disabled": "Memory is off. Enable it in Personal preferences.",
+			"settings.activity.empty-query": "No direct user text is available for retrieval in this turn.",
+			"settings.activity.loading": "Refreshing memory. Check again shortly.",
+			"settings.activity.no-match": "No relevant memories for this turn.",
+			"settings.activity.ready": "Recently prepared memories",
+			"settings.reason.content": "Content match",
+			"settings.reason.tag": "Tag match",
+			"settings.reason.content-and-tag": "Content and tag match",
+			"settings.truncated": "Only part of this item fit the context budget",
+			"settings.ignore": "Ignore in this session",
+			"settings.restoreIgnored": "Restore ignored items",
+			"settings.edit": "Edit",
+			"settings.activityError": "Memory could not be read or updated. Retry.",
+			"settings.ready": "No unsaved changes",
+			"settings.saving": "Saving…",
 			"settings.title": "Memory",
-			"settings.description": "Manage memory kept only on this user profile. The model may search the current direct user input; new items persist only after your confirmation.",
+			"settings.description": "Save facts and preferences for AI to remember. Retrieval follows this turn’s direct input; model suggestions require your confirmation.",
 			"settings.enabled": "Allow memory in model requests",
-			"settings.ownerNotice": "Memory is owner-isolated. Unknown user, workspace, or session ownership means no read or injection.",
+			"settings.ownerNotice": "Memory is stored locally and isolated by owner. Referenced content is sent to the current model provider; unknown ownership blocks retrieval.",
 			"settings.readonly": "Settings are read-only, or this page is not running on the local loopback surface.",
 			"settings.loading": "Loading…",
 			"settings.items": "Saved memories",
@@ -764,6 +1290,13 @@ window.__ModuleLoader__.load({
 						settingsScope
 					})
 				}, MemorySettingsCard));
+				scope.slots.inject("conversation.session.header.actions", () => scope.slots.register({
+					name: "conversation.session.header.actions",
+					id: "memory-status",
+					order: -7,
+					locale: "memory",
+					inject: () => ({ settingsScope })
+				}, MemoryHeaderStatus));
 			});
 		}
 		//#endregion

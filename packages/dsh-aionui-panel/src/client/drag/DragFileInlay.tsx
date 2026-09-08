@@ -31,9 +31,12 @@ import {
 } from './file-drag.ts'
 import { t } from '../locales.ts'
 import dragCss from '../styles/drag.module.css'
+import type { FileAttachmentQueue } from './attachments.ts'
+import { FileAttachmentRail } from './FileAttachmentRail.tsx'
 
 /** Injected business face of the drag inlay (session-routed). */
 export interface DragFileInjected {
+  fileQueue?: FileAttachmentQueue
   /** Splice a workspace-relative path reference or plain-text content into the active draft. */
   insertPath: (path: string) => boolean
   /** Add image files into the active session's draft image attachments. */
@@ -54,7 +57,7 @@ export type DragFileInlayProps =
  */
 export function DragFileInlay(props: DragFileInlayProps): ReactElement {
   const [active, setActive] = useState(false)
-  const [phase, setPhase] = useState<'idle' | ImageProcessingPhase | 'submitting' | 'failed'>('idle')
+  const [phase, setPhase] = useState<'idle' | ImageProcessingPhase | 'submitting' | 'failed' | 'directory'>('idle')
   const depth = useRef(0)
   const imageBatch = useRef<AbortController | null>(null)
   const generation = useRef(0)
@@ -102,6 +105,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     }
 
     const onDragEnter = (event: DragEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-dsh-panel-host], [data-aionui-explorer-col], [data-aionui-preview-col], [role="dialog"]')) return
       if (!hasAnyFileDrag(event.dataTransfer?.types)) return
       if (isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
         return
@@ -113,6 +117,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     }
 
     const onDragOver = (event: DragEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-dsh-panel-host], [data-aionui-explorer-col], [data-aionui-preview-col], [role="dialog"]')) return
       if (!hasAnyFileDrag(event.dataTransfer?.types)) return
       if (isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
         return
@@ -144,6 +149,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     }
 
     const onDrop = (event: DragEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-dsh-panel-host], [data-aionui-explorer-col], [data-aionui-preview-col], [role="dialog"]')) return
       // 1. Workspace internal file drag from aionui explorer
       if (hasFileDrag(event.dataTransfer?.types)) {
         event.preventDefault()
@@ -156,6 +162,14 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
 
       if (!event.dataTransfer?.types?.includes('Files')) return
 
+      const items = Array.from(event.dataTransfer.items ?? [])
+      if (items.some(item => item.webkitGetAsEntry?.()?.isDirectory)) {
+        event.preventDefault(); event.stopImmediatePropagation(); reset()
+        window.dispatchEvent(new Event('dragend'))
+        setPhase('directory')
+        return
+      }
+      setPhase('idle')
       const rawFiles = event.dataTransfer?.files
       if (!rawFiles || rawFiles.length === 0) {
         reset()
@@ -199,12 +213,14 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
 
       // Format non-image files serially to bound FileReader memory.
       if (nonImageFiles.length > 0) {
+        if (props.fileQueue) { props.fileQueue.add(nonImageFiles); return }
         void formatDroppedFilesSequentially(nonImageFiles).then((formatted) => {
+          if (!mounted) return
           const textToInsert = formatted.filter((item) => item !== '').join('\n\n')
           if (textToInsert !== '') {
             props.insertPath(textToInsert)
           }
-        }).catch(() => {})
+        }).catch(() => { if (mounted) setPhase('failed') })
       }
     }
 
@@ -264,10 +280,11 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       window.removeEventListener('paste', onPaste, true)
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [props.insertPath, props.addImages])
+  }, [props.insertPath, props.addImages, props.fileQueue])
 
   const statusText = phase === 'idle'
     ? t('explorer.drag.dropHint')
+    : phase === 'directory' ? t('attachment.directory')
     : phase === 'failed'
       ? t('explorer.drag.imageFailed')
       : phase === 'submitting'
@@ -276,14 +293,26 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
   const visible = active || phase !== 'idle'
 
   return (
-    <div
+    <><div
       className={visible ? `${dragCss.strip} ${dragCss.stripActive}` : dragCss.strip}
       data-testid="aionui-drag-inlay"
       data-phase={phase}
       aria-live="polite"
-      aria-busy={phase !== 'idle' && phase !== 'failed'}
+      aria-busy={phase !== 'idle' && phase !== 'failed' && phase !== 'directory'}
     >
       {visible ? <span className={dragCss.stripText}>{statusText}</span> : null}
     </div>
+    {props.fileQueue && <FileAttachmentRail queue={props.fileQueue} addImages={files => {
+      if (!files.length) return
+      const controller = new AbortController()
+      imageBatch.current?.abort(); imageBatch.current = controller
+      const batch = ++generation.current
+      setPhase('validating')
+      void processImageFilesSequentially(files, { signal: controller.signal }).then(images => {
+        if (controller.signal.aborted || batch !== generation.current) return
+        if (!props.addImages?.(images)) throw new Error('image admission failed')
+        setPhase('idle')
+      }).catch(() => { if (batch === generation.current) setPhase('failed') })
+    }} />}</>
   )
 }

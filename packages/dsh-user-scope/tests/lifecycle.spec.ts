@@ -57,6 +57,20 @@ async function eventually(check: () => boolean): Promise<void> {
 }
 
 describe('user-scope session lifecycle', () => {
+  it('recognizes locally registered workspaces before session attachment without granting remote access', async () => {
+    const { service, workspaces } = await fixture()
+    const workspaceId = asWorkspaceId('workspace-before-attachment')!
+    const local = { principalId: service.localPrincipal().id, source: 'desktop' as const }
+    expect(service.canAccess(local, { kind: 'workspace', workspaceId }).allowed).toBe(false)
+    workspaces.push({ id: workspaceId, sessionIds: [] })
+    expect(service.canAccess(local, { kind: 'workspace', workspaceId }).allowed).toBe(true)
+    const bound = await service.bindDevice('device-ungranted-workspace')
+    expect(service.canAccess({ ...bound, source: 'remote' }, { kind: 'workspace', workspaceId }).allowed).toBe(false)
+    expect(service.canAccess({ ...local, principalId: bound.principalId }, { kind: 'workspace', workspaceId }).allowed).toBe(false)
+    workspaces.length = 0
+    expect(service.canAccess(local, { kind: 'workspace', workspaceId }).allowed).toBe(false)
+  })
+
   it('registers sessions that were already live when the authority mounts', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)

@@ -36,8 +36,27 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     dialogRef.current?.querySelector<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus()
-  }, [])
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+      }
+      if (event.key !== 'Tab') return
+      const controls = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex="0"]') ?? [])]
+      const first = controls[0]
+      const last = controls[controls.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      if (previous?.isConnected) previous.focus()
+    }
+  }, [onClose])
 
   useEffect(() => {
     let active = true
@@ -162,5 +181,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
     </div>
   )
 
-  return typeof document === 'undefined' ? pickerContent : createPortal(pickerContent, document.body)
+  // The Dock owns a separate scroll/stacking context; keep its picker with
+  // the form so it inherits theme tokens and hides when the user changes tabs.
+  return typeof document === 'undefined' || document.querySelector('[data-dsh-dock-settings]')
+    ? pickerContent
+    : createPortal(pickerContent, document.body)
 }

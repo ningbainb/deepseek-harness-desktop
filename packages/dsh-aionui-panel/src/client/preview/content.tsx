@@ -25,12 +25,14 @@ export function TabContent({
   split,
   onContentChange,
   onSave,
+  onClose,
 }: {
   tab: PreviewTabState
   viewMode: 'source' | 'preview'
   split: boolean
   onContentChange: (content: string) => void
   onSave: () => void
+  onClose?: () => void
 }): JSX.Element {
   if (tab.error !== null) {
     return <div className={previewCss.placeholder}>
@@ -83,7 +85,7 @@ export function TabContent({
         <ImageViewer src={tab.content} meta={`${tab.image?.width ?? ''}${tab.image ? ' x ' : ''}${tab.image?.height ?? ''}`} />
       )}
       {tab.contentType === 'pdf' && tab.content !== null && <PdfViewer dataUrl={tab.content} title={tab.title} />}
-      {tab.contentType === 'url' && <UrlViewer tab={tab} />}
+      {tab.contentType === 'url' && <UrlViewer tab={tab} onClose={onClose} />}
       {(tab.contentType === 'word' || tab.contentType === 'excel' || tab.contentType === 'ppt' || tab.contentType === 'unsupported') && (
         <UnsupportedViewer tab={tab} />
       )}
@@ -404,7 +406,7 @@ export function dataUrlToBlob(dataUrl: string): Blob | null {
 }
 
 /** URL tab: address bar + iframe. */
-function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
+function UrlViewer({ tab, onClose }: { tab: PreviewTabState; onClose?: () => void }): JSX.Element {
   const [input, setInput] = useState(tab.content ?? '')
   const [url, setUrl] = useState(() => normalizeUrl(tab.content ?? ''))
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -436,7 +438,11 @@ function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
 
   return (
     <div className={previewCss.content}>
-      <div className={previewCss.urlBar}>
+      <div className={previewCss.urlBar} onKeyDown={event => {
+        if (onClose && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'w') {
+          event.preventDefault(); event.stopPropagation(); onClose()
+        }
+      }}>
         <input
           className={previewCss.urlInput}
           value={input}
@@ -452,6 +458,9 @@ function UrlViewer({ tab }: { tab: PreviewTabState }): JSX.Element {
           }}
           onFocus={(event) => event.currentTarget.select()}
         />
+        {onClose && <button type="button" className={previewCss.urlClose}
+          data-dsh-browser-close="true" aria-label={t('preview.url.close')}
+          title={t('preview.url.close')} onClick={onClose}>×</button>}
       </div>
       <iframe
         // Keyed on url + reloadNonce: a refresh (or a new address) remounts

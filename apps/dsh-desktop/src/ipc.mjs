@@ -13,6 +13,7 @@ import { assertUpdateChannel } from './update-channel-preferences.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
+import { normalizeFeatureEvent } from './feature-telemetry.mjs'
 
 // 'launch-builtins' was accepted here through 3.0.x. It had no implementation
 // and no caller, so it fell through to the exit branch below - sending it quit
@@ -431,6 +432,7 @@ export function registerDesktopIpc({
   onSettingsOpened = () => {},
   onUpdateCheck = () => {},
   recordValueModeEvent = () => false,
+  recordFeatureEvent = () => false,
   listSkills = async () => ({ skills: [] }),
   showNotification = async () => false,
   notificationService,
@@ -491,6 +493,7 @@ export function registerDesktopIpc({
     'desktop:settings-window-bounds-set',
     'desktop:settings-opened',
     'desktop:value-mode-event',
+    'desktop:feature-event',
     'desktop:skills-list',
     'desktop:notification-show',
     'desktop:workspace-file-open',
@@ -637,6 +640,9 @@ export function registerDesktopIpc({
   handle('desktop:value-mode-event', main, (_event, _surface, rawEvent) => {
     const event = normalizeValueModeProductEvent(rawEvent)
     return recordValueModeEvent(event)
+  })
+  handle('desktop:feature-event', main, (_event, _surface, rawEvent) => {
+    return recordFeatureEvent(normalizeFeatureEvent(rawEvent))
   })
   handle('desktop:skills-list', main, () => listSkills())
   handle('desktop:notification-show', [main, extensions], (_event, _surface, value) => {

@@ -22,7 +22,8 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import { FsService } from './host/fs-service.ts'
 import { GitService, subprocessRunner } from './host/git-service.ts'
 import { createWorkspaceGate } from './host/gate.ts'
-import { registerPanelRoutes } from './host/routes.ts'
+import { registerPanelRoutes, isLoopbackRequest } from './host/routes.ts'
+import { createAttachmentHandler, type AttachmentSession } from './host/attachments.ts'
 
 /** Required services: the route registry, the managed subprocess seam, the workspace registry, and the prompt band. */
 export const inject = ['webServer', 'subprocess', 'workspaceRegistry', 'systemPrompt']
@@ -42,6 +43,13 @@ export function apply(ctx: Context): void {
   const fs = new FsService(gate)
   const git = new GitService(subprocessRunner(ctx), gate, (root, rel) => fs.delete(root, rel))
   ctx.effect(() => registerPanelRoutes(ctx, fs, git), 'dsh-aionui-panel: /aionui-panel routes')
+  ctx.inject(['sessions'], scope => {
+    const sessions = scope.get('sessions') as { get(id: string): AttachmentSession | undefined }
+    scope.effect(() => scope.webServer.register({
+      kind: 'exact', path: '/aionui-panel/attachments',
+      handler: createAttachmentHandler(gate, id => sessions.get(id), isLoopbackRequest),
+    }), 'dsh-aionui-panel: session file attachments')
+  })
   ctx.effect(() => ctx.systemPrompt.section({
     name: 'plugin:aionui-panel',
     order: SECTION_ORDER,

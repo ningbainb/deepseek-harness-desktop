@@ -65,7 +65,32 @@ test('extension IPC rejects a registered main renderer before sensitive work', a
     handlers.get('extensions:list')({ sender: mainSender }),
     (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
   )
+  await assert.rejects(
+    handlers.get('extensions:settings-select')({ sender: mainSender }, 'memory'),
+    (error) => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
+  )
   unregister()
+})
+
+test('Dock settings IPC accepts only fixed page ids and a close request', async () => {
+  const ipcMain = new FakeIpcMain()
+  const selected = []
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh',
+    qqBotBinding: new EventEmitter(), pluginRecovery: new EventEmitter(),
+    selectDockSetting: async id => { selected.push(id) },
+  })
+  try {
+    const select = ipcMain.handlers.get('extensions:settings-select')
+    for (const id of ['value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', null]) await select(undefined, id)
+    assert.equal(selected.length, 6)
+    for (const id of ['https://example.com', '../memory', {}, undefined]) {
+      await assert.rejects(select(undefined, id), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    }
+    assert.equal(selected.length, 6)
+  } finally { unregister() }
 })
 test('extension IPC exposes only renderer-safe QQ Bot state and forwards lifecycle events', async () => {
   const ipcMain = new FakeIpcMain()

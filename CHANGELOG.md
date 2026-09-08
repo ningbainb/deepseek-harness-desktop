@@ -1,22 +1,24 @@
 # Changelog
 
-## 3.3.0 - 2026-09-04
+## 3.3.0 - 2026-09-09
 
 中文：
 
-- 新增任意文件拖入会话能力与智能格式化支持：支持拖入文本、代码、配置等文本类文件（<1MB）自动解析并按语言标记为 Markdown 代码块直接插入输入框；支持二进制、PDF、压缩包、Office 文档等插入规范 Markdown 引用链接；支持多文件批量拖入与混合拖入。
-- 原版图片拖入与剪贴板机制隔离修复：精确识别纯图片拖拽与粘贴操作，保留原版 Composer 附件与缩略图预览交互，消除原有双层拖拽遮罩冲突，非图片拖入时阻止冒泡，彻底避免原版触发“不支持的图片格式”错误。
-- 引入智能图像压缩与自适应降采样引擎：在拖拽与剪贴板粘贴（Ctrl+V）中自动检测超限大图，当图片体积或分辨率超过安全界限（2048px / 3MB）时，在浏览器内存中自动按比例降采样并进行阶梯式 JPEG 压缩（0.85 -> 0.72 -> 0.55 -> 0.4），适配上传大小限制，保障会话传输流畅，小图保持原画无损直传。
-- 现代化重构会话顶部模式选择器：重构为精美流线型胶囊下拉与悬浮气泡菜单，提供模式图标、名称、状态标识与功能说明，包含平滑进出过渡动效，完全取代旧版原生 `<select>` 下拉框。
-- 修复侧边栏左下角布局漂移与拓展坞 UI 升级：统一宽屏与折叠 Rail 模式下的左下角设置区对齐几何结构，桌面版原生插件入口无缝归入拓展坞，提升界面整体美观度与易用性。
+- **拓展坞与设置**：按功能组织侧栏，集中管理模型接入、性价比模式、个性化 Prompt、记忆、粒子主题和图像理解。设置窗口统一主题并居中打开，调整尺寸与间距，性价比模式提供中文说明。拖动窗口合并位置更新，减少连续拖动时的卡顿。
+- **项目与工作区**：创建项目和选择工作区使用统一弹窗，点击源文件夹区域即可打开系统文件夹选择器；已有项目可以直接打开，避免重复创建。
+- **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
+- **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片进行自适应压缩。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
+- **可感知的记忆**：展示当前会话的记忆活动、匹配结果和可操作入口，优化检索与排序。记忆继续按用户和作用域隔离，模型建议需要用户确认后才会保存。
+- **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥；匿名统计可以在设置中关闭。
 
 English:
 
-- Adds universal file drag-and-drop into chat sessions with smart formatting: text, code, and config files (<1MB) are automatically parsed and inserted as language-tagged Markdown code blocks; binary, PDF, archive, and office files are formatted as clean Markdown file link references; supports batch and multi-file drops.
-- Resolves conflicts between generic file drop and native image attachment workflows: purely visual image drops/pastes retain native Composer attachments and thumbnail previews without double overlay flicker, while non-image drops stop propagation to eliminate "Unsupported image format" errors.
-- Introduces an intelligent in-memory image compression and adaptive downsampling engine: automatically detects oversized images in drag-and-drop and clipboard paste (Ctrl+V) pipelines, scaling down dimensions (up to 2048px) and stepping compression quality (0.85 -> 0.72 -> 0.55 -> 0.4) to guarantee image payloads stay under 3MB safe upload limits without manual resizing; smaller images pass through losslessly.
-- Modernizes session top mode switcher: replaces the raw native `<select>` dropdown with a sleek pill selector and floating card popover, displaying distinct icons, status badges, descriptions, and smooth transition animations.
-- Fixes sidebar bottom-left layout drift and enhances extension dock: stabilizes alignment across wide and rail collapsed views, and seamlessly moves desktop native plugin entries into the extension dock.
+- **Dock and settings**: A grouped sidebar brings provider setup, Value Mode, personal prompts, memory, particles, and image understanding into one place. Settings windows use a consistent theme and centered placement. Compact spacing and coalesced window movement improve everyday interaction, and Value Mode includes Chinese guidance.
+- **Projects and workspaces**: A shared dialog supports project creation and workspace selection. Clicking the source folder area opens the native folder picker, while existing projects can be opened directly without creating duplicates.
+- **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
+- **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
+- **Visible memory activity**: Session memory activity and matches are visible with actions to inspect and manage them. Retrieval and ranking are improved. User and scope isolation remain enforced, and model suggestions require user confirmation before persistence.
+- **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Anonymous metrics can be disabled in settings.
 
 ## 3.2.0 - 2026-09-01
 

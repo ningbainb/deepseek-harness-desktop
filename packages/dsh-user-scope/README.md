@@ -23,3 +23,5 @@ the client cannot select or submit its principal, owner, or grants. Remote
 Session access requires an active device binding, matching owner, and the
 corresponding Workspace grant when a Workspace is present. Local desktop
 access remains the administrative profile view.
+
+Local desktop workspace access also checks actual registrations in the official WorkspaceRegistry, covering session creation before workspace attachment. This applies only to the current local principal; unknown workspaces, unavailable registries and remote devices retain the existing denial rules, and remote devices still require explicit grants.

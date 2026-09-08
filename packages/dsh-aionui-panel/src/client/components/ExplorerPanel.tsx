@@ -112,7 +112,7 @@ export function ExplorerPanel({
   return (
     <div className="aionui-root" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* The Files/Changes tab bar. */}
-      <div className={explorerCss.tabBar}>
+      <div className={explorerCss.tabBar} data-aionui-explorer-toolbar>
         <button
           type="button"
           className={state.activeTab === 'files' ? explorerCss.tabBtnActive : explorerCss.tabBtn}

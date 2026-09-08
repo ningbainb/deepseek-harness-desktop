@@ -200,7 +200,7 @@ try {
   await toolsMenu.getByRole('menuitem', { name: '扩展坞 / Extension Dock' }).click()
   const extensionPage = await extensionPagePromise
   await extensionPage.waitForURL(/extensions\.html/u)
-  await extensionPage.getByRole('heading', { name: '扩展坞' }).waitFor({ state: 'visible' })
+  await extensionPage.getByRole('heading', { name: '拓展坞', exact: true }).waitFor({ state: 'visible' })
   const extensionSession = await electronApp.evaluate(({ BrowserWindow, session }, partition) => {
     const windows = BrowserWindow.getAllWindows()
     const main = windows.find((window) => window.webContents.getURL().startsWith('http://127.0.0.1:'))

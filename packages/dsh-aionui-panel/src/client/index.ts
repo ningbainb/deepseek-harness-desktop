@@ -25,6 +25,7 @@ import { mountPanels } from './mount.tsx'
 import { NS, dictionaries, setLanguage, type AionUiPanelKey } from './locales.ts'
 import { DragFileInlay, type DragFileInjected } from './drag/DragFileInlay.tsx'
 import { insertPathIntoDraft } from './drag/file-drag.ts'
+import { FileAttachmentQueue, uploadAttachment, checkAttachment } from './drag/attachments.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -49,6 +50,25 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['slots', 'conversation', 'sessions'], (scope: ClientContext) => {
     const sessions = scope.sessions
     const conversation = scope.conversation
+    const fileQueues = new Map<string, FileAttachmentQueue>()
+    scope.effect(() => () => { for (const queue of fileQueues.values()) queue.dispose(); fileQueues.clear() }, 'aionui: attachment queues')
+    const fileQueue = (sessionId: SessionId | undefined): FileAttachmentQueue | undefined => {
+      if (!sessionId) return undefined
+      const actx = sessions.scope(sessionId)
+      if (!actx || !conversation.input) return undefined
+      let queue = fileQueues.get(sessionId)
+      if (!queue) {
+        const shell = conversation.input.for(actx)
+        queue = new FileAttachmentQueue({
+          read: () => shell.state.getSnapshot().draft,
+          insert: reference => insertPath(sessionId, reference),
+          remove: reference => shell.setDraft(shell.state.getSnapshot().draft.replace(reference, '')),
+          subscribe: listener => shell.state.subscribe(listener),
+        }, (file, signal) => uploadAttachment(sessionId, file, signal), path => checkAttachment(sessionId, path))
+        fileQueues.set(sessionId, queue)
+      }
+      return queue
+    }
     const insertPath = (sessionId: SessionId | undefined, path: string): boolean => {
       if (sessionId === undefined) return false
       const actx = sessions.scope(sessionId)
@@ -57,8 +77,9 @@ export function apply(ctx: ClientContext): void {
       if (input === undefined) return false
       const shell = input.for(actx)
       const draft = shell.state.getSnapshot().draft
-      shell.setDraft(insertPathIntoDraft(draft, path))
-      return true
+      const next = insertPathIntoDraft(draft, path)
+      shell.setDraft(next)
+      return shell.state.getSnapshot().draft === next
     }
     const addDraftImages = (sessionId: SessionId | undefined, files: readonly File[]): boolean => {
       if (sessionId === undefined || files.length === 0) return false
@@ -96,6 +117,7 @@ export function apply(ctx: ClientContext): void {
         order: 90,
         locale: NS,
         inject: (sessionId: SessionId | undefined): DragFileInjected => ({
+          fileQueue: fileQueue(sessionId),
           insertPath: (path: string): boolean => {
             return insertPath(sessionId, path)
           },
@@ -183,11 +205,11 @@ export function apply(ctx: ClientContext): void {
     // Mount everything. DOM failures degrade the panels, never the GUI.
     try {
       layout.mount()
-      mountPanels(
+      disposers.push(mountPanels(
         stores,
         () => layout.toggleExplorer(),
         (path) => insertPathIntoCurrentDraft(path),
-      )
+      ))
     } catch (error) {
       console.error('[dsh-aionui-panel] mount failed:', error)
     }

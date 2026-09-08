@@ -27,11 +27,16 @@ test('stripHeader accepts a Windows CRLF separator', () => {
   assert.equal(stripHeader(rendered, file, sourceRel), source)
 })
 
-test('copies cover the settings trio for six consumers plus host helpers', () => {
+test('copies cover the settings trio, two telemetry consumers, and host helpers', () => {
   const entries = copyEntries()
-  assert.equal(entries.length, 22)
-  const clientTrio = entries.filter(entry => /[\\/]src[\\/]client[\\/]/.test(entry.target))
+  assert.equal(entries.length, 24)
+  const clientTrio = entries.filter(entry => /[\\/]src[\\/]client[\\/]/.test(entry.target) && entry.file !== 'feature-telemetry.ts')
   assert.equal(clientTrio.length, 18)
+  const telemetryCopies = entries.filter(entry => entry.file === 'feature-telemetry.ts')
+  assert.deepEqual(telemetryCopies.map(entry => entry.target), [
+    join(REPO_ROOT, 'packages/dsh-web-ui-settings/src/client/feature-telemetry.ts'),
+    join(REPO_ROOT, 'packages/dsh-aionui-panel/src/client/feature-telemetry.ts'),
+  ])
   const hostCopies = entries.filter(entry => /[\\/]src[\\/]host[\\/]/.test(entry.target) || /[\\/]src[\\/]dsh-home\.ts$/.test(entry.target))
   assert.equal(hostCopies.length, 4)
 })
@@ -45,6 +50,7 @@ test('checkSync detects drift and applySync repairs it', async () => {
     await writeFile(join(sourceDir, 'settings-form.ts'), 'export const good = 1' + String.fromCharCode(10))
     await writeFile(join(sourceDir, 'PluginSettingsCard.tsx'), 'export const card = 1' + String.fromCharCode(10))
     await writeFile(join(sourceDir, 'settings-card.module.css'), '.card { color: red }' + String.fromCharCode(10))
+    await writeFile(join(root, 'shared', 'client', 'feature-telemetry.ts'), 'export const event = 1\n')
     const hostDir = join(root, 'shared', 'host')
     await mkdir(hostDir, { recursive: true })
     await writeFile(join(hostDir, 'poll-guard.ts'), 'export const guard = 1' + String.fromCharCode(10))
@@ -63,6 +69,8 @@ test('checkSync detects drift and applySync repairs it', async () => {
     assert.deepEqual(after, [])
     const fixed = await readFile(join(targetDir, 'settings-form.ts'), 'utf8')
     assert.equal(stripHeader(fixed, 'settings-form.ts', 'shared/client/settings/settings-form.ts'), 'export const good = 1' + String.fromCharCode(10))
+    const telemetry = await readFile(join(root, 'packages/dsh-aionui-panel/src/client/feature-telemetry.ts'), 'utf8')
+    assert.equal(stripHeader(telemetry, 'feature-telemetry.ts', 'shared/client/feature-telemetry.ts'), 'export const event = 1\n')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

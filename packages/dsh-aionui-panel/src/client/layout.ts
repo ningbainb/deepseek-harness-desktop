@@ -107,6 +107,7 @@ export class PanelLayoutController {
   /** Start watching for the frame and attach once it appears. */
   mount(): void {
     const tryAttach = (): void => {
+      if (this.frame !== null && (!this.frame.isConnected || !this.previewCol?.isConnected || !this.explorerCol?.isConnected)) this.detach()
       if (this.frame !== null) return
       const frame = findFrame()
       if (frame === null) return
@@ -345,6 +346,7 @@ export class PanelLayoutController {
     // Column contents follow the tracks (both columns always mounted).
     if (this.explorerCol !== null) {
       this.explorerCol.style.visibility = explorer > 0 ? 'visible' : 'hidden'
+      this.explorerCol.dataset.aionuiVisible = String(explorer > 0)
     }
     if (this.previewCol !== null) {
       this.previewCol.style.visibility = preview > 0 ? 'visible' : 'hidden'
@@ -374,16 +376,26 @@ export class PanelLayoutController {
   /** Detach everything (plugin unload). */
   dispose(): void {
     this.waitObserver?.disconnect()
+    this.detach()
+  }
+
+  private detach(): void {
     this.styleObserver?.disconnect()
     this.sizeObserver?.disconnect()
-    for (const dispose of this.disposers) dispose()
+    for (const dispose of this.disposers.splice(0)) dispose()
     this.previewCol?.remove()
     this.explorerCol?.remove()
     this.explorerHandle?.remove()
     this.previewHandle?.remove()
     this.floatingButton?.remove()
     if (this.instantTimer !== undefined) clearTimeout(this.instantTimer)
+    if (this.frame && this.shellTracks.length === 3 && parseGridTracks(this.frame.style.gridTemplateColumns).length === 5) {
+      this.frame.style.gridTemplateColumns = this.shellTracks.join(' ')
+    }
     if (frameElement === this.frame) frameElement = null
     this.frame = null
+    this.previewCol = null; this.explorerCol = null
+    this.explorerHandle = null; this.previewHandle = null; this.floatingButton = null
+    this.shellTracks = []; this.frameWidth = 0
   }
 }

@@ -6,6 +6,20 @@
  */
 
 const zh = {
+  'attachment.add': '添加文件',
+  'attachment.duplicate': '此文件已添加',
+  'attachment.missing': '文件引用已失效，请移除此项并重新添加。',
+  'attachment.directory': '请拖入文件；整个文件夹请通过创建项目添加。',
+  'attachment.pending': '正在添加…',
+  'attachment.ready': '已添加',
+  'attachment.failed': '添加失败',
+  'attachment.reference': '文件引用，按需读取',
+  'attachment.retry': '重试',
+  'attachment.remove': '移除',
+  'attachment.blocked': '请等待文件添加完成，或移除失败项后发送。',
+  'attachment.tooLarge': '单文件上限 100 MB，请拆分文件或使用工作区内的文件引用。',
+  'attachment.failedHint': '文件未能添加，请确认项目可用后重试。',
+
   'explorer.tabs.files': '文件',
   'explorer.tabs.changes': '变更',
   'explorer.search.placeholder': '按文件名搜索',
@@ -18,7 +32,7 @@ const zh = {
   'explorer.close': '关闭文件面板',
   'explorer.expand': '展开面板',
   'explorer.openPreview': '打开预览',
-  'explorer.drag.dropHint': '松手插入：文本进入草稿，Word/PDF 等仅插入路径引用',
+  'explorer.drag.dropHint': '松开添加文件到当前对话',
   'explorer.drag.imageProcessing': '正在校验并压缩图片，按 Esc 取消',
   'explorer.drag.imageSubmitting': '正在添加图片',
   'explorer.drag.imageFailed': '图片处理失败，可重新拖入重试',
@@ -73,6 +87,7 @@ const zh = {
   'preview.downloadHint': '可在系统应用中打开或下载查看',
   'preview.url.placeholder': '输入网址，回车打开',
   'preview.url.hint': '按 Esc 还原',
+  'preview.url.close': '关闭浏览器',
   'common.cancel': '取消',
   'common.confirm': '确定',
   'common.close': '关闭',
@@ -83,6 +98,21 @@ const zh = {
 } as const
 
 const en: Record<keyof typeof zh, string> = {
+  'preview.url.close': 'Close browser',
+  'attachment.add': 'Add files',
+  'attachment.duplicate': 'This file is already added',
+  'attachment.missing': 'File reference unavailable. Remove it and add the file again.',
+  'attachment.directory': 'Drop files here. To use a folder, add it through Create project.',
+  'attachment.pending': 'Adding…',
+  'attachment.ready': 'Added',
+  'attachment.failed': 'Failed',
+  'attachment.reference': 'File reference, read on demand',
+  'attachment.retry': 'Retry',
+  'attachment.remove': 'Remove',
+  'attachment.blocked': 'Wait for files to finish or remove failed files before sending.',
+  'attachment.tooLarge': '100 MB per file. Split the file or reference a file already in the workspace.',
+  'attachment.failedHint': 'Could not add the file. Check the workspace and retry.',
+
   'explorer.tabs.files': 'Files',
   'explorer.tabs.changes': 'Changes',
   'explorer.search.placeholder': 'Search file names',

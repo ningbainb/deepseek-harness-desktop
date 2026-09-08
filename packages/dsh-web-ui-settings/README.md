@@ -10,7 +10,9 @@ The dsh web UI plugin group for the DSH settings page: it adds a first-level set
 - **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
 - **One-click Desktop Dock entry**: on supported Desktop hosts, an Extension Dock button appears immediately beside Settings. The first three eligible launches show a non-modal hint; ordinary Web hosts render no Desktop-only entry.
 - **ChatGPT sign-in**: when the RC.1 authorization and OpenAI Codex provider services are present, a first-level settings section starts the official ChatGPT OAuth flow with one click and continues in the system browser.
-- **bai provider onboarding**: the top of the official `Settings → Models` page guides users through registration, top-up, Key creation, and a “Test and save” flow. The Web UI plugins page no longer shows this guide. A successful check discovers `/v1/models` and writes the official `llm-pi-ai` provider profile.
+- **bai provider onboarding**: `Settings → Models` and the Dock's `AI settings → Model connection` offer browser sign-in, explicit Key authorization, automatic model sync, and manual Key entry. A successful check discovers `/v1/models` and writes the official `llm-pi-ai` provider profile. Billing and Key management open the supplier console.
+
+The Desktop home workspace selector and sidebar project creation use the same centered folder form. The home selector also lists existing projects; selecting one opens it without renaming it. Browser-only hosts retain the official directory browser.
 
 ## Install
 
@@ -38,6 +40,7 @@ Restart `dsh web` for the section to appear in the settings page.
 - Authorization routes use the same loopback, canonical Host, same-origin, and authenticated-proxy checks as the settings bridge. Provider errors are reduced to stable codes before crossing the boundary.
 - The bai provider uses the official `llm-pi-ai` `openai-completions` configuration capability. It does not replace the official `ModelDirectory`; models come from `/v1/models` for the user-owned Key.
 - The bai Key enters the official credential service only through a protected local POST route. The route returns presence, model count, and model names only; it never returns the Key or writes it to settings files, URLs, or logs.
+- Browser connection starts only on a guarded local request. A temporary listener binds to `127.0.0.1`, accepts one form POST from the exact bai origin with a random 256-bit state, and expires after five minutes. The website asks the user to authorize a Key; passwords and website sessions stay on the website. Cancelling or plugin disposal closes the listener. An authorized write already in progress settles before another action. Account balance remains in the console.
 
 ## Proxy configuration
 

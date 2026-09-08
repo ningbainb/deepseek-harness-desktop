@@ -28,6 +28,11 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  */
 const MANIFEST = [
   {
+    file: 'feature-telemetry.ts',
+    source: 'shared/client/feature-telemetry.ts',
+    targets: ['dsh-web-ui-settings', 'dsh-aionui-panel'].map(pkg => `packages/${pkg}/src/client/feature-telemetry.ts`),
+  },
+  {
     file: 'settings-form.ts',
     source: 'shared/client/settings/settings-form.ts',
     targets: ['dsh-pet', 'dsh-task-board', 'dsh-remote-web-ui', 'dsh-live-stats', 'dsh-particle-theme', 'dsh-tool-describe-image']

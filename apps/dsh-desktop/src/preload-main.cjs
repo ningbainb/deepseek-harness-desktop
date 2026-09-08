@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 // Sandboxed Electron preloads cannot require sibling files. Keep this entry
 // self-contained so the bridge is available before the first local page loads.
@@ -60,6 +60,8 @@ const baseApi = {
 
 const api = Object.freeze({
   ...baseApi,
+  // Resolves only a File the user supplied; exposes no arbitrary filesystem lookup.
+  getDroppedFilePath: (file) => webUtils.getPathForFile(file),
   action: (action) => ipcRenderer.invoke('desktop:action', action),
   helpAction: (action) => ipcRenderer.invoke('desktop:help-action', action),
   toolAction: (action) => ipcRenderer.invoke('desktop:tool-action', action),
@@ -77,6 +79,7 @@ const api = Object.freeze({
   setSettingsWindowBounds: (bounds) => ipcRenderer.invoke('desktop:settings-window-bounds-set', bounds),
   settingsOpened: () => ipcRenderer.invoke('desktop:settings-opened'),
   recordValueModeEvent: (event) => ipcRenderer.invoke('desktop:value-mode-event', event),
+  recordFeatureEvent: (event) => ipcRenderer.invoke('desktop:feature-event', event),
   listSkills: () => ipcRenderer.invoke('desktop:skills-list'),
   openConversationImport: () => ipcRenderer.invoke('desktop:conversation-import-open'),
   probeConversationSources: () => ipcRenderer.invoke('desktop:conversation-import-probe'),

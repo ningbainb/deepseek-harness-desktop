@@ -28,3 +28,15 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+.attachments { position: relative; z-index: 4; max-width: var(--dsh-composer-card-max-width, 720px); margin: 0 auto; color: var(--aion-text-primary); background: var(--aion-bg-base, var(--dsw-alias-bg-layer-1)); font-size: 12px; }
+.fileList { display: flex; flex-wrap: wrap; gap: 8px; max-height: 168px; overflow: auto; }
+.fileCard { position: relative; display: flex; flex-direction: column; gap: 4px; max-width: 240px; min-width: 140px; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid var(--aion-border-base); background: var(--aion-bg-2); }
+.fileCard strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileCard small { color: var(--aion-text-secondary); }
+.fileCard button { color: inherit; background: transparent; border: 0; cursor: pointer; }
+.fileCard button:last-child { position: absolute; right: 4px; top: 4px; width: 26px; height: 26px; font-size: 18px; }
+.fileCard[data-state="failed"] { border-color: var(--aion-danger, #bc4141); }
+.addFile { color: var(--aion-text-secondary); background: transparent; border: 0; border-radius: 6px; padding: 5px 8px; margin: 4px 0; cursor: pointer; font: inherit; }
+.addFile:hover { background: var(--aion-bg-3); }
+.attachments button:focus-visible { outline: 2px solid var(--aion-primary); outline-offset: 2px; }

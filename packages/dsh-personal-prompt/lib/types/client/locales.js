@@ -1,4 +1,6 @@
 export const zh = {
+    'settings.ready': '无待保存修改',
+    'settings.saving': '保存中…',
     'settings.title': '个性化 Prompt',
     'settings.description': '为当前本机 Profile 管理全局或工作区 Prompt。它会作为请求上下文发送给当前模型供应商。',
     'settings.enabled': '启用个性化 Prompt',
@@ -37,6 +39,8 @@ export const zh = {
     'action.close': '关闭',
 };
 export const en = {
+    'settings.ready': 'No unsaved changes',
+    'settings.saving': 'Saving…',
     'settings.title': 'Personal Prompt',
     'settings.description': 'Manage global or workspace Prompt Profiles for this local Profile. The selected content is sent to the current model provider as request context.',
     'settings.enabled': 'Enable Personal Prompt',

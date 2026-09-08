@@ -19,8 +19,35 @@ export const ModelPicker = ({ title, current, onSelect, onClose, fetchModels }) 
     const [reloadToken, setReloadToken] = useState(0);
     const dialogRef = useRef(null);
     useEffect(() => {
+        const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
         dialogRef.current?.querySelector('button:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus();
-    }, []);
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                onClose();
+            }
+            if (event.key !== 'Tab')
+                return;
+            const controls = [...(dialogRef.current?.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex="0"]') ?? [])];
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+            }
+            else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+            }
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown, true);
+            if (previous?.isConnected)
+                previous.focus();
+        };
+    }, [onClose]);
     useEffect(() => {
         let active = true;
         setLoading(true);
@@ -60,5 +87,9 @@ export const ModelPicker = ({ title, current, onSelect, onClose, fetchModels }) 
                                         onClose();
                                     }, children: [_jsxs("span", { className: picker.modelLine, children: [_jsx("span", { className: picker.modelName, children: model.name || model.id }), selected && _jsx("span", { className: picker.selectedBadge, children: "\u5F53\u524D" })] }), _jsxs("span", { className: picker.modelId, children: [group.id, " / ", model.id] }), model.description && _jsx("span", { className: picker.modelDescription, children: model.description })] }, `${group.id}:${model.id}`));
                             })] }, group.id))) }), _jsxs("div", { className: picker.footer, children: [_jsx("span", { className: picker.footerHint, children: choiceCount > 0 ? `${choiceCount} 个可用模型` : '模型来自当前运行时目录' }), _jsx("button", { type: "button", className: styles.button, onClick: onClose, children: "\u5173\u95ED" })] })] }) }));
-    return typeof document === 'undefined' ? pickerContent : createPortal(pickerContent, document.body);
+    // The Dock owns a separate scroll/stacking context; keep its picker with
+    // the form so it inherits theme tokens and hides when the user changes tabs.
+    return typeof document === 'undefined' || document.querySelector('[data-dsh-dock-settings]')
+        ? pickerContent
+        : createPortal(pickerContent, document.body);
 };

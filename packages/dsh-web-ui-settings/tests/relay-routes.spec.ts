@@ -7,6 +7,8 @@ import {
   RELAY_API_PREFIX,
   RELAY_BASE_URL,
   RELAY_CONFIGURE_PATH,
+  RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH,
+  type RelayConnectResponse,
   RELAY_CREDENTIAL_REF,
   RELAY_PROVIDER_DISPLAY_NAME,
   RELAY_REMOVE_PATH,
@@ -120,6 +122,32 @@ describe('relay model normalization', () => {
 })
 
 describe('relay onboarding routes', () => {
+  it('completes browser authorization through the same credential and provider configuration path', async () => {
+    const settings = fakeSettings()
+    const credentials = fakeCredentials()
+    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ data: [{ id: 'browser-model' }] }))
+    const routes = makeRelayRoutes({ settings: settings.seam, credentials: credentials.seam, fetchImpl })
+    try {
+      const started = await invoke(routes, RELAY_CONNECT_PATH, relayRequest(RELAY_CONNECT_PATH, {}))
+      expect(started.status).toBe(200)
+      const flow = (started.body as RelayConnectResponse).connection
+      const parameters = new URLSearchParams(new URL(flow.url!).hash.slice(1))
+      const blocked = await invoke(routes, RELAY_CONFIGURE_PATH, relayRequest(RELAY_CONFIGURE_PATH, { apiKey: 'manual-key' }))
+      expect(blocked.status).toBe(409)
+      const result = await fetch('http://127.0.0.1:' + parameters.get('port') + '/complete', {
+        method: 'POST', headers: { origin: 'https://api.1521003.xyz', 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ state: parameters.get('state')!, apiKey: 'browser-test-key' }),
+      })
+      expect(result.status).toBe(200)
+      const state = await invoke(routes, RELAY_CONNECT_STATUS_PATH, relayRequest(RELAY_CONNECT_STATUS_PATH, {}))
+      expect(state.body).toEqual({ ok: true, connection: { phase: 'connected' } })
+      const status = await invoke(routes, RELAY_STATUS_PATH, relayRequest(RELAY_STATUS_PATH, {}))
+      expect(status.body).toMatchObject({ configured: true, modelCount: 1, models: [{ id: 'browser-model' }] })
+      expect(settings.writes).toHaveLength(1)
+      expect(JSON.stringify(status.body)).not.toContain('browser-test-key')
+    } finally { routes.dispose() }
+  })
+
   it('validates a user Key, stores it via credentials, and writes only the managed provider path', async () => {
     const settings = fakeSettings()
     const credentials = fakeCredentials()

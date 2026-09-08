@@ -40,6 +40,8 @@ Changes publish through the standard settings scope and apply live. Disabling th
 
 Rendering uses one animation loop, capped particle counts, a device-pixel ratio ceiling of 1.5, and sustained frame-time feedback. Slow frames gradually reduce quality; stable fast frames restore it. The loop pauses for hidden documents, uses a static low-density frame for reduced-motion users, and never intercepts pointer or accessibility input.
 
+Desktop window dragging and resizing pause the particle loop until the gesture ends. When file attachments are visible, the lower attachment and composer band is excluded from the particle canvas to keep filenames and status readable.
+
 ## Extension API
 
 The client exports `ParticleThemeRegistry`, `ParticleThemeDefinition`, and the page-profile primitives. A future scene registers a unique ID and returns an object with `update(state)` and `dispose()` methods. The controller remains unchanged, so additional themes can share the same lifecycle, settings, accessibility, and page-awareness rules.

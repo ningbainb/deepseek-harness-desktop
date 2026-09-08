@@ -55,7 +55,7 @@ test('keeps events in memory and flushes one bounded JSON batch', async () => {
   assert.equal(requests[0].url, 'https://telemetry.example/v1/events')
   assert.equal(requests[0].init.method, 'POST')
   assert.deepEqual(JSON.parse(requests[0].init.body), {
-    schema: 3,
+    schema: 4,
     events: [{ name: 'surface_opened', ...CONTEXT, ...ACTORS, ...SURFACE_EVENT }],
   })
   assert.equal(requests[0].init.headers.origin, undefined)

@@ -4,6 +4,9 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  dockAiGroup: 'AI 设置', dockDesktopGroup: '桌面体验', dockPersonal: '个人偏好',
+  dockModels: '模型接入',
+  dockCollaboration: '模型协作', dockAppearance: '外观与动效', dockVision: '图像理解', dockMemory: '记忆',
   'title': 'Web UI 插件',
   'description': '统一管理 dsh-web-ui 全家桶插件的启用与配置。',
   'expand': '展开',
@@ -43,7 +46,8 @@ export const zh = {
   'dockDismiss': '关闭拓展坞提示',
   'dockOpenFailed': '拓展坞未能打开，请从工具菜单重试。',
   'dockBannerTitle': '桌面原生能力已整合至拓展坞',
-  'dockBannerDesc': 'AI 核心调度、运行守护与环境自愈等内置能力可在拓展坞中集中管理。',
+  'dockBannerDesc': '性价比模式、Prompt、记忆、鲸鱼粒子和图像理解已移到拓展坞左侧，按需打开设置。',
+  'dockSettingUnavailable': '此设置暂时不可用，请重新加载拓展坞或重启运行时。',
   'dockBannerAction': '打开拓展坞',
 } satisfies Record<string, string>
 
@@ -52,6 +56,10 @@ export type WebUIPluginsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  dockAiGroup: 'AI settings', dockDesktopGroup: 'Desktop', dockPersonal: 'Personal preferences',
+  dockModels: 'Model connection',
+  dockCollaboration: 'Model collaboration', dockAppearance: 'Appearance and motion', dockVision: 'Image understanding', dockMemory: 'Memory',
+  'dockSettingUnavailable': 'This setting is unavailable. Reload the Dock or restart the runtime.',
   'title': 'Web UI Plugins',
   'description': 'Enable and configure the dsh-web-ui family plugins from one place.',
   'expand': 'Show plugins',
@@ -91,7 +99,7 @@ export const en = {
   'dockDismiss': 'Dismiss Extension Dock tip',
   'dockOpenFailed': 'Extension Dock could not open. Try again from the Tools menu.',
   'dockBannerTitle': 'Desktop Native Capabilities in Extension Dock',
-  'dockBannerDesc': 'Manage AI core features, runtime guards, and self-repair directly in Extension Dock.',
+  'dockBannerDesc': 'Open Value Mode, Prompt, memory, whale particles, and image understanding from the Dock sidebar.',
   'dockBannerAction': 'Open Extension Dock',
 } satisfies Record<WebUIPluginsKey, string>
 
@@ -169,13 +177,20 @@ export const communityPluginsEn = {
 } satisfies Record<CommunityPluginKey, string>
 
 export const relayZh = {
+  connect: '登录并连接 bai', reconnect: '更换授权 / 重新连接',
+  manualConnect: '已有 API Key？手动接入', continueBrowser: '在浏览器继续', cancelConnect: '取消连接',
+  waitingBrowser: '请在浏览器登录并确认授权。完成后将自动同步模型；连接有效期为 5 分钟。',
+  syncingModels: '授权已收到，正在验证 Key 并同步模型…',
+  connected: '连接完成，已同步可用模型。现在可以在模型选择器中选择 bai 模型。',
+  expiredConnect: '本次连接已过期，请重新点击登录并连接。',
+  errorConnect: '连接未完成，请重新发起或使用手动接入。',
   title: '推荐：使用 bai 供应商',
-  description: '用户自行注册、充值并创建 Key；项目只负责把 Key 安全接入本机的 bai 供应商配置。',
-  notice: 'Key 只会通过本机回环接口写入官方凭据服务，不会写进配置文件、URL、日志或项目自有后端。额度、充值和 Key 撤销都在 bai 供应商控制台完成。',
+  description: '登录你的中转站账号，授权后自动连接并同步可用模型。',
+  notice: '账号密码留在供应商网站。授权 Key 保存在本机，并用于向 bai 发起模型请求。充值和 Key 撤销可在控制台管理。',
   stepsTitle: '三步开始使用',
   step1: '注册或登录 bai 供应商账号。',
-  step2: '在钱包中充值或兑换额度。',
-  step3: '在 bai 供应商的 API Keys 页面创建并复制一个 Key。',
+  step2: '选择已有 Key，或创建一个桌面专用 Key，然后确认连接。',
+  step3: '返回软件选择已同步的模型；额度不足时可前往充值。',
   openRegister: '注册 / 登录',
   openWallet: '充值 / 兑换额度',
   openKeys: '创建 API Key',
@@ -212,13 +227,20 @@ export const relayZh = {
 export type RelayLocaleKey = keyof typeof relayZh
 
 export const relayEn: Record<RelayLocaleKey, string> = {
+  connect: 'Sign in and connect bai', reconnect: 'Change authorization / reconnect',
+  manualConnect: 'Already have an API Key? Connect manually', continueBrowser: 'Continue in browser', cancelConnect: 'Cancel connection',
+  waitingBrowser: 'Sign in and authorize in your browser. Models will sync automatically. This connection expires in 5 minutes.',
+  syncingModels: 'Authorization received. Verifying the Key and syncing models…',
+  connected: 'Connected and models synced. Choose a bai model in the model selector.',
+  expiredConnect: 'This connection expired. Start sign-in again.',
+  errorConnect: 'Connection did not complete. Retry or connect manually.',
   title: 'Recommended: use the bai provider',
-  description: 'Users register, top up, and create their own Key. The project only connects it to the official local bai provider configuration.',
-  notice: 'The Key is sent only through the local loopback route to the official credential service. It is not put in settings files, URLs, logs, or a project-owned backend. Billing, top-ups, and revocation stay in the bai console.',
+  description: 'Sign in to your relay account to authorize access and sync available models automatically.',
+  notice: 'Your password stays on the provider website. The authorized Key is saved locally and used for requests to bai. Manage billing and Key revocation in the console.',
   stepsTitle: 'Start in three steps',
   step1: 'Register or sign in to bai.',
-  step2: 'Top up or redeem balance in Wallet.',
-  step3: 'Create and copy an API Key in bai API Keys.',
+  step2: 'Select a Key or create a dedicated Desktop Key, then confirm the connection.',
+  step3: 'Return to Desktop and choose a synced model. Top up when needed.',
   openRegister: 'Register / sign in',
   openWallet: 'Top up / redeem',
   openKeys: 'Create API Key',

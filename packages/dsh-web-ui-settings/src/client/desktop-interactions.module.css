@@ -1,0 +1,27 @@
+.overlay { position: fixed; inset: 0; z-index: 2147483646; display: grid; place-items: center; background: rgb(0 0 0 / .28); padding: 24px; box-sizing: border-box; color: var(--dsw-alias-label-primary, #242a34); }
+.dialog { width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow: auto; box-sizing: border-box; padding: 28px; border: 1px solid var(--dsw-alias-border-l2, #dce1e8); border-radius: 20px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 16px 48px rgb(0 0 0 / .16); font: inherit; font-size: 14px; }
+.dialog header, .dialog footer { display: flex; align-items: center; gap: 12px; }
+.dialog header { justify-content: space-between; margin-bottom: 24px; }
+.dialog h2 { margin: 0; font-size: 22px; }
+.dialog button { font: inherit; color: inherit; border: 1px solid transparent; border-radius: 9px; background: transparent; padding: 8px 14px; cursor: pointer; }
+.dialog button:hover { background: var(--dsw-alias-bg-layer-2, #f3f4f5); }
+.dialog button:disabled { opacity: .5; cursor: default; }
+.dialog :focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #416bd4); outline-offset: 3px; }
+.dialog .close { font-size: 24px; padding: 0; width: 32px; height: 32px; }
+.field { display: grid; gap: 9px; margin-bottom: 12px; font-weight: 500; }
+.field input { width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--dsw-alias-border-l2, #dce1e8); background: var(--dsw-alias-bg-layer-2, #f8f9fa); color: inherit; font: inherit; padding: 12px 14px; margin-bottom: 10px; }
+.dialog .folder { width: 100%; min-height: 132px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-color: var(--dsw-alias-border-l2, #dce1e8); border-radius: 12px; }
+.folder span { max-width: 100%; overflow-wrap: anywhere; color: var(--dsw-alias-label-secondary, #657080); font-size: 12px; user-select: text; }
+.folderActions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.dialog footer { justify-content: flex-end; margin-top: 28px; }
+.dialog .primary { color: var(--dsw-alias-bg-layer-1, white); background: var(--dsw-alias-label-primary, #242a34); min-width: 112px; }
+.error { color: var(--dsw-alias-error-primary, #bd3131); overflow-wrap: anywhere; }
+.browserClose { flex: 0 0 32px; width: 32px; height: 32px; border: 0; border-radius: 6px; color: inherit; background: transparent; cursor: pointer; font-size: 22px; }
+.browserClose:hover { background: var(--dsw-alias-bg-layer-2, #eee); }
+.browserClose:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #416bd4); }
+@media (max-width: 600px) { .dialog { padding: 20px; } }
+
+.existing { display: grid; gap: 4px; max-height: 160px; overflow: auto; margin-bottom: 12px; }
+.existing button { display: grid; text-align: left; gap: 4px; }
+.existing small { color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+.existing button[aria-pressed="true"] { background: var(--dsw-alias-bg-layer-2); }
