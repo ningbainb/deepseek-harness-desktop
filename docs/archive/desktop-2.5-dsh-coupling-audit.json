@@ -4279,7 +4279,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-directory-picker.mjs",
-      "line": 53,
+      "line": 54,
       "operation": "DSH_HOME"
     },
     {

@@ -9,6 +9,7 @@ import { _electron as electron } from 'playwright'
 
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -54,6 +55,7 @@ try {
       DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
   })
+  await useChineseFixtureLocale(electronApp)
   electronApp.process().stdout?.on('data', (chunk) => {
     processOutput.push(String(chunk))
     process.stdout.write(chunk)
@@ -177,6 +179,7 @@ try {
   await page.waitForSelector('[data-dsh-file-attachments]', { timeout: 30_000 })
   assert.equal(await electronApp.evaluate(() => globalThis.__pickerCalls), 2)
   await page.waitForFunction(() => document.body.textContent.includes('桌面项目测试'))
+  await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
   const panelControls = await page.evaluate(() => {
     const close = document.querySelector('[data-aionui-explorer-toolbar] button[aria-label="关闭文件面板"]')
     const toggles = [...document.querySelectorAll('[data-dsh-panel-host] > div:first-child button')]

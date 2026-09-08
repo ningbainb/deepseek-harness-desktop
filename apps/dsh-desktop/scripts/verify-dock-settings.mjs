@@ -9,7 +9,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const packaged = process.argv.includes('--packaged')
+const packaged = process.argv.includes('--packaged') || Boolean(process.env.DSH_DESKTOP_E2E_EXECUTABLE)
 const executablePath = packaged
   ? resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE ?? resolve(appDir, 'dist/win-unpacked/DeepSeek Harness Desktop.exe'))
   : electronPath
