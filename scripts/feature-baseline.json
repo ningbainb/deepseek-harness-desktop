@@ -356,6 +356,13 @@
       ]
     },
     {
+      "id": "star-prompt",
+      "name": "3.3.0 升级后每个本机用户显示一次 Star 提示",
+      "uiSelector": "#dsh-desktop-star-prompt",
+      "e2eScript": "scripts/verify-star-prompt.mjs",
+      "features": ["version-3.3.0-once", "previous-version-claim-preserved", "restart-does-not-repeat"]
+    },
+    {
       "id": "embedded-browser-close",
       "name": "内置浏览器常驻关闭按钮",
       "uiSelector": "[data-dsh-browser-close]",

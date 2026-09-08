@@ -1,10 +1,11 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -14,6 +15,7 @@ const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
 
 async function launchDesktop({ preview = false } = {}) {
+  await seedPrimaryRuntimePermissionForTest({ userData })
   return electron.launch({
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
@@ -37,6 +39,8 @@ async function waitForHarnessPage(electronApp) {
 
 let electronApp
 try {
+  await mkdir(userData, { recursive: true })
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['3.2.0'] }), 'utf8')
   electronApp = await launchDesktop()
   const firstPage = await waitForHarnessPage(electronApp)
   const firstPrompt = firstPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
@@ -46,9 +50,10 @@ try {
   await firstPrompt.waitFor({ state: 'hidden' })
 
   const claimedState = JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8'))
-  if (!claimedState.shownVersions?.includes('3.2.0')) {
-    throw new Error(`3.2.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
+  if (!claimedState.shownVersions?.includes('3.3.0')) {
+    throw new Error(`3.3.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
   }
+  if (!claimedState.shownVersions?.includes('3.2.0')) throw new Error('upgrade discarded the previous release claim')
 
   await electronApp.close()
   electronApp = undefined
@@ -56,7 +61,7 @@ try {
   const thirdPage = await waitForHarnessPage(electronApp)
   await thirdPage.waitForTimeout(1_600)
   if (await thirdPage.locator('#dsh-desktop-star-prompt[data-open="true"]').isVisible()) {
-    throw new Error('the 3.2.0 Star prompt appeared more than once for the same user profile')
+    throw new Error('the 3.3.0 Star prompt appeared more than once for the same user profile')
   }
 
   await electronApp.close()
@@ -73,7 +78,7 @@ try {
   if (JSON.stringify(previewState) !== JSON.stringify(claimedState)) {
     throw new Error(`preview mode changed Star prompt state: ${JSON.stringify(previewState)}`)
   }
-  console.log('verified 3.2.0 Star prompt appears once, persists its claim, and remains previewable without extra persistence')
+  console.log('verified 3.3.0 Star prompt appears once, persists its claim, and remains previewable without extra persistence')
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })

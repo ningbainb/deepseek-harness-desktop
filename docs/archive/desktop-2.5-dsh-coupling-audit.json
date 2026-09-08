@@ -4303,7 +4303,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs",
-      "line": 59,
+      "line": 60,
       "operation": "DSH_HOME"
     },
     {
@@ -4525,7 +4525,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-star-prompt.mjs",
-      "line": 25,
+      "line": 27,
       "operation": "DSH_HOME"
     },
     {

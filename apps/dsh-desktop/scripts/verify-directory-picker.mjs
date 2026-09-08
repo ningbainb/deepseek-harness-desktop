@@ -243,12 +243,20 @@ try {
   await dialog.getByRole('button', { name: /^(取消|Cancel)$/iu }).click()
   // Keep the official browser-only picker coverage: it remains available without the desktop preload.
   const browserWindow = electronApp.waitForEvent('window')
-  await electronApp.evaluate(({ BrowserWindow }, url) => {
-    const testWindow = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } })
-    void testWindow.loadURL(url)
+  await electronApp.evaluate(async ({ BrowserWindow }, url) => {
+    // This exercises a real browser-visible UI; a never-shown window can defer
+    // animation-frame-driven mounting on a headless Windows build runner.
+    const testWindow = new BrowserWindow({ width: 1024, height: 768, show: true, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false } })
+    await testWindow.loadURL(url)
   }, page.url())
   const browserPage = await browserWindow
-  await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: 30_000 })
+  assert.equal(await browserPage.evaluate(() => typeof window.dshDesktop), 'undefined', 'browser fixture must not receive the desktop preload')
+  try {
+    await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: 30_000 })
+  } catch (error) {
+    console.error('browser-only picker fixture', JSON.stringify(await browserPage.evaluate(() => ({ url: location.href, ready: document.readyState, visibility: document.visibilityState, width: innerWidth, height: innerHeight, desktopBridge: typeof window.dshDesktop, body: document.body.innerText.slice(0, 3000) }))))
+    throw error
+  }
   await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).dispatchEvent('click')
   const browserDialog = browserPage.getByRole('dialog').filter({ hasText: /folder|directory|文件夹|目录/iu })
   await browserDialog.waitFor({ timeout: 10_000 })

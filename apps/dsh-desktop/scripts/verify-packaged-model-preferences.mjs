@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,11 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const appPath = resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
   ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
-const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-model-preferences-'))
+const temporary = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-model-preferences-')))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const workspace = join(temporary, 'workspace')
@@ -60,6 +61,7 @@ async function launch() {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
   const errors = []
   page.on('pageerror', (error) => errors.push(`pageerror:${error.message}`))
@@ -99,14 +101,18 @@ async function closeSettings(settings) {
 }
 
 async function chooseWorkspace(page) {
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async (_parent, options) => {
+      if (!options?.properties?.includes('openDirectory')) throw new Error('expected native folder picker')
+      return { canceled: false, filePaths: [path] }
+    }
+  }, workspace)
   await page.getByRole('button', { name: '选择工作区', exact: true }).click({ force: true })
-  const picker = page.getByRole('dialog').filter({ hasText: /编辑路径|新建文件夹|打开/u }).last()
+  const picker = page.getByRole('dialog', { name: '选择工作区', exact: true })
   await picker.waitFor({ state: 'visible', timeout: 30_000 })
-  await picker.getByRole('button', { name: /编辑路径|Edit path/iu }).click()
-  const pathInput = picker.locator('input').first()
-  await pathInput.fill(workspace)
-  await pathInput.press('Enter')
-  await picker.getByRole('button', { name: '打开', exact: true }).click()
+  await picker.getByRole('button', { name: /点击选择项目文件夹/u }).click()
+  await picker.getByRole('textbox').fill('Model preferences fixture')
+  await picker.getByRole('button', { name: /^(创建项目|打开已有项目)$/u }).click()
   await picker.waitFor({ state: 'hidden', timeout: 30_000 })
   await dismissStartup(page)
 }

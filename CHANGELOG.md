@@ -4,6 +4,7 @@
 
 中文：
 
+- **Star 提示**：升级到 3.3.0 后，每个本机用户显示一次社区支持提示；关闭后，同一版本重启不再弹出。
 - **拓展坞与设置**：按功能组织侧栏，集中管理模型接入、性价比模式、个性化 Prompt、记忆、粒子主题和图像理解。设置窗口统一主题并居中打开，调整尺寸与间距，性价比模式提供中文说明。拖动窗口合并位置更新，减少连续拖动时的卡顿。
 - **项目与工作区**：创建项目和选择工作区使用统一弹窗，点击源文件夹区域即可打开系统文件夹选择器；已有项目可以直接打开，避免重复创建。
 - **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
@@ -13,6 +14,7 @@
 
 English:
 
+- **Star reminder**: Each local user sees the community support prompt once after upgrading to 3.3.0. It does not appear again on subsequent launches of the same version.
 - **Dock and settings**: A grouped sidebar brings provider setup, Value Mode, personal prompts, memory, particles, and image understanding into one place. Settings windows use a consistent theme and centered placement. Compact spacing and coalesced window movement improve everyday interaction, and Value Mode includes Chinese guidance.
 - **Projects and workspaces**: A shared dialog supports project creation and workspace selection. Clicking the source folder area opens the native folder picker, while existing projects can be opened directly without creating duplicates.
 - **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
