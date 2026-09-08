@@ -218,11 +218,11 @@ describe('any-file drop formatting', () => {
     const canvas = {
       width: 0,
       height: 0,
-      getContext: () => ({
+      getContext: vi.fn(() => ({
         drawImage,
         imageSmoothingEnabled: false,
         imageSmoothingQuality: 'low',
-      }),
+      })),
       toBlob: (callback: BlobCallback) => callback(new Blob(['compressed'])),
     }
     const createElement = document.createElement.bind(document)
@@ -234,6 +234,7 @@ describe('any-file drop formatting', () => {
 
     expect(result).not.toBeNull()
     expect(result.type).toBe('image/jpeg')
+    expect(canvas.getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true })
     expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 2048, 2048)
     expect(close).toHaveBeenCalledTimes(1)
     expect(canvas).toMatchObject({ width: 0, height: 0 })

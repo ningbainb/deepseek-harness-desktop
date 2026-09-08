@@ -269,6 +269,7 @@ async function electronMemorySample(application, label) {
     totalWorkingSetBytes: rows.reduce((sum, row) => sum + row.workingSetBytes, 0),
     totalPrivateBytes: rows.reduce((sum, row) => sum + row.privateBytes, 0),
     processCount: rows.length,
+    processes: rows,
   }
 }
 
@@ -331,6 +332,7 @@ async function idleMedian(application, label) {
     totalWorkingSetBytes: median(samples.map(sample => sample.totalWorkingSetBytes)),
     totalPrivateBytes: median(samples.map(sample => sample.totalPrivateBytes)),
     processCount: median(samples.map(sample => sample.processCount)),
+    processesAtMiddleSample: samples[Math.floor(samples.length / 2)].processes,
   }
 }
 
@@ -467,6 +469,7 @@ try {
     if (operation % 5 === 0) {
       await wait(750)
       groupIdle.push(await idleMedian(activeApplication, `after-${operation}`))
+      console.log('image-drop idle memory', JSON.stringify(groupIdle.at(-1)))
       treeSamples.push({
         label: `after-${operation}`,
         ...(await processTreeSample(rootProcessId, Date.now() - measuredAt)),

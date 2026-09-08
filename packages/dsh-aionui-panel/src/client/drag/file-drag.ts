@@ -373,7 +373,9 @@ export async function compressImageFileToFit(
     onPhase?.('compressing')
     canvas.width = targetW
     canvas.height = targetH
-    const context = canvas.getContext('2d')
+    // This offscreen canvas is encoded to a Blob immediately, so prefer CPU
+    // storage instead of retaining GPU textures for repeated large drops.
+    const context = canvas.getContext('2d', { willReadFrequently: true })
     if (context === null) throw new ImageProcessingError('canvas-unavailable', 'image canvas is unavailable')
     context.imageSmoothingEnabled = true
     context.imageSmoothingQuality = 'high'

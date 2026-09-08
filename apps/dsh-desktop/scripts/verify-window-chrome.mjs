@@ -76,6 +76,18 @@ try {
     state: 'attached',
     timeout: runtimeReadyTimeoutMs,
   })
+  // Plugin CSS can arrive before React mounts the frame measured below.
+  try {
+    await page.locator('[data-dsh-frame]').waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+  } catch (error) {
+    console.error('window frame not ready', JSON.stringify(await page.evaluate(() => ({
+      url: location.href,
+      ready: document.readyState,
+      body: document.body.innerText.slice(0, 4000),
+      plugins: [...document.querySelectorAll('style[data-plugin]')].map(element => element.dataset.plugin),
+    }))))
+    throw error
+  }
   const state = await page.evaluate(() => ({
     chromeCount: document.querySelectorAll('#dsh-desktop-window-chrome').length,
     chromeText: document.querySelector('#dsh-desktop-window-chrome')?.textContent,
@@ -297,12 +309,13 @@ try {
     assert.ok(Number(state.layerTop) >= 31, `modal layer starts under the title bar: ${state.layerTop}`)
   }
   const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
-  if (await starPrompt.isVisible()) {
-    const starDialog = starPrompt.getByRole('dialog')
-    await assertDialogUsesSafeViewport(starDialog)
-    await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
-    await starPrompt.waitFor({ state: 'hidden' })
-  }
+  // This fresh 3.3.0 profile receives the prompt after its display delay.
+  // Wait for it explicitly before interacting with dialogs underneath it.
+  await starPrompt.waitFor({ state: 'visible', timeout: 10_000 })
+  const starDialog = starPrompt.getByRole('dialog')
+  await assertDialogUsesSafeViewport(starDialog)
+  await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
+  await starPrompt.waitFor({ state: 'hidden' })
   const introContinueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
   const introDialog = page.getByRole('dialog').filter({ has: introContinueButton })
   // The upstream UI may skip this one-time disclosure when the profile or

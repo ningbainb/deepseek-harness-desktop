@@ -45,6 +45,7 @@ try {
   const firstPage = await waitForHarnessPage(electronApp)
   const firstPrompt = firstPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
   await firstPrompt.waitFor({ state: 'visible', timeout: 10_000 })
+  await firstPrompt.getByText('3.3.0 · 社区支持', { exact: true }).waitFor({ state: 'visible' })
   await firstPage.getByRole('button', { name: '去 GitHub 点个 Star' }).waitFor({ state: 'visible' })
   await firstPage.getByRole('button', { name: '先继续使用', exact: true }).click()
   await firstPrompt.waitFor({ state: 'hidden' })

@@ -363,6 +363,13 @@
       "features": ["version-3.3.0-once", "previous-version-claim-preserved", "restart-does-not-repeat"]
     },
     {
+      "id": "image-drop-compression",
+      "name": "连续图片拖入、软件画布压缩与内存保全",
+      "uiSelector": "[data-testid=\"aionui-drag-inlay\"]",
+      "e2eScript": "scripts/verify-packaged-image-drop.mjs",
+      "features": ["software-canvas-encoding", "decoder-and-canvas-release", "twenty-drop-memory-budget", "cancel-and-retry"]
+    },
+    {
       "id": "embedded-browser-close",
       "name": "内置浏览器常驻关闭按钮",
       "uiSelector": "[data-dsh-browser-close]",

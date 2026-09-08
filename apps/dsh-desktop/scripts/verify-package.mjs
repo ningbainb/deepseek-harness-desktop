@@ -6,6 +6,7 @@ import YAML from 'yaml'
 import sharp from 'sharp'
 
 import afterPack from './after-pack.cjs'
+import { verifyAsarIntegrity } from './verify-asar-integrity.mjs'
 import {
   macBundleRootFromResources,
   parseVerifyPackageArguments,
@@ -395,6 +396,7 @@ if (!settingsBridge.includes('"particle-theme"')) {
   throw new Error('packaged settings bridge is missing the particle-theme namespace')
 }
 await access(join(resources, 'app.asar'))
+console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'))} packed ASAR files`)
 await access(join(resources, 'app-icon.png'))
 const telemetryConfiguration = JSON.parse(await readFile(join(resources, 'telemetry-config.json'), 'utf8'))
 const telemetryConfigurationKeys = telemetryConfiguration !== null && typeof telemetryConfiguration === 'object'

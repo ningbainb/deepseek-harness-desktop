@@ -8,7 +8,7 @@
 - **拓展坞与设置**：按功能组织侧栏，集中管理模型接入、性价比模式、个性化 Prompt、记忆、粒子主题和图像理解。设置窗口统一主题并居中打开，调整尺寸与间距，性价比模式提供中文说明。拖动窗口合并位置更新，减少连续拖动时的卡顿。
 - **项目与工作区**：创建项目和选择工作区使用统一弹窗，点击源文件夹区域即可打开系统文件夹选择器；已有项目可以直接打开，避免重复创建。
 - **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
-- **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片进行自适应压缩。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
+- **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片通过软件画布进行自适应压缩，减少连续拖入时的 GPU 内存占用。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
 - **可感知的记忆**：展示当前会话的记忆活动、匹配结果和可操作入口，优化检索与排序。记忆继续按用户和作用域隔离，模型建议需要用户确认后才会保存。
 - **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥。自动化构建测试不向生产服务上报。
 
@@ -18,7 +18,7 @@ English:
 - **Dock and settings**: A grouped sidebar brings provider setup, Value Mode, personal prompts, memory, particles, and image understanding into one place. Settings windows use a consistent theme and centered placement. Compact spacing and coalesced window movement improve everyday interaction, and Value Mode includes Chinese guidance.
 - **Projects and workspaces**: A shared dialog supports project creation and workspace selection. Clicking the source folder area opens the native folder picker, while existing projects can be opened directly without creating duplicates.
 - **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
-- **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
+- **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Software canvas encoding reduces GPU memory use during repeated large image drops. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
 - **Visible memory activity**: Session memory activity and matches are visible with actions to inspect and manage them. Retrieval and ranking are improved. User and scope isolation remain enforced, and model suggestions require user confirmation before persistence.
 - **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Automated build tests do not report to the production service.
 
