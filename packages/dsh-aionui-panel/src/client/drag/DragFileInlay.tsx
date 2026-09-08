@@ -19,20 +19,22 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   FILE_DRAG_MIME,
+  ImageProcessingError,
   MAX_SAFE_IMAGE_BYTES,
-  compressImageFileToFit,
-  formatDroppedFile,
+  formatDroppedFilesSequentially,
   hasAnyFileDrag,
   hasFileDrag,
   isImageFile,
   isPureImageDrag,
+  processImageFilesSequentially,
+  type ImageProcessingPhase,
 } from './file-drag.ts'
 import { t } from '../locales.ts'
 import dragCss from '../styles/drag.module.css'
 
 /** Injected business face of the drag inlay (session-routed). */
 export interface DragFileInjected {
-  /** Splice a workspace-relative path or document text into the active session's draft. */
+  /** Splice a workspace-relative path reference or plain-text content into the active draft. */
   insertPath: (path: string) => boolean
   /** Add image files into the active session's draft image attachments. */
   addImages?: (files: readonly File[]) => boolean
@@ -45,18 +47,58 @@ export type DragFileInlayProps =
 
 /**
  * The composer dock entry: a zero-height anchor that shows a hint strip
- * while a file row or non-image document is dragged over the page and inserts content on drop.
+ * while a file row or non-image document is dragged over the page and inserts a path reference
+ * or plain-text content on drop. It does not claim to parse binary document formats.
  * Pure image drags from the OS are yielded completely to the host's native image attachment handler.
  * @param props - the composed dock entry props.
  */
 export function DragFileInlay(props: DragFileInlayProps): ReactElement {
   const [active, setActive] = useState(false)
+  const [phase, setPhase] = useState<'idle' | ImageProcessingPhase | 'submitting' | 'failed'>('idle')
   const depth = useRef(0)
+  const imageBatch = useRef<AbortController | null>(null)
+  const generation = useRef(0)
 
   useEffect(() => {
+    let mounted = true
     const reset = (): void => {
       depth.current = 0
       setActive(false)
+    }
+
+    const setCurrentPhase = (batch: number, next: typeof phase): void => {
+      if (mounted && batch === generation.current) setPhase(next)
+    }
+
+    const processImages = (files: readonly File[]): void => {
+      if (files.length === 0) return
+      if (!props.addImages) {
+        generation.current += 1
+        setPhase('failed')
+        return
+      }
+      imageBatch.current?.abort()
+      const controller = new AbortController()
+      const batch = ++generation.current
+      imageBatch.current = controller
+      setCurrentPhase(batch, 'validating')
+      void processImageFilesSequentially(files, {
+        signal: controller.signal,
+        onPhase: next => setCurrentPhase(batch, next),
+      }).then(processed => {
+        if (controller.signal.aborted || batch !== generation.current) return
+        setCurrentPhase(batch, 'submitting')
+        if (!props.addImages?.(processed)) throw new Error('image attachment submission was rejected')
+        setCurrentPhase(batch, 'idle')
+      }).catch(reason => {
+        if (reason instanceof ImageProcessingError && reason.code === 'aborted') {
+          setCurrentPhase(batch, 'idle')
+          return
+        }
+        setCurrentPhase(batch, 'failed')
+      }).finally(() => {
+        if (imageBatch.current === controller) imageBatch.current = null
+      })
     }
 
     const onDragEnter = (event: DragEvent): void => {
@@ -147,21 +189,17 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       event.preventDefault()
       event.stopImmediatePropagation()
       reset()
+      // The native attachment surface observed dragenter before this capture-phase
+      // handler learned that the image needed preprocessing. It cannot observe the
+      // stopped drop, so explicitly close every drag overlay before async work.
+      window.dispatchEvent(new Event('dragend'))
 
-      // 1. Process image files: automatically compress oversized images before adding to draft attachments
-      if (imageFiles.length > 0 && props.addImages) {
-        void Promise.all(
-          imageFiles.map((file) => compressImageFileToFit(file))
-        ).then((compressed) => {
-          props.addImages?.(compressed)
-        }).catch(() => {})
-      }
+      // Process images serially; a new batch or session teardown cancels stale work.
+      processImages(imageFiles)
 
-      // 2. Format non-image files and splice into the prompt draft
+      // Format non-image files serially to bound FileReader memory.
       if (nonImageFiles.length > 0) {
-        void Promise.all(
-          nonImageFiles.map((file) => formatDroppedFile(file))
-        ).then((formatted) => {
+        void formatDroppedFilesSequentially(nonImageFiles).then((formatted) => {
           const textToInsert = formatted.filter((item) => item !== '').join('\n\n')
           if (textToInsert !== '') {
             props.insertPath(textToInsert)
@@ -195,14 +233,15 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       event.preventDefault()
       event.stopImmediatePropagation()
 
-      void Promise.all(
-        imageFiles.map((file) => compressImageFileToFit(file))
-      ).then((compressed) => {
-        props.addImages?.(compressed)
-      }).catch(() => {})
+      processImages(imageFiles)
     }
 
     const onDragEnd = (): void => reset()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || imageBatch.current === null) return
+      event.preventDefault()
+      imageBatch.current.abort()
+    }
 
     document.addEventListener('dragenter', onDragEnter, true)
     document.addEventListener('dragover', onDragOver, true)
@@ -210,24 +249,41 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     document.addEventListener('drop', onDrop, true)
     window.addEventListener('dragend', onDragEnd, true)
     window.addEventListener('paste', onPaste, true)
+    window.addEventListener('keydown', onKeyDown, true)
 
     return () => {
+      mounted = false
+      generation.current += 1
+      imageBatch.current?.abort()
+      imageBatch.current = null
       document.removeEventListener('dragenter', onDragEnter, true)
       document.removeEventListener('dragover', onDragOver, true)
       document.removeEventListener('dragleave', onDragLeave, true)
       document.removeEventListener('drop', onDrop, true)
       window.removeEventListener('dragend', onDragEnd, true)
       window.removeEventListener('paste', onPaste, true)
+      window.removeEventListener('keydown', onKeyDown, true)
     }
   }, [props.insertPath, props.addImages])
 
+  const statusText = phase === 'idle'
+    ? t('explorer.drag.dropHint')
+    : phase === 'failed'
+      ? t('explorer.drag.imageFailed')
+      : phase === 'submitting'
+        ? t('explorer.drag.imageSubmitting')
+        : t('explorer.drag.imageProcessing')
+  const visible = active || phase !== 'idle'
+
   return (
     <div
-      className={active ? `${dragCss.strip} ${dragCss.stripActive}` : dragCss.strip}
+      className={visible ? `${dragCss.strip} ${dragCss.stripActive}` : dragCss.strip}
       data-testid="aionui-drag-inlay"
+      data-phase={phase}
       aria-live="polite"
+      aria-busy={phase !== 'idle' && phase !== 'failed'}
     >
-      {active ? <span className={dragCss.stripText}>{t('explorer.drag.dropHint')}</span> : null}
+      {visible ? <span className={dragCss.stripText}>{statusText}</span> : null}
     </div>
   )
 }

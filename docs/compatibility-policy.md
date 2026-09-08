@@ -18,6 +18,8 @@ Desktop 3.0.9 does not block normal startup because a user plugin lacks publishe
 
 New plugin installs are explicit user actions. Desktop validates the selected package reference, applies it transactionally to the persistent profile, and restores the previous archive if installation or activation fails. The built-in plugin market gives fresh users a normal discovery path without adding a startup choice screen.
 
+Version-specific community conflicts are recorded in `apps/dsh-desktop/runtime-support/community-plugin-known-issues.json`. A record matches only the reproduced package, Desktop, Runtime, and embedded Node tuple. It contributes a visible compatibility diagnostic and release evidence; startup inspection does not disable or uninstall the user's plugin. A new plugin or host version is unclassified until that tuple is tested, so an old complaint cannot become a permanent package ban.
+
 ## Runtime evidence
 
 The packaged official Runtime remains evidence-gated. Stable accepts only an exact `known-good` or `supported` entry whose Runtime version, provider, Desktop range, package integrity, lockfile, and patch evidence match. Installation damage is routed to updater repair because a model must not rewrite packaged application binaries.

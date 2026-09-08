@@ -206,18 +206,38 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
         setLoading(false)
       },
     )
-    // Best-effort current-model label for the toolbar chip; the sheet
-    // always re-reads a fresh directory on open.
-    void models(session.sessionId).then(
-      (directory) => {
-        if (!cancelled) setCurrentModel(directory.current)
-      },
-      () => { /* chip falls back to a plain label */ },
-    )
     return () => {
       cancelled = true
       clearTimeout(timeout)
       controller.abort()
+    }
+  }, [session.sessionId])
+
+  // The public SDK has no session-model change event. Reconcile only on
+  // lifecycle signals; the model sheet also performs a fresh read on open.
+  useEffect(() => {
+    let cancelled = false
+    let generation = 0
+    const refresh = (): void => {
+      const request = ++generation
+      void models(session.sessionId).then(
+        directory => {
+          if (!cancelled && request === generation) setCurrentModel(directory.current)
+        },
+        () => { /* chip keeps its last confirmed value */ },
+      )
+    }
+    const onVisible = (): void => { if (document.visibilityState === 'visible') refresh() }
+    refresh()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    return () => {
+      cancelled = true
+      generation += 1
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
     }
   }, [session.sessionId])
 

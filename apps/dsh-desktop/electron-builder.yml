@@ -35,6 +35,7 @@ directories:
 
 files:
   - src/**
+  - runtime-support/community-plugin-known-issues.json
   - package.json
   - '!**/*.map'
   - '!**/test/**'

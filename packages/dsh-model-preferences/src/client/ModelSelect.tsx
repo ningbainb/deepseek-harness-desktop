@@ -11,11 +11,15 @@ import {
   type SortedModelOption,
 } from './model-projection.ts'
 import styles from './model-preferences.module.css'
+import { installModelRefreshBridge } from './model-refresh.ts'
 
 export type ModelSelectProps = PropsRuntime<'conversation.input.model'>
   & PropsLocale<'model-preferences'>
   & ModelSelectInjected
-  & { settingsScope: import('@deepseek-ai/dsh-client-runtime/client').SettingsScope<ModelPreferencesConfig> }
+  & {
+    modelSessionId: string
+    settingsScope: import('@deepseek-ai/dsh-client-runtime/client').SettingsScope<ModelPreferencesConfig>
+  }
 
 type Pane = 'root' | 'model' | 'effort'
 
@@ -36,7 +40,7 @@ function errorText(reason: unknown, fallback: string): string {
  * model-selection seat so the desktop composer keeps its native appearance.
  */
 export function ModelSelect(props: ModelSelectProps) {
-  const { locked, available, directory, load, select, settingsScope, t } = props
+  const { locked, available, directory, load, modelSessionId, select, settingsScope, t } = props
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
   const [selecting, setSelecting] = useState(false)
@@ -44,6 +48,7 @@ export function ModelSelect(props: ModelSelectProps) {
   const lastActionRef = useRef<'load' | 'select'>('load')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const refreshBridgeRef = useRef<{ announce(): void; dispose(): void } | null>(null)
   const id = useId()
   const state = useSyncExternalStore(
     listener => directory.subscribe(listener),
@@ -109,6 +114,18 @@ export function ModelSelect(props: ModelSelectProps) {
   }, [available, load])
 
   useEffect(() => {
+    refreshBridgeRef.current?.dispose()
+    refreshBridgeRef.current = null
+    if (!available) return
+    const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: load })
+    refreshBridgeRef.current = bridge
+    return () => {
+      bridge.dispose()
+      if (refreshBridgeRef.current === bridge) refreshBridgeRef.current = null
+    }
+  }, [available, load, modelSessionId])
+
+  useEffect(() => {
     if (!open) return
     const closeOutside = (event: PointerEvent): void => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
@@ -146,6 +163,7 @@ export function ModelSelect(props: ModelSelectProps) {
     try {
       const accepted = await select(selection)
       if (!accepted) throw new Error(t('error.select'))
+      refreshBridgeRef.current?.announce()
       close()
       triggerRef.current?.focus()
     } catch (reason) {

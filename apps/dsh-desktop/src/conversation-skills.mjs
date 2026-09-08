@@ -39,6 +39,14 @@ export function filterConversationSkills(skills, query) {
   return skills.filter((skill) => `${skill.name}\n${skill.description}\n${skill.source}`.toLocaleLowerCase().includes(needle))
 }
 
+export function normalizeSkillDiagnostics(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => typeof item?.error === 'string' ? item.error.trim() : '')
+    .filter((message, index, messages) => message !== '' && messages.indexOf(message) === index)
+    .slice(0, 20)
+}
+
 function setNativeInputValue(element, value) {
   const prototype = Object.getPrototypeOf(element)
   const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
@@ -85,6 +93,7 @@ function installConversationSkillsPage() {
     list: null,
     status: null,
     skills: [],
+    diagnostics: [],
     filtered: [],
     activeIndex: -1,
     loadedAt: 0,
@@ -185,12 +194,17 @@ function installConversationSkillsPage() {
     state.filtered = filterConversationSkills(state.skills, state.search?.value)
     if (state.filtered.length === 0) {
       state.status.hidden = false
-      state.status.textContent = state.skills.length === 0 ? '尚未发现已安装技能' : '没有匹配的技能'
+      state.status.textContent = state.skills.length === 0 && state.diagnostics.length > 0
+        ? `有 ${state.diagnostics.length} 个技能未载入：${state.diagnostics[0]}`
+        : state.skills.length === 0 ? '尚未发现已安装技能' : '没有匹配的技能'
       state.activeIndex = -1
       positionMenu()
       return
     }
-    state.status.hidden = true
+    state.status.hidden = state.diagnostics.length === 0
+    if (state.diagnostics.length > 0) {
+      state.status.textContent = `有 ${state.diagnostics.length} 个技能未载入：${state.diagnostics[0]}`
+    }
     let recentGroupAdded = false
     let allGroupAdded = false
     for (const [index, skill] of state.filtered.entries()) {
@@ -243,6 +257,7 @@ function installConversationSkillsPage() {
       if (typeof window.dshDesktop?.listSkills !== 'function') throw new Error('desktop skill inventory is unavailable')
       const inventory = await window.dshDesktop.listSkills()
       state.skills = normalizeConversationSkills(inventory?.skills, recentNames())
+      state.diagnostics = normalizeSkillDiagnostics(inventory?.diagnostics)
       state.loadedAt = Date.now()
       render()
     } catch (error) {
@@ -665,6 +680,7 @@ export const CONVERSATION_SKILLS_SCRIPT = `(() => {
 ${buildSkillTrigger.toString()}
 ${normalizeConversationSkills.toString()}
 ${filterConversationSkills.toString()}
+${normalizeSkillDiagnostics.toString()}
 ${setNativeInputValue.toString()}
 ${insertSkillTrigger.toString()}
 return (${installConversationSkillsPage.toString()})()

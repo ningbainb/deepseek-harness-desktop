@@ -2,10 +2,12 @@
  * Drag-to-composer pure helper tests: MIME detection and the draft splicing
  * rule (separator spacing around the caret, empty path, out-of-range caret).
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   FILE_DRAG_MIME,
   MAX_SAFE_IMAGE_BYTES,
+  MAX_SOURCE_IMAGE_BYTES,
+  ImageProcessingError,
   calculateScaledDimensions,
   compressImageFileToFit,
   formatDroppedFile,
@@ -15,7 +17,27 @@ import {
   insertPathIntoDraft,
   isImageFile,
   isPureImageDrag,
+  imageDimensionsFromHeader,
+  processImageFilesSequentially,
 } from '../src/client/drag/file-drag.ts'
+
+function pngHeader(width: number, height: number): Uint8Array {
+  const bytes = new Uint8Array(24)
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const view = new DataView(bytes.buffer)
+  view.setUint32(16, width)
+  view.setUint32(20, height)
+  return bytes
+}
+
+function pngFile(name: string, width: number, height: number): File {
+  return new File([pngHeader(width, height)], name, { type: 'image/png' })
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('hasFileDrag', () => {
   it('detects the custom file MIME among drag types', () => {
@@ -127,12 +149,123 @@ describe('any-file drop formatting', () => {
   })
 
   it('preserves small image files without unnecessary compression', async () => {
-    const smallImage = {
-      name: 'icon.png',
-      type: 'image/png',
-      size: 150_000,
-    } as unknown as File
+    const smallImage = pngFile('icon.png', 800, 600)
     const result = await compressImageFileToFit(smallImage)
     expect(result).toBe(smallImage)
+  })
+
+  it('parses dimensions from image headers before browser decoding', () => {
+    expect(imageDimensionsFromHeader(pngHeader(3840, 2160))).toEqual({ width: 3840, height: 2160 })
+
+    const gif = new Uint8Array(10)
+    gif.set(new TextEncoder().encode('GIF89a'))
+    new DataView(gif.buffer).setUint16(6, 640, true)
+    new DataView(gif.buffer).setUint16(8, 480, true)
+    expect(imageDimensionsFromHeader(gif)).toEqual({ width: 640, height: 480 })
+  })
+
+  it('rejects unsafe bytes and pixels before creating a decoded image', async () => {
+    const createObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    const hugeBytes = {
+      name: 'huge.png',
+      type: 'image/png',
+      size: MAX_SOURCE_IMAGE_BYTES + 1,
+      slice: () => new Blob([pngHeader(100, 100)]),
+    } as unknown as File
+    await expect(compressImageFileToFit(hugeBytes)).rejects.toMatchObject({ code: 'source-too-large' })
+    await expect(compressImageFileToFit(pngFile('pixels.png', 8000, 8000))).rejects.toMatchObject({ code: 'source-too-large' })
+    expect(createObjectUrl).not.toHaveBeenCalled()
+  })
+
+  it('processes image batches serially and honours cancellation', async () => {
+    let activeProbes = 0
+    let peakProbes = 0
+    const order: string[] = []
+    const file = (name: string): File => ({
+      name,
+      type: 'image/png',
+      size: 24,
+      slice: () => ({
+        arrayBuffer: async () => {
+          activeProbes += 1
+          peakProbes = Math.max(peakProbes, activeProbes)
+          order.push(`start:${name}`)
+          await new Promise(resolve => setTimeout(resolve, 1))
+          order.push(`end:${name}`)
+          activeProbes -= 1
+          return pngHeader(100, 100).buffer
+        },
+      }),
+    } as unknown as File)
+    const files = [file('a.png'), file('b.png'), file('c.png')]
+    expect(await processImageFilesSequentially(files)).toEqual(files)
+    expect(peakProbes).toBe(1)
+    expect(order).toEqual(['start:a.png', 'end:a.png', 'start:b.png', 'end:b.png', 'start:c.png', 'end:c.png'])
+
+    const controller = new AbortController()
+    controller.abort()
+    await expect(processImageFilesSequentially(files, { signal: controller.signal })).rejects.toEqual(
+      expect.objectContaining<ImageProcessingError>({ code: 'aborted' }),
+    )
+  })
+
+  it('closes ImageBitmap decoders and clears the canvas after compression', async () => {
+    const close = vi.fn()
+    const bitmap = { width: 2304, height: 2304, close } as unknown as ImageBitmap
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
+    const drawImage = vi.fn()
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        drawImage,
+        imageSmoothingEnabled: false,
+        imageSmoothingQuality: 'low',
+      }),
+      toBlob: (callback: BlobCallback) => callback(new Blob(['compressed'])),
+    }
+    const createElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((name: string) => (
+      name === 'canvas' ? canvas as unknown as HTMLCanvasElement : createElement(name)
+    ))
+
+    const result = await compressImageFileToFit(pngFile('bitmap.png', 2304, 2304))
+
+    expect(result).not.toBeNull()
+    expect(result.type).toBe('image/jpeg')
+    expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 2048, 2048)
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(canvas).toMatchObject({ width: 0, height: 0 })
+  })
+
+  it('releases decoded image and canvas resources when compression fails', async () => {
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:test') })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    class TestImage {
+      naturalWidth = 4000
+      naturalHeight = 3000
+      width = 4000
+      height = 3000
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      private value = ''
+      set src(next: string) {
+        this.value = next
+        if (next !== '') queueMicrotask(() => this.onload?.())
+      }
+      get src(): string { return this.value }
+    }
+    vi.stubGlobal('Image', TestImage)
+    const canvas = { width: 0, height: 0, getContext: () => null }
+    const createElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((name: string) => (
+      name === 'canvas' ? canvas as unknown as HTMLCanvasElement : createElement(name)
+    ))
+
+    await expect(compressImageFileToFit(pngFile('large.png', 4000, 3000))).rejects.toMatchObject({ code: 'canvas-unavailable' })
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:test')
+    expect(canvas).toMatchObject({ width: 0, height: 0 })
   })
 })

@@ -714,6 +714,67 @@ window.__ModuleLoader__.load({
 			return options;
 		}
 		//#endregion
+		//#region src/client/model-refresh.ts
+		/** Event-driven model reconciliation for visible Desktop renderer windows. */
+		const MODEL_REFRESH_CHANNEL = "dsh-model-selection-confirmed-v1";
+		/**
+		* Re-read confirmed host state on visibility/network recovery and after a
+		* sibling Desktop window confirms a selection. This owns no polling timer.
+		*/
+		function installModelRefreshBridge(options) {
+			const windowTarget = options.windowTarget ?? window;
+			const documentTarget = options.documentTarget ?? document;
+			const schedule = options.schedule ?? queueMicrotask;
+			const channelFactory = options.channelFactory ?? (typeof BroadcastChannel === "function" ? (name) => new BroadcastChannel(name) : void 0);
+			let disposed = false;
+			let queued = false;
+			const requestRefresh = () => {
+				if (disposed || queued) return;
+				queued = true;
+				schedule(() => {
+					queued = false;
+					if (!disposed) options.refresh();
+				});
+			};
+			const onVisible = () => {
+				if (documentTarget.visibilityState === void 0 || documentTarget.visibilityState === "visible") requestRefresh();
+			};
+			const onRecovery = () => requestRefresh();
+			documentTarget.addEventListener("visibilitychange", onVisible);
+			windowTarget.addEventListener("focus", onRecovery);
+			windowTarget.addEventListener("online", onRecovery);
+			let channel;
+			try {
+				channel = channelFactory?.(MODEL_REFRESH_CHANNEL);
+				if (channel !== void 0) channel.onmessage = (event) => {
+					const message = event.data;
+					if (typeof message === "object" && message !== null && message.sessionId === options.sessionId) requestRefresh();
+				};
+			} catch {
+				channel = void 0;
+			}
+			return {
+				announce: () => {
+					try {
+						channel?.postMessage({ sessionId: options.sessionId });
+					} catch {}
+				},
+				dispose: () => {
+					if (disposed) return;
+					disposed = true;
+					documentTarget.removeEventListener("visibilitychange", onVisible);
+					windowTarget.removeEventListener("focus", onRecovery);
+					windowTarget.removeEventListener("online", onRecovery);
+					if (channel !== void 0) {
+						channel.onmessage = null;
+						try {
+							channel.close();
+						} catch {}
+					}
+				}
+			};
+		}
+		//#endregion
 		//#region src/client/ModelSelect.tsx
 		function errorText(reason, fallback) {
 			return reason instanceof Error && reason.message.trim() ? reason.message.trim() : fallback;
@@ -724,7 +785,7 @@ window.__ModuleLoader__.load({
 		* model-selection seat so the desktop composer keeps its native appearance.
 		*/
 		function ModelSelect(props) {
-			const { locked, available, directory, load, select, settingsScope, t } = props;
+			const { locked, available, directory, load, modelSessionId, select, settingsScope, t } = props;
 			const [open, setOpen] = (0, react.useState)(false);
 			const [pane, setPane] = (0, react.useState)("root");
 			const [selecting, setSelecting] = (0, react.useState)(false);
@@ -732,6 +793,7 @@ window.__ModuleLoader__.load({
 			const lastActionRef = (0, react.useRef)("load");
 			const rootRef = (0, react.useRef)(null);
 			const triggerRef = (0, react.useRef)(null);
+			const refreshBridgeRef = (0, react.useRef)(null);
 			const id = (0, react.useId)();
 			const state = (0, react.useSyncExternalStore)((listener) => directory.subscribe(listener), () => directory.getSnapshot(), () => directory.getSnapshot());
 			const config = (0, react.useSyncExternalStore)((listener) => settingsScope.subscribe(listener), () => settingsScope.getSnapshot(), () => settingsScope.getSnapshot()).value ?? {
@@ -774,6 +836,24 @@ window.__ModuleLoader__.load({
 				load();
 			}, [available, load]);
 			(0, react.useEffect)(() => {
+				refreshBridgeRef.current?.dispose();
+				refreshBridgeRef.current = null;
+				if (!available) return;
+				const bridge = installModelRefreshBridge({
+					sessionId: modelSessionId,
+					refresh: load
+				});
+				refreshBridgeRef.current = bridge;
+				return () => {
+					bridge.dispose();
+					if (refreshBridgeRef.current === bridge) refreshBridgeRef.current = null;
+				};
+			}, [
+				available,
+				load,
+				modelSessionId
+			]);
+			(0, react.useEffect)(() => {
 				if (!open) return;
 				const closeOutside = (event) => {
 					if (!rootRef.current?.contains(event.target)) setOpen(false);
@@ -807,6 +887,7 @@ window.__ModuleLoader__.load({
 				lastActionRef.current = "select";
 				try {
 					if (!await select(selection)) throw new Error(t("error.select"));
+					refreshBridgeRef.current?.announce();
 					close();
 					triggerRef.current?.focus();
 				} catch (reason) {
@@ -1260,6 +1341,7 @@ window.__ModuleLoader__.load({
 						const available = sessions.subagentAddress(sessionId) === void 0;
 						return {
 							available,
+							modelSessionId: String(sessionId),
 							directory: directory.store,
 							settingsScope,
 							load: () => {

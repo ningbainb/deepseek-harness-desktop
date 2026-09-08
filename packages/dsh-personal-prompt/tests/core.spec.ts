@@ -97,6 +97,11 @@ describe('personal prompt resolution and boundary', () => {
     })
     expect(normalized.profiles.map(item => item.id)).toEqual(['profile-global', 'duplicate'])
     expect(normalized.activeProfileId).toBeUndefined()
+    expect(normalizePersonalPrompt({ enabled: true, profiles: [profile()] })).toEqual({
+      version: 1,
+      enabled: true,
+      profiles: [profile()],
+    })
     expect(() => normalizePersonalPrompt({ version: 2, profiles: [] })).toThrow(/unsupported/)
     expect(() => assertPersonalPrompt({ ...DEFAULT_PERSONAL_PROMPT, version: 2 })).toThrow()
     expect(() => assertPersonalPrompt({

@@ -20,6 +20,10 @@ test('skill frontmatter requires kebab-case name and a description', () => {
   })
   assert.throws(() => parseSkillFrontmatter(validSkill('BadSkill')), /kebab-case/)
   assert.throws(() => parseSkillFrontmatter('no frontmatter'), /frontmatter/)
+  assert.deepEqual(parseSkillFrontmatter(validSkill('chinese-description', '处理中文文档')), {
+    name: 'chinese-description',
+    description: '处理中文文档',
+  })
 })
 
 test('skill discovery follows official root precedence and reports shadows', async () => {
@@ -40,6 +44,36 @@ test('skill discovery follows official root precedence and reports shadows', asy
     assert.equal(entries.length, 2)
     assert.equal(entries[0].description, 'Project copy')
     assert.equal(entries[1].shadowedBy, entries[0].path)
+    assert.match(result.diagnostics[0].error, /duplicate skill name "shared".*project-dsh/u)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('skill discovery reports missing manifests and ignored symbolic-link entries', async (context) => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-skill-diagnostics-'))
+  try {
+    const projectRoot = join(root, 'project')
+    const skillRoot = join(projectRoot, '.dsh', 'skills')
+    await mkdir(join(skillRoot, 'missing-manifest'), { recursive: true })
+    const target = join(root, 'linked-skill')
+    await mkdir(target)
+    await writeFile(join(target, 'SKILL.md'), validSkill('linked-skill'))
+    try {
+      await symlink(target, join(skillRoot, 'linked-skill'), process.platform === 'win32' ? 'junction' : 'dir')
+    } catch (error) {
+      if (error?.code === 'EPERM') return context.skip('Windows symbolic-link creation requires Developer Mode')
+      throw error
+    }
+
+    const result = await discoverSkills({ roots: defaultSkillRoots({
+      projectRoot,
+      dshHome: join(root, 'dsh-home'),
+      agentsHome: join(root, 'agents-home'),
+    }) })
+    assert.equal(result.skills.length, 0)
+    assert.ok(result.diagnostics.some((item) => /missing SKILL\.md/u.test(item.error)))
+    assert.ok(result.diagnostics.some((item) => /ignores symbolic links/u.test(item.error)))
   } finally {
     await rm(root, { recursive: true, force: true })
   }

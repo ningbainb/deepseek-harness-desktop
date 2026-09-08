@@ -20,6 +20,7 @@ const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308])
 const MAX_MANAGED_GIT_REDIRECTS = 4
 const MAX_REDIRECT_URL_LENGTH = 8_192
 const MAX_PATH_ENTRIES = 64
+const MANAGED_GIT_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000
 
 function managedGitRuntimeError(code, message, cause = undefined) {
   const error = new Error(message, cause === undefined ? undefined : { cause })
@@ -353,11 +354,13 @@ export function createManagedGitRuntimeService({
   verifyManagedGitArchiveFn = verifyManagedGitArchive,
   installManagedGitArchiveFn = installManagedGitArchive,
   downloadManagedGitArchiveFn = downloadManagedGitArchive,
+  fetchImpl = undefined,
   mkdtempFn = nodeFs.mkdtemp,
   rmFn = nodeFs.rm,
   temporaryDirectory = tmpdir(),
   spawn = undefined,
   timeoutMs = MANAGED_GIT_PROBE_TIMEOUT_MS,
+  downloadTimeoutMs = MANAGED_GIT_DOWNLOAD_TIMEOUT_MS,
   now = undefined,
 } = {}) {
   const normalizedUserDataDirectory = assertAbsolutePath(userDataDirectory, 'managed Git user-data directory')
@@ -374,6 +377,12 @@ export function createManagedGitRuntimeService({
   const verifyArchive = assertFunction(verifyManagedGitArchiveFn, 'managed Git archive verifier')
   const installArchive = assertFunction(installManagedGitArchiveFn, 'managed Git archive installer')
   const downloadArchive = assertFunction(downloadManagedGitArchiveFn, 'managed Git archive downloader')
+  if (fetchImpl !== undefined && typeof fetchImpl !== 'function') {
+    throw new TypeError('managed Git fetch implementation must be a function')
+  }
+  if (!Number.isInteger(downloadTimeoutMs) || downloadTimeoutMs < 1_000 || downloadTimeoutMs > 30 * 60 * 1000) {
+    throw new TypeError('managed Git download timeout must be between 1000 and 1800000ms')
+  }
   const createTemporaryDirectory = assertFunction(mkdtempFn, 'managed Git temporary directory creator')
   const remove = assertFunction(rmFn, 'managed Git temporary directory remover')
   let activeRepair
@@ -463,7 +472,20 @@ export function createManagedGitRuntimeService({
     try {
       stagingDirectory = await createTemporaryDirectory(join(normalizedTemporaryDirectory, 'dsh-managed-git-download-'))
       const directory = assertAbsolutePath(stagingDirectory, 'managed Git temporary directory')
-      const downloaded = await downloadArchive({ release, destinationDirectory: directory })
+      const downloadController = new AbortController()
+      const downloadTimer = setTimeout(() => downloadController.abort(), downloadTimeoutMs)
+      downloadTimer.unref?.()
+      let downloaded
+      try {
+        downloaded = await downloadArchive({
+          release,
+          destinationDirectory: directory,
+          signal: downloadController.signal,
+          ...(fetchImpl === undefined ? {} : { fetchImpl }),
+        })
+      } finally {
+        clearTimeout(downloadTimer)
+      }
       const archivePath = assertDownloadPathInside(directory, downloaded?.archivePath)
       await verifyArchive({
         archivePath,

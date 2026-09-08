@@ -440,6 +440,7 @@ export function runPnpm({
   args,
   executable = process.execPath,
   pathEntries = [],
+  environment = process.env,
   timeoutMs = 15 * 60 * 1000,
   signal,
 }) {
@@ -448,10 +449,10 @@ export function runPnpm({
       reject(new Error('pnpm execution aborted'))
       return
     }
-    const environment = createPnpmEnvironment({ pathEntries })
+    const childEnvironment = createPnpmEnvironment({ pathEntries, environment })
     const child = spawn(executable, [pnpmCli, ...args], {
       cwd: profileDir,
-      env: environment,
+      env: childEnvironment,
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -505,6 +506,7 @@ export class PluginManager {
     registry = new PluginRegistry(),
     hostCompatibility,
     pathEntries = [],
+    environment = undefined,
     beforeMutation = async () => {},
     profileArchive,
   }) {
@@ -515,6 +517,10 @@ export class PluginManager {
     this.registry = registry
     this.hostCompatibility = hostCompatibility
     this.pathEntries = normalizePnpmPathEntries(pathEntries)
+    if (environment !== undefined && (environment === null || typeof environment !== 'object' || Array.isArray(environment))) {
+      throw new TypeError('plugin manager environment must be an object')
+    }
+    this.environment = environment === undefined ? undefined : { ...environment }
     if (typeof beforeMutation !== 'function') throw new TypeError('beforeMutation must be a function')
     this.beforeMutation = beforeMutation
     if (profileArchive !== undefined && typeof profileArchive.begin !== 'function') {
@@ -540,6 +546,7 @@ export class PluginManager {
       // Preserve the runner's historical input shape unless Electron main
       // explicitly supplied a child-only PATH prefix.
       ...(this.pathEntries.length === 0 ? {} : { pathEntries: this.pathEntries }),
+      ...(this.environment === undefined ? {} : { environment: this.environment }),
     })
   }
 

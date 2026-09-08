@@ -50,6 +50,7 @@ const recoveryModeLabel = document.querySelector('#recovery-mode-label')
 const restoreSafeMode = document.querySelector('#restore-safe-mode')
 const recoveryIncidents = document.querySelector('#recovery-incidents')
 const recoverySnapshots = document.querySelector('#recovery-snapshots')
+const networkDiagnosticResults = document.querySelector('#network-diagnostic-results')
 const activationBanner = document.querySelector('#activation-banner')
 const activationMessage = document.querySelector('#activation-message')
 const restartRuntimeButton = document.querySelector('#restart-runtime')
@@ -68,6 +69,14 @@ const marketInstallPhases = new Map()
 
 const MARKET_PAGE_SIZE = 20
 const compactNumber = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
+
+function formatFileSize(bytes) {
+  const value = Number(bytes)
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  const units = ['B', 'KiB', 'MiB', 'GiB']
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1)
+  return `${(value / (1024 ** index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
+}
 
 function setOperationBusy(busy) {
   document.body.dataset.busy = String(busy)
@@ -225,6 +234,7 @@ function compatibilityReason(reason) {
     'invalid-surfaces': '插件声明了无效的 Desktop Surface 需求',
     'invalid-runtime-evidence': '插件声明了无效的运行时测试证据',
     'invalid-peer-dependencies': '插件的依赖信息格式无效',
+    'known-native-image-drop-conflict': `已验证${subject}会抢占原生图片拖放事件；保留安装状态，请移除或改用后续经验证版本`,
   }
   return messages[reason.code] ?? '插件适配信息异常'
 }
@@ -696,6 +706,46 @@ function snapshotMarkup(snapshot) {
   return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(snapshot.label ?? 'Profile 配置')}</span><span class="badge">${escapeHtml(snapshot.kind ?? 'snapshot')}</span></div><p class="description">${escapeHtml(snapshot.createdAt ?? '')}</p></div><button type="button" class="item-action update" data-restore-snapshot="${escapeHtml(snapshot.id)}">恢复并重启</button></article>`
 }
 
+const networkSurfaceLabels = Object.freeze({
+  api: '模型 API',
+  update: '应用更新',
+  market: '社区目录',
+  pluginRegistry: 'NPM 清单',
+  pluginInstaller: '插件安装子进程',
+})
+
+const networkStatusLabels = Object.freeze({
+  reachable: '可连接',
+  blocked: '不可连接',
+  'not-probed': '未探测',
+})
+
+const networkReasonLabels = Object.freeze({
+  'proxy-authentication-required': '代理需要认证',
+  timeout: '检查超时，连接已重置',
+  'dns-failed': 'DNS 解析失败',
+  unreachable: '连接失败',
+  'endpoint-http-error': '目标返回异常状态',
+  'official-provider-endpoint-not-exposed': '官方 Provider 未向 Desktop 暴露当前 API 探测端点',
+  'pnpm-child-runs-only-during-user-install': '仅在用户确认安装时启动，不执行额外安装探测',
+  'pnpm-proxy-transport-unverified': '当前代理模式无法映射到 pnpm 子进程',
+})
+
+function networkDiagnosticMarkup(key, result) {
+  const connectivity = result?.connectivity ?? {}
+  const status = networkStatusLabels[connectivity.status] ?? '未知'
+  const reason = networkReasonLabels[connectivity.reason]
+  const elapsed = Number.isFinite(connectivity.elapsedMs) ? `，${Math.max(0, Math.round(connectivity.elapsedMs))} ms` : ''
+  const configuration = result?.configuration?.summary ?? '未提供配置摘要'
+  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(networkSurfaceLabels[key] ?? key)}</span><span class="badge${connectivity.status === 'blocked' ? ' inactive' : ''}">${escapeHtml(status)}</span></div><p class="description">${escapeHtml(`${reason ?? '检查完成'}${elapsed}`)}</p><p class="recovery-time">${escapeHtml(configuration)}</p></div></article>`
+}
+
+function renderNetworkDiagnostics(results) {
+  networkDiagnosticResults.innerHTML = Object.entries(networkSurfaceLabels)
+    .map(([key]) => networkDiagnosticMarkup(key, results?.[key]))
+    .join('')
+}
+
 async function refreshRecovery() {
   const state = await window.dshDesktop.getPluginRecoveryState()
   recoveryCount.textContent = state.incidents.length
@@ -1100,6 +1150,19 @@ document.querySelector('#export-diagnostics').addEventListener('click', () => {
   })
 })
 
+document.querySelector('#run-network-diagnostics').addEventListener('click', () => {
+  void extensionOperations.run(async () => {
+    networkDiagnosticResults.innerHTML = '<p class="empty">正在逐项检查网络连通性</p>'
+    try {
+      renderNetworkDiagnostics(await window.dshDesktop.runNetworkDiagnostics())
+      notify('网络连通性检查已完成')
+    } catch (error) {
+      networkDiagnosticResults.innerHTML = '<p class="empty">网络连通性检查未完成，请导出诊断包查看配置状态</p>'
+      notify(error.message, true)
+    }
+  })
+})
+
 document.querySelector('#import-skill').addEventListener('click', async () => {
   await extensionOperations.run(async () => {
     try {
@@ -1142,11 +1205,32 @@ document.querySelector('#open-plugins-dir')?.addEventListener('click', () => {
   })
 })
 document.querySelector('#reset-profile-env')?.addEventListener('click', async () => {
-  if (!window.confirm('警告：一键重置将清理所有第三方社区插件并恢复官方内置基线，原有插件配置将自动备份。聊天记录与个人设置不受影响。确认重置？')) return
   await extensionOperations.run(async () => {
     try {
-      await window.dshDesktop.resetProfile()
-      notify('插件环境已成功重置为初始基线，DSH 已重启')
+      const preview = await window.dshDesktop.previewProfileReset()
+      const cleanup = Array.isArray(preview.cleanupScope) ? preview.cleanupScope.join('、') : '第三方插件和 Profile 激活配置'
+      const preserved = Array.isArray(preview.preservedScope) ? preview.preservedScope.join('、') : '会话、API 配置和个人设置'
+      const estimateNote = preview.estimateComplete ? '' : '（扫描达到边界，数值为已统计部分）'
+      const confirmed = window.confirm([
+        '此操作将重建 Desktop 插件 Profile，请核对范围：',
+        '',
+        `当前 Profile：${preview.profileDirectory}`,
+        `插件加载目录：${preview.pluginLoadDirectory}`,
+        `备份位置：${preview.backupDirectory}`,
+        `当前 Profile 大小：${formatFileSize(preview.currentProfileBytes)}${estimateNote}`,
+        `当前可用空间：${formatFileSize(preview.availableBytes)}`,
+        `最低所需空间：${formatFileSize(preview.requiredFreeBytes)}`,
+        `预计立即回收：${formatFileSize(preview.estimatedReclaimBytes)}（来自超出保留上限的旧备份）`,
+        `将清理：${cleanup}`,
+        `明确保留：${preserved}`,
+        '',
+        'API 与 provider 配置不在本操作范围内。确认停止 Runtime、创建备份并重置？',
+      ].join('\n'))
+      if (!confirmed) return
+      const result = await window.dshDesktop.resetProfile({ timestamp: preview.timestamp })
+      notify(result.backupDirectory
+        ? `插件环境已重置并重启；原 Profile 位于 ${result.backupDirectory}`
+        : '插件环境已重置并重启；此前没有 Desktop Profile 可备份')
       await refresh()
     } catch (error) {
       notify(error.message, true)

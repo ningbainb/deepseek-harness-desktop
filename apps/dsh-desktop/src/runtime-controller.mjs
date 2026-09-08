@@ -89,6 +89,35 @@ function quotePowerShellLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`
 }
 
+// ProcessStartInfo on Windows PowerShell 5.1 only exposes the legacy Arguments
+// string. Quote each argv entry with the CommandLineToArgvW-compatible rules so
+// paths remain data even when they contain whitespace, quotes, or trailing
+// backslashes.
+export function quoteWindowsCommandLineArgument(value) {
+  const text = String(value)
+  if (text.length > 0 && !/[\s"]/u.test(text)) return text
+
+  let quoted = '"'
+  let backslashes = 0
+  for (const character of text) {
+    if (character === '\\') {
+      backslashes += 1
+      continue
+    }
+    if (character === '"') {
+      quoted += '\\'.repeat(backslashes * 2 + 1)
+      quoted += '"'
+      backslashes = 0
+      continue
+    }
+    quoted += '\\'.repeat(backslashes)
+    quoted += character
+    backslashes = 0
+  }
+  quoted += '\\'.repeat(backslashes * 2)
+  return `${quoted}"`
+}
+
 export function createRuntimeInvocation({
   executable,
   cliPath,
@@ -125,12 +154,31 @@ export function createRuntimeInvocation({
   // DSH child no console to inherit. A hidden PowerShell host supplies one;
   // the required preload explicitly attaches the GUI-subsystem DSH process
   // to it so restricted-token pwsh children can share it without flashing a
-  // new console window. Window suppression belongs to spawn's windowsHide
-  // option: PowerShell 5.1 can terminate a GUI-subsystem Node-mode child with
-  // 0xFFFFFFFF when -WindowStyle Hidden is also supplied.
+  // new console window. Launch through ProcessStartInfo instead of PowerShell's
+  // call operator: PowerShell can treat a GUI executable as asynchronous and
+  // exit before DSH, which reparents the runtime and defeats taskkill /T. The
+  // Process object keeps the direct parent alive until DSH actually exits while
+  // inheriting the wrapper's captured stdout and stderr handles.
+  const runtimeArgumentsString = args.map(quoteWindowsCommandLineArgument).join(' ')
+  // The child must not be able to forge a shutdown target by printing a
+  // lookalike PID line. This nonce exists only in the encoded wrapper command
+  // and the Electron main process; it is not added to the Runtime environment.
+  const runtimeControlToken = randomBytes(24).toString('hex')
+  const runtimePidLinePrefix = `dsh desktop runtime pid ${runtimeControlToken}: `
   const command = [
-    `& ${[executable, ...args].map(quotePowerShellLiteral).join(' ')} | ForEach-Object { [Console]::Out.WriteLine($_) }`,
-    'exit $LASTEXITCODE',
+    '$ErrorActionPreference = \'Stop\'',
+    '$startInfo = New-Object System.Diagnostics.ProcessStartInfo',
+    `$startInfo.FileName = ${quotePowerShellLiteral(executable)}`,
+    `$startInfo.Arguments = ${quotePowerShellLiteral(runtimeArgumentsString)}`,
+    '$startInfo.UseShellExecute = $false',
+    '$startInfo.CreateNoWindow = $false',
+    '$startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden',
+    '$runtime = New-Object System.Diagnostics.Process',
+    '$runtime.StartInfo = $startInfo',
+    '[void] $runtime.Start()',
+    `[Console]::Out.WriteLine(${quotePowerShellLiteral(runtimePidLinePrefix)} + $runtime.Id)`,
+    '$runtime.WaitForExit()',
+    'exit $runtime.ExitCode',
   ].join('\n')
   return {
     executable: systemRoot
@@ -143,6 +191,7 @@ export function createRuntimeInvocation({
       '-EncodedCommand',
       Buffer.from(command, 'utf16le').toString('base64'),
     ],
+    runtimeControlToken,
   }
 }
 
@@ -213,6 +262,7 @@ export function terminateChildProcessTree(
     systemRoot = process.env.SystemRoot,
     execFileFn = execFile,
     processKill = process.kill,
+    rootPid,
   } = {},
 ) {
   if (!child || child.exitCode !== null) return Promise.resolve()
@@ -220,11 +270,12 @@ export function terminateChildProcessTree(
     if (!signalChildProcessGroup(child, 'SIGTERM', processKill)) child.kill('SIGTERM')
     return Promise.resolve()
   }
+  const targetPid = Number.isInteger(rootPid) && rootPid > 0 ? rootPid : child.pid
   const executable = systemRoot ? join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill.exe'
   return new Promise((resolve, reject) => {
     execFileFn(
       executable,
-      ['/PID', String(child.pid), '/T', '/F'],
+      ['/PID', String(targetPid), '/T', '/F'],
       { windowsHide: true, timeout: 5_000 },
       (error) => error ? reject(error) : resolve(),
     )
@@ -240,9 +291,13 @@ export function terminateChildProcessTree(
  */
 export function forceKillChildProcessTree(
   child,
-  { platform = process.platform, processKill = process.kill } = {},
+  { platform = process.platform, processKill = process.kill, rootPid } = {},
 ) {
   if (!child || child.exitCode !== null) return
+  if (platform === 'win32' && Number.isInteger(rootPid) && rootPid > 0 && rootPid !== child.pid) {
+    processKill(rootPid, 'SIGKILL')
+    return
+  }
   if (platform !== 'win32' && signalChildProcessGroup(child, 'SIGKILL', processKill)) return
   child.kill('SIGKILL')
 }
@@ -365,6 +420,7 @@ export class DshRuntimeController extends EventEmitter {
     this.readySince = undefined
     this.manualStop = false
     this.workspaceFileOpenToken = undefined
+    this.runtimeProcessPids = new WeakMap()
     this.stopResolver = undefined
     this.status = Object.freeze({ state: 'stopped', url: undefined, error: undefined })
   }
@@ -532,6 +588,7 @@ export class DshRuntimeController extends EventEmitter {
       ELECTRON_RUN_AS_NODE: '1',
       PATH: [...this.pathEntries, process.env.PATH].filter(Boolean).join(delimiter),
     }
+    let runtimeControlToken
     try {
       const launchPatchFiles = validateRuntimePatchFiles(this.patchFilesProvider() ?? [])
       const invocation = createRuntimeInvocation({
@@ -544,6 +601,7 @@ export class DshRuntimeController extends EventEmitter {
         patchFiles: launchPatchFiles,
         runtimeHost: this.runtimeHost,
       })
+      runtimeControlToken = invocation.runtimeControlToken
       this.startupPhases.complete(STARTUP_PHASES.RUNTIME_RESOLVE)
       this.startupPhases.enter(STARTUP_PHASES.RUNTIME_SPAWN)
       const child = this.spawnProcess(
@@ -572,13 +630,25 @@ export class DshRuntimeController extends EventEmitter {
     // Keep the per-child value in these closures. The authority itself is
     // cleared as soon as the child stops, but stdio/error events can arrive
     // after that transition and must still be safe to persist.
-    const stdout = createLineReader((line) => this.#handleLine('stdout', line, workspaceFileOpenToken))
-    const stderr = createLineReader((line) => this.#handleLine('stderr', line, workspaceFileOpenToken))
+    const child = this.child
+    const stdout = createLineReader((line) => this.#handleLine(
+      child,
+      'stdout',
+      line,
+      workspaceFileOpenToken,
+      runtimeControlToken,
+    ))
+    const stderr = createLineReader((line) => this.#handleLine(
+      child,
+      'stderr',
+      line,
+      workspaceFileOpenToken,
+      runtimeControlToken,
+    ))
     this.child.stdout?.on('data', (chunk) => stdout.write(chunk))
     this.child.stdout?.on('end', () => stdout.end())
     this.child.stderr?.on('data', (chunk) => stderr.write(chunk))
     this.child.stderr?.on('end', () => stderr.end())
-    const child = this.child
     child.once('error', (error) => this.#handleChildError(child, error, workspaceFileOpenToken))
     child.once('exit', (code, signal) => this.#handleExit(child, code, signal, workspaceFileOpenToken))
     this.startupTimer = this.schedule(() => {
@@ -589,7 +659,31 @@ export class DshRuntimeController extends EventEmitter {
     return readyPromise
   }
 
-  async #handleLine(stream, line, redactionToken = this.workspaceFileOpenToken) {
+  async #handleLine(
+    child,
+    stream,
+    line,
+    redactionToken = this.workspaceFileOpenToken,
+    runtimeControlToken,
+  ) {
+    if (
+      stream === 'stdout'
+      && this.platform === 'win32'
+      && this.child === child
+      && !this.runtimeProcessPids.has(child)
+      && typeof runtimeControlToken === 'string'
+    ) {
+      const runtimePidPattern = new RegExp(
+        `^dsh desktop runtime pid ${runtimeControlToken}: (\\d+)$`,
+        'u',
+      )
+      const runtimePidMatch = runtimePidPattern.exec(String(line).trim())
+      if (runtimePidMatch !== null) {
+        const runtimePid = Number.parseInt(runtimePidMatch[1], 10)
+        if (runtimePid > 0 && runtimePid !== child.pid) this.runtimeProcessPids.set(child, runtimePid)
+        return
+      }
+    }
     const sanitizedLine = this.#redactWorkspaceFileOpenToken(line, redactionToken)
     this.#appendDiagnostic(`[${stream}] ${sanitizedLine}`, redactionToken)
     emitBestEffort(this, 'line', [{ stream, line: sanitizedLine }], (error) => {
@@ -659,7 +753,10 @@ export class DshRuntimeController extends EventEmitter {
   // must not escape here: that would take down the app instead of the runtime.
   #forceKillChild(child, redactionToken = this.workspaceFileOpenToken) {
     try {
-      this.forceTerminateProcessTree(child, { platform: this.platform })
+      this.forceTerminateProcessTree(child, {
+        platform: this.platform,
+        rootPid: this.runtimeProcessPids.get(child),
+      })
     } catch (error) {
       this.#appendDiagnostic(
         `[process] force kill failed: ${this.#errorMessage(error, redactionToken)}`,
@@ -673,6 +770,14 @@ export class DshRuntimeController extends EventEmitter {
         // Nothing left to escalate to; the exit handler still reports the state.
       }
     }
+  }
+
+  #terminateChildProcessTree(child) {
+    return this.terminateProcessTree(child, {
+      platform: this.platform,
+      systemRoot: this.systemRoot,
+      rootPid: this.runtimeProcessPids.get(child),
+    })
   }
 
   #terminateFailedStartupChild(redactionToken = this.workspaceFileOpenToken) {
@@ -701,7 +806,7 @@ export class DshRuntimeController extends EventEmitter {
     this.failedStartupCleanup = cleanup
 
     void Promise.resolve()
-      .then(() => this.terminateProcessTree(child))
+      .then(() => this.#terminateChildProcessTree(child))
       .catch((error) => {
         this.#appendDiagnostic(
           `[process] failed-startup tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,
@@ -739,6 +844,7 @@ export class DshRuntimeController extends EventEmitter {
       : 0
     this.readySince = undefined
     this.child = undefined
+    this.runtimeProcessPids.delete(child)
     this.workspaceFileOpenToken = undefined
     this.#appendDiagnostic(`[process] exited code=${String(code)} signal=${String(signal)}`, redactionToken)
 
@@ -827,7 +933,7 @@ export class DshRuntimeController extends EventEmitter {
       })
       try {
         await Promise.race([
-          Promise.resolve().then(() => this.terminateProcessTree(child)),
+          Promise.resolve().then(() => this.#terminateChildProcessTree(child)),
           boundedTermination,
         ])
       } catch (error) {
@@ -888,7 +994,7 @@ export class DshRuntimeController extends EventEmitter {
     })
     const forceTimer = this.schedule(() => this.#forceKillChild(child), this.shutdownTimeoutMs)
     try {
-      await this.terminateProcessTree(child)
+      await this.#terminateChildProcessTree(child)
     } catch (error) {
       this.#appendDiagnostic(
         `[process] process-tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,

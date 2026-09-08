@@ -10,6 +10,7 @@ import {
   insertSkillTrigger,
   installConversationSkills,
   normalizeConversationSkills,
+  normalizeSkillDiagnostics,
 } from '../src/conversation-skills.mjs'
 
 test('skill inventory hides shadowed entries, deduplicates names, and pins recent use', () => {
@@ -30,6 +31,16 @@ test('skill inventory hides shadowed entries, deduplicates names, and pins recen
 test('skill trigger uses a stable natural-language invocation', () => {
   assert.equal(buildSkillTrigger('playwright'), '使用 playwright 技能：')
   assert.throws(() => buildSkillTrigger('  '), /skill name/u)
+})
+
+test('skill diagnostics are bounded, deduplicated, and renderer-safe', () => {
+  assert.deepEqual(normalizeSkillDiagnostics([
+    { error: 'missing SKILL.md' },
+    { error: ' missing SKILL.md ' },
+    { error: 'symbolic link ignored' },
+    { path: 'private/path' },
+  ]), ['missing SKILL.md', 'symbolic link ignored'])
+  assert.equal(normalizeSkillDiagnostics(Array.from({ length: 30 }, (_, index) => ({ error: `error-${index}` }))).length, 20)
 })
 
 test('skill trigger inserts at the current selection and emits a native input event', () => {

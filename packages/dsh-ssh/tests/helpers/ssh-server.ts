@@ -10,7 +10,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { connect, createServer, type Server as NetServer } from 'node:net'
-import { Server, utils as ssh2Utils, type ClientChannel, type Connection as ServerConnection, type ServerChannel } from 'ssh2'
+import ssh2 from 'ssh2'
+import type { ClientChannel, Connection as ServerConnection, Server as SshServer } from 'ssh2'
+
+const { Server, utils: ssh2Utils } = ssh2
 
 /** Test credentials. */
 export const TEST_USER = 'tester'
@@ -71,14 +74,14 @@ export class TestSshServer {
   connectCount = 0
   /** Client keypair for key-auth tests. */
   readonly keyPair: KeyPairPaths
-  private readonly server: Server
+  private readonly server: SshServer
   private readonly clients: ServerConnection[]
   private readonly echoServer: NetServer
   private readonly dir: string
 
   private constructor(
     port: number,
-    server: Server,
+    server: SshServer,
     echoServer: NetServer,
     dir: string,
     keyPair: KeyPairPaths,
@@ -118,6 +121,11 @@ export class TestSshServer {
     let connectCount = 0
     const server = new Server({ hostKeys: [readFileSync(hostKey)] }, (client) => {
       clients.push(client)
+      // Test clients may tear down a transport immediately after an auth or
+      // health probe. On Windows that ordinary close can surface as
+      // ECONNRESET on the server-side ssh2 connection; keep it local to the
+      // fixture instead of terminating the test runner.
+      client.on('error', () => undefined)
       client.on('authentication', (ctx) => {
         if (ctx.method === 'password' && ctx.username === TEST_USER && ctx.password === TEST_PASSWORD) {
           ctx.accept()

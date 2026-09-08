@@ -9,6 +9,27 @@ import { promisify } from 'node:util'
 
 const desktopRoot = join(import.meta.dirname, '..')
 const execFileAsync = promisify(execFile)
+const upgradeTransactionScript = join(desktopRoot, 'build', 'installer-upgrade-transaction.ps1')
+
+async function runUpgradeTransaction(mode, installDirectory, installRegistryKey = '', uninstallRegistryKey = '') {
+  return execFileAsync('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    upgradeTransactionScript,
+    '-Mode',
+    mode,
+    '-InstallDirectory',
+    installDirectory,
+    '-InstallRegistryKey',
+    installRegistryKey,
+    '-UninstallRegistryKey',
+    uninstallRegistryKey,
+  ], { timeout: 15_000, windowsHide: true })
+}
 
 async function settleWithin(promise, timeoutMs, message) {
   let timer
@@ -84,6 +105,7 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   const config = await readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8')
   const include = await readFile(join(desktopRoot, 'build', 'installer.nsh'), 'utf8')
   const cleanup = await readFile(join(desktopRoot, 'build', 'cleanup-stale-processes.ps1'), 'utf8')
+  const transaction = await readFile(upgradeTransactionScript, 'utf8')
 
   assert.match(config, /include: build\/installer\.nsh/u)
   assert.match(config, /oneClick: false/u)
@@ -97,12 +119,16 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(include, /customCheckAppRunning/u)
   assert.doesNotMatch(include, /customInit/u)
   assert.match(include, /cleanup-stale-processes\.ps1/u)
+  assert.match(include, /installer-upgrade-transaction\.ps1/u)
   assert.match(include, /SetOutPath "\$TEMP"/u)
   assert.doesNotMatch(include, /SetOutPath "\$PLUGINSDIR"/u)
   assert.match(include, /-InstallRegistryKey "\$\{INSTALL_REGISTRY_KEY\}"/u)
   assert.match(include, /-UninstallRegistryKey "\$\{UNINSTALL_REGISTRY_KEY\}"/u)
   assert.match(include, /-PrepareExistingUpgrade/u)
+  assert.match(include, /-UpgradeTransactionScript "\$PLUGINSDIR\\installer-upgrade-transaction\.ps1"/u)
   assert.match(include, /!ifdef BUILD_UNINSTALLER[\s\S]*!else[\s\S]*-PrepareExistingUpgrade/u)
+  assert.match(include, /!macro customInstall[\s\S]*-Mode Commit/u)
+  assert.match(include, /Function \.onInstFailed[\s\S]*-Mode Rollback/u)
   assert.match(cleanup, /DeepSeek Harness Desktop\.exe/u)
   assert.match(cleanup, /Registry::\$hive\\\$InstallRegistryKey/u)
   assert.match(cleanup, /Get-UninstallerDirectory/u)
@@ -135,8 +161,15 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(cleanup, /\$excludedProcessIds\.Contains\(\$processId\)/u)
   assert.doesNotMatch(cleanup, /Test-InstallerUpgradeMarker|installerUpgradeMarker/u)
   assert.match(cleanup, /Stage-UpgradeInstalls/u)
-  assert.match(cleanup, /\[System\.IO\.Directory\]::Move/u)
-  assert.match(cleanup, /RecycleOption\]::SendToRecycleBin/u)
+  assert.match(cleanup, /-Mode Begin/u)
+  assert.match(cleanup, /UpgradeTransactionScript/u)
+  assert.match(transaction, /state = 'prepared'/u)
+  assert.match(transaction, /state = 'committed'/u)
+  assert.match(transaction, /registry import failed/u)
+  assert.match(transaction, /upgrade-install-restored/u)
+  assert.match(transaction, /\[System\.IO\.Directory\]::Move/u)
+  assert.match(transaction, /\.dsh-desktop-update-old-/u)
+  assert.doesNotMatch(transaction, /[^\x00-\x7F]/u)
   assert.match(cleanup, /IndexOf\(\$root, \$comparison\)/u)
   assert.match(cleanup, /Get-CommandLineVariants/u)
   assert.match(cleanup, /\\u62D2\\u7EDD\\u8BBF\\u95EE/u)
@@ -298,6 +331,7 @@ test('Windows installer preflight accepts a missing previous install directory',
       error => error?.code === 1,
     )
   } finally {
+    await runUpgradeTransaction('Rollback', missingInstallDirectory, '', uninstallRegistryKey).catch(() => {})
     await execFileAsync('reg.exe', ['DELETE', `HKCU\\${registryRoot}`, '/f'], {
       timeout: 5_000,
       windowsHide: true,
@@ -404,11 +438,21 @@ test('Windows installer stages an unmarked legacy install before electron-builde
       execFileAsync('reg.exe', ['QUERY', `HKCU\\${uninstallRegistryKey}`], { windowsHide: true }),
       error => error?.code === 1,
     )
+    assert.equal(
+      (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')).length,
+      1,
+    )
+    await runUpgradeTransaction('Rollback', installDirectory, installRegistryKey, uninstallRegistryKey)
+    assert.equal(await readFile(join(resources, 'app.asar'), 'utf8'), 'legacy app archive')
+    assert.equal(await readFile(preservedUserData, 'utf8'), '{"preserved":true}\n')
+    await execFileAsync('reg.exe', ['QUERY', `HKCU\\${installRegistryKey}`], { windowsHide: true })
+    await execFileAsync('reg.exe', ['QUERY', `HKCU\\${uninstallRegistryKey}`], { windowsHide: true })
     assert.deepEqual(
       (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')),
       [],
     )
   } finally {
+    await runUpgradeTransaction('Rollback', installDirectory, installRegistryKey, uninstallRegistryKey).catch(() => {})
     await execFileAsync('reg.exe', ['DELETE', `HKCU\\${registryRoot}`, '/f'], {
       timeout: 5_000,
       windowsHide: true,
@@ -443,11 +487,104 @@ test('Windows installer stages a marked 2.5 install instead of trusting its old 
     ], { timeout: 10_000, windowsHide: true })
     assert.match(stdout, /upgrade-install-staged root=/u)
     await assert.rejects(readFile(join(resources, 'app.asar')), error => error?.code === 'ENOENT')
+    assert.equal(
+      (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')).length,
+      1,
+    )
+    await runUpgradeTransaction('Rollback', installDirectory)
+    assert.equal(await readFile(join(resources, 'app.asar'), 'utf8'), 'modern app archive')
     assert.deepEqual(
       (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')),
       [],
     )
   } finally {
+    await runUpgradeTransaction('Rollback', installDirectory).catch(() => {})
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
+
+test('Windows installer transaction commits two upgrades and restores the prior version after a failed third upgrade', {
+  skip: process.platform !== 'win32',
+  timeout: 45_000,
+}, async () => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-installer-transaction-'))
+  const installDirectory = join(temporary, 'DeepSeek Harness Desktop')
+  const resources = join(installDirectory, 'resources')
+  const preservedSession = join(temporary, 'user-data', 'session.jsonl')
+  const registryRoot = `Software\\DeepSeekHarnessDesktopTests\\transaction-${process.pid}-${Date.now()}`
+  const installRegistryKey = `${registryRoot}\\Install`
+  const uninstallRegistryKey = `${registryRoot}\\Uninstall`
+
+  async function writeInstall(version, { complete = true } = {}) {
+    await mkdir(resources, { recursive: true })
+    await writeFile(join(installDirectory, 'DeepSeek Harness Desktop.exe'), `desktop-${version}\n`, 'utf8')
+    await writeFile(join(resources, 'app.asar'), `runtime-${version}\n`, 'utf8')
+    if (complete) {
+      await writeFile(join(resources, 'installer-upgrade-v3'), 'dsh-desktop-installer-upgrade=3\n', 'utf8')
+    }
+  }
+
+  async function writeRegistry(version) {
+    await execFileAsync('reg.exe', [
+      'ADD', `HKCU\\${installRegistryKey}`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', installDirectory, '/f',
+    ], { timeout: 5_000, windowsHide: true })
+    await execFileAsync('reg.exe', [
+      'ADD', `HKCU\\${uninstallRegistryKey}`, '/v', 'UninstallString', '/t', 'REG_SZ', '/d',
+      `"${join(installDirectory, 'Uninstall DeepSeek Harness Desktop.exe')}" /currentuser`, '/f',
+    ], { timeout: 5_000, windowsHide: true })
+    await execFileAsync('reg.exe', [
+      'ADD', `HKCU\\${uninstallRegistryKey}`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', version, '/f',
+    ], { timeout: 5_000, windowsHide: true })
+  }
+
+  async function assertVersion(version) {
+    assert.equal(await readFile(join(installDirectory, 'DeepSeek Harness Desktop.exe'), 'utf8'), `desktop-${version}\n`)
+    assert.equal(await readFile(join(resources, 'app.asar'), 'utf8'), `runtime-${version}\n`)
+    const { stdout } = await execFileAsync('reg.exe', [
+      'QUERY', `HKCU\\${uninstallRegistryKey}`, '/v', 'DisplayVersion',
+    ], { timeout: 5_000, windowsHide: true })
+    assert.match(stdout, new RegExp(`DisplayVersion\\s+REG_SZ\\s+${version.replaceAll('.', '\\.')}`, 'u'))
+    assert.deepEqual(
+      (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')),
+      [],
+    )
+  }
+
+  try {
+    await mkdir(join(temporary, 'user-data'), { recursive: true })
+    await writeFile(preservedSession, '{"session":"original"}\n', 'utf8')
+    await writeInstall('1.0.0')
+    await writeRegistry('1.0.0')
+
+    for (const version of ['2.0.0', '3.0.0']) {
+      await runUpgradeTransaction('Begin', installDirectory, installRegistryKey, uninstallRegistryKey)
+      assert.equal(
+        (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')).length,
+        1,
+      )
+      await writeInstall(version)
+      await writeRegistry(version)
+      await runUpgradeTransaction('Commit', installDirectory, installRegistryKey, uninstallRegistryKey)
+      await assertVersion(version)
+    }
+
+    await runUpgradeTransaction('Begin', installDirectory, installRegistryKey, uninstallRegistryKey)
+    await writeInstall('4.0.0', { complete: false })
+    await writeRegistry('4.0.0')
+    await assert.rejects(
+      runUpgradeTransaction('Commit', installDirectory, installRegistryKey, uninstallRegistryKey),
+      error => /upgrade marker/u.test(error.stderr ?? ''),
+    )
+    await runUpgradeTransaction('Rollback', installDirectory, installRegistryKey, uninstallRegistryKey)
+
+    await assertVersion('3.0.0')
+    assert.equal(await readFile(preservedSession, 'utf8'), '{"session":"original"}\n')
+  } finally {
+    await runUpgradeTransaction('Rollback', installDirectory, installRegistryKey, uninstallRegistryKey).catch(() => {})
+    await execFileAsync('reg.exe', ['DELETE', `HKCU\\${registryRoot}`, '/f'], {
+      timeout: 5_000,
+      windowsHide: true,
+    }).catch(() => {})
     await rm(temporary, { recursive: true, force: true })
   }
 })

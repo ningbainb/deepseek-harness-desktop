@@ -22,7 +22,7 @@ Official packaged Desktop releases enable first-party anonymous product analysis
 
 | Area | Behavior |
 | --- | --- |
-| Runtime | One persistent official DSH host using the real `DSH_HOME` and `profiles/desktop`, random loopback port, HTTP readiness probe, graceful stop, bounded automatic restart, and an explicit `--no-open`; Windows window suppression stays at spawn level rather than the PowerShell command payload |
+| Runtime | One persistent official DSH host using the real `DSH_HOME` and `profiles/desktop`, random loopback port, HTTP readiness probe, graceful process-tree stop, bounded automatic restart, and an explicit `--no-open`; Windows window suppression stays at spawn level and the wrapper tracks the real GUI-subsystem Runtime PID |
 | Web surface | Original DSH Web application and complete dsh-web-ui plugin/skin aggregate |
 | Conversation continuity | FIFO next-turn queue, automatic continuation after cancellation, normalized user-cancellation feedback |
 | Model recovery | Bounded backoff for rate limits, timeouts, network loss, and retryable server errors; immediate manual cancellation |
@@ -48,7 +48,7 @@ Official packaged Desktop releases enable first-party anonymous product analysis
 
 ## Windows startup and recovery
 
-The Windows invocation retains the PowerShell wrapper where it is needed for streaming Runtime output, but it does not pass `-WindowStyle Hidden`. On Windows PowerShell 5.1, that flag combined with Electron Node mode and no console handle can cause the Runtime (including `--version`) to exit silently with `0xFFFFFFFF`; Electron's spawn-level `windowsHide` is the single window-suppression mechanism.
+The Windows invocation retains a hidden PowerShell console host for Runtime output and restricted-token shell descendants, but it does not pass PowerShell's `-WindowStyle Hidden` command-line option. On Windows PowerShell 5.1, that option combined with Electron Node mode and no console handle can cause the Runtime, including `--version`, to exit silently with `0xFFFFFFFF`; Electron's spawn-level `windowsHide` remains the window-suppression mechanism. The wrapper launches the GUI-subsystem Electron Runtime through `ProcessStartInfo`, inherits the captured output handles, reports the direct Runtime PID over an internal control line, and waits for that process. Shutdown applies `taskkill /T /F` to the registered Runtime PID rather than only the wrapper, so the Runtime and its descendants are reclaimed before the wrapper exits.
 
 Startup also normalizes legacy empty-object, empty-list, and comment-only patch files before profile resolution. A status-subscription or startup IPC failure is converted to a recoverable startup state rather than leaving the renderer at its initial 8% progress. The sanitized Runtime log remains the diagnostic source when readiness does not arrive.
 
@@ -80,6 +80,10 @@ The live stats projection separates billing correction from streaming throughput
 
 Claude Code and Codex directories are scanned read-only. The user can preview project matching and session rows before confirming import. Imported messages and tool results are historical, marked non-executable, redacted through the central pipeline, and recorded in an idempotent ledger so retries do not duplicate sessions.
 
+### Conversation compaction
+
+The official `@deepseek-ai/dsh-base` bundle exposes `/compact` in an active conversation. The command asks the official compaction service for one useful reduction below the automatic threshold; Desktop does not simulate compaction by deleting messages. A successful compaction retains the append-only original event history, replaces an earlier balanced model-visible span with a summary checkpoint, keeps the recent tail, and does not split tool-call/result pairs. Busy, changed-session, summary-generation, commit, and persistence failures remain visible and retryable instead of silently discarding history.
+
 ### Personalization and remote data boundaries
 
 The optional Personal Prompt and Memory bundles are disabled by default. Memory remains in the local DSH profile, is written only after an explicit user action or confirmation, and can be searched, edited, deleted, or cleared. Personal Prompt profiles remain in profile settings and, when enabled, become request context sent to the currently selected model Provider. Remote mobile access is paired to a device and checked against Workspace and Session ownership; the default non-loopback full `/api` is denied.
@@ -90,6 +94,26 @@ runtime rejects that value for safety, and this project does not bypass the
 guard. For a phone test on the current runtime, use the paired mobile-only
 route through the configured auto-tunnel or a private/manual tunnel. Pairing,
 Workspace/Session ownership, and revoke remain active.
+
+### Proxy routing and diagnostics
+
+Desktop uses the operating-system proxy by default. A recognized command-line routing flag takes precedence: `--proxy-server=...`, `--proxy-pac-url=...`, `--proxy-auto-detect`, or `--no-proxy-server`; `--proxy-bypass-list=...` supplies its bypass list. For managed launches, `DSH_DESKTOP_PROXY_MODE` accepts `system`, `direct`, `auto_detect`, or `pac_script`, while `DSH_DESKTOP_PROXY_PAC_URL`, `DSH_DESKTOP_PROXY_RULES`, and `DSH_DESKTOP_NO_PROXY` provide PAC, fixed-server, and bypass values. If those are absent, `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`, including their lowercase forms, provide the fixed-server configuration.
+
+API, update, and market traffic can override that common setting independently with `DSH_DESKTOP_API_*`, `DSH_DESKTOP_UPDATE_*`, or `DSH_DESKTOP_MARKET_*`, using the same `PROXY_MODE`, `PROXY_PAC_URL`, `PROXY_RULES`, and `NO_PROXY` suffixes. Precedence is command line, scope-specific environment, Desktop-wide environment, conventional proxy environment, then the system default. Command-line proxy flags remain process-wide because Chromium consumes them before Desktop starts.
+
+The update policy is applied and awaited on the default Electron Session used by the updater, while update probes use a separate Session with the same policy. Community catalog requests, NPM manifest checks, and managed Git downloads use a market-only Session. Fixed market rules that can be represented as `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY` are also passed to the pnpm installation child; PAC and auto-detect cannot be translated to that child and are reported as unverified instead of applied. Authentication challenges, invalid PAC, request cancellation, and DNS failures have bounded return paths on the isolated probe/market Sessions; resetting those connections does not interrupt the main conversation Session.
+
+The Extension Dock recovery page provides an explicit connectivity check for update, community catalog, and NPM manifest endpoints. It labels model API and the on-demand pnpm installer as not probed instead of generating credentialed model calls or a fake install. The explicit engineering command `pnpm --dir apps/dsh-desktop test:plugin-proxy:e2e` separately installs a fixed public plugin into a disposable project and empty store through an allowlisted loopback proxy, proving the production pnpm child honors the market projection without turning that network operation into a routine UI probe. The redacted diagnostic package separately records each scope's mode, rule kinds and counts, bypass count, PAC presence, application status, and transport limitation. Neither surface records endpoints, user names, passwords, or raw proxy errors. The DSH Runtime receives direct/fixed proxy environment projections for API traffic, but each Provider, community plugin, or external process still decides whether it honors them. Electron proxy settings and environment variables therefore do not prove that model API or arbitrary plugin traffic used the proxy, and they are not a network sandbox. There is currently no per-session offline switch backed by official tool and sandbox enforcement, so Desktop does not expose a decorative switch that would imply stronger isolation.
+
+### Built-in surfaces and conversation operations
+
+Long conversations keep the composer seat fixed while the official conversation scrollport moves. The floating turn navigator uses user-message boundaries for previous and next navigation; its bottom action reports the final turn when the scrollport reaches the floor. The Explorer context action and internal file-tree drag insert a workspace-relative path reference into the draft. Preview remains a separate local view. External text and code files below 1 MB may add fenced text to the draft, but Word, PDF, spreadsheet, archive, binary, and larger files add only a path link; none of these draft changes reaches the model until the user sends the message.
+
+The whale pet is an optional local activity and interaction surface. Clicking pets it; its hover controls feed or hide it, and the conversation input dock can summon a hidden pet. Disabling the plugin hides the surface and stops its refresh work. It does not grant the model tools or change session execution.
+
+Task Board opens from its sidebar row. The visible **Back to chat** button is a normal keyboard-focusable button and returns the center column to the conversation; choosing a native sidebar destination or another full-column surface also closes the board. Closing the board does not delete tasks or running task sessions.
+
+The current official Runtime distinguishes archive, registration deletion, and branch. Archiving a conversation removes it from grouping surfaces while retaining its persisted session log and Workspace account. Deleting a Workspace removes only that registration and its session account; it never deletes the directory, user files, live Sessions, or persisted logs. Desktop exposes no operation that claims to delete a session log. **Branch into a new conversation** is available only on the final assistant message of a completed turn; it copies the durable prefix through that boundary into a child session with lineage metadata, opens the child, and leaves the source unchanged.
 
 ## Performance and size
 
@@ -131,6 +155,8 @@ The upstream settings dialog remains the settings implementation, while the desk
 
 `@linxin666/dsh-particle-theme` is a normal Web UI bundle rather than a mutually exclusive skin. Its fixed, pointer-transparent canvas extends the startup whale language into the main interface. Page profiles reduce density, opacity, and speed while an editable control is focused or a dialog is open, stop animation for a hidden page, and honor `prefers-reduced-motion`. Users can disable the canvas or tune density, opacity, and speed in **Settings > Plugin config > Particle theme**. Device-pixel ratio is capped and sustained slow frames lower scene quality; new scenes can register through `ParticleThemeRegistry` without changing the page controller.
 
+Skin Center v2 switches the active skin atomically in the current page and persists the selection for the next launch; it does not rewrite the Cordis patch or require a page reload. Its background occlusion and the empty/with-content blur controls are independent. Setting both blur values to zero removes the fixed blur layer while keeping a selected skin's artwork mounted. The regression entry `pnpm --filter @deepseek-ai/dsh-desktop test:skin-center:e2e` verifies live Blue Fantasy activation, zero-occlusion artwork, zero-blur overlay safety, five full relaunches, and Electron device scale factors 1, 1.25, and 1.5. Command-line device scaling is automation evidence, not a substitute for a final packaged pass under physical Windows display settings.
+
 ## Extension Dock
 
 Open `Tools > Extension Dock` from the native menu.
@@ -145,7 +171,7 @@ A community bundle can declare `dsh.compatibility` for Desktop and Runtime range
 
 The built-in Tencent QQ Bot integration is disabled until it is bound from Extension Dock. Binding uses the official QR connector inside the desktop main process. The AppSecret is encrypted with the operating-system credential store, is never sent to renderer code, and is supplied to the DSH child process only through its environment. Unbinding deletes the encrypted credential, disables the profile row, and restarts DSH.
 
-Skill discovery scans project `.dsh/skills`, project `.agents/skills`, user DSH skills, and user Agents skills in precedence order. Import copies one validated skill folder into `~/.dsh/skills` without overwriting an existing name.
+Skill discovery scans project, custom, user DSH, and user Agents roots in explicit precedence order. Import copies one validated skill folder into `~/.dsh/skills` without overwriting an existing name; authoring, compatibility, link handling, and visible diagnostics are documented in [Desktop skills](skills.md).
 
 The Preset tab exports and previews `.dshpreset` v1 without exposing a selected path to renderer code. Its plan shows Manifest metadata, integrity-only trust, required Secret names, capability gaps, exact package changes, skills, settings, templates, and conflicts. Import requires explicit confirmation and uses one Runtime stop/start transaction; details are in [Desktop Presets](presets.md).
 

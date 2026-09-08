@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
 
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -608,6 +608,8 @@ test('extension diagnostic export delegates to the centralized redacted exporter
   qqBotBinding.cancel = () => ({})
   qqBotBinding.unbind = async () => ({})
   let exports = 0
+  let networkRuns = 0
+  const networkResult = { update: { connectivity: { status: 'reachable' } } }
   const unregister = registerExtensionIpc({
     ipcMain,
     dialog: { showSaveDialog: async () => assert.fail('extension IPC must not write raw diagnostics') },
@@ -623,13 +625,26 @@ test('extension diagnostic export delegates to the centralized redacted exporter
       exports += 1
       return { canceled: false, exported: true }
     },
+    networkDiagnostics: {
+      run: async () => {
+        networkRuns += 1
+        return networkResult
+      },
+    },
   })
   assert.deepEqual(await ipcMain.handlers.get('extensions:diagnostics-export')(), {
     canceled: false,
     exported: true,
   })
   assert.equal(exports, 1)
+  assert.equal(await ipcMain.handlers.get('extensions:network-diagnostics')(), networkResult)
+  assert.equal(networkRuns, 1)
+  await assert.rejects(
+    ipcMain.handlers.get('extensions:network-diagnostics')(undefined, 'unexpected'),
+    /do not accept arguments/u,
+  )
   unregister()
+  assert.equal(ipcMain.handlers.has('extensions:network-diagnostics'), false)
 })
 
 test('plugin batch emits every progress phase and stops and starts the runtime once', async () => {
@@ -1269,6 +1284,7 @@ test('extension shutdown quiesce times out instead of waiting forever for a plug
 })
 
 test('extensions:profile-dir-open opens desktop profile directory', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-dir-open-'))
   const ipcMain = new FakeIpcMain()
   const qqBotBinding = new EventEmitter()
   qqBotBinding.status = () => ({ bound: false })
@@ -1279,22 +1295,27 @@ test('extensions:profile-dir-open opens desktop profile directory', async () => 
       return ''
     },
   }
-  const unregister = registerExtensionIpc({
-    ipcMain,
-    dialog: {},
-    shell,
-    getWindow: () => undefined,
-    pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
-    controller: { stop: async () => {}, start: async () => {} },
-    ensureProfile: async () => {},
-    projectRoot: 'C:\\project',
-    dshHome: 'C:\\dsh',
-    qqBotBinding,
-  })
+  let unregister
+  try {
+    unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell,
+      getWindow: () => undefined,
+      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+      controller: { stop: async () => {}, start: async () => {} },
+      ensureProfile: async () => {},
+      projectRoot: 'C:\\project',
+      dshHome,
+      qqBotBinding,
+    })
 
-  await ipcMain.handlers.get('extensions:profile-dir-open')()
-  assert.match(openedPath, /profiles[\\/]desktop$/u)
-  await unregister()
+    await ipcMain.handlers.get('extensions:profile-dir-open')()
+    assert.equal(openedPath, join(dshHome, 'profiles', 'desktop'))
+  } finally {
+    await unregister?.()
+    await rm(dshHome, { recursive: true, force: true })
+  }
 })
 
 test('extensions:profile-reset stops runtime, ensures profile, and restarts runtime', async () => {
@@ -1326,6 +1347,136 @@ test('extensions:profile-reset stops runtime, ensures profile, and restarts runt
   await unregister()
 })
 
+test('extensions:profile-reset-preview reports exact paths, bounded size, preservation, and old-backup reclaim', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-preview-'))
+  let unregister
+  try {
+    const profilesDir = join(dshHome, 'profiles')
+    const profileDir = join(profilesDir, 'desktop')
+    await mkdir(join(profileDir, 'node_modules', 'community'), { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), '{"name":"desktop"}\n')
+    await writeFile(join(profileDir, 'node_modules', 'community', 'index.js'), 'export {}\n')
+    for (const timestamp of [100, 200, 300]) {
+      const backup = join(profilesDir, `desktop.backup-${timestamp}`)
+      await mkdir(backup, { recursive: true })
+      await writeFile(join(backup, 'old.txt'), `backup-${timestamp}\n`)
+    }
+    const ipcMain = new FakeIpcMain()
+    const qqBotBinding = new EventEmitter()
+    qqBotBinding.status = () => ({ bound: false })
+    unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell: {},
+      getWindow: () => undefined,
+      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+      controller: { stop: async () => {}, start: async () => {} },
+      ensureProfile: async () => {},
+      projectRoot: 'C:\\project',
+      dshHome,
+      qqBotBinding,
+    })
+
+    const preview = await ipcMain.handlers.get('extensions:profile-reset-preview')()
+    assert.equal(preview.profileDirectory, profileDir)
+    assert.equal(preview.pluginLoadDirectory, join(profileDir, 'node_modules'))
+    assert.equal(preview.backupDirectory, `${profileDir}.backup-${preview.timestamp}`)
+    assert.ok(preview.currentProfileBytes > 0)
+    assert.ok(preview.availableBytes > preview.currentProfileBytes)
+    assert.ok(preview.requiredFreeBytes > preview.currentProfileBytes)
+    assert.equal(preview.spaceSufficient, true)
+    assert.ok(preview.estimatedReclaimBytes > 0)
+    assert.equal(preview.prunedBackupCount, 1)
+    assert.equal(preview.estimateComplete, true)
+    assert.ok(preview.cleanupScope.includes('third-party dependencies'))
+    assert.ok(preview.preservedScope.includes('API and provider configuration'))
+  } finally {
+    await unregister?.()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('extensions:profile-reset refuses insufficient disk space before stopping Runtime', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-space-'))
+  let unregister
+  try {
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'profile.json'), '{}\n')
+    let stops = 0
+    const ipcMain = new FakeIpcMain()
+    const qqBotBinding = new EventEmitter()
+    qqBotBinding.status = () => ({ bound: false })
+    unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell: {},
+      getWindow: () => undefined,
+      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+      controller: { stop: async () => { stops += 1 }, start: async () => {} },
+      ensureProfile: async () => {},
+      projectRoot: 'C:\\project',
+      dshHome,
+      qqBotBinding,
+      getProfileResetAvailableBytes: async () => 1,
+    })
+
+    const preview = await ipcMain.handlers.get('extensions:profile-reset-preview')()
+    assert.equal(preview.availableBytes, 1)
+    assert.equal(preview.spaceSufficient, false)
+    await assert.rejects(
+      ipcMain.handlers.get('extensions:profile-reset')(undefined, { timestamp: preview.timestamp }),
+      /requires \d+ free bytes but only 1 are available/u,
+    )
+    assert.equal(stops, 0)
+    assert.equal(await readFile(join(profileDir, 'profile.json'), 'utf8'), '{}\n')
+  } finally {
+    await unregister?.()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('extensions:profile-reset rejects a linked profile before stopping Runtime', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-link-'))
+  let unregister
+  try {
+    const external = join(dshHome, 'external-profile')
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    await mkdir(external, { recursive: true })
+    await mkdir(join(dshHome, 'profiles'), { recursive: true })
+    await symlink(external, profileDir, 'junction')
+    let stops = 0
+    const ipcMain = new FakeIpcMain()
+    const qqBotBinding = new EventEmitter()
+    qqBotBinding.status = () => ({ bound: false })
+    unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell: {},
+      getWindow: () => undefined,
+      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+      controller: { stop: async () => { stops += 1 }, start: async () => {} },
+      ensureProfile: async () => {},
+      projectRoot: 'C:\\project',
+      dshHome,
+      qqBotBinding,
+    })
+
+    await assert.rejects(
+      ipcMain.handlers.get('extensions:profile-reset-preview')(),
+      /requires a real directory/u,
+    )
+    await assert.rejects(
+      ipcMain.handlers.get('extensions:profile-reset')(),
+      /requires a real directory/u,
+    )
+    assert.equal(stops, 0)
+  } finally {
+    await unregister?.()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
 test('extensions:profile-reset preserves the old profile in a backup', async () => {
   const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-success-'))
   let unregister
@@ -1352,8 +1503,10 @@ test('extensions:profile-reset preserves the old profile in a backup', async () 
       qqBotBinding,
     })
 
-    const result = await ipcMain.handlers.get('extensions:profile-reset')()
+    const preview = await ipcMain.handlers.get('extensions:profile-reset-preview')()
+    const result = await ipcMain.handlers.get('extensions:profile-reset')(undefined, { timestamp: preview.timestamp })
     assert.equal(result.reset, true)
+    assert.equal(result.backupDirectory, preview.backupDirectory)
     assert.equal(await readFile(join(profileDir, 'fresh.txt'), 'utf8'), 'fresh\n')
     const entries = await readdir(join(dshHome, 'profiles'))
     const backups = entries.filter((name) => name.startsWith('desktop.backup-'))

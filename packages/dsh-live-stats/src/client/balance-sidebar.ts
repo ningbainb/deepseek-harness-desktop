@@ -52,10 +52,12 @@ function createEntry(controller: BalanceController): HTMLButtonElement {
 
 function updateEntryAmount(entry: HTMLButtonElement, state: ReturnType<BalanceController['getSnapshot']>): void {
   const amountSpan = entry.querySelector<HTMLSpanElement>('[data-dsh-balance-amount]')
+  const balanceKnown = state.totalBalance !== '--'
+  const amount = balanceKnown ? `${state.totalBalance} ${state.currency}` : '未知'
   if (amountSpan) {
-    amountSpan.textContent = state.loading ? '…' : `${state.totalBalance} ${state.currency}`
+    amountSpan.textContent = state.loading ? '…' : amount
   }
-  entry.title = state.loading ? '大模型用量' : `大模型用量 · 余额 ${state.totalBalance} ${state.currency}`
+  entry.title = state.loading ? '大模型用量' : `大模型用量 · 官方余额${balanceKnown ? ` ${amount}` : '未知'}`
   entry.toggleAttribute('data-active', state.open)
 }
 

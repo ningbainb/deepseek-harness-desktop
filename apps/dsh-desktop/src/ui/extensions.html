@@ -194,12 +194,17 @@
         </article>
         <div class="recovery-toolbar">
           <h3>环境自愈与重置</h3>
-          <button type="button" class="item-action danger" id="reset-profile-env">一键重置插件环境（格式化）</button>
+          <button type="button" class="item-action danger" id="reset-profile-env">检查并重置插件环境</button>
         </div>
         <div class="recovery-toolbar">
           <h3>最近故障</h3>
           <button type="button" class="secondary" id="export-diagnostics">导出诊断包</button>
         </div>
+        <div class="recovery-toolbar">
+          <div><h3>网络连通性</h3><p class="description">分别检查更新、社区目录和 NPM 清单；模型 API 与安装子进程会明确标为未探测。</p></div>
+          <button type="button" class="secondary" id="run-network-diagnostics">运行连通性检查</button>
+        </div>
+        <div class="list" id="network-diagnostic-results" aria-live="polite"><p class="empty">尚未运行网络连通性检查</p></div>
         <div class="list" id="recovery-incidents" aria-live="polite"></div>
         <div class="recovery-toolbar"><h3>可恢复配置</h3></div>
         <div class="list" id="recovery-snapshots" aria-live="polite"></div>

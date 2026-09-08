@@ -129,6 +129,11 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
     logStore: {
       tail: async () => `runtime line Authorization: Bearer log-secret ${aliceDshHome}\\logs\\runtime.log`,
     },
+    network: {
+      api: { applied: false, status: 'unsupported', reason: 'pac-not-supported-by-runtime-environment' },
+      update: { applied: true, summary: 'mode=fixed_servers rules=1 kinds=https bypass=1 pac=no' },
+      market: { applied: true, summary: 'mode=direct rules=0 kinds=none bypass=0 pac=no' },
+    },
     now: () => new Date('2026-08-20T01:02:03.000Z'),
     redactionRoots,
   })
@@ -138,6 +143,8 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
   assert.equal(diagnostics.runtime.state, 'starting')
   assert.equal(diagnostics.runtime.restartAttempt, 2)
   assert.equal(diagnostics.plugins[0].name, '@community/broken')
+  assert.equal(diagnostics.network.api.status, 'unsupported')
+  assert.equal(diagnostics.network.update.applied, true)
   assert.match(diagnostics.startup.recentRuntimeLog, /\[unclassified\] 1 local event/u)
   const serialized = JSON.stringify(diagnostics)
   assert.doesNotMatch(serialized, /openai-secret|plugin-token|log-secret|Alice|43125/u)

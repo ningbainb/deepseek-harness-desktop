@@ -73,3 +73,22 @@ test('public command and atomic-write contracts support the planned seams', asyn
   assert.match(atomicTypes, /function withFileLock<T>\(filename: string/u)
   assert.match(atomicTypes, /dirMode\?: number/u)
 })
+
+test('public Workspace contract keeps path and Session cwd immutable during relocation', async () => {
+  const workspaceManifest = resolveManifest('@deepseek-ai/dsh-workspace')
+  const sessionManifest = resolveManifest('@deepseek-ai/dsh-session')
+  const clientRuntimeManifest = resolveManifest('@deepseek-ai/dsh-client-runtime', webAppRequire)
+  const workspaceTypes = await readPackageFile(workspaceManifest, 'lib/types/types.d.ts')
+  const registryTypes = await readPackageFile(workspaceManifest, 'lib/types/index.d.ts')
+  const sessionTypes = await readPackageFile(sessionManifest, 'lib/types/types.d.ts')
+  const clientTypes = await readPackageFile(clientRuntimeManifest, 'lib/types/client/contract/workspaces.d.ts')
+
+  assert.match(workspaceTypes, /readonly path: string/u)
+  assert.match(workspaceTypes, /Never rewritten[\s\S]*afterwards/u)
+  assert.match(workspaceTypes, /canonical cwd equals the workspace\s+\* path/u)
+  assert.match(sessionTypes, /readonly cwd\?: string/u)
+  assert.doesNotMatch(registryTypes, /(?:setPath|movePath|relocate)\(/u)
+  assert.doesNotMatch(clientTypes, /(?:setPath|movePath|relocate)\(/u)
+  assert.match(registryTypes, /create\(path: string, title\?: string\): Promise<Workspace>/u)
+  assert.match(clientTypes, /create\(input: \{[\s\S]*path: string;[\s\S]*\}\): Promise<WorkspaceView>/u)
+})

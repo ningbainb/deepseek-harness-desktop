@@ -17,6 +17,7 @@ import {
   DshRuntimeController,
   computeRestartDelay,
   createRuntimeInvocation,
+  quoteWindowsCommandLineArgument,
   formatRuntimeExit,
   forceKillChildProcessTree,
   parseDshReadyUrl,
@@ -92,7 +93,7 @@ test('default startup budget tolerates first-run Windows scanning', () => {
   assert.equal(controller.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS)
 })
 
-test('Windows runtime wrapper avoids the PowerShell WindowStyle crash and preserves its console host', () => {
+test('Windows runtime wrapper waits for the GUI child and preserves its hidden console host', () => {
   const invocation = createRuntimeInvocation({
     platform: 'win32',
     systemRoot: 'C:\\Windows',
@@ -112,15 +113,28 @@ test('Windows runtime wrapper avoids the PowerShell WindowStyle crash and preser
   ])
   assert.equal(invocation.args.includes('-WindowStyle'), false)
   assert.equal(invocation.args.includes('Hidden'), false)
+  assert.match(invocation.runtimeControlToken, /^[a-f0-9]{48}$/u)
   const script = Buffer.from(invocation.args[4], 'base64').toString('utf16le')
   assert.match(script, /DeepSeek''s Harness/u)
-  assert.match(script, /'--expose-internals'/u)
-  assert.match(script, /'--require' '[^']*windows-console-preload\.cjs'/u)
-  assert.match(script, /'--profile' 'desktop'/u)
-  assert.match(script, /'--port' '0'/u)
-  assert.match(script, /'--no-open'/u)
-  assert.match(script, /ForEach-Object \{ \[Console\]::Out\.WriteLine\(\$_\) \}/u)
-  assert.match(script, /exit \$LASTEXITCODE/u)
+  assert.match(script, /\$startInfo\.FileName = /u)
+  assert.match(script, /\$startInfo\.Arguments = '--expose-internals --require (?:"[^"]+"|\S*windows-console-preload\.cjs)/u)
+  assert.match(script, /--profile desktop/u)
+  assert.match(script, /--port 0/u)
+  assert.match(script, /--no-open/u)
+  assert.match(script, /\$startInfo\.UseShellExecute = \$false/u)
+  assert.match(script, /\$startInfo\.CreateNoWindow = \$false/u)
+  assert.match(script, /ProcessWindowStyle\]::Hidden/u)
+  assert.match(script, /\$runtime\.WaitForExit\(\)/u)
+  assert.match(script, new RegExp(`dsh desktop runtime pid ${invocation.runtimeControlToken}:`, 'u'))
+  assert.match(script, /exit \$runtime\.ExitCode/u)
+})
+
+test('Windows ProcessStartInfo argv quoting preserves spaces, quotes, empty values, and trailing slashes', () => {
+  assert.equal(quoteWindowsCommandLineArgument('plain'), 'plain')
+  assert.equal(quoteWindowsCommandLineArgument(''), '""')
+  assert.equal(quoteWindowsCommandLineArgument('two words'), '"two words"')
+  assert.equal(quoteWindowsCommandLineArgument('say"hello'), '"say\\"hello"')
+  assert.equal(quoteWindowsCommandLineArgument('C:\\two words\\'), '"C:\\two words\\\\"')
 })
 
 test('non-Windows runtime launch remains a direct argv spawn', () => {
@@ -239,12 +253,15 @@ test('Windows preload attaches the GUI-subsystem runtime to its hidden parent co
     'process.stdout.write(String(getConsoleProcessList(Buffer.alloc(16), 4)))',
   ].join(';')
   const environment = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+  const desktopDirectory = fileURLToPath(new URL('..', import.meta.url))
   const detached = spawnSync(electronExecutable, ['-e', probe], {
+    cwd: desktopDirectory,
     encoding: 'utf8',
     env: environment,
     windowsHide: true,
   })
   const attached = spawnSync(electronExecutable, ['--require', preloadPath, '-e', probe], {
+    cwd: desktopDirectory,
     encoding: 'utf8',
     env: environment,
     windowsHide: true,
@@ -1025,6 +1042,21 @@ test('Windows shutdown never reaches for a POSIX process group', async () => {
   assert.deepEqual(calls[0].args, ['/PID', '43125', '/T', '/F'])
 })
 
+test('Windows shutdown targets the registered GUI runtime instead of only its wrapper', async () => {
+  const calls = []
+  const child = { pid: 43125, exitCode: null, kill: () => {} }
+  await terminateChildProcessTree(child, {
+    platform: 'win32',
+    rootPid: 43126,
+    execFileFn: (executable, args, options, callback) => {
+      calls.push({ executable, args, options })
+      callback(null)
+    },
+  })
+  assert.deepEqual(calls[0].args, ['/PID', '43126', '/T', '/F'])
+  assert.equal(calls[0].options.windowsHide, true)
+})
+
 test('force kill escalates to the POSIX process group and keeps the Windows direct kill', () => {
   const posix = []
   forceKillChildProcessTree(
@@ -1039,6 +1071,17 @@ test('force kill escalates to the POSIX process group and keeps the Windows dire
     { platform: 'win32', processKill: () => { throw new Error('not on Windows') } },
   )
   assert.deepEqual(windows, [{ direct: 'SIGKILL' }])
+
+  const windowsRuntime = []
+  forceKillChildProcessTree(
+    { pid: 43125, exitCode: null, kill: (signal) => windowsRuntime.push({ direct: signal }) },
+    {
+      platform: 'win32',
+      rootPid: 43126,
+      processKill: (pid, signal) => windowsRuntime.push({ pid, signal }),
+    },
+  )
+  assert.deepEqual(windowsRuntime, [{ pid: 43126, signal: 'SIGKILL' }])
 
   const fallback = []
   forceKillChildProcessTree(

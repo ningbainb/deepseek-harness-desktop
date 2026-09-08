@@ -158,6 +158,23 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
       await mkdir(dirname(path), { recursive: true })
       await writeFile(path, 'native')
     }
+    const nativePackages = [
+      '@img/sharp-darwin-arm64',
+      '@img/sharp-libvips-darwin-arm64',
+      '@koromix/koffi-darwin-arm64',
+      '@vscode/ripgrep-darwin-arm64',
+      'lightningcss-darwin-arm64',
+      'node-addon-require-builtin-darwin-arm64',
+    ]
+    for (const packageName of nativePackages) {
+      const packageRoot = join(nodeModules, ...packageName.split('/'))
+      await mkdir(packageRoot, { recursive: true })
+      await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+        name: packageName,
+        os: ['darwin'],
+        cpu: ['arm64'],
+      }))
+    }
 
     await afterPack({
       electronPlatformName: 'darwin',
@@ -169,6 +186,7 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
 
     const report = JSON.parse(await readFile(join(root, 'runtime-prune-report.json'), 'utf8'))
     assert.ok(report.removedFiles >= 1)
+    assert.deepEqual(report.restoredNativeBindings, [])
     await access(keepPty)
     await access(keepHelper)
     await assert.rejects(access(dropWin), { code: 'ENOENT' })

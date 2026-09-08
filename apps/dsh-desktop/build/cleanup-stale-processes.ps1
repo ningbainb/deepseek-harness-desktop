@@ -7,7 +7,9 @@ param(
   [string] $UninstallRegistryKey = '',
 
   [Alias('PrepareLegacyUpgrade')]
-  [switch] $PrepareExistingUpgrade
+  [switch] $PrepareExistingUpgrade,
+
+  [string] $UpgradeTransactionScript = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +24,10 @@ $forceAttempts = 12
 $retryDelayMs = 400
 $script:receiptProtocolFailed = $false
 $script:permissionDenied = $false
+
+if ([string]::IsNullOrWhiteSpace($UpgradeTransactionScript)) {
+  $UpgradeTransactionScript = Join-Path $PSScriptRoot 'installer-upgrade-transaction.ps1'
+}
 
 try {
   if (-not ('DshInstaller.ProcessPath' -as [type])) {
@@ -121,10 +127,6 @@ namespace DshInstaller
   $installRootReferences = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase
   )
-  $registryPaths = [System.Collections.Generic.HashSet[string]]::new(
-    [System.StringComparer]::OrdinalIgnoreCase
-  )
-
   function Add-InstallRoot([string] $path) {
     if ([string]::IsNullOrWhiteSpace($path)) {
       return
@@ -168,17 +170,11 @@ namespace DshInstaller
     if (-not [string]::IsNullOrWhiteSpace($InstallRegistryKey)) {
       $installRegistryPath = "Registry::$hive\$InstallRegistryKey"
       $installState = Get-ItemProperty -LiteralPath $installRegistryPath -ErrorAction SilentlyContinue
-      if ($null -ne $installState) {
-        [void] $registryPaths.Add($installRegistryPath)
-      }
       Add-InstallRoot $installState.InstallLocation
     }
     if (-not [string]::IsNullOrWhiteSpace($UninstallRegistryKey)) {
       $uninstallRegistryPath = "Registry::$hive\$UninstallRegistryKey"
       $uninstallState = Get-ItemProperty -LiteralPath $uninstallRegistryPath -ErrorAction SilentlyContinue
-      if ($null -ne $uninstallState) {
-        [void] $registryPaths.Add($uninstallRegistryPath)
-      }
       Add-InstallRoot (Get-UninstallerDirectory $uninstallState.UninstallString)
     }
   }
@@ -471,95 +467,15 @@ namespace DshInstaller
     })
   }
 
-  function Test-UpgradeInstallRoot([string] $root) {
-    (Test-Path -LiteralPath (Join-Path $root $mainExecutableName) -PathType Leaf) -and
-      (Test-Path -LiteralPath (Join-Path $root 'resources\app.asar') -PathType Leaf)
-  }
-
-  function Move-UpgradeInstallRoot([string] $root, [string] $quarantine) {
-    $moveError = $null
-    for ($attempt = 0; $attempt -lt 5; $attempt += 1) {
-      try {
-        [System.IO.Directory]::Move($root, $quarantine)
-        return
-      } catch [System.UnauthorizedAccessException] {
-        $moveError = $_.Exception
-      } catch [System.IO.IOException] {
-        $moveError = $_.Exception
-      }
-      if ($attempt -lt 4) {
-        Start-Sleep -Milliseconds 250
-      }
-    }
-    throw $moveError
-  }
-
   function Stage-UpgradeInstalls {
-    $upgradeRoots = @($existingRoots | Where-Object { Test-UpgradeInstallRoot $_ })
-    if ($upgradeRoots.Count -eq 0 -and $registryPaths.Count -eq 0) {
-      return
+    if (-not (Test-Path -LiteralPath $UpgradeTransactionScript -PathType Leaf)) {
+      throw "upgrade transaction script is missing: $UpgradeTransactionScript"
     }
-
-    $staged = [System.Collections.Generic.List[object]]::new()
-    try {
-      foreach ($root in $upgradeRoots) {
-        $parent = [System.IO.Path]::GetDirectoryName($root)
-        if ([string]::IsNullOrWhiteSpace($parent)) {
-          throw "unsafe upgrade install root: $root"
-        }
-        $quarantine = Join-Path $parent ".dsh-desktop-update-old-$([System.Guid]::NewGuid().ToString('N'))"
-        Move-UpgradeInstallRoot $root $quarantine
-        $staged.Add([pscustomobject]@{ Root = $root; Quarantine = $quarantine })
-      }
-
-      foreach ($registryPath in $registryPaths) {
-        if (Test-Path -LiteralPath $registryPath) {
-          Remove-Item -LiteralPath $registryPath -Recurse -Force -ErrorAction Stop
-        }
-      }
-    } catch {
-      for ($index = $staged.Count - 1; $index -ge 0; $index -= 1) {
-        $entry = $staged[$index]
-        if ((Test-Path -LiteralPath $entry.Quarantine) -and -not (Test-Path -LiteralPath $entry.Root)) {
-          try {
-            [System.IO.Directory]::Move($entry.Quarantine, $entry.Root)
-          } catch {
-            Write-Output "upgrade-install-restore-error root=$($entry.Root): $($_.Exception.Message)"
-          }
-        }
-      }
-      Write-Output "upgrade-install-error: $($_.Exception.Message)"
-      exit 34
-    }
-
-    foreach ($entry in $staged) {
-      $removeError = $null
-      for ($attempt = 0; $attempt -lt 3; $attempt += 1) {
-        try {
-          Remove-Item -LiteralPath $entry.Quarantine -Recurse -Force -ErrorAction Stop
-          break
-        } catch {
-          $removeError = $_.Exception.Message
-          if ($attempt -lt 2) {
-            Start-Sleep -Milliseconds 250
-          }
-        }
-      }
-      if (Test-Path -LiteralPath $entry.Quarantine) {
-        try {
-          Add-Type -AssemblyName Microsoft.VisualBasic
-          [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
-            $entry.Quarantine,
-            [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
-            [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
-          )
-          Write-Output "upgrade-install-quarantine-recycled path=$($entry.Quarantine)"
-        } catch {
-          Write-Output "upgrade-install-quarantine-retained path=$($entry.Quarantine): $removeError; $($_.Exception.Message)"
-        }
-      }
-      Write-Output "upgrade-install-staged root=$($entry.Root)"
-    }
+    & $UpgradeTransactionScript `
+      -Mode Begin `
+      -InstallDirectory $InstallDirectory `
+      -InstallRegistryKey $InstallRegistryKey `
+      -UninstallRegistryKey $UninstallRegistryKey
   }
 
   function Complete-Preflight {

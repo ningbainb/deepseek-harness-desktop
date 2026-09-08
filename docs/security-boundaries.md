@@ -18,6 +18,23 @@ Desktop 3.0 treats compatibility, diagnostics, presets, runtime selection, and t
 | Diagnostics | Export is user initiated, destination chosen, confirmed, local only, and redacted before a ZIP or JSON package is written. |
 | Legacy credential compatibility | Desktop reads only app-owned old Free Mode credential files, fills missing reference values in the child environment, never overwrites current credentials, and never logs secret values. |
 
+## User and device authorization matrix
+
+The host-only [`dsh-user-scope`](../packages/dsh-user-scope/README.md) service is the ownership authority. It persists an opaque local principal, one principal per paired device, Workspace grants, and Session ownership. Unknown ownership, unavailable or newer-schema state, identity fields supplied by a client, and revoked bindings fail closed.
+
+| Resource or operation | Remote paired device | Local Desktop profile | Revocation and unknown ownership |
+| --- | --- | --- | --- |
+| Device principal | The paired cookie must resolve to the same live principal before and after each awaited Host call. | Uses the one opaque principal persisted for the current DSH profile. | Device revocation invalidates the next request; an unknown or mismatched binding is denied. |
+| Workspace list and use | Only Workspaces with an explicit `use` grant are listed or accepted. | Retains the profile management view. | Revoked or unknown grants are omitted and direct access returns a non-enumerating unavailable result. |
+| Session list, history, prompt, rename, model directory and model selection | The Session must be owned by or granted to the principal and, when attached to a Workspace, that Workspace must also be granted. Authorization is rechecked after Host calls. | Uses the local profile principal and registered Session ownership. | Unknown Session ownership is denied; removal of a grant makes later reads and writes unavailable. |
+| Session search | The search engine receives only authorized Session IDs; returned rows are authorized and bounded again before release. | Uses the normal local search surface. | A missing index, foreign row, or unauthorized Session is not exposed. |
+| Session event stream | Each Mux frame is filtered by current Session access. The live device table is the synchronous kill switch. | Uses the normal local event channel. | Revoking the device aborts the active stream and suppresses later frames. |
+| Attachment and native file access | No attachment or arbitrary file method is present in the mobile allowlist. | Native Workspace file opening separately requires a canonical registered root, relative allowlisted path, real-path revalidation, and a private capability. | Unknown paths and client-supplied absolute paths are rejected. |
+| Memory and personal Prompt | The mobile API exposes no direct CRUD method. Request-time injection uses user-scope; personal Prompt injection is local-owner only. | Uses the local principal with feature enablement and Session ownership checks. | Unavailable scope or foreign Session ownership suppresses injection. |
+| Conversation import | The mobile API exposes no import method. Desktop import uses the private Desktop route and its own file capability. | User-initiated Desktop flow only. | A remote device cannot select a host path or invoke import through the mobile API. |
+
+There is no complete in-app local multi-account switch. The supported local identity boundary is the current DSH profile plus separately paired device principals; changing a display name, Workspace path, email, or machine name does not select a principal. Adding local account switching is a separate design task that must migrate or explicitly share ownership rather than rewriting identifiers.
+
 ## Privacy defaults
 
 Official packaged builds upload a fixed product-event vocabulary to the release-injected first-party endpoint. A Desktop-only local random secret derives rotating daily and monthly anonymous actors; the stable secret, IP, content, credentials, paths, and long-lived device identity are not persisted by the service. Development, source, test, and Fork builds have an inert committed configuration. Diagnostic export remains separately user initiated with `userInitiated: true` and `automaticUpload: false`; its manifest lists excluded secret values, project files, prompts, sessions, answers, tool results, user names, real home paths, and URL credentials.

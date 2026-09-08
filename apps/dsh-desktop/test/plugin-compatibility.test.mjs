@@ -6,6 +6,7 @@ import {
   createHostCompatibility,
   createHostCompatibilityProvider,
 } from '../src/extensions/plugin-compatibility.mjs'
+import { COMMUNITY_PLUGIN_KNOWN_ISSUES } from '../src/extensions/plugin-known-issues.mjs'
 
 const host = createHostCompatibility({
   desktopVersion: '0.1.9',
@@ -211,4 +212,53 @@ test('missing declared Desktop capabilities and surfaces fail closed while undec
     { code: 'capability-missing', subject: 'workspace-files.open' },
     { code: 'surface-unsupported', subject: 'extensions' },
   ])
+})
+
+test('the reproduced dsh-paperclip tuple reports a bounded native image-drop conflict', () => {
+  const issue = COMMUNITY_PLUGIN_KNOWN_ISSUES[0]
+  assert.equal(issue.id, 'dsh-paperclip-0.2.5-native-image-drop')
+  assert.equal(issue.package.integrity, 'sha512-3do+7wwMCzd4fEzxIdC/b52MhWENOJRehgHhGD7VUfgHuNUm8AW2LjZ1I8iLzLG7vjl/7276Xc3RwcPcg9oalA==')
+  assert.equal(issue.disposition.startupAction, 'inspect-only')
+
+  const paperclip = {
+    name: 'dsh-paperclip',
+    version: '0.2.5',
+    dsh: { bundle: { patch: './cordis.patch.yml' } },
+    peerDependencies: {
+      '@deepseek-ai/cordis': '^4.0.1',
+      '@deepseek-ai/dsh-client-runtime': '^0.1.0-rc.6',
+      '@deepseek-ai/dsh-client-ui-conversation': '^0.1.0-rc.6',
+      react: '^18.2.0',
+    },
+  }
+  const exactHost = createHostCompatibility({
+    desktopVersion: '3.3.0',
+    nodeVersion: '24.18.1',
+    runtimeVersion: '0.1.1-rc.1',
+    packages: {
+      '@deepseek-ai/cordis': '4.0.1',
+      '@deepseek-ai/dsh-client-runtime': '0.1.1-rc.1',
+      '@deepseek-ai/dsh-client-ui-conversation': '0.1.1-rc.1',
+      react: '18.3.1',
+    },
+  })
+  const result = assessPluginCompatibility(paperclip, exactHost)
+  assert.equal(result.status, 'incompatible')
+  assert.deepEqual(result.reasons, [{
+    code: 'known-native-image-drop-conflict',
+    subject: 'dsh-paperclip@0.2.5',
+    actual: 'conversation.native-image-preview',
+  }])
+  assert.deepEqual(result.details.tested, {
+    desktop: '3.3.0',
+    runtime: '0.1.1-rc.1',
+    verifiedAt: '2026-09-08',
+    matrixArtifact: 'runtime-support/community-plugin-known-issues.json',
+  })
+
+  assert.equal(assessPluginCompatibility({ ...paperclip, version: '0.2.6' }, exactHost).status, 'compatible')
+  assert.equal(assessPluginCompatibility(paperclip, createHostCompatibility({
+    ...exactHost,
+    desktopVersion: '3.3.1',
+  })).status, 'compatible')
 })

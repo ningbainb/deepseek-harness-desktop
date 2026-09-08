@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsdown",
     "prepare": "tsdown",
+    "test": "vitest run",
     "watch": "tsdown --watch"
   },
   "license": "Apache-2.0",
@@ -52,5 +53,9 @@
     "@ningbainb/dsh-memory": "workspace:*",
     "@linxin666/dsh-skins": "workspace:*",
     "@linxin666/dsh-client-ui-skin-center": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1",
+    "vitest": "^4.1.8"
   }
 }

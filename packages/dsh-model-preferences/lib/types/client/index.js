@@ -135,6 +135,7 @@ export function apply(ctx) {
                 const available = sessions.subagentAddress(sessionId) === undefined;
                 return {
                     available,
+                    modelSessionId: String(sessionId),
                     directory: directory.store,
                     settingsScope,
                     load: () => {

@@ -33,6 +33,11 @@ if (!process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaultPackagedExe)) {
 
 const CORE_SUITES = [
   {
+    name: 'Network Proxy Routing & Recovery',
+    script: 'scripts/verify-proxy-routing.mjs',
+    args: [],
+  },
+  {
     name: 'Window Chrome & Geometry',
     script: 'scripts/verify-window-chrome.mjs',
     args: [],
@@ -40,6 +45,11 @@ const CORE_SUITES = [
   {
     name: 'Settings Window Multi-tab & Resizing',
     script: 'scripts/verify-settings-window.mjs',
+    args: [],
+  },
+  {
+    name: 'Long Conversation Scroll & Turn Navigation',
+    script: 'scripts/verify-conversation-scroll.mjs',
     args: [],
   },
   {
@@ -75,6 +85,11 @@ const PACKAGED_SUITES = [
     args: [],
   },
   {
+    name: 'Packaged SSH Terminal & Relaunch Persistence',
+    script: 'scripts/verify-packaged-ssh.mjs',
+    args: [],
+  },
+  {
     name: 'Packaged Direct-Start Matrix',
     script: 'scripts/verify-packaged-direct-start-matrix.mjs',
     args: [],
@@ -92,6 +107,21 @@ const PACKAGED_SUITES = [
   {
     name: 'Packaged Model Preferences Card',
     script: 'scripts/verify-packaged-model-preferences.mjs',
+    args: [],
+  },
+  {
+    name: 'Packaged Image Drop Reliability & Memory',
+    script: 'scripts/verify-packaged-image-drop.mjs',
+    args: [],
+  },
+  {
+    name: 'Workspace Relocation Compatibility & Rollback',
+    script: 'scripts/verify-workspace-relocation.mjs',
+    args: [],
+  },
+  {
+    name: 'Skin Center Live Apply & Relaunch Persistence',
+    script: 'scripts/verify-skin-center.mjs',
     args: [],
   },
   {

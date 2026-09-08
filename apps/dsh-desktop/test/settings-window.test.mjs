@@ -23,6 +23,10 @@ test('settings controller scopes movement and eight-way resizing to the upstream
   assert.match(SETTINGS_WINDOW_CSS, /min\(360px/u)
   assert.match(SETTINGS_WINDOW_CSS, /container-type:\s*inline-size/u)
   assert.match(SETTINGS_WINDOW_CSS, /overflow:\s*auto/u)
+  assert.match(SETTINGS_WINDOW_CSS, /scrollbar-gutter:\s*stable/u)
+  assert.match(script, /layer\.append\(handle\)/u)
+  assert.match(script, /positionResizeHandles/u)
+  assert.doesNotMatch(SETTINGS_WINDOW_CSS, /data-dsh-settings-resize="e"\]\s*\{\s*right:\s*2px/u)
 })
 
 test('settings controller applies CSS before mounting and follows navigation', async () => {

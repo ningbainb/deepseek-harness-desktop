@@ -10,6 +10,8 @@ import {
   normalizeReleaseNotes,
 } from '../src/updater.mjs'
 import {
+  beginDesktopStartup,
+  describeDesktopProxyConfiguration,
   requestsDisableUpdates,
   resolveDesktopProxyConfiguration,
 } from '../src/electron-app.mjs'
@@ -361,6 +363,35 @@ test('manual no-update result is visible while automatic errors stay hidden', as
   assert.ok(harness.logs.some((line) => line.includes('network unavailable')))
 })
 
+test('automatic DNS failure reaches a non-blocking terminal state after shell and runtime readiness', async () => {
+  const startupEvents = []
+  const startup = beginDesktopStartup({
+    loadShell: async () => startupEvents.push('shell-ready'),
+    startRuntime: async () => {
+      startupEvents.push('runtime-ready')
+      return 'http://127.0.0.1:43125/'
+    },
+  })
+  await Promise.all([startup.shellPromise, startup.runtimePromise])
+
+  const harness = createHarness()
+  const dnsFailure = new Error('getaddrinfo ENOTFOUND updates.example.invalid')
+  dnsFailure.code = 'ENOTFOUND'
+  await harness.controller.check()
+  harness.updater.emit('error', dnsFailure)
+  await tick()
+
+  assert.deepEqual(startupEvents.toSorted(), ['runtime-ready', 'shell-ready'])
+  assert.deepEqual(harness.controller.getStatus(), {
+    phase: 'error',
+    currentVersion: '1.0.0',
+    message: 'getaddrinfo ENOTFOUND updates.example.invalid',
+    visible: false,
+  })
+  assert.ok(harness.logs.some((line) => line.includes('ENOTFOUND')))
+  harness.controller.dispose()
+})
+
 test('manual update errors are visible and clear taskbar progress', async () => {
   const harness = createHarness()
   await harness.controller.check({ manual: true })
@@ -421,14 +452,47 @@ test('requestsDisableUpdates recognizes CLI flags and environment variables', ()
 
 test('resolveDesktopProxyConfiguration extracts proxy rules from argv and environment', () => {
   assert.deepEqual(resolveDesktopProxyConfiguration(['--proxy-server=http://127.0.0.1:7890']), {
+    mode: 'fixed_servers',
     proxyRules: 'http://127.0.0.1:7890',
   })
   assert.deepEqual(resolveDesktopProxyConfiguration([], {
     HTTP_PROXY: 'http://proxy.corp:8080',
     NO_PROXY: 'localhost,127.0.0.1',
   }), {
+    mode: 'fixed_servers',
     proxyRules: 'http=http://proxy.corp:8080;https=http://proxy.corp:8080',
     proxyBypassRules: 'localhost,127.0.0.1',
   })
+  assert.deepEqual(resolveDesktopProxyConfiguration([
+    '--proxy-bypass-list=localhost;127.0.0.1',
+    '--proxy-pac-url=https://proxy.example/proxy.pac',
+  ]), {
+    mode: 'pac_script',
+    pacScript: 'https://proxy.example/proxy.pac',
+    proxyBypassRules: 'localhost;127.0.0.1',
+  })
+  assert.deepEqual(resolveDesktopProxyConfiguration([], {
+    DSH_DESKTOP_PROXY_MODE: 'direct',
+    HTTPS_PROXY: 'http://ignored.example:8080',
+  }), { mode: 'direct' })
+  assert.deepEqual(resolveDesktopProxyConfiguration([], {
+    DSH_DESKTOP_PROXY_MODE: 'system',
+  }), { mode: 'system' })
   assert.equal(resolveDesktopProxyConfiguration([], {}), undefined)
+})
+
+test('proxy diagnostics report only routing shape and never credentials or endpoints', () => {
+  const secret = 'proxy-secret-password'
+  const summary = describeDesktopProxyConfiguration({
+    mode: 'fixed_servers',
+    proxyRules: `http=http://alice:${secret}@proxy.corp:8080;https=socks5://private.example:1080`,
+    proxyBypassRules: 'localhost,127.0.0.1',
+  })
+  assert.equal(summary, 'mode=fixed_servers rules=2 kinds=http,https bypass=2 pac=no')
+  assert.doesNotMatch(summary, new RegExp(secret, 'u'))
+  assert.doesNotMatch(summary, /alice|proxy\.corp|private\.example/u)
+  assert.equal(
+    describeDesktopProxyConfiguration({ mode: 'pac_script', pacScript: `https://alice:${secret}@proxy.example/proxy.pac` }),
+    'mode=pac_script rules=0 kinds=none bypass=0 pac=yes',
+  )
 })

@@ -56,6 +56,7 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
+  '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-user-scope',
   'dsh-better-sidebar',
 ].toSorted())
@@ -160,6 +161,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-value-mode',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
+  '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-user-scope',
   'dsh-better-sidebar',
   'reasoning-slider',
@@ -227,6 +229,7 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-git-graph',
   '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-client-ui-task-board',
+  '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-memory',
   '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-ssh',

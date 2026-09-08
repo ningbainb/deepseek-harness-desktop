@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -13,6 +13,7 @@ const {
   classifyPrunableFile,
   packageSupportsPlatform,
   prunePackagedRuntime,
+  restoreRequiredNativeBindings,
   restoreRequiredPackagedPeers,
 } = afterPack
 
@@ -221,6 +222,49 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
       assert.equal(manifest.name, packageName)
     }
     assert.deepEqual(await restoreRequiredPackagedPeers(root), [])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('release recovery restores Windows native optional bindings omitted by electron-builder', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-native-bindings-'))
+  try {
+    const restored = await restoreRequiredNativeBindings(root, {
+      platform: 'win32',
+      arch: 'x64',
+    })
+    assert.deepEqual(restored, [
+      '@img/sharp-win32-x64',
+      '@koromix/koffi-win32-x64',
+      '@vscode/ripgrep-win32-x64',
+      'lightningcss-win32-x64-msvc',
+      'node-addon-require-builtin-win32-x64-msvc',
+    ])
+    await access(join(
+      root,
+      '@img',
+      'sharp-win32-x64',
+      'lib',
+      'sharp-win32-x64-0.35.3.node',
+    ))
+    await access(join(root, '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'))
+    await access(join(root, '@vscode', 'ripgrep-win32-x64', 'bin', 'rg.exe'))
+    await access(join(
+      root,
+      'lightningcss-win32-x64-msvc',
+      'lightningcss.win32-x64-msvc.node',
+    ))
+    await access(join(
+      root,
+      'node-addon-require-builtin-win32-x64-msvc',
+      'prebuilt',
+      'win32-x64-msvc-napi-v9.node',
+    ))
+    assert.deepEqual(await restoreRequiredNativeBindings(root, {
+      platform: 'win32',
+      arch: 'x64',
+    }), [])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

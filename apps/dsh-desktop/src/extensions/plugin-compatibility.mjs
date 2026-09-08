@@ -4,6 +4,11 @@ import { dirname, join } from 'node:path'
 
 import semver from 'semver'
 
+import {
+  findCommunityPluginKnownIssue,
+  knownIssueCompatibilityDetail,
+} from './plugin-known-issues.mjs'
+
 const { satisfies, valid, validRange } = semver
 const RANGE_OPTIONS = Object.freeze({ includePrerelease: true })
 const MAX_PUBLIC_VALUE_LENGTH = 256
@@ -264,6 +269,14 @@ export function assessPluginCompatibility(manifest, host) {
     })
   }
   const reasons = []
+  const knownIssue = findCommunityPluginKnownIssue(manifest, host)
+  if (knownIssue !== undefined) {
+    reasons.push(Object.freeze({
+      code: knownIssue.conflict.code,
+      subject: `${knownIssue.package.name}@${knownIssue.package.version}`,
+      actual: knownIssue.conflict.surface,
+    }))
+  }
   const patch = manifest.dsh?.bundle?.patch
   if (typeof patch !== 'string' || patch.trim().length === 0) {
     reasons.push(Object.freeze({ code: 'not-dsh-bundle' }))
@@ -397,7 +410,11 @@ export function assessPluginCompatibility(manifest, host) {
     return Object.freeze({
       status: 'incompatible',
       reasons: Object.freeze(reasons),
-      ...(explicit ? { details: compatibilityDetail(explicit, host) } : {}),
+      ...(explicit
+        ? { details: compatibilityDetail(explicit, host) }
+        : knownIssue === undefined
+          ? {}
+          : { details: knownIssueCompatibilityDetail(knownIssue, host) }),
     })
   }
   if (compatibilityEvidence) {

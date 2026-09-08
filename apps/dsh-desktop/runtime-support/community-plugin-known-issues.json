@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    {
+      "id": "dsh-paperclip-0.2.5-native-image-drop",
+      "package": {
+        "name": "dsh-paperclip",
+        "version": "0.2.5",
+        "integrity": "sha512-3do+7wwMCzd4fEzxIdC/b52MhWENOJRehgHhGD7VUfgHuNUm8AW2LjZ1I8iLzLG7vjl/7276Xc3RwcPcg9oalA==",
+        "tarballShasum": "7e03c24996e2befa99201ae7fee88e088dcf6b23",
+        "clientSha256": "a8733a8d328ecaaf32d8546b43839041636f53b88b1b1277d25615d41e3d39e4",
+        "hostSha256": "aeb00dea1e01229ae6eeda0c69015c741df88760a8229d65c43651876669ab5f"
+      },
+      "host": {
+        "desktopVersion": "3.3.0",
+        "runtimeVersion": "0.1.1-rc.1",
+        "nodeVersion": "24.18.1"
+      },
+      "conflict": {
+        "code": "known-native-image-drop-conflict",
+        "surface": "conversation.native-image-preview",
+        "mechanism": "The plugin claims every file drop on the conversation scroll surface, including image files, before the delegated native preview listener can receive the event."
+      },
+      "disposition": {
+        "kind": "compatibility-diagnostic",
+        "startupAction": "inspect-only",
+        "versionScope": "exact"
+      },
+      "source": "https://registry.npmjs.org/dsh-paperclip/-/dsh-paperclip-0.2.5.tgz",
+      "verifiedAt": "2026-09-08"
+    }
+  ]
+}

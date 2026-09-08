@@ -41,19 +41,28 @@ async function readSkillCandidates(root) {
   try {
     entries = await readdir(root.path, { withFileTypes: true })
   } catch (error) {
-    if (error?.code === 'ENOENT') return []
-    throw error
+    if (error?.code === 'ENOENT') return { candidates: [], diagnostics: [] }
+    return {
+      candidates: [],
+      diagnostics: [{ path: root.path, error: `skill root could not be read: ${error.message}` }],
+    }
   }
   const candidates = []
+  const diagnostics = []
   for (const entry of entries.toSorted((left, right) => left.name.localeCompare(right.name))) {
     if (entry.name === '.system') continue
     if (entry.isDirectory()) {
       candidates.push({ path: join(root.path, entry.name, 'SKILL.md'), container: join(root.path, entry.name) })
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       candidates.push({ path: join(root.path, entry.name), container: join(root.path, entry.name) })
+    } else if (entry.isSymbolicLink()) {
+      diagnostics.push({
+        path: join(root.path, entry.name),
+        error: 'skill discovery ignores symbolic links; import or copy the skill into a real directory',
+      })
     }
   }
-  return candidates
+  return { candidates, diagnostics }
 }
 
 export async function discoverSkills({ roots }) {
@@ -61,7 +70,9 @@ export async function discoverSkills({ roots }) {
   const diagnostics = []
   const winners = new Map()
   for (const root of [...roots].toSorted((left, right) => left.rank - right.rank)) {
-    for (const candidate of await readSkillCandidates(root)) {
+    const discovered = await readSkillCandidates(root)
+    diagnostics.push(...discovered.diagnostics)
+    for (const candidate of discovered.candidates) {
       try {
         const metadata = parseSkillFrontmatter(await readFile(candidate.path, 'utf8'))
         const winner = winners.get(metadata.name)
@@ -74,9 +85,16 @@ export async function discoverSkills({ roots }) {
           shadowedBy: winner?.path,
         }
         if (!winner) winners.set(metadata.name, skill)
+        else diagnostics.push({
+          path: candidate.path,
+          error: `duplicate skill name "${metadata.name}" is shadowed by the higher-precedence ${winner.source} entry`,
+        })
         skills.push(skill)
       } catch (error) {
-        if (error?.code !== 'ENOENT') diagnostics.push({ path: candidate.path, error: error.message })
+        diagnostics.push({
+          path: candidate.path,
+          error: error?.code === 'ENOENT' ? 'skill directory is missing SKILL.md' : error.message,
+        })
       }
     }
   }

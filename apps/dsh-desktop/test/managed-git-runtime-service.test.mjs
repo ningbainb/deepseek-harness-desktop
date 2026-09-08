@@ -256,6 +256,7 @@ test('managed Git repair rejects a bad downloaded hash without replacing a prior
     await mkdir(paths.installDirectory, { recursive: true })
     await writeFile(join(paths.installDirectory, 'legacy.txt'), 'preserve this install')
     let installCalls = 0
+    const fetchImpl = async () => { throw new Error('fixture fetch must not be called directly') }
     const service = createManagedGitRuntimeService({
       userDataDirectory,
       temporaryDirectory,
@@ -265,7 +266,9 @@ test('managed Git repair rejects a bad downloaded hash without replacing a prior
       confirm: async () => true,
       probeSystemGitFn: async () => ({ available: false, reason: 'not-found' }),
       verifyManagedGitInstallFn: async () => { throw new Error('legacy directory is not a verified install') },
-      downloadManagedGitArchiveFn: async ({ destinationDirectory }) => {
+      fetchImpl,
+      downloadManagedGitArchiveFn: async ({ destinationDirectory, fetchImpl: receivedFetch }) => {
+        assert.equal(receivedFetch, fetchImpl)
         const archivePath = join(destinationDirectory, 'archive.zip')
         await writeFile(archivePath, Buffer.alloc(archive.byteLength, 0x74))
         return { archivePath }

@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import electronPath from 'electron'
 
 import { BoundedLogStore } from '../src/log-store.mjs'
 import { ensureDesktopProfile, resolveDshCliPath } from '../src/profile.mjs'
@@ -16,6 +17,7 @@ test('explicit Desktop background opt-in exposes the durable Task Board Host sch
     await ensureDesktopProfile({ dshHome: root })
     controller = new DshRuntimeController({
       cliPath: resolveDshCliPath(),
+      executable: electronPath,
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,
@@ -61,6 +63,7 @@ test('Desktop defaults to the browser scheduler when background automation was n
     await ensureDesktopProfile({ dshHome: root })
     controller = new DshRuntimeController({
       cliPath: resolveDshCliPath(),
+      executable: electronPath,
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,

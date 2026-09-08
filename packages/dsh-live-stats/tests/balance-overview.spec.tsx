@@ -161,6 +161,18 @@ describe('balance sidebar entry', () => {
     dispose()
   })
 
+  it('labels an unavailable official balance as unknown instead of zero', async () => {
+    mountShell()
+    const dispose = mountBalanceSidebarEntry(stubController({ totalBalance: '--', currency: '' }))
+    await flushObserver()
+
+    const entry = document.querySelector<HTMLButtonElement>('[data-dsh-balance-entry]')
+    expect(entry?.querySelector('[data-dsh-balance-amount]')?.textContent).toBe('未知')
+    expect(entry?.title).toContain('官方余额未知')
+    expect(entry?.textContent).not.toContain('0.00')
+    dispose()
+  })
+
   it('re-asserts its slot when a sibling plugin row pushes it down', async () => {
     const { newSession } = mountShell()
     const dispose = mountBalanceSidebarEntry(stubController())

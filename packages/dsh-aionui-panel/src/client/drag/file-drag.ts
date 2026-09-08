@@ -5,24 +5,16 @@
  * framework-free so the splicing math is unit-testable in isolation.
  *
  * Workspace files carry a custom MIME (`application/x-dsh-file`); external
- * OS document files (markdown, source code, text, config, pdf) are read and
- * spliced cleanly into the active draft with formatted attachments.
-/**
- * Pure drag-to-composer helpers shared by the explorer rows (the drag
- * source) and the composer dock inlay (the drop target): the custom MIME
- * type, the drag-state detector, and the draft-splicing rule. Deliberately
- * framework-free so the splicing math is unit-testable in isolation.
- *
- * Workspace files carry a custom MIME (`application/x-dsh-file`); external
- * OS document files (markdown, source code, text, config, pdf) are read and
- * spliced cleanly into the active draft with formatted attachments.
+ * Plain-text files are read into the draft. PDF, Word, spreadsheet, archive,
+ * binary, and large files contribute only a path reference; this layer does
+ * not parse their content or open the Preview panel.
  * @module dsh-aionui-panel/client/drag/file-drag
  */
 
 /** Custom MIME carrying a workspace-relative file path. */
 export const FILE_DRAG_MIME = 'application/x-dsh-file'
 
-/** Common document extensions that can be parsed as text. */
+/** Plain-text extensions whose bytes may be inserted into the draft as text. */
 export const TEXT_DOCUMENT_EXTENSIONS = new Set([
   'txt', 'md', 'markdown', 'json', 'jsonc', 'yaml', 'yml', 'toml', 'xml', 'csv', 'tsv',
   'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'rs',
@@ -92,6 +84,222 @@ export const MAX_SAFE_IMAGE_BYTES = 3 * 1024 * 1024
  */
 export const MAX_IMAGE_DIMENSION = 2048
 
+/** Hard admission limits applied before browser image decoding. */
+export const MAX_SOURCE_IMAGE_BYTES = 32 * 1024 * 1024
+export const MAX_SOURCE_IMAGE_PIXELS = 32_000_000
+export const MAX_SOURCE_IMAGE_DIMENSION = 12_000
+
+export type ImageProcessingPhase = 'validating' | 'decoding' | 'compressing'
+
+export type ImageProcessingErrorCode =
+  | 'aborted'
+  | 'empty'
+  | 'not-image'
+  | 'source-too-large'
+  | 'dimensions-unknown'
+  | 'dimensions-invalid'
+  | 'decode-failed'
+  | 'canvas-unavailable'
+  | 'encode-failed'
+  | 'output-too-large'
+
+export class ImageProcessingError extends Error {
+  constructor(readonly code: ImageProcessingErrorCode, message: string) {
+    super(message)
+    this.name = 'ImageProcessingError'
+  }
+}
+
+export interface ImageProcessingOptions {
+  signal?: AbortSignal
+  onPhase?: (phase: ImageProcessingPhase) => void
+}
+
+interface ImageDimensions {
+  width: number
+  height: number
+}
+
+function abortError(): ImageProcessingError {
+  return new ImageProcessingError('aborted', 'image processing was cancelled')
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError()
+}
+
+function u24le(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! | (bytes[offset + 1]! << 8) | (bytes[offset + 2]! << 16)
+}
+
+/** Read dimensions from common image headers without allocating decoded pixels. */
+export function imageDimensionsFromHeader(bytes: Uint8Array): ImageDimensions | null {
+  if (bytes.length >= 24 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    return { width: view.getUint32(16), height: view.getUint32(20) }
+  }
+  if (bytes.length >= 10 && String.fromCharCode(...bytes.slice(0, 3)) === 'GIF') {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    return { width: view.getUint16(6, true), height: view.getUint16(8, true) }
+  }
+  if (bytes.length >= 30 && String.fromCharCode(...bytes.slice(0, 2)) === 'BM') {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) }
+  }
+  if (bytes.length >= 30
+    && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+    && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') {
+    const kind = String.fromCharCode(...bytes.slice(12, 16))
+    if (kind === 'VP8X') return { width: 1 + u24le(bytes, 24), height: 1 + u24le(bytes, 27) }
+    if (kind === 'VP8L' && bytes[20] === 0x2f) {
+      return {
+        width: 1 + bytes[21]! + ((bytes[22]! & 0x3f) << 8),
+        height: 1 + (bytes[22]! >> 6) + (bytes[23]! << 2) + ((bytes[24]! & 0x0f) << 10),
+      }
+    }
+    if (kind === 'VP8 ' && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      return { width: view.getUint16(26, true) & 0x3fff, height: view.getUint16(28, true) & 0x3fff }
+    }
+  }
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let offset = 2
+    while (offset + 8 < bytes.length) {
+      if (bytes[offset] !== 0xff) {
+        offset += 1
+        continue
+      }
+      const marker = bytes[offset + 1]!
+      offset += 2
+      if (marker === 0xd8 || marker === 0xd9) continue
+      if (offset + 2 > bytes.length) break
+      const length = (bytes[offset]! << 8) | bytes[offset + 1]!
+      if (length < 2 || offset + length > bytes.length) break
+      if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7)
+        || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+        return {
+          width: (bytes[offset + 5]! << 8) | bytes[offset + 6]!,
+          height: (bytes[offset + 3]! << 8) | bytes[offset + 4]!,
+        }
+      }
+      offset += length
+    }
+  }
+  return null
+}
+
+export function validateImageDimensions(dimensions: ImageDimensions): void {
+  const { width, height } = dimensions
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) {
+    throw new ImageProcessingError('dimensions-invalid', 'image dimensions are invalid')
+  }
+  if (width > MAX_SOURCE_IMAGE_DIMENSION || height > MAX_SOURCE_IMAGE_DIMENSION || width * height > MAX_SOURCE_IMAGE_PIXELS) {
+    throw new ImageProcessingError('source-too-large', `image dimensions exceed the ${MAX_SOURCE_IMAGE_PIXELS} pixel safety limit`)
+  }
+}
+
+async function probeImageDimensions(file: File, signal?: AbortSignal): Promise<ImageDimensions | null> {
+  throwIfAborted(signal)
+  if (typeof file.slice !== 'function') return null
+  const header = new Uint8Array(await file.slice(0, 64 * 1024).arrayBuffer())
+  throwIfAborted(signal)
+  return imageDimensionsFromHeader(header)
+}
+
+async function decodeImage(
+  file: File,
+  knownDimensions: ImageDimensions | null,
+  signal?: AbortSignal,
+): Promise<{ source: CanvasImageSource; dimensions: ImageDimensions; release: () => void }> {
+  throwIfAborted(signal)
+  if (typeof createImageBitmap === 'function') {
+    let bitmap: ImageBitmap | undefined
+    try {
+      bitmap = await createImageBitmap(file)
+      throwIfAborted(signal)
+      const dimensions = { width: bitmap.width, height: bitmap.height }
+      validateImageDimensions(dimensions)
+      if (knownDimensions !== null && (knownDimensions.width !== dimensions.width || knownDimensions.height !== dimensions.height)) {
+        throw new ImageProcessingError('dimensions-invalid', 'decoded image dimensions do not match its header')
+      }
+      const decoded = bitmap
+      return {
+        source: decoded,
+        dimensions,
+        release: () => decoded.close(),
+      }
+    } catch (error) {
+      bitmap?.close()
+      if (error instanceof ImageProcessingError) throw error
+      throw new ImageProcessingError('decode-failed', 'the image could not be decoded')
+    }
+  }
+
+  let objectUrl = ''
+  try {
+    objectUrl = URL.createObjectURL(file)
+  } catch {
+    throw new ImageProcessingError('decode-failed', 'the browser could not open this image')
+  }
+  const image = new Image()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cleanupListeners = (): void => {
+        image.onload = null
+        image.onerror = null
+        signal?.removeEventListener('abort', onAbort)
+      }
+      const onAbort = (): void => {
+        cleanupListeners()
+        image.src = ''
+        reject(abortError())
+      }
+      image.onload = () => {
+        cleanupListeners()
+        resolve()
+      }
+      image.onerror = () => {
+        cleanupListeners()
+        reject(new ImageProcessingError('decode-failed', 'the image could not be decoded'))
+      }
+      signal?.addEventListener('abort', onAbort, { once: true })
+      image.src = objectUrl
+    })
+    throwIfAborted(signal)
+    const dimensions = {
+      width: image.naturalWidth || image.width,
+      height: image.naturalHeight || image.height,
+    }
+    validateImageDimensions(dimensions)
+    if (knownDimensions !== null && (knownDimensions.width !== dimensions.width || knownDimensions.height !== dimensions.height)) {
+      throw new ImageProcessingError('dimensions-invalid', 'decoded image dimensions do not match its header')
+    }
+    return {
+      source: image,
+      dimensions,
+      release: () => {
+        image.src = ''
+        URL.revokeObjectURL(objectUrl)
+      },
+    }
+  } catch (error) {
+    image.src = ''
+    URL.revokeObjectURL(objectUrl)
+    throw error
+  }
+}
+
+async function canvasBlob(canvas: HTMLCanvasElement, quality: number, signal?: AbortSignal): Promise<Blob> {
+  throwIfAborted(signal)
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (signal?.aborted) reject(abortError())
+      else if (blob === null) reject(new ImageProcessingError('encode-failed', 'image encoding failed'))
+      else resolve(blob)
+    }, 'image/jpeg', quality)
+  })
+}
+
 /**
  * Calculate scaled dimensions that fit within maxDimension while maintaining aspect ratio.
  */
@@ -121,105 +329,83 @@ export function calculateScaledDimensions(
 export async function compressImageFileToFit(
   file: File,
   maxBytes = MAX_SAFE_IMAGE_BYTES,
-  maxDimension = MAX_IMAGE_DIMENSION
+  maxDimension = MAX_IMAGE_DIMENSION,
+  options: ImageProcessingOptions = {},
 ): Promise<File> {
-  if (!isImageFile(file)) return file
-
-  if (typeof window === 'undefined' || typeof document === 'undefined' || typeof Image === 'undefined') {
-    return file
+  const { signal, onPhase } = options
+  onPhase?.('validating')
+  throwIfAborted(signal)
+  if (!isImageFile(file)) throw new ImageProcessingError('not-image', 'the selected file is not an image')
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) throw new ImageProcessingError('empty', 'the image is empty')
+  if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+    throw new ImageProcessingError('source-too-large', `image exceeds the ${MAX_SOURCE_IMAGE_BYTES} byte source limit`)
   }
 
-  // Fast path: small files under 1.5MB that are within dimension need no recompression
-  if (file.size <= 1.5 * 1024 * 1024) {
-    return file
+  const headerDimensions = await probeImageDimensions(file, signal)
+  if (headerDimensions !== null) validateImageDimensions(headerDimensions)
+  if (headerDimensions === null && file.size > maxBytes) {
+    throw new ImageProcessingError('dimensions-unknown', 'image dimensions could not be verified before decoding')
   }
 
-  return new Promise<File>((resolve) => {
-    let objectUrl = ''
-    try {
-      objectUrl = URL.createObjectURL(file)
-    } catch {
-      resolve(file)
-      return
+  if (typeof window === 'undefined'
+    || typeof document === 'undefined'
+    || (typeof Image === 'undefined' && typeof createImageBitmap !== 'function')) {
+    if (file.size <= maxBytes) return file
+    throw new ImageProcessingError('canvas-unavailable', 'image compression is unavailable in this environment')
+  }
+
+  if (file.size <= maxBytes
+    && headerDimensions !== null
+    && headerDimensions.width <= maxDimension
+    && headerDimensions.height <= maxDimension) {
+    return file
+  }
+  onPhase?.('decoding')
+  const decoded = await decodeImage(file, headerDimensions, signal)
+  const canvas = document.createElement('canvas')
+  try {
+    const { width: targetW, height: targetH } = calculateScaledDimensions(
+      decoded.dimensions.width,
+      decoded.dimensions.height,
+      maxDimension,
+    )
+    if (file.size <= maxBytes && targetW === decoded.dimensions.width && targetH === decoded.dimensions.height) return file
+    onPhase?.('compressing')
+    canvas.width = targetW
+    canvas.height = targetH
+    const context = canvas.getContext('2d')
+    if (context === null) throw new ImageProcessingError('canvas-unavailable', 'image canvas is unavailable')
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(decoded.source, 0, 0, targetW, targetH)
+    let output: Blob | undefined
+    for (const quality of [0.85, 0.72, 0.55, 0.4]) {
+      output = await canvasBlob(canvas, quality, signal)
+      if (output.size <= maxBytes) break
     }
-
-    const img = new Image()
-    const cleanup = (): void => {
-      if (objectUrl) {
-        try {
-          URL.revokeObjectURL(objectUrl)
-        } catch {}
-      }
+    if (output === undefined || output.size > maxBytes) {
+      throw new ImageProcessingError('output-too-large', 'compressed image still exceeds the attachment limit')
     }
+    const baseName = file.name.replace(/\.[^.]+$/u, '') || 'image'
+    return new File([output], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
+  } finally {
+    decoded.release()
+    canvas.width = 0
+    canvas.height = 0
+  }
+}
 
-    img.onload = () => {
-      cleanup()
-      const origW = img.naturalWidth || img.width
-      const origH = img.naturalHeight || img.height
-
-      if (origW <= 0 || origH <= 0) {
-        resolve(file)
-        return
-      }
-
-      if (file.size <= maxBytes && origW <= maxDimension && origH <= maxDimension) {
-        resolve(file)
-        return
-      }
-
-      const { width: targetW, height: targetH } = calculateScaledDimensions(origW, origH, maxDimension)
-
-      const canvas = document.createElement('canvas')
-      canvas.width = targetW
-      canvas.height = targetH
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        resolve(file)
-        return
-      }
-
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = 'high'
-      ctx.drawImage(img, 0, 0, targetW, targetH)
-
-      const qualities = [0.85, 0.72, 0.55, 0.4]
-      let qIndex = 0
-
-      const tryNextQuality = (): void => {
-        const quality = qualities[qIndex] ?? 0.5
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              resolve(file)
-              return
-            }
-            if (blob.size <= maxBytes || qIndex >= qualities.length - 1) {
-              const baseName = file.name.replace(/\.[^.]+$/u, '')
-              const compressedFile = new File([blob], `${baseName}.jpg`, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              })
-              resolve(compressedFile)
-            } else {
-              qIndex++
-              tryNextQuality()
-            }
-          },
-          'image/jpeg',
-          quality
-        )
-      }
-
-      tryNextQuality()
-    }
-
-    img.onerror = () => {
-      cleanup()
-      resolve(file)
-    }
-
-    img.src = objectUrl
-  })
+/** Process one image at a time so decoded pixel buffers cannot multiply by batch size. */
+export async function processImageFilesSequentially(
+  files: readonly File[],
+  options: ImageProcessingOptions = {},
+): Promise<File[]> {
+  const output: File[] = []
+  for (const file of files) {
+    throwIfAborted(options.signal)
+    output.push(await compressImageFileToFit(file, MAX_SAFE_IMAGE_BYTES, MAX_IMAGE_DIMENSION, options))
+  }
+  return output
 }
 
 /**
@@ -276,10 +462,10 @@ export function formatDocumentAttachment(fileName: string, content: string, file
 }
 
 /**
- * Read and format any dropped OS file into the appropriate markdown snippet:
+ * Read and format any dropped OS file into the appropriate draft snippet:
  * - Images: `![fileName](filePath)`
  * - Text/code documents (< 1MB): formatted code block with content
- * - Other files (PDF, Word, Excel, ZIP, binary, large files): `[fileName](filePath)`
+ * - Other files (PDF, Word, Excel, ZIP, binary, large files): path reference only
  */
 export async function formatDroppedFile(file: File): Promise<string> {
   const electronPath = (file as unknown as { path?: string }).path
@@ -315,6 +501,17 @@ export async function formatDroppedFile(file: File): Promise<string> {
   }
 
   return formatGenericFileAttachment(file.name, electronPath)
+}
+
+/** Format dropped files serially so FileReader buffers are bounded to one file. */
+export async function formatDroppedFilesSequentially(files: readonly File[], signal?: AbortSignal): Promise<string[]> {
+  const output: string[] = []
+  for (const file of files) {
+    throwIfAborted(signal)
+    output.push(await formatDroppedFile(file))
+  }
+  throwIfAborted(signal)
+  return output
 }
 
 /**

@@ -185,6 +185,21 @@ export class BalanceService {
     }
 
     const { model, provider, baseURL } = this.resolveModelAndProvider()
+
+    if (provider !== 'deepseek-official') {
+      return {
+        ok: false,
+        is_available: false,
+        currency: '',
+        totalBalance: '--',
+        toppedUpBalance: '--',
+        grantedBalance: '--',
+        modelName: model,
+        provider,
+        fetchedAt: now,
+        error: '当前 Provider 没有可验证的官方余额接口',
+      }
+    }
     const apiKey = await this.resolveApiKey()
 
     if (!apiKey) {
@@ -228,20 +243,35 @@ export class BalanceService {
         balance_infos?: BalanceInfo[]
       }
 
-      const primary = json.balance_infos?.[0] ?? {
-        currency: 'CNY',
-        total_balance: '0.00',
-        granted_balance: '0.00',
-        topped_up_balance: '0.00',
+      const primary = json.balance_infos?.[0]
+      if (
+        primary === undefined
+        || typeof primary.currency !== 'string'
+        || typeof primary.total_balance !== 'string'
+        || typeof primary.granted_balance !== 'string'
+        || typeof primary.topped_up_balance !== 'string'
+      ) {
+        return {
+          ok: false,
+          is_available: json.is_available === true,
+          currency: '',
+          totalBalance: '--',
+          toppedUpBalance: '--',
+          grantedBalance: '--',
+          modelName: model,
+          provider,
+          fetchedAt: now,
+          error: '官方余额接口未返回完整的余额明细',
+        }
       }
 
       const result: ModelBalanceResponse = {
         ok: true,
-        is_available: json.is_available ?? true,
-        currency: primary.currency || 'CNY',
-        totalBalance: primary.total_balance ?? '0.00',
-        toppedUpBalance: primary.topped_up_balance ?? '0.00',
-        grantedBalance: primary.granted_balance ?? '0.00',
+        is_available: json.is_available === true,
+        currency: primary.currency,
+        totalBalance: primary.total_balance,
+        toppedUpBalance: primary.topped_up_balance,
+        grantedBalance: primary.granted_balance,
         modelName: model,
         provider,
         fetchedAt: now,

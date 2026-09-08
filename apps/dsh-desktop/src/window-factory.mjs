@@ -6,6 +6,114 @@ import { getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, window
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
 
+function clamp(value, minimum, maximum) {
+  return Math.min(Math.max(value, minimum), Math.max(minimum, maximum))
+}
+
+/** Place a child beside its parent when possible and keep it inside one work area. */
+export function attachedWindowBounds(parentBounds, childBounds, workArea, gap = 12) {
+  const width = Math.min(childBounds.width, workArea.width)
+  const height = Math.min(childBounds.height, workArea.height)
+  const workRight = workArea.x + workArea.width
+  const workBottom = workArea.y + workArea.height
+  const right = parentBounds.x + parentBounds.width + gap
+  const left = parentBounds.x - width - gap
+  const x = right + width <= workRight
+    ? right
+    : left >= workArea.x
+      ? left
+      : clamp(parentBounds.x + parentBounds.width - width, workArea.x, workRight - width)
+  return {
+    x,
+    y: clamp(parentBounds.y, workArea.y, workBottom - height),
+    width,
+    height,
+  }
+}
+
+function sameBounds(left, right) {
+  return left.x === right.x && left.y === right.y && left.width === right.width && left.height === right.height
+}
+
+function matchingWorkArea(screen, bounds) {
+  return screen?.getDisplayMatching?.(bounds)?.workArea
+    ?? screen?.getPrimaryDisplay?.()?.workArea
+}
+
+/**
+ * Follow the main window until the user moves the child independently.
+ * Display changes still clamp a detached child, and every listener is removed
+ * when the child closes.
+ */
+export function installAttachedWindowPlacement({ parentWindow, childWindow, screen, gap = 12 } = {}) {
+  if (!parentWindow || !childWindow || !screen) return () => {}
+  let detached = false
+  let applying = false
+  let disposed = false
+
+  const expectedBounds = () => {
+    const parent = parentWindow.getBounds()
+    const child = childWindow.getBounds()
+    const workArea = matchingWorkArea(screen, parent)
+    return workArea === undefined ? child : attachedWindowBounds(parent, child, workArea, gap)
+  }
+  const applyBounds = (bounds) => {
+    if (childWindow.isDestroyed?.()) return
+    if (sameBounds(childWindow.getBounds(), bounds)) return
+    applying = true
+    try { childWindow.setBounds(bounds, false) } finally { applying = false }
+  }
+  const followParent = () => {
+    if (detached || parentWindow.isDestroyed?.() || childWindow.isDestroyed?.()) return
+    applyBounds(expectedBounds())
+  }
+  const childMoved = () => {
+    if (applying || detached || parentWindow.isDestroyed?.() || childWindow.isDestroyed?.()) return
+    if (!sameBounds(childWindow.getBounds(), expectedBounds())) detached = true
+  }
+  const displayChanged = () => {
+    if (parentWindow.isDestroyed?.() || childWindow.isDestroyed?.()) return
+    if (!detached) {
+      followParent()
+      return
+    }
+    const child = childWindow.getBounds()
+    const workArea = matchingWorkArea(screen, child)
+    if (workArea !== undefined) {
+      applyBounds({
+        ...child,
+        width: Math.min(child.width, workArea.width),
+        height: Math.min(child.height, workArea.height),
+        x: clamp(child.x, workArea.x, workArea.x + workArea.width - Math.min(child.width, workArea.width)),
+        y: clamp(child.y, workArea.y, workArea.y + workArea.height - Math.min(child.height, workArea.height)),
+      })
+    }
+  }
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    for (const event of ['move', 'resize', 'maximize', 'unmaximize', 'restore']) {
+      parentWindow.removeListener?.(event, followParent)
+    }
+    childWindow.removeListener?.('move', childMoved)
+    childWindow.removeListener?.('closed', dispose)
+    for (const event of ['display-added', 'display-removed', 'display-metrics-changed']) {
+      screen.removeListener?.(event, displayChanged)
+    }
+  }
+
+  for (const event of ['move', 'resize', 'maximize', 'unmaximize', 'restore']) {
+    parentWindow.on?.(event, followParent)
+  }
+  childWindow.on?.('move', childMoved)
+  childWindow.once?.('closed', dispose)
+  for (const event of ['display-added', 'display-removed', 'display-metrics-changed']) {
+    screen.on?.(event, displayChanged)
+  }
+  followParent()
+  return dispose
+}
+
 export function secondaryWindowWebPreferences({ preload } = {}) {
   return {
     ...(preload ? { preload } : {}),
@@ -59,6 +167,7 @@ export function createDesktopWindowFactory({
   handoffPath,
   communityPath,
   surfaceRegistry,
+  screen,
   shell,
   getMainWindow = () => undefined,
   log = () => {},
@@ -146,6 +255,7 @@ export function createDesktopWindowFactory({
       ...windowChromeBrowserOptions(chromeTheme),
       webPreferences: secondaryWindowWebPreferences({ preload: extensionPreload }),
     })
+    installAttachedWindowPlacement({ parentWindow: mainWindow, childWindow: browserWindow, screen })
     await configureSecondaryWindow({
       key: 'extensions',
       browserWindow,

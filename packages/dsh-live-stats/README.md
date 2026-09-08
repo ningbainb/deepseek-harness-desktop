@@ -15,6 +15,14 @@ Live input/output token estimates, rolling one-second generation peak, and sessi
 - **Host half**: registers the replayable `liveTokenUsage` session projection (`ctx.sessionProjections`). The fold estimates input tokens from the surface log plus header/tool framing and turns streamed output increments into timestamped samples. Each sample computes the output-token total in `[t-1000ms, t]`; same-millisecond batches are coalesced, and each step records its latest rolling rate and maximum rolling peak. Usage summaries and final messages correct billing buckets only and never create instantaneous samples. The latest rate remains resident when no new sample arrives; no TPS is shown when a step has no valid streamed sample.
 - **Client half**: mounts the cost/TPS row in the conversation composer dock. It reads the host's `liveTokenUsage` projection directly and renders compact input/output token totals plus the current-session estimated cost.
 
+The usage center keeps three measurements distinct. Official account balance is
+queried only for `deepseek-official`, whose verified `/user/balance` endpoint
+returns a complete balance record. An unsupported Provider, missing record, or
+failed request is labeled unknown and is never filled with zero. The `≈` cost is
+a local estimate using the selected peak/off-peak price period, not an account
+balance or invoice. TPS is the rolling one-second streamed-output peak, not a
+billing rate.
+
 ## Installation
 
 Install the family aggregate package `@linxin666/dsh-web-ui-all` (all plugins and skins in one) or this plugin alone:

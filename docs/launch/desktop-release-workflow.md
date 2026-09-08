@@ -1,4 +1,4 @@
-# DeepSeek Harness Desktop 3.0.9 release preparation and handoff
+# DeepSeek Harness Desktop 3.3.0 release preparation and handoff
 
 This guide describes repository verification for a possible release. It does not authorize a push, tag, GitHub Release, deployment, or announcement.
 
@@ -20,6 +20,8 @@ Run `pnpm verify` for the complete repository gate. A release candidate must als
 The direct-start matrix covers clean installs, real preserved Homes from Desktop 2.3 through 2.7 and 3.0.1, user plugins, settings, sessions, syntax failures, startup throws, invalid repair candidates, native ABI failures, verified repair, and same-Home built-ins fallback. It asserts that no startup choice page appears and that preserved state remains in the same Home.
 
 The Desktop Release workflow then packages the selected updater channel, runs packaged directory-picker, terminal, window-chrome, profile, direct-start, smoke, shutdown, signature, checksum, and manifest checks. These gates verify a candidate; they do not make a local artifact published.
+
+Before publication, a Windows release test machine must also run two real in-place upgrades using three consecutive installer versions and the same preserved Home. Verify exactly one Start Menu shortcut, Desktop shortcut, uninstall entry, and application directory; verify the installed executable and Runtime version agree after each upgrade; then interrupt a subsequent candidate after its old-version staging step and confirm the prior version and original session are restored. Record installer hashes and signature states. The fixture transaction test and a successful makensis compile are prerequisites, not substitutes for this release-machine run.
 
 The committed telemetry resource is inert, while the official release job requires and injects the reviewed first-party endpoint plus the official-build marker. Product events contain rotating daily and monthly anonymous actors and bounded categorical outcomes, never model prompts, credentials, conversation bodies, tool results, plugin names, or absolute user paths. Diagnostics remain user-initiated, locally exported, and redacted.
 

@@ -62,11 +62,74 @@ const requiredPackages = [
   'ws',
   ...MANAGED_RUNTIME_PACKAGES,
 ]
+const REQUIRED_NATIVE_BINDINGS = Object.freeze({
+  'darwin-arm64': Object.freeze([
+    '@img/sharp-darwin-arm64',
+    '@img/sharp-libvips-darwin-arm64',
+    '@koromix/koffi-darwin-arm64',
+    '@vscode/ripgrep-darwin-arm64',
+    'lightningcss-darwin-arm64',
+    'node-addon-require-builtin-darwin-arm64',
+  ]),
+  'win32-x64': Object.freeze([
+    '@img/sharp-win32-x64',
+    '@koromix/koffi-win32-x64',
+    '@vscode/ripgrep-win32-x64',
+    'lightningcss-win32-x64-msvc',
+    'node-addon-require-builtin-win32-x64-msvc',
+  ]),
+})
+const requiredNativeBindings = REQUIRED_NATIVE_BINDINGS[
+  `${TARGET_PLATFORM.platform}-${TARGET_PLATFORM.arch}`
+] ?? []
+requiredPackages.push(...requiredNativeBindings)
 
 for (const packageName of requiredPackages) {
   const manifestPath = join(unpackedModules, ...packagePathSegments(packageName), 'package.json')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   if (manifest.name !== packageName) throw new Error(`packaged manifest mismatch for ${packageName}`)
+}
+
+if (TARGET_PLATFORM.platform === 'win32' && TARGET_PLATFORM.arch === 'x64') {
+  await access(join(
+    unpackedModules,
+    '@img',
+    'sharp-win32-x64',
+    'lib',
+    'sharp-win32-x64-0.35.3.node',
+  ))
+  await access(join(
+    unpackedModules,
+    '@koromix',
+    'koffi-win32-x64',
+    'win32_x64',
+    'koffi.node',
+  ))
+  await access(join(
+    unpackedModules,
+    'lightningcss-win32-x64-msvc',
+    'lightningcss.win32-x64-msvc.node',
+  ))
+  await access(join(unpackedModules, '@vscode', 'ripgrep-win32-x64', 'bin', 'rg.exe'))
+  await access(join(
+    unpackedModules,
+    'node-addon-require-builtin-win32-x64-msvc',
+    'prebuilt',
+    'win32-x64-msvc-napi-v9.node',
+  ))
+}
+
+if (TARGET_PLATFORM.platform === process.platform && TARGET_PLATFORM.arch === process.arch) {
+  await import(pathToFileURL(join(unpackedModules, 'koffi', 'index.js')).href)
+  await import(pathToFileURL(join(unpackedModules, 'sharp', 'dist', 'index.mjs')).href)
+  await import(pathToFileURL(join(unpackedModules, 'lightningcss', 'node', 'index.mjs')).href)
+  await import(pathToFileURL(join(unpackedModules, '@vscode', 'ripgrep', 'lib', 'index.js')).href)
+  await import(pathToFileURL(join(
+    unpackedModules,
+    'node-addon-require-builtin',
+    'lib',
+    'index.js',
+  )).href)
 }
 
 await access(join(unpackedModules, '@deepseek-ai', 'dsh', 'lib', 'bin.js'))
@@ -398,6 +461,9 @@ if (!packagingConfig.protocols?.some((entry) => entry.schemes?.includes('dsh')))
 }
 if (!packagingConfig.fileAssociations?.some((entry) => entry.ext === 'dshpreset' && entry.role === 'Editor')) {
   throw new Error('packaging config is missing the review-only .dshpreset association')
+}
+if (!packagingConfig.files?.includes('runtime-support/community-plugin-known-issues.json')) {
+  throw new Error('packaging config is missing the community plugin known-issues evidence')
 }
 if (!packagingConfig.extraResources?.some((entry) => entry.to === 'telemetry-config.json')) {
   throw new Error('packaging config is missing the anonymous metrics resource')

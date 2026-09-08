@@ -2,11 +2,12 @@
   InitPluginsDir
   SetOutPath "$TEMP"
   File /oname=$PLUGINSDIR\cleanup-stale-processes.ps1 "${BUILD_RESOURCES_DIR}\cleanup-stale-processes.ps1"
+  File /oname=$PLUGINSDIR\installer-upgrade-transaction.ps1 "${BUILD_RESOURCES_DIR}\installer-upgrade-transaction.ps1"
 cleanup_retry:
   !ifdef BUILD_UNINSTALLER
   nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup-stale-processes.ps1" -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
   !else
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup-stale-processes.ps1" -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -PrepareExistingUpgrade'
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup-stale-processes.ps1" -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -PrepareExistingUpgrade -UpgradeTransactionScript "$PLUGINSDIR\installer-upgrade-transaction.ps1"'
   !endif
   Pop $0
   Pop $1
@@ -34,4 +35,27 @@ cleanup_script_error:
   MessageBox MB_ICONSTOP|MB_OK "安装前检查脚本执行失败。文件尚未被替换，请重新下载安装包后重试。$\r$\n$\r$\n$1 / The preflight script failed before any files were replaced. Download the installer again and retry." /SD IDOK
   Abort
 cleanup_done:
+!macroend
+
+!macro customInstall
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-upgrade-transaction.ps1" -Mode Commit -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" upgrade_commit_done
+  MessageBox MB_ICONSTOP|MB_OK "升级事务无法提交（错误码 $0）。安装程序将恢复上一版本。$\r$\n$\r$\n$1 / The upgrade transaction could not commit (code $0). The installer will restore the previous version." /SD IDOK
+  Abort
+upgrade_commit_done:
+!macroend
+
+!macro customHeader
+  !ifndef BUILD_UNINSTALLER
+  Function .onInstFailed
+    IfFileExists "$PLUGINSDIR\installer-upgrade-transaction.ps1" 0 upgrade_rollback_done
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-upgrade-transaction.ps1" -Mode Rollback -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
+    Pop $0
+    Pop $1
+    DetailPrint "$1"
+  upgrade_rollback_done:
+  FunctionEnd
+  !endif
 !macroend

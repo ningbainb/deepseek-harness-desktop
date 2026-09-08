@@ -34,6 +34,7 @@ export const SETTINGS_WINDOW_CSS = `
   min-width: 0 !important;
   max-width: 188px !important;
   overflow: auto !important;
+  scrollbar-gutter: stable;
 }
 
 .${SETTINGS_DIALOG_CLASS} > nav + div {
@@ -41,6 +42,7 @@ export const SETTINGS_WINDOW_CSS = `
   min-width: 0 !important;
   max-width: 100% !important;
   overflow: auto !important;
+  scrollbar-gutter: stable;
 }
 
 .${SETTINGS_DIALOG_CLASS} input,
@@ -59,7 +61,7 @@ export const SETTINGS_WINDOW_CSS = `
 
 .${SETTINGS_DIALOG_CLASS} [data-dsh-settings-drag-handle="true"]:active { cursor: grabbing; }
 
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize] {
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize] {
   position: absolute;
   z-index: 2147483647;
   display: block;
@@ -67,35 +69,27 @@ export const SETTINGS_WINDOW_CSS = `
   touch-action: none;
 }
 
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="n"],
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="s"] {
-  right: 10px;
-  left: 10px;
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="n"],
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="s"] {
   height: 8px;
   cursor: ns-resize;
 }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="n"] { top: 2px; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="s"] { bottom: 2px; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="e"],
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="w"] {
-  top: 10px;
-  bottom: 10px;
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="e"],
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="w"] {
   width: 8px;
   cursor: ew-resize;
 }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="e"] { right: 2px; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="w"] { left: 2px; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="ne"],
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="nw"],
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="se"],
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="sw"] {
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="ne"],
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="nw"],
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="se"],
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="sw"] {
   width: 14px;
   height: 14px;
 }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="ne"] { top: 2px; right: 2px; cursor: nesw-resize; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="nw"] { top: 2px; left: 2px; cursor: nwse-resize; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="se"] { right: 2px; bottom: 2px; cursor: nwse-resize; }
-.${SETTINGS_DIALOG_CLASS} [data-dsh-settings-resize="sw"] { bottom: 2px; left: 2px; cursor: nesw-resize; }
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="ne"] { cursor: nesw-resize; }
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="nw"] { cursor: nwse-resize; }
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="se"] { cursor: nwse-resize; }
+.${SETTINGS_LAYER_CLASS} > [data-dsh-settings-resize="sw"] { cursor: nesw-resize; }
 
 @container (max-width: 620px) {
   .${SETTINGS_DIALOG_CLASS} > nav {
@@ -143,6 +137,30 @@ export function createSettingsWindowScript() {
       const y = clamp(Number.isFinite(input.y) ? Math.round(input.y) : defaultY, config.margin, Math.max(config.margin, viewportHeight - config.margin - height));
       return { x, y, width, height };
     };
+    const positionResizeHandles = (bounds) => {
+      if (!active?.handles) return;
+      const edge = 8;
+      const corner = 14;
+      const inset = 10;
+      const styles = {
+        n: { left: bounds.x + inset, top: bounds.y - edge, width: Math.max(0, bounds.width - inset * 2), height: edge },
+        ne: { left: bounds.x + bounds.width, top: bounds.y - corner, width: corner, height: corner },
+        e: { left: bounds.x + bounds.width, top: bounds.y + inset, width: edge, height: Math.max(0, bounds.height - inset * 2) },
+        se: { left: bounds.x + bounds.width, top: bounds.y + bounds.height, width: corner, height: corner },
+        s: { left: bounds.x + inset, top: bounds.y + bounds.height, width: Math.max(0, bounds.width - inset * 2), height: edge },
+        sw: { left: bounds.x - corner, top: bounds.y + bounds.height, width: corner, height: corner },
+        w: { left: bounds.x - edge, top: bounds.y + inset, width: edge, height: Math.max(0, bounds.height - inset * 2) },
+        nw: { left: bounds.x - corner, top: bounds.y - corner, width: corner, height: corner },
+      };
+      for (const [name, handle] of active.handles) {
+        const next = styles[name];
+        if (!next) continue;
+        handle.style.left = next.left + 'px';
+        handle.style.top = next.top + 'px';
+        handle.style.width = next.width + 'px';
+        handle.style.height = next.height + 'px';
+      }
+    };
     const applyBounds = (input) => {
       if (!active?.dialog?.isConnected) return;
       const bounds = normalize(input, active.layer);
@@ -152,6 +170,7 @@ export function createSettingsWindowScript() {
       active.dialog.style.setProperty('--dsh-settings-window-y', bounds.y + 'px');
       active.dialog.style.setProperty('--dsh-settings-window-width', bounds.width + 'px');
       active.dialog.style.setProperty('--dsh-settings-window-height', bounds.height + 'px');
+      positionResizeHandles(bounds);
     };
     const saveBounds = () => {
       if (!active?.bounds) return;
@@ -189,7 +208,12 @@ export function createSettingsWindowScript() {
       window.addEventListener('pointerup', stopGesture, true);
       window.addEventListener('pointercancel', stopGesture, true);
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+    const detachActive = () => {
+      if (!active) return;
+      for (const handle of active.handles?.values?.() ?? []) handle.remove();
+      active = undefined;
     };
     const attach = (dialog) => {
       if (dialog.classList.contains(config.dialogClass)) return;
@@ -204,14 +228,16 @@ export function createSettingsWindowScript() {
       dragHandle.dataset.dshSettingsDragHandle = 'true';
       dragHandle.title = '拖动设置窗口 / Drag settings window';
       dragHandle.addEventListener('pointerdown', (event) => startGesture(event, 'move'));
+      const handles = new Map();
       for (const edge of ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']) {
         const handle = document.createElement('span');
         handle.dataset.dshSettingsResize = edge;
         handle.setAttribute('aria-hidden', 'true');
         handle.addEventListener('pointerdown', (event) => startGesture(event, edge));
-        dialog.append(handle);
+        layer.append(handle);
+        handles.set(edge, handle);
       }
-      active = { dialog, layer, bounds: undefined };
+      active = { dialog, layer, handles, bounds: undefined };
       void api.settingsOpened?.().catch(() => {});
       applyBounds(persistedBounds ?? {
         x: box.x - layerBox.x,
@@ -221,7 +247,7 @@ export function createSettingsWindowScript() {
       });
     };
     const scan = () => {
-      if (active && !active.dialog.isConnected) active = undefined;
+      if (active && !active.dialog.isConnected) detachActive();
       document.querySelectorAll('[role="dialog"]').forEach(attach);
     };
     const observer = new MutationObserver(scan);
@@ -236,6 +262,7 @@ export function createSettingsWindowScript() {
     window[controllerKey] = {
       dispose: () => {
         stopGesture();
+        detachActive();
         observer.disconnect();
         window.removeEventListener('resize', onResize);
       },

@@ -1,4 +1,4 @@
-import { mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { lstat, mkdir, readdir, rename, rm, statfs } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
@@ -9,6 +9,101 @@ import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
 const PROFILE_RESET_BACKUP_LIMIT = 3
+const PROFILE_RESET_SCAN_ENTRY_LIMIT = 50_000
+const PROFILE_RESET_FREE_SPACE_RESERVE = 64 * 1024 * 1024
+
+async function profileResetAvailableBytes(path) {
+  let cursor = path
+  while (true) {
+    try {
+      const value = await statfs(cursor)
+      return Number(value.bavail) * Number(value.bsize)
+    } catch (error) {
+      const parent = dirname(cursor)
+      if (error?.code !== 'ENOENT' || parent === cursor) throw error
+      cursor = parent
+    }
+  }
+}
+
+async function inspectTreeSize(root) {
+  const pending = [root]
+  let bytes = 0
+  let entries = 0
+  let complete = true
+  while (pending.length > 0) {
+    const path = pending.pop()
+    let stat
+    try {
+      stat = await lstat(path)
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue
+      complete = false
+      continue
+    }
+    entries += 1
+    bytes += stat.size
+    if (entries >= PROFILE_RESET_SCAN_ENTRY_LIMIT) {
+      complete = false
+      break
+    }
+    if (!stat.isDirectory() || stat.isSymbolicLink()) continue
+    try {
+      const children = await readdir(path)
+      for (const child of children) pending.push(join(path, child))
+    } catch {
+      complete = false
+    }
+  }
+  return Object.freeze({ bytes, entries, complete })
+}
+
+async function assertRealProfileDirectory(path) {
+  try {
+    const stat = await lstat(path)
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      throw new Error('desktop profile reset requires a real directory')
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+}
+
+async function createProfileResetPreview(profileDir, timestamp = Date.now(), getAvailableBytes = profileResetAvailableBytes) {
+  await assertRealProfileDirectory(profileDir)
+  const parent = dirname(profileDir)
+  const profileName = basename(profileDir)
+  const prefix = `${profileName}.backup-`
+  const profile = await inspectTreeSize(profileDir)
+  let existing = []
+  try {
+    existing = (await readdir(parent, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix) && /^\d+$/u.test(entry.name.slice(prefix.length)))
+      .sort((left, right) => right.name.localeCompare(left.name, 'en'))
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+  const pruned = existing.slice(Math.max(0, PROFILE_RESET_BACKUP_LIMIT - 1))
+  const reclaimed = []
+  for (const entry of pruned) reclaimed.push(await inspectTreeSize(join(parent, entry.name)))
+  const availableBytes = await getAvailableBytes(parent)
+  const requiredFreeBytes = profile.bytes + PROFILE_RESET_FREE_SPACE_RESERVE
+  return Object.freeze({
+    timestamp,
+    profileDirectory: profileDir,
+    pluginLoadDirectory: join(profileDir, 'node_modules'),
+    backupDirectory: `${profileDir}.backup-${timestamp}`,
+    currentProfileBytes: profile.bytes,
+    availableBytes,
+    requiredFreeBytes,
+    spaceSufficient: availableBytes >= requiredFreeBytes,
+    estimatedReclaimBytes: reclaimed.reduce((total, item) => total + item.bytes, 0),
+    prunedBackupCount: pruned.length,
+    estimateComplete: profile.complete && reclaimed.every((item) => item.complete),
+    cleanupScope: Object.freeze(['third-party dependencies', 'profile bundle activation', 'profile patch files']),
+    preservedScope: Object.freeze(['sessions and workspaces', 'API and provider configuration', 'personal settings', 'the new profile backup']),
+  })
+}
 
 async function pruneProfileResetBackups(profileDir) {
   const parent = dirname(profileDir)
@@ -60,6 +155,7 @@ const CHANNELS = [
   'extensions:recovery-restore',
   'extensions:full-user-trust-revoke',
   'extensions:diagnostics-export',
+  'extensions:network-diagnostics',
   'extensions:community-open',
   'extensions:market-list',
   'extensions:market-install',
@@ -67,6 +163,7 @@ const CHANNELS = [
   'extensions:skill-open',
   'extensions:skill-root',
   'extensions:profile-dir-open',
+  'extensions:profile-reset-preview',
   'extensions:profile-reset',
   'extensions:qqbot-status',
   'extensions:qqbot-bind',
@@ -98,6 +195,7 @@ export function registerExtensionIpc({
   migrationService,
   notificationService,
   communityMarket,
+  networkDiagnostics,
   // These callbacks run exclusively in the main process. The resolver turns
   // the renderer's source reference into a private descriptor and the
   // revalidator checks it again before mutation. No descriptor is returned
@@ -110,6 +208,7 @@ export function registerExtensionIpc({
   trackProductOperation = (_detail, operation) => operation(),
   onRuntimeMaintenanceChange = () => {},
   quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
+  getProfileResetAvailableBytes = profileResetAvailableBytes,
 }) {
   if (typeof surfaceRegistry?.assert !== 'function') {
     throw new TypeError('extension IPC requires a desktop surface registry')
@@ -481,6 +580,11 @@ export function registerExtensionIpc({
     return revokeFullUserTrust()
   })
   handleExtension('extensions:diagnostics-export', () => exportDiagnostics())
+  handleExtension('extensions:network-diagnostics', (_event, ...args) => {
+    if (args.length !== 0) throw new TypeError('network diagnostics do not accept arguments')
+    if (typeof networkDiagnostics?.run !== 'function') throw new Error('network diagnostics are unavailable')
+    return networkDiagnostics.run()
+  })
   handleExtension('extensions:community-open', (_event, id) => shell.openExternal(resolveCommunityPluginUrl(id)))
   handleExtension('extensions:market-list', () => {
     if (typeof communityMarket?.list !== 'function') throw new Error('community market is unavailable')
@@ -519,10 +623,22 @@ export function registerExtensionIpc({
     await mkdir(profileDir, { recursive: true })
     return shell.openPath(profileDir)
   })
-  handleExtension('extensions:profile-reset', () => enqueuePluginMutation(async () => {
-    await controller.stop()
+  handleExtension('extensions:profile-reset-preview', async () => {
     const profileDir = join(dshHome, 'profiles', 'desktop')
-    const timestamp = Date.now()
+    return createProfileResetPreview(profileDir, Date.now(), getProfileResetAvailableBytes)
+  })
+  handleExtension('extensions:profile-reset', (_event, request = {}) => enqueuePluginMutation(async () => {
+    const requestedTimestamp = request?.timestamp
+    if (requestedTimestamp !== undefined && (!Number.isSafeInteger(requestedTimestamp) || requestedTimestamp <= 0)) {
+      throw new TypeError('invalid profile reset preview')
+    }
+    const timestamp = requestedTimestamp ?? Date.now()
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    const preview = await createProfileResetPreview(profileDir, timestamp, getProfileResetAvailableBytes)
+    if (!preview.spaceSufficient) {
+      throw new Error(`desktop profile reset requires ${preview.requiredFreeBytes} free bytes but only ${preview.availableBytes} are available`)
+    }
+    await controller.stop()
     const backupDir = `${profileDir}.backup-${timestamp}`
     let moved = false
     try {
@@ -532,6 +648,7 @@ export function registerExtensionIpc({
       } catch (error) {
         if (error?.code !== 'ENOENT') throw error
       }
+      if (moved) await assertRealProfileDirectory(backupDir)
       await ensureProfile()
       await controller.start()
     } catch (error) {
@@ -555,7 +672,7 @@ export function registerExtensionIpc({
       throw error
     }
     await pruneProfileResetBackups(profileDir).catch(() => {})
-    return Object.freeze({ reset: true, timestamp })
+    return Object.freeze({ reset: true, timestamp, backupDirectory: moved ? backupDir : undefined })
   }))
   handleExtension('extensions:qqbot-status', () => qqBotBinding.status())
   handleExtension('extensions:qqbot-bind', () => {

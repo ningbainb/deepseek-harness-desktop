@@ -41,6 +41,7 @@ import {
   resolvePackageVersion,
 } from './extensions/plugin-compatibility.mjs'
 import { PluginManager, resolvePnpmCliPath } from './extensions/plugins.mjs'
+import { PluginRegistry } from './extensions/plugin-registry.mjs'
 import { defaultSkillRoots, discoverSkills } from './extensions/skills.mjs'
 import {
   QqBotBindingService,
@@ -50,6 +51,15 @@ import {
 import { publicUpdateStatus, registerDesktopIpc, registerDesktopStartupIpc } from './ipc.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
+import { createDesktopNetworkDiagnostics } from './network-diagnostics.mjs'
+import {
+  applyElectronProxyConfiguration,
+  createAbortableElectronSessionFetch,
+  describeDesktopProxyConfiguration as describeProxyConfiguration,
+  resolveDesktopNetworkPlan,
+  resolveDesktopProxyConfiguration as resolveProxyConfiguration,
+  runtimeProxyEnvironmentFor,
+} from './network-proxy.mjs'
 import {
   readLegacyCredentialCompatibility,
   validateLegacyCredentialEnvironment,
@@ -179,6 +189,7 @@ export function prioritizeRuntimeBinPathEntries(runtimeBin, pathEntries, { platf
 
 export function desktopRuntimeEnvironmentFor({
   credentialEnvironment = {},
+  proxyEnvironment = {},
   qqBotCredentials,
   backgroundAutomation = false,
   fullUser = false,
@@ -187,8 +198,12 @@ export function desktopRuntimeEnvironmentFor({
     throw new TypeError('fullUser must be a boolean')
   }
   const normalizedCredentialEnvironment = validateLegacyCredentialEnvironment(credentialEnvironment)
+  if (proxyEnvironment === null || typeof proxyEnvironment !== 'object' || Array.isArray(proxyEnvironment)) {
+    throw new TypeError('proxy environment must be an object')
+  }
   return Object.freeze({
     ...normalizedCredentialEnvironment,
+    ...proxyEnvironment,
     CI: '1',
     DSH_DESKTOP_PRODUCT_METRICS_BRIDGE: '1',
     DSH_DESKTOP_NO_INTERACTIVE: '1',
@@ -228,26 +243,12 @@ export function requestsDisableUpdates(commandLine = [], env = process.env) {
 }
 
 export function resolveDesktopProxyConfiguration(commandLine = [], env = process.env) {
-  for (const arg of commandLine) {
-    if (typeof arg !== 'string') continue
-    const match = /^--proxy-server=(.+)$/i.exec(arg.trim())
-    if (match) {
-      return { proxyRules: match[1].trim() }
-    }
-  }
-  const httpProxy = env?.HTTP_PROXY || env?.http_proxy || env?.ALL_PROXY || env?.all_proxy
-  const httpsProxy = env?.HTTPS_PROXY || env?.https_proxy || httpProxy
-  const noProxy = env?.NO_PROXY || env?.no_proxy
-  if (httpProxy || httpsProxy) {
-    const rules = []
-    if (httpProxy) rules.push(`http=${httpProxy}`)
-    if (httpsProxy) rules.push(`https=${httpsProxy}`)
-    return {
-      proxyRules: rules.join(';'),
-      ...(noProxy ? { proxyBypassRules: noProxy } : {}),
-    }
-  }
-  return undefined
+  return resolveProxyConfiguration(commandLine, env)
+}
+
+/** Describe proxy shape without retaining endpoints, user names, or passwords. */
+export function describeDesktopProxyConfiguration(config) {
+  return describeProxyConfiguration(config)
 }
 
 export { desktopDeepLinkFrom } from './desktop-ingress.mjs'
@@ -478,7 +479,7 @@ export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
   const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
-  const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, safeStorage, screen, shell, Tray, WebContentsView } = electron
+  const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
   const initialUpdateShutdownRequest = parseUpdateShutdownRequest(process.argv)
   const updateShutdownCoordinator = createUpdateShutdownCoordinator({
@@ -630,6 +631,54 @@ export async function startElectronApp(metadata) {
     preload: MAIN_PRELOAD_PATH,
     state,
   })
+  const networkPlan = resolveDesktopNetworkPlan(process.argv, process.env)
+  const marketNetworkSession = electronSession.fromPartition('dsh-network-market', { cache: false })
+  const updateProbeSession = electronSession.fromPartition('dsh-network-update-probe', { cache: false })
+  const marketFetch = createAbortableElectronSessionFetch(marketNetworkSession)
+  const updateProbeFetch = createAbortableElectronSessionFetch(updateProbeSession)
+  const runtimeProxyProjection = runtimeProxyEnvironmentFor(networkPlan.api)
+  const marketChildProxyProjection = runtimeProxyEnvironmentFor(networkPlan.market)
+  const [updateNetworkStatus, updateProbeNetworkStatus, marketNetworkStatus] = await Promise.all([
+    applyElectronProxyConfiguration(mainWindow.webContents.session, networkPlan.update, {
+      scope: 'update',
+      log: (line) => logStore.append(line),
+    }),
+    applyElectronProxyConfiguration(updateProbeSession, networkPlan.update, {
+      scope: 'update',
+      log: async () => {},
+    }),
+    applyElectronProxyConfiguration(marketNetworkSession, networkPlan.market, {
+      scope: 'market',
+      log: (line) => logStore.append(line),
+    }),
+  ])
+  await logStore.append(
+    `[network] scope=api ${describeProxyConfiguration(networkPlan.api)}`
+    + ` status=${runtimeProxyProjection.status} reason=${runtimeProxyProjection.reason}`,
+  )
+  const desktopNetworkStatus = Object.freeze({
+    api: Object.freeze({
+      applied: runtimeProxyProjection.status === 'configured',
+      status: runtimeProxyProjection.status,
+      reason: runtimeProxyProjection.reason,
+      summary: describeProxyConfiguration(networkPlan.api),
+    }),
+    update: Object.freeze({
+      ...updateNetworkStatus,
+      probeApplied: updateProbeNetworkStatus.applied,
+    }),
+    market: Object.freeze({
+      ...marketNetworkStatus,
+      packageInstaller: marketChildProxyProjection.status === 'configured'
+        ? 'cooperative-environment'
+        : 'process-environment-unverified',
+    }),
+  })
+  const networkDiagnostics = createDesktopNetworkDiagnostics({
+    updateFetch: updateProbeFetch,
+    marketFetch,
+    networkStatus: desktopNetworkStatus,
+  })
   const desktopWindowFactory = createDesktopWindowFactory({
     BrowserWindow,
     appIcon,
@@ -640,6 +689,7 @@ export async function startElectronApp(metadata) {
     handoffPath: HANDOFF_PATH,
     communityPath: COMMUNITY_PATH,
     surfaceRegistry,
+    screen,
     shell,
     getMainWindow: () => mainWindow,
     log: (line) => void logStore.append(line),
@@ -754,6 +804,7 @@ export async function startElectronApp(metadata) {
     userDataDirectory: userData,
     bundledGitDirectory: app.isPackaged ? process.resourcesPath : undefined,
     confirm: confirmManagedGitInstall,
+    fetchImpl: marketFetch,
   })
   const toggleDesktopTerminal = async () => {
     if (terminalSurface && !terminalSurface.disposed) {
@@ -1026,6 +1077,7 @@ export async function startElectronApp(metadata) {
   const ensureProfile = () => ensureProfileForMode('full')
   const desktopRuntimeEnvironment = () => desktopRuntimeEnvironmentFor({
     credentialEnvironment: legacyCredentialEnvironment,
+    proxyEnvironment: runtimeProxyProjection.environment,
     qqBotCredentials,
     backgroundAutomation: true,
     fullUser: true,
@@ -1175,6 +1227,10 @@ export async function startElectronApp(metadata) {
   const pluginManager = new PluginManager({
     profileDir: desktopProfileDir,
     hostCompatibility,
+    registry: new PluginRegistry({
+      fetchImpl: marketFetch,
+    }),
+    environment: { ...process.env, ...marketChildProxyProjection.environment },
     pathEntries: runtimePathEntries,
     profileArchive: userPluginArchive,
     beforeMutation: (event) => pluginRecoveryStore.captureSnapshot({
@@ -1353,14 +1409,6 @@ export async function startElectronApp(metadata) {
     session: mainWindow.webContents.session,
     getActiveOrigin: () => activeOrigin,
   })
-  const proxyConfig = resolveDesktopProxyConfiguration(process.argv, process.env)
-  if (proxyConfig) {
-    void mainWindow.webContents.session.setProxy(proxyConfig).then(() => {
-      return logStore.append(`[network] configured session proxy rules: ${proxyConfig.proxyRules}`)
-    }).catch((error) => {
-      return logStore.append(`[network] proxy configuration failed: ${error.message}`)
-    })
-  }
   mainWindow.webContents.session.on('will-download', (_event, item) => {
     void promptForDownloadDestination({
       item,
@@ -1426,6 +1474,7 @@ export async function startElectronApp(metadata) {
       platform: process.platform,
       arch: process.arch,
     },
+    network: desktopNetworkStatus,
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
     sessionRecovery: { skipped: sessionRecoverySkippedCount },
     repairIncidentStore,
@@ -1695,7 +1744,7 @@ export async function startElectronApp(metadata) {
   }
 
   const communityMarket = createCommunityMarketService({
-    fetch: (input, options) => net.fetch(input, options),
+    fetch: marketFetch,
   })
   let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
@@ -1716,6 +1765,7 @@ export async function startElectronApp(metadata) {
     migrationService,
     notificationService,
     communityMarket,
+    networkDiagnostics,
     resolveFullAccessPlugin,
     revalidateFullAccessPlugin,
     completeFullAccessPlugin,
@@ -2373,7 +2423,7 @@ export async function startElectronApp(metadata) {
     updater: autoUpdater,
     mirrors: parseUpdateMirrors(process.env.DSH_DESKTOP_UPDATE_MIRRORS),
     probe: (url) => probeUpdateSource(url, {
-      fetchFn: (input, options) => net.fetch(input, options),
+      fetchFn: updateProbeFetch,
     }),
     log: (line) => void logStore.append(line),
   }) : undefined

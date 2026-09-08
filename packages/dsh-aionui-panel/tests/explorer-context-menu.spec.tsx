@@ -61,7 +61,7 @@ describe('Explorer file context menu', () => {
     host.remove()
   })
 
-  it('copies an absolute path and inserts the relative file path into the active draft', async () => {
+  it('copies an absolute path and inserts a relative path reference without opening Preview', async () => {
     const stores = fakeStores()
     const addToConversation = vi.fn(() => true)
     const toggleCollapse = vi.fn()
@@ -86,7 +86,7 @@ describe('Explorer file context menu', () => {
       file.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 50 }))
     })
     expect(document.body.textContent).toContain('复制路径')
-    expect(document.body.textContent).toContain('添加到对话框')
+    expect(document.body.textContent).toContain('插入路径引用')
 
     const copy = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
       .find((item) => item.textContent === '复制路径')
@@ -97,9 +97,10 @@ describe('Explorer file context menu', () => {
       file.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 50 }))
     })
     const add = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((item) => item.textContent === '添加到对话框')
+      .find((item) => item.textContent === '插入路径引用')
     act(() => { add?.click() })
     expect(addToConversation).toHaveBeenCalledWith('docs/readme.md')
+    expect(stores.preview.openFile).not.toHaveBeenCalled()
 
     act(() => { root.unmount() })
   })

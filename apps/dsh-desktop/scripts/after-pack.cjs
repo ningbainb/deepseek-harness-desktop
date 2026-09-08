@@ -1,4 +1,4 @@
-const { cp, mkdir, readFile, readdir, rm, stat, writeFile } = require('node:fs/promises')
+const { cp, mkdir, readFile, readdir, realpath, rm, stat, writeFile } = require('node:fs/promises')
 const { dirname, extname, isAbsolute, join, relative, resolve } = require('node:path')
 
 const sharp = require('sharp')
@@ -18,6 +18,64 @@ const REQUIRED_PACKAGED_PEERS = Object.freeze([
   '@deepseek-ai/dsh-typert-protocol',
   '@deepseek-ai/dsh-workspace',
 ])
+
+// electron-builder's npm fallback can omit transitive optional dependencies
+// from a pnpm install even when the active platform package is present in the
+// store. Runtime loaders resolve these native bindings during startup, so
+// recover only the binding for the artifact's exact platform and architecture.
+const REQUIRED_PACKAGED_NATIVE_BINDINGS = Object.freeze({
+  'darwin-arm64': Object.freeze([
+    Object.freeze({
+      packageName: '@img/sharp-darwin-arm64',
+      resolveFrom: 'sharp',
+      sourceFromEntry: Object.freeze(['..', '..', '@img', 'sharp-darwin-arm64']),
+    }),
+    Object.freeze({
+      packageName: '@img/sharp-libvips-darwin-arm64',
+      resolveFrom: 'sharp',
+      sourceFromEntry: Object.freeze(['..', '..', '@img', 'sharp-libvips-darwin-arm64']),
+    }),
+    Object.freeze({
+      packageName: '@koromix/koffi-darwin-arm64',
+      resolveFrom: 'koffi',
+    }),
+    Object.freeze({
+      packageName: '@vscode/ripgrep-darwin-arm64',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+    Object.freeze({
+      packageName: 'lightningcss-darwin-arm64',
+      resolveFrom: '@linxin666/dsh-client-ui-skin-center',
+    }),
+    Object.freeze({
+      packageName: 'node-addon-require-builtin-darwin-arm64',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+  ]),
+  'win32-x64': Object.freeze([
+    Object.freeze({
+      packageName: '@img/sharp-win32-x64',
+      resolveFrom: 'sharp',
+      sourceFromEntry: Object.freeze(['..', '..', '@img', 'sharp-win32-x64']),
+    }),
+    Object.freeze({
+      packageName: '@koromix/koffi-win32-x64',
+      resolveFrom: 'koffi',
+    }),
+    Object.freeze({
+      packageName: '@vscode/ripgrep-win32-x64',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+    Object.freeze({
+      packageName: 'lightningcss-win32-x64-msvc',
+      resolveFrom: '@linxin666/dsh-client-ui-skin-center',
+    }),
+    Object.freeze({
+      packageName: 'node-addon-require-builtin-win32-x64-msvc',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+  ]),
+})
 
 const SOURCE_ROOTS = new Map([
   ['@anthropic-ai/sdk', ['src']],
@@ -361,14 +419,55 @@ async function restoreRequiredPackagedPeers(nodeModulesRoot) {
   return restored
 }
 
+async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_PACKING_TARGET) {
+  const normalizedTarget = normalizePackingTarget(target)
+  const bindings = REQUIRED_PACKAGED_NATIVE_BINDINGS[
+    `${normalizedTarget.platform}-${normalizedTarget.arch}`
+  ] ?? []
+  const restored = []
+  for (const { packageName, resolveFrom, sourceFromEntry } of bindings) {
+    const targetPath = join(nodeModulesRoot, ...packageName.split('/'))
+    try {
+      await stat(targetPath)
+      continue
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+    let resolutionAnchor
+    try {
+      resolutionAnchor = require.resolve(resolveFrom)
+    } catch (error) {
+      if (error?.code !== 'MODULE_NOT_FOUND') throw error
+      resolutionAnchor = require.resolve(`${resolveFrom}/package.json`)
+    }
+    const source = Array.isArray(sourceFromEntry)
+      ? resolve(dirname(resolutionAnchor), ...sourceFromEntry)
+      : dirname(require.resolve(`${packageName}/package.json`, {
+          paths: [dirname(resolutionAnchor)],
+        }))
+    const physicalSource = await realpath(source)
+    await stat(join(physicalSource, 'package.json'))
+    await mkdir(dirname(targetPath), { recursive: true })
+    await cp(physicalSource, targetPath, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+    })
+    restored.push(packageName)
+  }
+  return restored
+}
+
 async function afterPack(context) {
   const platform = context.electronPlatformName
   if (platform !== 'win32' && platform !== 'darwin') return
   const target = packingTargetFromContext(context)
   const nodeModulesRoot = packagedNodeModulesRoot(context)
   const restoredPeers = await restoreRequiredPackagedPeers(nodeModulesRoot)
+  const restoredNativeBindings = await restoreRequiredNativeBindings(nodeModulesRoot, target)
   const report = await prunePackagedRuntime(nodeModulesRoot, target)
   report.restoredPeers = restoredPeers
+  report.restoredNativeBindings = restoredNativeBindings
   const outputPath = join(context.outDir, 'runtime-prune-report.json')
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(
@@ -381,6 +480,7 @@ module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers
+module.exports.restoreRequiredNativeBindings = restoreRequiredNativeBindings
 module.exports.packingTargetFromContext = packingTargetFromContext
 module.exports.packagedNodeModulesRoot = packagedNodeModulesRoot
 module.exports.DEFAULT_PACKING_TARGET = DEFAULT_PACKING_TARGET

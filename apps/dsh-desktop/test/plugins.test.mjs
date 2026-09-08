@@ -75,6 +75,22 @@ test('PluginManager forwards validated child-only PATH entries without changing 
   assert.deepEqual(calls[0].pathEntries, [managedGitDirectory])
   assert.equal(Object.isFrozen(calls[0].pathEntries), true)
 
+  const proxyEnvironment = { HTTPS_PROXY: 'http://proxy.example:8443', NO_PROXY: 'localhost' }
+  const proxiedCalls = []
+  const proxiedManager = new PluginManager({
+    profileDir: 'profile',
+    pnpmCli: 'pnpm.mjs',
+    environment: proxyEnvironment,
+    registry: {
+      fetchManifest: async () => ({ name: '@community/example', version: '1.0.0' }),
+    },
+    runner: async (options) => { proxiedCalls.push(options) },
+  })
+  proxyEnvironment.HTTPS_PROXY = 'http://mutated.example:9000'
+  await proxiedManager.prepare('@community/example@1.0.0', { allowUnknown: true })
+  assert.equal(proxiedCalls[0].environment.HTTPS_PROXY, 'http://proxy.example:8443')
+  assert.equal(proxiedCalls[0].environment.NO_PROXY, 'localhost')
+
   assert.throws(
     () => new PluginManager({ profileDir: 'profile', pnpmCli: 'pnpm.mjs', pathEntries: ['relative'] }),
     /pnpm PATH entry/u,
@@ -828,6 +844,66 @@ test('startup compatibility inspection never changes enabled bundles and tolerat
     assert.deepEqual(diagnostic.incompatible.map((item) => item.name), [incompatible])
     assert.deepEqual(diagnostic.unavailable.map((item) => item.name), [unreadable])
     assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), original)
+  } finally {
+    await rm(profileDir, { recursive: true, force: true })
+  }
+})
+
+test('dsh-paperclip 0.2.5 is diagnosed without silently disabling the user bundle', async () => {
+  const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-paperclip-known-issue-'))
+  const packageName = 'dsh-paperclip'
+  const manifestPath = join(profileDir, 'package.json')
+  const original = {
+    name: 'dsh-profile-desktop',
+    private: true,
+    dependencies: { [packageName]: '0.2.5' },
+    dsh: { profile: { bundles: [...BUILTIN_BUNDLES, packageName] } },
+  }
+  try {
+    await writeFile(manifestPath, `${JSON.stringify(original, null, 2)}\n`)
+    const packageRoot = join(profileDir, 'node_modules', packageName)
+    await mkdir(packageRoot, { recursive: true })
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+      name: packageName,
+      version: '0.2.5',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+      peerDependencies: {
+        '@deepseek-ai/cordis': '^4.0.1',
+        '@deepseek-ai/dsh-client-runtime': '^0.1.0-rc.6',
+        '@deepseek-ai/dsh-client-ui-conversation': '^0.1.0-rc.6',
+        react: '^18.2.0',
+      },
+    }))
+    const manager = new PluginManager({
+      profileDir,
+      pnpmCli: 'pnpm.mjs',
+      hostCompatibility: createHostCompatibility({
+        desktopVersion: '3.3.0',
+        nodeVersion: '24.18.1',
+        runtimeVersion: '0.1.1-rc.1',
+        packages: {
+          '@deepseek-ai/cordis': '4.0.1',
+          '@deepseek-ai/dsh-client-runtime': '0.1.1-rc.1',
+          '@deepseek-ai/dsh-client-ui-conversation': '0.1.1-rc.1',
+          react: '18.3.1',
+        },
+      }),
+    })
+
+    const diagnostic = await manager.inspectCompatibility()
+    assert.deepEqual(diagnostic.incompatible, [{
+      name: packageName,
+      reasons: [{
+        code: 'known-native-image-drop-conflict',
+        subject: 'dsh-paperclip@0.2.5',
+        actual: 'conversation.native-image-preview',
+      }],
+    }])
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')), original)
+    const inventory = await manager.inventory()
+    const installed = inventory.find((plugin) => plugin.name === packageName)
+    assert.equal(installed.enabled, true)
+    assert.equal(installed.compatibility.status, 'incompatible')
   } finally {
     await rm(profileDir, { recursive: true, force: true })
   }

@@ -54,6 +54,16 @@
       "requiredInDesktop": false
     },
     {
+      "id": "chat-artifacts",
+      "package": "@ningbainb/dsh-chat-artifacts",
+      "path": "packages/dsh-chat-artifacts",
+      "description": "安全可回放的会话 Artifact 工具与渲染卡片",
+      "patchId": "chat-artifacts",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
       "id": "ui-dsh-aionui-panel",
       "package": "@linxin666/dsh-client-ui-aionui-panel",
       "path": "packages/dsh-aionui-panel",
@@ -195,6 +205,12 @@
       "e2eScript": "scripts/verify-settings-window.mjs"
     },
     {
+      "id": "conversation-scroll-navigation",
+      "name": "长对话固定输入区、滚轮转发与轮次导航",
+      "uiSelector": "[data-dsh-turn-navigator]",
+      "e2eScript": "scripts/verify-conversation-scroll.mjs"
+    },
+    {
       "id": "directory-picker",
       "name": "项目文件夹原生选择与工作区导入",
       "e2eScript": "scripts/verify-directory-picker.mjs"
@@ -208,6 +224,11 @@
       "id": "preset-deep-link",
       "name": "预设与协议唤起处理 (dsh://)",
       "e2eScript": "scripts/verify-preset-deep-link.mjs"
+    },
+    {
+      "id": "network-proxy-routing",
+      "name": "分层代理配置、真实路由与有界网络诊断",
+      "e2eScript": "scripts/verify-proxy-routing.mjs"
     },
     {
       "id": "terminal",
@@ -240,6 +261,12 @@
       "id": "remote-settings-card",
       "name": "远程移动控制与配对安全卡片",
       "e2eScript": "scripts/verify-packaged-remote-lan.mjs"
+    },
+    {
+      "id": "skin-center",
+      "name": "皮肤中心即时试穿、持久化与背景控制",
+      "uiSelector": "body[data-dsh-skin-center]",
+      "e2eScript": "scripts/verify-skin-center.mjs"
     }
   ],
   "skinCatalog": [

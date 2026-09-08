@@ -30,7 +30,7 @@ const panelState = (dialog) => dialog.evaluate((element) => {
       scrollWidth: content.scrollWidth,
       overflow: getComputedStyle(content).overflow,
     },
-    handleCount: element.querySelectorAll('[data-dsh-settings-resize]').length,
+    handleCount: layer.querySelectorAll('[data-dsh-settings-resize]').length,
     minWidth: getComputedStyle(element).minWidth,
     minHeight: getComputedStyle(element).minHeight,
   }
@@ -94,6 +94,40 @@ try {
   assert.equal(state.content.overflow, 'auto')
   assertContained(state)
 
+  const scrollbarResult = await dialog.evaluate(async (element) => {
+    const content = element.querySelector(':scope > nav + div')
+    if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')
+    const spacer = document.createElement('div')
+    spacer.dataset.dshSettingsScrollbarProbe = 'true'
+    spacer.style.height = Math.max(2400, content.clientHeight * 4) + 'px'
+    spacer.style.pointerEvents = 'none'
+    content.append(spacer)
+    content.style.overflowY = 'scroll'
+    await new Promise(resolveFrame => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)))
+    const box = content.getBoundingClientRect()
+    return {
+      x: box.right - Math.max(2, (content.offsetWidth - content.clientWidth) / 2),
+      top: box.top,
+      bottom: box.bottom,
+      gutter: content.offsetWidth - content.clientWidth,
+    }
+  })
+  assert.ok(scrollbarResult.gutter >= 4, JSON.stringify(scrollbarResult))
+  const beforeScrollbarDrag = state.box
+  for (let iteration = 0; iteration < 20; iteration += 1) {
+    const startY = iteration % 2 === 0 ? scrollbarResult.top + 32 : scrollbarResult.bottom - 32
+    const endY = iteration % 2 === 0 ? scrollbarResult.bottom - 32 : scrollbarResult.top + 32
+    await page.mouse.move(scrollbarResult.x, startY)
+    await page.mouse.down()
+    await page.mouse.move(scrollbarResult.x, endY, { steps: 4 })
+    await page.mouse.up()
+  }
+  state = await panelState(dialog)
+  assert.ok(Math.abs(state.box.x - beforeScrollbarDrag.x) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
+  assert.ok(Math.abs(state.box.y - beforeScrollbarDrag.y) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
+  assert.ok(Math.abs(state.box.width - beforeScrollbarDrag.width) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
+  assert.ok(Math.abs(state.box.height - beforeScrollbarDrag.height) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
+
   const initial = state.box
   const dragHandle = dialog.locator('[data-dsh-settings-drag-handle="true"]')
   const dragBox = await dragHandle.boundingBox()
@@ -109,7 +143,7 @@ try {
   assertContained(state)
 
   const beforeResize = state.box
-  const southeast = dialog.locator('[data-dsh-settings-resize="se"]')
+  const southeast = dialog.locator('xpath=..').locator('[data-dsh-settings-resize="se"]')
   const southeastBox = await southeast.boundingBox()
   assert.ok(southeastBox)
   const resizeHit = await page.evaluate(({ x, y }) => {

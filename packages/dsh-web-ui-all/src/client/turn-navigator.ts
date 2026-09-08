@@ -8,8 +8,9 @@
  *
  * Selectors used:
  *  - Container: [data-pane="conversation"] (stamped by dsh-web-ui-all shim)
- *  - User messages: [class*="userMessage"], [data-message-role="user"],
- *    [class*="humanTurn"], [class*="turnUser"]
+ *  - Scrollport: [data-conversation-scroll] (official conversation contract)
+ *  - User messages: [data-chat-flow-kind="user"] (official conversation contract),
+ *    followed by compatibility selectors for older shells.
  */
 
 /** Stable data attribute for the injected navigator widget. */
@@ -80,6 +81,7 @@ const NAVIGATOR_STYLE = `
 `.trim()
 
 const USER_MSG_SELECTORS = [
+  '[data-chat-flow-kind="user"]',
   '[data-message-role="user"]',
   '[class*="userMessage"]',
   '[class*="humanTurn"]',
@@ -87,36 +89,56 @@ const USER_MSG_SELECTORS = [
   '[data-role="user"]',
 ].join(', ')
 
+/** Collect all user message elements in DOM order. */
+export function getUserMessages(pane: HTMLElement): HTMLElement[] {
+  const matches = Array.from(pane.querySelectorAll<HTMLElement>(USER_MSG_SELECTORS))
+  return matches.filter(turn => !matches.some(other => other !== turn && other.contains(turn)))
+}
+
 /** Find the conversation scrollable area inside the pane. */
-function findScrollRoot(pane: HTMLElement): HTMLElement {
-  // Prefer explicit overflow-y scroll/auto container inside pane
-  for (const child of Array.from(pane.querySelectorAll('*')) as HTMLElement[]) {
-    const style = getComputedStyle(child)
-    if (style.overflowY === 'auto' || style.overflowY === 'scroll') return child
+export function findScrollRoot(pane: HTMLElement, turns = getUserMessages(pane)): HTMLElement {
+  const official = pane.matches('[data-conversation-scroll]')
+    ? pane
+    : pane.querySelector<HTMLElement>('[data-conversation-scroll]')
+  if (official !== null) return official
+
+  const candidates = [pane, ...Array.from(pane.querySelectorAll<HTMLElement>('*'))]
+    .filter((child) => {
+      const style = getComputedStyle(child)
+      return style.overflowY === 'auto' || style.overflowY === 'scroll'
+    })
+  const containingAllTurns = turns.length === 0
+    ? candidates
+    : candidates.filter(candidate => turns.every(turn => candidate.contains(turn)))
+  const visiblyScrollable = containingAllTurns.filter(candidate => candidate.scrollHeight > candidate.clientHeight + 1)
+  const pool = visiblyScrollable.length > 0 ? visiblyScrollable : containingAllTurns
+  for (const child of pool) {
+    if (!pool.some(other => other !== child && child.contains(other))) return child
   }
   return pane
 }
 
-/** Collect all user message elements in DOM order. */
-function getUserMessages(pane: HTMLElement): HTMLElement[] {
-  return Array.from(pane.querySelectorAll<HTMLElement>(USER_MSG_SELECTORS))
+function viewportTop(scrollRoot: HTMLElement): number {
+  return scrollRoot.getBoundingClientRect().top + scrollRoot.clientTop
 }
 
-/** Determine the index of the currently-visible turn (first one past viewport center). */
-function currentTurnIndex(scrollRoot: HTMLElement, turns: HTMLElement[]): number {
+/** Determine the last user turn at or above the readable top anchor. */
+export function currentTurnIndex(scrollRoot: HTMLElement, turns: HTMLElement[]): number {
   if (turns.length === 0) return -1
-  const viewTop = scrollRoot.scrollTop
-  const viewCenter = viewTop + scrollRoot.clientHeight / 2
+  // Keep this slightly below scrollToTurn's 60px landing offset. Using the
+  // viewport center advances tall turns before the reader has reached them and
+  // can make a Next click a no-op at the top of a real conversation.
+  const viewAnchor = viewportTop(scrollRoot) + Math.min(80, scrollRoot.clientHeight / 4)
   for (let i = turns.length - 1; i >= 0; i--) {
-    if ((turns[i]?.offsetTop ?? 0) <= viewCenter) return i
+    if ((turns[i]?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY) <= viewAnchor) return i
   }
   return 0
 }
 
 /** Smooth-scroll to a turn. */
-function scrollToTurn(scrollRoot: HTMLElement, turn: HTMLElement): void {
-  const offsetTop = turn.offsetTop
-  scrollRoot.scrollTo({ top: Math.max(0, offsetTop - 60), behavior: 'smooth' })
+export function scrollToTurn(scrollRoot: HTMLElement, turn: HTMLElement): void {
+  const top = scrollRoot.scrollTop + turn.getBoundingClientRect().top - viewportTop(scrollRoot)
+  scrollRoot.scrollTo({ top: Math.max(0, top - 60), behavior: 'smooth' })
 }
 
 /** Build and return the navigator widget element. */
@@ -161,7 +183,8 @@ function createNavigator(): HTMLDivElement {
 function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLElement): void {
   const turns = getUserMessages(pane)
   const total = turns.length
-  const idx = currentTurnIndex(scrollRoot, turns)
+  const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40
+  const idx = total > 0 && atBottom ? total - 1 : currentTurnIndex(scrollRoot, turns)
 
   const prevBtn = nav.querySelector<HTMLButtonElement>('[data-role="prev"]')
   const nextBtn = nav.querySelector<HTMLButtonElement>('[data-role="next"]')
@@ -171,7 +194,6 @@ function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLE
   if (prevBtn) prevBtn.disabled = idx <= 0 || total === 0
   if (nextBtn) nextBtn.disabled = idx >= total - 1 || total === 0
   if (bottomBtn) {
-    const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40
     bottomBtn.disabled = atBottom
   }
   const nextCounterText = total === 0 ? '–' : String(idx + 1) + '/' + String(total)
@@ -181,23 +203,24 @@ function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLE
 }
 
 /** Attach click handlers to the navigator buttons. */
-function bindNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLElement): void {
+function bindNavigator(nav: HTMLDivElement, scrollRoot: () => HTMLElement, pane: HTMLElement): void {
   nav.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('button')
     if (!btn) return
     const role = btn.dataset.role
+    const root = scrollRoot()
     const turns = getUserMessages(pane)
-    const idx = currentTurnIndex(scrollRoot, turns)
+    const idx = currentTurnIndex(root, turns)
 
     if (role === 'prev' && idx > 0 && turns[idx - 1]) {
-      scrollToTurn(scrollRoot, turns[idx - 1]!)
+      scrollToTurn(root, turns[idx - 1]!)
     } else if (role === 'next' && idx < turns.length - 1 && turns[idx + 1]) {
-      scrollToTurn(scrollRoot, turns[idx + 1]!)
+      scrollToTurn(root, turns[idx + 1]!)
     } else if (role === 'bottom') {
-      scrollRoot.scrollTo({ top: scrollRoot.scrollHeight, behavior: 'smooth' })
+      root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' })
     }
     // Re-sync after scroll settles
-    setTimeout(() => syncNavigator(nav, scrollRoot, pane), 350)
+    setTimeout(() => syncNavigator(nav, scrollRoot(), pane), 350)
   })
 }
 
@@ -211,15 +234,23 @@ export function mountTurnNavigator(pane: HTMLElement): () => void {
     pane.style.position = 'relative'
   }
 
-  const scrollRoot = findScrollRoot(pane)
   const nav = createNavigator()
   pane.appendChild(nav)
-  bindNavigator(nav, scrollRoot, pane)
-
+  let scrollRoot = findScrollRoot(pane)
   const onScroll = (): void => syncNavigator(nav, scrollRoot, pane)
+  const refresh = (): void => {
+    const nextRoot = findScrollRoot(pane)
+    if (nextRoot !== scrollRoot) {
+      scrollRoot.removeEventListener('scroll', onScroll)
+      scrollRoot = nextRoot
+      scrollRoot.addEventListener('scroll', onScroll, { passive: true })
+    }
+    syncNavigator(nav, scrollRoot, pane)
+  }
+  bindNavigator(nav, () => scrollRoot, pane)
   scrollRoot.addEventListener('scroll', onScroll, { passive: true })
 
-  const mutationObs = new MutationObserver(() => syncNavigator(nav, scrollRoot, pane))
+  const mutationObs = new MutationObserver(refresh)
   mutationObs.observe(pane, { childList: true, subtree: true })
 
   syncNavigator(nav, scrollRoot, pane)

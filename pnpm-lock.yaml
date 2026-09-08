@@ -9,12 +9,13 @@ overrides:
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-ssh': link:./packages/dsh-ssh
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-task-board': link:./packages/dsh-task-board
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-git-graph': link:./packages/dsh-git-graph
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-remote-web-ui': link:./packages/dsh-remote-web-ui
 
 patchedDependencies:
   '@deepseek-ai/dsh-client-ui-settings-models@0.1.1-rc.1': 9baf60934a16131f14e55d0dbf685fabc9cecb6b560827990321e05b43a5796f
   '@deepseek-ai/dsh-llm-pi-ai@0.1.1-rc.1': f0f3357859008764476da83993e587a9c225af1db912a80f424489e8ebc34a83
   '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': b9fba5757b490db09a0910247a247d0c2f0537ac625b192d0aedad426eefcec4
-  '@linxin666/dsh-web-ui-all@0.2.5': c31efe298d2459a868a79c960834659bb94d494f1b3a8f88bd6e845b352b245c
+  '@linxin666/dsh-web-ui-all@0.2.5': 12b68c382defe28c71b0836202ac8d6676c1ab46527f7dabaf837ae7419e6a94
 
 importers:
 
@@ -32,6 +33,9 @@ importers:
 
   apps/dsh-desktop:
     dependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.1
+        version: 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
       '@deepseek-ai/cordis-plugin-group':
         specifier: 1.0.1
         version: 1.0.1(@deepseek-ai/cordis-plugin-loader@1.0.2)(@deepseek-ai/cordis@4.0.1)
@@ -98,9 +102,15 @@ importers:
       '@deepseek-ai/dsh-code-runtime':
         specifier: 0.1.1-rc.1
         version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-command-compact':
+        specifier: 0.1.1-rc.1
+        version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-commands@0.1.1-rc.1(9750df5955adaa982f393e8cac6df95b))(@deepseek-ai/dsh-compaction@0.1.1-rc.1(5cbe4132ad009d8a23616461916c1ac8))(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-compaction':
         specifier: 0.1.1-rc.1
         version: 0.1.1-rc.1(5cbe4132ad009d8a23616461916c1ac8)
+      '@deepseek-ai/dsh-compaction-basic':
+        specifier: 0.1.1-rc.1
+        version: 0.1.1-rc.1(2b27f0963f7d8a4f2ac14f87644ee767)
       '@deepseek-ai/dsh-fs':
         specifier: 0.1.1-rc.1
         version: 0.1.1-rc.1(5c1e9fa634fd2a1dc9bc8920dfb28aeb)
@@ -170,6 +180,9 @@ importers:
       '@deepseek-ai/dsh-timeout':
         specifier: 0.1.1-rc.1
         version: 0.1.1-rc.1(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.1(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-token-meter':
+        specifier: 0.1.1-rc.1
+        version: 0.1.1-rc.1(6a0180ae74e211934a53125ebb61582b)
       '@deepseek-ai/dsh-tools':
         specifier: 0.1.1-rc.1
         version: 0.1.1-rc.1(5493e0ab460eb504a0593977b284c2a8)
@@ -191,6 +204,9 @@ importers:
       '@linxin666/dsh-client-ui-mode-switcher':
         specifier: workspace:*
         version: link:../../packages/dsh-mode-switcher
+      '@linxin666/dsh-client-ui-skin-center':
+        specifier: 0.2.5
+        version: 0.2.5(react@18.3.1)
       '@linxin666/dsh-client-ui-web-ui-settings':
         specifier: workspace:*
         version: link:../../packages/dsh-web-ui-settings
@@ -209,12 +225,18 @@ importers:
       '@linxin666/dsh-particle-theme':
         specifier: workspace:*
         version: link:../../packages/dsh-particle-theme
+      '@linxin666/dsh-remote-web-ui':
+        specifier: workspace:*
+        version: link:../../packages/dsh-remote-web-ui
       '@linxin666/dsh-value-mode':
         specifier: workspace:*
         version: link:../../packages/dsh-value-mode
       '@linxin666/dsh-web-ui-all':
         specifier: 0.2.5
-        version: 0.2.5(patch_hash=c31efe298d2459a868a79c960834659bb94d494f1b3a8f88bd6e845b352b245c)(137ab99ea686920e7b67ed9e4b149d6c)
+        version: 0.2.5(patch_hash=12b68c382defe28c71b0836202ac8d6676c1ab46527f7dabaf837ae7419e6a94)(137ab99ea686920e7b67ed9e4b149d6c)
+      '@ningbainb/dsh-chat-artifacts':
+        specifier: workspace:*
+        version: link:../../packages/dsh-chat-artifacts
       '@ningbainb/dsh-memory':
         specifier: workspace:*
         version: link:../../packages/dsh-memory
@@ -1550,7 +1572,7 @@ importers:
         specifier: workspace:*
         version: link:../dsh-pet
       '@linxin666/dsh-remote-web-ui':
-        specifier: workspace:*
+        specifier: link:../dsh-remote-web-ui
         version: link:../dsh-remote-web-ui
       '@linxin666/dsh-skins':
         specifier: workspace:*
@@ -1573,6 +1595,13 @@ importers:
       '@ningbainb/dsh-user-scope':
         specifier: workspace:*
         version: link:../dsh-user-scope
+    devDependencies:
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1(@noble/hashes@2.3.0)
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.3.0))(yaml@2.9.0)
 
   packages/dsh-web-ui-settings:
     dependencies:
@@ -4825,13 +4854,6 @@ packages:
       react: ^18.2.0
       react-dom: ^18.2.0
 
-  '@linxin666/dsh-remote-web-ui@0.2.5':
-    resolution: {integrity: sha512-rxZBmF4NaewSIDcNVIrgcGV1TljYTnhBuZBVb/8bu5mx4ebHmjN8gqRk7g/VT13RB1tMANGl4ptoADiJbOwQOA==}
-    engines: {node: ^22.19.0 || >=24.0.0}
-    peerDependencies:
-      react: ^18.2.0
-      react-dom: ^18.2.0
-
   '@linxin666/dsh-skins@0.2.5':
     resolution: {integrity: sha512-yB8Vw9y6+oMopktPbWvCFgEt6HRO6Zt+lwlUZei0dSNNdHeoi5pCZDqX9pTmNbMzwh8ioTbGLaXDYF7l/+LAkw==}
 
@@ -4843,6 +4865,7 @@ packages:
 
   '@linxin666/dsh-web-ui-all@0.2.5':
     resolution: {integrity: sha512-v8wggRtXF5mvxqZSpajMNujYLYfy5XvFMoo2ofI7IID8EBPx9D17aVt9asarr45Sj4gb3WNANFfTb89VAfRzJw==}
+    deprecated: 迁移到 @linxin666/dsh-web-all；详见该版本 Release notes
 
   '@malept/cross-spawn-promise@2.0.0':
     resolution: {integrity: sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg==}
@@ -12135,16 +12158,6 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       schemastery: 3.18.0
 
-  '@linxin666/dsh-remote-web-ui@0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      cloudflared: 0.7.3
-      clsx: 2.1.1
-      qrcode.react: 4.2.0(react@18.3.1)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-      schemastery: 3.18.0
-      zod: 4.4.3
-
   '@linxin666/dsh-skins@0.2.5(react@18.3.1)':
     dependencies:
       '@linxin666/dsh-client-ui-skin-center': 0.2.5(react@18.3.1)
@@ -12156,7 +12169,7 @@ snapshots:
       react: 18.3.1
       schemastery: 3.18.0
 
-  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=c31efe298d2459a868a79c960834659bb94d494f1b3a8f88bd6e845b352b245c)(137ab99ea686920e7b67ed9e4b149d6c)':
+  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=12b68c382defe28c71b0836202ac8d6676c1ab46527f7dabaf837ae7419e6a94)(137ab99ea686920e7b67ed9e4b149d6c)':
     dependencies:
       '@linxin666/dsh-chat-recovery': 0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-client-ui-aionui-panel': link:packages/dsh-aionui-panel
@@ -12170,7 +12183,7 @@ snapshots:
       '@linxin666/dsh-desktop-launcher': 0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-liangshen': 0.2.5
       '@linxin666/dsh-pet': 0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@linxin666/dsh-remote-web-ui': 0.2.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@linxin666/dsh-remote-web-ui': link:packages/dsh-remote-web-ui
       '@linxin666/dsh-skins': 0.2.5(react@18.3.1)
       '@linxin666/dsh-ssh': link:packages/dsh-ssh
       '@linxin666/dsh-tool-describe-image': 0.2.5(react@18.3.1)

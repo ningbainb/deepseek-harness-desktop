@@ -1,6 +1,6 @@
-# Desktop 3.0.9 upgrade and rollback
+# Desktop 3.3.0 upgrade and rollback
 
-Desktop 3.0.9 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
+Desktop 3.3.0 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
 
 ## Startup behavior
 
@@ -18,7 +18,9 @@ The startup page is status-only. There are no migration, isolation, safe-mode, o
 
 Plugin installation and automatic repair remain transactional. Before a persistent plugin mutation, Desktop archives the affected manifest, lockfile, patch files, and package links. A failed activation restores that archive and the previous Runtime. Automatic repair applies only a verified candidate and rolls it back if the repaired full-profile start fails.
 
-Application updates retain the existing installer rollback and update-shutdown checks. Runtime installation damage is handled by the updater path; it is not treated as a profile or plugin problem.
+Windows application replacement is transactional. Before extraction, the installer stops the exact prior application processes, exports the existing install and uninstall registry keys, and moves recognized prior application directories to same-volume backups. It keeps those backups until the new executable, Runtime archive, and installer protocol marker are present. Successful installation commits and removes the backups; the NSIS failure callback removes a partial replacement and restores the prior directories and registry state. A non-committed journal left by interruption is rolled back when the next installer begins, while a committed cleanup journal never restores an older version.
+
+The installer transaction covers the application directory and its registration only. It does not move or delete `DSH_HOME`, Electron `userData`, project files, conversations, or sessions. Runtime installation damage after a committed update is handled by the updater path; it is not treated as a profile or plugin problem.
 
 Keep an independent backup before major operating-system or disk changes. Desktop rollback covers mutations it owns, not arbitrary project edits or hardware loss.
 

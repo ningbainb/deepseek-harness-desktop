@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { catalogFromDirectory, modelDisplayName, selectionForModel, sortModelCatalog, } from "./model-projection.js";
 import styles from './model-preferences.module.css';
+import { installModelRefreshBridge } from "./model-refresh.js";
 function errorText(reason, fallback) {
     return reason instanceof Error && reason.message.trim() ? reason.message.trim() : fallback;
 }
@@ -11,7 +12,7 @@ function errorText(reason, fallback) {
  * model-selection seat so the desktop composer keeps its native appearance.
  */
 export function ModelSelect(props) {
-    const { locked, available, directory, load, select, settingsScope, t } = props;
+    const { locked, available, directory, load, modelSessionId, select, settingsScope, t } = props;
     const [open, setOpen] = useState(false);
     const [pane, setPane] = useState('root');
     const [selecting, setSelecting] = useState(false);
@@ -19,6 +20,7 @@ export function ModelSelect(props) {
     const lastActionRef = useRef('load');
     const rootRef = useRef(null);
     const triggerRef = useRef(null);
+    const refreshBridgeRef = useRef(null);
     const id = useId();
     const state = useSyncExternalStore(listener => directory.subscribe(listener), () => directory.getSnapshot(), () => directory.getSnapshot());
     const settingsSnapshot = useSyncExternalStore(listener => settingsScope.subscribe(listener), () => settingsScope.getSnapshot(), () => settingsScope.getSnapshot());
@@ -69,6 +71,19 @@ export function ModelSelect(props) {
         load();
     }, [available, load]);
     useEffect(() => {
+        refreshBridgeRef.current?.dispose();
+        refreshBridgeRef.current = null;
+        if (!available)
+            return;
+        const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: load });
+        refreshBridgeRef.current = bridge;
+        return () => {
+            bridge.dispose();
+            if (refreshBridgeRef.current === bridge)
+                refreshBridgeRef.current = null;
+        };
+    }, [available, load, modelSessionId]);
+    useEffect(() => {
         if (!open)
             return;
         const closeOutside = (event) => {
@@ -110,6 +125,7 @@ export function ModelSelect(props) {
             const accepted = await select(selection);
             if (!accepted)
                 throw new Error(t('error.select'));
+            refreshBridgeRef.current?.announce();
             close();
             triggerRef.current?.focus();
         }

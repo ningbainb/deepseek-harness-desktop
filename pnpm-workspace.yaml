@@ -37,14 +37,15 @@ autoInstallPeers: false
 
 patchedDependencies: { '@deepseek-ai/dsh-subprocess-local@0.1.1-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.1-rc.1.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.1-rc.1': patches/@deepseek-ai__dsh-llm-pi-ai@0.1.1-rc.1.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch, '@deepseek-ai/dsh-client-ui-settings-models@0.1.1-rc.1': patches/@deepseek-ai__dsh-client-ui-settings-models@0.1.1-rc.1.patch }
 
-# Desktop pins the published aggregate at 0.2.5, while the Aion panel, SSH,
-# Task Board, and Git Graph dependencies use reviewed workspace builds for
-# Desktop-owned fixes and the 2.7 Runtime Provider boundary.
+# Desktop pins the published aggregate at 0.2.5, while selected dependencies
+# use reviewed workspace builds for Desktop-owned fixes and security
+# boundaries.
 overrides:
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-aionui-panel': 'link:./packages/dsh-aionui-panel'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-ssh': 'link:./packages/dsh-ssh'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-task-board': 'link:./packages/dsh-task-board'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-git-graph': 'link:./packages/dsh-git-graph'
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-remote-web-ui': 'link:./packages/dsh-remote-web-ui'
 
 allowBuilds:
   # The cloudflared postinstall downloads the platform binary (the auto-tunnel

@@ -199,9 +199,10 @@ try {
 
   // Pairing deliberately refuses to mint a dead loopback-only QR by default.
   // For the packaged authorization run, configure the documented manual
-  // publicBaseUrl seam to the throwaway loopback origin in the isolated test
-  // profile. This keeps the production route policy unchanged while allowing
-  // the real packaged /m/api and SSE handlers to be exercised.
+  // publicBaseUrl seam to a secure, non-routable origin in the isolated test
+  // profile. The current security contract rejects cleartext public origins;
+  // the URL is used only to satisfy QR construction while all test traffic
+  // stays on the real packaged loopback /m/api and SSE handlers.
   if (loopbackMode) {
     const described = await requestJson(`${loopbackOrigin}/api/dsh-web-ui-settings/describe`, {
       method: 'POST',
@@ -214,7 +215,7 @@ try {
       method: 'POST',
       body: {
         ns: 'remote-web-ui',
-        ops: [{ op: 'set', path: ['publicBaseUrl'], value: loopbackOrigin }],
+        ops: [{ op: 'set', path: ['publicBaseUrl'], value: 'https://packaged-loopback.invalid' }],
         expectedRevision: remoteNamespace.revision,
       },
     })
@@ -351,12 +352,15 @@ try {
   const sseClosed = readSseUntilClose(eventsResponse)
   await new Promise(resolveDelay => setTimeout(resolveDelay, 100))
 
+  const revokeStartedAt = performance.now()
   const revoked = await requestJson(`${loopbackOrigin}/api/pair/device/revoke`, {
     method: 'POST',
     body: { deviceId: deviceA.deviceId },
   })
   assert.equal(revoked.status, 200, 'device A revoke failed')
   const sseData = await sseClosed
+  const sseCloseMs = Math.round(performance.now() - revokeStartedAt)
+  assert.ok(sseCloseMs <= 2_000, `device A SSE closed too slowly after revoke: ${String(sseCloseMs)}ms`)
   assert.equal(sseData.includes(sessionB), false, 'A SSE received a B session identity')
   const afterRevokeA = await rpc(lanOrigin, 'mobile.preferences', {}, { mobile: true, cookie: deviceA.cookie })
   const afterRevokeB = await rpc(lanOrigin, 'mobile.preferences', {}, { mobile: true, cookie: deviceB.cookie })
@@ -369,7 +373,7 @@ try {
     pairing: { distinctDevices: true, workspaceScoped: true },
     isolation: { workspaceList: true, sessionList: true, historyDenied: true, search: searchMode, searchScoped: searchMode === 'scoped', crossWorkspaceCreateDenied: true },
     remoteOperations: { send: true, modelRead: true, modelSelect: true, rename: true },
-    revoke: { deviceADeniedImmediately: true, deviceBStillAuthorized: true, sseClosedImmediately: true },
+    revoke: { deviceADeniedImmediately: true, deviceBStillAuthorized: true, sseClosedImmediately: true, sseCloseMs },
     pageErrorCount: launched.errors.length,
   }, null, 2))
 } finally {
