@@ -4663,91 +4663,91 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1023,
+      "line": 1024,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1037,
+      "line": 1038,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1056,
+      "line": 1057,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1058,
+      "line": 1059,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1061,
+      "line": 1062,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1074,
+      "line": 1075,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1118,
+      "line": 1119,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1227,
+      "line": 1228,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1232,
+      "line": 1233,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1237,
+      "line": 1238,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1387,
+      "line": 1388,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1913,
+      "line": 1914,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1945,
+      "line": 1946,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2009,
+      "line": 2010,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2015,
+      "line": 2016,
       "operation": "profileDir"
     },
     {
@@ -10009,37 +10009,37 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 999,
+      "line": 1000,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1389,
+      "line": 1390,
       "operation": "recover"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1870,
-      "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 1871,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2293,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2295,
+      "line": 1872,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2294,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2296,
       "operation": "start"
     },
     {

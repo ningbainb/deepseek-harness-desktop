@@ -330,7 +330,8 @@
         "browser-picker-preserved",
         "home-workspace-selector",
         "existing-workspace-selection",
-        "anonymous-project-outcome-metrics"
+        "anonymous-project-outcome-metrics",
+        "automated-runs-excluded-from-production-metrics"
       ]
     },
     {

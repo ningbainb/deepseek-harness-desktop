@@ -35,8 +35,10 @@ export async function resolveTelemetryEndpoint({
   resourcesPath,
   readFile = readFileDefault,
   testEndpoint,
+  automatedRun = false,
 }) {
   if (testEndpoint !== undefined) return validEndpoint(testEndpoint, { allowLocalHttp: true })
+  if (automatedRun) return undefined
   if (isPackaged !== true || typeof resourcesPath !== 'string' || resourcesPath.length === 0) return undefined
   let configuration
   try {

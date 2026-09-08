@@ -9,7 +9,7 @@
 - **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
 - **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片进行自适应压缩。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
 - **可感知的记忆**：展示当前会话的记忆活动、匹配结果和可操作入口，优化检索与排序。记忆继续按用户和作用域隔离，模型建议需要用户确认后才会保存。
-- **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥；匿名统计可以在设置中关闭。
+- **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥。自动化构建测试不向生产服务上报。
 
 ### 验证
 
@@ -32,7 +32,7 @@ DeepSeek Harness Desktop 是社区维护的开源桌面发行版。普通文件�
 - **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
 - **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
 - **Visible memory activity**: Session memory activity and matches are visible with actions to inspect and manage them. Retrieval and ranking are improved. User and scope isolation remain enforced, and model suggestions require user confirmation before persistence.
-- **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Anonymous metrics can be disabled in settings.
+- **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Automated build tests do not report to the production service.
 
 ### Verification
 

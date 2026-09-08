@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,7 +14,7 @@ import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const runtimeReadyTimeoutMs = packagedExecutable || process.env.CI ? 120_000 : 60_000
-const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-directory-picker-e2e-'))
+const temporary = await realpath(await mkdtemp(resolve(tmpdir(), 'dsh-directory-picker-e2e-')))
 const dshHome = resolve(temporary, 'dsh-home')
 const userData = resolve(temporary, 'user-data')
 let electronApp

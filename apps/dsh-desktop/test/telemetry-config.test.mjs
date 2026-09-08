@@ -51,3 +51,20 @@ test('allows an explicit local endpoint only through the test seam', async () =>
     testEndpoint: 'http://127.0.0.1:43191/v1/events',
   }), 'http://127.0.0.1:43191/v1/events')
 })
+
+test('automated official builds cannot resolve the production endpoint', async () => {
+  let reads = 0
+  const options = {
+    isPackaged: true,
+    resourcesPath: 'resources',
+    automatedRun: true,
+    readFile: async () => {
+      reads += 1
+      return '{"endpoint":"https://telemetry.example/v1/events","officialBuild":true}'
+    },
+  }
+  assert.equal(await resolveTelemetryEndpoint(options), undefined)
+  assert.equal(reads, 0)
+  assert.equal(await resolveTelemetryEndpoint({ ...options, testEndpoint: 'http://127.0.0.1:43191/v1/events' }), 'http://127.0.0.1:43191/v1/events')
+  assert.equal(reads, 0)
+})

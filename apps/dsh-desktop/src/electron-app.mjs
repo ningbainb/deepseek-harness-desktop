@@ -546,6 +546,7 @@ export async function startElectronApp(metadata) {
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
+    automatedRun: process.env.CI === 'true' || process.env.CI === '1' || process.env.NODE_ENV === 'test',
     testEndpoint: process.env.NODE_ENV === 'test'
       ? process.env.DSH_DESKTOP_TELEMETRY_TEST_ENDPOINT
       : undefined,
