@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream'
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -9,7 +9,9 @@ import { isLoopbackRequest } from '../src/host/routes.ts'
 const roots: string[] = []
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }) })
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-attachments-test-')); roots.push(root)
+  // The production WorkspaceGate returns realpath, including when Windows TEMP
+  // contains a short (8.3) path. Model that contract instead of a lexical path.
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-attachments-test-'))); roots.push(root)
   const owner = { header: { cwd: root } }
   const handler = createAttachmentHandler(async () => ({ ok: true, canonical: root }), id => id === 'owned' ? owner : undefined, isLoopbackRequest)
   const request = async (name: string, bytes: Buffer, override: Record<string, unknown> = {}, method = 'POST') => {
