@@ -79,8 +79,8 @@ state has been invented.
 
 ## Verification summary
 
-The latest combined-diff real Electron core regression passed all eight suites
-in 159.9 seconds: controlled proxy routing, window chrome, settings interaction,
+The final post-merge real Electron core regression passed all eight suites in
+122.4 seconds: controlled proxy routing, window chrome, settings interaction,
 long-conversation scroll/navigation, directory picker, Runtime Provider, preset
 deep link, and the ten-case direct-start/repair matrix. The proxy-related unit
 and IPC set passed 117/117. The direct feature-baseline script now covers 18
@@ -97,14 +97,14 @@ three warm launches then measured median `total-to-renderer` times of 10,175 ms
 and 9,803 ms respectively. Three five-minute packaged idle rounds measured a
 median-of-round-medians total working set of 739,844,096 bytes, total private
 bytes of 917,565,440 bytes, and DSH Host working set of 106,909,696 bytes with
-eight processes in every final window. The complete Desktop Node test command
-was rerun serially after the Windows Runtime lifecycle correction: it reached
-its own summary and exited in 110.2 seconds with 878 passes and two expected
-skips. Four HKCU installer cases and one temporary Electron localStorage helper
-were denied by the restricted sandbox; the two affected files then passed 10/10
-outside that sandbox in 47.8 seconds. The background scheduler no longer holds
-the test worker open, and the subsequent eight-suite Electron gate left no
-matching Runtime process behind.
+eight processes in every final window. After merging the latest upstream `main`,
+the complete Desktop Node test command was rerun serially outside the restricted
+sandbox: it reached its own summary and exited in 133.9 seconds with 888 passes,
+zero failures, and two expected Windows symlink skips. An earlier restricted run
+had denied four HKCU installer cases and one temporary Electron localStorage
+helper; those five environment-dependent cases passed in the final unrestricted
+run. The background scheduler no longer holds the test worker open, and the
+subsequent eight-suite Electron gate left no matching Runtime process behind.
 
 After the remote-plugin dependency correction, another clean electron-builder
 run again passed the 94-package verifier. Direct inspection of the packaged
