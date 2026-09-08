@@ -242,14 +242,18 @@ try {
   await dialog.getByRole('button', { name: /打开已有项目|Open existing project/iu }).waitFor()
   await dialog.getByRole('button', { name: /^(取消|Cancel)$/iu }).click()
   // Keep the official browser-only picker coverage: it remains available without the desktop preload.
-  const browserWindow = electronApp.waitForEvent('window')
-  await electronApp.evaluate(async ({ BrowserWindow }, url) => {
+  console.log('verifying browser-only directory picker without desktop preload')
+  const browserWindow = electronApp.waitForEvent('window', { timeout: 30_000 })
+  await electronApp.evaluate(({ BrowserWindow }, url) => {
     // This exercises a real browser-visible UI; a never-shown window can defer
     // animation-frame-driven mounting on a headless Windows build runner.
     const testWindow = new BrowserWindow({ width: 1024, height: 768, show: true, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false } })
-    await testWindow.loadURL(url)
+    // Wait for DOM readiness from Playwright below. Awaiting Electron's full
+    // load event here can stall the RPC on an unrelated pending page resource.
+    void testWindow.loadURL(url).catch(error => console.error('browser fixture navigation failed', error.message))
   }, page.url())
   const browserPage = await browserWindow
+  await browserPage.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   assert.equal(await browserPage.evaluate(() => typeof window.dshDesktop), 'undefined', 'browser fixture must not receive the desktop preload')
   try {
     await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: 30_000 })
