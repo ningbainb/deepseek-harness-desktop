@@ -79,6 +79,7 @@ export class DesktopUpdateController extends EventEmitter {
     onInstallFailure = async () => {},
     downloadRouter,
     updateChannel = DEFAULT_UPDATE_CHANNEL,
+    unavailableReason = undefined,
     installLaunchTimeoutMs = UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
     installPreparationTimeoutMs = UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
     setTimeoutFn = setTimeout,
@@ -96,6 +97,9 @@ export class DesktopUpdateController extends EventEmitter {
     this.onInstallFailure = onInstallFailure
     this.downloadRouter = downloadRouter
     this.updateChannel = normalizeUpdateChannel(updateChannel)
+    this.unavailableReason = typeof unavailableReason === 'string' && unavailableReason.length > 0
+      ? unavailableReason
+      : undefined
     this.installLaunchTimeoutMs = installLaunchTimeoutMs
     this.installPreparationTimeoutMs = installPreparationTimeoutMs
     this.setTimeoutFn = setTimeoutFn
@@ -149,7 +153,13 @@ export class DesktopUpdateController extends EventEmitter {
 
   async check({ manual = false } = {}) {
     if (!this.enabled) {
-      if (manual) this.#publish({ phase: 'unavailable', visible: true })
+      if (manual) {
+        this.#publish({
+          phase: 'unavailable',
+          visible: true,
+          ...(this.unavailableReason ? { reason: this.unavailableReason } : {}),
+        })
+      }
       return false
     }
     if (this.checking || this.downloading || this.installing) {

@@ -227,6 +227,7 @@ export function publicUpdateStatus(status) {
     percent: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : undefined,
     message: boundedText(status?.message, 1_000),
     visible: status?.visible === true,
+    ...(status?.reason === 'unsigned-mac-preview' ? { reason: 'unsigned-mac-preview' } : {}),
   }
 }
 

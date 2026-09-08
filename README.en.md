@@ -287,12 +287,18 @@ The particle-whale theme can be applied not only to the startup page but also to
 
 ## Download and Install
 
+### Windows
+
 1. Open [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest).
 2. Download `DeepSeek-Harness-Desktop-Setup-<version>-x64.exe`.
 3. Run the installer.
 4. Launch **DeepSeek Harness Desktop**.
 
-The installer already includes DSH, desktop plugins, skins, pnpm, MinGit, and the required native dependencies. Separate Node.js or Git setup is not required.
+The Windows installer already includes DSH, desktop plugins, skins, pnpm, MinGit, and the required native dependencies. Separate Node.js or Git setup is not required.
+
+### macOS unsigned preview (Apple Silicon)
+
+arm64 only. After downloading the `.dmg` or `.zip`, move the app to `/Applications` and clear quarantine with `xattr`. macOS 15 no longer has Right-click > Open. Preview builds have no auto-update and use system Git. Full steps: [macOS unsigned preview install guide](docs/macos-preview.md).
 
 If GitHub downloads are slow in your region, you can also join the community group at the top of this page to get the synchronized installer.
 

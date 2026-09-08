@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { homedir, release as osRelease } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
@@ -48,6 +49,11 @@ import {
   setQqBotProfileEnabled,
 } from './extensions/qqbot.mjs'
 import { publicUpdateStatus, registerDesktopIpc, registerDesktopStartupIpc } from './ipc.mjs'
+import {
+  UNSIGNED_MAC_PREVIEW_REASON,
+  inspectMacCodeSignature,
+  resolveUpdateAvailability,
+} from './unsigned-mac-preview.mjs'
 import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
 import {
@@ -2358,8 +2364,16 @@ export async function startElectronApp(metadata) {
   updateShutdownCoordinator.setHandler(requestUpdateShutdown)
   updateShutdownCoordinator.drain()
 
+  const updateAvailability = resolveUpdateAvailability({
+    platform: process.platform,
+    packaged: app.isPackaged,
+    disableRequested: requestsDisableUpdates(process.argv, process.env),
+    codesignVerified: process.platform === 'darwin' && app.isPackaged
+      ? inspectMacCodeSignature({ execPath: process.execPath, spawnSyncFn: spawnSync })
+      : null,
+  })
   let autoUpdater
-  if (app.isPackaged && process.platform === 'win32' && !requestsDisableUpdates(process.argv, process.env)) {
+  if (updateAvailability.enabled) {
     try {
       autoUpdater = await loadElectronAutoUpdater()
     } catch (error) {
@@ -2383,6 +2397,9 @@ export async function startElectronApp(metadata) {
     getWindow: () => mainWindow,
     currentVersion: app.getVersion(),
     enabled: Boolean(autoUpdater),
+    unavailableReason: updateAvailability.reason === UNSIGNED_MAC_PREVIEW_REASON
+      ? UNSIGNED_MAC_PREVIEW_REASON
+      : undefined,
     updateChannel,
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),

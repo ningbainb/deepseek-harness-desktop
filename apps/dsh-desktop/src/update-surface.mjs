@@ -409,9 +409,15 @@ export function createUpdateSurfaceScript() {
         status.textContent = '当前桌面版无需更新。';
         actions.append(later, recheck);
       } else if (phase === 'unavailable') {
-        title.textContent = '当前环境无法检查更新';
-        status.textContent = '桌面更新仅在已安装的 Windows 版本中可用。';
-        actions.append(later);
+        if (value.reason === 'unsigned-mac-preview') {
+          title.textContent = '预览版不支持自动更新';
+          status.textContent = '未签名的 macOS 预览版无法使用应用内更新。请到 GitHub Release 页手动下载新版本。';
+          actions.append(github, later);
+        } else {
+          title.textContent = '当前环境无法检查更新';
+          status.textContent = '桌面更新仅在已安装的 Windows 版本中可用。';
+          actions.append(later);
+        }
       } else if (phase === 'error') {
         title.textContent = '更新没有完成';
         status.textContent = value.message || '请检查网络连接后重试。';
