@@ -364,7 +364,8 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
       )
     } finally {
       await controller?.stop()
-      await rm(root, { recursive: true, force: true })
+      await logs.queue
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   }
 })
@@ -619,6 +620,9 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
   } finally {
     await browser?.close()
     await controller?.stop()
-    await rm(root, { recursive: true, force: true })
+    // Runtime shutdown enqueues its final log entry; drain it before removing
+    // the fixture so Windows cannot recreate a file during recursive cleanup.
+    await logs.queue
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })

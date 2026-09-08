@@ -1282,9 +1282,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 329 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 334 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 340 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 378 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 380 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 491 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 379 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 381 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 492 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 48 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 115 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 121 | profileDir |
@@ -1558,9 +1558,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1130 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1133 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 346 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 386 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 489 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 498 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 387 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 490 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 499 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 56 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 72 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 94 | start |
