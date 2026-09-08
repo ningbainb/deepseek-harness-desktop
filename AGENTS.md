@@ -34,8 +34,10 @@
 
 ## git push 与 NPM 发布已放开（内测结束）
 
-**git push 已放开**：可正常执行 `git push` 到远程仓库 `dsh-external/dsh-web-ui`，
-推送前仍须核验目标仓库为 PRIVATE。
+**git push 已放开**：本仓库是公开开源仓库，可正常执行 `git push` 到 GitHub 仓库
+`https://github.com/ningbainb/deepseek-harness-desktop.git` 的 `main` 分支，不要求仓库为
+PRIVATE，也不得为了推送改变仓库可见性。推送前须核验远程 URL、目标分支和待推送提交；
+若目标不是上述仓库或分支，须先由维护者确认。
 
 **内测已结束，NPM 包可按正常流程发布**：本仓库任何包（`@linxin666/dsh-*`）发布前
 仍需由维护者确认发布动作、版本号与 registry 规范，避免误发或破坏线上包。
