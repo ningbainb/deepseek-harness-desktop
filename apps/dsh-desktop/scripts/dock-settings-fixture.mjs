@@ -1,7 +1,6 @@
 const localizedContexts = new WeakSet()
 
-/** Open an existing form through the same sidebar navigation used by the user. */
-export async function openDockSetting(app, mainPage, id) {
+export async function useChineseFixtureLocale(app) {
   const context = app.context()
   if (!localizedContexts.has(context)) {
     // These interaction fixtures assert Chinese copy. Set the browser language
@@ -12,6 +11,11 @@ export async function openDockSetting(app, mainPage, id) {
     })
     localizedContexts.add(context)
   }
+}
+
+/** Open an existing form through the same sidebar navigation used by the user. */
+export async function openDockSetting(app, mainPage, id) {
+  await useChineseFixtureLocale(app)
   let dock = app.windows().find(page => page.url().includes('/extensions.html'))
   if (!dock) {
     await mainPage.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first().evaluate(button => button.click())

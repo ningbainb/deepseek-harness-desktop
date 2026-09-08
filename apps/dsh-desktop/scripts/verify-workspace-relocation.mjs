@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { appendFile, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -12,6 +12,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -21,7 +22,7 @@ if (packagedExecutable !== undefined && !existsSync(packagedExecutable)) {
   throw new Error(`DSH_DESKTOP_E2E_EXECUTABLE does not exist: ${packagedExecutable}`)
 }
 
-const temporary = await mkdtemp(join(tmpdir(), 'dsh-workspace-relocation-e2e-'))
+const temporary = await realpath(await mkdtemp(join(tmpdir(), 'dsh-workspace-relocation-e2e-')))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const oldPath = join(temporary, 'project-before-move')
@@ -195,6 +196,7 @@ try {
   assert.equal(typeof oldSessionId, 'string')
   await rpc(first.page, 'session.rename', { sessionId: oldSessionId, title: originalTitle })
   assert.deepEqual(first.rendererErrors, [])
+  await waitForSessionLog(join(dshHome, 'sessions'), oldSessionId)
   await activeApp.close()
   activeApp = undefined
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { appendFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -12,6 +12,8 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -21,7 +23,7 @@ if (packagedExecutable !== undefined && !existsSync(packagedExecutable)) {
   throw new Error(`DSH_DESKTOP_E2E_EXECUTABLE does not exist: ${packagedExecutable}`)
 }
 
-const temporary = await mkdtemp(join(tmpdir(), 'dsh-conversation-scroll-e2e-'))
+const temporary = await realpath(await mkdtemp(join(tmpdir(), 'dsh-conversation-scroll-e2e-')))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const workspacePath = join(temporary, 'conversation-scroll-workspace')
@@ -64,6 +66,7 @@ async function launch() {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
   const rendererErrors = []
   const rendererConsole = []
@@ -331,6 +334,7 @@ try {
   assert.equal(typeof created?.sessionId, 'string', JSON.stringify(created))
   const sessionId = created.sessionId
   assert.deepEqual(first.rendererErrors, [])
+  await waitForSessionLog(join(dshHome, 'sessions'), sessionId)
   await activeApp.close()
   activeApp = undefined
 
