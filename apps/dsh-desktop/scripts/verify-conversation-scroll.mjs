@@ -399,10 +399,15 @@ try {
   assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
 
   await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').click()
-  await second.page.waitForFunction(() => {
+  await second.page.waitForFunction(expected => {
     const scroll = document.querySelector('[data-conversation-scroll]')
+    const counter = document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')
+    const bottom = document.querySelector('[data-dsh-turn-navigator] [data-role="bottom"]')
+    // The scroll position can settle one renderer frame before the navigator.
+    // Await both observable results, then keep the exact assertions below.
     return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
-  })
+      && counter?.textContent === expected && bottom instanceof HTMLButtonElement && bottom.disabled
+  }, `${messageCount}/${messageCount}`)
   navigation = await navigatorState(second.page)
   assert.equal(navigation.counter, `${messageCount}/${messageCount}`)
   assert.equal(navigation.bottomDisabled, true)
