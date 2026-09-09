@@ -46,7 +46,7 @@ This Cloudflare Worker accepts only the fixed Desktop product-event schema and o
 
 The official `desktop-v*` release workflow fails if this variable is absent or not a credential-free HTTPS `/v1/events` URL. The committed Desktop configuration remains empty, so local, development, test, source, and Fork builds do not upload to the official service.
 
-The official website sends form-encoded Beacons to `/v1/download-clicks` only from the exact Origins `https://1521003.xyz`, `https://www.1521003.xyz`, and `https://ningbainb.github.io`. Installer links remain direct GitHub Release links, so missing or failed telemetry never delays or blocks a download.
+The deployed official website does not send installer-click telemetry. The backend retains `/v1/download-clicks` compatibility for form-encoded Beacons from the exact Origins `https://1521003.xyz`, `https://www.1521003.xyz`, and `https://ningbainb.github.io`; endpoint availability is not evidence that the current site sends events. Installer links remain direct GitHub Release links. Website download totals come from GitHub installer-asset counts and do not measure completed installations or unique users.
 
 ## Operations
 

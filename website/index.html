@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 3.3.0：开源 Windows AI 编程工作台。支持通用文件拖拽、智能图像压缩、现代化模式选择器，性价比模式由专家主控派发副模型，用量看板追踪 Token 与费用。">
+    <meta name="description" content="DeepSeek Harness Desktop 3.3.0：开源 Windows AI 编程工作台。拓展坞集中管理 AI 设置，创建项目可选本地文件夹，文件交给模型按需读取，记忆匹配与确认过程可查看。">
     <meta name="keywords" content="DeepSeek Harness Desktop 3.3.0,文件拖拽,图像压缩,模式选择器,性价比模式,Value Mode,大模型用量看板,Token 统计,Claude Code 项目导入,Codex 项目导入,Windows AI 编程客户端,开源 AI 编程助手">
     <meta name="author" content="DeepSeek Harness Desktop Community">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -14,18 +14,18 @@
     <link rel="canonical" href="https://ningbainb.github.io/deepseek-harness-desktop/">
     <link rel="sitemap" type="application/xml" href="https://ningbainb.github.io/deepseek-harness-desktop/sitemap.xml">
     <meta property="og:title" content="DeepSeek Harness Desktop 3.3.0：专家主控的开源 Windows AI 工作台">
-    <meta property="og:description" content="性价比模式、实时大模型用量看板，以及 Claude Code / Codex 项目导入，全部集成在一个可直接安装的 Windows 桌面客户端中。">
+    <meta property="og:description" content="拓展坞 AI 设置、项目文件夹选择、模型按需读取文件与可查看的记忆活动；保留性价比模式、用量看板和 Claude Code / Codex 项目导入。">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://ningbainb.github.io/deepseek-harness-desktop/">
     <meta property="og:site_name" content="DeepSeek Harness Desktop">
     <meta property="og:locale" content="zh_CN">
-    <meta property="og:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp">
+    <meta property="og:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp">
     <meta property="og:image:alt" content="DeepSeek Harness Desktop 3.3.0 主界面与 AI 编程工作区">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="DeepSeek Harness Desktop 3.3.0：专家主控的开源 Windows AI 工作台">
-    <meta name="twitter:description" content="性价比模式、实时大模型用量看板，以及 Claude Code / Codex 项目导入，全部集成在一个可直接安装的 Windows 桌面客户端中。">
-    <meta name="twitter:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp">
-    <title>DeepSeek Harness Desktop 3.3.0 - 文件拖拽、智能压缩与性价比模式</title>
+    <meta name="twitter:description" content="拓展坞 AI 设置、项目文件夹选择、模型按需读取文件与可查看的记忆活动；保留性价比模式、用量看板和 Claude Code / Codex 项目导入。">
+    <meta name="twitter:image" content="https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp">
+    <title>DeepSeek Harness Desktop 3.3.0 - 拓展坞、项目文件与记忆管理</title>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,7 +35,7 @@
             "@id": "https://ningbainb.github.io/deepseek-harness-desktop/#website",
             "url": "https://ningbainb.github.io/deepseek-harness-desktop/",
             "name": "DeepSeek Harness Desktop",
-            "description": "DeepSeek Harness Desktop 3.3.0 是社区维护的开源 Windows AI 编程工作台，提供通用文件拖拽、智能图像压缩、专家主控的性价比模式、大模型用量看板，以及 Claude Code 和 Codex 项目导入。",
+            "description": "DeepSeek Harness Desktop 3.3.0：开源 Windows AI 编程工作台。拓展坞集中管理 AI 设置，创建项目可选本地文件夹，文件交给模型按需读取，记忆匹配与确认过程可查看。",
             "inLanguage": "zh-CN"
           },
           {
@@ -44,7 +44,7 @@
             "name": "DeepSeek Harness Desktop",
             "alternateName": "DeepSeek Harness 桌面版",
             "url": "https://ningbainb.github.io/deepseek-harness-desktop/",
-            "description": "完整保留 Harness Web Surface 的开源 Windows AI 编程客户端。3.3.0 支持任意文件拖拽入会话、图像智能压缩与全新模式选择器，让专家主控模型负责拆解、派发与汇总，副模型完成子任务；用量看板追踪 Token 与费用。",
+            "description": "DeepSeek Harness Desktop 3.3.0：开源 Windows AI 编程工作台。拓展坞集中管理 AI 设置，创建项目可选本地文件夹，文件交给模型按需读取，记忆匹配与确认过程可查看。",
             "applicationCategory": "DeveloperApplication",
             "applicationSubCategory": "AI coding assistant",
             "operatingSystem": "Windows 10, Windows 11",
@@ -55,15 +55,18 @@
             "releaseNotes": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.3.0",
             "codeRepository": "https://github.com/ningbainb/deepseek-harness-desktop",
             "license": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/LICENSE",
-            "dateModified": "2026-09-04",
-            "image": "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp",
+            "dateModified": "2026-09-09",
+            "image": "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp",
             "screenshot": [
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp",
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp",
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import-preview.webp",
-              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp"
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp",
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-create-project.webp",
+              "https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-memory.webp"
             ],
             "featureList": [
+              "拓展坞分组 AI 设置与统一主题",
+              "创建项目与工作区系统文件夹选择",
+              "文件真实引用与模型按需读取",
+              "本地记忆筛选、确认建议与可查看的匹配活动",
               "完整 Harness Web Surface",
               "原生 Windows 桌面生命周期",
               "可靠覆盖升级与精确旧进程清理",
@@ -186,6 +189,30 @@
                   "@type": "Answer",
                   "text": "从同一 GitHub Release 下载 SHA256SUMS.txt 和 release-manifest.json。先比对安装包 SHA-256，再查看 manifest 记录的实际签名状态；本地或源码构建可能未签名，不能据此推断发布资产状态。"
                 }
+              },
+              {
+                "@type": "Question",
+                "name": "拖入文件后会自动解析成 Markdown 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。普通文件保存到当前工作区后显示附件卡片，发送时提供真实文件引用，由模型按需调用工具读取和研究；不自动把全文注入对话。文件可添加不代表所有格式都能被模型理解，图片使用独立的压缩与视觉流程。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "记忆会自动保存或发送吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "模型建议需要你确认后才保存。开启记忆引用后，系统按本轮输入检索相关记忆，并将引用内容随请求发送给当前模型供应商；归属或作用域无法确认时不引用。可在拓展坞的个人偏好中查看和管理。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "升级到 3.3.0 会显示 Star 提示吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "会。每个本机用户升级到 3.3.0 后显示一次，包括看过 3.2.0 提示的用户。关闭后重启不重复，预览不改变记录；是否前往 GitHub 点 Star 由你决定，不影响继续使用。"
+                }
               }
             ]
           }
@@ -199,7 +226,7 @@
       } catch {}
     </script>
     <link rel="icon" href="official-whale.svg" type="image/svg+xml">
-    <link rel="preload" as="image" href="assets/desktop-3.2.0-workspace.webp" type="image/webp" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/desktop-3.3.0-workspace.webp" type="image/webp" fetchpriority="high">
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" type="module"></script>
   </head>
@@ -241,8 +268,8 @@
           <div class="hero-copy reveal">
             <p class="overline">DeepSeek Harness Desktop 社区版</p>
             <h1>DeepSeek Harness<br>Desktop 3.3.0</h1>
-            <p class="hero-summary">把大模型用得更聪明：性价比模式由专家主控模型拆解、派发和复核任务，副模型专注完成子任务；你可以在一个 Windows AI 编程工作台里看清 Token、费用和真实滚动峰值。</p>
-            <p class="hero-summary">Claude Code 与 Codex 项目、历史会话可安全导入，原有 Harness 数据和插件直接延续。Windows 10/11 x64 一键安装，无需另配 Node.js。</p>
+            <p class="hero-summary">项目、文件和 AI 设置更顺手：点击选择本地项目文件夹，把文件拖入会话交给模型按需研究；在拓展坞集中配置模型、性价比模式与个人偏好，查看记忆的匹配和确认状态。</p>
+            <p class="hero-summary">性价比模式、实时 Token 与费用看板、Claude Code / Codex 历史会话导入继续保留，原有 Harness 数据和插件直接延续。Windows 10/11 x64 一键安装，无需另配 Node.js。</p>
             <div class="hero-buttons">
               <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2h7v7H2V2Zm9 0h7v7h-7V2ZM2 11h7v7H2v-7Zm9 0h7v7h-7v-7Z"/></svg>
@@ -320,54 +347,70 @@
       <section class="latest-features" id="latest-features" aria-labelledby="latest-features-title">
         <div class="container">
           <div class="section-title reveal">
-            <span>v3.2.0 重点能力</span>
-            <h2 id="latest-features-title">把专家模型用在决策，把副模型用在执行</h2>
+            <span>v3.3.0 重点能力</span>
+            <h2 id="latest-features-title">从项目、文件到记忆，让日常操作更顺手</h2>
           </div>
           <div class="latest-grid">
             <article class="latest-card reveal">
               <span class="latest-index">01</span>
-              <h3>性价比模式，专家主控</h3>
-              <p>选择模式后立即出现配置引导：专家主控负责理解、拆解、派发、复核和汇总，副模型只完成被派发的局部任务。平衡策略默认开启，模型角色一目了然。</p>
-              <small>EXPERT CONTROLLER + WORKER MODEL</small>
+              <h3>拓展坞，设置集中管理</h3><p>模型接入、性价比模式、个人偏好和更多 AI 设置按侧栏分组。设置面板明暗一致、默认居中，拖动更新合并以减少卡顿。</p><small>DOCK SETTINGS</small>
             </article>
             <article class="latest-card reveal">
               <span class="latest-index">02</span>
+              <h3>选文件夹，就能创建项目</h3><p>创建项目与选择工作区使用统一弹窗，点击源文件夹区域打开系统选择器。选择已经连接的目录会打开原有工作区。</p><small>PROJECTS AND WORKSPACES</small>
+            </article>
+            <article class="latest-card reveal">
+              <span class="latest-index">03</span>
+              <h3>拖入文件，由模型按需研究</h3><p>普通文件添加后显示附件卡片，发送时提供真实文件引用，不预先解析或自动转成 Markdown。图片走独立的压缩与视觉流程。</p><small>MODEL-DRIVEN FILE HANDOFF</small>
+            </article>
+            <article class="latest-card reveal">
+              <span class="latest-index">04</span>
+              <h3>准备引用哪些记忆，看得见</h3><p>在个人偏好中查看已保存记忆、待确认建议和最近准备的记忆。建议经你确认才保存；开启引用后，相关内容随请求发给当前模型供应商。面板不代表模型已采纳。</p><small>VISIBLE MEMORY ACTIVITY</small>
+            </article>
+            <article class="latest-card reveal">
+              <span class="latest-index">05</span>
+              <h3>性价比模式，专家主控</h3>
+              <p>选择模式后立即出现配置引导：专家主控负责理解、拆解、派发、复核和汇总，副模型只完成被派发的局部任务。智能平衡是默认策略，配置完成并确认后才启用模式。</p>
+              <small>EXPERT CONTROLLER + WORKER MODEL</small>
+            </article>
+            <article class="latest-card reveal">
+              <span class="latest-index">06</span>
               <h3>策略可调，子代理有边界</h3>
               <p>更省、智能平衡、更强三档策略按任务复杂度选择派发力度；子代理深度固定为 1，避免递归失控，主控统一收口质量与风险。</p>
               <small>BOUNDED DELEGATION</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">03</span>
+              <span class="latest-index">07</span>
               <h3>用量中心 + 滚动峰值</h3>
               <p>把余额、Token、缓存节省、请求耗时和费用放在一屏；生成速度严格按有效流式增量统计，滚动 1 秒峰值不会被一次汇总事件放大。</p>
               <small>TOKENS, COST, ROLLING PEAK</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">04</span>
+              <span class="latest-index">08</span>
               <h3>导入预览，安全接续</h3>
               <p>Claude Code / Codex 项目和会话先扫描、再预览、后确认；敏感字段统一脱敏，历史工具记录保留为不可执行上下文。</p>
               <small>CLAUDE CODE + CODEX HANDOFF</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">05</span>
+              <span class="latest-index">09</span>
               <h3>完整 Harness 工作台</h3>
               <p>会话、工作区、文件、变更、技能、任务看板、SSH 和插件入口都在同一个桌面工作区里，原有 DSH 数据继续沿用。</p>
               <small>ONE DESKTOP WORKSPACE</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">06</span>
+              <span class="latest-index">10</span>
               <h3>启动自愈与插件隔离</h3>
               <p>启动阶段可见、Runtime 自动修复可回滚，第三方插件异常由 SafePluginBoundary 隔离；关键路径保持可用，失败时给出明确的恢复状态。</p>
               <small>RESILIENT STARTUP</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">07</span>
+              <span class="latest-index">11</span>
               <h3>匿名数据埋点可审计</h3>
-              <p>正式包只记录固定枚举的产品使用事件和 Value Mode 粗粒度漏斗；不记录模型名、Token、Prompt、路径或 Secret，数据写入一方聚合服务。</p>
+              <p>正式包记录项目创建或连接、普通文件添加、拓展坞设置页打开等固定结果，用于按版本改进体验；不上传对话、记忆正文、文件内容、路径、模型名、Token 或密钥。</p>
               <small>PRIVACY-FIRST PRODUCT SIGNALS</small>
             </article>
             <article class="latest-card reveal">
-              <span class="latest-index">08</span>
+              <span class="latest-index">12</span>
               <h3>可验证发布与完整 Harness</h3>
               <p>Windows x64 安装包提供 SHA-256 与 release manifest；同时保留会话、工具、Skills、任务看板、Git、SSH、移动远程、QQ Bot 和主题生态。</p>
               <small>VERIFIABLE RELEASE, COMPLETE SURFACE</small>
@@ -378,15 +421,33 @@
 
       <section class="features" id="features">
         <div class="container">
-          <div class="section-title reveal"><span>3.2.0 实机界面 · 文案与画面一一对应</span><h2>从第一次选择到真正接手工作，每一步都有画面</h2></div>
+          <div class="section-title reveal"><span>3.3.0 实机界面与历史功能参考</span><h2>从第一次选择到真正接手工作，每一步都有画面</h2></div>
+
+          <article class="feature-row reveal">
+            <div class="feature-copy">
+              <div class="feature-title"><span class="play-icon">A</span><h3>创建项目：选择一个文件夹开始</h3></div>
+              <p>输入项目名称，点击源文件夹区域打开系统文件夹选择器，确认后创建项目。主页的“选择工作区”也使用统一弹窗，已连接的目录直接打开。</p>
+              <ul><li>项目名称与源文件夹集中确认</li><li>未选择文件夹时，创建按钮保持禁用</li><li>文件添加后由模型按需调用工具研究，格式支持取决于模型与可用工具</li></ul>
+            </div>
+            <figure class="product-shot"><img src="assets/desktop-3.3.0-create-project.webp" width="1122" height="872" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.3.0 创建项目与文件夹选择"><figcaption>3.3.0 实机：尚未选择文件夹的创建项目弹窗</figcaption></figure>
+          </article>
+          <article class="feature-row feature-row-reverse reveal">
+            <div class="feature-copy">
+              <div class="feature-title"><span class="play-icon">B</span><h3>个人偏好：知道 AI 准备引用哪些记忆</h3></div>
+              <p>从拓展坞打开个人偏好，切换到记忆。按作用域和关键词筛选已保存内容，查看待确认建议和最近准备的记忆；新增、编辑、删除都在同一处完成。</p>
+              <ul><li>记忆保存在本机并按用户与作用域隔离</li><li>开启“允许模型在请求中引用记忆”后按本轮输入检索</li><li>引用内容会发给当前模型供应商，归属不明时不引用</li></ul>
+            </div>
+            <figure class="product-shot"><img src="assets/desktop-3.3.0-memory.webp" width="1566" height="1296" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.3.0 个人偏好记忆设置，包含引用开关、筛选和待确认建议"><figcaption>3.3.0 实机：未启用引用、尚无记忆的初始状态</figcaption></figure>
+          </article>
+
 
           <article class="feature-row reveal">
             <div class="feature-copy">
               <div class="feature-title"><span class="play-icon">1</span><h3>性价比模式：选择角色，立即开始协作</h3></div>
-              <p>右侧实机画面就是用户选择模式后看到的配置引导：专家主控模型、副模型 / 子代理执行模型、运行策略三步集中确认。没有明确主控时才预选当前默认模型，配置完整后才写入并开启。</p>
+              <p>右侧为 3.2.0 配置引导的历史实机参考；3.3.0 可在拓展坞继续设置：专家主控模型、副模型 / 子代理执行模型、运行策略三步集中确认。没有明确主控时才预选当前默认模型，配置完整后才写入并开启。</p>
               <ul><li>01 专家主控模型：理解、拆解、复核、汇总</li><li>02 副模型：并行调查、局部实现和重复性工作</li><li>03 运行策略：更省 / 平衡 / 更强，未完成配置保持关闭</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-value-mode-setup.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 性价比模式三步配置引导，包含专家主控模型、副模型和运行策略"><figcaption>实机：三步配置引导，未完成配置时保持关闭</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-value-mode-setup.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 性价比模式三步配置引导，包含专家主控模型、副模型和运行策略"><figcaption>3.2.0 历史参考：三步配置引导，未完成配置时保持关闭</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
@@ -395,7 +456,7 @@
               <p>点击侧栏“大模型用量”即可进入用量中心。实机首屏展示余额、今日 / 累计 Token、缓存节省、滚动 1 秒峰值、年度热力图和 30 天走势；无有效流式样本时明确显示“暂无数据”，不制造虚假速率。</p>
               <ul><li>余额、今日 Token、累计 Token、缓存节省</li><li>滚动 1 秒最新速率与步骤内峰值</li><li>热力图与 30 天走势，空数据安全降级</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-usage-dashboard.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 大模型用量与数据分析中心，展示余额、Token、缓存和滚动 1 秒峰值"><figcaption>实机：用量中心首屏（无历史数据时显示“暂无数据”）</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-usage-dashboard.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 大模型用量与数据分析中心，展示余额、Token、缓存和滚动 1 秒峰值"><figcaption>3.2.0 历史参考：用量中心首屏（无历史数据时显示“暂无数据”）</figcaption></figure>
           </article>
 
           <article class="feature-row reveal">
@@ -404,7 +465,7 @@
               <p>这张深色实机画面对应“已完成扫描并选中会话”的预览态：两种来源并列显示项目和会话，右侧先看迁移上下文，再确认导入 Harness。整个流程只读、可重试且幂等。</p>
               <ul><li>Claude Code 与 Codex 项目 / 会话并列发现</li><li>选中会话后预览项目匹配与 Transcript Events</li><li>Token、API Key、路径等敏感内容脱敏，历史工具调用不可执行</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-project-import-preview.webp" width="1040" height="720" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入扫描结果和选中会话预览"><figcaption>实机：已扫描 7 + 7 会话，选中后预览迁移上下文</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.2.0-project-import-preview.webp" width="1040" height="720" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入扫描结果和选中会话预览"><figcaption>3.2.0 历史参考：已扫描 7 + 7 会话，选中后预览迁移上下文</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
@@ -413,7 +474,7 @@
               <p>这张主界面实机图展示了桌面版的真实骨架：会话与工作区在左侧，文件 / 变更面板在右侧，模型、技能和发送入口集中在中间。任务看板、SSH、插件和原有 DSH 数据从同一工作台继续使用。</p>
               <ul><li>会话、工作区、文件、变更导航清晰可见</li><li>模型、技能、插件与任务能力在同一桌面入口</li><li>独立 profile 与端口回退，桌面版可和 Web 端共存</li></ul>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.2.0-workspace.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 主工作区，展示会话、工作区、文件变更面板和桌面能力入口"><figcaption>实机：主工作区、文件 / 变更面板与能力入口</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.3.0-workspace.webp" width="2558" height="1680" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.3.0 主工作区，展示工作区选择、模式选择、文件面板和拓展坞入口"><figcaption>3.3.0 实机：主工作区、文件 / 变更面板与拓展坞入口</figcaption></figure>
           </article>
         </div>
       </section>
@@ -474,9 +535,9 @@
                 <span class="release-state">STABLE / 稳定通道</span>
                 <strong class="release-version">v3.3.0</strong>
               </div>
-              <p>v3.3.0 支持任意文件拖入会话、智能图像压缩自适应降采样、现代化模式选择器重构，以及侧边栏与拓展坞对齐优化；保留专家主控性价比模式、用量看板与项目导入。</p>
+              <p>v3.3.0 集中整理拓展坞设置，统一创建项目与工作区选择，文件以真实引用交给模型按需读取；记忆活动可查看，浏览器与文件预览关闭控件修复。正式包增加匿名功能结果统计，升级后每个本机用户显示一次 Star 提示。</p>
               <div class="release-facts">
-                <span><small>发布日期</small><time class="release-date" datetime="2026-09-04">2026-09-04</time></span>
+                <span><small>发布日期</small><time class="release-date" datetime="2026-09-09">2026-09-09</time></span>
                 <span><small>安装包</small><strong class="release-size">约 192 MiB</strong></span>
                 <span><small>同步状态</small><strong data-release-status>正在同步 GitHub</strong></span>
               </div>
@@ -498,6 +559,9 @@
         <div class="container">
           <div class="section-title reveal"><span>常见问题</span><h2 id="faq-title">关于 DeepSeek Harness Desktop</h2></div>
           <div class="faq-grid">
+            <article class="faq-card reveal"><h3>拖入文件后会自动解析成 Markdown 吗？</h3><p>不会。普通文件保存到当前工作区后显示附件卡片，发送时提供真实文件引用，由模型按需调用工具读取和研究；不自动把全文注入对话。文件可添加不代表所有格式都能被模型理解，图片使用独立的压缩与视觉流程。</p></article>
+            <article class="faq-card reveal"><h3>记忆会自动保存或发送吗？</h3><p>模型建议需要你确认后才保存。开启记忆引用后，系统按本轮输入检索相关记忆，并将引用内容随请求发送给当前模型供应商；归属或作用域无法确认时不引用。可在拓展坞的个人偏好中查看和管理。</p></article>
+            <article class="faq-card reveal"><h3>升级到 3.3.0 会显示 Star 提示吗？</h3><p>会。每个本机用户升级到 3.3.0 后显示一次，包括看过 3.2.0 提示的用户。关闭后重启不重复，预览不改变记录；是否前往 GitHub 点 Star 由你决定，不影响继续使用。</p></article>
             <article class="faq-card reveal">
               <h3>DeepSeek Harness Desktop 是什么？</h3>
               <p>它是社区维护的开源 Windows 桌面发行版，在原版 Harness Web Surface 外增加原生应用生命周期、插件、主题、自动更新与移动远程能力。</p>

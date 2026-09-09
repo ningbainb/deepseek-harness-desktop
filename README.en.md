@@ -42,7 +42,18 @@ The installer includes the main runtime components, so you do not need to separa
 
 [Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
-### Latest Release: 3.2.0
+### Latest Release: 3.3.0
+
+- **Organized Dock settings**: Model connection, Value Mode, Personal Prompt, Memory, particle theme, and image understanding are grouped in the sidebar. Settings follow the same light/dark theme, open centered by default, and coalesce drag updates to reduce stutter.
+- **Projects and file handoff**: Creating a project and choosing a workspace use a shared dialog with a native folder picker. Ordinary dropped files appear as attachment cards; sending supplies real file references for the model to investigate with tools, without preprocessing or automatic Markdown conversion.
+- **Visible memory activity**: Inspect saved memories, pending suggestions, and recently prepared memory context in the Dock. Suggestions require confirmation before saving, and memories are isolated by local user and scope. When references are enabled, matching content is sent to the selected model provider; the panel does not prove that the model used it.
+- **Upgrade and feedback**: Each local user upgrading to 3.3.0 sees the Star prompt once; closing it and restarting does not repeat it. Official builds add anonymous project, ordinary-file, and settings-page outcome counts, excluding conversations, file contents, paths, and credentials. See the [privacy policy](PRIVACY.md).
+
+![DeepSeek Harness Desktop 3.3.0 project creation and source-folder selection](docs/screenshots/3.3.0-create-project.webp)
+
+![DeepSeek Harness Desktop 3.3.0 Dock memory settings](docs/screenshots/3.3.0-memory.webp)
+
+### Continuing core capabilities
 
 - **Value Mode V2**: An expert controller model understands, decomposes, delegates, reviews, and synthesizes work while a subagent worker model handles bounded subtasks; first selection opens setup guidance.
 - **Large-Model Usage Dashboard**: Balance, input/output tokens, context, cache, latency, cost, and generation speed are visible; peak speed uses a strict rolling one-second algorithm instead of treating one aggregate usage event as instantaneous throughput.
@@ -53,7 +64,9 @@ The installer includes the main runtime components, so you do not need to separa
 
 ---
 
-## Three reasons to try 3.2.0
+## Model collaboration, usage, and project import
+
+The following three screenshots are historical 3.2.0 captures. These capabilities remain available; use the Dock for the current 3.3.0 settings navigation and layout.
 
 ### Value Mode: let the expert decide, let the worker execute
 
@@ -157,7 +170,7 @@ The desktop app runs the DeepSeek Harness Web Surface directly while the desktop
 
 In one window, you can handle AI conversations, code changes, file management, Git operations, task execution, model switching, and plugin extensions.
 
-![DeepSeek Harness Desktop 3.2.0 main interface and AI coding workspace](docs/screenshots/3.2.0-workspace.webp)
+![DeepSeek Harness Desktop 3.3.0 main interface and AI coding workspace](docs/screenshots/3.3.0-workspace.webp)
 
 ## Skills and Plugins
 
@@ -259,7 +272,7 @@ The input area can display:
 - Input Tokens
 - Output Tokens
 
-![Large-model usage dashboard and rolling one-second peak](docs/screenshots/3.2.0-usage-dashboard.webp)
+![Historical 3.2.0 capture: large-model usage dashboard and rolling one-second peak](docs/screenshots/3.2.0-usage-dashboard.webp)
 
 ## Themes and Skins
 

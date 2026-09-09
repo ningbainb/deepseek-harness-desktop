@@ -3,10 +3,18 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc>
-    <lastmod>2026-09-01</lastmod>
+    <lastmod>2026-09-09</lastmod>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-workspace.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 3.2.0 主工作区与 AI 编程入口</image:title>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-create-project.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.3.0 创建项目</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-memory.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.3.0 记忆设置</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 3.3.0 主工作区与 AI 编程入口</image:title>
     </image:image>
     <image:image>
       <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp</image:loc>
@@ -23,6 +31,6 @@
   </url>
   <url>
     <loc>https://ningbainb.github.io/deepseek-harness-desktop/privacy.html</loc>
-    <lastmod>2026-09-01</lastmod>
+    <lastmod>2026-09-09</lastmod>
   </url>
 </urlset>

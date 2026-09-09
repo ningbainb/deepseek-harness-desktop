@@ -6,9 +6,9 @@ The desktop application is a thin lifecycle and security layer around the offici
 
 The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, `dsh-codex-connect`, and `reasoning-slider` while preserving community bundles already added to that profile. The native Extension Dock market fetches the public awesome-dsh-plugin index and sends confirmed installs through Desktop's transactional plugin manager; it is not a Runtime bundle. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
 
-## Desktop 3.2 platform policy
+## Desktop 3.3 platform policy
 
-Desktop 3.2.0 is the expert-controller, usage-observability, and context-handoff release. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
+Desktop 3.3.0 provides grouped Dock settings, shared project/workspace dialogs, model-driven file handoff, and visible local memory activity. New public integrations must use the 3.0 contracts and policies rather than infer behavior from the internal Electron implementation.
 
 The Desktop Client SDK and Desktop Contract remain 1.x. Runtime Provider, Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility, Runtime matrix, and compat-patch inputs have machine-readable definitions. The applicable additive-change, deprecation, and major-version rules are in the [compatibility policy](compatibility-policy.md) and [schema versioning guide](schema-versioning.md).
 
@@ -16,7 +16,7 @@ Stable Runtime selection is evidence-led: a Stable build and startup accept only
 
 Startup reads the current Home and persistent Desktop Profile directly. It tries the complete plugin graph twice, may run a bounded model-backed repair in a private transaction workspace, verifies every candidate before applying it, and otherwise starts built-in plugins from the same Home. It does not require a startup migration, isolated recovery session, or safe-mode choice. The exact fallback and rollback boundaries are documented in [upgrade and rollback](upgrade-and-rollback.md).
 
-Official packaged Desktop releases enable first-party anonymous product analysis for DAU, MAU, country-level adoption, version adoption, in-app updates, and feature funnels. Daily and monthly anonymous actors rotate at UTC boundaries and are independent from DSH identity, accounts, hardware, sessions, and credentials; development, source, test, and Fork builds stay disconnected. Desktop never automatically uploads diagnostics. A diagnostic JSON/ZIP is created only after user confirmation to a user-selected location; it contains a manifest and hashes and uses centralized redaction. The content boundary and non-goals are in [security boundaries](security-boundaries.md).
+Official packaged Desktop releases enable first-party anonymous product analysis for activity, retention, country-level adoption, versions, updates, and fixed feature outcomes. Rotating daily/monthly actors and a stable anonymous installation hash are independent of DSH accounts, hardware, sessions, and credentials. Schema 4 adds daily, version-specific project, ordinary-file, and Dock settings outcomes; these independent observations do not prove ordered funnel completion or completed model tasks. Development, source, test, and Fork builds stay disconnected. Desktop never automatically uploads diagnostics; a redacted JSON/ZIP is exported only after confirmation to a user-selected location. See the [privacy policy](../PRIVACY.md), [metric definitions](../apps/dsh-telemetry-worker/README.md), and [security boundaries](security-boundaries.md).
 
 ## Included desktop capabilities
 
@@ -56,9 +56,23 @@ After a one-time native confirmation, the single primary Runtime runs with `dang
 
 Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. The primary invocation contains exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
-## Desktop 3.2.0 screenshots
+## Using Desktop 3.3.0
 
-The current release keeps the complete Harness surface and adds visible model roles, usage accounting, and external-project handoff. The screenshots below are captured from the 3.2.0 desktop workflow.
+1. Open the Extension Dock to connect a model or configure Value Mode. Its sidebar also groups Personal Prompt, Memory, the particle theme, and image understanding. Existing plugin, import, backup, and repair entries remain available.
+2. Use Add workspace to open Create project, enter a name, and click the source-folder area to open the system folder picker. Choose workspace uses the shared dialog to connect a directory; an already connected directory opens its existing workspace.
+3. Drag ordinary files into the conversation or use Add files. Wait for the attachment cards to finish adding, then send your request. Files are stored under the current workspace and passed as real references; the model chooses tools to inspect them. Desktop does not parse every file or convert it to Markdown, and accepting a file does not guarantee a model can interpret its format. Images use the separate compression and vision path.
+4. Open Personal preferences > Memory in the Dock to review saved items, confirm suggestions, and inspect recently prepared memory context. The panel describes request preparation, not proof that the model adopted a memory. Enable memory references to send relevant matches to the selected model provider; see [personalization boundaries](#personalization-and-remote-data-boundaries).
+5. Browser and file-preview panels provide their own close control. Closing a preview returns to the conversation. For the one-time upgrade Star prompt, see [upgrade behavior](upgrade-and-rollback.md#star-prompt-after-upgrading).
+
+![DeepSeek Harness Desktop 3.3.0 main workspace](screenshots/3.3.0-workspace.webp)
+
+![DeepSeek Harness Desktop 3.3.0 project creation dialog](screenshots/3.3.0-create-project.webp)
+
+![DeepSeek Harness Desktop 3.3.0 Dock memory settings](screenshots/3.3.0-memory.webp)
+
+## Model collaboration, usage, and import
+
+These capabilities remain available in 3.3.0. The screenshots below are historical 3.2.0 captures; current settings navigation and layout are shown above.
 
 ![DeepSeek Harness Desktop 3.2.0 main workspace and AI coding entry points](screenshots/3.2.0-workspace.webp)
 

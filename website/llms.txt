@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.3.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are universal file drag-and-drop with smart Markdown conversion, adaptive image compression, modern session mode switcher, Value Mode (expert controller plus subagent worker routing), a live large-model usage dashboard, and safe Claude Code / Codex project and conversation import.
+> DeepSeek Harness Desktop 3.3.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are grouped Extension Dock settings, shared project/workspace dialogs with a native folder picker, real file references for model-driven investigation without preprocessing, adaptive image compression, and visible local memory activity. Value Mode, the live large-model usage dashboard, and Claude Code / Codex import remain available.
 
 ## Canonical identity
 
@@ -23,7 +23,13 @@
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
 - Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
 
-## What makes 3.2.0 useful
+## What makes 3.3.0 useful
+
+- Dock: grouped model connection, Value Mode, Personal Prompt, Memory, particle theme, and image-understanding settings; consistent theme, centered default settings window, and coalesced dragging.
+- Projects: Create project and Choose workspace share a dialog with a system folder picker; an already connected directory opens its existing workspace.
+- Files: ordinary dropped files are stored under the current workspace and appear as attachment cards. Sending supplies real file references; the model chooses tools to read them. Desktop does not pre-parse files, automatically convert them to Markdown, or inject every file in full. Accepting a file does not guarantee model/tool support for its format. Images use a separate compression and vision path.
+- Memory: saved items, scope/search filters, pending suggestions, and recent preparation activity are visible under Dock > Personal preferences > Memory. Suggestions require confirmation. When memory references are enabled, matching content is sent to the selected model provider; unknown ownership or scope prevents injection.
+- Upgrade: each local user upgrading to 3.3.0 sees the Star prompt once, including users who saw 3.2.0. Closing persists that version; restarting does not repeat it. Previewing does not change the record, and starring is optional.
 
 - Value Mode / 性价比模式: the expert controller model owns task understanding, decomposition, delegation, review, and final synthesis. The subagent worker model completes bounded delegated work. First selection opens a setup guide, preselects the current default model as the expert controller when no explicit controller exists, and requires both model roles plus a strategy before enabling.
 - Value Mode strategies: Saver, Balanced (default), and Powerful. The worker route is bounded to one subagent level, so worker agents do not recursively delegate or invoke expert consultation.
@@ -50,12 +56,21 @@
 
 ## Product metrics and privacy
 
-- Official packaged builds send only a closed vocabulary of coarse product events to a first-party aggregate service.
+- Official packaged builds send only a closed vocabulary of coarse product events to a first-party aggregate service. Rotating daily/monthly actors and a stable anonymous installation hash support activity and retention. Schema 4 adds daily version-specific project, ordinary-file, and Dock settings outcomes. Release views cover 7/30/90 days and aggregate CSV exports; old schema 2/3 data is not backfilled. These independent observations do not establish ordered funnels or completed model tasks.
+- The website does not upload installer-click telemetry. Its download total counts GitHub installer-asset downloads, not completed installations or unique people.
 - Value Mode telemetry records selection, setup, enablement, strategy, and coarse controller/subagent route counts; it does not send model names, token counts, prompts, paths, secrets, or conversation content.
 - Local/source/test/Fork builds remain disconnected. Diagnostics are exported only after user confirmation and are redacted.
 - Read the full policy at https://ningbainb.github.io/deepseek-harness-desktop/privacy.html.
 
-## Latest interface screenshots
+## Desktop 3.3.0 interface screenshots
+
+- Main workspace: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp
+- Create project: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-create-project.webp
+- Memory settings: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-memory.webp
+
+## Historical 3.2.0 interface references
+
+These features remain available; use the 3.3.0 Dock for current settings navigation and layout.
 
 - Value Mode three-step setup: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp
 - Large-model usage dashboard: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp

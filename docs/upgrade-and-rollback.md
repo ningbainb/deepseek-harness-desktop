@@ -2,6 +2,10 @@
 
 Desktop 3.3.0 starts directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
 
+## Star prompt after upgrading
+
+Each local user upgrading to 3.3.0 sees the 3.3.0 Star prompt once, including users who already saw the 3.2.0 prompt. Closing it records the version locally, so restarting does not show it again. Opening a preview does not consume or reset this record. The prompt invites the user to visit GitHub; it does not automatically star the repository or require a Star to continue using Desktop.
+
 ## Startup behavior
 
 Startup is automatic and has one normal destination: the complete existing profile.

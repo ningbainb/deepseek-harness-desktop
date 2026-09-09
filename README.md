@@ -42,7 +42,18 @@ QQ 群：**1105158177**
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-### 最新版本：3.2.0
+### 最新版本：3.3.0
+
+- **拓展坞设置更集中**：模型接入、性价比模式、个性化 Prompt、记忆、粒子主题与图像理解按侧栏分组；设置窗口统一明暗主题、默认居中，拖动更新合并以减少卡顿。
+- **创建项目与文件交接**：创建项目或选择工作区使用统一弹窗，点击打开系统文件夹选择器；普通文件拖入后显示附件卡片，发送时提供真实文件引用，由模型按需调用工具研究，不预先解析或自动转换成 Markdown。
+- **记忆有迹可查**：在拓展坞查看已保存记忆、待确认建议和最近准备的记忆上下文；建议经确认后才保存，记忆按本机用户与作用域隔离。开启引用后，匹配内容会随请求发送给当前模型供应商；面板不代表模型已采纳。
+- **升级与反馈**：升级到 3.3.0 后每个本机用户显示一次 Star 提示，关闭并重启后不重复；正式包增加项目、普通文件和设置页的匿名结果统计，不采集对话、文件内容、路径或密钥，详见 [隐私政策](PRIVACY.md)。
+
+![DeepSeek Harness Desktop 3.3.0 创建项目，点击选择源文件夹](docs/screenshots/3.3.0-create-project.webp)
+
+![DeepSeek Harness Desktop 3.3.0 拓展坞记忆设置](docs/screenshots/3.3.0-memory.webp)
+
+### 持续提供的核心能力
 
 - **性价比模式 V2**：专家主控模型负责理解、拆解、派发、复核和汇总，副模型 / 子代理只处理被派发的局部任务；首次选择会自动引导配置。
 - **大模型用量看板**：实时展示余额、输入/输出 Token、上下文、缓存、请求耗时与费用；峰值采用严格滚动 1 秒算法，不再把一次 usage 汇总事件误当作瞬时速率。
@@ -53,7 +64,9 @@ QQ 群：**1105158177**
 
 ---
 
-## 3.2.0 三个核心能力
+## 模型协作、用量与项目导入
+
+以下三张截图为 3.2.0 历史实机参考；3.3.0 的设置入口与布局以拓展坞为准，功能继续保留。
 
 ### 性价比模式：专家做决策，副模型做执行
 
@@ -158,7 +171,7 @@ QQ 群：**1105158177**
 
 在同一个窗口中即可完成 AI 对话、代码修改、文件管理、Git 操作、任务执行、模型切换和插件扩展。
 
-![DeepSeek Harness Desktop 3.2.0 主界面与 AI 编程工作区](docs/screenshots/3.2.0-workspace.webp)
+![DeepSeek Harness Desktop 3.3.0 主界面与 AI 编程工作区](docs/screenshots/3.3.0-workspace.webp)
 
 ## Skills 与插件
 
@@ -260,7 +273,7 @@ QQ 群：**1105158177**
 - Input Token
 - Output Token
 
-![大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-usage-dashboard.webp)
+![3.2.0 历史参考：大模型用量看板与滚动 1 秒峰值](docs/screenshots/3.2.0-usage-dashboard.webp)
 
 ## 主题与皮肤
 
