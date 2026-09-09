@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomFillSync, randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,6 +32,7 @@ const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-image-drop-'))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const workspacePath = join(temporary, 'workspace')
+const fixtureFiles = new Map()
 let activeApplication
 
 const wait = delayMs => new Promise(resolveWait => setTimeout(resolveWait, delayMs))
@@ -135,10 +136,23 @@ async function fixturePayload() {
   }).png().toBuffer()
   const corrupt = Buffer.alloc(2 * 1024 * 1024 + 64, 0x61)
 
+  const fixtures = {
+    large: { name: 'large.jpg', type: 'image/jpeg', bytes: large },
+    small: { name: 'small.png', type: 'image/png', bytes: small },
+    corrupt: { name: 'corrupt.png', type: 'image/png', bytes: corrupt },
+  }
+  const directory = join(temporary, 'image-fixtures')
+  await mkdir(directory)
+  for (const [key, fixture] of Object.entries(fixtures)) {
+    const path = join(directory, fixture.name)
+    await writeFile(path, fixture.bytes)
+    fixtureFiles.set(key, path)
+  }
+
   return {
-    large: { name: 'large.jpg', type: 'image/jpeg', base64: large.toString('base64') },
-    small: { name: 'small.png', type: 'image/png', base64: small.toString('base64') },
-    corrupt: { name: 'corrupt.png', type: 'image/png', base64: corrupt.toString('base64') },
+    ...Object.fromEntries(Object.entries(fixtures).map(([key, fixture]) => [key, {
+      name: fixture.name, type: fixture.type, size: fixture.bytes.length,
+    }])),
     sizes: { large: large.byteLength, small: small.byteLength, corrupt: corrupt.byteLength },
     dimensions: { width, height },
   }
@@ -146,12 +160,11 @@ async function fixturePayload() {
 
 async function installBrowserHarness(page, payload) {
   await page.evaluate((encoded) => {
-    const decode = (value) => {
-      const binary = atob(value)
-      const bytes = new Uint8Array(binary.length)
-      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
-      return bytes
-    }
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.hidden = true
+    input.dataset.dshImageDropFixture = 'true'
+    document.body.append(input)
     const originalCreate = URL.createObjectURL.bind(URL)
     const originalRevoke = URL.revokeObjectURL.bind(URL)
     const liveUrls = new Set()
@@ -159,7 +172,7 @@ async function installBrowserHarness(page, payload) {
       fixtures: Object.fromEntries(Object.entries(encoded).filter(([key]) => key !== 'sizes' && key !== 'dimensions').map(([key, fixture]) => [key, {
         name: fixture.name,
         type: fixture.type,
-        bytes: decode(fixture.base64),
+        size: fixture.size,
       }])),
       currentTransfer: null,
       phaseTrace: [],
@@ -191,13 +204,23 @@ async function installBrowserHarness(page, payload) {
 }
 
 async function beginDrag(page, fixtureName, sequence) {
+  const path = fixtureFiles.get(fixtureName)
+  assert.equal(typeof path, 'string', `missing disk fixture: ${fixtureName}`)
+  // DOM.setFileInputFiles supplies an OS-backed File, as a real external drop
+  // does. Rebuilding it from a Uint8Array on every iteration instead makes
+  // Chromium retain synthetic blob buffers even without any application drop
+  // handler, contaminating the retained-memory measurement below.
+  await page.locator('input[data-dsh-image-drop-fixture]').setInputFiles(path)
   await page.evaluate(({ fixtureKey, fileSequence }) => {
     const harness = globalThis.__dshImageDropHarness
     const fixture = harness?.fixtures?.[fixtureKey]
     const target = document.querySelector('[data-composer-card]')
     if (fixture === undefined || !(target instanceof HTMLElement)) throw new Error('drop fixture or composer is unavailable')
     harness.phaseTrace = []
-    const file = new File([fixture.bytes], `${fileSequence}-${fixture.name}`, { type: fixture.type })
+    const input = document.querySelector('input[data-dsh-image-drop-fixture]')
+    const sourceFile = input?.files?.[0]
+    if (!(sourceFile instanceof File) || sourceFile.size !== fixture.size) throw new Error('disk fixture bytes do not match')
+    const file = new File([sourceFile], `${fileSequence}-${fixture.name}`, { type: fixture.type })
     const transfer = new DataTransfer()
     transfer.items.add(file)
     harness.currentTransfer = transfer
@@ -227,6 +250,7 @@ async function finishDrop(page, cancel = false) {
       dataTransfer: harness.currentTransfer,
     }))
     harness.currentTransfer = null
+    document.querySelector('input[data-dsh-image-drop-fixture]').value = ''
     if (shouldCancel) {
       window.dispatchEvent(new KeyboardEvent('keydown', {
         key: 'Escape',
@@ -259,17 +283,21 @@ async function browserState(page) {
 }
 
 async function electronMemorySample(application, label) {
-  const rows = await application.evaluate(({ app }) => app.getAppMetrics().map(metric => ({
-    type: metric.type,
-    workingSetBytes: (metric.memory?.workingSetSize ?? 0) * 1024,
-    privateBytes: (metric.memory?.privateBytes ?? 0) * 1024,
-  })))
+  const { rows, mainProcessMemory } = await application.evaluate(({ app }) => ({
+    rows: app.getAppMetrics().map(metric => ({
+      type: metric.type,
+      workingSetBytes: (metric.memory?.workingSetSize ?? 0) * 1024,
+      privateBytes: (metric.memory?.privateBytes ?? 0) * 1024,
+    })),
+    mainProcessMemory: process.memoryUsage(),
+  }))
   return {
     label,
     totalWorkingSetBytes: rows.reduce((sum, row) => sum + row.workingSetBytes, 0),
     totalPrivateBytes: rows.reduce((sum, row) => sum + row.privateBytes, 0),
     processCount: rows.length,
     processes: rows,
+    mainProcessMemory,
   }
 }
 
@@ -333,6 +361,7 @@ async function idleMedian(application, label) {
     totalPrivateBytes: median(samples.map(sample => sample.totalPrivateBytes)),
     processCount: median(samples.map(sample => sample.processCount)),
     processesAtMiddleSample: samples[Math.floor(samples.length / 2)].processes,
+    mainProcessMemoryAtMiddleSample: samples[Math.floor(samples.length / 2)].mainProcessMemory,
   }
 }
 

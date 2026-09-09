@@ -4297,7 +4297,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-image-drop.mjs",
-      "line": 373,
+      "line": 402,
       "operation": "DSH_HOME"
     },
     {
