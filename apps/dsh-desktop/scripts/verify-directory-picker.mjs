@@ -253,11 +253,18 @@ try {
     void testWindow.loadURL(url).catch(error => console.error('browser fixture navigation failed', error.message))
   }, page.url())
   const browserPage = await browserWindow
-  await browserPage.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+  const browserBootErrors = []
+  browserPage.on('pageerror', error => browserBootErrors.push(error.message))
+  browserPage.on('requestfailed', request => browserBootErrors.push(`${request.resourceType()}: ${request.failure()?.errorText}`))
+  await browserPage.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { waitUntil: 'domcontentloaded', timeout: runtimeReadyTimeoutMs })
   assert.equal(await browserPage.evaluate(() => typeof window.dshDesktop), 'undefined', 'browser fixture must not receive the desktop preload')
   try {
-    await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: 30_000 })
+    // This separate renderer loads the complete plugin graph too. Apply the
+    // same bounded boot budget as the main renderer, rather than the shorter
+    // timeout used below for interactions with an already mounted dialog.
+    await browserPage.getByRole('button', { name: /add workspace|添加工作区/iu }).waitFor({ timeout: runtimeReadyTimeoutMs })
   } catch (error) {
+    console.error('browser-only boot errors', JSON.stringify(browserBootErrors))
     console.error('browser-only picker fixture', JSON.stringify(await browserPage.evaluate(() => ({ url: location.href, ready: document.readyState, visibility: document.visibilityState, width: innerWidth, height: innerHeight, desktopBridge: typeof window.dshDesktop, body: document.body.innerText.slice(0, 3000) }))))
     throw error
   }
