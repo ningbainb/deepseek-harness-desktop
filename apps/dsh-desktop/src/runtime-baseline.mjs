@@ -78,4 +78,3 @@ export function resolveHostPackageVersion(name, baseline) {
   if (!baseline || typeof baseline.packageVersion !== 'function') throw new TypeError('RuntimeBaseline is required')
   return baseline.packageVersion(name)
 }
-

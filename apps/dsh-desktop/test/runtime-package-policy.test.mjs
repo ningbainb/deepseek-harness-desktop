@@ -22,4 +22,3 @@ test('ambiguous ownership fails closed', () => {
     builtinPlugin: ['shared-name'],
   }), /declared more than once/u)
 })
-

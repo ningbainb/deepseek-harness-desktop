@@ -74,4 +74,3 @@ export const DESKTOP_RUNTIME_PACKAGE_POLICY = createRuntimePackagePolicy({
   builtinPlugin: [...BUILTIN_RUNTIME_PACKAGES, DESKTOP_REPAIR_BUNDLE],
   sharedSafe: DESKTOP_PLUGIN_COMPAT_PACKAGES,
 })
-
