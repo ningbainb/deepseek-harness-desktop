@@ -5,20 +5,14 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
+import { resolveNsisCompiler } from './nsis-compiler.mjs'
 
 // Compiles and executes the production NSIS macros with tiny isolated payloads.
 // This exercises callbacks and extraction, not a full Desktop overlay upgrade.
 const exec = promisify(execFile)
 const desktop = resolve(import.meta.dirname, '..')
-const repository = resolve(desktop, '..', '..')
 if (process.platform !== 'win32') throw new Error('Installer lifecycle verification requires Windows')
-const cache = join(repository, '.electron-builder-cache', 'nsis-3.0.4.1')
-let compiler = process.env.DSH_NSIS_COMPILER
-if (!compiler) {
-  const compilerRoot = (await readdir(cache, { withFileTypes: true })).find(entry => entry.isDirectory() && entry.name.startsWith('nsis-3.0.4.1-'))
-  if (!compilerRoot) throw new Error('NSIS compiler is not cached; set DSH_NSIS_COMPILER or build the Windows installer first')
-  compiler = join(cache, compilerRoot.name, 'makensis.exe')
-}
+const compiler = await resolveNsisCompiler()
 const root = await mkdtemp(join(tmpdir(), 'dsh-nsis-lifecycle-'))
 const results = []
 try {
@@ -41,14 +35,14 @@ try {
       await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', 'old', '/f'], { windowsHide: true })
     }
     try {
-      await exec(compiler, [
+      await exec(compiler.path, [
         '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_INSTALL=${install}`,
         `/DTEST_PAYLOAD=${payload}`, `/DTEST_REGISTRY=${key}`,
         ...(scenario === 'commit-failure' ? ['/DTEST_BAD_MARKER'] : []),
         ...(scenario === 'section-abort' ? ['/DTEST_ABORT'] : []),
         join(desktop, 'test', 'fixtures', 'installer-lifecycle.nsi'),
-      ], { windowsHide: true, timeout: 30_000 })
+      ], { windowsHide: true, timeout: 30_000, env: compiler.env })
       let exitCode = 0
       try {
         await exec(installer, ['/S'], {

@@ -18,6 +18,29 @@ import {
 import { DesktopProfileBaselineQuarantine } from '../src/profile-baseline-quarantine.mjs'
 import { BUILTIN_BUNDLES, ensureDesktopProfile } from '../src/profile.mjs'
 
+async function settleRecovery(recovery) {
+  let timer
+  try {
+    await Promise.race([
+      (async () => {
+        // A recovery can enqueue a second crash and capture a ready snapshot.
+        // Await both before asserting state or deleting the fixture directory.
+        for (;;) {
+          const queue = recovery.operationQueue
+          await queue
+          await Promise.all([...recovery.backgroundOperations])
+          if (queue === recovery.operationQueue && recovery.backgroundOperations.size === 0) return
+        }
+      })(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Plugin recovery fixture did not settle within 10000ms')), 10_000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 test('diagnostic-only recovery observes no Runtime events and cannot auto-disable a plugin', async () => {
   const controller = new EventEmitter()
   controller.status = { state: 'starting' }
@@ -339,10 +362,7 @@ test('opaque user loader startup failure reaches readiness through a reversible 
     controller.status = { state: 'crashed', error: 'DSH runtime did not become ready within 120000ms' }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      if (controller.status.state === 'ready') break
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     assert.equal(starts, 1)
     assert.equal(ensured, 1)
@@ -424,9 +444,7 @@ test('an interrupted active baseline is reapplied before retrying, after the run
     events.splice(0)
     controller.status = { state: 'crashed', error: 'DSH runtime did not become ready within 120000ms' }
     controller.emit('status', controller.status)
-    for (let attempt = 0; attempt < 100 && controller.status.state !== 'ready'; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
 
     assert.equal(controller.status.state, 'ready')
     assert.deepEqual(events, ['stop', 'quarantine', 'ensure', 'start'])
@@ -514,7 +532,7 @@ test('opaque baseline fallback never quarantines host startup failures', async (
     await recovery.initialize()
     controller.status = { state: 'crashed', error: 'listen EADDRINUSE 127.0.0.1:43125' }
     controller.emit('status', controller.status)
-    for (let attempt = 0; attempt < 30; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    await settleRecovery(recovery)
     assert.equal(quarantines, 0)
     assert.equal((await recovery.getState()).baselineQuarantineAvailable, false)
     await recovery.dispose()
@@ -592,10 +610,7 @@ test('a remaining opaque patch loader falls back to the baseline after manifest 
     await recovery.initialize()
     controller.status = { state: 'crashed', error: 'DSH runtime did not become ready within 120000ms' }
     controller.emit('status', controller.status)
-    for (let attempt = 0; attempt < 160; attempt += 1) {
-      if (controller.status.state === 'ready') break
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     assert.equal(safeModeCalls, 1)
     assert.equal(starts, 2)
@@ -765,10 +780,7 @@ test('unattributed timeout uses lightweight profile candidates when normal inven
     controller.status = { state: 'crashed', error: 'DSH runtime did not become ready within 120000ms' }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      if ((await recovery.getState()).safeMode) break
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     assert.equal(safeModeCalls, 1)
     assert.equal(starts, 1)
@@ -841,9 +853,7 @@ test('an unattributed Crashpad handler disconnect enters safe mode from a valid 
     }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 100 && controller.status.state !== 'ready'; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     assert.equal(starts, 1)
@@ -915,9 +925,7 @@ test('an unattributed Crashpad handler disconnect falls back to a reversible bas
     }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 100 && controller.status.state !== 'ready'; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     const baselineManifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     assert.equal(starts, 1)
@@ -972,12 +980,8 @@ test('unknown host failures preserve community plugins instead of entering autom
     controller.status = { state: 'crashed', error: 'listen EADDRINUSE 127.0.0.1:43125' }
     controller.emit('status', controller.status)
 
-    let state
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      state = await recovery.getState()
-      if (state.currentIncident) break
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
+    const state = await recovery.getState()
     assert.equal(safeModeCalls, 0)
     assert.equal(state.safeMode, false)
     assert.equal(state.currentIncident.pluginName, undefined)
@@ -1034,7 +1038,7 @@ test('a Git executable host failure wins over a nearby Crashpad marker and never
     }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 30; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5))
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     assert.equal(safeModeCalls, 0)
     assert.equal(quarantines, 0)
@@ -1345,14 +1349,7 @@ test('a host failure after one isolated plugin does not disable the remaining pl
     })
     controller.status = { state: 'crashed', error: `failed to load plugin '${firstPlugin}'` }
     controller.emit('status', controller.status)
-    for (let attempt = 0; attempt < 100 && starts === 0; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
-    for (let attempt = 0; attempt < 100 && safeModeCalls === 0 && controller.status.state !== 'crashed'; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
-    // Let the queued second crash run after the original isolated retry.
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await settleRecovery(recovery)
 
     assert.equal(starts, 1)
     assert.deepEqual(disabled, [firstPlugin])
@@ -1429,10 +1426,7 @@ test('desktop plugin recovery isolates once and enters safe mode after the next 
     controller.status = { state: 'crashed', error: 'runtime exited before readiness' }
     controller.emit('status', controller.status)
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      if ((await recovery.getState()).safeMode) break
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
+    await settleRecovery(recovery)
     const state = await recovery.getState()
     const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     assert.equal(starts, 2)
