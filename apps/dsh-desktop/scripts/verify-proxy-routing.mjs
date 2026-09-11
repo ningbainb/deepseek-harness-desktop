@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -90,8 +90,19 @@ try {
       ELECTRON_ENABLE_LOGGING: '0',
     },
   })
-  await electronApp.firstWindow()
-  console.log('Proxy routing Electron process ready')
+  const page = await electronApp.firstWindow()
+  // firstWindow only means BrowserWindow exists. On a clean runner, profile
+  // preparation is still running and quitting now can interrupt bootstrap.
+  await page.waitForURL(/\/ui\/startup\.html(?:[?#]|$)/u, { timeout: 30_000 })
+  const shutdownReady = await electronApp.evaluate(async ({ app }) => {
+    const deadline = Date.now() + 10_000
+    while (app.listenerCount('before-quit') === 0 && Date.now() < deadline) {
+      await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
+    }
+    return app.listenerCount('before-quit') > 0
+  })
+  assert.equal(shutdownReady, true, 'Desktop bootstrap must install its normal shutdown lifecycle')
+  console.log('Proxy routing Desktop shell and shutdown lifecycle ready')
 
   const routed = await electronApp.evaluate(async ({ session }, input) => {
     const networkSession = session.fromPartition('dsh-proxy-routing-e2e', { cache: false })
@@ -226,6 +237,9 @@ try {
   console.log('DNS failure recovery verified')
 
   console.log('Desktop Electron proxy routing verified: fixed, bypass, authenticated, PAC recovery, DNS recovery')
+} catch (error) {
+  console.error('Proxy fixture desktop log:', await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => 'unavailable'))
+  throw error
 } finally {
   let phase = 'network sessions'
   let deadline
@@ -253,5 +267,8 @@ try {
         `proxy fixture teardown exceeded 30s at ${phase}; fixture retained at ${temporary}`,
       )), 30_000) }),
     ])
+  } catch (error) {
+    console.error('Proxy fixture shutdown log:', await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => 'unavailable'))
+    throw error
   } finally { clearTimeout(deadline) }
 }
