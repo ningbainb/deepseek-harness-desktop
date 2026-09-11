@@ -103,7 +103,13 @@ describe('normalizeMutationPlan', () => {
 describe('happy path', () => {
   test('runs prepare, apply, restore-profile, restart, commit and finalize in order', async () => {
     const { coordinator, calls } = harness()
-    const tx = transaction('t')
+    const tx = {
+      ...transaction('t'),
+      validateActivated: async () => calls.push('validateActivated'),
+      markRuntimeStarting: async () => calls.push('markRuntimeStarting'),
+      markRuntimeHealthy: async () => calls.push('markRuntimeHealthy'),
+      commit: async () => calls.push('commit'),
+    }
     const result = await coordinator.run({
       label: 'plugin change',
       prepare: async () => {
@@ -120,7 +126,41 @@ describe('happy path', () => {
       },
     })
     assert.equal(result, 'done')
-    assert.deepEqual(calls, ['prepare', 'stop', 'apply:prepared', 'ensureProfile', 'start', 'finalize:t'])
+    assert.deepEqual(calls, [
+      'prepare',
+      'stop',
+      'apply:prepared',
+      'ensureProfile',
+      'validateActivated',
+      'markRuntimeStarting',
+      'start',
+      'markRuntimeHealthy',
+      'commit',
+      'finalize:t',
+    ])
+  })
+
+  test('post-activation graph validation fails before runtime start and rolls back', async () => {
+    const { coordinator, calls } = harness()
+    const tx = {
+      rollback: async () => calls.push('rollback'),
+      validateActivated: async () => {
+        calls.push('validateActivated')
+        throw new Error('activated graph drift')
+      },
+    }
+    await assert.rejects(
+      coordinator.run({ apply: async () => ({ transactions: [tx], result: {} }) }),
+      /activated graph drift/u,
+    )
+    assert.deepEqual(calls, [
+      'stop',
+      'ensureProfile',
+      'validateActivated',
+      'rollback',
+      'ensureProfile',
+      'start',
+    ])
   })
 
   test('prepare runs before the runtime goes down', async () => {

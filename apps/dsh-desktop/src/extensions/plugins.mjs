@@ -540,6 +540,8 @@ export class PluginManager {
     environment = undefined,
     beforeMutation = async () => {},
     profileArchive,
+    stagingManager,
+    runtimeGraphValidator,
   }) {
     this.profileDir = profileDir
     this.pnpmCli = pnpmCli
@@ -558,6 +560,14 @@ export class PluginManager {
       throw new TypeError('profileArchive must provide begin()')
     }
     this.profileArchive = profileArchive
+    if (stagingManager !== undefined && typeof stagingManager.begin !== 'function') {
+      throw new TypeError('stagingManager must provide begin()')
+    }
+    if (runtimeGraphValidator !== undefined && typeof runtimeGraphValidator !== 'function') {
+      throw new TypeError('runtimeGraphValidator must be a function')
+    }
+    this.stagingManager = stagingManager
+    this.runtimeGraphValidator = runtimeGraphValidator
     this.updateStates = new Map()
     this.queue = Promise.resolve()
   }
@@ -568,10 +578,10 @@ export class PluginManager {
     return result
   }
 
-  #runPnpm(args) {
+  #runPnpm(args, profileDir = this.profileDir) {
     return this.runner({
       pnpmCli: this.pnpmCli,
-      profileDir: this.profileDir,
+      profileDir,
       executable: this.executable,
       args,
       // Preserve the runner's historical input shape unless Electron main
@@ -579,6 +589,60 @@ export class PluginManager {
       ...(this.pathEntries.length === 0 ? {} : { pathEntries: this.pathEntries }),
       ...(this.environment === undefined ? {} : { environment: this.environment }),
     })
+  }
+
+  async #validateRuntimeGraph(profileDir) {
+    if (this.runtimeGraphValidator === undefined) return undefined
+    return this.runtimeGraphValidator(profileDir)
+  }
+
+  async #prepareStagedInstall(items, { operation }) {
+    if (this.stagingManager === undefined) return undefined
+    const staged = await this.stagingManager.begin({
+      operation,
+      pluginIds: items.map((item) => item.name),
+    })
+    try {
+      await this.#runPnpm(
+        ['add', ...items.map((item) => item.spec), '--save-exact', '--offline'],
+        staged.stageDir,
+      )
+      const lock = await readOptionalFile(join(staged.stageDir, 'pnpm-lock.yaml'))
+      for (const item of items) {
+        if (typeof item.integrity === 'string' && (lock === undefined || !lock.includes(item.integrity))) {
+          throw new Error(`installed lockfile integrity does not match ${item.spec}`)
+        }
+        const installed = await readInstalledManifest(staged.stageDir, item.name)
+        if (installed?.name !== item.name || installed?.version !== item.version) {
+          throw new Error(`installed package identity does not match ${item.spec}`)
+        }
+        if (typeof installed.dsh?.bundle?.patch !== 'string') {
+          throw new Error(`${item.name} is not a DSH bundle package`)
+        }
+      }
+      const manifest = await readManifest(staged.stageDir)
+      const profile = manifest.dsh?.profile ?? {}
+      const bundles = new Set(profile.bundles ?? [])
+      for (const item of items) bundles.add(item.name)
+      manifest.dsh = {
+        ...(manifest.dsh ?? {}),
+        profile: { ...profile, bundles: [...bundles] },
+      }
+      await writeManifest(staged.stageDir, manifest)
+      await staged.markDependenciesResolved()
+      await this.#validateRuntimeGraph(staged.stageDir)
+      await staged.markGraphValidated()
+      return staged
+    } catch (error) {
+      try {
+        await staged.cancel()
+      } catch (cancelError) {
+        throw new Error('staged plugin resolution failed and cleanup was incomplete', {
+          cause: new AggregateError([error, cancelError]),
+        })
+      }
+      throw error
+    }
   }
 
   async inventory() {
@@ -772,12 +836,23 @@ export class PluginManager {
       enforceCompatibilityAdmission(compatibility, { allowUnknown })
       const spec = `${parsed.name}@${candidate.version}`
       await this.#runPnpm(['store', 'add', spec])
+      const previous = await readInstalledManifest(this.profileDir, parsed.name)
+      const staging = await this.#prepareStagedInstall([{
+        name: parsed.name,
+        version: candidate.version,
+        spec,
+        integrity: typeof candidate.dist?.integrity === 'string' ? candidate.dist.integrity : undefined,
+      }], { operation: 'plugin-install' })
       return Object.freeze({
         name: parsed.name,
         version: candidate.version,
         spec,
         manifest: candidate,
         compatibility,
+        ...(staging === undefined ? {} : {
+          staging,
+          previousVersion: typeof previous?.version === 'string' ? previous.version : undefined,
+        }),
       })
     })
   }
@@ -836,7 +911,20 @@ export class PluginManager {
       }))
 
       await this.#runPnpm(['store', 'add', ...candidates.map((candidate) => candidate.spec)])
-      return Object.freeze({ items: Object.freeze(candidates) })
+      const previous = await readInstalledManifests(this.profileDir, candidates.map((candidate) => candidate.name))
+      const staging = await this.#prepareStagedInstall(candidates, { operation: 'plugin-batch-install' })
+      return Object.freeze({
+        items: Object.freeze(candidates),
+        ...(staging === undefined ? {} : {
+          staging,
+          previousVersions: Object.freeze(Object.fromEntries(candidates.map((candidate) => [
+            candidate.name,
+            typeof previous.get(candidate.name)?.version === 'string'
+              ? previous.get(candidate.name).version
+              : undefined,
+          ]))),
+        }),
+      })
     })
   }
 
@@ -893,6 +981,20 @@ export class PluginManager {
     return this.#enqueue(async () => {
       if (PROTECTED_PACKAGES.has(prepared.name)) throw new Error(`${prepared.name} is a built-in desktop plugin`)
       await this.beforeMutation({ type: 'install', name: prepared.name, version: prepared.version })
+      if (prepared.staging !== undefined) {
+        const result = Object.freeze({
+          name: prepared.name,
+          version: prepared.version,
+          previousVersion: prepared.previousVersion,
+          restartRequired: true,
+        })
+        this.updateStates.delete(prepared.name)
+        return prepared.staging.activate({
+          profileArchive: this.profileArchive,
+          validateActivated: (profileDir) => this.#validateRuntimeGraph(profileDir),
+          result,
+        })
+      }
       const snapshot = await captureProfileSnapshot(this.profileDir)
       const previous = await readInstalledManifest(this.profileDir, prepared.name)
       try {
@@ -965,6 +1067,26 @@ export class PluginManager {
       const names = items.map((item) => item.name)
       const versions = items.map((item) => item.version)
       await this.beforeMutation({ type: 'install-batch', names, versions })
+      if (prepared.staging !== undefined) {
+        const result = Object.freeze({
+          plugins: Object.freeze(items.map((item) => Object.freeze({
+            name: item.name,
+            version: item.version,
+            previousVersion: prepared.previousVersions?.[item.name],
+          }))),
+          restartRequired: true,
+          activation: Object.freeze({
+            mode: 'restart',
+            reason: 'runtime-bundle-graph-changed',
+          }),
+        })
+        for (const name of names) this.updateStates.delete(name)
+        return prepared.staging.activate({
+          profileArchive: this.profileArchive,
+          validateActivated: (profileDir) => this.#validateRuntimeGraph(profileDir),
+          result,
+        })
+      }
       const snapshot = await captureProfileSnapshot(this.profileDir)
       const previous = await readInstalledManifests(this.profileDir, names)
       try {

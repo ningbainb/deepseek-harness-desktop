@@ -196,8 +196,17 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
     try {
       plan = normalizeMutationPlan(await apply(prepared))
       await ensureProfile()
+      for (const transaction of plan?.transactions ?? []) {
+        await transaction.validateActivated?.()
+      }
+      for (const transaction of plan?.transactions ?? []) {
+        await transaction.markRuntimeStarting?.()
+      }
       onRuntimeEvent?.('starting')
       await controller.start()
+      for (const transaction of plan?.transactions ?? []) {
+        await transaction.markRuntimeHealthy?.()
+      }
       for (const transaction of plan?.transactions ?? []) {
         await transaction.commit?.()
       }

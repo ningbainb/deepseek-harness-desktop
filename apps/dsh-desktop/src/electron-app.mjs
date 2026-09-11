@@ -43,6 +43,7 @@ import { DesktopSurfaceRegistry } from './desktop-surfaces.mjs'
 import {
   createHostCompatibilityProvider,
 } from './extensions/plugin-compatibility.mjs'
+import { PluginStagingManager } from './extensions/plugin-staging.mjs'
 import { PluginManager, resolvePnpmCliPath } from './extensions/plugins.mjs'
 import { PluginRegistry } from './extensions/plugin-registry.mjs'
 import { defaultSkillRoots, discoverSkills } from './extensions/skills.mjs'
@@ -96,6 +97,7 @@ import {
   resolveRuntimePackages,
 } from './profile.mjs'
 import { createRuntimeBaseline, resolveHostPackageVersion } from './runtime-baseline.mjs'
+import { validateProtectedRuntimeGraph } from './runtime-graph-validator.mjs'
 import { DESKTOP_RUNTIME_PACKAGE_POLICY } from './runtime-package-policy.mjs'
 import { WebProfileMigrationService } from './profile-migration.mjs'
 import { PresetService } from './presets/preset-service.mjs'
@@ -1278,6 +1280,18 @@ export async function startElectronApp(metadata) {
   await logStore.append(
     `[runtime] immutable baseline ready packages=${Object.keys(runtimeBaseline.packages).length} fingerprint=${runtimeBaseline.fingerprint.slice(0, 12)}`,
   )
+  const pluginStagingManager = new PluginStagingManager({ profileDir: desktopProfileDir })
+  const stagedRecovery = await pluginStagingManager.recover({ profileArchive: userPluginArchive })
+  if (stagedRecovery.recovered) {
+    await logStore.append(
+      `[plugins] cleared interrupted staging transaction phase=${stagedRecovery.previousPhase}`,
+    )
+  }
+  const validateDesktopPluginGraph = (profileDir) => validateProtectedRuntimeGraph({
+    profileDir,
+    baseline: runtimeBaseline,
+    policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
+  })
   let primaryFullUserPermission
   try {
     primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission({
@@ -1334,6 +1348,8 @@ export async function startElectronApp(metadata) {
     environment: { ...process.env, ...marketChildProxyProjection.environment },
     pathEntries: runtimePathEntries,
     profileArchive: userPluginArchive,
+    stagingManager: pluginStagingManager,
+    runtimeGraphValidator: validateDesktopPluginGraph,
     beforeMutation: (event) => pluginRecoveryStore.captureSnapshot({
       kind: 'before-mutation',
       label: event?.name ? `${event.type}: ${event.name}` : event?.type ?? '插件变更前',
