@@ -266,6 +266,9 @@
       "features": [
         "official-dsh-0.1.5-exact-pin",
         "immutable-application-runtime-baseline",
+        "offline-startup-runtime-integrity-audit",
+        "silent-legacy-managed-link-drift-repair",
+        "post-migration-protected-graph-proof",
         "host-package-authority-excludes-profile",
         "unified-protected-package-ownership",
         "main-process-plugin-compatibility-admission",

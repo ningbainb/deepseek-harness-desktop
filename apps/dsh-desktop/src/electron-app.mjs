@@ -98,6 +98,7 @@ import {
 } from './profile.mjs'
 import { createRuntimeBaseline, resolveHostPackageVersion } from './runtime-baseline.mjs'
 import { validateProtectedRuntimeGraph } from './runtime-graph-validator.mjs'
+import { auditRuntimeIntegrity, migrateLegacyRuntimeIntegrity } from './runtime-integrity-audit.mjs'
 import { DESKTOP_RUNTIME_PACKAGE_POLICY } from './runtime-package-policy.mjs'
 import { WebProfileMigrationService } from './profile-migration.mjs'
 import { PresetService } from './presets/preset-service.mjs'
@@ -1131,15 +1132,28 @@ export async function startElectronApp(metadata) {
     )
     return undefined
   })
+  let auditFullProfileIntegrity
   const ensureProfileForMode = async (mode) => {
     const profileStartedAt = performance.now()
     try {
-      const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
-      if (mode === 'full') {
-        await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
-      } else if (mode === 'builtins') {
-        const builtinsDir = join(dshHome, 'profiles', 'desktop-builtins')
-        await setQqBotProfileEnabled({ profileDir: builtinsDir, enabled: false }).catch(() => {})
+      const repair = async () => {
+        const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
+        if (mode === 'full') {
+          await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
+        } else if (mode === 'builtins') {
+          const builtinsDir = join(dshHome, 'profiles', 'desktop-builtins')
+          await setQqBotProfileEnabled({ profileDir: builtinsDir, enabled: false }).catch(() => {})
+        }
+        return result
+      }
+      const migration = mode === 'full' && auditFullProfileIntegrity !== undefined
+        ? await migrateLegacyRuntimeIntegrity({ audit: auditFullProfileIntegrity, repair })
+        : undefined
+      const result = migration?.repairResult ?? await repair()
+      if (migration?.repaired) {
+        await logStore.append(
+          `[plugins] repaired legacy Runtime dependency drift reason=${migration.before.reasonCode}`,
+        )
       }
       await logStore.append(
         '[startup] profile-ready=' + Math.round(performance.now() - profileStartedAt) + 'ms packages=' + runtimePackages.size + ' mode=' + mode,
@@ -1289,6 +1303,11 @@ export async function startElectronApp(metadata) {
   }
   const validateDesktopPluginGraph = (profileDir) => validateProtectedRuntimeGraph({
     profileDir,
+    baseline: runtimeBaseline,
+    policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
+  })
+  auditFullProfileIntegrity = () => auditRuntimeIntegrity({
+    profileDir: desktopProfileDir,
     baseline: runtimeBaseline,
     policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
   })
