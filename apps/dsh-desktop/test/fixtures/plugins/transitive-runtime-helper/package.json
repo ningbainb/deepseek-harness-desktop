@@ -1,0 +1,7 @@
+{
+  "name": "@fixtures/dsh-runtime-helper",
+  "version": "1.0.0",
+  "dependencies": {
+    "protected-runtime": "file:../protected-runtime-conflict"
+  }
+}

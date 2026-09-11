@@ -1,0 +1,12 @@
+{
+  "name": "@fixtures/dsh-incompatible-plugin",
+  "version": "1.0.0",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "desktop": ">=99.0.0"
+    }
+  }
+}

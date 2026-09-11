@@ -1,0 +1,12 @@
+{
+  "name": "@fixtures/dsh-direct-runtime-conflict",
+  "version": "1.0.0",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "protected-runtime": "file:../protected-runtime-conflict"
+  }
+}

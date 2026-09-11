@@ -1,0 +1,12 @@
+{
+  "name": "@fixtures/dsh-transitive-runtime-conflict",
+  "version": "1.0.0",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@fixtures/dsh-runtime-helper": "file:../transitive-runtime-helper"
+  }
+}

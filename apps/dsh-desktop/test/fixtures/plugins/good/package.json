@@ -1,0 +1,15 @@
+{
+  "name": "@fixtures/dsh-good-plugin",
+  "version": "1.0.0",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "desktop": ">=3.5.0 <4.0.0"
+    }
+  },
+  "peerDependencies": {
+    "protected-runtime": "1.0.0"
+  }
+}

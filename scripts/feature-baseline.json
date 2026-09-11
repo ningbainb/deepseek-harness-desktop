@@ -269,6 +269,7 @@
         "offline-startup-runtime-integrity-audit",
         "silent-legacy-managed-link-drift-repair",
         "post-migration-protected-graph-proof",
+        "isolated-pnpm-linker-validated-with-local-fixtures",
         "host-package-authority-excludes-profile",
         "unified-protected-package-ownership",
         "main-process-plugin-compatibility-admission",

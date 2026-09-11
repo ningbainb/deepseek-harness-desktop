@@ -373,7 +373,7 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
         jitterRatio: 0.15
 ${DESKTOP_PATCH_END}
 `
-const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
+const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: isolated\nautoInstallPeers: false\n`
 
 /** Identify patch files that carry no loader entries, including legacy `{}` placeholders. */
 export function isSemanticallyEmptyPatch(source) {
