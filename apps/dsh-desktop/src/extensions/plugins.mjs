@@ -209,10 +209,39 @@ export function createPluginInventory(manifest, {
           ?? (hostCompatibility === undefined || typeof hostCompatibility === 'function'
             ? UNKNOWN_COMPATIBILITY
             : assessPluginCompatibility(installed, hostCompatibility))
+      const localizedDescription = installed?.description
+      const description = typeof localizedDescription === 'string'
+        ? localizedDescription
+        : typeof localizedDescription?.['zh-CN'] === 'string'
+          ? localizedDescription['zh-CN']
+          : typeof localizedDescription?.zh === 'string'
+            ? localizedDescription.zh
+            : typeof localizedDescription?.en === 'string'
+              ? localizedDescription.en
+              : undefined
+      const author = installed?.author
+      const publisher = typeof author === 'string'
+        ? author
+        : typeof author?.name === 'string'
+          ? author.name
+          : typeof installed?.publisher === 'string'
+            ? installed.publisher
+            : undefined
+      const declaredPermissions = installed?.dsh?.permissions
       return {
         name,
         requested,
         version: typeof installed?.version === 'string' ? installed.version : undefined,
+        displayName: typeof installed?.displayName === 'string'
+          ? installed.displayName.slice(0, 160)
+          : typeof installed?.dsh?.displayName === 'string'
+            ? installed.dsh.displayName.slice(0, 160)
+            : name,
+        description: typeof description === 'string' ? description.slice(0, 320) : undefined,
+        publisher: typeof publisher === 'string' ? publisher.slice(0, 120) : undefined,
+        permissions: Array.isArray(declaredPermissions)
+          ? declaredPermissions.filter((item) => typeof item === 'string').slice(0, 12)
+          : [],
         builtIn,
         managedByDesktop: builtIn,
         enabled: bundles.has(name)

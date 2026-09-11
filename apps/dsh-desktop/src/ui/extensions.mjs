@@ -4,6 +4,14 @@ import {
   communityMarketInstallPresentation,
   selectCommunityMarketPlugins,
 } from './community-market-view.mjs'
+import {
+  compatibilityDialogPresentation,
+  filterInstalledPlugins,
+  pluginCardPresentation,
+  pluginEmptyPresentation,
+  pluginEnvironmentRepairPresentation,
+  pluginInstallPresentation,
+} from './plugin-management-view.mjs'
 
 const themeQuery = new URLSearchParams(window.location.search).get('theme')
 if (themeQuery === 'dark' || themeQuery === 'light') {
@@ -11,6 +19,13 @@ if (themeQuery === 'dark' || themeQuery === 'light') {
 }
 
 const pluginList = document.querySelector('#plugin-list')
+const pluginSearch = document.querySelector('#plugin-search')
+const pluginDetail = document.querySelector('#plugin-detail')
+const pluginInstallSubmit = document.querySelector('#plugin-install-submit')
+const pluginInstallState = document.querySelector('#plugin-install-state')
+const pluginUpdateSummary = document.querySelector('#plugin-update-summary')
+const pluginUpdateSummaryText = document.querySelector('#plugin-update-summary-text')
+const updateAllPluginsButton = document.querySelector('#update-all-plugins')
 const communityPluginList = document.querySelector('#community-plugin-list')
 const skillList = document.querySelector('#skill-list')
 const pluginCount = document.querySelector('#plugin-count')
@@ -19,7 +34,6 @@ const nativeTotal = document.querySelector('#native-total')
 const nativeSearch = document.querySelector('#native-search')
 const nativePluginGrid = document.querySelector('#native-plugin-grid')
 const nativeResultState = document.querySelector('#native-result-state')
-const jumpToNative = document.querySelector('#jump-to-native')
 const skillCount = document.querySelector('#skill-count')
 const marketCount = document.querySelector('#market-count')
 const marketTotal = document.querySelector('#market-total')
@@ -35,6 +49,13 @@ const marketPrevious = document.querySelector('#market-previous')
 const marketNext = document.querySelector('#market-next')
 const marketReloadButton = document.querySelector('#market-reload')
 const toast = document.querySelector('#toast')
+const pluginDialog = document.querySelector('#plugin-dialog')
+const pluginDialogTitle = document.querySelector('#plugin-dialog-title')
+const pluginDialogDescription = document.querySelector('#plugin-dialog-description')
+const pluginDialogDetails = document.querySelector('#plugin-dialog-details')
+const pluginDialogDetailText = document.querySelector('#plugin-dialog-detail-text')
+const pluginDialogCancel = document.querySelector('#plugin-dialog-cancel')
+const pluginDialogConfirm = document.querySelector('#plugin-dialog-confirm')
 const qqBotCard = document.querySelector('#qqbot-card')
 const qqBotStateLabel = document.querySelector('#qqbot-state-label')
 const qqBotUnbound = document.querySelector('#qqbot-unbound')
@@ -71,6 +92,25 @@ const marketInstallPhases = new Map()
 let marketRefreshPromise
 let pluginUpdatePromise
 let refreshAllPromise
+let cachedPlugins = []
+let activePluginName
+const PLUGIN_SETTINGS_KEY = 'dsh-plugin-settings-v1'
+const pluginSettings = { autoUpdate: false, askUnknown: true, developerMode: false }
+try {
+  Object.assign(pluginSettings, JSON.parse(localStorage.getItem(PLUGIN_SETTINGS_KEY) ?? '{}'))
+} catch { /* use safe defaults */ }
+
+function syncPluginSettings() {
+  document.querySelector('#plugin-auto-update').checked = pluginSettings.autoUpdate === true
+  document.querySelector('#plugin-ask-unknown').checked = pluginSettings.askUnknown !== false
+  document.querySelector('#plugin-developer-mode').checked = pluginSettings.developerMode === true
+  document.querySelector('#plugin-developer-tools').hidden = pluginSettings.developerMode !== true
+}
+
+function savePluginSettings() {
+  try { localStorage.setItem(PLUGIN_SETTINGS_KEY, JSON.stringify(pluginSettings)) } catch { /* optional setting persistence */ }
+  syncPluginSettings()
+}
 
 const MARKET_PAGE_SIZE = 20
 const compactNumber = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
@@ -86,7 +126,7 @@ function formatFileSize(bytes) {
 function setOperationBusy(busy) {
   document.body.dataset.busy = String(busy)
   document.body.setAttribute('aria-busy', String(busy))
-  for (const button of document.querySelectorAll('button:not([role="tab"])')) button.disabled = busy
+  for (const button of document.querySelectorAll('[data-mutation-control], [data-update-plugin], [data-remove-plugin], [data-toggle-plugin], [data-install-market-plugin]')) button.disabled = busy
   marketReloadButton.disabled = busy || Boolean(marketRefreshPromise)
   checkPluginUpdatesButton.disabled = busy || Boolean(pluginUpdatePromise)
   refreshButton.disabled = busy || Boolean(refreshAllPromise)
@@ -101,8 +141,19 @@ function escapeHtml(value) {
   return element.innerHTML
 }
 
-function notify(message, error = false) {
-  toast.textContent = message
+function notify(message, error = false, action = undefined) {
+  toast.replaceChildren()
+  const text = document.createElement('span')
+  text.textContent = message
+  toast.append(text)
+  if (action?.label && typeof action.run === 'function') {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'toast-action'
+    button.textContent = action.label
+    button.addEventListener('click', action.run, { once: true })
+    toast.append(button)
+  }
   toast.classList.toggle('error', error)
   toast.hidden = false
   clearTimeout(notify.timer)
@@ -269,39 +320,32 @@ function compatibilityFacts(compatibility) {
   return facts
 }
 
+function pluginStatusMarkup(plugin) {
+  const presentation = pluginCardPresentation(plugin)
+  if (presentation.label === '') return ''
+  return `<span class="plugin-status ${presentation.tone}">${escapeHtml(presentation.label)}</span>`
+}
+
 function pluginMarkup(plugin) {
-  const status = plugin.compatibility?.status ?? 'unknown'
-  const badge = plugin.builtIn
-    ? '<span class="badge builtin">DESKTOP</span>'
-    : '<span class="badge">社区</span>'
-  const compatibilityBadge = `<span class="badge ${escapeHtml(status)}">${escapeHtml(compatibilityLabels[status] ?? compatibilityLabels.unknown)}</span>`
-  const version = plugin.version ? `v${plugin.version}` : '版本未知'
-  const state = plugin.enabled ? '' : ' · 已停用'
-  const latest = plugin.updateAvailable ? ` · 可更新至 v${plugin.latestVersion}` : ''
-  const summary = plugin.builtIn
-    ? `${version} · 随 Desktop 更新`
-    : `${version} · ${plugin.requested}${state}${latest}`
-  const installedReason = status === 'compatible' ? '' : compatibilityReason(plugin.compatibility?.reasons?.[0])
-  const updateReason = plugin.updateAvailable && plugin.updateCompatibility?.status === 'incompatible'
-    ? compatibilityReason(plugin.updateCompatibility?.reasons?.[0])
+  return `<article class="plugin-card" data-plugin-status="${escapeHtml(plugin.status ?? 'normal')}"><button type="button" class="plugin-card-main" data-open-plugin="${escapeHtml(plugin.name)}" aria-label="查看 ${escapeHtml(plugin.displayName ?? plugin.name)}"><span class="plugin-card-icon">${nativeIconSvg('sparkles')}</span><span class="plugin-card-copy"><span class="plugin-card-title-row"><strong>${escapeHtml(plugin.displayName ?? plugin.name)}</strong>${pluginStatusMarkup(plugin)}</span><span class="plugin-card-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</span><span class="plugin-card-publisher">${escapeHtml(plugin.publisher ?? '社区作者')}</span></span></button></article>`
+}
+
+function pluginDetailMarkup(plugin) {
+  const compatibility = plugin.compatibility?.status ?? plugin.advanced?.compatibility ?? 'unknown'
+  const compatibilityText = compatibilityLabels[compatibility] ?? compatibilityLabels.unknown
+  const facts = compatibilityFacts(plugin.compatibility)
+  const updateLine = plugin.updateBlocked
+    ? '<span class="plugin-detail-warning">新版本暂不兼容，当前版本仍可继续使用。</span>'
+    : plugin.updateAvailable
+      ? `<button type="button" class="primary" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}" data-mutation-control>更新到 v${escapeHtml(plugin.latestVersion ?? '')}</button>`
+      : '<span class="meta">已是当前可用版本</span>'
+  const attention = plugin.attention
+    ? `<section class="plugin-attention"><strong>${escapeHtml(plugin.statusLabel || '需要处理')}</strong><p>${escapeHtml(plugin.attention)}</p></section>`
     : ''
-  const description = [
-    summary,
-    updateReason ? `更新已拦截：${updateReason}` : installedReason,
-    ...compatibilityFacts(plugin.compatibility),
-  ].filter(Boolean).join(' · ')
-  let updateAction = ''
-  if (plugin.updateAvailable && plugin.updateCompatibility?.status === 'incompatible') {
-    updateAction = '<span class="meta">已拦截更新</span>'
-  } else if (plugin.updateAvailable) {
-    updateAction = `<button type="button" class="item-action update" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}">更新</button>`
-  } else if (plugin.updateError) {
-    updateAction = '<span class="meta">暂无法检查</span>'
-  }
-  const actions = plugin.builtIn
-    ? '<span class="meta">内置保护</span>'
-    : `${updateAction}<button type="button" class="item-action danger" data-remove-plugin="${escapeHtml(plugin.name)}">移除</button>`
-  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(plugin.name)}</span>${badge}${compatibilityBadge}</div><p class="description">${escapeHtml(description)}</p></div><div class="item-actions">${actions}</div></article>`
+  const permissions = plugin.permissions?.length
+    ? plugin.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
+    : '<li>未声明额外权限</li>'
+  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label><dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
 }
 
 const NATIVE_PLUGINS = [
@@ -701,6 +745,70 @@ function refreshMarket({ force = false } = {}) {
   return marketRefreshPromise
 }
 
+function normalizedErrorMessage(error) {
+  return String(error?.message ?? error)
+    .replace(/^Error invoking remote method '[^']+': Error:\s*/u, '')
+    .slice(0, 2_000)
+}
+
+function showPluginDialog({ title, description, details = '', confirmLabel = '继续', cancelLabel = '取消', cancelHidden = false, returnValue = false }) {
+  pluginDialogTitle.textContent = title
+  pluginDialogDescription.textContent = description
+  pluginDialogDetails.hidden = details === ''
+  pluginDialogDetails.open = false
+  pluginDialogDetailText.textContent = details
+  pluginDialogConfirm.textContent = confirmLabel
+  pluginDialogCancel.textContent = cancelLabel
+  pluginDialogCancel.hidden = cancelHidden
+  pluginDialog.showModal()
+  pluginDialogConfirm.focus()
+  return new Promise((resolve) => {
+    const onClose = () => {
+      pluginDialog.removeEventListener('close', onClose)
+      resolve(returnValue ? pluginDialog.returnValue : pluginDialog.returnValue === 'confirm')
+    }
+    pluginDialog.addEventListener('close', onClose)
+  })
+}
+
+pluginDialog.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    pluginDialog.close('dismiss')
+    return
+  }
+  if (event.key !== 'Tab') return
+  const controls = [...pluginDialog.querySelectorAll('button:not([hidden]), summary, [tabindex]:not([tabindex="-1"])')]
+    .filter((element) => !element.disabled)
+  if (controls.length === 0) return
+  const first = controls[0]
+  const last = controls.at(-1)
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+})
+
+function showPluginFailure(error, fallback = '插件安装失败') {
+  const details = normalizedErrorMessage(error)
+  const incompatible = details.includes('此插件暂不兼容') || error?.code === 'PLUGIN_INCOMPATIBLE'
+  if (incompatible) {
+    const presentation = compatibilityDialogPresentation('incompatible')
+    return showPluginDialog({
+      ...presentation,
+      details,
+    })
+  }
+  notify(fallback, true, {
+    label: '查看',
+    run: () => { void showPluginDialog({ title: fallback, description: '原有插件环境没有改变。', details, confirmLabel: '知道了', cancelHidden: true }) },
+  })
+  return Promise.resolve(false)
+}
+
 const recoveryResolutionLabels = Object.freeze({
   'auto-disabled': '已自动停用',
   'disabled-by-user': '已手动停用',
@@ -793,6 +901,7 @@ async function refreshRecovery() {
   recoverySnapshots.innerHTML = state.snapshots.length
     ? state.snapshots.map(snapshotMarkup).join('')
     : '<p class="empty">启动成功后会在这里保存最近三份可用配置</p>'
+  document.querySelector('#plugin-environment-repair').hidden = !pluginEnvironmentRepairPresentation(state).visible
 }
 
 function renderQqBot(status, eventType) {
@@ -839,12 +948,67 @@ async function refresh() {
 }
 
 function renderPlugins(plugins) {
-  pluginCount.textContent = plugins.length
-  pluginList.innerHTML = plugins.length ? plugins.map(pluginMarkup).join('') : '<p class="empty">暂无插件</p>'
+  cachedPlugins = plugins
+  const communityPlugins = filterInstalledPlugins(plugins)
+  const query = pluginSearch.value
+  const visiblePlugins = filterInstalledPlugins(plugins, query)
+  const empty = pluginEmptyPresentation({ installedCount: communityPlugins.length, query })
+  pluginCount.textContent = communityPlugins.length
+  pluginList.innerHTML = visiblePlugins.length
+    ? visiblePlugins.map(pluginMarkup).join('')
+    : `<div class="plugin-empty"><strong>${escapeHtml(empty.title)}</strong><p>${escapeHtml(empty.description)}</p>${empty.action ? `<button type="button" class="primary" data-open-discover>${escapeHtml(empty.action)}</button>` : ''}</div>`
+  const available = communityPlugins.filter((plugin) => plugin.updateAvailable && !plugin.updateBlocked)
+  pluginUpdateSummary.hidden = available.length === 0
+  pluginUpdateSummaryText.textContent = `${available.length} 个插件有更新`
+  updateAllPluginsButton.dataset.updateNames = available.map((plugin) => plugin.name).join('\n')
+  if (activePluginName) {
+    const active = communityPlugins.find((plugin) => plugin.name === activePluginName)
+    if (active) pluginDetail.innerHTML = pluginDetailMarkup(active)
+    else closePluginDetail()
+  }
   if (extensionOperations.busy) setOperationBusy(true)
 }
 
-function checkPluginUpdates({ silent = false } = {}) {
+function openPluginDetail(name) {
+  const plugin = cachedPlugins.find((item) => item.name === name && !item.builtIn)
+  if (!plugin) return
+  activePluginName = name
+  pluginDetail.innerHTML = pluginDetailMarkup(plugin)
+  pluginList.hidden = true
+  pluginSearch.closest('label').hidden = true
+  pluginUpdateSummary.hidden = true
+  document.querySelector('#install-plugin').hidden = true
+  document.querySelector('.plugin-tools').hidden = true
+  pluginDetail.hidden = false
+  pluginDetail.querySelector('[data-close-plugin-detail]')?.focus()
+}
+
+function closePluginDetail() {
+  activePluginName = undefined
+  pluginDetail.hidden = true
+  pluginDetail.replaceChildren()
+  pluginList.hidden = false
+  pluginSearch.closest('label').hidden = false
+  document.querySelector('#install-plugin').hidden = false
+  document.querySelector('.plugin-tools').hidden = false
+  renderPlugins(cachedPlugins)
+  pluginSearch.focus()
+}
+
+async function updatePluginBatch(plugins, { allowUnknown = false } = {}) {
+  if (plugins.length === 0) return undefined
+  return extensionOperations.run(async () => {
+    const result = await window.dshDesktop.installPluginBatch(
+      plugins.map((plugin) => `${plugin.name}@${plugin.latestVersion}`),
+      allowUnknown,
+    )
+    notify(plugins.length === 1 ? '插件已更新' : `${plugins.length} 个插件已更新`)
+    await refresh()
+    return result
+  })
+}
+
+function checkPluginUpdates({ silent = false, skipAutoUpdate = false } = {}) {
   if (pluginUpdatePromise) return pluginUpdatePromise
   checkPluginUpdatesButton.disabled = true
   pluginUpdateState.textContent = '正在检查社区插件更新…'
@@ -857,6 +1021,11 @@ function checkPluginUpdates({ silent = false } = {}) {
         ? `发现 ${available} 个社区插件更新；不兼容版本已拦截。`
         : '社区插件已检查；内置插件随 Desktop 更新。'
       if (!silent) notify(available > 0 ? `发现 ${available} 个插件更新` : '插件已是最新状态')
+      const automatic = plugins.filter((plugin) => plugin.updateAvailable && plugin.updateCompatibility?.status === 'compatible')
+      if (!skipAutoUpdate && pluginSettings.autoUpdate && automatic.length > 0) {
+        pluginUpdateState.textContent = `正在安全更新 ${automatic.length} 个插件…`
+        await updatePluginBatch(automatic)
+      }
     } catch (error) {
       pluginUpdateState.textContent = '插件更新源暂时不可用，已安装版本未改变。'
       if (!silent) notify(error.message, true)
@@ -867,6 +1036,68 @@ function checkPluginUpdates({ silent = false } = {}) {
   })()
   return pluginUpdatePromise
 }
+
+pluginSearch.addEventListener('input', () => renderPlugins(cachedPlugins))
+
+updateAllPluginsButton.addEventListener('click', async () => {
+  const names = new Set(updateAllPluginsButton.dataset.updateNames?.split('\n').filter(Boolean) ?? [])
+  const plugins = cachedPlugins.filter((plugin) => names.has(plugin.name) && plugin.updateAvailable && !plugin.updateBlocked)
+  const unknown = plugins.some((plugin) => plugin.updateCompatibility?.status === 'unknown')
+  if (unknown && !await confirmUnknownCompatibility('所有更新会作为一个整体应用；任何一项失败都会保留当前版本。')) return
+  try {
+    await updatePluginBatch(plugins, { allowUnknown: unknown })
+    await checkPluginUpdates({ silent: true, skipAutoUpdate: true })
+  } catch (error) {
+    await showPluginFailure(error, '插件更新失败')
+  }
+})
+
+for (const [id, key] of [
+  ['plugin-auto-update', 'autoUpdate'],
+  ['plugin-ask-unknown', 'askUnknown'],
+  ['plugin-developer-mode', 'developerMode'],
+]) {
+  document.querySelector(`#${id}`).addEventListener('change', (event) => {
+    pluginSettings[key] = event.currentTarget.checked
+    savePluginSettings()
+  })
+}
+syncPluginSettings()
+
+document.querySelector('#repair-plugin-environment').addEventListener('click', () => {
+  document.querySelector('#reset-profile-env').click()
+})
+document.querySelector('#developer-runtime-info').addEventListener('click', async () => {
+  try {
+    const info = await window.dshDesktop.getInfo()
+    document.querySelector('#developer-result').textContent = `Desktop ${info?.version ?? '未知'} · Runtime ${info?.runtimeVersion ?? info?.runtime ?? '由 Desktop 管理'}`
+  } catch (error) {
+    document.querySelector('#developer-result').textContent = normalizedErrorMessage(error)
+  }
+})
+document.querySelector('#developer-export-diagnostics').addEventListener('click', () => {
+  document.querySelector('#export-diagnostics').click()
+})
+document.querySelector('#developer-open-profile').addEventListener('click', async () => {
+  try { await window.dshDesktop.openProfileDirectory() } catch (error) { await showPluginFailure(error, '无法打开依赖环境') }
+})
+document.querySelector('#developer-open-logs').addEventListener('click', async () => {
+  try { await window.dshDesktop.openLogs() } catch (error) { await showPluginFailure(error, '无法打开日志') }
+})
+document.querySelector('#developer-copy-environment').addEventListener('click', async () => {
+  try {
+    const info = await window.dshDesktop.getInfo()
+    const payload = JSON.stringify({
+      desktopVersion: info?.version,
+      runtimeVersion: info?.runtimeVersion ?? info?.runtime,
+      platform: info?.platform,
+    }, null, 2)
+    await navigator.clipboard.writeText(payload)
+    notify('环境信息已复制')
+  } catch (error) {
+    await showPluginFailure(error, '复制环境信息失败')
+  }
+})
 
 document.querySelector('#qqbot-bind').addEventListener('click', () => {
   void extensionOperations.run(async () => {
@@ -989,7 +1220,7 @@ const searchEntries = [
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
   ['发现插件', '插件市场 社区 群友作品', 'market-tab'],
-  ['内置能力', '原生插件 保护', 'native-tab'],
+  ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
   ['技能', '导入技能 Skill', 'skills-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
   ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
@@ -1028,11 +1259,6 @@ dockSearch.addEventListener('keydown', event => {
   if (event.key === 'Escape') resetFeatureSearch()
   if (event.key === 'ArrowDown') { event.preventDefault(); searchResults.querySelector('button')?.focus() }
   if (event.key === 'Enter') { event.preventDefault(); searchResults.querySelector('button')?.click() }
-})
-
-jumpToNative?.addEventListener('click', () => {
-  const nativeTab = document.querySelector('#native-tab')
-  if (nativeTab) activateTab(nativeTab, true)
 })
 
 nativePluginGrid?.addEventListener('click', event => {
@@ -1077,22 +1303,75 @@ const removePluginPrefillListener = window.dshDesktop.onPluginInstallPrefill?.((
   notify('已从外部请求填入安装来源，请确认后点击「安装并重启」。')
 })
 
+async function confirmUnknownCompatibility(details) {
+  if (pluginSettings.askUnknown === false) return false
+  const presentation = compatibilityDialogPresentation('unknown')
+  return showPluginDialog({
+    ...presentation,
+    details,
+  })
+}
+
+function isUnknownCompatibilityError(error) {
+  const message = normalizedErrorMessage(error)
+  return error?.code === 'PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED' || message.includes('无法确认兼容性')
+}
+
+async function installPluginWithAdmission(spec, { fullAccess = false, button = pluginInstallSubmit } = {}) {
+  const originalLabel = button.textContent
+  button.textContent = pluginInstallPresentation('installing').button
+  button.setAttribute('aria-busy', 'true')
+  pluginInstallState.hidden = true
+  const preparingTimer = setTimeout(() => {
+    pluginInstallState.textContent = pluginInstallPresentation('preparing').message
+    pluginInstallState.hidden = false
+  }, 1_200)
+  const finishingTimer = setTimeout(() => {
+    pluginInstallState.textContent = pluginInstallPresentation('finishing').message
+    pluginInstallState.hidden = false
+  }, 5_000)
+  try {
+    try {
+      return await window.dshDesktop.installPlugin(spec, false, fullAccess)
+    } catch (error) {
+      if (!isUnknownCompatibilityError(error)) throw error
+      const approved = await confirmUnknownCompatibility(normalizedErrorMessage(error))
+      if (!approved) return undefined
+      return window.dshDesktop.installPlugin(spec, true, fullAccess)
+    }
+  } finally {
+    clearTimeout(preparingTimer)
+    clearTimeout(finishingTimer)
+    button.textContent = originalLabel
+    button.removeAttribute('aria-busy')
+    pluginInstallState.hidden = true
+  }
+}
+
 document.querySelector('#plugin-form').addEventListener('submit', async (event) => {
   event.preventDefault()
   const form = event.currentTarget
   const data = new FormData(form)
-  const spec = data.get('spec')
-  const allowUnknown = data.get('allowUnknown') === 'on'
+  const spec = String(data.get('spec') ?? '').trim()
   const fullAccess = data.get('fullAccess') === 'on'
+  if (spec === '') return
+  if (fullAccess) {
+    const presentation = compatibilityDialogPresentation('full-access')
+    const approved = await showPluginDialog({
+      ...presentation,
+    })
+    if (!approved) return
+  }
+  pluginInstallSubmit.textContent = pluginInstallPresentation(extensionOperations.busy ? 'queued' : 'installing').button
   await extensionOperations.run(async () => {
     try {
-      const result = await window.dshDesktop.installPlugin(spec, allowUnknown, fullAccess)
-      notify(`${result.name} 已安装，DSH 已重启`)
-      showActivation(`${result.name} 已安装。可立即刷新列表；如扩展界面仍显示旧状态，请完整重启 Harness。`, { mode: result.restartRequired ? 'restart' : 'refresh' })
+      const result = await installPluginWithAdmission(spec, { fullAccess })
+      if (!result) return
+      notify('插件已安装')
       form.reset()
       await refresh()
     } catch (error) {
-      notify(error.message, true)
+      await showPluginFailure(error)
     }
   })
 })
@@ -1104,34 +1383,69 @@ window.addEventListener('beforeunload', () => {
   removePluginPrefillListener?.()
 }, { once: true })
 
-pluginList.addEventListener('click', async (event) => {
+document.querySelector('#plugins').addEventListener('click', async (event) => {
+  const openButton = event.target.closest('[data-open-plugin]')
+  if (openButton) {
+    openPluginDetail(openButton.dataset.openPlugin)
+    return
+  }
+  if (event.target.closest('[data-close-plugin-detail]')) {
+    closePluginDetail()
+    return
+  }
+  if (event.target.closest('[data-open-discover]')) {
+    activateTab(document.querySelector('#market-tab'), true)
+    return
+  }
   const updateButton = event.target.closest('[data-update-plugin]')
   if (updateButton) {
     const allowUnknown = updateButton.dataset.updateCompatibility === 'unknown'
-    if (allowUnknown && !window.confirm('该版本没有声明 Desktop/DSH 适配范围，仍要更新吗？失败时会自动回滚。')) return
+    if (allowUnknown && !await confirmUnknownCompatibility('更新失败时，当前版本会继续保留。')) return
     await extensionOperations.run(async () => {
       try {
         const result = await window.dshDesktop.updatePlugin(updateButton.dataset.updatePlugin, allowUnknown)
-        notify(`${result.name} 已更新至 v${result.version}，DSH 已重启`)
-        showActivation(`${result.name} 已更新。刷新以读取新清单；必要时可完整重启 Harness。`, { mode: result.restartRequired ? 'restart' : 'refresh' })
+        notify(`${result.name} 已更新`)
         await refresh()
-        await checkPluginUpdates({ silent: true })
+        await checkPluginUpdates({ silent: true, skipAutoUpdate: true })
       } catch (error) {
-        notify(error.message, true)
+        await showPluginFailure(error, '插件更新失败')
+        await refresh()
       }
     })
     return
   }
   const button = event.target.closest('[data-remove-plugin]')
   if (!button) return
+  const approved = await showPluginDialog({
+    title: '卸载插件？',
+    description: '插件代码会被移除，聊天、设置和个人数据不会受影响。',
+    confirmLabel: '卸载',
+  })
+  if (!approved) return
   await extensionOperations.run(async () => {
     try {
       await window.dshDesktop.removePlugin(button.dataset.removePlugin)
-      notify(`${button.dataset.removePlugin} 已移除`)
-      showActivation(`${button.dataset.removePlugin} 已移除。刷新以确认当前扩展状态。`, { mode: 'refresh' })
+      notify('插件已卸载')
+      activePluginName = undefined
       await refresh()
     } catch (error) {
-      notify(error.message, true)
+      await showPluginFailure(error, '插件卸载失败')
+    }
+  })
+})
+
+document.querySelector('#plugins').addEventListener('change', async (event) => {
+  const toggle = event.target.closest('[data-toggle-plugin]')
+  if (!toggle) return
+  const enabled = toggle.checked
+  await extensionOperations.run(async () => {
+    try {
+      await window.dshDesktop.setPluginEnabled(toggle.dataset.togglePlugin, enabled)
+      notify(enabled ? '插件已启用' : '插件已停用')
+      await refresh()
+    } catch (error) {
+      toggle.checked = !enabled
+      await showPluginFailure(error, enabled ? '插件启用失败' : '插件停用失败')
     }
   })
 })
@@ -1328,45 +1642,32 @@ document.querySelector('#open-conversation-import')?.addEventListener('click', (
     }
   })
 })
-document.querySelector('#open-plugins-dir')?.addEventListener('click', () => {
-  void extensionOperations.run(async () => {
-    try {
-      await window.dshDesktop.openProfileDirectory()
-    } catch (error) {
-      notify(error.message, true)
-    }
-  })
-})
 document.querySelector('#reset-profile-env')?.addEventListener('click', async () => {
   await extensionOperations.run(async () => {
     try {
       const preview = await window.dshDesktop.previewProfileReset()
-      const cleanup = Array.isArray(preview.cleanupScope) ? preview.cleanupScope.join('、') : '第三方插件和 Profile 激活配置'
-      const preserved = Array.isArray(preview.preservedScope) ? preview.preservedScope.join('、') : '会话、API 配置和个人设置'
-      const estimateNote = preview.estimateComplete ? '' : '（扫描达到边界，数值为已统计部分）'
-      const confirmed = window.confirm([
-        '此操作将重建 Desktop 插件 Profile，请核对范围：',
-        '',
-        `当前 Profile：${preview.profileDirectory}`,
-        `插件加载目录：${preview.pluginLoadDirectory}`,
-        `备份位置：${preview.backupDirectory}`,
-        `当前 Profile 大小：${formatFileSize(preview.currentProfileBytes)}${estimateNote}`,
-        `当前可用空间：${formatFileSize(preview.availableBytes)}`,
-        `最低所需空间：${formatFileSize(preview.requiredFreeBytes)}`,
-        `预计立即回收：${formatFileSize(preview.estimatedReclaimBytes)}（来自超出保留上限的旧备份）`,
-        `将清理：${cleanup}`,
-        `明确保留：${preserved}`,
-        '',
-        'API 与 provider 配置不在本操作范围内。确认停止 Runtime、创建备份并重置？',
-      ].join('\n'))
+      const confirmed = await showPluginDialog({
+        title: '修复插件环境？',
+        description: '修复只会重建插件运行环境，不会删除聊天、设置、模型服务商、API 配置或个人数据。',
+        details: `当前环境约 ${formatFileSize(preview.currentProfileBytes)}，所需可用空间 ${formatFileSize(preview.requiredFreeBytes)}。原环境会先安全备份。`,
+        confirmLabel: '修复',
+      })
       if (!confirmed) return
       const result = await window.dshDesktop.resetProfile({ timestamp: preview.timestamp })
-      notify(result.backupDirectory
-        ? `插件环境已重置并重启；原 Profile 位于 ${result.backupDirectory}`
-        : '插件环境已重置并重启；此前没有 Desktop Profile 可备份')
+      void result
+      notify('插件环境已修复')
       await refresh()
     } catch (error) {
-      notify(error.message, true)
+      const action = await showPluginDialog({
+        title: '插件环境修复失败',
+        description: '原有聊天、设置和个人数据没有改变。你可以重试，或导出诊断信息用于反馈。',
+        details: normalizedErrorMessage(error),
+        confirmLabel: '重试',
+        cancelLabel: '导出诊断信息',
+        returnValue: true,
+      })
+      if (action === 'confirm') document.querySelector('#reset-profile-env').click()
+      if (action === 'cancel') document.querySelector('#export-diagnostics').click()
     }
   })
 })

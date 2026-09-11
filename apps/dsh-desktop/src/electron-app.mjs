@@ -1922,6 +1922,7 @@ export async function startElectronApp(metadata) {
     completeFullAccessPlugin,
     revokeFullUserTrust,
     exportDiagnostics,
+    openLogs: () => shell.openPath(logsDirectory),
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
     recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },

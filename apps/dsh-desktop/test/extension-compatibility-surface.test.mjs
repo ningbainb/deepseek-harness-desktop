@@ -18,6 +18,38 @@ test('Extension Dock presents declared Desktop compatibility requirements and ru
   assert.match(source, /保留安装状态，请移除或改用后续经验证版本/u)
 })
 
+test('Extension Dock exposes only installed discover and settings as plugin top-level areas', async () => {
+  const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
+  const group = /<nav class="page-tabs" data-tab-group="plugins"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? ''
+  assert.match(group, />已安装 /u)
+  assert.match(group, />发现插件 /u)
+  assert.match(group, />设置</u)
+  assert.doesNotMatch(group, />内置能力 /u)
+})
+
+test('Extension Dock keeps healthy plugin state quiet and technical fields inside advanced information', async () => {
+  const script = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
+  assert.match(script, /if \(presentation\.label === ''\) return ''/u)
+  assert.doesNotMatch(script, /badge compatible[^\n]*compatibilityLabels/u)
+  assert.match(script, /plugin-advanced-information/u)
+  for (const field of ['Compatibility', 'Runtime Range', 'Source', 'Package Name', 'Integrity']) {
+    assert.match(script, new RegExp(field, 'u'))
+  }
+})
+
+test('Extension Dock plugin dialogs and icon-only controls have accessible contracts', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8'),
+  ])
+  assert.match(html, /<dialog id="plugin-dialog"[^>]*aria-labelledby="plugin-dialog-title"[^>]*aria-describedby="plugin-dialog-description"/u)
+  assert.match(html, /role="status" aria-live="polite"/u)
+  assert.match(script, /event\.key === 'Escape'/u)
+  assert.match(script, /event\.key !== 'Tab'/u)
+  assert.match(script, /aria-label="查看 /u)
+  assert.match(script, /aria-label="返回已安装插件"/u)
+})
+
 test('Extension Dock does not expose the retired permission reconfirmation control', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),

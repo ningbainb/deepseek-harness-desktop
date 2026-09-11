@@ -243,7 +243,22 @@ test('plugin update checks stay online and exact updates use the guarded transac
     qqBotBinding,
   })
 
-  assert.equal(await ipcMain.handlers.get('extensions:plugin-check')(), plugins)
+  const [updateState] = await ipcMain.handlers.get('extensions:plugin-check')()
+  assert.deepEqual({
+    name: updateState.name,
+    updateAvailable: updateState.updateAvailable,
+    latestVersion: updateState.latestVersion,
+    status: updateState.status,
+    statusLabel: updateState.statusLabel,
+    health: updateState.health,
+  }, {
+    name: '@community/example',
+    updateAvailable: true,
+    latestVersion: '2.0.0',
+    status: 'update-available',
+    statusLabel: '可更新',
+    health: 'healthy',
+  })
   assert.deepEqual(events, ['check'])
   assert.deepEqual(
     await ipcMain.handlers.get('extensions:plugin-update')(undefined, {
@@ -1129,6 +1144,46 @@ test('plugin removal rolls back when the updated runtime cannot start', async ()
     'start-2',
   ])
   unregister()
+})
+
+test('compatibility admission errors cross IPC with plain user-facing messages before downtime', async () => {
+  for (const [code, expected] of [
+    ['PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED', /无法确认兼容性/u],
+    ['PLUGIN_INCOMPATIBLE', /此插件暂不兼容/u],
+  ]) {
+    const ipcMain = new FakeIpcMain()
+    const qqBotBinding = new EventEmitter()
+    qqBotBinding.status = () => ({ bound: false })
+    let stopped = false
+    const unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell: {},
+      getWindow: () => undefined,
+      pluginManager: {
+        prepare: async () => {
+          const error = new Error('technical compatibility detail')
+          error.code = code
+          error.compatibility = { status: code === 'PLUGIN_INCOMPATIBLE' ? 'incompatible' : 'unknown' }
+          throw error
+        },
+      },
+      controller: { stop: async () => { stopped = true }, start: async () => {} },
+      ensureProfile: async () => {},
+      projectRoot: 'C:\\project',
+      dshHome: 'C:\\dsh',
+      qqBotBinding,
+    })
+    await assert.rejects(
+      ipcMain.handlers.get('extensions:plugin-install')(undefined, {
+        spec: '@community/example@1.0.0',
+        allowUnknown: false,
+      }),
+      expected,
+    )
+    assert.equal(stopped, false)
+    unregister()
+  }
 })
 
 test('production plugin removal prepares staging before runtime downtime', async () => {

@@ -116,7 +116,10 @@ test('plugin inventory distinguishes protected built-ins from community bundles'
       ['@community/example', {
         name: '@community/example',
         version: '1.2.3',
-        dsh: { bundle: { patch: './cordis.patch.yml' } },
+        displayName: 'Example Plugin',
+        description: { 'zh-CN': '示例能力' },
+        author: { name: 'Community Author' },
+        dsh: { bundle: { patch: './cordis.patch.yml' }, permissions: ['读取当前项目文件'] },
         peerDependencies: { '@deepseek-ai/cordis': '^4.0.1' },
       }],
     ]),
@@ -129,6 +132,10 @@ test('plugin inventory distinguishes protected built-ins from community bundles'
   assert.equal(builtIn.compatibility.status, 'compatible')
   assert.equal(community.enabled, true)
   assert.equal(community.version, '1.2.3')
+  assert.equal(community.displayName, 'Example Plugin')
+  assert.equal(community.description, '示例能力')
+  assert.equal(community.publisher, 'Community Author')
+  assert.deepEqual(community.permissions, ['读取当前项目文件'])
   assert.equal(community.compatibility.status, 'compatible')
   assert.equal(compatibilityDependency.builtIn, true)
   assert.equal(compatibilityDependency.managedByDesktop, true)

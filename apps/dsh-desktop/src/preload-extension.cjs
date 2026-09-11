@@ -43,6 +43,7 @@ const api = Object.freeze({
   openSkill: (id) => ipcRenderer.invoke('extensions:skill-open', id),
   openSkillRoot: () => ipcRenderer.invoke('extensions:skill-root'),
   openProfileDirectory: () => ipcRenderer.invoke('extensions:profile-dir-open'),
+  openLogs: () => ipcRenderer.invoke('extensions:logs-open'),
   previewProfileReset: () => ipcRenderer.invoke('extensions:profile-reset-preview'),
   resetProfile: (request) => ipcRenderer.invoke('extensions:profile-reset', request),
   openConversationImport: () => ipcRenderer.invoke('desktop:conversation-import-open'),

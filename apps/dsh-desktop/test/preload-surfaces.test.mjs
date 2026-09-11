@@ -39,6 +39,7 @@ test('extension preload exposes extension operations without product update acti
   assert.match(source, /extensions:qqbot-bind/u)
   assert.match(source, /extensions:plugin-install-prefill/u)
   assert.match(source, /runNetworkDiagnostics: \(\) => ipcRenderer\.invoke\('extensions:network-diagnostics'\)/u)
+  assert.match(source, /openLogs: \(\) => ipcRenderer\.invoke\('extensions:logs-open'\)/u)
   assert.doesNotMatch(source, /desktop:update-install/u)
   assert.doesNotMatch(source, /desktop:update-channel-(?:get|set)/u)
   assert.doesNotMatch(source, /desktop:action/u)

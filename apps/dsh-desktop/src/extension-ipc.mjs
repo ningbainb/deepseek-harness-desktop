@@ -2,6 +2,7 @@ import { lstat, mkdir, readdir, rename, rm, statfs } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
+import { createPluginUIStates } from './extensions/plugin-ui-state.mjs'
 import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/skills.mjs'
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
@@ -163,6 +164,7 @@ const CHANNELS = [
   'extensions:skill-open',
   'extensions:skill-root',
   'extensions:profile-dir-open',
+  'extensions:logs-open',
   'extensions:profile-reset-preview',
   'extensions:profile-reset',
   'extensions:qqbot-status',
@@ -206,6 +208,7 @@ export function registerExtensionIpc({
   completeFullAccessPlugin = async () => {},
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
+  openLogs = async () => { throw new Error('runtime logs are unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
   recordFeatureEvent = () => false,
   onRuntimeMaintenanceChange = () => {},
@@ -254,9 +257,12 @@ export function registerExtensionIpc({
 
   const scan = async () => {
     const roots = defaultSkillRoots({ projectRoot, dshHome, agentsHome })
-    const [plugins, catalog] = await Promise.all([
+    const [plugins, catalog, recoveryState] = await Promise.all([
       pluginManager.inventory(),
       discoverSkills({ roots }),
+      typeof pluginRecovery?.getState === 'function'
+        ? pluginRecovery.getState()
+        : Promise.resolve({ incidents: [] }),
     ])
     skillPaths = new Map()
     const skills = catalog.skills.map((skill, index) => {
@@ -271,7 +277,7 @@ export function registerExtensionIpc({
       }
     })
     return {
-      plugins,
+      plugins: createPluginUIStates(plugins, { incidents: recoveryState?.incidents }),
       communityPlugins: COMMUNITY_PLUGIN_CATALOG.map((plugin) => ({ ...plugin })),
       skills,
       qqbot: qqBotBinding.status(),
@@ -556,6 +562,18 @@ export function registerExtensionIpc({
         surfaceRegistry.assert(event?.sender, 'extensions')
         return await handler(event, ...args)
       } catch (error) {
+        if (error?.code === 'PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED') {
+          const presented = new Error('无法确认兼容性：这个插件没有声明与当前 DeepSeek Harness Desktop 的兼容范围。继续安装通常没有问题，但存在无法正常运行的可能。')
+          presented.code = error.code
+          presented.compatibility = error.compatibility
+          throw presented
+        }
+        if (error?.code === 'PLUGIN_INCOMPATIBLE') {
+          const presented = new Error('此插件暂不兼容：插件需要的 DeepSeek Harness Runtime 与当前 Desktop 版本不一致。为了避免影响应用稳定性，本次安装已停止。')
+          presented.code = error.code
+          presented.compatibility = error.compatibility
+          throw presented
+        }
         if (error instanceof TypeError) {
           throw new DesktopContractError(DESKTOP_ERROR_CODES.INVALID_ARGUMENT, error.message)
         }
@@ -576,7 +594,15 @@ export function registerExtensionIpc({
       return result
     } catch (error) { record('failed'); throw error }
   })
-  handleExtension('extensions:plugin-check', () => pluginManager.checkUpdates())
+  handleExtension('extensions:plugin-check', async () => {
+    const [plugins, recoveryState] = await Promise.all([
+      pluginManager.checkUpdates(),
+      typeof pluginRecovery?.getState === 'function'
+        ? pluginRecovery.getState()
+        : Promise.resolve({ incidents: [] }),
+    ])
+    return createPluginUIStates(plugins, { incidents: recoveryState?.incidents })
+  })
   handleExtension('extensions:plugin-install', (_event, request) => {
     return trackProductOperation('install', () => installPlugin(request))
   })
@@ -673,6 +699,7 @@ export function registerExtensionIpc({
     await mkdir(profileDir, { recursive: true })
     return shell.openPath(profileDir)
   })
+  handleExtension('extensions:logs-open', () => openLogs())
   handleExtension('extensions:profile-reset-preview', async () => {
     const profileDir = join(dshHome, 'profiles', 'desktop')
     return createProfileResetPreview(profileDir, Date.now(), getProfileResetAvailableBytes)

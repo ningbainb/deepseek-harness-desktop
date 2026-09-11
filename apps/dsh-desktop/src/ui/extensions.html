@@ -38,7 +38,7 @@
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
           <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
           <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">发现插件 <small id="market-count">--</small></button>
-          <button id="native-tab" type="button" role="tab" data-tab="native-plugins" data-group="plugins" aria-controls="native-plugins">内置能力 <small id="native-count">--</small></button>
+          <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
         </nav>
         <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
           <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="backup" aria-controls="presets">环境预设</button>
@@ -53,57 +53,72 @@
         <div><strong>后续动作</strong><p id="activation-message">扩展状态已改变。</p></div>
         <div class="item-actions"><button type="button" class="primary" id="activation-refresh">刷新</button><button type="button" class="secondary" id="restart-runtime">Restart DeepSeek Harness</button></div>
       </section>
-      <section id="native-plugins" class="panel native-panel" role="tabpanel" aria-labelledby="native-tab" hidden>
-        <header class="native-masthead">
-          <div class="native-intro">
-            <p class="native-kicker">内置能力</p>
-            <h2>内置能力</h2>
-            <p>已内置并随 DeepSeek Harness Desktop 统一发布的核心功能模块。可在此查看能力说明，并前往对应设置。</p>
-          </div>
-          <div class="native-metrics" aria-label="原生功能状态">
-            <div><strong id="native-total">18</strong><span>内置核心能力</span></div>
-            <div><strong class="native-status-ok">随版本更新</strong><span>由桌面版维护</span></div>
-          </div>
-        </header>
-        <div class="native-controls">
-          <div class="native-category-chips" role="tablist" aria-label="原生插件分类">
-            <button type="button" class="native-chip active" data-native-category="all">全部能力</button>
-            <button type="button" class="native-chip" data-native-category="ai">AI 核心与调度</button>
-            <button type="button" class="native-chip" data-native-category="system">运行与守护</button>
-            <button type="button" class="native-chip" data-native-category="tools">工具与协同</button>
-            <button type="button" class="native-chip" data-native-category="ui">界面与主题</button>
-          </div>
-          <div class="native-search-wrap">
-            <input type="search" id="native-search" class="native-search-input" placeholder="搜索原生功能、能力或包名…" autocomplete="off" spellcheck="false" aria-label="搜索原生插件">
-          </div>
+      <section id="plugin-settings" class="panel plugin-settings-panel" role="tabpanel" aria-labelledby="plugin-settings-tab" hidden>
+        <div class="panel-head">
+          <div><h2>插件设置</h2></div>
+          <p>只保留日常会用到的选项。诊断工具在开发者模式中按需显示。</p>
         </div>
-        <div class="native-results-head"><p id="native-result-state" aria-live="polite">已加载全部原生能力</p></div>
-        <div class="native-grid" id="native-plugin-grid" aria-live="polite"></div>
+        <div class="settings-list" aria-label="插件设置">
+          <label class="setting-row" for="plugin-auto-update"><span><strong>插件自动更新</strong><small>检查到兼容更新时，使用安全验证与回滚流程自动应用。</small></span><input id="plugin-auto-update" type="checkbox" role="switch"></label>
+          <label class="setting-row" for="plugin-ask-unknown"><span><strong>安装未知兼容插件时询问</strong><small>无法确认适配范围时，由你决定是否继续。</small></span><input id="plugin-ask-unknown" type="checkbox" role="switch" checked></label>
+          <label class="setting-row" for="plugin-developer-mode"><span><strong>开发者模式</strong><small>显示运行环境、日志和诊断入口。</small></span><input id="plugin-developer-mode" type="checkbox" role="switch"></label>
+        </div>
+        <section class="environment-repair" id="plugin-environment-repair" hidden>
+          <div><strong>插件环境需要修复</strong><p>修复只会重建插件运行环境，不会删除聊天、设置或个人数据。</p></div>
+          <button type="button" class="primary" id="repair-plugin-environment" data-mutation-control>修复</button>
+        </section>
+        <section class="developer-tools" id="plugin-developer-tools" hidden>
+          <div class="section-heading"><h3>开发者工具</h3><p>用于定位插件与运行环境问题。</p></div>
+          <div class="developer-actions">
+            <button type="button" class="secondary" id="developer-runtime-info">Runtime</button>
+            <button type="button" class="secondary" id="developer-export-diagnostics">插件诊断</button>
+            <button type="button" class="secondary" id="developer-open-profile">依赖环境</button>
+            <button type="button" class="secondary" id="developer-open-logs">打开日志</button>
+            <button type="button" class="secondary" id="developer-copy-environment">复制环境信息</button>
+          </div>
+          <p class="developer-result" id="developer-result" role="status" aria-live="polite"></p>
+        </section>
+        <details class="native-catalog-disclosure">
+            <summary>查看 Desktop 内置能力</summary>
+            <div class="native-controls">
+              <div class="native-category-chips" role="group" aria-label="内置能力分类">
+                <button type="button" class="native-chip active" data-native-category="all">全部</button>
+                <button type="button" class="native-chip" data-native-category="ai">AI</button>
+                <button type="button" class="native-chip" data-native-category="system">运行</button>
+                <button type="button" class="native-chip" data-native-category="tools">工具</button>
+                <button type="button" class="native-chip" data-native-category="ui">界面</button>
+              </div>
+              <div class="native-search-wrap"><input type="search" id="native-search" class="native-search-input" placeholder="搜索内置能力…" autocomplete="off" spellcheck="false" aria-label="搜索内置能力"></div>
+            </div>
+            <p class="native-results-head" id="native-result-state" aria-live="polite">已加载全部内置能力</p>
+            <span id="native-count" hidden>--</span><span id="native-total" hidden>18</span>
+            <div class="native-grid" id="native-plugin-grid" aria-live="polite"></div>
+        </details>
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
-        <div class="native-shortcut-banner"><span>内置能力随桌面版维护</span><button type="button" class="secondary" id="jump-to-native">查看内置能力</button></div>
         <div class="panel-head">
-          <div><h2 id="plugin-heading">已安装插件</h2></div>
-          <p>安装注册表中的 DSH bundle。安装前请确认来源可信；插件拥有宿主进程权限。</p>
+          <div><h2 id="plugin-heading">插件</h2></div>
+          <p>管理你安装的扩展能力。正常插件保持安静，只在需要操作时提示。</p>
         </div>
-        <details class="install-disclosure" id="install-plugin"><summary>安装插件</summary><form id="plugin-form">
-          <label for="plugin-spec">插件来源 / NPM 包名</label>
+        <label class="plugin-search" for="plugin-search"><span class="sr-only">搜索已安装插件</span><input type="search" id="plugin-search" placeholder="搜索插件…" autocomplete="off" spellcheck="false"></label>
+        <section class="plugin-update-summary" id="plugin-update-summary" hidden><span id="plugin-update-summary-text"></span><button type="button" class="primary" id="update-all-plugins" data-mutation-control>全部更新</button></section>
+        <details class="install-disclosure" id="install-plugin"><summary>从其他来源安装</summary><form id="plugin-form">
+          <label for="plugin-spec">插件来源</label>
           <div class="field-row">
             <input type="text" id="plugin-spec" name="spec" placeholder="@scope/dsh-plugin@1.0.0 或本地目录/.tgz" autocomplete="off" spellcheck="false" required>
-            <button type="submit" class="primary">安装并重启</button>
+            <button type="submit" class="primary" id="plugin-install-submit" data-mutation-control>安装</button>
           </div>
-          <label class="risk-check"><input type="checkbox" name="allowUnknown">允许安装未声明 Desktop/DSH 适配范围的插件</label>
-          <label class="risk-check"><input type="checkbox" name="fullAccess" checked>主 Runtime 完整权限（默认）：确认来源风险后安装到持久化 Desktop Profile，并按当前 Windows 用户权限运行；不会替换 Desktop 内置组件</label>
+          <p class="inline-operation-state" id="plugin-install-state" role="status" aria-live="polite" hidden></p>
+          <details class="install-advanced"><summary>高级选项</summary><label class="risk-check"><input type="checkbox" name="fullAccess">这是来自本地、Git 或其他外部来源的高级插件</label></details>
         </form></details>
         <div class="plugin-tools">
           <p id="plugin-update-state">内置插件随桌面版更新；社区插件仅在此处检查。</p>
           <div class="plugin-tool-actions">
-
-            <button type="button" class="secondary" id="open-plugins-dir">打开插件目录</button>
             <button type="button" class="secondary" id="check-plugin-updates">检查插件更新</button>
           </div>
         </div>
         <div class="list" id="plugin-list" aria-live="polite"></div>
+        <section class="plugin-detail" id="plugin-detail" hidden aria-live="polite"></section>
       </section>
 
       <section id="market" class="panel market-panel" role="tabpanel" aria-labelledby="market-tab" hidden>
@@ -144,35 +159,26 @@
 
       <section id="recovery" class="panel" role="tabpanel" aria-labelledby="recovery-tab" hidden>
         <div class="panel-head">
-          <div><h2>诊断与恢复</h2></div>
-          <p>查看启动故障、重新启用已隔离插件，或恢复最近一次可用配置。</p>
+          <div><h2>插件环境修复</h2></div>
+          <p>能自动恢复的问题会静默处理；这里只保留需要你主动操作的情况。</p>
         </div>
-        <div class="recovery-safety">
-          这些操作只改变桌面版插件配置。聊天记录、模型设置、账号信息和个人设置不会受影响。
-        </div>
-        <article class="recovery-mode" id="recovery-mode">
-          <div>
-            <span class="meta">当前启动模式</span>
-            <strong id="recovery-mode-label">正常模式</strong>
-          </div>
-          <button type="button" class="item-action update" id="restore-safe-mode" hidden>恢复历史停用插件并重启</button>
-        </article>
-        <div class="recovery-toolbar">
-          <h3>环境自愈与重置</h3>
-          <button type="button" class="item-action danger" id="reset-profile-env">检查并重置插件环境</button>
-        </div>
-        <div class="recovery-toolbar">
-          <h3>最近故障</h3>
-          <button type="button" class="secondary" id="export-diagnostics">导出诊断包</button>
-        </div>
-        <div class="recovery-toolbar">
-          <div><h3>网络连通性</h3><p class="description">分别检查更新、社区目录和 NPM 清单；模型 API 与安装子进程会明确标为未探测。</p></div>
-          <button type="button" class="secondary" id="run-network-diagnostics">运行连通性检查</button>
-        </div>
-        <div class="list" id="network-diagnostic-results" aria-live="polite"><p class="empty">尚未运行网络连通性检查</p></div>
-        <div class="list" id="recovery-incidents" aria-live="polite"></div>
-        <div class="recovery-toolbar"><h3>可恢复配置</h3></div>
-        <div class="list" id="recovery-snapshots" aria-live="polite"></div>
+        <section class="recovery-primary">
+          <div><strong>插件运行环境出现异常</strong><p>聊天记录、设置和个人数据不会受到影响。</p></div>
+          <button type="button" class="primary" id="reset-profile-env" data-mutation-control>修复插件环境</button>
+        </section>
+        <details class="recovery-advanced">
+          <summary>高级恢复与诊断</summary>
+          <article class="recovery-mode" id="recovery-mode">
+            <div><span class="meta">当前启动模式</span><strong id="recovery-mode-label">正常模式</strong></div>
+            <button type="button" class="item-action update" id="restore-safe-mode" hidden data-mutation-control>恢复历史停用插件并重启</button>
+          </article>
+          <div class="recovery-toolbar"><h3>最近故障</h3><button type="button" class="secondary" id="export-diagnostics">导出诊断信息</button></div>
+          <div class="list" id="recovery-incidents" aria-live="polite"></div>
+          <div class="recovery-toolbar"><div><h3>连通性</h3><p class="description">更新、社区目录和插件来源分别检查；模型 API 与安装子进程会明确标为未探测。</p></div><button type="button" class="secondary" id="run-network-diagnostics">运行检查</button></div>
+          <div class="list" id="network-diagnostic-results" aria-live="polite"><p class="empty">尚未运行连通性检查</p></div>
+          <div class="recovery-toolbar"><h3>可恢复配置</h3></div>
+          <div class="list" id="recovery-snapshots" aria-live="polite"></div>
+        </details>
       </section>
 
       <section id="skills" class="panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
@@ -286,6 +292,14 @@
       </main>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="plugin-dialog" class="plugin-dialog" aria-labelledby="plugin-dialog-title" aria-describedby="plugin-dialog-description">
+      <form method="dialog">
+        <h2 id="plugin-dialog-title"></h2>
+        <p id="plugin-dialog-description"></p>
+        <details id="plugin-dialog-details" hidden><summary>查看详情</summary><pre id="plugin-dialog-detail-text"></pre></details>
+        <div class="dialog-actions"><button type="submit" class="secondary" value="cancel" id="plugin-dialog-cancel">取消</button><button type="submit" class="primary" value="confirm" id="plugin-dialog-confirm">继续</button></div>
+      </form>
+    </dialog>
     <script type="module" src="./extensions.mjs"></script>
   </body>
 </html>
