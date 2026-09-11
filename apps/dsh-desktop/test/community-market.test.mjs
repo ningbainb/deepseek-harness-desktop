@@ -110,7 +110,7 @@ test('community market projects bounded catalog data and derives install sources
   await assert.rejects(service.resolveInstall('unknown-entry'), /community market plugin identifier/u)
 })
 
-test('community market revalidates a successful response with its ETag', async () => {
+test('community market serves a bounded cache and force-revalidates with its ETag', async () => {
   const headers = []
   let calls = 0
   const service = createCommunityMarketService({
@@ -125,9 +125,32 @@ test('community market revalidates a successful response with its ETag', async (
 
   const first = await service.list()
   const second = await service.list()
+  assert.equal(calls, 1)
+  const revalidated = await service.list({ force: true })
   assert.equal(headers[0]['if-none-match'], undefined)
   assert.equal(headers[1]['if-none-match'], '"catalog-1"')
   assert.deepEqual(second, first)
+  assert.deepEqual(revalidated, first)
+})
+
+test('community market deduplicates concurrent reads', async () => {
+  let calls = 0
+  let release
+  const pending = new Promise((resolve) => { release = resolve })
+  const service = createCommunityMarketService({
+    fetch: async () => {
+      calls += 1
+      await pending
+      return jsonResponse(catalog)
+    },
+  })
+
+  const first = service.list()
+  const second = service.list()
+  assert.equal(calls, 1)
+  release()
+  assert.deepEqual(await second, await first)
+  assert.equal(calls, 1)
 })
 
 test('community market rejects empty, malformed, and oversized catalogs', async () => {
@@ -159,5 +182,5 @@ test('community market does not substitute stale data after a network failure', 
 
   await service.list()
   fail = true
-  await assert.rejects(service.list(), /community market catalog unavailable: offline/u)
+  await assert.rejects(service.list({ force: true }), /community market catalog unavailable: offline/u)
 })

@@ -101,6 +101,22 @@
   border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.06));
 }
 
+.toolbar > .muted { flex-basis: 100%; margin: 0; line-height: 1.6; }
+.empty { margin: 12px 0 0; padding: 24px 18px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 10px; color: var(--dsw-alias-label-tertiary); line-height: 1.7; text-align: center; }
+.profileList:empty { display: none; }
+.details { border-top: 1px solid var(--dsw-alias-border-l2); padding-top: 12px; }
+.details > summary { cursor: pointer; color: var(--dsw-alias-label-secondary); font-size: 12px; padding: 4px 0; }
+.details > summary:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 3px; border-radius: 3px; }
+.details[open] > .field { margin-top: 12px; }
+.actions > .danger { margin-right: auto; }
+.profileMeta { overflow-wrap: anywhere; }
+.toolbar .toggle input[type='checkbox'] { appearance: none; position: relative; width: 32px; height: 19px; border-radius: 12px; background: var(--dsw-alias-label-dimmed); transition: background 120ms; flex: none; }
+.toolbar .toggle input[type='checkbox']::after { content: ''; position: absolute; left: 3px; top: 3px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform 120ms; }
+.toolbar .toggle input[type='checkbox']:checked { background: var(--dsw-alias-brand-primary); }
+.toolbar .toggle input[type='checkbox']:checked::after { transform: translateX(13px); }
+.toolbar .toggle input[type='checkbox']:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 3px; }
+.toolbar .toggle input[type='checkbox']:disabled { opacity: .45; cursor: not-allowed; }
+
 .toggle {
   display: inline-flex;
   align-items: center;
@@ -224,8 +240,8 @@
 }
 
 .editor {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   margin-top: 6px;
   padding: 16px;
@@ -233,6 +249,8 @@
   background: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.02));
   border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
 }
+.editor > * { grid-column: 1 / -1; min-width: 0; }
+.editor > .field:nth-child(-n+2) { grid-column: auto; }
 
 .field {
   display: flex;
@@ -399,6 +417,7 @@
 }
 
 @media (max-width: 520px) {
+  .editor { grid-template-columns: minmax(0, 1fr); }
   .header,
   .profileHeader {
     flex-wrap: wrap;

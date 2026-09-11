@@ -7,7 +7,7 @@ import {
 } from '../src/patch-registry.ts'
 
 const policy = {
-  today: '2026-08-26',
+  today: '2026-09-10',
   testExists: () => true,
 }
 
@@ -25,12 +25,12 @@ describe('Desktop compat patch registry', () => {
       'transcript-tool-call-balance',
     ])
     for (const entry of DESKTOP_COMPAT_PATCHES) {
-      expect(entry.appliesTo).toEqual(['0.1.1-rc.1'])
+      expect(entry.appliesTo).toEqual(['0.1.1-rc.1', '0.1.5-alpha.1', '0.1.5-rc.1'])
       expect(entry.applicableVersions).toEqual(entry.appliesTo)
       expect(entry.owner).toBe('desktop-platform')
       expect(entry.tests).toEqual([entry.test])
       expect(entry.test).toMatch(/^(?:packages\/dsh-desktop-compat\/tests\/.+\.spec\.ts|apps\/dsh-desktop\/test\/.+\.test\.mjs)$/u)
-      expect(entry.lastVerified).toMatch(/^2026-08-(21|24|25|26)$/u)
+      expect(entry.lastVerified).toBe('2026-09-10')
     }
   })
 

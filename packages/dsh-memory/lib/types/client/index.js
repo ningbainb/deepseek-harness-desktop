@@ -1,7 +1,6 @@
 import { normalizeMemoryConfig } from "../core/config.js";
 import { MEMORY_SETTINGS_NAMESPACE } from "../core/schema.js";
 import { MemorySettingsCard } from "./MemorySettingsCard.js";
-import { MemoryHeaderStatus } from "./MemoryActivityPanel.js";
 import { en, zh } from "./locales.js";
 export * from "./locales.js";
 export { MemorySettingsCard } from "./MemorySettingsCard.js";
@@ -37,9 +36,6 @@ export function apply(ctx) {
                 settingsScope,
             }),
         }, MemorySettingsCard));
-        scope.slots.inject('conversation.session.header.actions', () => scope.slots.register({
-            name: 'conversation.session.header.actions', id: 'memory-status', order: -7, locale: 'memory',
-            inject: () => ({ settingsScope }),
-        }, MemoryHeaderStatus));
+        // Memory management and activity stay in settings, not the conversation header.
     });
 }

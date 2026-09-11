@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { _electron as electron } from 'playwright'
@@ -13,6 +13,11 @@ const execFileAsync = promisify(execFile)
 const desktopRoot = join(import.meta.dirname, '..')
 const executablePath = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 if (!executablePath) throw new Error('DSH_DESKTOP_E2E_EXECUTABLE is required')
+// Candidate verification can exercise the hash-verified helper extracted from
+// the actual installer rather than accidentally testing a newer source helper.
+const cleanupScriptPath = process.env.DSH_DESKTOP_E2E_CLEANUP_SCRIPT
+  ?? join(desktopRoot, 'build', 'cleanup-stale-processes.ps1')
+if (!isAbsolute(cleanupScriptPath)) throw new Error('cleanup script path must be absolute')
 
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-update-shutdown-'))
 const userData = join(temporary, 'user-data')
@@ -120,7 +125,7 @@ try {
       '-ExecutionPolicy',
       'Bypass',
       '-File',
-      join(desktopRoot, 'build', 'cleanup-stale-processes.ps1'),
+      cleanupScriptPath,
       '-InstallDirectory',
       dirname(executablePath),
     ],
@@ -134,7 +139,23 @@ try {
         DSH_HOME: dshHome,
       },
     },
-  )
+  ).catch(async (error) => {
+    try {
+      const { stdout: diagnostics } = await execFileAsync('powershell.exe', [
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+        [
+          '$rows = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:DSH_SHUTDOWN_PROBE_EXE } | Select-Object ProcessId,ParentProcessId,Name)',
+          '$state = "available"; $stream = $null',
+          'try { $stream = [IO.File]::Open($env:DSH_SHUTDOWN_PROBE_EXE, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) } catch { $state = "blocked" } finally { if ($null -ne $stream) { $stream.Dispose() } }',
+          '@{ processes = $rows; replacementFile = $state } | ConvertTo-Json -Depth 4 -Compress',
+        ].join('; '),
+      ], { timeout: 15_000, windowsHide: true, env: { ...process.env, DSH_SHUTDOWN_PROBE_EXE: executablePath } })
+      console.error(`shutdown failure before test teardown: ${diagnostics.trim()}`)
+    } catch {
+      console.error('shutdown failure diagnostics unavailable; preserving the original failure')
+    }
+    throw error
+  })
   await settleWithin(closed, 10_000, 'packaged app did not exit after its validated receipt')
 
   assert.match(stdout, new RegExp(`receipt-ok pid=${expectedPid}(?:\\r?\\n|$)`, 'u'))

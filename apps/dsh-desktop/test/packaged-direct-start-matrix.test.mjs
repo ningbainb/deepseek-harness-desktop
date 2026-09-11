@@ -25,6 +25,7 @@ test('direct-start fixtures have release-commit provenance and complete text has
   assert.deepEqual(verified.versions, DIRECT_START_FIXTURE_VERSIONS)
   assert.ok(verified.files.includes('2.3/home.json'))
   assert.ok(verified.files.includes('3.0.1/home.json'))
+  assert.ok(verified.files.includes('3.3.0/home.json'))
   assert.ok(verified.files.includes('probe-package/index.mjs'))
 })
 
@@ -79,6 +80,25 @@ test('3.0.1 packaged verification requires the legacy key in the Runtime without
   })
   assert.equal(result.legacyCredentialVisible, true)
   assert.equal(JSON.stringify(result).includes('fixture-old-api-key'), false)
+})
+
+test('3.3.0 verification rejects silently dropping its existing enabled bundles', async context => {
+  const root = await mkdtemp(join(tmpdir(), 'direct-start-330-bundles-'))
+  context.after(() => rm(root, { recursive: true, force: true }))
+  const layout = await materializeDirectStartFixture({ root, version: '3.3.0' })
+  assert.equal(layout.expectedLegacyBundles.length, 7)
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(layout.runtimeReadablePath, JSON.stringify({
+    marker: layout.sessionMarker, profile: 'desktop', legacyCredentialVisible: false,
+  }))
+  const result = await verifyPackagedDirectStart(layout, { runtimeLog: '[startup] direct-state=ready-full\n' })
+  assert.equal(result.version, '3.3.0')
+  const manifestPath = join(layout.profileDir, 'package.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => name !== '@linxin666/dsh-value-mode')
+  await writeFile(manifestPath, JSON.stringify(manifest))
+  await assert.rejects(verifyPackagedDirectStart(layout, { runtimeLog: '[startup] direct-state=ready-full\n' }),
+    /dropped an enabled legacy bundle/u)
 })
 
 test('packaged direct-start matrix covers every historical Home plus a truly fresh Home', async () => {

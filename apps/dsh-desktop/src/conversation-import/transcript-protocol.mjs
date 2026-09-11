@@ -204,6 +204,7 @@ export function convertExternalEventsToDshEvents(events, importMeta = {}) {
     append('assistant/message', {
       turn,
       step,
+      stream: [],
       message: {
         id: messageId(importId, sourceSessionId, event, index, suffix),
         role: 'assistant',

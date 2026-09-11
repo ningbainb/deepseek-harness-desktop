@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -130,6 +131,12 @@ try {
   const projectDirectory = resolve(temporary, 'picked-project')
   await mkdir(projectDirectory)
   await writeFile(resolve(projectDirectory, 'preview-fixture.txt'), 'Browser close fixture')
+  const fixtureGit = args => execFileSync('git', args, { cwd: projectDirectory, windowsHide: true, timeout: 15_000, encoding: 'utf8',
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null' } })
+  fixtureGit(['init', '--quiet', '--template='])
+  fixtureGit(['add', 'preview-fixture.txt'])
+  fixtureGit(['-c', 'user.name=DSH Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'Fixture'])
+  await writeFile(resolve(projectDirectory, 'git-fixture.txt'), 'Native Git tab fixture')
   await electronApp.evaluate(({ dialog }, path) => {
     globalThis.__pickerCalls = 0
     dialog.showOpenDialog = async (_parent, options) => {
@@ -176,9 +183,26 @@ try {
   })
   await dialog.getByRole('button', { name: /^(创建项目|Create project)$/iu }).click()
   await dialog.waitFor({ state: 'hidden', timeout: 30_000 })
-  await page.waitForSelector('[data-dsh-file-attachments]', { timeout: 30_000 })
+  await page.waitForSelector('[data-composer-seat]', { timeout: 30_000 })
+  await page.waitForSelector('[data-testid="aionui-drag-inlay"]', { state: 'attached', timeout: 30_000 })
+  assert.equal(await page.locator('[data-dsh-file-attachments]').count(), 0, 'native uploads do not have a duplicate empty attachment picker')
   assert.equal(await electronApp.evaluate(() => globalThis.__pickerCalls), 2)
   await page.waitForFunction(() => document.body.textContent.includes('桌面项目测试'))
+  await page.waitForFunction(() => document.querySelector('[data-aionui-explorer-col]')?.getAttribute('data-aionui-visible') === 'false')
+  assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'native SDK owns the default sidebar before its first open')
+  const nativeReturn = page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible')
+  await nativeReturn.waitFor({ state: 'visible' })
+  assert.equal(await nativeReturn.count(), 1, 'native default has one return control')
+  await nativeReturn.click()
+  const initialNativePanel = page.locator('[data-sidebar-right-panel]')
+  await initialNativePanel.waitFor({ state: 'visible' })
+  assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false)
+  await initialNativePanel.locator('[data-sidebar-right-toggle]').click()
+  await initialNativePanel.waitFor({ state: 'hidden' })
+  assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'collapsing the default native surface keeps compatibility tools inactive')
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-default.png') })
+  // Explicitly enter the preserved tools before testing their existing controls.
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
   await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
   const panelControls = await page.evaluate(() => {
     const close = document.querySelector('[data-aionui-explorer-toolbar] button[aria-label="关闭文件面板"]')
@@ -198,7 +222,17 @@ try {
     await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
     await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
   }
-  const composer = page.locator('[data-composer-card] textarea').first()
+  const composer = page.locator('[data-composer-card] textarea, [data-composer-input][contenteditable="true"]').first()
+  const draftText = () => composer.evaluate(element => element instanceof HTMLTextAreaElement ? element.value : element.innerText)
+  const nativeUploadNames = []
+  let failNextUpload = false
+  await page.context().route('**/api/session/uploadFileBinary?**', async route => {
+    nativeUploadNames.push(new URL(route.request().url()).searchParams.get('name'))
+    if (failNextUpload) {
+      failNextUpload = false
+      await route.fulfill({ status: 503, body: 'isolated upload retry fixture' })
+    } else await route.continue()
+  })
   await composer.fill('保留我的草稿')
   await page.evaluate(() => {
     const target = document.querySelector('[data-composer-card]')
@@ -207,16 +241,77 @@ try {
     transfer.items.add(new File([new Uint8Array([0, 255, 7])], 'sample.bin', { type: 'application/octet-stream' }))
     target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
   })
-  await page.waitForFunction(() => document.querySelectorAll('[data-dsh-file-attachments] [data-state="ready"]').length === 2, { timeout: 30_000 })
-  assert.match(await composer.inputValue(), /保留我的草稿/u)
-  assert.match(await composer.inputValue(), /\.dsh-attachments/u)
-  await page.getByRole('button', { name: '移除 sample.bin', exact: true }).click()
-  assert.doesNotMatch(await composer.inputValue(), /sample\.bin/u)
-  await page.locator('[data-dsh-file-attachments]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/file-attachments.png') })
+  await page.waitForFunction(() => {
+    const cards = [...document.querySelectorAll('[aria-label="待发送文件"]')]
+    return cards.length === 2 && cards.every(card => !/上传中|上传失败/u.test(card.textContent))
+  }, undefined, { timeout: 30_000 })
+  assert.equal(await draftText(), '保留我的草稿', 'native uploads preserve text without appending legacy path references')
+  assert.equal(await page.locator('[data-dsh-file-attachments]').count(), 0, 'one native attachment rail owns the new files')
+  assert.deepEqual([...nativeUploadNames].sort(), ['sample.bin', '说明.txt'].sort(), 'each file uploads through the official route exactly once')
+  assert.equal(await page.getByRole('button', { name: '移除文件 说明.txt', exact: true }).count(), 1)
+  await page.getByRole('button', { name: '移除文件 sample.bin', exact: true }).click()
+  assert.equal(await page.getByRole('button', { name: '移除文件 sample.bin', exact: true }).count(), 0)
+  assert.equal(await page.locator('[aria-label="待发送文件"]').count(), 1)
+  assert.doesNotMatch(await draftText(), /sample\.bin/u)
+  failNextUpload = true
+  await page.evaluate(() => {
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['retry contents'], 'retry.txt', { type: 'text/plain' }))
+    document.querySelector('[data-composer-card]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }))
+  })
+  const retry = page.getByRole('button', { name: '重试上传 retry.txt', exact: true })
+  await retry.waitFor({ state: 'visible' })
+  assert.equal(await page.getByRole('button', { name: '发送消息', exact: true }).isDisabled(), true, 'failed native uploads block send')
+  assert.equal(await draftText(), '保留我的草稿')
+  await retry.click()
+  await page.waitForFunction(() => {
+    const cards = [...document.querySelectorAll('[aria-label="待发送文件"]')]
+    return cards.length === 2 && cards.every(card => !/上传中|上传失败/u.test(card.textContent))
+  })
+  assert.equal(nativeUploadNames.filter(name => name === 'retry.txt').length, 2, 'retry performs exactly one additional native upload')
+  await page.getByRole('button', { name: '移除文件 retry.txt', exact: true }).click()
+  assert.equal(await page.locator('[aria-label="待发送文件"]').count(), 1)
+  await page.locator('[data-composer-seat]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/file-attachments.png') })
   // Open the actual preview surface through its file tree and new URL control.
-  const previewFile = page.getByRole('button', { name: 'preview-fixture.txt', exact: true })
+  const previewFile = page.locator('[data-aionui-explorer-col]').getByRole('button', { name: 'preview-fixture.txt', exact: true })
   await previewFile.dblclick()
-  await page.getByTitle(/新建 URL 预览|New URL preview/iu, { exact: true }).click()
+  const nativePreview = page.locator('[data-sidebar-right-panel]').filter({ hasText: 'Browser close fixture' })
+  await nativePreview.waitFor({ state: 'visible', timeout: 30_000 })
+  await page.waitForFunction(() => {
+    const composer = document.querySelector('[data-composer-seat]')
+    const explorer = document.querySelector('[data-aionui-explorer-col]')
+    const native = document.querySelector('[data-sidebar-right-panel][data-sidebar-right-open]')
+    return composer?.getBoundingClientRect().width >= 350
+      && explorer?.getAttribute('data-aionui-visible') === 'false'
+      && native && getComputedStyle(native).transform === 'none'
+  })
+  const nativeBounds = await nativePreview.boundingBox()
+  const conversationBounds = await page.locator('[data-pane="conversation"]').boundingBox()
+  assert.ok(nativeBounds && conversationBounds && nativeBounds.x >= conversationBounds.x + conversationBounds.width - 1,
+    'native preview must not cover the conversation')
+  const nativeControlOverlap = await page.evaluate(() => {
+    const native = [...document.querySelectorAll('[data-sidebar-right-panel="push"] [data-sidebar-right-mode], [data-sidebar-right-panel="push"] [data-sidebar-right-toggle]')]
+    const workbench = [...document.querySelectorAll('[data-dsh-panel-host] button')].filter(button => /^(展开|收起|Expand|Collapse)/u.test(button.getAttribute('aria-label') || ''))
+    return native.some(left => workbench.some(right => {
+      const a = left.getBoundingClientRect(), b = right.getBoundingClientRect()
+      return a.width > 0 && b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+    }))
+  })
+  assert.equal(nativeControlOverlap, false, 'native controls and terminal/browser controls must not overlap')
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-preview.png') })
+  assert.equal(await page.locator('[data-aionui-preview-toolbar]').isVisible(), false, 'common file preview must not load a duplicate Desktop preview')
+  await nativePreview.locator('[data-sidebar-right-toggle]').click()
+  await nativePreview.waitFor({ state: 'hidden' })
+  assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'native collapse must not automatically restore compatibility columns')
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  await previewFile.dblclick()
+  await nativePreview.waitFor({ state: 'visible' })
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  await nativePreview.waitFor({ state: 'hidden' })
+  await previewFile.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '编辑 / 兼容预览', exact: true }).click()
+  await nativePreview.waitFor({ state: 'hidden' })
+  await page.locator('[data-aionui-preview-toolbar]').waitFor({ state: 'visible' })
   await page.getByRole('button', { name: '关闭文件面板', exact: true }).click()
   const previewControls = await page.evaluate(() => {
     const button = document.querySelector('[data-aionui-preview-toolbar] [aria-label="关闭预览面板"]')
@@ -230,12 +325,112 @@ try {
   assert.equal(previewControls.overlap, false, 'preview close must avoid sibling controls when explorer is collapsed')
   await page.locator('[data-aionui-preview-toolbar]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/preview-controls-fixed.png') })
   await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-  const browserClose = page.getByRole('button', { name: /^(关闭浏览器|Close browser)$/iu }).first()
+  await page.route('https://desktop-browser-fixture.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Browser fixture</title><p>Isolated browser preview</p>' }))
+  await page.getByTitle(/新建 URL 预览|New URL preview/iu, { exact: true }).click()
+  const nativeBrowser = page.locator('[data-aionui-native-panel="browser"]')
+  await nativeBrowser.waitFor({ state: 'visible' })
+  assert.equal(rendererEvents.some(line => /slot .*already declared/u.test(line)), false, 'native adaptation must not redeclare an SDK-owned child slot')
+  assert.equal(await page.locator('[data-aionui-preview-toolbar]').isVisible(), false, 'native browser must not display a second Desktop tab strip')
+  const address = nativeBrowser.locator('input')
+  await address.fill('https://desktop-browser-fixture.test/first')
+  await address.press('Enter')
+  await nativeBrowser.frameLocator('iframe').getByText('Isolated browser preview').waitFor()
+  assert.equal(await nativeBrowser.locator('iframe').getAttribute('sandbox'), 'allow-scripts allow-forms')
+  assert.equal(await nativeBrowser.frameLocator('iframe').locator('body').evaluate(() => {
+    try { return Boolean(window.parent.document) } catch { return false }
+  }), false, 'browser sandbox must not expose the Harness parent document')
+  await address.fill('draft not submitted')
+  await page.locator('[data-sidebar-right-panel]').filter({ has: nativeBrowser }).locator('[data-sidebar-right-toggle]').click()
+  await nativeBrowser.waitFor({ state: 'hidden' })
+  console.log('native browser collapsed controls', JSON.stringify(await page.evaluate(() => ({
+    returns: [...document.querySelectorAll('[data-aionui-native-return]')].map(el => el.outerHTML),
+    expand: [...document.querySelectorAll('[data-sidebar-right-expand]')].map(el => ({ html: el.outerHTML.slice(0, 500), parents: [el.parentElement, el.parentElement?.parentElement, el.parentElement?.parentElement?.parentElement].filter(Boolean).map(parent => ({ tag: parent.tagName, cls: parent.className, display: getComputedStyle(parent).display, rect: parent.getBoundingClientRect().toJSON() })) })),
+    controls: [...document.querySelectorAll('button')].filter(el => /侧栏|侧边栏|sidebar|预览/u.test(el.getAttribute('aria-label') || el.textContent || '')).map(el => ({ text: el.textContent?.slice(0, 60), label: el.getAttribute('aria-label'), rect: el.getBoundingClientRect().toJSON() })),
+  }))))
+  console.log('native browser renderer events', JSON.stringify(rendererEvents.slice(-15)))
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-browser-collapsed.png') })
+  const sidebarReturn = page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible')
+  await sidebarReturn.waitFor({ state: 'visible' })
+  assert.equal(await sidebarReturn.count(), 1, 'only one native sidebar return control is visible')
+  await sidebarReturn.click()
+  await nativeBrowser.waitFor({ state: 'visible' })
+  assert.equal(await address.inputValue(), 'draft not submitted')
+  assert.equal(await nativeBrowser.locator('iframe').getAttribute('src'), 'https://desktop-browser-fixture.test/first')
+  await address.press('Escape')
+  assert.equal(await address.inputValue(), 'https://desktop-browser-fixture.test/first')
+  await nativeBrowser.getByRole('button', { name: '刷新', exact: true }).click()
+  await nativeBrowser.frameLocator('iframe').getByText('Isolated browser preview').waitFor()
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-browser.png') })
+  if (process.argv.includes('--native-layout')) {
+    const { verifyNativeBrowserLayout } = await import('./native-browser-layout-fixture.mjs')
+    try {
+      await verifyNativeBrowserLayout({ page })
+    } catch (error) {
+      console.error('native layout failure', JSON.stringify({ rendererEvents: rendererEvents.slice(-12),
+        controls: await page.locator('[data-sidebar-right-panel] [role="tab"], [data-sidebar-right-panel] button, [data-sidebar-right-float-host] button').evaluateAll(elements => elements.map(element => ({
+          role: element.getAttribute('role'), label: element.getAttribute('aria-label'), text: element.textContent?.slice(0, 80),
+          box: element.getBoundingClientRect().toJSON(), disabled: element.hasAttribute('disabled'),
+        }))),
+      }))
+      await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-layout-failure.png') })
+      throw error
+    }
+  }
+  assert.equal(await nativeBrowser.locator('[data-dsh-browser-close]').count(), 0, 'native browser must not add a second close button')
+  const browserClose = page.locator('[data-sidebar-right-panel]').getByRole('tab')
+    .filter({ hasText: /^网页预览$/u }).getByRole('button', { name: /^(关闭|Close)$/iu })
   await browserClose.waitFor({ timeout: 15_000 })
   await browserClose.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/browser-close.png') })
   await browserClose.click()
   await browserClose.waitFor({ state: 'hidden' })
-  assert.match(await composer.inputValue(), /保留我的草稿/u)
+  await nativeBrowser.waitFor({ state: 'detached' })
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  const legacyExplorer = page.locator('[data-aionui-explorer-toolbar]')
+  await legacyExplorer.getByRole('button', { name: '变更', exact: true }).click()
+  const nativeGit = page.locator('[data-aionui-native-panel="changes"]')
+  await nativeGit.waitFor({ state: 'visible', timeout: 15_000 })
+  assert.equal(await nativeGit.locator('[data-aionui-explorer-toolbar]').count(), 0, 'native Git must not nest a second tab strip')
+  assert.equal(await page.locator('[data-aionui-explorer-col] input').count(), 0, 'hidden legacy tools release their rendered body')
+  const gitRow = nativeGit.locator('[role="button"][title="git-fixture.txt"]')
+  await gitRow.hover()
+  await gitRow.getByTitle('暂存', { exact: true }).click()
+  await gitRow.getByTitle('取消暂存', { exact: true }).waitFor({ state: 'visible' })
+  assert.match(fixtureGit(['diff', '--cached', '--name-only']), /git-fixture\.txt/u)
+  await gitRow.getByTitle('取消暂存', { exact: true }).click()
+  await gitRow.getByTitle('暂存', { exact: true }).waitFor({ state: 'visible' })
+  assert.doesNotMatch(fixtureGit(['diff', '--cached', '--name-only']), /git-fixture\.txt/u)
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-git-tab.png') })
+  const nativeDock = page.locator('[data-sidebar-right-panel]')
+  // A closable guide chip includes its nested Close button in its accessible
+  // name. Match the exact visible title, not an assumed accessible-name shape.
+  const startTab = nativeDock.getByRole('tab').filter({ hasText: /^开始$/u })
+  if (await startTab.count()) await startTab.click()
+  else await nativeDock.getByRole('button', { name: '新标签页', exact: true }).click()
+  await nativeDock.getByRole('button', { name: /文件工具/u }).click()
+  const nativeFiles = page.locator('[data-aionui-native-panel="files"]')
+  await nativeFiles.getByRole('textbox', { name: '按文件名搜索', exact: true }).fill('preview-fixture')
+  const searchResult = nativeFiles.locator('[data-aionui-search-results][data-search-status="done"]').getByRole('button', { name: 'preview-fixture.txt', exact: true })
+  await searchResult.waitFor({ state: 'visible' })
+  assert.equal(await nativeFiles.locator('[data-aionui-explorer-toolbar]').count(), 0)
+  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-file-tools.png') })
+  await searchResult.click()
+  assert.equal(await nativeFiles.getByRole('textbox', { name: '按文件名搜索', exact: true }).inputValue(), '', 'native file search reveals the selected result in the tree')
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  await legacyExplorer.getByRole('button', { name: '文件', exact: true }).click()
+  try {
+    await nativeDock.locator('[data-files-reload]').waitFor({ state: 'visible', timeout: 10_000 })
+    await nativeDock.getByRole('button', { name: 'preview-fixture.txt', exact: true }).waitFor({ state: 'visible' })
+  } catch (error) {
+    console.error('native files route failure', JSON.stringify({ events: rendererEvents.slice(-15),
+      body: (await page.locator('body').innerText()).slice(-3000),
+      tabs: await nativeDock.locator('[role="tab"], button').evaluateAll(elements => elements.map(element => ({ role: element.getAttribute('role'), label: element.getAttribute('aria-label'), text: element.textContent?.slice(0, 100) }))),
+    }))
+    await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-files-route-failure.png') })
+    throw error
+  }
+  assert.equal(await nativeFiles.count(), 0, 'native file browser does not render an extra desktop file tool body')
+  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  assert.match(await draftText(), /保留我的草稿/u)
   await addWorkspace.dispatchEvent('click')
   await dialog.waitFor()
   await dialog.getByRole('button', { name: /点击选择项目文件夹|Choose a project folder/iu }).click()
@@ -273,13 +468,80 @@ try {
   await browserDialog.waitFor({ timeout: 10_000 })
   assert.doesNotMatch(await browserDialog.textContent() ?? '', /win32 folder dialog worker|directory picker failed/iu)
   assert.equal(await browserDialog.getByRole('button', { name: /new folder|新建文件夹/iu }).count(), 1)
-  await browserDialog.getByRole('button', { name: /edit path|编辑路径/iu }).click()
-  assert.equal(await browserDialog.locator('input').count(), 1)
+  await browserPage.evaluate(() => {
+    window.__pickerFocus = []
+    const describe = node => node instanceof Element ? {
+      tag: node.tagName, label: node.getAttribute('aria-label'), role: node.getAttribute('role'), dialog: !!node.closest('[role="dialog"]'),
+    } : null
+    for (const eventName of ['focusin', 'focusout', 'pointerdown', 'click']) document.addEventListener(eventName, event => {
+      window.__pickerFocus.push({ event: event.type, target: describe(event.target), related: describe(event.relatedTarget), active: describe(document.activeElement), focused: document.hasFocus() })
+      if (window.__pickerFocus.length > 32) window.__pickerFocus.shift()
+    }, true)
+  })
+  try {
+    // Exercise entry, typing and Escape repeatedly: merely catching one frame
+    // of the editor does not prove it keeps focus or preserves typed paths.
+    for (let iteration = 0; iteration < 10; iteration++) {
+      await browserDialog.getByRole('button', { name: /edit path|编辑路径/iu }).click()
+      const pathInput = browserDialog.getByRole('textbox', { name: /edit path|编辑路径/iu })
+      await pathInput.waitFor({ state: 'visible', timeout: 10_000 })
+      // Reproduce the observed late composer autofocus deterministically.
+      await browserPage.evaluate(() => {
+        const composer = document.querySelector('[data-composer-input], [data-composer-card] textarea')
+        if (!(composer instanceof HTMLElement)) throw new Error('composer focus fixture missing')
+        composer.focus()
+      })
+      assert.equal(await pathInput.evaluate(element => element === document.activeElement), true, 'native directory editor retains focus after delayed composer autofocus')
+      await pathInput.fill(projectDirectory)
+      assert.equal(await pathInput.inputValue(), projectDirectory)
+      await pathInput.press('Escape')
+      await browserDialog.getByRole('button', { name: /edit path|编辑路径/iu }).waitFor({ state: 'visible' })
+    }
+  } catch (error) {
+    console.error('browser-only path editing failure', JSON.stringify({ errors: browserBootErrors.slice(-10),
+      focus: await browserPage.evaluate(() => window.__pickerFocus),
+      dialog: (await browserDialog.innerText().catch(() => '')).slice(0, 2000),
+      inputs: await browserPage.locator('input').evaluateAll(elements => elements.map(element => ({ type: element.type, label: element.getAttribute('aria-label'), visible: element.getBoundingClientRect().width > 0 }))),
+    }))
+    await browserPage.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/browser-picker-failure.png') })
+    throw error
+  }
   console.log('verified project modal, native directory selection/cancel, real workspace creation, duplicate protection and mixed file attachments')
+  // This auxiliary browser window is not an app-owned window. Close its CDP
+  // target before quitting the app so pending picker work cannot hold teardown.
+  await browserPage.close()
 
 } finally {
-  await electronApp?.close()
+  console.log('closing directory-picker fixture')
+  const closeFixture = async () => {
+    if (electronApp && electronApp.process()?.exitCode === null) {
+      // Observe real main-process navigation, including loadURL calls that do not
+      // emit will-navigate. Closing the app must not start another startup page.
+      await electronApp.evaluate(({ app, BrowserWindow }) => {
+        app.prependOnceListener('before-quit', () => {
+          for (const window of BrowserWindow.getAllWindows()) {
+            window.webContents.on('did-start-navigation', (_event, url, _inPlace, isMainFrame) => {
+              if (isMainFrame) console.log(`[fixture-shutdown-navigation] ${url}`)
+            })
+          }
+        })
+      })
+    }
+    await electronApp?.close()
+  }
+  let closeDeadline
+  try {
+    await Promise.race([
+      closeFixture(),
+      new Promise((_, reject) => { closeDeadline = setTimeout(() => reject(new Error(
+        `directory-picker teardown exceeded 30s; fixture retained at ${temporary}; Electron exit=${electronApp?.process()?.exitCode}`,
+      )), 30_000) }),
+    ])
+  } finally { clearTimeout(closeDeadline) }
+  assert.doesNotMatch(processOutput.join(''), /\[fixture-shutdown-navigation\]/u,
+    `Desktop initiated a main-frame navigation after before-quit; fixture retained at ${temporary}`)
   await rm(temporary, { recursive: true, force: true })
+  console.log('directory-picker fixture exited and cleaned up')
 }
 assert.doesNotMatch(
   processOutput.join(''),

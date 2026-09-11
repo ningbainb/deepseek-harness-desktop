@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { carrierKeyOf } from "@deepseek-ai/dsh-scope";
 import z from "schemastery";
 import { chmod, mkdir, readFile } from "node:fs/promises";
@@ -964,7 +963,7 @@ function textFromEvent(event) {
 /** Return only direct user text after the latest turn/start boundary. */
 function extractCurrentUserQuery(session) {
 	if (session.header.origin === "subagent") return "";
-	const events = session.events;
+	const events = session.snapshotEvents();
 	let start = -1;
 	for (let index = 0; index < events.length; index += 1) if (events[index]?.type === "turn/start") start = index;
 	if (start < 0) return "";
@@ -1599,14 +1598,16 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		if (entry !== void 0) hydrate(entry);
 	});
 	for (const session of ctx.sessions.list()) rememberSession(void 0, session);
-	installSettingsSection(ctx, settingsNamespace(MEMORY_SETTINGS_NAMESPACE), Config, initialConfig, {
-		setSource: (next) => {
-			source = next;
-		},
-		onChange: () => {},
-		validate: (value) => {
-			assertMemoryConfig(value);
-		}
+	ctx.inject(["settings"], (settingsCtx) => {
+		settingsCtx.settings.installSection(ctx, MEMORY_SETTINGS_NAMESPACE, Config, initialConfig, {
+			setSource: (next) => {
+				source = next;
+			},
+			onChange: () => {},
+			validate: (value) => {
+				assertMemoryConfig(value);
+			}
+		});
 	});
 	ctx.effect(() => {
 		const disposeSection = ctx.systemPrompt.section({

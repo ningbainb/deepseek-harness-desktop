@@ -21,13 +21,43 @@ export function selectionFromOptionId(state, id, config) {
     const option = flattenModelOptions(catalog).find(candidate => sameModelKey({ provider: candidate.provider, model: candidate.model.id }, key));
     return option === undefined ? undefined : selectionForModel(option, state.current);
 }
-/** Shared persistence path used by both `/model` and the composer seat. */
+const recentWrites = new WeakMap();
+/** One write in flight per settings scope; coalesce rapid choices into eight entries. */
+function persistRecentSelection(settingsScope, selection) {
+    const pending = recentWrites.get(settingsScope);
+    const current = normalizeModelPreferences(settingsScope.getSnapshot().value);
+    const next = recordRecentModel(pending ? { ...current, recentModels: pending.recent } : current, selection);
+    if (pending) {
+        pending.recent = next.recentModels;
+        pending.revision += 1;
+        return;
+    }
+    const write = { recent: next.recentModels, revision: 0 };
+    recentWrites.set(settingsScope, write);
+    void (async () => {
+        try {
+            let revision;
+            do {
+                revision = write.revision;
+                try {
+                    await settingsScope.set('recentModels', write.recent);
+                }
+                catch {
+                    // Preference storage failure must not undo an accepted model route.
+                    // Retry only if another confirmed choice arrived; no retry timer.
+                }
+            } while (revision !== write.revision);
+        }
+        finally {
+            recentWrites.delete(settingsScope);
+        }
+    })();
+}
+/** Shared selection path used by both `/model` and the composer seat. */
 export async function selectModelWithPreferences(directory, settingsScope, selection) {
     await directory.select(selection);
-    const current = normalizeModelPreferences(settingsScope.getSnapshot().value);
-    const next = recordRecentModel(current, { provider: selection.provider, model: selection.model });
     try {
-        await settingsScope.set('recentModels', next.recentModels);
+        persistRecentSelection(settingsScope, { provider: selection.provider, model: selection.model });
     }
     catch {
         // The host selection already succeeded. A read-only or temporarily

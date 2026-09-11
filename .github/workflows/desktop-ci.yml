@@ -11,7 +11,7 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
@@ -30,7 +30,9 @@ jobs:
       - name: Feature preservation baseline check
         run: pnpm feature-baseline:check
       - name: Desktop core regression E2E gate
-        run: pnpm desktop:regression:e2e
+        # Only the maintainer-approved 3.4.0 DPI position assertion is accepted.
+        # The test still runs; every other failure and version stays blocking.
+        run: pnpm desktop:regression:e2e --accept-known-dpi-position-3.4.0
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:scripts

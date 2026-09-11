@@ -179,6 +179,15 @@ async function visualState(page, dialog) {
         const backdrop = style.backdropFilter || style.webkitBackdropFilter
         return style.position === 'fixed' && style.zIndex === '-1' && backdrop !== '' && backdrop !== 'none'
       }).length,
+      blurLayers: [...document.body.children].flatMap(element => {
+        const style = getComputedStyle(element)
+        const backdrop = style.backdropFilter || style.webkitBackdropFilter
+        return style.position === 'fixed' && style.zIndex === '-1' && backdrop !== '' && backdrop !== 'none'
+          ? [{ id: element.id, className: element.className, backdrop, inlineStyle: element.getAttribute('style') }]
+          : []
+      }),
+      blurInputs: [...dialogElement.querySelectorAll('input[id^="skin-center-background-blur"]')]
+        .map(element => ({ id: element.id, value: element.value })),
       coveringAncestors,
     }
   }, await dialog.elementHandle())
@@ -295,6 +304,9 @@ try {
   await activeApp.close()
   activeApp = undefined
 
+  assert.deepEqual(first.rendererErrors, [])
+  const expectedWindowState = JSON.parse(await readFile(join(userData, 'window-state.json'), 'utf8'))
+  const viewportByScale = new Map()
   const relaunches = []
   for (let index = 0; index < relaunchScaleFactors.length; index += 1) {
     const requestedScale = relaunchScaleFactors[index]
@@ -310,6 +322,10 @@ try {
     assertBlueFantasy(visual)
     assertGeometry(visual)
     assert.ok(Math.abs(visual.devicePixelRatio - requestedScale) <= 0.05, JSON.stringify({ requestedScale, actual: visual.devicePixelRatio }))
+    if (viewportByScale.has(requestedScale)) {
+      assert.deepEqual(visual.viewport, viewportByScale.get(requestedScale),
+        'the real conversation viewport must not grow on repeated same-DPI launches')
+    } else viewportByScale.set(requestedScale, visual.viewport)
     assert.deepEqual(current.rendererErrors, [])
     relaunches.push({
       iteration: index + 1,
@@ -319,6 +335,9 @@ try {
     })
     await activeApp.close()
     activeApp = undefined
+    assert.deepEqual(current.rendererErrors, [])
+    assert.deepEqual(JSON.parse(await readFile(join(userData, 'window-state.json'), 'utf8')),
+      expectedWindowState, 'skin relaunches must preserve the normal logical window rectangle')
   }
 
   console.log(JSON.stringify({
@@ -326,6 +345,7 @@ try {
     liveTryOn: true,
     zeroScrimKeepsArtwork: true,
     settingsOverlayHasNoBackdropFilterAncestor: true,
+    windowGeometryPersisted: true,
     relaunches,
   }, null, 2))
 } finally {

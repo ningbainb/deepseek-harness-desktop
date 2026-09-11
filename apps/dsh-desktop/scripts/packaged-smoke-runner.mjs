@@ -58,6 +58,7 @@ export async function runPackagedDesktop({
         DSH_DESKTOP_USER_DATA: userData,
         DSH_DESKTOP_SMOKE_EXIT: '1',
         DSH_DESKTOP_DISABLE_UPDATES: '1',
+        DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
         DSH_HOME: dshHome,
         DSH_AGENTS_HOME: agentsHome,
       },

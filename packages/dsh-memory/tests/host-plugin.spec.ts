@@ -2,12 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 const settingsMocks = vi.hoisted(() => ({
   install: vi.fn(),
-  namespace: vi.fn((value: string) => value),
-}))
-
-vi.mock('@deepseek-ai/dsh-settings', () => ({
-  installSettingsSection: settingsMocks.install,
-  settingsNamespace: settingsMocks.namespace,
 }))
 
 import { apply } from '../src/index.ts'
@@ -19,6 +13,7 @@ describe('memory host plugin', () => {
     const listeners = new Map<string, (this: unknown, ...args: any[]) => void>()
     const registrations: unknown[] = []
     const ctx: any = {
+      settings: { installSection: settingsMocks.install },
       userScope: {
         availabilityState: () => 'ready',
         localPrincipal: () => ({ id: 'principal-host' }),
@@ -35,6 +30,7 @@ describe('memory host plugin', () => {
       on: vi.fn((name: string, listener: (this: unknown, ...args: any[]) => void) => { listeners.set(name, listener) }),
       effect: (effect: () => unknown) => effect(),
       inject: vi.fn((dependencies: string[], callback: (scope: unknown) => unknown) => {
+        if (dependencies.includes('settings')) return callback({ settings: ctx.settings })
         if (dependencies.includes('workspaceRegistry')) return callback({ workspaceRegistry: { list: () => [] } })
         if (dependencies.includes('webServer')) return callback({ webServer: { register: vi.fn(() => vi.fn()) } })
         return undefined

@@ -12,7 +12,7 @@ import type {
   ChatGptAuthState,
 } from './chatgpt-auth-protocol.ts'
 
-/** Official RC.1 record written by the built-in pi-ai OpenAI Codex flow. */
+/** Official DSH 0.1.5 record written by the built-in pi-ai OpenAI Codex flow. */
 export const CHATGPT_CREDENTIAL_KEY = credentialKey('llm-pi-ai', 'openai-codex')
 
 const MAX_LABEL_CHARS = 256

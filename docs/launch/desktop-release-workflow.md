@@ -1,4 +1,4 @@
-# DeepSeek Harness Desktop 3.3.0 release preparation and handoff
+# DeepSeek Harness Desktop 3.4.0 release preparation and handoff
 
 This guide describes repository verification for a possible release. It does not authorize a push, tag, GitHub Release, deployment, or announcement.
 
@@ -15,7 +15,7 @@ The Desktop version is `apps/dsh-desktop/package.json`; root `package.json` must
 
 ## Required verification
 
-Run `pnpm verify` for the complete repository gate. A release candidate must also package an unsigned directory first and run the direct-start matrix against that exact executable before any signed installer is produced.
+Run `pnpm verify` for the complete repository gate. For 3.4.0, the checked runtime evidence must identify official DSH `0.1.5-rc.1`, and the real-host integration profile must pass before packaging. A release candidate must also package an unsigned directory first and run the direct-start matrix against that exact executable before any signed installer is produced.
 
 The direct-start matrix covers clean installs, real preserved Homes from Desktop 2.3 through 2.7 and 3.0.1, user plugins, settings, sessions, syntax failures, startup throws, invalid repair candidates, native ABI failures, verified repair, and same-Home built-ins fallback. It asserts that no startup choice page appears and that preserved state remains in the same Home.
 

@@ -2,9 +2,9 @@ import { createServer, request as httpRequest } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Server } from 'node:http'
 import { describe, expect, it } from 'vitest'
-import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { makeMobileApiRoutes } from '../src/mobile-api.ts'
+import type { MobileApiProxy } from '../src/mobile-contract.ts'
 import type { PairingService } from '../src/pairing.ts'
 
 const cookieName = 'dsh_pair'
@@ -57,7 +57,7 @@ function makeUserScope() {
   }
 }
 
-function makeApiProxy(calls: string[]): ApiProxy {
+function makeApiProxy(calls: string[]): MobileApiProxy {
   return {
     workspace: {
       list: async () => {
@@ -105,7 +105,7 @@ function makeApiProxy(calls: string[]): ApiProxy {
       rename: async () => { calls.push('session.rename'); return { rpcId: 'host-rename', result: { ok: true, value: { title: 'renamed', seq: 1 } } } },
     },
     events: { mux: async function* () {} },
-  } as unknown as ApiProxy
+  } as unknown as MobileApiProxy
 }
 
 async function serve(routes: WebRoute[]): Promise<TestServer> {
@@ -275,7 +275,7 @@ describe('mobile owner isolation', () => {
           }
         },
       },
-    } as unknown as ApiProxy
+    } as unknown as MobileApiProxy
     const routes = makeMobileApiRoutes({
       service,
       apiProxy,
@@ -328,7 +328,7 @@ describe('mobile owner isolation', () => {
           await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
         },
       },
-    } as unknown as ApiProxy
+    } as unknown as MobileApiProxy
     const routes = makeMobileApiRoutes({ service, apiProxy, userScope: makeUserScope(), mobileEnterToSend: () => true })
     const server = await serve(routes)
     let data = ''
@@ -379,7 +379,7 @@ describe('mobile owner isolation', () => {
           return { rpcId: 'host-history', result: { ok: true, value: { events: [{ seq: 1, event: { type: 'secret-after-revoke' } }], hasMore: false } } }
         },
       },
-    } as unknown as ApiProxy
+    } as unknown as MobileApiProxy
     const routes = makeMobileApiRoutes({ service, apiProxy, userScope: makeUserScope(), mobileEnterToSend: () => true })
     const server = await serve(routes)
     try {
@@ -422,7 +422,7 @@ describe('mobile owner isolation', () => {
           return { rpcId: 'host-history', result: { ok: true, value: { events: [{ seq: 1, event: { type: 'secret-after-grant-revoke' } }], hasMore: false } } }
         },
       },
-    } as unknown as ApiProxy
+    } as unknown as MobileApiProxy
     const routes = makeMobileApiRoutes({ service, apiProxy, userScope, mobileEnterToSend: () => true })
     const server = await serve(routes)
     try {

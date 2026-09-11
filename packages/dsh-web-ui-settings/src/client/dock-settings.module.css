@@ -50,11 +50,15 @@
 .content > * { list-style: none; min-width: 0; }
 .content input, .content textarea, .content select { max-width: 100%; box-sizing: border-box; }
 .breadcrumb { margin: 0 auto 16px; max-width: 740px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
-.heading { max-width: 740px; margin: 0 auto 20px; font-size: 23px; font-weight: 650; }
-.tabs { display: flex; gap: 24px; max-width: 740px; margin: 0 auto 20px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
-.tabs button { padding: 8px 2px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; cursor: pointer; }
-.tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-brand-primary); font-weight: 600; }
+.heading { max-width: 740px; margin: 0 auto 16px; font-size: 21px; font-weight: 650; letter-spacing: -.3px; }
+.tabs { display: flex; gap: 4px; max-width: 740px; margin: 0 auto 22px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l2); }
+.tabs button { flex: 1; padding: 7px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); border-color: var(--dsw-alias-border-l2); font-weight: 600; box-shadow: 0 1px 2px #00000008; }
 .tabs button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
 .content :global([data-personal-prompt-card]), .content :global([data-memory-card]), .content :global([data-value-mode-card]) { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.content :global([data-personal-prompt-card]) > header h3, .content :global([data-memory-card]) > header h3 { font-size: 16px; }
+.content :global([data-personal-prompt-card]) > header > span, .content :global([data-memory-card]) > header > span { border: 0; border-radius: 5px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); }
+.content button, .content input, .content select, .content textarea { transition-duration: 120ms; }
+.content :global([data-dock-save-bar]) { display: flex; flex-wrap: wrap; gap: 8px; }
 .page :global([data-dock-save-bar]) { position: sticky; bottom: -28px; z-index: 2; margin-top: 16px; padding: 12px 0; background: var(--dsw-alias-bg-layer-1); border-top: 1px solid var(--dsw-alias-border-l2); }
 @media (max-width: 540px) { .page { padding: 12px; } }

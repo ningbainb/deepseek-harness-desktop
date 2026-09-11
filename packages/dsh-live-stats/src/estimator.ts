@@ -149,7 +149,7 @@ export function estimateMessageTokens(message: Message, spec: EstimatorSpec): nu
   return estimateContentTokens(message.content, spec) + spec.roleOverhead
 }
 
-/** Estimate the system prompt and tool schemas carried outside the surface.
+/** Estimate the tool schemas carried outside the model-visible surface.
  * @param header - the epoch header, or undefined when none was recorded.
  * @param spec - resolved estimator settings.
  * @returns the estimated token count (zero for an absent header).
@@ -157,11 +157,25 @@ export function estimateMessageTokens(message: Message, spec: EstimatorSpec): nu
 export function estimateHeaderTokens(header: EpochHeader | undefined, spec: EstimatorSpec): number {
   if (header === undefined) return 0
   let tokens = 0
-  if (header.system !== undefined) {
-    tokens += Math.ceil(header.system.length / spec.charsPerToken) + spec.roleOverhead
+  // Sessions written before 1.1.5 stored the rendered system prompt inside
+  // request/header. Keep replay pricing for those logs while current sessions
+  // price their dedicated system/message surface node.
+  const legacySystem = (header as EpochHeader & { system?: unknown }).system
+  if (typeof legacySystem === 'string') {
+    tokens += Math.ceil(legacySystem.length / spec.charsPerToken) + spec.roleOverhead
   }
   if (header.tools !== undefined && header.tools.length > 0) {
     tokens += Math.ceil(JSON.stringify(header.tools).length / spec.charsPerToken) + spec.blockOverhead
   }
   return tokens
+}
+
+/** Price the rendered system prompt stored as a dedicated surface message. */
+export function estimateSystemMessageTokens(message: Message, spec: EstimatorSpec): number {
+  if (message.content.length === 0) return 0
+  let characters = 0
+  for (const block of message.content) {
+    characters += block.type === 'text' ? block.text.length : JSON.stringify(block).length
+  }
+  return Math.ceil(characters / spec.charsPerToken) + spec.roleOverhead
 }

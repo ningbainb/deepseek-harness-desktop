@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 
 export const COMMUNITY_MARKET_URL = 'https://awesome-dsh-plugin.com/plugins.json'
 
-const DEFAULT_TIMEOUT_MS = 15_000
+const DEFAULT_TIMEOUT_MS = 6_000
+const DEFAULT_CACHE_TTL_MS = 5 * 60_000
 const DEFAULT_MAX_BYTES = 10_000_000
 const MAX_PLUGINS = 10_000
 const MAX_NAME_LENGTH = 200
@@ -191,16 +192,23 @@ export function createCommunityMarketService({
   fetch: fetchImpl = globalThis.fetch,
   catalogUrl = COMMUNITY_MARKET_URL,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  cacheTtlMs = DEFAULT_CACHE_TTL_MS,
   maxBytes = DEFAULT_MAX_BYTES,
+  now = Date.now,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('community market fetch implementation is required')
   if (catalogUrl !== COMMUNITY_MARKET_URL) throw new TypeError('community market URL is fixed')
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new TypeError('community market timeout is invalid')
+  if (!Number.isSafeInteger(cacheTtlMs) || cacheTtlMs < 0 || cacheTtlMs > 60 * 60_000) {
+    throw new TypeError('community market cache TTL is invalid')
+  }
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new TypeError('community market size limit is invalid')
+  if (typeof now !== 'function') throw new TypeError('community market clock is invalid')
 
   let served
+  let inFlight
 
-  async function list() {
+  async function fetchCatalog() {
     const headers = { accept: 'application/json' }
     if (served?.etag !== undefined) headers['if-none-match'] = served.etag
     else if (served?.lastModified !== undefined) headers['if-modified-since'] = served.lastModified
@@ -224,6 +232,7 @@ export function createCommunityMarketService({
 
     if (response.status === 304) {
       if (served === undefined) throw new Error('community market catalog returned 304 without cached data')
+      served.servedAt = now()
       return served.publicCatalog
     }
     if (!response.ok) throw new Error(`community market catalog request failed with HTTP ${response.status}`)
@@ -253,8 +262,19 @@ export function createCommunityMarketService({
       ...projected,
       etag: responseHeader(response, 'etag'),
       lastModified: responseHeader(response, 'last-modified'),
+      servedAt: now(),
     }
     return served.publicCatalog
+  }
+
+  function list({ force = false } = {}) {
+    if (typeof force !== 'boolean') throw new TypeError('community market force flag is invalid')
+    if (!force && served !== undefined && now() - served.servedAt <= cacheTtlMs) {
+      return Promise.resolve(served.publicCatalog)
+    }
+    if (inFlight !== undefined) return inFlight
+    inFlight = fetchCatalog().finally(() => { inFlight = undefined })
+    return inFlight
   }
 
   async function resolveInstall(id) {

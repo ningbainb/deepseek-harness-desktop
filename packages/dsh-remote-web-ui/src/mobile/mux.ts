@@ -24,9 +24,7 @@
  * delivers again, fallback polling stops and the live stream takes over.
  */
 
-import type { MuxFrame } from '@deepseek-ai/dsh-host-apiproxy/api/events'
-import { muxFrameSchema } from '@deepseek-ai/dsh-host-apiproxy/api/events.schema'
-import { serverRequestSchema } from '@deepseek-ai/dsh-host-apiproxy/api/rpc.schema'
+import { isMobileMuxFrame, type MobileMuxFrame } from '../mobile-contract.ts'
 import { history as fetchHistory, type HistoryPage } from './api.ts'
 
 /** Injectable seams for tests. */
@@ -62,7 +60,7 @@ function browserSource(url: string): EventSourceLike {
 }
 
 /** The `session/event` arm of the mux frame union. */
-type SessionEventFrame = Extract<MuxFrame, { type: 'session/event' }>
+type SessionEventFrame = Extract<MobileMuxFrame, { type: 'session/event' }>
 
 const DEFAULT_POLL_INTERVAL_MS = 3000
 const DEFAULT_STALL_THRESHOLD_MS = 12000
@@ -87,9 +85,10 @@ export class MuxClient {
   private readonly pollIntervalMs: number
   private readonly stallThresholdMs: number
   private readonly now: () => number
-  private readonly listeners = new Set<(frame: MuxFrame) => void>()
+  private readonly listeners = new Set<(frame: MobileMuxFrame) => void>()
   private source: EventSourceLike | undefined
   private stopped = false
+  private started = false
   private readonly url: string
 
   /** The session to keep live via fallback polling (undefined = none). */
@@ -126,14 +125,16 @@ export class MuxClient {
   /** Open the stream (idempotent; EventSource reconnects until {@link stop}). */
   start(): void {
     this.stopped = false
+    this.started = true
     this.lastDataAt = this.now()
-    if (this.source === undefined) this.connect()
+    if (this.source === undefined && this.observeSessionId !== undefined) this.connect()
     this.startTick()
   }
 
   /** Close for good. */
   stop(): void {
     this.stopped = true
+    this.started = false
     this.stopTick()
     this.stopPolling()
     this.closeSource()
@@ -142,7 +143,7 @@ export class MuxClient {
   }
 
   /** Subscribe to validated frames; returns an unsubscribe function. */
-  onFrame(listener: (frame: MuxFrame) => void): () => void {
+  onFrame(listener: (frame: MobileMuxFrame) => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
@@ -153,11 +154,15 @@ export class MuxClient {
    * history and re-emits new events as `session/event` frames.
    */
   observe(sessionId: string | undefined): void {
+    if (this.observeSessionId === sessionId) return
     this.observeSessionId = sessionId
+    this.closeSource()
     if (sessionId === undefined) {
       this.stopPolling()
       return
     }
+    this.sseAlive = false
+    if (this.started && !this.stopped) this.connect()
     // If SSE is already stalled for this session, start patching right away.
     if (!this.polling && !this.stopped && !this.sseAlive && (this.now() - this.lastDataAt) > this.stallThresholdMs) {
       this.startPolling()
@@ -167,7 +172,8 @@ export class MuxClient {
   private connect(): void {
     // A fresh stream starts unknown; only a delivered frame proves it works.
     this.sseAlive = false
-    const source = this.sourceFactory(this.url)
+    const separator = this.url.includes('?') ? '&' : '?'
+    const source = this.sourceFactory(`${this.url}${separator}sessionId=${encodeURIComponent(this.observeSessionId ?? '')}`)
     this.source = source
     source.onmessage = (event) => {
       this.handleMessage(event.data)
@@ -270,20 +276,20 @@ export class MuxClient {
     }
     // The SSE channel carries server-request envelopes whose payload is the
     // mux frame (same wire shape as the desktop mux channel).
-    const envelope = serverRequestSchema.safeParse(parsed)
-    if (!envelope.success) return
-    const frame = muxFrameSchema.safeParse(envelope.data.payload)
-    if (!frame.success) return
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return
+    const envelope = parsed as Record<string, unknown>
+    if (envelope.type !== 'server-request' || typeof envelope.rpcId !== 'string') return
+    if (!isMobileMuxFrame(envelope.payload)) return
     // A delivered frame proves the SSE channel is live (the tunnel forwards
     // it) and delivers again — drop any fallback polling so the live stream
     // takes over without double delivery.
     this.sseAlive = true
     this.lastDataAt = this.now()
     if (this.polling) this.stopPolling()
-    this.emit(frame.data)
+    this.emit(envelope.payload)
   }
 
-  private emit(frame: MuxFrame): void {
+  private emit(frame: MobileMuxFrame): void {
     for (const listener of this.listeners) {
       try {
         listener(frame)

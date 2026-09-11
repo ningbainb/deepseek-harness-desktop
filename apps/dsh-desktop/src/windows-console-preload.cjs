@@ -3,6 +3,7 @@
 // runtime. Attach explicitly so restricted-token command children can share
 // that hidden console instead of allocating a visible one.
 if (process.platform === 'win32') {
+  require('./windows-runner-console.cjs').installRunnerConsolePropagation()
   try {
     const koffi = require('koffi')
     const kernel32 = koffi.load('kernel32.dll')

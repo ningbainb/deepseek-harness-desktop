@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/client/index.ts'
 
 describe('memory client registration', () => {
-  it('binds the memory settings namespace and registers the card and session memory action', () => {
+  it('keeps memory management in settings without adding a main conversation action', () => {
     const settingsScope = {
       getSnapshot: () => ({ value: { version: 1 as const, enabled: false }, revision: 0, writable: true }),
       subscribe: () => () => {},
@@ -29,8 +29,8 @@ describe('memory client registration', () => {
     apply(ctx)
 
     expect(locale.register).toHaveBeenCalledWith('memory', expect.any(Object))
-    expect(registration).toHaveLength(2)
-    expect(registration[1]?.contribution).toMatchObject({ name: 'conversation.session.header.actions', id: 'memory-status' })
+    expect(registration).toHaveLength(1)
+    expect(registration.some(item => item.contribution.name === 'conversation.session.header.actions')).toBe(false)
     expect(registration[0]?.contribution).toMatchObject({
       name: 'web-ui.plugin.item',
       id: 'memory',

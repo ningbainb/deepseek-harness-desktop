@@ -14,7 +14,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -49,7 +49,7 @@ export const TASK_BOARD_GUIDANCE = '本机已安装 dsh-task-board 插件（DSH 
  * web settings surface edits. Spelled here rather than imported: the browser
  * half spells the same value and must not depend on a Host package.
  */
-export const TASK_BOARD_SETTINGS_NAMESPACE = settingsNamespace('task-board')
+export const TASK_BOARD_SETTINGS_NAMESPACE = 'task-board'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -150,7 +150,7 @@ export function apply(ctx: Context, config?: Config): void {
 
   // The live source the announcement reads: the settings section once the web
   // settings surface is served, the composition entry otherwise
-  // (installSettingsSection swaps it when the namespace registers).
+  // (the settings service swaps it when the namespace registers).
   let current: () => Config = () => config ?? {}
   let disposeSection: (() => void) | undefined
 
@@ -171,12 +171,14 @@ export function apply(ctx: Context, config?: Config): void {
     })
   }
 
-  installSettingsSection(ctx, TASK_BOARD_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => { current = source },
-    onChange: sync,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, TASK_BOARD_SETTINGS_NAMESPACE, Config, config ?? {}, {
+      setSource: (source) => { current = source },
+      onChange: sync,
+    })
   })
 
   // Initial registration from the composition entry (covers deployments with
-  // no settings service, whose installSettingsSection never fires its hooks).
+  // no settings service, whose section installation never fires its hooks).
   sync()
 }

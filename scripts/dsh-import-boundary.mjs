@@ -9,6 +9,7 @@ export const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..')
 export const BASELINE_PATH = resolve(SCRIPT_DIR, 'dsh-import-boundary.baseline.json')
 
 const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx'])
+const IGNORED_SOURCE_PREFIXES = Object.freeze(['.patch-work/'])
 const CONTROLLED_PREFIXES = Object.freeze([
   'apps/dsh-desktop/src/runtime-provider.mjs',
   'packages/dsh-desktop-compat/src/',
@@ -103,6 +104,7 @@ export async function scanRepositoryImports(root = REPOSITORY_ROOT) {
   const paths = (await listRepositoryFiles(root))
     .map((path) => path.split('\\').join('/'))
     .filter((path) => SOURCE_EXTENSIONS.has(sourceExtension(path)))
+    .filter((path) => !IGNORED_SOURCE_PREFIXES.some((prefix) => path.startsWith(prefix)))
     .filter((path) => !path.includes('/lib/') && !path.includes('/dist/') && !path.includes('/build/'))
     .filter((path) => !path.endsWith('.d.ts'))
     .toSorted()

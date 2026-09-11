@@ -70,7 +70,7 @@ class FakeStatement {
   async run() {
     this.database.runs.push({ sql: this.sql, values: this.values })
     if (this.database.fail) throw new Error('private database failure')
-    return { success: true }
+    return { success: true, meta: { rows_written: 0 } }
   }
 
   async all() {
@@ -87,6 +87,7 @@ class FakeDatabase {
     this.queries = []
     this.queryResults = [...queryResults]
     this.runs = []
+    this.points = []
   }
 
   prepare(sql) {
@@ -124,7 +125,7 @@ function downloadClickRequest(body = VALID_DOWNLOAD_CLICK, init = {}) {
 }
 
 function enabledEnvironment(database = new FakeDatabase()) {
-  return { INGEST_ENABLED: '1', METRICS: database }
+  return { INGEST_ENABLED: '1', METRICS: database, ANALYTICS: { writeDataPoint: p => database.points.push(p) } }
 }
 
 function adminEnvironment(database = new FakeDatabase()) {
@@ -230,8 +231,8 @@ test('accepts the macos operating system family and still rejects unknown ones',
     events: [{ ...VALID_EVENT, os: 'macos' }],
   }), enabledEnvironment(database))
   assert.equal(accepted.status, 204)
-  assert.equal(database.batches.length, 1)
-  assert.ok(database.batches[0][0].values.includes('macos'))
+  assert.equal(database.batches.length, 0)
+  assert.ok(database.points[0].blobs.includes('macos'))
 
   const rejected = await worker.fetch(requestFor({
     schema: 2,
@@ -253,21 +254,14 @@ test('accepts Value Mode lifecycle and route events without model identity', asy
   }), enabledEnvironment(database), { now: () => new Date('2026-08-19T23:59:59.000Z') })
 
   assert.equal(response.status, 204)
-  assert.equal(database.batches.length, 1)
-  assert.equal(database.batches[0].length, 6)
-  assert.deepEqual(database.batches[0][0].values, [
-    '2026-08-19',
-    'value_mode_call',
-    '3.1.0',
-    'stable',
-    'windows-11',
-    'zh',
-    'started',
-    'controller',
-    'none',
-    1,
+  assert.equal(database.batches.length, 0)
+  assert.equal(database.points.length, 2)
+  assert.deepEqual(database.points[0].blobs.slice(0,11), [
+    '2026-08-19', 'cost_mode_route', '3.1.0', 'stable', 'windows-11', 'zh', 'started', 'main', 'unknown', 'unknown', 'none',
   ])
-  assert.doesNotMatch(database.batches[0][0].sql, /model|prompt|token|raw/iu)
+  assert.equal(database.points[1].blobs[1], 'cost_mode_guide')
+  assert.equal(database.points[1].blobs[6], 'completed')
+  assert.equal(database.points[1].blobs[7], 'header')
 
   const rejected = await worker.fetch(requestFor({
     schema: 2,
@@ -276,7 +270,7 @@ test('accepts Value Mode lifecycle and route events without model identity', asy
   assert.equal(rejected.status, 400)
 })
 
-test('groups identical events and binds only aggregate dimensions', async () => {
+test('routes repeated counters to Analytics Engine without per-event D1 writes', async () => {
   const database = new FakeDatabase()
   const now = new Date('2026-08-19T23:59:59.000Z')
   const response = await worker.fetch(requestFor({
@@ -285,42 +279,14 @@ test('groups identical events and binds only aggregate dimensions', async () => 
   }), enabledEnvironment(database), { now: () => now, country: () => 'CN' })
 
   assert.equal(response.status, 204)
-  assert.equal(database.batches.length, 1)
-  assert.equal(database.batches[0].length, 4)
-  assert.deepEqual(database.batches[0][0].values, [
-    '2026-08-19',
-    'runtime_start_result',
-    '2.5.0',
-    'stable',
-    'windows-11',
-    'zh',
-    'ready',
-    'none',
-    '2-5s',
-    2,
-  ])
-  assert.doesNotMatch(database.batches[0][0].sql, /ip|user.?agent|timestamp|raw/iu)
-  const daily = database.batches[0].find(statement => /product_actor_daily/iu.test(statement.sql))
-  const monthly = database.batches[0].find(statement => /product_actor_monthly/iu.test(statement.sql))
-  assert.deepEqual(daily.values, [
-    '2026-08-19',
-    'a'.repeat(64),
-    'CN',
-    '2.5.0',
-    'runtime_start_result',
-    'ready',
-    'none',
-  ])
-  assert.deepEqual(monthly.values, [
-    '2026-08',
-    'b'.repeat(64),
-    'CN',
-    '2.5.0',
-    'runtime_start_result',
-    'ready',
-    'none',
-  ])
-  assert.doesNotMatch(daily.sql, /ip|city|user.?agent|timestamp|raw/iu)
+  assert.equal(database.batches.length, 0)
+  assert.equal(database.points.length, 3)
+  assert.equal(database.points.reduce((sum,p) => sum + p.doubles[0], 0), 3)
+  assert.deepEqual(database.points[0].blobs.slice(0,9), ['2026-08-19','runtime_start_result','2.5.0','stable','windows-11','zh','ready','none','2-5s'])
+  assert.equal(database.points[2].blobs[5], 'en')
+  assert.equal(database.points[0].blobs[11], 'CN')
+  assert.deepEqual(Object.keys(database.points[0]).sort(), ['blobs','doubles','indexes'])
+
 })
 
 test('schema 3 records one stable installation cohort and daily presence for duplicate launches', async () => {
@@ -349,8 +315,8 @@ test('contains D1 failures without exposing internal details', async () => {
     requestFor({ schema: 2, events: [VALID_EVENT] }),
     enabledEnvironment(new FakeDatabase({ fail: true })),
   )
-  assert.equal(response.status, 503)
-  assert.equal(await response.text(), 'temporarily unavailable')
+  assert.equal(response.status, 204)
+  assert.equal(await response.text(), '')
 })
 
 test('accepts an official website download beacon and writes only a country aggregate', async () => {
@@ -366,9 +332,10 @@ test('accepts an official website download beacon and writes only a country aggr
 
   assert.equal(response.status, 204)
   assert.equal(response.headers.get('access-control-allow-origin'), OFFICIAL_WEBSITE_ORIGIN)
-  assert.equal(database.runs.length, 1)
-  assert.deepEqual(database.runs[0].values, ['2026-08-19', 'CN', '2.5.0', 'hero', 1])
-  assert.doesNotMatch(database.runs[0].sql, /ip|city|user.?agent|timestamp|referrer|raw/iu)
+  assert.equal(database.runs.length, 0)
+  assert.equal(database.points.length, 1)
+  assert.deepEqual(database.points[0], { indexes: ['CN'], blobs: ['2026-08-19','download_click','2.5.0','','','','clicked','hero','none','','','CN','','','',''], doubles: [1] })
+
 })
 
 test('accepts only the official GitHub Pages and custom-domain download origins', async () => {
@@ -428,20 +395,15 @@ test('download beacon fails closed without touching D1 when ingestion is disable
 test('scheduled retention keeps aggregate trends and retention cohorts on bounded windows', async () => {
   const database = new FakeDatabase()
   await worker.scheduled({}, { METRICS: database }, {})
-  assert.equal(database.runs.length, 7)
-  assert.match(database.runs[0].sql, /DELETE FROM metric_daily/iu)
-  assert.match(database.runs[1].sql, /DELETE FROM download_click_daily/iu)
-  assert.match(database.runs[2].sql, /DELETE FROM product_actor_daily/iu)
-  assert.match(database.runs[3].sql, /DELETE FROM product_actor_monthly/iu)
-  assert.match(database.runs[4].sql, /DELETE FROM product_installation_first_seen/iu)
-  assert.match(database.runs[5].sql, /DELETE FROM product_installation_daily/iu)
-  assert.match(database.runs[0].sql, /-400 days/iu)
-  assert.match(database.runs[1].sql, /-400 days/iu)
-  assert.match(database.runs[2].sql, /-35 days/iu)
-  assert.match(database.runs[3].sql, /-13 months/iu)
-  assert.match(database.runs[4].sql, /-400 days/iu)
-  assert.match(database.runs[5].sql, /-400 days/iu)
-  assert.match(database.runs[6].sql, /DELETE FROM product_release_daily.*-89 days/iu)
+  assert.equal(database.runs.length, 9)
+  for (const [table,window] of Object.entries({metric_daily:'-400 days',download_click_daily:'-400 days',product_actor_daily:'-35 days',product_actor_monthly:'-13 months',product_installation_first_seen:'-400 days',product_installation_daily:'-400 days',product_release_daily:'-89 days',analytics_failure:'-30 days',analytics_daily:'-400 days'})) {
+    const statement = database.runs.find(run => run.sql.startsWith('DELETE FROM ' + table + ' '))
+    assert.ok(statement, table)
+    assert.ok(statement.sql.includes(window), table + ' retention window')
+    if (table === 'analytics_failure') assert.match(statement.sql, /LIMIT 250/u)
+    else if (table !== 'analytics_daily') assert.match(statement.sql, /LIMIT 150/u)
+  }
+
 })
 
 test('management custom domain root redirects to the admin surface only', async () => {
@@ -602,6 +564,7 @@ test('admin summary returns only bounded aggregate queries for a signed session'
      schema: 5,
     rangeDays: 30,
     generatedAt: '2026-08-19T08:02:00.000Z',
+    analytics: { snapshotAt: null, sampleInterval: 1, mode: 'hourly-weighted-aggregate' },
     downloads: {
       totalClicks: 42,
       trend: [{ day: '2026-08-19', count: 9 }],
@@ -616,6 +579,12 @@ test('admin summary returns only bounded aggregate queries for a signed session'
     },
     valueMode: {
       usage: [{ event: 'value_mode_call', outcome: 'started', detail: 'controller', count: 4 }],
+      summary: {
+        main: { started: 0, success: 0, failure: 0, cancelled: 0 }, subagent: { started: 0, success: 0, failure: 0, cancelled: 0 },
+        strategies: { saving: 0, balanced: 0, stronger: 0, unknown: 0 }, guide: { shown: 0, completed: 0, dismissed: 0, failed: 0 },
+        legacyStarted: 0, failureRate: null, guideCompletionRate: null,
+        definition: 'Failure / (success + failure); cancellations and unfinished or legacy starts excluded. Guide completion is completed/shown event counts, not a user cohort.',
+      },
     },
     active: {
       asOfDay: '2026-08-19',
@@ -653,12 +622,13 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       sessionDurations: [{ bucket: '5-30m', count: 8 }],
     },
   })
-  assert.equal(database.queries.length, 18)
+  assert.equal(database.queries.length, 20)
   assert.deepEqual(database.queries.slice(0, 9).map(query => query.values), Array.from({ length: 9 }, () => ['-29 days']))
   assert.deepEqual(database.queries[9].values, ['2026-08-19'])
   assert.deepEqual(database.queries[10].values, ['2026-08-19', '-29 days', '2026-08-19'])
   assert.deepEqual(database.queries[11].values, ['2026-08-19', '-29 days', '2026-08-19'])
-  assert.deepEqual(database.queries.slice(12).map(query => query.values), Array.from({ length: 6 }, () => ['-29 days']))
+  assert.deepEqual(database.queries.slice(12, 19).map(query => query.values), Array.from({ length: 7 }, () => ['-29 days']))
+  assert.deepEqual(database.queries[19].values, [])
   for (const query of database.queries) {
     assert.doesNotMatch(query.sql, /ip|city|user.?agent|referrer|raw/iu)
   }

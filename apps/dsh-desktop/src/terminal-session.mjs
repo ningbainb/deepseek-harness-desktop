@@ -141,6 +141,7 @@ export class DesktopTerminalSession {
   #platform
   #environment
   #pathEntries
+  #resolvePathEntries
   #exists
   #loadPty
   #emit
@@ -148,6 +149,7 @@ export class DesktopTerminalSession {
   #dataSubscription
   #exitSubscription
   #startPromise
+  #size = DEFAULT_TERMINAL_SIZE
   #info
   #generation = 0
   #disposed = false
@@ -157,6 +159,7 @@ export class DesktopTerminalSession {
     platform = process.platform,
     environment = process.env,
     pathEntries = [],
+    resolvePathEntries,
     exists = existsSync,
     loadPty = () => import('node-pty'),
     emit = () => {},
@@ -165,6 +168,8 @@ export class DesktopTerminalSession {
     this.#platform = platform
     this.#environment = environment
     this.#pathEntries = normalizedPathEntries(pathEntries)
+    if (resolvePathEntries !== undefined && typeof resolvePathEntries !== 'function') throw new TypeError('terminal PATH resolver must be a function')
+    this.#resolvePathEntries = resolvePathEntries
     if (typeof exists !== 'function') throw new TypeError('terminal existence probe must be a function')
     if (typeof loadPty !== 'function') throw new TypeError('terminal PTY loader must be a function')
     if (typeof emit !== 'function') throw new TypeError('terminal emitter must be a function')
@@ -180,42 +185,48 @@ export class DesktopTerminalSession {
     if (this.#pty !== undefined && this.#info !== undefined) return this.#info
     if (this.#startPromise !== undefined) return this.#startPromise
     const normalizedSize = normalizeTerminalSize(size)
+    this.#size = normalizedSize
     let operation
-    operation = this.#start(normalizedSize).finally(() => {
+    operation = this.#start().finally(() => {
       if (this.#startPromise === operation) this.#startPromise = undefined
     })
     this.#startPromise = operation
     return operation
   }
 
-  async #start(size) {
+  async #start() {
+    const generation = ++this.#generation
     try {
-      const [module, shell] = await Promise.all([
+      const [module, shell, pathEntries] = await Promise.all([
         this.#loadPty(),
         Promise.resolve(resolveDesktopTerminalShell({
           platform: this.#platform,
           environment: this.#environment,
           exists: this.#exists,
         })),
+        this.#resolvePathEntries ? this.#resolvePathEntries() : this.#pathEntries,
       ])
       if (this.#disposed) throw new Error('terminal session is disposed')
+      if (generation !== this.#generation) throw new Error('terminal startup was superseded')
       const spawn = resolvePtySpawn(module)
       const environment = createTerminalEnvironment({
         platform: this.#platform,
         environment: this.#environment,
-        pathEntries: this.#pathEntries,
+        pathEntries,
       })
       const pty = spawn(shell.executable, shell.args, {
         name: 'xterm-256color',
-        ...size,
+        // Layout can settle while PATH/native loading is pending. Never start
+        // ConPTY with the stale hidden-view dimensions from the first request.
+        ...this.#size,
         cwd: this.#cwd,
         env: environment,
         ...(this.#platform === 'win32' ? { useConpty: true } : {}),
       })
       if (!pty || typeof pty.write !== 'function' || typeof pty.resize !== 'function' || typeof pty.kill !== 'function') {
+        try { pty?.kill?.() } catch {}
         throw new TypeError('node-pty returned an invalid terminal process')
       }
-      const generation = ++this.#generation
       this.#pty = pty
       this.#info = Object.freeze({ label: shell.label, cwd: this.#cwd })
       this.#dataSubscription = pty.onData?.((data) => {
@@ -234,8 +245,10 @@ export class DesktopTerminalSession {
       })
       return this.#info
     } catch (error) {
-      this.#stopCurrent()
-      emitSafely(this.#emit, 'error', Object.freeze({ code: 'terminal-start-failed' }))
+      if (!this.#disposed && generation === this.#generation) {
+        this.#stopCurrent()
+        emitSafely(this.#emit, 'error', Object.freeze({ code: 'terminal-start-failed' }))
+      }
       throw error
     }
   }
@@ -248,6 +261,7 @@ export class DesktopTerminalSession {
 
   resize(value) {
     const size = normalizeTerminalSize(value)
+    this.#size = size
     if (this.#pty === undefined) return false
     this.#pty.resize(size.cols, size.rows)
     return true
@@ -255,7 +269,9 @@ export class DesktopTerminalSession {
 
   async restart(size = DEFAULT_TERMINAL_SIZE) {
     if (this.#disposed) throw new Error('terminal session is disposed')
+    normalizeTerminalSize(size)
     this.#stopCurrent()
+    this.#startPromise = undefined
     return this.start(size)
   }
 

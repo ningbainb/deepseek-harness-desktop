@@ -43,7 +43,7 @@ it('switches personal forms with the keyboard without losing either draft', () =
   const renderSlot = vi.fn((_slot, _owner, options) => <textarea aria-label={options.only} />)
   render(<DockSettingsPage renderSlot={renderSlot as never} t={key => key} />)
   fireEvent.change(screen.getByLabelText('personal-prompt'), { target: { value: 'prompt draft' } })
-  fireEvent.keyDown(screen.getByRole('tab', { name: 'Prompt' }), { key: 'ArrowRight' })
+  fireEvent.keyDown(screen.getByRole('tab', { name: 'dockResponsePreferences' }), { key: 'ArrowRight' })
   expect(screen.getByRole('tab', { name: 'dockMemory' }).getAttribute('aria-selected')).toBe('true')
   fireEvent.change(screen.getByLabelText('memory'), { target: { value: 'memory draft' } })
   fireEvent.keyDown(screen.getByRole('tab', { name: 'dockMemory' }), { key: 'Home' })

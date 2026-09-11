@@ -1,6 +1,12 @@
 import { DeepLinkRouter, normalizeDeepLink, presetFileFrom } from './deep-links.mjs'
 import { parseUpdateShutdownRequest } from './update-shutdown-receipt.mjs'
 
+/** Isolated QA must not replace the installed app's system-wide link handler. */
+export function registerDesktopProtocolClient({ app, protocol, env = process.env }) {
+  if (!app.isPackaged || env.DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION === '1') return false
+  return app.setAsDefaultProtocolClient(protocol)
+}
+
 /**
  * Extract one bounded application deep link from untrusted process arguments.
  * Keep this helper in the ingress module so the same validation is used by

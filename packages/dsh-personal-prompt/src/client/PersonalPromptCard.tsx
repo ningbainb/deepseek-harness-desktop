@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   DEFAULT_PERSONAL_PROMPT,
@@ -267,7 +267,6 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
         </div>
         <span className={dirty ? styles.dirty : styles.badge}>{dirty ? t('settings.unsaved') : saved ? t('settings.saved') : t('settings.ready')}</span>
       </header>
-      <p className={styles.notice}>{t('settings.ownerNotice')}</p>
       {!settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
       {settingsSnapshot.status === 'loading' && <p className={styles.muted} role="status">{t('settings.loading')}</p>}
       {conflict && <p className={styles.error} role="alert">{t('settings.conflict')}</p>}
@@ -278,13 +277,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
           <input type="checkbox" checked={draftConfig.enabled} disabled={!settingsSnapshot.writable} onChange={event => { setDraftConfig(current => ({ ...current, enabled: event.target.checked })); setConfigDirty(true); setSaved(false) }} />
           {t('settings.enabled')}
         </label>
-        <label className={styles.toggle}>
-          <span>{t('settings.active')}</span>
-          <select className={styles.activeSelect} value={draftConfig.activeProfileId ?? ''} disabled={!settingsSnapshot.writable} onChange={event => { const next = setActivePromptProfile(draftConfig, event.target.value || undefined); setDraftConfig(next); setConfigDirty(true); setSaved(false) }}>
-            <option value="">{t('settings.none')}</option>
-            {visibleProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-          </select>
-        </label>
+        <span className={styles.muted}>{t('settings.ownerNotice')}</span>
       </div>
 
       <section>
@@ -292,11 +285,11 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
           <strong>{t('settings.profiles')}</strong>
           <button type="button" className={styles.button} disabled={!settingsSnapshot.writable || saving} onClick={create}>{t('settings.new')}</button>
         </div>
-        {listedProfiles.length === 0 && <p className={styles.muted}>{t('settings.noProfiles')}</p>}
+        {listedProfiles.length === 0 && <p className={styles.empty}>{t('settings.noProfiles')}</p>}
         <div className={styles.profileList} role="list">
           {listedProfiles.map(profile => (
             <button type="button" role="listitem" key={profile.id} className={`${styles.profileButton} ${profile.id === selectedId ? styles.profileSelected : ''}`} onClick={() => selectProfile(profile.id)}>
-              <span className={styles.profileMain}><span className={styles.profileName}>{profile.name || profile.id}</span><span className={styles.profileMeta}>{profile.scope === 'global' ? t('settings.global') : profile.scope === 'workspace' ? `${t('settings.workspace')} · ${profile.workspaceId}` : t('settings.session')}</span></span>
+              <span className={styles.profileMain}><span className={styles.profileName}>{profile.name || t('settings.untitled')}</span><span className={styles.profileMeta}>{profile.scope === 'global' ? t('settings.global') : profile.scope === 'workspace' ? `${t('settings.workspace')} · ${workspaceItems.find(item => workspaceIdOf(item) === profile.workspaceId)?.title ?? profile.workspaceId}` : t('settings.session')}</span></span>
               <span className={styles.profileState}>{profile.enabled ? t('settings.enable') : t('settings.disable')}</span>
             </button>
           ))}
@@ -311,19 +304,23 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
           {readOnlySession && <p className={styles.notice}>{t('settings.sessionReadonly')}</p>}
           <label className={styles.toggle}><input type="checkbox" checked={editor.enabled} disabled={readOnlySession} onChange={event => editEditor({ enabled: event.target.checked })} />{editor.enabled ? t('settings.enable') : t('settings.disable')}</label>
           <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.content')}</span><textarea value={editor.content} maxLength={MAX_PROMPT_CONTENT_LENGTH} disabled={readOnlySession} placeholder={t('settings.contentPlaceholder')} onChange={event => editEditor({ content: event.target.value })} /><span className={styles.counter}>{editor.content.length} / {MAX_PROMPT_CONTENT_LENGTH}</span></label>
-          <div><span className={styles.fieldLabel}>{t('settings.preview')}</span>{preview ? <pre className={styles.preview}>{preview}</pre> : <p className={styles.muted}>{t('settings.previewEmpty')}</p>}</div>
-          {!dock && <>
-          <footer className={styles.footer}>
-            <button type="button" className={styles.danger} disabled={!settingsSnapshot.writable || saving} onClick={remove}>{t('settings.delete')}</button>
-            <button type="button" className={styles.button} disabled={!dirty || saving} onClick={reload}>{t('settings.discard')}</button>
-            <button type="button" className={styles.primary} disabled={!dirty || saving || readOnlySession || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.loading') : t('settings.save')}</button>
-          </footer>
-          </>}
+          <details className={styles.details} data-preference-preview="true"><summary>{t('settings.preview')}</summary>{preview ? <pre className={styles.preview}>{preview}</pre> : <p className={styles.muted}>{t('settings.previewEmpty')}</p>}</details>
         </section>
       )}
+      <details className={styles.details} data-preference-advanced="true">
+        <summary>{t('settings.advanced')}</summary>
+        <p className={styles.muted}>{t('settings.advancedHint')}</p>
+        <label className={styles.field}>
+          <span>{t('settings.active')}</span>
+          <select value={draftConfig.activeProfileId ?? ''} disabled={!settingsSnapshot.writable || saving} onChange={event => { const next = setActivePromptProfile(draftConfig, event.target.value || undefined); setDraftConfig(next); setConfigDirty(true); setSaved(false) }}>
+            <option value="">{t('settings.none')}</option>
+            {visibleProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+        </label>
+      </details>
       <footer className={styles.actions} data-dock-save-bar={dock || undefined}>
-        {dock && editorOpen && editor !== undefined && <button type="button" className={styles.danger} disabled={!settingsSnapshot.writable || saving} onClick={remove}>{t('settings.delete')}</button>}
-        {dock && dirty && <button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.discard')}</button>}
+        {editorOpen && editor !== undefined && <button type="button" className={styles.danger} disabled={!settingsSnapshot.writable || saving} onClick={remove}>{t('settings.delete')}</button>}
+        {dirty && <button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.discard')}</button>}
         <button type="button" className={styles.button} disabled={saving} onClick={reload}>{t('settings.reload')}</button>
         <button type="button" className={styles.primary} data-dock-save="true" disabled={!dirty || saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
       </footer>

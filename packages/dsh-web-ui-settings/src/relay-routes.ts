@@ -11,8 +11,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { createBridgeRouteGuard, type BridgeAccess } from './bridge.ts'
 import { RelayConnectionController } from './relay-connect.ts'
@@ -41,7 +40,11 @@ const RELAY_REQUEST_TIMEOUT_MS = 15_000
 const RELAY_MODELS_URL = RELAY_BASE_URL.replace(/\/+$/u, '') + '/models'
 const RELAY_CREDENTIAL = credentialRef(RELAY_CREDENTIAL_REF)
 
-type SettingsFace = Pick<SettingsProvider, 'get' | 'mutate'> & { writable?: boolean }
+type SettingsFace = {
+  writable?: boolean
+  get(ns: typeof LLM_SETTINGS_NAMESPACE): unknown
+  mutate(ns: typeof LLM_SETTINGS_NAMESPACE, ops: readonly SettingsPathOp[]): Promise<void>
+}
 type CredentialsFace = Pick<CredentialProvider, 'describe' | 'set' | 'unset'>
 
 export interface RelayRouteDeps {
@@ -102,7 +105,7 @@ function normalizedApiKey(value: unknown): string {
 
 function profileFromSettings(settings: SettingsFace): RecordLike | undefined {
   try {
-    const value = settings.get(settingsNamespace(LLM_SETTINGS_NAMESPACE))
+    const value = settings.get(LLM_SETTINGS_NAMESPACE)
     if (!isRecord(value) || !isRecord(value.providers)) return undefined
     const profile = value.providers[RELAY_PROVIDER_ID]
     return isRecord(profile) ? profile : undefined
@@ -255,7 +258,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
       const models = await relayModels(apiKey, fetchImpl)
       try { await deps.credentials.set(RELAY_CREDENTIAL, apiKey) }
       catch { throw new RelayRouteError('credential-save-failed') }
-      try { await deps.settings.mutate(settingsNamespace(LLM_SETTINGS_NAMESPACE), providerMutation(models)) }
+      try { await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, providerMutation(models)) }
       catch { throw new RelayRouteError('settings-save-failed') }
       return { ok: true, modelCount: models.length, models }
     } finally { configuring = false }
@@ -311,7 +314,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
         throw new RelayRouteError('credential-delete-failed')
       }
       try {
-        await deps.settings.mutate(settingsNamespace(LLM_SETTINGS_NAMESPACE), removeMutation())
+        await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, removeMutation())
       } catch {
         throw new RelayRouteError('settings-save-failed')
       }

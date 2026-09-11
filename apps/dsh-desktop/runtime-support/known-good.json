@@ -10,18 +10,18 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "3.3.0",
-    "rootVersion": "3.3.0",
+    "version": "3.4.0",
+    "rootVersion": "3.4.0",
     "nodeEngine": "^22.19.0 || >=24.0.0",
     "packageManager": "pnpm@11.22.0"
   },
   "runtime": {
     "packageName": "@deepseek-ai/dsh",
-    "version": "0.1.1-rc.1",
-    "integrity": "sha512-HVauMT0F7MWUctkxzBcu5PMFc8j0lm0kX+4IbcUsA7Oh+/xv7xhigEDP0SaSOM/kR48U/BldHbZru116DcZz0w==",
+    "version": "0.1.5-rc.1",
+    "integrity": "sha512-rmNmzQCg3oIc1z8xH7izRSOuy1TNzq+/NILyfM+7e8DKOyV+yBtg47WEsqR2SiIe1ATec3L/rUa1YhIcfQ2XEg==",
     "files": {
-      "package.json": "43bf5ec5af6b63539a72da01d35c5232d23c3f023336839374c8467d542cd916",
-      "lib/bin.js": "c0226687bb20f45c603ec6fe50f3de16d1c3510c3a803304ec575ef9bc366c62"
+      "package.json": "8da881a5aa7d371dc1244ebb7acb8dfa9ac5fafce50404b31185d89cf152763a",
+      "lib/bin.js": "0ff7f1d72c4e0cbe14001709c81e20a04b70464118a7f78568952988e28f2ac5"
     },
     "bin": {
       "dsh": "lib/bin.js"
@@ -31,12 +31,12 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "7d3e335c387ceb62e2fb326d7edb21fd48683d7c484e5c1881d61b052db8ee9c"
+    "sha256": "c759b8a40cb0f9a2a4c006f7f30af49932ada7eb7b9c56b65fa004cf87663e32"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
     "supportStatus": "known-good",
-    "upstreamVersion": "0.1.1-rc.1",
+    "upstreamVersion": "0.1.5-rc.1",
     "capabilities": [
       {
         "id": "runtime.lifecycle",
@@ -66,7 +66,7 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "4aae66924fa00e2438274fa9c39761c85dee223dcfd9774f3907255043fe216d",
+    "sha256": "427a650e7a376713ab1bf24f143ae140e495c73310de1aea5afd1a293f02be3e",
     "ids": [
       "cancellation-presentation",
       "desktop-skin-profile-isolation",
@@ -82,15 +82,17 @@
     "ids": [
       "conversation.composer.dock",
       "conversation.input.dock",
+      "conversation.input.left",
       "conversation.input.model",
       "conversation.input.selector.context",
       "conversation.session.header.actions",
       "model-preferences.onboarding",
       "root",
-      "settings.models.content",
+      "settings.models.footer",
       "settings.section",
       "sidebar.footer.action",
       "sidebar.remote",
+      "sidebar.right.pane.tab",
       "tool.call.toolview",
       "web-ui.plugin.item"
     ]

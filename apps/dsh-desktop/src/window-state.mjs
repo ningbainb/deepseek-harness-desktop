@@ -52,14 +52,26 @@ export async function loadWindowState(path, displays) {
   }
 }
 
-export function attachWindowStatePersistence(window, path) {
+export function attachWindowStatePersistence(window, path, { restoredBounds } = {}) {
   let timer
   let writeQueue = Promise.resolve()
   let latestWrite = writeQueue
+  // A restored Windows frame can round outward at fractional DPI. Until a
+  // coordinate changes, preserve the requested logical value rather than
+  // feeding that construction error into the next launch's requested size.
+  const initialBounds = restoredBounds && window.isDestroyed?.() !== true
+    ? window.getNormalBounds() : undefined
+  const unchanged = new Map(['x', 'y', 'width', 'height']
+    .filter(key => Number.isFinite(restoredBounds?.[key]) && Number.isFinite(initialBounds?.[key]))
+    .map(key => [key, { observed: initialBounds[key], requested: restoredBounds[key] }]))
 
   const capture = () => {
     if (window.isDestroyed?.() === true) return undefined
-    const bounds = window.getNormalBounds()
+    const bounds = { ...window.getNormalBounds() }
+    for (const [key, { observed, requested }] of unchanged) {
+      if (bounds[key] === observed) bounds[key] = requested
+      else unchanged.delete(key)
+    }
     return `${JSON.stringify({ ...bounds, maximized: window.isMaximized() }, null, 2)}\n`
   }
   const persist = (content) => {

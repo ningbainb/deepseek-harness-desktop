@@ -31,6 +31,17 @@ async function waitForRuntimeWindow(application, timeoutMs) {
   throw new Error('runtime window did not appear before the E2E timeout')
 }
 
+function attachRendererDiagnostics(window) {
+  window.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+  window.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') {
+      const location = message.location()
+      const suffix = location.url ? ` (${location.url}:${location.lineNumber}:${location.columnNumber})` : ''
+      console.error(`renderer console ${message.type()}: ${message.text()}${suffix}`)
+    }
+  })
+}
+
 try {
   await seedPrimaryRuntimePermissionForTest({ userData })
   electronApp = await electron.launch({
@@ -52,11 +63,9 @@ try {
   electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
   const startupPage = await electronApp.firstWindow()
   for (const window of electronApp.windows()) {
-    window.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+    attachRendererDiagnostics(window)
   }
-  electronApp.on('window', (window) => {
-    window.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
-  })
+  electronApp.on('window', attachRendererDiagnostics)
   let page
   try {
     page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
@@ -85,7 +94,39 @@ try {
       ready: document.readyState,
       body: document.body.innerText.slice(0, 4000),
       plugins: [...document.querySelectorAll('style[data-plugin]')].map(element => element.dataset.plugin),
+      rightbarCount: document.querySelectorAll('[data-rightbar-col]').length,
+      sidebarHostCount: document.querySelectorAll('[data-dsh-better-sidebar]').length,
+      shellContext: window.dshDesktop?.shellContext,
+      sidebarResources: performance.getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((name) => name.includes('sidebar')),
+      bootEntries: window.__DSH_BOOT__?.entries?.filter((entry) => entry.id.includes('sidebar')).map((entry) => ({
+        id: entry.id,
+        inject: entry.inject,
+      })),
     }))))
+    const sidebarInventory = await page.evaluate(async () => {
+      const response = await fetch('/api/pluginInventory/list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'client-request',
+          rpcId: crypto.randomUUID(),
+          method: 'pluginInventory/list',
+          payload: { args: {} },
+        }),
+      })
+      const body = await response.json().catch(() => undefined)
+      return {
+        status: response.status,
+        entries: body?.result?.value?.entries?.filter((entry) =>
+          entry.moduleName?.includes('better-sidebar') || entry.entryId?.includes('better-sidebar')),
+        error: body?.result?.error,
+      }
+    }).catch((probeError) => ({ error: String(probeError) }))
+    console.error(`sidebar inventory: ${JSON.stringify(sidebarInventory)}`)
+    const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8').catch(() => '')
+    console.error(`window frame runtime log:\n${runtimeLog.slice(-8_000) || '(no runtime log)'}`)
     throw error
   }
   const state = await page.evaluate(() => ({
@@ -111,6 +152,8 @@ try {
         platform: query.get('dsh-desktop-platform'),
       }
     })(),
+    shellContext: window.dshDesktop?.shellContext,
+    locationSearch: location.search,
     sidebarToggles: [...document.querySelectorAll('[data-dsh-panel-host] button')].map((button) => {
       const rect = button.getBoundingClientRect()
       const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
@@ -150,8 +193,10 @@ try {
     `Top menus overlap the native caption area: ${JSON.stringify({ menusRight: state.menusRight, viewportWidth })}`,
   )
   assert.equal(state.paddingTop, '32px')
-  assert.equal(state.runtimeQuery.mode, 'advanced')
-  assert.equal(state.runtimeQuery.platform, process.platform)
+  assert.deepEqual(state.shellContext, { mode: 'advanced', platform: process.platform })
+  assert.ok(state.runtimeQuery.mode === null || state.runtimeQuery.mode === 'advanced')
+  assert.ok(state.runtimeQuery.platform === null || state.runtimeQuery.platform === process.platform)
+  assert.equal(new URLSearchParams(state.locationSearch).has('token'), false)
   if (state.sidebarToggles.length > 0) {
     assert.ok(
       state.sidebarToggles.every((toggle) => toggle.top >= 32 && !toggle.hitChrome),
@@ -301,34 +346,91 @@ try {
         { timeout: 5000 },
       ).catch(() => {})
     }
-    const state = await dialog.evaluate((element) => ({
-      layerClass: element.parentElement?.className,
-      layerTop: element.parentElement?.getBoundingClientRect().top,
-    }))
+    const state = await dialog.evaluate((element) => {
+      const layer = element.parentElement
+      const style = layer ? getComputedStyle(layer) : undefined
+      return {
+        chromeEnabled: document.documentElement.dataset.dshDesktopWindowChrome,
+        chromeHeight: getComputedStyle(document.documentElement)
+          .getPropertyValue('--dsh-desktop-window-chrome-height'),
+        layerClass: layer?.className,
+        layerId: layer?.id,
+        layerPosition: style?.position,
+        layerTop: layer?.getBoundingClientRect().top,
+        layerCssTop: style?.top,
+        layerHeight: style?.height,
+        layerTransform: style?.transform,
+        layerDisplay: style?.display,
+        layerConnected: layer?.isConnected,
+        layerWidth: layer?.getBoundingClientRect().width,
+        dialogLabel: element.getAttribute('aria-label'),
+        layerMarginTop: style?.marginTop,
+        ancestors: (() => {
+          const entries = []
+          for (let node = layer?.parentElement; node; node = node.parentElement) {
+            const css = getComputedStyle(node)
+            entries.push({ tag: node.tagName, id: node.id, className: node.className,
+              top: node.getBoundingClientRect().top, transform: css.transform,
+              translate: css.translate, filter: css.filter, contain: css.contain })
+          }
+          return entries
+        })(),
+      }
+    })
     assert.match(String(state.layerClass), /dsh-desktop-modal-layer/u)
-    assert.ok(Number(state.layerTop) >= 31, `modal layer starts under the title bar: ${state.layerTop}`)
+    assert.ok(Number(state.layerTop) >= 31, `modal layer starts under the title bar: ${JSON.stringify(state)}`)
   }
-  const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
-  // This fresh 3.3.0 profile receives the prompt after its display delay.
-  // Wait for it explicitly before interacting with dialogs underneath it.
-  await starPrompt.waitFor({ state: 'visible', timeout: 10_000 })
-  const starDialog = starPrompt.getByRole('dialog')
-  await assertDialogUsesSafeViewport(starDialog)
-  await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
-  await starPrompt.waitFor({ state: 'hidden' })
+  const starPrompt = page.locator('#dsh-desktop-star-prompt')
   const introContinueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
   const introDialog = page.getByRole('dialog').filter({ has: introContinueButton })
-  // The upstream UI may skip this one-time disclosure when the profile or
-  // release channel has already recorded acceptance. Validate its chrome
-  // boundary when present, but do not make an unrelated menu E2E depend on it.
+  // Existing disclosures own the modal surface before optional community prompts.
+  // Preserve both viewport assertions while following their non-overlapping order.
   if (await introDialog.isVisible()) {
+    assert.equal(await page.locator('#dsh-desktop-star-prompt[data-open="true"]').count(), 0)
     await assertDialogUsesSafeViewport(introDialog)
     await introDialog.getByRole('button', { name: /^(?:继续|Continue)$/u }).click()
     await introDialog.waitFor({ state: 'hidden' })
   }
+  // This fresh 3.4.0 profile receives the prompt after its display delay.
+  // Wait for it after the introductory dialog has released the modal surface.
+  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
+  const starDialog = starPrompt.getByRole('dialog')
+  await assertDialogUsesSafeViewport(starDialog)
+  await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
+  // data-open changes before the 360 ms fade finishes. Wait for the actual
+  // root to hide so its outgoing dialog cannot be mistaken for Settings.
+  await starPrompt.waitFor({ state: 'hidden' })
   await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate((button) => button.click())
-  const settingsDialog = page.locator('[role="dialog"]:visible').last()
+  const settingsDialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
   await assertDialogUsesSafeViewport(settingsDialog)
+  const dynamicModal = await page.evaluate(async () => {
+    const layer = document.createElement('div'), dialog = document.createElement('div')
+    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none'
+    dialog.style.cssText = 'width:100px;height:100px'
+    layer.append(dialog)
+    document.body.append(layer)
+    const paint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    try {
+      await paint()
+      const before = layer.classList.contains('dsh-desktop-modal-layer')
+      dialog.setAttribute('role', 'dialog')
+      await paint()
+      const afterRole = layer.classList.contains('dsh-desktop-modal-layer')
+      const top = layer.getBoundingClientRect().top
+      dialog.removeAttribute('role')
+      layer.classList.remove('dsh-desktop-modal-layer')
+      await paint()
+      const afterRemoval = layer.classList.contains('dsh-desktop-modal-layer')
+      dialog.setAttribute('aria-modal', 'true')
+      await paint()
+      return { before, afterRole, top, afterRemoval, afterAria: layer.classList.contains('dsh-desktop-modal-layer') }
+    } finally { layer.remove() }
+  })
+  assert.equal(dynamicModal.before, false)
+  assert.equal(dynamicModal.afterRole, true)
+  assert.ok(dynamicModal.top >= 31, JSON.stringify(dynamicModal))
+  assert.equal(dynamicModal.afterRemoval, false)
+  assert.equal(dynamicModal.afterAria, true)
   const nativeWindowState = await electronApp.evaluate(({ app, BrowserWindow, Menu, nativeImage }) => {
     const window = BrowserWindow.getAllWindows()[0]
     const helpMenu = Menu.getApplicationMenu()?.items.find((item) => item.label.includes('Help'))

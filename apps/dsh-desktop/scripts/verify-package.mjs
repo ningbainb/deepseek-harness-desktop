@@ -43,6 +43,7 @@ const resources = await resolvePackagedResourcesPath({
   appDir,
   parsed: parsedArguments,
 })
+const desktopManifest = JSON.parse(await readFile(join(appDir, 'package.json'), 'utf8'))
 const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
 const { packageSupportsPlatform } = afterPack
 const ELECTRON_LOCALES = Object.freeze(['en-US.pak', 'zh-CN.pak', 'zh-TW.pak'])
@@ -54,6 +55,7 @@ const requiredPackages = [
   'node-pty',
   'pnpm',
   'semver',
+  '@tencent-connect/dsh-qqbot',
   '@tencent-connect/qqbot-connector',
   '@tencent-connect/qqbot-nodejs',
   '@xterm/addon-fit',
@@ -63,6 +65,10 @@ const requiredPackages = [
   'ws',
   ...MANAGED_RUNTIME_PACKAGES,
 ]
+const EXACT_PACKAGED_INTEGRATIONS = Object.freeze([
+  '@deepseek-ai/dsh-user-approval',
+  '@tencent-connect/dsh-qqbot',
+])
 const REQUIRED_NATIVE_BINDINGS = Object.freeze({
   'darwin-arm64': Object.freeze([
     '@img/sharp-darwin-arm64',
@@ -89,6 +95,12 @@ for (const packageName of requiredPackages) {
   const manifestPath = join(unpackedModules, ...packagePathSegments(packageName), 'package.json')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   if (manifest.name !== packageName) throw new Error(`packaged manifest mismatch for ${packageName}`)
+  if (
+    EXACT_PACKAGED_INTEGRATIONS.includes(packageName)
+    && manifest.version !== desktopManifest.dependencies?.[packageName]
+  ) {
+    throw new Error(`packaged integration version mismatch for ${packageName}`)
+  }
 }
 
 if (TARGET_PLATFORM.platform === 'win32' && TARGET_PLATFORM.arch === 'x64') {
@@ -330,6 +342,11 @@ if (TARGET_PLATFORM.platform === 'win32') {
   await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty.node'))
   await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty', 'conpty.dll'))
 }
+const aggregateClient = await readFile(join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'lib', 'client.js'), 'utf8')
+const aggregateNavigator = aggregateClient.match(/\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\/\/#endregion/u)?.[0] ?? ''
+if (!aggregateNavigator.includes('positionNavigator') || !aggregateNavigator.includes('[data-composer-seat]') || aggregateNavigator.includes('bottom: 80px')) {
+  throw new Error('packaged web UI aggregate is missing composer-aware conversation navigation')
+}
 const aggregatePatch = await readFile(
   join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'cordis.patch.yml'),
   'utf8',
@@ -337,15 +354,87 @@ const aggregatePatch = await readFile(
 if (!/- id: web-ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u.test(aggregatePatch)) {
   throw new Error('packaged web UI aggregate is missing the Desktop mode switcher')
 }
-const apiProxyBundle = await readFile(
-  join(unpackedModules, '@deepseek-ai', 'dsh-host-apiproxy', 'lib', 'index.js'),
-  'utf8',
-)
-if (
-  apiProxyBundle.includes('settings-not-exposed')
-  || apiProxyBundle.includes('WEB_SETTINGS_NAMESPACES')
-) {
-  throw new Error('packaged Host API proxy still contains the retired settings allowlist')
+for (const retiredPackage of ['dsh-client-runtime', 'dsh-host-apiproxy']) {
+  try {
+    await access(join(unpackedModules, '@deepseek-ai', retiredPackage, 'package.json'))
+    throw new Error(`packaged Runtime still contains retired @deepseek-ai/${retiredPackage}`)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+}
+
+const PACKAGED_PATCH_CONTRACTS = Object.freeze([
+  Object.freeze({
+    packageName: '@linxin666/dsh-desktop-launcher',
+    file: Object.freeze(['lib', 'index.js']),
+    required: Object.freeze(['settings.installSection']),
+    forbidden: Object.freeze(['installSettingsSection', 'settingsNamespace']),
+  }),
+  Object.freeze({
+    packageName: '@linxin666/dsh-desktop-launcher',
+    file: Object.freeze(['lib', 'client.js']),
+    required: Object.freeze(['@deepseek-ai/dsh-client-store']),
+    forbidden: Object.freeze(['@deepseek-ai/dsh-client-runtime/client']),
+  }),
+  Object.freeze({
+    packageName: 'dsh-better-sidebar',
+    file: Object.freeze(['lib', 'index.js']),
+    required: Object.freeze(['const ns = SIDEBAR_PREFS_NS']),
+    forbidden: Object.freeze(['settingsNamespace']),
+  }),
+  Object.freeze({
+    packageName: 'dsh-better-sidebar',
+    file: Object.freeze(['lib', 'client.js']),
+    required: Object.freeze([
+      '@deepseek-ai/dsh-client-ui-primitives',
+      'shellContext',
+      'installLayoutCompatibilityAnchors',
+      '[data-rightbar-col]',
+    ]),
+    forbidden: Object.freeze(['@deepseek-ai/dsh-client-runtime/client']),
+  }),
+  Object.freeze({
+    packageName: 'dsh-better-sidebar',
+    file: Object.freeze(['package.json']),
+    required: Object.freeze(['@deepseek-ai/dsh-client-ui-renderer']),
+    forbidden: Object.freeze(['@deepseek-ai/dsh-client-runtime']),
+  }),
+  Object.freeze({
+    packageName: '@linxin666/dsh-chat-recovery',
+    file: Object.freeze(['lib', 'client.js']),
+    required: Object.freeze(['ctx.uiConversation', 'chat.legacy', 'sessions.create']),
+    forbidden: Object.freeze(['connectWorkspace', '@deepseek-ai/dsh-client-runtime/client']),
+  }),
+  Object.freeze({
+    packageName: '@linxin666/dsh-chat-recovery',
+    file: Object.freeze(['package.json']),
+    required: Object.freeze([
+      '@deepseek-ai/dsh-api-session-controller',
+      '@deepseek-ai/dsh-client-ui-chat',
+      '@deepseek-ai/dsh-client-ui-conversation',
+      '@deepseek-ai/dsh-client-ui-renderer',
+      '@deepseek-ai/dsh-client-ui-session',
+    ]),
+    forbidden: Object.freeze(['@deepseek-ai/dsh-client-runtime', '@deepseek-ai/dsh-client-connection']),
+  }),
+])
+for (const contract of PACKAGED_PATCH_CONTRACTS) {
+  const packagedPath = join(
+    unpackedModules,
+    ...packagePathSegments(contract.packageName),
+    ...contract.file,
+  )
+  const source = await readFile(packagedPath, 'utf8')
+  for (const marker of contract.required) {
+    if (!source.includes(marker)) {
+      throw new Error(`packaged ${contract.packageName} is missing required DSH 0.1.5 marker: ${marker}`)
+    }
+  }
+  for (const marker of contract.forbidden) {
+    if (source.includes(marker)) {
+      throw new Error(`packaged ${contract.packageName} retains retired DSH API marker: ${marker}`)
+    }
+  }
 }
 
 const packagedTaskBoard = await import(pathToFileURL(join(unpackedModules, '@linxin666', 'dsh-client-ui-task-board', 'lib', 'index.js')).href)
@@ -396,7 +485,9 @@ if (!settingsBridge.includes('"particle-theme"')) {
   throw new Error('packaged settings bridge is missing the particle-theme namespace')
 }
 await access(join(resources, 'app.asar'))
-console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'))} packed ASAR files`)
+console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'), {
+  requiredFiles: ['runtime-launcher.mjs', 'runtime-startup-timing.mjs', 'runtime-shutdown-control.mjs', 'runtime-stream-drain.mjs', 'modal-reveal.mjs'].map(name => join('src', name)),
+})} packed ASAR files`)
 await access(join(resources, 'app-icon.png'))
 const telemetryConfiguration = JSON.parse(await readFile(join(resources, 'telemetry-config.json'), 'utf8'))
 const telemetryConfigurationKeys = telemetryConfiguration !== null && typeof telemetryConfiguration === 'object'
@@ -450,8 +541,8 @@ if (!allowMissingUpdateMetadata) await access(join(resources, 'app-update.yml'))
 // TTY, so that file is commonly stale in CI. Validate the same config file the
 // successful package command consumed instead of trusting a leftover artifact.
 const packagingConfig = YAML.parse(await readFile(join(appDir, 'electron-builder.yml'), 'utf8'))
-if (packagingConfig.compression !== 'maximum') {
-  throw new Error('packaging config must use maximum compression')
+if (packagingConfig.compression !== 'normal') {
+  throw new Error('packaging config must use normal compression for bounded install latency')
 }
 if (JSON.stringify(packagingConfig.electronLanguages) !== JSON.stringify(
   ELECTRON_LOCALES.map(locale => locale.slice(0, -'.pak'.length)),

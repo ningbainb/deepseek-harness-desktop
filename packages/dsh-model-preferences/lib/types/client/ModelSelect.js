@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { catalogFromDirectory, modelDisplayName, selectionForModel, sortModelCatalog, } from "./model-projection.js";
 import styles from './model-preferences.module.css';
 import { installModelRefreshBridge } from "./model-refresh.js";
@@ -18,6 +18,8 @@ export function ModelSelect(props) {
     const [selecting, setSelecting] = useState(false);
     const [error, setError] = useState(null);
     const lastActionRef = useRef('load');
+    const loadRef = useRef(load);
+    loadRef.current = load;
     const rootRef = useRef(null);
     const triggerRef = useRef(null);
     const refreshBridgeRef = useRef(null);
@@ -60,29 +62,28 @@ export function ModelSelect(props) {
     const currentName = modelDisplayName(currentOption, state.current);
     const modelLabel = currentName || t('trigger.fallback');
     const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`;
-    const reload = () => {
+    const reload = useCallback(() => {
         lastActionRef.current = 'load';
-        load();
-    };
+        loadRef.current();
+    }, []);
     useEffect(() => {
         if (!available)
             return;
-        lastActionRef.current = 'load';
-        load();
-    }, [available, load]);
+        reload();
+    }, [available, directory, modelSessionId, reload]);
     useEffect(() => {
         refreshBridgeRef.current?.dispose();
         refreshBridgeRef.current = null;
         if (!available)
             return;
-        const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: load });
+        const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: reload });
         refreshBridgeRef.current = bridge;
         return () => {
             bridge.dispose();
             if (refreshBridgeRef.current === bridge)
                 refreshBridgeRef.current = null;
         };
-    }, [available, load, modelSessionId]);
+    }, [available, modelSessionId, reload]);
     useEffect(() => {
         if (!open)
             return;
@@ -167,7 +168,11 @@ export function ModelSelect(props) {
                         setOpen(true);
                         setPane('root');
                         setError(null);
-                        reload();
+                        // The mounted directory and the refresh bridge already keep this
+                        // projection current. Opening the menu must not restart the same
+                        // model request on every click.
+                        if (state.status === 'idle' || state.status === 'error')
+                            reload();
                     }
                 }, children: [_jsx("span", { className: styles.triggerLabel, children: modelLabel }), effortLabel !== undefined && _jsx("span", { className: styles.triggerEffort, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: `${styles.chevron} ${open ? styles.chevronOpen : ''}` })] }), open && (_jsxs("div", { id: `${id}-menu`, className: styles.menu, role: "menu", "aria-label": t('menu.aria'), "aria-busy": state.status === 'loading' || busy, children: [pane === 'root' && (_jsxs(_Fragment, { children: [_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('model'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.models') }), _jsx("span", { className: styles.cellValue, children: modelLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }), reasoning !== undefined && (_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('effort'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.effort') }), _jsx("span", { className: styles.cellValue, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }))] })), pane === 'model' && (_jsxs(_Fragment, { children: [state.status === 'loading' && _jsx("div", { className: styles.status, role: "status", children: t('status.loading') }), state.error !== null && lastActionRef.current === 'load' && (_jsxs("div", { className: styles.error, role: "alert", children: [_jsxs("span", { children: [t('error.load'), " ", state.error] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] })), error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), catalog.failures.map(failure => (_jsxs("div", { className: styles.warning, role: "status", children: [_jsxs("span", { children: [failure.name || failure.id, ": ", failure.message] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] }, failure.id))), _jsxs("div", { className: `${styles.groups} scrollable`, children: [catalog.pinned.length > 0 && renderGroup(t('menu.pinned'), catalog.pinned, 'pinned'), catalog.groups.map(group => renderGroup(group.name, group.models, group.id))] }), state.status === 'ready' && options.length === 0 && _jsx("div", { className: styles.empty, children: t('status.empty') })] })), pane === 'effort' && (_jsxs(_Fragment, { children: [error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), effortChoices.length === 0 && _jsx("div", { className: styles.empty, children: t('status.empty') }), effortChoices.map(choice => (_jsxs("button", { type: "button", role: "menuitemradio", "aria-checked": effectiveEffort === choice.effort, className: `${styles.option} ${effectiveEffort === choice.effort ? styles.optionCurrent : ''}`, disabled: busy, onClick: () => chooseEffort(choice.effort), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: choice.label }), choice.description !== undefined && _jsx("span", { className: styles.description, children: choice.description })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: effectiveEffort === choice.effort && _jsx("span", { className: styles.checkmark }) })] }, choice.key)))] }))] }))] }));
 }

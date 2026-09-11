@@ -1,0 +1,39 @@
+diff --git a/package.json b/package.json
+index d16e9b7789eae4256200fad2fb2b1edfb13cf72f..5eb6dfd34134e93b46c5a1be8c806a12ab7188a0 100644
+--- a/package.json
++++ b/package.json
+@@ -22,6 +22,24 @@
+     "./package.json": "./package.json"
+   },
+   "license": "MIT",
++  "dependencies": {
++    "@shikijs/langs": "^4.3.1",
++    "anser": "^2.3.5",
++    "clsx": "^2.0.0",
++    "katex": "^0.16.47",
++    "mdast-util-from-markdown": "^2.0.3",
++    "mdast-util-gfm": "^3.1.0",
++    "mdast-util-math": "^3.0.0",
++    "micromark-core-commonmark": "^2.0.3",
++    "micromark-extension-gfm": "^3.0.0",
++    "micromark-extension-math": "^3.1.0",
++    "micromark-factory-space": "^2.0.1",
++    "micromark-util-character": "^2.1.1",
++    "micromark-util-classify-character": "^2.0.1",
++    "micromark-util-sanitize-uri": "^2.0.1",
++    "micromark-util-symbol": "^2.0.1",
++    "shiki": "^4.3.1"
++  },
+   "devDependencies": {
+     "@types/react": "~18.3.1",
+     "@types/react-dom": "~18.3.0",
+@@ -53,6 +71,8 @@
+     "lib/types/**/*.d.ts"
+   ],
+   "peerDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.2"
++    "@deepseek-ai/cordis": "^4.0.2",
++    "react": "^18.2.0",
++    "react-dom": "^18.2.0"
+   }
+ }

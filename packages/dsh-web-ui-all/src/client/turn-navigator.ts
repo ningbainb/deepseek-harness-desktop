@@ -20,13 +20,17 @@ const NAVIGATOR_ATTR = 'data-dsh-turn-navigator'
 const NAVIGATOR_STYLE = `
 [data-dsh-turn-navigator] {
   position: absolute;
-  bottom: 80px;
-  right: 16px;
+  bottom: 12px;
+  left: 16px;
   z-index: 200;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--dsw-alias-border-l2, #64748b);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2, #1e293b);
   pointer-events: none;
 }
 
@@ -34,17 +38,17 @@ const NAVIGATOR_STYLE = `
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-layer-2, rgba(30, 41, 59, 0.92));
   color: var(--dsw-alias-label-secondary, #94a3b8);
   font-size: 14px;
   cursor: pointer;
   pointer-events: all;
   transition: background 120ms ease, color 120ms ease, transform 80ms ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  box-shadow: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -65,6 +69,10 @@ const NAVIGATOR_STYLE = `
   transform: none;
 }
 
+[data-dsh-turn-navigator] button[hidden] {
+  display: none;
+}
+
 [data-dsh-turn-navigator] .dsh-turn-counter {
   font-size: 11px;
   font-weight: 600;
@@ -76,7 +84,7 @@ const NAVIGATOR_STYLE = `
   pointer-events: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  box-shadow: none;
 }
 `.trim()
 
@@ -92,7 +100,10 @@ const USER_MSG_SELECTORS = [
 /** Collect all user message elements in DOM order. */
 export function getUserMessages(pane: HTMLElement): HTMLElement[] {
   const matches = Array.from(pane.querySelectorAll<HTMLElement>(USER_MSG_SELECTORS))
-  return matches.filter(turn => !matches.some(other => other !== turn && other.contains(turn)))
+  return matches.filter(turn => {
+    const ancestor = turn.parentElement?.closest(USER_MSG_SELECTORS)
+    return !ancestor || ancestor === pane || !pane.contains(ancestor)
+  })
 }
 
 /** Find the conversation scrollable area inside the pane. */
@@ -181,6 +192,7 @@ function createNavigator(): HTMLDivElement {
 
 /** Update button disabled state and counter text. */
 function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLElement): void {
+  positionNavigator(nav, scrollRoot, pane)
   const turns = getUserMessages(pane)
   const total = turns.length
   const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40
@@ -195,6 +207,8 @@ function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLE
   if (nextBtn) nextBtn.disabled = idx >= total - 1 || total === 0
   if (bottomBtn) {
     bottomBtn.disabled = atBottom
+    const hidden = atBottom || hasNativeBottomAction(pane)
+    if (bottomBtn.hidden !== hidden) bottomBtn.hidden = hidden
   }
   const nextCounterText = total === 0 ? '–' : String(idx + 1) + '/' + String(total)
   if (counter && counter.textContent !== nextCounterText) {
@@ -202,9 +216,22 @@ function syncNavigator(nav: HTMLDivElement, scrollRoot: HTMLElement, pane: HTMLE
   }
 }
 
+/** Keep navigation above the composer and away from its send/search controls. */
+export function positionNavigator(nav: HTMLElement, scrollRoot: HTMLElement, pane: HTMLElement): void {
+  const bounds = pane.getBoundingClientRect()
+  if (bounds.height <= 0) return
+  const composer = pane.querySelector<HTMLElement>('[data-composer-seat]')
+    ?? document.querySelector<HTMLElement>('[data-composer-seat]')
+  const composerTop = composer?.getBoundingClientRect().top ?? bounds.bottom
+  const contentBottom = Math.min(bounds.bottom, scrollRoot.getBoundingClientRect().bottom, composerTop)
+  const bottom = Math.max(12, Math.round(bounds.bottom - contentBottom + 12)) + 'px'
+  if (nav.style.bottom !== bottom) nav.style.bottom = bottom
+}
+
 /** Attach click handlers to the navigator buttons. */
-function bindNavigator(nav: HTMLDivElement, scrollRoot: () => HTMLElement, pane: HTMLElement): void {
-  nav.addEventListener('click', (e) => {
+function bindNavigator(nav: HTMLDivElement, scrollRoot: () => HTMLElement, pane: HTMLElement): () => void {
+  let settleTimer: ReturnType<typeof setTimeout> | undefined
+  const onClick = (e: MouseEvent): void => {
     const btn = (e.target as HTMLElement).closest('button')
     if (!btn) return
     const role = btn.dataset.role
@@ -220,8 +247,14 @@ function bindNavigator(nav: HTMLDivElement, scrollRoot: () => HTMLElement, pane:
       root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' })
     }
     // Re-sync after scroll settles
-    setTimeout(() => syncNavigator(nav, scrollRoot(), pane), 350)
-  })
+    clearTimeout(settleTimer)
+    settleTimer = setTimeout(() => syncNavigator(nav, scrollRoot(), pane), 350)
+  }
+  nav.addEventListener('click', onClick)
+  return () => {
+    clearTimeout(settleTimer)
+    nav.removeEventListener('click', onClick)
+  }
 }
 
 /**
@@ -230,7 +263,9 @@ function bindNavigator(nav: HTMLDivElement, scrollRoot: () => HTMLElement, pane:
  */
 export function mountTurnNavigator(pane: HTMLElement): () => void {
   // Ensure the pane is positioned relatively so absolute children work
-  if (getComputedStyle(pane).position === 'static') {
+  const previousPosition = pane.style.position
+  const ownsPosition = getComputedStyle(pane).position === 'static'
+  if (ownsPosition) {
     pane.style.position = 'relative'
   }
 
@@ -247,19 +282,34 @@ export function mountTurnNavigator(pane: HTMLElement): () => void {
     }
     syncNavigator(nav, scrollRoot, pane)
   }
-  bindNavigator(nav, () => scrollRoot, pane)
+  const disposeClicks = bindNavigator(nav, () => scrollRoot, pane)
   scrollRoot.addEventListener('scroll', onScroll, { passive: true })
 
-  const mutationObs = new MutationObserver(refresh)
-  mutationObs.observe(pane, { childList: true, subtree: true })
+  const mutationObs = new MutationObserver(records => {
+    // Ignore our counter/position/disabled writes. Native controls may change
+    // visibility without being replaced (theme, wrapper or disabled state).
+    if (records.some(record => !nav.contains(record.target))) refresh()
+  })
+  mutationObs.observe(pane, {
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'aria-label', 'disabled', 'inert'],
+  })
+  const resizeObs = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(refresh)
+  resizeObs?.observe(pane)
+  const composer = document.querySelector<HTMLElement>('[data-composer-seat]')
+  if (composer) resizeObs?.observe(composer)
+  window.addEventListener('resize', refresh)
 
   syncNavigator(nav, scrollRoot, pane)
 
   return () => {
     mutationObs.disconnect()
+    resizeObs?.disconnect()
+    window.removeEventListener('resize', refresh)
     scrollRoot.removeEventListener('scroll', onScroll)
+    disposeClicks()
     nav.remove()
-    if (pane.style.position === 'relative') pane.style.position = ''
+    if (ownsPosition && pane.style.position === 'relative') pane.style.position = previousPosition
   }
 }
 
@@ -277,30 +327,76 @@ function ensureStyle(): void {
  * Watches for the conversation pane to mount / re-mount and re-injects the widget.
  * @returns disposer.
  */
+function isVisibleControl(element: HTMLElement, pane: HTMLElement): boolean {
+  if (!element.isConnected || element.closest('[hidden], [aria-hidden="true"], [inert]')) return false
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const style = getComputedStyle(node)
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.opacity === '0') return false
+    if (node === pane) break
+  }
+  return true
+}
+
+/** Native labels are from the pinned SDK locale contract, not CSS hashes. */
+export function hasNativeBottomAction(pane: HTMLElement): boolean {
+  return Array.from(pane.querySelectorAll<HTMLButtonElement>('button[aria-label="回到底部"], button[aria-label="Back to bottom"]'))
+    .some(button => !button.disabled
+      && !button.closest('[data-chat-flow], [data-dsh-turn-navigator]')
+      && isVisibleControl(button, pane))
+}
+
+export function hasNativeTurnNavigator(pane: HTMLElement): boolean {
+  return Array.from(pane.querySelectorAll<HTMLElement>('nav[aria-label="轮次导航"], nav[aria-label="Turn navigation"]'))
+    .some(nav => {
+      if (nav.querySelectorAll('button').length < 2) return false
+      // DSH hides its rail in narrow conversation containers. A registered
+      // but CSS-hidden rail must not suppress the usable Desktop fallback.
+      return isVisibleControl(nav, pane)
+    })
+}
+
 export function installTurnNavigator(): () => void {
   ensureStyle()
   let disposeNavigator: (() => void) | undefined
   let currentPane: HTMLElement | undefined
+  let fallbackNeeded = false
 
   const PANE_SELECTOR = '[data-pane="conversation"]'
 
   const tryMount = (): void => {
     const pane = document.querySelector<HTMLElement>(PANE_SELECTOR)
-    if (pane === currentPane) return
+    const native = pane !== null && hasNativeTurnNavigator(pane)
+    // Empty sessions have no navigation actions. Keep observing so restored
+    // history or the first message can enable the fallback in the same pane.
+    const turns = pane && !native ? getUserMessages(pane) : []
+    const scroll = pane && !native && turns.length === 0 ? findScrollRoot(pane, turns) : null
+    const needed = pane !== null && !native && (turns.length > 0
+      || (scroll !== null && scroll.scrollHeight > scroll.clientHeight + 40))
+    if (pane === currentPane && needed === fallbackNeeded
+      && (!needed || pane?.querySelector(`[${NAVIGATOR_ATTR}]`))) return
+    if (pane !== currentPane) {
+      resizeObserver?.disconnect()
+      if (pane) resizeObserver?.observe(pane)
+    }
     disposeNavigator?.()
     disposeNavigator = undefined
     currentPane = undefined
+    fallbackNeeded = needed
     if (!pane) return
     currentPane = pane
-    disposeNavigator = mountTurnNavigator(pane)
+    if (needed) disposeNavigator = mountTurnNavigator(pane)
   }
 
   const observer = new MutationObserver(tryMount)
-  observer.observe(document.body, { childList: true, subtree: true })
+  const resizeObserver = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(tryMount)
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'aria-hidden', 'hidden'] })
+  window.addEventListener('resize', tryMount)
   tryMount()
 
   return () => {
     observer.disconnect()
+    resizeObserver?.disconnect()
+    window.removeEventListener('resize', tryMount)
     disposeNavigator?.()
     const style = document.getElementById('dsh-turn-navigator-style')
     style?.remove()

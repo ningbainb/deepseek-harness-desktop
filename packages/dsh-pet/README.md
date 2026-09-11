@@ -48,7 +48,7 @@ dsh-pet/
 |   |-- persist.ts      # persistence ($DSH_HOME/pet.json, atomic write)
 |   |-- routes.ts       # /api/pet/* JSON API + /pet/whale/* static asset routes
 |   `-- client/         # browser half
-|       |-- index.ts    # global mount (createRoot → body) + polling (800ms) + interaction wiring (fetch)
+|       |-- index.ts    # global mount (createRoot → body) + polling (2s) + interaction wiring (fetch)
 |       |-- PetDockEntry.tsx  # global floating entry (document.body, always shown: no session / new session / mid-session)
 |       |-- WhalePet.tsx      # floating component (portal + rAF frame animation + dragging)
 |       |-- spritesheet.ts    # atlas geometry + per-state animation tracks (frames/duration)
@@ -64,16 +64,18 @@ official session events (turn/step/chunk/tool) ----\
                                                     > PetService (host)
 optional legacy activity/status ------------------/
                                                               | /api/pet/* JSON
-global React root (createRoot → document.body) <-- polling 800ms -- pet-client (browser)
+global React root (createRoot → document.body) <-- polling 2s -- pet-client (browser)
                                                               |
                                                    WhalePet floating layer (portal + rAF)
 ```
 
-- **Status source**: the host projects official `turn/start`, `step/start`, `assistant/chunk`, `assistant/message`, `tool/call`, `tool/result`, and `turn/end` events into waiting/thinking/tool/review/done/failed states. Optional legacy `activity/status` events remain a compatibility input.
+- **Status source**: the host projects official durable `turn/start`, `step/start`, `assistant/message`, `tool/call`, `tool/result`, and `turn/end` events plus process-local `agent/assistant-stream` frames into waiting/thinking/tool/review/done/failed states. Optional legacy `activity/status` events remain a compatibility input.
 - **Multi-session semantics**: the API and browser mount are host-global and expose no foreground-session identity, so the most recent meaningful event wins the display. Every session's completed turns are still rewarded independently, and disposing a non-current session does not reset the visible state.
 - **Mount point**: `document.body` (global React root, always shown: no session / new session / mid-session — the old mount point `conversation.composer.dock` only rendered in an active session, hiding the pet in new sessions); the component uses `createPortal` internally to render the global floating layer.
 - **Rendering**: CSS sprite (background-position) per-frame animation, frame durations from the track definitions in `spritesheet.ts`.
 - **Communication**: browser ↔ host over the same-origin `/api/pet/*` JSON endpoints (state/interact/set-visible/set-config); the atlas loads from `/pet/whale/spritesheet.webp` — both the RPC domain and the `/plugins/` static service are platform-registered, and the plugin self-sufficiently provides its own API and assets (the same pattern as dsh-remote-web-ui's `/api/pair`).
+
+Polling checks every two seconds while the page is visible; each poller owns at most one in-flight read with an eight-second timeout. Interaction refreshes coalesce into one newer read instead of allowing stale snapshots to win. Hiding the page or disabling/unloading the pet cancels its display reads and prevents late publication.
 
 ## Install
 

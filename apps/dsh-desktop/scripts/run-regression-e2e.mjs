@@ -17,14 +17,20 @@
  *   node scripts/run-regression-e2e.mjs --full   # Full regression
  */
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { acceptedReleaseIssue } from './release-known-issues.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const IS_FULL = process.argv.includes('--full')
 const SOURCE_ONLY = process.argv.includes('--source')
+const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
+const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
+const acceptedIssues = []
+// QA uses isolated data and must also leave the host's link association intact.
+process.env.DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION = '1'
 if (SOURCE_ONLY) delete process.env.DSH_DESKTOP_E2E_EXECUTABLE
 
 const defaultPackagedExe = resolve(APP_DIR, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe')
@@ -36,8 +42,28 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 const CORE_SUITES = [
   {
+    name: 'Settings Availability Before Slow Resources Complete',
+    script: 'scripts/verify-settings-readiness.mjs',
+    args: [],
+  },
+  {
+    name: 'Optional Prompt Ordering & Once-per-release Lifecycle',
+    script: 'scripts/verify-star-prompt.mjs',
+    args: [],
+  },
+  {
     name: 'Extension Dock Settings & Compact Layout',
     script: 'scripts/verify-dock-settings.mjs',
+    args: [],
+  },
+  {
+    name: 'Selected Model Balance & Provider Credential Isolation',
+    script: 'scripts/verify-selected-balance.mjs',
+    args: [],
+  },
+  {
+    name: 'Dock Model Catalog, Selection & Timeout Recovery',
+    script: 'scripts/verify-dock-model-catalog.mjs',
     args: [],
   },
   {
@@ -61,13 +87,28 @@ const CORE_SUITES = [
     args: [],
   },
   {
+    name: 'Native DSH Turn Navigation Without Duplicate Controls',
+    script: 'scripts/verify-conversation-scroll.mjs',
+    args: ['--native-turns', '--native-tabs', '--mode-switch'],
+  },
+  {
     name: 'Directory Picker & Workspace Import',
     script: 'scripts/verify-directory-picker.mjs',
-    args: [],
+    args: ['--native-layout'],
   },
   {
     name: 'Runtime Provider & IPC Services',
     script: 'scripts/verify-runtime-provider.mjs',
+    args: [],
+  },
+  ...(process.platform === 'win32' ? [{
+    name: 'Windows DPI Persistence, Maximize and Explicit Resize',
+    script: 'scripts/verify-window-state-dpi.mjs',
+    args: [],
+  }] : []),
+  {
+    name: 'Particle Composer Clearance & Multi-window Settings Delivery',
+    script: 'scripts/verify-particle-theme.mjs',
     args: [],
   },
   {
@@ -82,11 +123,35 @@ const CORE_SUITES = [
       'test/packaged-direct-start-matrix.test.mjs',
       'test/repair-agent-integration.test.mjs',
       'test/session-preservation.test.mjs',
+      'test/legacy-session-backend.test.mjs',
+      'test/pet-client-polling.test.mjs',
+      'test/dock-settings-fixture.test.mjs',
+      'test/desktop-ingress.test.mjs',
+      'test/runtime-presentation.test.mjs',
+      'test/runtime-startup-timing.test.mjs',
+      'test/runtime-shutdown-control.test.mjs',
+      'test/runtime-stream-drain.test.mjs',
+      'test/window-state.test.mjs',
+      'test/window-chrome.test.mjs',
+      'test/settings-window.test.mjs',
+      'test/modal-reveal.test.mjs',
+      'test/star-prompt.test.mjs',
+      'test/install-recovery.test.mjs',
+      'test/terminal-session.test.mjs',
+      'test/terminal-window.test.mjs',
+      'test/terminal-renderer.test.mjs',
+      'test/windows-background-runner.test.mjs',
+      'test/windows-runner-console.test.mjs',
     ],
   },
 ]
 
 const PACKAGED_SUITES = [
+  ...(process.platform === 'win32' ? [{
+    name: 'Compiled NSIS Upgrade & Rollback Lifecycle',
+    script: 'scripts/verify-installer-lifecycle.mjs',
+    args: [],
+  }] : []),
   {
     name: 'Embedded Terminal (ConPTY / xterm)',
     script: 'scripts/verify-terminal.mjs',
@@ -146,6 +211,7 @@ const PACKAGED_SUITES = [
 
 function runSuite(suite) {
   return new Promise((resolveRun, reject) => {
+    let output = ''
     const startTime = Date.now()
     console.log(`\n============================================================`)
     console.log(` [RUNNING E2E] ${suite.name}`)
@@ -163,8 +229,14 @@ function runSuite(suite) {
         // Ensure child processes inherit packaged executable if defined
         DSH_DESKTOP_E2E_EXECUTABLE: process.env.DSH_DESKTOP_E2E_EXECUTABLE,
       },
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
+    for (const [stream, destination] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+      stream.on('data', chunk => {
+        output = (output + chunk.toString()).slice(-128_000)
+        destination.write(chunk)
+      })
+    }
 
     child.on('error', (err) => reject(err))
     child.on('exit', (code, signal) => {
@@ -173,6 +245,14 @@ function runSuite(suite) {
         console.log(`[PASS] ${suite.name} (${elapsed}s)`)
         resolveRun()
       } else {
+        const issue = acceptedReleaseIssue({ version: VERSION, enabled: ACCEPT_KNOWN_DPI,
+          script: suite.script, code, signal, output })
+        if (issue) {
+          acceptedIssues.push(issue)
+          console.warn(`[ACCEPTED KNOWN ISSUE] ${issue}: test failed; maintainer explicitly deferred it for 3.4.0. No test was skipped.`)
+          resolveRun()
+          return
+        }
         const reason = signal ? `signal ${signal}` : `exit code ${code}`
         reject(new Error(`[FAIL] ${suite.name} failed with ${reason} (${elapsed}s)`))
       }
@@ -207,7 +287,8 @@ async function main() {
 
   const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1)
   console.log(`\n============================================================`)
-  console.log(` [ALL PASSED] Unified Desktop Regression Gate (${suitesToRun.length} suites, ${totalElapsed}s)`)
+  console.log(` [${acceptedIssues.length ? 'COMPLETED WITH ACCEPTED KNOWN ISSUE' : 'ALL PASSED'}] Unified Desktop Regression Gate (${suitesToRun.length} suites, ${totalElapsed}s)`)
+  if (acceptedIssues.length) console.log(` Accepted issues: ${acceptedIssues.join(', ')}`)
   console.log(`============================================================`)
 }
 

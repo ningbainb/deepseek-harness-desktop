@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import * as artifact from '../src/index.ts'
@@ -17,7 +17,7 @@ async function setup(): Promise<Context> {
 function renderArtifact(ctx: Context, args: unknown) {
   return ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: CallId('artifact-test'),
+    callId: ToolCallId('artifact-test'),
     name: 'render_artifact',
     arguments: args,
   })

@@ -14,7 +14,7 @@ export { ModelSelect } from "./ModelSelect.js";
 export * from "./model-projection.js";
 // The nested composer/command injections inherit `sessions` from this
 // package fiber while resolving the official model directory service.
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions'];
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session', 'sessions'];
 const EMPTY_CONFIG = {
     version: 1,
     pinnedModels: [],
@@ -39,16 +39,14 @@ function currentConfig(scope) {
 }
 function catalogLoader(ctx) {
     return async () => {
-        const api = ctx.get('connection')?.api;
-        const models = api?.llm?.models;
-        if (models === undefined)
-            throw new Error('model catalog is unavailable');
-        const response = await models({});
-        if (!response.result.ok)
-            throw new Error(response.result.error?.message || 'model catalog request failed');
+        // DSH 0.1.5 exposes the shared Host-generation catalog through the typed
+        // Remote service, the same public seam used by the official model picker.
+        const response = await ctx.remote.session.modelCatalog();
+        if (!response.ok)
+            throw new Error(response.error?.message || 'model catalog request failed');
         return {
-            groups: response.result.value.groups ?? [],
-            failures: response.result.value.failures ?? [],
+            groups: response.value.groups ?? [],
+            failures: response.value.failures ?? [],
         };
     };
 }
@@ -69,8 +67,8 @@ export function apply(ctx) {
     const loadCatalog = catalogLoader(ctx);
     ctx.inject(['slots'], scope => {
         // The official Models page owns this extension slot.
-        scope.slots.inject('settings.models.content', () => scope.slots.register({
-            name: 'settings.models.content',
+        scope.slots.inject('settings.models.footer', () => scope.slots.register({
+            name: 'settings.models.footer',
             id: 'model-preferences',
             order: 10,
             locale: 'model-preferences',
@@ -86,7 +84,7 @@ export function apply(ctx) {
     // The public command seam can decorate a Host command. It cannot replace a
     // same-name client contribution, and the current official model-selection
     // plugin registers `/model` as exactly such a contribution.
-    ctx.inject(['commandUi', 'modelDirectories'], (scope) => {
+    ctx.inject(['commandUi', 'modelDirectories', 'remote.session'], (scope) => {
         const command = scope.get('commandUi');
         const models = scope.modelDirectories;
         const sessions = scope.sessions;
@@ -123,7 +121,7 @@ export function apply(ctx) {
             return command.decorate({ name: 'model', available, ui });
         }, 'model-preferences: decorate /model when supported');
     });
-    ctx.inject(['slots', 'modelDirectories'], (scope) => {
+    ctx.inject(['slots', 'modelDirectories', 'remote.session'], (scope) => {
         const models = scope.modelDirectories;
         const sessions = scope.sessions;
         scope.slots.inject('conversation.input.model', () => scope.slots.register({

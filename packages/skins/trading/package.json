@@ -28,14 +28,13 @@
     "test": "vitest run"
   },
   "license": "Apache-2.0",
-  "peerDependencies": {},
   "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-client-connection": "0.1.5-rc.1",
     "jsdom": "29.1.1",
     "lightningcss": "^1.32.0",
     "tsdown": "^0.22.2",
-    "vitest": "^4.1.8",
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1"
+    "vitest": "^4.1.8"
   },
   "files": [
     "lib",

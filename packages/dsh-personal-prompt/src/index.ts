@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import { carrierKeyOf, type ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
@@ -162,10 +162,12 @@ export function apply(ctx: Context, initialConfig: PersonalPromptConfig = DEFAUL
     }
   }
 
-  installSettingsSection(ctx, settingsNamespace(PERSONAL_PROMPT_SETTINGS_NAMESPACE), Config, initialConfig, {
-    setSource: next => { source = next },
-    onChange: () => {},
-    validate: value => { assertPersonalPrompt(value) },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, PERSONAL_PROMPT_SETTINGS_NAMESPACE, Config, initialConfig, {
+      setSource: next => { source = next },
+      onChange: () => {},
+      validate: value => { assertPersonalPrompt(value) },
+    })
   })
 
   ctx.effect(() => {

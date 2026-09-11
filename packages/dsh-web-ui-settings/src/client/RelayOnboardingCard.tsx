@@ -89,6 +89,7 @@ function statusText(status: RelayStatusResponse | null, loading: boolean, t: (ke
 
 export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const { t } = props
+  const [expanded, setExpanded] = useState(true)
   const [status, setStatus] = useState<RelayStatusResponse | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(true)
@@ -189,13 +190,16 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   return (
     <section className={css.card} data-relay-onboarding-card="true" data-dock-dirty={apiKey.trim() !== '' ? 'true' : undefined}>
       <header className={css.header}>
+        <button type="button" className={css.collapse} aria-expanded={expanded} aria-controls="dsh-relay-content" aria-label={t(expanded ? 'collapseRelay' : 'expandRelay')} title={t(expanded ? 'collapseRelay' : 'expandRelay')} onClick={() => setExpanded(value => !value)}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d={expanded ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
         <div>
           <h3 className={css.title}>{t('title')}</h3>
           <p className={css.description}>{t('description')}</p>
         </div>
         <span className={status?.configured ? css.badgeReady : css.badge}>{statusText(status, loading, t)}</span>
       </header>
-
+      <div id="dsh-relay-content" className={css.body} hidden={!expanded}>
       <p className={css.notice}>{t('notice')}</p>
 
       <div className={css.actions}>
@@ -286,6 +290,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
       {status?.writable === false && <p className={css.muted}>{t('readonly')}</p>}
       {notice !== undefined && <p className={css.success} role="status">{notice}</p>}
       {error !== undefined && <p className={css.error} role="alert">{error}</p>}
+      </div>
     </section>
   )
 }

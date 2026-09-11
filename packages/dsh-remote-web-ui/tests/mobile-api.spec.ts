@@ -8,8 +8,8 @@ import { createServer, request as httpRequest } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
 import { makeMobileApiRoutes } from '../src/mobile-api.ts'
+import type { MobileApiProxy } from '../src/mobile-contract.ts'
 
 interface TestServer {
   port: number
@@ -55,7 +55,7 @@ const apiProxy = {
     rename: async () => ({ rpcId: 'r', result: { ok: true, value: { ok: true } } }),
   },
   events: { mux: () => (async function* () {})() },
-} as unknown as ApiProxy
+} as unknown as MobileApiProxy
 
 async function serve(routes: WebRoute[]): Promise<TestServer> {
   const server = createServer((request, response) => {
@@ -175,7 +175,7 @@ describe('mobile api envelope', () => {
     const blockingProxy = {
       ...apiProxy,
       events: { mux: () => (async function* () { while (true) { await new Promise(() => {}) } })() },
-    } as unknown as ApiProxy
+    } as unknown as MobileApiProxy
     const routes = makeMobileApiRoutes({ service, apiProxy: blockingProxy, userScope, mobileEnterToSend, eventsHeartbeatMs: 25 })
     let connections = 0
     const server = createServer((request, response) => {

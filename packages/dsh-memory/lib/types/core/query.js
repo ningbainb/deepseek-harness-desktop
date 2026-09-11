@@ -18,7 +18,7 @@ function textFromEvent(event) {
 export function extractCurrentUserQuery(session) {
     if (session.header.origin === 'subagent')
         return '';
-    const events = session.events;
+    const events = session.snapshotEvents();
     let start = -1;
     for (let index = 0; index < events.length; index += 1) {
         if (events[index]?.type === 'turn/start')

@@ -32,6 +32,7 @@ const marketPagination = document.querySelector('#market-pagination')
 const marketPageState = document.querySelector('#market-page-state')
 const marketPrevious = document.querySelector('#market-previous')
 const marketNext = document.querySelector('#market-next')
+const marketReloadButton = document.querySelector('#market-reload')
 const toast = document.querySelector('#toast')
 const qqBotCard = document.querySelector('#qqbot-card')
 const qqBotStateLabel = document.querySelector('#qqbot-state-label')
@@ -66,6 +67,9 @@ let marketPage = 1
 let marketView
 let installedMarketReferences = new Set()
 const marketInstallPhases = new Map()
+let marketRefreshPromise
+let pluginUpdatePromise
+let refreshAllPromise
 
 const MARKET_PAGE_SIZE = 20
 const compactNumber = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
@@ -82,6 +86,9 @@ function setOperationBusy(busy) {
   document.body.dataset.busy = String(busy)
   document.body.setAttribute('aria-busy', String(busy))
   for (const button of document.querySelectorAll('button:not([role="tab"])')) button.disabled = busy
+  marketReloadButton.disabled = busy || Boolean(marketRefreshPromise)
+  checkPluginUpdatesButton.disabled = busy || Boolean(pluginUpdatePromise)
+  refreshButton.disabled = busy || Boolean(refreshAllPromise)
   if (!busy) syncMarketPaginationState()
 }
 
@@ -319,7 +326,7 @@ const NATIVE_PLUGINS = [
   },
   {
     id: 'personal-prompt',
-    name: '个性化 Prompt 管理',
+    name: '回复偏好',
     packageName: '@ningbainb/dsh-personal-prompt',
     category: 'ai',
     categoryLabel: 'AI 核心',
@@ -648,34 +655,49 @@ function renderMarket() {
   if (extensionOperations.busy) setOperationBusy(true)
 }
 
-async function refreshMarket() {
+function refreshMarket({ force = false } = {}) {
+  if (marketRefreshPromise) return marketRefreshPromise
+  const previousCatalog = marketCatalog
+  marketReloadButton.disabled = true
   marketResultState.textContent = '正在读取社区目录'
-  try {
-    const catalog = await window.dshDesktop.listCommunityMarket()
-    marketCatalog = catalog
-    marketPage = 1
-    marketCount.textContent = compactNumber.format(catalog.count)
-    marketTotal.textContent = compactNumber.format(catalog.count)
-    marketUpdated.textContent = catalog.updated ?? '--'
-    const selectedCategory = marketCategory.value
-    marketCategory.innerHTML = '<option value="all">全部分类</option>' + catalog.categories.map((category) => {
-      const label = category.label?.zh ?? category.label?.en ?? category.id
-      return `<option value="${escapeHtml(category.id)}">${escapeHtml(label)}</option>`
-    }).join('')
-    if ([...marketCategory.options].some((option) => option.value === selectedCategory)) {
-      marketCategory.value = selectedCategory
+  marketRefreshPromise = (async () => {
+    try {
+      const catalog = await window.dshDesktop.listCommunityMarket(force)
+      marketCatalog = catalog
+      marketPage = 1
+      marketCount.textContent = compactNumber.format(catalog.count)
+      marketTotal.textContent = compactNumber.format(catalog.count)
+      marketUpdated.textContent = catalog.updated ?? '--'
+      const selectedCategory = marketCategory.value
+      marketCategory.innerHTML = '<option value="all">全部分类</option>' + catalog.categories.map((category) => {
+        const label = category.label?.zh ?? category.label?.en ?? category.id
+        return `<option value="${escapeHtml(category.id)}">${escapeHtml(label)}</option>`
+      }).join('')
+      if ([...marketCategory.options].some((option) => option.value === selectedCategory)) {
+        marketCategory.value = selectedCategory
+      }
+      renderMarket()
+    } catch (error) {
+      if (previousCatalog) {
+        marketCatalog = previousCatalog
+        renderMarket()
+        marketResultState.textContent = '目录刷新失败，继续显示本机缓存'
+        return
+      }
+      marketCatalog = undefined
+      marketView = undefined
+      marketCount.textContent = '--'
+      marketTotal.textContent = '--'
+      marketUpdated.textContent = '--'
+      marketResultState.textContent = '社区目录暂时不可用'
+      marketList.innerHTML = `<p class="market-empty">${escapeHtml(error.message)}</p>`
+      marketPagination.hidden = true
+    } finally {
+      marketRefreshPromise = undefined
+      marketReloadButton.disabled = extensionOperations.busy
     }
-    renderMarket()
-  } catch (error) {
-    marketCatalog = undefined
-    marketView = undefined
-    marketCount.textContent = '--'
-    marketTotal.textContent = '--'
-    marketUpdated.textContent = '--'
-    marketResultState.textContent = '社区目录暂时不可用'
-    marketList.innerHTML = `<p class="market-empty">${escapeHtml(error.message)}</p>`
-    marketPagination.hidden = true
-  }
+  })()
+  return marketRefreshPromise
 }
 
 const recoveryResolutionLabels = Object.freeze({
@@ -821,20 +843,28 @@ function renderPlugins(plugins) {
   if (extensionOperations.busy) setOperationBusy(true)
 }
 
-async function checkPluginUpdates({ silent = false } = {}) {
+function checkPluginUpdates({ silent = false } = {}) {
+  if (pluginUpdatePromise) return pluginUpdatePromise
+  checkPluginUpdatesButton.disabled = true
   pluginUpdateState.textContent = '正在检查社区插件更新…'
-  try {
-    const plugins = await window.dshDesktop.checkPluginUpdates()
-    renderPlugins(plugins)
-    const available = plugins.filter((plugin) => plugin.updateAvailable).length
-    pluginUpdateState.textContent = available > 0
-      ? `发现 ${available} 个社区插件更新；不兼容版本已拦截。`
-      : '社区插件已检查；内置插件随 Desktop 更新。'
-    if (!silent) notify(available > 0 ? `发现 ${available} 个插件更新` : '插件已是最新状态')
-  } catch (error) {
-    pluginUpdateState.textContent = '插件更新源暂时不可用，已安装版本未改变。'
-    if (!silent) notify(error.message, true)
-  }
+  pluginUpdatePromise = (async () => {
+    try {
+      const plugins = await window.dshDesktop.checkPluginUpdates()
+      renderPlugins(plugins)
+      const available = plugins.filter((plugin) => plugin.updateAvailable).length
+      pluginUpdateState.textContent = available > 0
+        ? `发现 ${available} 个社区插件更新；不兼容版本已拦截。`
+        : '社区插件已检查；内置插件随 Desktop 更新。'
+      if (!silent) notify(available > 0 ? `发现 ${available} 个插件更新` : '插件已是最新状态')
+    } catch (error) {
+      pluginUpdateState.textContent = '插件更新源暂时不可用，已安装版本未改变。'
+      if (!silent) notify(error.message, true)
+    } finally {
+      pluginUpdatePromise = undefined
+      checkPluginUpdatesButton.disabled = extensionOperations.busy
+    }
+  })()
+  return pluginUpdatePromise
 }
 
 document.querySelector('#qqbot-bind').addEventListener('click', () => {
@@ -902,10 +932,19 @@ function activateTab(tab, focus = false, settingOverride) {
   document.querySelector('main').scrollTop = 0
   try { localStorage.setItem('dsh-dock-setting', setting ?? '') } catch { /* optional navigation state */ }
   const settingState = document.querySelector('#dock-settings-state')
+  const settingRetry = document.querySelector('#dock-settings-retry')
   document.querySelector('#dock-settings').setAttribute('aria-labelledby', tab.id)
   settingState.textContent = '正在加载设置…'
-  void window.dshDesktop.selectDockSetting?.(setting ?? null).catch(error => {
-    if (request === settingsRequest) settingState.textContent = error.message || '设置加载失败，请重试。'
+  settingState.hidden = !setting
+  settingRetry.hidden = true
+  void Promise.resolve(window.dshDesktop.selectDockSetting?.(setting ?? null)).then(() => {
+    if (request === settingsRequest) settingState.hidden = true
+  }).catch(error => {
+    if (request === settingsRequest) {
+      settingState.hidden = false
+      settingState.textContent = error.message || '设置加载失败，请重试。'
+      settingRetry.hidden = false
+    }
   })
   for (const item of tabs) {
     const active = item.closest('.settings-sidebar')
@@ -944,7 +983,7 @@ for (const tab of tabs) {
 const searchEntries = [
   ['模型接入', '供应商 bai 中转站 登录 账号 充值 API Key', 'relay-tab'],
   ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
-  ['Prompt', '个人偏好 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
+  ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
@@ -960,26 +999,32 @@ const searchEntries = [
 ]
 const dockSearch = document.querySelector('#dock-search')
 const searchResults = document.querySelector('#dock-search-results')
+const sidebarNavigation = document.querySelector('.settings-sidebar > nav')
+function resetFeatureSearch() {
+  searchResults.hidden = true
+  dockSearch.value = ''
+  sidebarNavigation.hidden = false
+}
 dockSearch.addEventListener('input', () => {
   const query = dockSearch.value.trim().toLocaleLowerCase()
   searchResults.replaceChildren()
   searchResults.hidden = !query
+  sidebarNavigation.hidden = Boolean(query)
   if (!query) return
   for (const [title, aliases, id, setting] of searchEntries.filter(entry => entry.slice(0, 2).join(' ').toLocaleLowerCase().includes(query))) {
     const button = document.createElement('button')
     button.type = 'button'
     button.textContent = title
     button.addEventListener('click', () => {
+      resetFeatureSearch()
       activateTab(document.getElementById(id), true, setting)
-      searchResults.hidden = true
-      dockSearch.value = ''
     })
     searchResults.append(button)
   }
   if (!searchResults.childElementCount) searchResults.textContent = '没有匹配的功能'
 })
 dockSearch.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { searchResults.hidden = true; dockSearch.value = '' }
+  if (event.key === 'Escape') resetFeatureSearch()
   if (event.key === 'ArrowDown') { event.preventDefault(); searchResults.querySelector('button')?.focus() }
   if (event.key === 'Enter') { event.preventDefault(); searchResults.querySelector('button')?.click() }
 })
@@ -1120,8 +1165,8 @@ marketNext.addEventListener('click', () => {
   renderMarket()
   document.querySelector('#market').scrollIntoView({ block: 'start', behavior: 'smooth' })
 })
-document.querySelector('#market-reload').addEventListener('click', () => {
-  void extensionOperations.run(refreshMarket)
+marketReloadButton.addEventListener('click', () => {
+  void refreshMarket({ force: true })
 })
 marketList.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-install-market-plugin]')
@@ -1325,19 +1370,23 @@ document.querySelector('#reset-profile-env')?.addEventListener('click', async ()
   })
 })
 checkPluginUpdatesButton.addEventListener('click', () => {
-  void extensionOperations.run(() => checkPluginUpdates())
+  void checkPluginUpdates()
 })
-refreshButton.addEventListener('click', () => {
-  void extensionOperations.run(async () => {
-    await Promise.all([refresh(), refreshMarket()])
-    await checkPluginUpdates({ silent: true })
-  })
-})
+function refreshAll() {
+  if (refreshAllPromise) return refreshAllPromise
+  refreshButton.disabled = true
+  refreshAllPromise = Promise.all([refresh(), refreshMarket({ force: true })])
+    .then(() => checkPluginUpdates({ silent: true }))
+    .finally(() => {
+      refreshAllPromise = undefined
+      refreshButton.disabled = extensionOperations.busy
+    })
+  return refreshAllPromise
+}
+refreshButton.addEventListener('click', () => { void refreshAll() })
 
 document.querySelector('#activation-refresh').addEventListener('click', () => {
-  void extensionOperations.run(async () => {
-    await refresh()
-    await checkPluginUpdates({ silent: true })
+  void refreshAll().then(() => {
     activationBanner.hidden = true
   })
 })
@@ -1450,6 +1499,6 @@ try {
   if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
 } catch { /* first visit opens model collaboration */ }
 activateTab(initialTab, false, initialSetting)
-await extensionOperations.run(refresh)
+await refresh()
 void refreshMarket()
-void extensionOperations.run(() => checkPluginUpdates({ silent: true }))
+void checkPluginUpdates({ silent: true })

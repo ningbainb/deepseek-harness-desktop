@@ -7,8 +7,10 @@ A session-header switcher for changing the active agent mode without editing con
 ## Behavior
 
 - Loads the available agent presets from the official DSH runtime and hides broken presets.
-- Switches a blank session in place.
-- If the current session already contains messages, creates a blank session with the requested preset in the same workspace so existing history is preserved. During the transition it briefly synchronizes the official default preset so the official session-preset seat shows the target mode, then immediately restores the user's original default.
+- Switches a blank session in place. If either the list row or the loaded native projection records a started conversation, it is not reused as a blank draft.
+- If the current session already contains messages, creates a blank session with the requested preset in the same workspace or its original directory, preserving existing history. An unrelated workspace is never chosen as a fallback.
+- Creation or refresh failure keeps the original conversation selected; a late result does not replace a conversation the user has since opened.
+- Current DSH uses official Remote calls and session projections without changing the global default. Older hosts retain their preset-label synchronization and restore the user's original default afterwards.
 - Disables the selector while a switch is running and reports runtime errors in its tooltip.
 
 The selector is hidden when the runtime exposes fewer than two usable presets.

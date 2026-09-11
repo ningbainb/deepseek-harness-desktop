@@ -7,7 +7,7 @@
  */
 
 import type { IncomingMessage } from 'node:http'
-import type { MuxFrame } from '@deepseek-ai/dsh-host-apiproxy/api/events'
+import type { MobileMuxFrame } from './mobile-contract.ts'
 import type { PairingService } from './pairing.ts'
 import {
   asDeviceId,
@@ -112,7 +112,7 @@ export function isAuthorizedMuxFrame(
   frame: unknown,
   authority: MobileScopeAuthority,
   scope: AccessScope,
-): frame is { rpcId: string; payload: MuxFrame } {
+): frame is { rpcId: string; payload: MobileMuxFrame } {
   if (!isRecord(frame) || typeof frame.rpcId !== 'string' || frame.rpcId.length === 0 || frame.rpcId.length > 256) return false
   if (!isRecord(frame.payload) || typeof frame.payload.type !== 'string' || !MUX_FRAME_TYPES.has(frame.payload.type)) return false
   const sessionId = asSessionId(frame.payload.sessionId)

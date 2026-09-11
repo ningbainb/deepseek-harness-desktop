@@ -100,4 +100,17 @@ describe('ScmPanel window-focus refresh throttle', () => {
 
     act(() => { root.unmount() })
   })
+
+  it('shares the refresh budget across split and floating bodies of one workspace', () => {
+    const stores = makeFakeStores()
+    const root = createRoot(host)
+    act(() => root.render(<><ScmPanel stores={stores} /><ScmPanel stores={stores} /></>))
+    act(() => window.dispatchEvent(new Event('focus')))
+    expect(stores.scm.refresh).toHaveBeenCalledTimes(1)
+    act(() => { vi.advanceTimersByTime(5000); window.dispatchEvent(new Event('focus')) })
+    expect(stores.scm.refresh).toHaveBeenCalledTimes(2)
+    act(() => root.unmount())
+    act(() => { vi.advanceTimersByTime(5000); window.dispatchEvent(new Event('focus')) })
+    expect(stores.scm.refresh).toHaveBeenCalledTimes(2)
+  })
 })

@@ -1,4 +1,6 @@
-export const CONVERSATION_POLISH_CSS = `
+import { CONVERSATION_RENDERING_CSS, CONVERSATION_RENDERING_SCRIPT } from './conversation-rendering.mjs'
+
+export const CONVERSATION_POLISH_CSS = CONVERSATION_RENDERING_CSS + `
 [data-variant="think"] > [data-open] > [data-disclosure-row] {
   position: sticky;
   z-index: 20;
@@ -25,6 +27,8 @@ export const CONVERSATION_POLISH_CSS = `
 export async function applyConversationPolish(webContents) {
   if (!webContents || webContents.isDestroyed?.()) return false
   await webContents.insertCSS(CONVERSATION_POLISH_CSS, { cssOrigin: 'author' })
+  if (webContents.isDestroyed?.()) return false
+  await webContents.executeJavaScript(CONVERSATION_RENDERING_SCRIPT)
   return true
 }
 
@@ -34,5 +38,8 @@ export function installConversationPolish({ browserWindow, onError = () => {} })
     void applyConversationPolish(webContents).catch(onError)
   }
   webContents.on('did-finish-load', apply)
-  return () => webContents.removeListener('did-finish-load', apply)
+  return () => {
+    webContents.removeListener('did-finish-load', apply)
+    if (!webContents.isDestroyed?.()) void webContents.executeJavaScript('globalThis.dshConversationRenderingController?.dispose()').catch(onError)
+  }
 }

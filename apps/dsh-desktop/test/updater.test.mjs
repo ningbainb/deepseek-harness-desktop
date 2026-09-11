@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
+import { validUpdateDiagnostic } from '../src/update-diagnostics.mjs'
 
 import {
   DesktopUpdateController,
@@ -170,6 +171,8 @@ test('available update starts downloading in the background without prompting', 
   })
   await tick()
   assert.equal(harness.updater.downloads, 1)
+  const diagnostic = harness.controller.getStatus().update
+  assert.equal(validUpdateDiagnostic(diagnostic), true)
   assert.deepEqual(harness.controller.getStatus(), {
     phase: 'downloading',
     currentVersion: '1.0.0',
@@ -178,6 +181,7 @@ test('available update starts downloading in the background without prompting', 
     releaseNotes: 'Complete release notes.',
     percent: 0,
     visible: false,
+    update: { attempt_id: diagnostic.attempt_id, timestamp: diagnostic.timestamp, stage: 'download', error_type: 'none', error_code: 'none', source_version: '1.0.0', target_version: '1.1.0', source: 'github', source_attempt: 0, update_channel: 'stable' },
   })
 })
 
@@ -382,11 +386,14 @@ test('automatic DNS failure reaches a non-blocking terminal state after shell an
   await tick()
 
   assert.deepEqual(startupEvents.toSorted(), ['runtime-ready', 'shell-ready'])
+  const diagnostic = harness.controller.getStatus().update
+  assert.equal(validUpdateDiagnostic(diagnostic), true)
   assert.deepEqual(harness.controller.getStatus(), {
     phase: 'error',
     currentVersion: '1.0.0',
     message: 'getaddrinfo ENOTFOUND updates.example.invalid',
     visible: false,
+    update: { attempt_id: diagnostic.attempt_id, timestamp: diagnostic.timestamp, stage: 'check', error_type: 'network', error_code: 'ENOTFOUND', source_version: '1.0.0', target_version: 'unknown', source: 'github', source_attempt: 0, update_channel: 'stable' },
   })
   assert.ok(harness.logs.some((line) => line.includes('ENOTFOUND')))
   harness.controller.dispose()

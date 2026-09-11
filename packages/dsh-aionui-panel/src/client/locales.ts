@@ -6,6 +6,14 @@
  */
 
 const zh = {
+  'native.files': '文件工具',
+  'native.filesHint': '搜索、拖拽、路径引用与编辑',
+  'native.changes': 'Git 变更',
+  'native.changesHint': '查看差异、暂存和管理工作区更改',
+  'native.inactive': '请返回此标签所属的对话后操作。',
+  'native.browser': '网页预览',
+  'native.browserHint': '在独立标签中查看网页',
+  'native.reopen': '打开原生侧栏',
   'attachment.add': '添加文件',
   'attachment.duplicate': '此文件已添加',
   'attachment.missing': '文件引用已失效，请移除此项并重新添加。',
@@ -32,6 +40,7 @@ const zh = {
   'explorer.close': '关闭文件面板',
   'explorer.expand': '展开面板',
   'explorer.openPreview': '打开预览',
+  'explorer.openEditor': '编辑 / 兼容预览',
   'explorer.drag.dropHint': '松开添加文件到当前对话',
   'explorer.drag.imageProcessing': '正在校验并压缩图片，按 Esc 取消',
   'explorer.drag.imageSubmitting': '正在添加图片',
@@ -98,6 +107,14 @@ const zh = {
 } as const
 
 const en: Record<keyof typeof zh, string> = {
+  'native.files': 'File tools',
+  'native.filesHint': 'Search, drag, reference paths and edit',
+  'native.changes': 'Git changes',
+  'native.changesHint': 'Review diffs, stage and manage workspace changes',
+  'native.inactive': 'Return to the conversation that owns this tab to use its tools.',
+  'native.browser': 'Web preview',
+  'native.browserHint': 'View a web page in its own tab',
+  'native.reopen': 'Open native sidebar',
   'preview.url.close': 'Close browser',
   'attachment.add': 'Add files',
   'attachment.duplicate': 'This file is already added',
@@ -125,6 +142,7 @@ const en: Record<keyof typeof zh, string> = {
   'explorer.close': 'Close file panel',
   'explorer.expand': 'Expand panel',
   'explorer.openPreview': 'Open preview',
+  'explorer.openEditor': 'Edit / compatibility preview',
   'explorer.drag.dropHint': 'Release to insert: text enters the draft; Word/PDF add a path reference only',
   'explorer.drag.imageProcessing': 'Validating and compressing image; press Esc to cancel',
   'explorer.drag.imageSubmitting': 'Adding image',

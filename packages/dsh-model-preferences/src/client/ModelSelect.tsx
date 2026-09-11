@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -18,7 +18,7 @@ export type ModelSelectProps = PropsRuntime<'conversation.input.model'>
   & ModelSelectInjected
   & {
     modelSessionId: string
-    settingsScope: import('@deepseek-ai/dsh-client-runtime/client').SettingsScope<ModelPreferencesConfig>
+    settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').SettingsScope<ModelPreferencesConfig>
   }
 
 type Pane = 'root' | 'model' | 'effort'
@@ -46,6 +46,8 @@ export function ModelSelect(props: ModelSelectProps) {
   const [selecting, setSelecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastActionRef = useRef<'load' | 'select'>('load')
+  const loadRef = useRef(load)
+  loadRef.current = load
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const refreshBridgeRef = useRef<{ announce(): void; dispose(): void } | null>(null)
@@ -102,28 +104,27 @@ export function ModelSelect(props: ModelSelectProps) {
   const modelLabel = currentName || t('trigger.fallback')
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
 
-  const reload = (): void => {
+  const reload = useCallback((): void => {
     lastActionRef.current = 'load'
-    load()
-  }
+    loadRef.current()
+  }, [])
 
   useEffect(() => {
     if (!available) return
-    lastActionRef.current = 'load'
-    load()
-  }, [available, load])
+    reload()
+  }, [available, directory, modelSessionId, reload])
 
   useEffect(() => {
     refreshBridgeRef.current?.dispose()
     refreshBridgeRef.current = null
     if (!available) return
-    const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: load })
+    const bridge = installModelRefreshBridge({ sessionId: modelSessionId, refresh: reload })
     refreshBridgeRef.current = bridge
     return () => {
       bridge.dispose()
       if (refreshBridgeRef.current === bridge) refreshBridgeRef.current = null
     }
-  }, [available, load, modelSessionId])
+  }, [available, modelSessionId, reload])
 
   useEffect(() => {
     if (!open) return
@@ -237,7 +238,10 @@ export function ModelSelect(props: ModelSelectProps) {
             setOpen(true)
             setPane('root')
             setError(null)
-            reload()
+            // The mounted directory and the refresh bridge already keep this
+            // projection current. Opening the menu must not restart the same
+            // model request on every click.
+            if (state.status === 'idle' || state.status === 'error') reload()
           }
         }}
       >

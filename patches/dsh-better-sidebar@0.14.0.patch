@@ -1,0 +1,469 @@
+diff --git a/lib/client-editor.js b/lib/client-editor.js
+index 11cb963d54054e847a5b83d8b8222da13fc9630a..da7911ea4afbadf282704d3593b4015e388c267f 100644
+--- a/lib/client-editor.js
++++ b/lib/client-editor.js
+@@ -33599,11 +33599,10 @@ globalThis.__dshChunks__["editor"] = (require) => {
+ 	* CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+ 	* external and the loader resolves them here). A superset is safe: the
+ 	* require only answers what the chunk actually asks for. The shell's static
+-	* module table seeds React, Cordis, and the UI libraries (primitives/slots);
+-	* `dsh-client-runtime/client` normalizes onto the runtime package row
+-	* (stripClientSuffix). dsh-client-web-react / dsh-client-schema-form were
+-	* dropped in DSH 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the
+-	* chunks never asked for them, so they no longer belong here.
++	* module table seeds React, Cordis, and the UI libraries (primitives/slots).
++	* dsh-client-web-react / dsh-client-schema-form were dropped in DSH
++	* 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the chunks never
++	* asked for them, so they no longer belong here.
+ 	*/
+ 	const CHUNK_EXTERNALS = [
+ 		"react",
+@@ -33612,8 +33611,7 @@ globalThis.__dshChunks__["editor"] = (require) => {
+ 		"react-dom/client",
+ 		"cordis",
+ 		"@deepseek-ai/dsh-client-ui-slots",
+-		"@deepseek-ai/dsh-client-ui-primitives",
+-		"@deepseek-ai/dsh-client-runtime/client"
++		"@deepseek-ai/dsh-client-ui-primitives"
+ 	];
+ 	/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
+ 	const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
+diff --git a/lib/client-registry.js b/lib/client-registry.js
+index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca414b6870 100644
+--- a/lib/client-registry.js
++++ b/lib/client-registry.js
+@@ -1335,11 +1335,10 @@ window.__ModuleLoader__.load({
+ 		* CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+ 		* external and the loader resolves them here). A superset is safe: the
+ 		* require only answers what the chunk actually asks for. The shell's static
+-		* module table seeds React, Cordis, and the UI libraries (primitives/slots);
+-		* `dsh-client-runtime/client` normalizes onto the runtime package row
+-		* (stripClientSuffix). dsh-client-web-react / dsh-client-schema-form were
+-		* dropped in DSH 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the
+-		* chunks never asked for them, so they no longer belong here.
++		* module table seeds React, Cordis, and the UI libraries (primitives/slots).
++		* dsh-client-web-react / dsh-client-schema-form were dropped in DSH
++		* 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the chunks never
++		* asked for them, so they no longer belong here.
+ 		*/
+ 		const CHUNK_EXTERNALS = [
+ 			"react",
+@@ -1348,8 +1347,7 @@ window.__ModuleLoader__.load({
+ 			"react-dom/client",
+ 			"cordis",
+ 			"@deepseek-ai/dsh-client-ui-slots",
+-			"@deepseek-ai/dsh-client-ui-primitives",
+-			"@deepseek-ai/dsh-client-runtime/client"
++			"@deepseek-ai/dsh-client-ui-primitives"
+ 		];
+ 		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
+ 		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
+@@ -7384,11 +7382,12 @@ window.__ModuleLoader__.load({
+ 		function parseDesktopEnv() {
+ 			if (cached !== void 0) return cached;
+ 			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
+-			const modeParam = params.get("dsh-desktop-mode");
++			const shellContext = window.dshDesktop?.shellContext;
++			const modeParam = params.get("dsh-desktop-mode") ?? shellContext?.mode;
+ 			const mode = modeParam === "compatibility" || modeParam === "advanced" ? modeParam : null;
+-			const platformParam = params.get("dsh-desktop-platform");
+-			const platform = platformParam !== null && platformParam !== "" ? platformParam.toLowerCase() : null;
+-			const desktop = mode !== null || typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
++			const platformParam = params.get("dsh-desktop-platform") ?? shellContext?.platform;
++			const platform = typeof platformParam === "string" && platformParam !== "" ? platformParam.toLowerCase() : null;
++			const desktop = mode !== null || shellContext !== void 0 || typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
+ 			cached = {
+ 				desktop,
+ 				mode,
+@@ -9921,6 +9920,35 @@ window.__ModuleLoader__.load({
+ 			"locale",
+ 			"modules"
+ 		];
++		function installLayoutCompatibilityAnchors() {
++			const ownedFrames = /* @__PURE__ */ new Set();
++			const ownedCenters = /* @__PURE__ */ new Set();
++			const sync = () => {
++				for (const rightbar of document.querySelectorAll("[data-rightbar-col]")) {
++					const frame = rightbar.parentElement;
++					const center = rightbar.previousElementSibling;
++					if (frame !== null && !frame.hasAttribute("data-dsh-frame")) {
++						frame.setAttribute("data-dsh-frame", "");
++						ownedFrames.add(frame);
++					}
++					if (center instanceof HTMLElement && !center.hasAttribute("data-pane")) {
++						center.setAttribute("data-pane", "conversation");
++						ownedCenters.add(center);
++					}
++				}
++			};
++			sync();
++			const observer = new MutationObserver(sync);
++			observer.observe(document.body, {
++				childList: true,
++				subtree: true
++			});
++			return () => {
++				observer.disconnect();
++				for (const frame of ownedFrames) if (frame.getAttribute("data-dsh-frame") === "") frame.removeAttribute("data-dsh-frame");
++				for (const center of ownedCenters) if (center.getAttribute("data-pane") === "conversation") center.removeAttribute("data-pane");
++			};
++		}
+ 		/**
+ 		* Error boundary over the sidebar tree (root scope): a render error in the
+ 		* sidebar SHELL itself must never blank the page silently — the shared
+@@ -9933,6 +9961,7 @@ window.__ModuleLoader__.load({
+ 		* @param ctx - the client cordis context (slots, sessions).
+ 		*/
+ 		function apply(ctx) {
++			ctx.effect(installLayoutCompatibilityAnchors, "dsh-better-sidebar: DSH 0.1.5 layout anchors");
+ 			attachLocale(ctx.locale);
+ 			ctx.effect(() => {
+ 				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
+diff --git a/lib/client.js b/lib/client.js
+index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32656a8e5e 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -1335,11 +1335,10 @@ window.__ModuleLoader__.load({
+ 		* CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+ 		* external and the loader resolves them here). A superset is safe: the
+ 		* require only answers what the chunk actually asks for. The shell's static
+-		* module table seeds React, Cordis, and the UI libraries (primitives/slots);
+-		* `dsh-client-runtime/client` normalizes onto the runtime package row
+-		* (stripClientSuffix). dsh-client-web-react / dsh-client-schema-form were
+-		* dropped in DSH 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the
+-		* chunks never asked for them, so they no longer belong here.
++		* module table seeds React, Cordis, and the UI libraries (primitives/slots).
++		* dsh-client-web-react / dsh-client-schema-form were dropped in DSH
++		* 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the chunks never
++		* asked for them, so they no longer belong here.
+ 		*/
+ 		const CHUNK_EXTERNALS = [
+ 			"react",
+@@ -1348,8 +1347,7 @@ window.__ModuleLoader__.load({
+ 			"react-dom/client",
+ 			"cordis",
+ 			"@deepseek-ai/dsh-client-ui-slots",
+-			"@deepseek-ai/dsh-client-ui-primitives",
+-			"@deepseek-ai/dsh-client-runtime/client"
++			"@deepseek-ai/dsh-client-ui-primitives"
+ 		];
+ 		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
+ 		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
+@@ -7384,11 +7382,12 @@ window.__ModuleLoader__.load({
+ 		function parseDesktopEnv() {
+ 			if (cached !== void 0) return cached;
+ 			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
+-			const modeParam = params.get("dsh-desktop-mode");
++			const shellContext = window.dshDesktop?.shellContext;
++			const modeParam = params.get("dsh-desktop-mode") ?? shellContext?.mode;
+ 			const mode = modeParam === "compatibility" || modeParam === "advanced" ? modeParam : null;
+-			const platformParam = params.get("dsh-desktop-platform");
+-			const platform = platformParam !== null && platformParam !== "" ? platformParam.toLowerCase() : null;
+-			const desktop = mode !== null || typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
++			const platformParam = params.get("dsh-desktop-platform") ?? shellContext?.platform;
++			const platform = typeof platformParam === "string" && platformParam !== "" ? platformParam.toLowerCase() : null;
++			const desktop = mode !== null || shellContext !== void 0 || typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
+ 			cached = {
+ 				desktop,
+ 				mode,
+@@ -9921,6 +9920,35 @@ window.__ModuleLoader__.load({
+ 			"locale",
+ 			"modules"
+ 		];
++		function installLayoutCompatibilityAnchors() {
++			const ownedFrames = /* @__PURE__ */ new Set();
++			const ownedCenters = /* @__PURE__ */ new Set();
++			const sync = () => {
++				for (const rightbar of document.querySelectorAll("[data-rightbar-col]")) {
++					const frame = rightbar.parentElement;
++					const center = rightbar.previousElementSibling;
++					if (frame !== null && !frame.hasAttribute("data-dsh-frame")) {
++						frame.setAttribute("data-dsh-frame", "");
++						ownedFrames.add(frame);
++					}
++					if (center instanceof HTMLElement && !center.hasAttribute("data-pane")) {
++						center.setAttribute("data-pane", "conversation");
++						ownedCenters.add(center);
++					}
++				}
++			};
++			sync();
++			const observer = new MutationObserver(sync);
++			observer.observe(document.body, {
++				childList: true,
++				subtree: true
++			});
++			return () => {
++				observer.disconnect();
++				for (const frame of ownedFrames) if (frame.getAttribute("data-dsh-frame") === "") frame.removeAttribute("data-dsh-frame");
++				for (const center of ownedCenters) if (center.getAttribute("data-pane") === "conversation") center.removeAttribute("data-pane");
++			};
++		}
+ 		/**
+ 		* Error boundary over the sidebar tree (root scope): a render error in the
+ 		* sidebar SHELL itself must never blank the page silently — the shared
+@@ -9933,6 +9961,7 @@ window.__ModuleLoader__.load({
+ 		* @param ctx - the client cordis context (slots, sessions).
+ 		*/
+ 		function apply(ctx) {
++			ctx.effect(installLayoutCompatibilityAnchors, "dsh-better-sidebar: DSH 0.1.5 layout anchors");
+ 			attachLocale(ctx.locale);
+ 			ctx.effect(() => {
+ 				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
+diff --git a/lib/index.js b/lib/index.js
+index 83aaac8d178f437ed3ba1f5d901687bb4e5eecc9..d926340ad81fd2946bebc15501a2458dcc1cf7f4 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -6,7 +6,7 @@ import z from "schemastery";
+ import { createHash, randomUUID } from "node:crypto";
+ import { fileURLToPath } from "node:url";
+ import { spawn } from "node:child_process";
+-import { SettingsConflictError, settingsNamespace } from "@deepseek-ai/dsh-settings";
++import { SettingsConflictError } from "@deepseek-ai/dsh-settings";
+ import { chmodSync, existsSync, readFileSync, realpathSync } from "node:fs";
+ import { homedir, userInfo } from "node:os";
+ import { defineTool } from "@deepseek-ai/dsh-tools";
+@@ -2718,7 +2718,7 @@ function apply(ctx, config) {
+ 		}
+ 	};
+ 	ctx.inject(["settings"], (sctx) => {
+-		const ns = settingsNamespace(SIDEBAR_PREFS_NS);
++		const ns = SIDEBAR_PREFS_NS;
+ 		const scope = sctx.settings.register(ns, PrefsSchema);
+ 		const viewOf = () => {
+ 			const descriptor = sctx.settings.describe({ redactSecrets: true }).find((candidate) => candidate.ns === ns);
+diff --git a/lib/types/client/chunk-loader.d.ts b/lib/types/client/chunk-loader.d.ts
+index ac54aab163c72247afb52e962e386c0c8449fcd2..808de2eb4ee9bd3d4322a5763ed04fbef5c9fbae 100644
+--- a/lib/types/client/chunk-loader.d.ts
++++ b/lib/types/client/chunk-loader.d.ts
+@@ -57,11 +57,10 @@ export type ChunkExports = Record<string, unknown>;
+  * CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+  * external and the loader resolves them here). A superset is safe: the
+  * require only answers what the chunk actually asks for. The shell's static
+- * module table seeds React, Cordis, and the UI libraries (primitives/slots);
+- * `dsh-client-runtime/client` normalizes onto the runtime package row
+- * (stripClientSuffix). dsh-client-web-react / dsh-client-schema-form were
+- * dropped in DSH 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the
+- * chunks never asked for them, so they no longer belong here.
++ * module table seeds React, Cordis, and the UI libraries (primitives/slots).
++ * dsh-client-web-react / dsh-client-schema-form were dropped in DSH
++ * 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the chunks never
++ * asked for them, so they no longer belong here.
+  */
+ export declare const CHUNK_EXTERNALS: readonly string[];
+ /**
+diff --git a/lib/types/client/desktop-env.d.ts b/lib/types/client/desktop-env.d.ts
+index eebd7c2fffe354690443b595238492e4c70b9a6c..9a2eccdcf13aaddff93ed2a994a6047f0aca85ec 100644
+--- a/lib/types/client/desktop-env.d.ts
++++ b/lib/types/client/desktop-env.d.ts
+@@ -1,11 +1,11 @@
+ /**
+  * Desktop-shell detection for the sidebar. The official DSH Desktop shell
+- * (Electron) stamps every render URL with `dsh-desktop-mode` and
+- * `dsh-desktop-platform` and exposes `window.__DSH_DESKTOP_FILE_PATH__`
+- * through its preload; community Tauri shells keep the native system frame
+- * (no stamps — plain-browser semantics). Parsed once per page and memoized
+- * (the URL never changes mid-session); `resetDesktopEnvForTests` clears the
+- * memo for unit tests.
++ * (Electron) stamps the initial render URL with `dsh-desktop-mode` and
++ * `dsh-desktop-platform` and exposes a trusted preload shell context. DSH
++ * 0.1.5 may sanitize the URL after exchanging its launch token, so the
++ * preload context is the durable fallback. Community Tauri shells keep the
++ * native system frame (no stamps — plain-browser semantics). Parsed once per
++ * page and memoized; `resetDesktopEnvForTests` clears the memo for unit tests.
+  *
+  * Geometry facts the sidebar adapts to (from the Electron runtime):
+  * - win32 `advanced` mode draws the window controls in a 32px overlay strip
+diff --git a/package.json b/package.json
+index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..3015363b47e04bc0785f793bf58d03d9a6d5346e 100644
+--- a/package.json
++++ b/package.json
+@@ -45,9 +45,10 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-api-session-controller",
++        "@deepseek-ai/dsh-api-workspace-controller",
+         "@deepseek-ai/dsh-client-locale",
+-        "@deepseek-ai/dsh-client-ui-slots",
++        "@deepseek-ai/dsh-client-ui-renderer",
+         "@deepseek-ai/dsh-client-ui-conversation",
+         "@deepseek-ai/dsh-client-modules"
+       ],
+@@ -76,7 +77,6 @@
+     "@deepseek-ai/cordis": "^4.0.1",
+     "@deepseek-ai/dsh-agent": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.8",
+@@ -129,7 +129,6 @@
+     "@cordisjs/plugin-loader": "^1.0.0-rc.5",
+     "@deepseek-ai/dsh-agent": "0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-locale": "0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.8",
+diff --git a/src/client/chunk-loader.ts b/src/client/chunk-loader.ts
+index 30f0a9afa1297470ae7ed106137f1ee2a03e6152..b33f97065a9bbf2c82b663b91837e4caf0973f63 100644
+--- a/src/client/chunk-loader.ts
++++ b/src/client/chunk-loader.ts
+@@ -62,11 +62,10 @@ type ChunkFactory = (require: (spec: string) => unknown) => ChunkExports
+  * CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+  * external and the loader resolves them here). A superset is safe: the
+  * require only answers what the chunk actually asks for. The shell's static
+- * module table seeds React, Cordis, and the UI libraries (primitives/slots);
+- * `dsh-client-runtime/client` normalizes onto the runtime package row
+- * (stripClientSuffix). dsh-client-web-react / dsh-client-schema-form were
+- * dropped in DSH 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the
+- * chunks never asked for them, so they no longer belong here.
++ * module table seeds React, Cordis, and the UI libraries (primitives/slots).
++ * dsh-client-web-react / dsh-client-schema-form were dropped in DSH
++ * 0.1.0-rc.8 (no rc.8 publish, nothing requires them) — the chunks never
++ * asked for them, so they no longer belong here.
+  */
+ export const CHUNK_EXTERNALS: readonly string[] = [
+   'react',
+@@ -76,7 +75,6 @@ export const CHUNK_EXTERNALS: readonly string[] = [
+   'cordis',
+   '@deepseek-ai/dsh-client-ui-slots',
+   '@deepseek-ai/dsh-client-ui-primitives',
+-  '@deepseek-ai/dsh-client-runtime/client',
+ ]
+ 
+ /** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
+diff --git a/src/client/desktop-env.ts b/src/client/desktop-env.ts
+index 751f67f25f84af74036238ead6e309045b3b15eb..6ab1df59dfc9a855881df979dd9cd090df63c4b2 100644
+--- a/src/client/desktop-env.ts
++++ b/src/client/desktop-env.ts
+@@ -1,11 +1,11 @@
+ /**
+  * Desktop-shell detection for the sidebar. The official DSH Desktop shell
+- * (Electron) stamps every render URL with `dsh-desktop-mode` and
+- * `dsh-desktop-platform` and exposes `window.__DSH_DESKTOP_FILE_PATH__`
+- * through its preload; community Tauri shells keep the native system frame
+- * (no stamps — plain-browser semantics). Parsed once per page and memoized
+- * (the URL never changes mid-session); `resetDesktopEnvForTests` clears the
+- * memo for unit tests.
++ * (Electron) stamps the initial render URL with `dsh-desktop-mode` and
++ * `dsh-desktop-platform` and exposes a trusted preload shell context. DSH
++ * 0.1.5 may sanitize the URL after exchanging its launch token, so the
++ * preload context is the durable fallback. Community Tauri shells keep the
++ * native system frame (no stamps — plain-browser semantics). Parsed once per
++ * page and memoized; `resetDesktopEnvForTests` clears the memo for unit tests.
+  *
+  * Geometry facts the sidebar adapts to (from the Electron runtime):
+  * - win32 `advanced` mode draws the window controls in a 32px overlay strip
+@@ -31,17 +31,27 @@ export interface DesktopEnv {
+ 
+ let cached: DesktopEnv | undefined
+ 
++interface DesktopShellContext {
++  readonly mode?: unknown
++  readonly platform?: unknown
++}
++
+ /** Read the shell's desktop stamps (memoized per page). */
+ export function parseDesktopEnv(): DesktopEnv {
+   if (cached !== undefined) return cached
+   // location.search includes the leading '?', which URLSearchParams does NOT
+   // strip (it would become part of the first key) — drop it explicitly.
+   const params = new URLSearchParams(window.location.search.replace(/^\?/, ''))
+-  const modeParam = params.get('dsh-desktop-mode')
++  const shellContext = (window as { dshDesktop?: { shellContext?: DesktopShellContext } })
++    .dshDesktop?.shellContext
++  const modeParam = params.get('dsh-desktop-mode') ?? shellContext?.mode
+   const mode = modeParam === 'compatibility' || modeParam === 'advanced' ? modeParam : null
+-  const platformParam = params.get('dsh-desktop-platform')
+-  const platform = platformParam !== null && platformParam !== '' ? platformParam.toLowerCase() : null
++  const platformParam = params.get('dsh-desktop-platform') ?? shellContext?.platform
++  const platform = typeof platformParam === 'string' && platformParam !== ''
++    ? platformParam.toLowerCase()
++    : null
+   const desktop = mode !== null
++    || shellContext !== undefined
+     || typeof (window as { __DSH_DESKTOP_FILE_PATH__?: unknown }).__DSH_DESKTOP_FILE_PATH__ !== 'undefined'
+   cached = {
+     desktop,
+diff --git a/src/client/index.tsx b/src/client/index.tsx
+index c87fbd16ec7565826faa0409ebb26b06142246ea..726a7c5ab4182dc730fce2d18a1a6e2585b746b8 100644
+--- a/src/client/index.tsx
++++ b/src/client/index.tsx
+@@ -34,6 +34,44 @@ import './layout.css'
+  *  externals through — Cordis guards service access without inject. */
+ export const inject = ['slots', 'sessions', 'connection', 'workspaces', 'locale', 'modules']
+ 
++/**
++ * DSH 0.1.5 keeps the right-column marker but no longer emits the older
++ * frame/center-column data attributes that the sidebar layout contract used.
++ * Restore those semantic anchors from the current public DOM marker without
++ * depending on generated CSS-module class names. The observer also covers a
++ * React remount, while cleanup removes only attributes installed here.
++ */
++function installLayoutCompatibilityAnchors(): () => void {
++  const ownedFrames = new Set<HTMLElement>()
++  const ownedCenters = new Set<HTMLElement>()
++  const sync = (): void => {
++    for (const rightbar of document.querySelectorAll<HTMLElement>('[data-rightbar-col]')) {
++      const frame = rightbar.parentElement
++      const center = rightbar.previousElementSibling
++      if (frame !== null && !frame.hasAttribute('data-dsh-frame')) {
++        frame.setAttribute('data-dsh-frame', '')
++        ownedFrames.add(frame)
++      }
++      if (center instanceof HTMLElement && !center.hasAttribute('data-pane')) {
++        center.setAttribute('data-pane', 'conversation')
++        ownedCenters.add(center)
++      }
++    }
++  }
++  sync()
++  const observer = new MutationObserver(sync)
++  observer.observe(document.body, { childList: true, subtree: true })
++  return () => {
++    observer.disconnect()
++    for (const frame of ownedFrames) {
++      if (frame.getAttribute('data-dsh-frame') === '') frame.removeAttribute('data-dsh-frame')
++    }
++    for (const center of ownedCenters) {
++      if (center.getAttribute('data-pane') === 'conversation') center.removeAttribute('data-pane')
++    }
++  }
++}
++
+ /**
+  * Error boundary over the sidebar tree (root scope): a render error in the
+  * sidebar SHELL itself must never blank the page silently — the shared
+@@ -46,6 +84,7 @@ export const inject = ['slots', 'sessions', 'connection', 'workspaces', 'locale'
+  * @param ctx - the client cordis context (slots, sessions).
+  */
+ export function apply(ctx: Context): void {
++  ctx.effect(installLayoutCompatibilityAnchors, 'dsh-better-sidebar: DSH 0.1.5 layout anchors')
+   // The sidebar follows the DSH i18n system: attach the locale service so
+   // the module-level t()/isZh() resolve the Host-backed language preference
+   // (and switch live — the Sidebar root subscribes to it), and register the
+diff --git a/src/index.ts b/src/index.ts
+index baeb387e4e68d4e879ebf49f2c105d8c4b112f30..d1beeb168a3dd8bd4e1bda1aee4b40931ff5142e 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -35,7 +35,7 @@ import { extractFrameAncestors } from './browser-probe.ts'
+ import { isTrustedApiRequest, isLoopbackHostname } from './trust-fence.ts'
+ import { registerBundleRoute } from './bundle-route.ts'
+ import * as git from './git.ts'
+-import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
++import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+ import { defaultShell, ensureSpawnHelper, PtyManager, shellDisplayName } from './pty-manager.ts'
+ import { AgentPtyRegistry, clampDims, type AgentTerminalHandle } from './agent-pty.ts'
+ import {
+@@ -550,7 +550,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
+     }
+   }
+   ctx.inject(['settings'], (sctx) => {
+-    const ns: SettingsNamespace = settingsNamespace(SIDEBAR_PREFS_NS)
++    const ns = SIDEBAR_PREFS_NS as SettingsNamespace
+     // The structural settings mirror types `schema` as unknown, so the
+     // generic is not inferred here; the real service resolves it from the
+     // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.

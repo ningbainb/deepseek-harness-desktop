@@ -5,6 +5,7 @@ import {
   estimateContentTokens,
   estimateHeaderTokens,
   estimateMessageTokens,
+  estimateSystemMessageTokens,
   estimateTextBlockTokens,
   estimateToolCallBlockTokens,
   resolveEstimatorConfig,
@@ -79,11 +80,13 @@ describe('live-stats estimator', () => {
     }
   })
 
-  it('prices header framing for system text and tool schemas', () => {
+  it('prices system surface messages and header tool schemas separately', () => {
     expect(estimateHeaderTokens(undefined, SPEC)).toBe(0)
-    expect(estimateHeaderTokens({
-      config: { provider: 'mock', model: 'mock' },
-      system: 'abcd',
+    expect(estimateSystemMessageTokens({
+      id: 'system-message' as never,
+      role: 'system',
+      source: { kind: 'system' },
+      content: [{ type: 'text', text: 'abcd' }],
     }, SPEC)).toBe(5)
     expect(estimateHeaderTokens({
       config: { provider: 'mock', model: 'mock' },

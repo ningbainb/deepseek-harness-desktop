@@ -14,7 +14,11 @@ describe('ValueMode Request Routing', () => {
     // Mock services
     ctx.tools = { register: vi.fn() } as never
     ctx.systemPrompt = { section: vi.fn() } as never
-    ctx.settings = { register: vi.fn() } as never
+    ctx.settings = {
+      installSection: vi.fn().mockImplementation((_ctx, _namespace, _schema, initial, options) => {
+        options.setSource(() => initial)
+      }),
+    } as never
     ctx.llm = {
       listProviders: vi.fn().mockReturnValue([
         { id: 'deepseek', displayName: 'DeepSeek' },

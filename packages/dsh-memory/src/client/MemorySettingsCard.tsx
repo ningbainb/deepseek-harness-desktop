@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   MAX_MEMORY_CONTENT_LENGTH,
@@ -350,17 +350,15 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         </div>
         <span className={saved ? styles.badgeSaved : styles.badge}>{saving ? t('settings.saving') : saved ? t('settings.saved') : editorOpen && JSON.stringify(draft) !== cleanDraft ? t('settings.unsaved') : t('settings.ready')}</span>
       </header>
-      <p className={styles.notice}>{t('settings.ownerNotice')}</p>
-      <MemoryActivityPanel t={t} enabled={enabled} onEdit={select} />
       {saved && selectedId && <p className={styles.muted} role="status">{t('settings.savedTo')} {t(('settings.' + draft.scope) as MemoryLocaleKey)}{draft.workspaceId || draft.sessionId ? ' · ' + (draft.workspaceId || draft.sessionId) : ''}</p>}
       {!settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
       {settingsSnapshot.status === 'loading' && <p className={styles.muted} role="status">{t('settings.loading')}</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
 
-      <label className={styles.toggle}>
+      <div className={styles.enableRow}><label className={styles.toggle}>
         <input type="checkbox" checked={enabled} disabled={!settingsSnapshot.writable || saving} onChange={event => saveConfig(event.target.checked)} />
         {t('settings.enabled')}
-      </label>
+      </label><p className={styles.muted}>{t('settings.ownerNotice')}</p></div>
 
       {dock && <div className={styles.tabs} role="tablist" aria-label={t('settings.title')} onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
@@ -387,7 +385,7 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         </div>
         {clearEntries && <div className={styles.notice} role="alert"><p>{t('settings.clearConfirm')} {clearEntries.length} {t('settings.count')}</p><div className={styles.actions}><button type="button" className={styles.button} onClick={() => setClearEntries(null)}>{t('settings.cancelAction')}</button><button type="button" className={styles.danger} disabled={saving} onClick={clear}>{t('settings.confirmDelete')}</button></div></div>}
         {loading && <p className={styles.muted}>{t('settings.loading')}</p>}
-        {!loading && visibleItems.length === 0 && <p className={styles.muted}>{t('settings.noItems')}</p>}
+        {!loading && visibleItems.length === 0 && <p className={styles.empty}>{t('settings.noItems')}</p>}
         <div className={styles.itemList} role="list">
           {visibleItems.map(item => (
             <button type="button" role="listitem" key={item.id} className={item.id === selectedId ? styles.itemSelected : styles.item} onClick={() => select(item)}>
@@ -419,22 +417,25 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
       </section>
 
       <section className={styles.editor} hidden={dock && !editorOpen}>
-        <p className={styles.muted}>{t('settings.targetHint')}</p>
         {selectedId && <p className={styles.muted}>{t('settings.updated')} {new Date(draft.expectedUpdatedAt ?? 0).toLocaleString()}</p>}
-        <header className={styles.sectionHeader}><strong>{selectedId === undefined ? t('settings.new') : selectedId}</strong></header>
+        <header className={styles.sectionHeader}><strong>{selectedId === undefined ? t('settings.newMemory') : t('settings.edit')}</strong></header>
         <label className={styles.field}><span>{t('settings.scope')}</span><select value={draft.scope} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, scope: event.target.value as MemoryScope }))}><option value="global">{t('settings.global')}</option><option value="workspace">{t('settings.workspace')}</option><option value="session">{t('settings.session')}</option></select></label>
         {draft.scope === 'workspace' && <label className={styles.field}><span>{t('settings.workspaceId')}</span><input value={draft.workspaceId} maxLength={128} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, workspaceId: event.target.value }))} /></label>}
         {draft.scope === 'session' && <label className={styles.field}><span>{t('settings.sessionId')}</span><input value={draft.sessionId} maxLength={128} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, sessionId: event.target.value }))} /></label>}
         <label className={styles.field}><span>{t('settings.content')}</span><textarea value={draft.content} maxLength={MAX_MEMORY_CONTENT_LENGTH} placeholder={t('settings.contentPlaceholder')} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, content: event.target.value }))} /><span className={styles.counter}>{draft.content.length} / {MAX_MEMORY_CONTENT_LENGTH}</span></label>
+        <details className={styles.details} data-memory-advanced="true"><summary>{t('settings.advanced')}</summary>
+        <p className={styles.muted}>{t('settings.targetHint')}</p>
         <label className={styles.field}><span>{t('settings.tags')}</span><input value={draft.tags} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, tags: event.target.value }))} /></label>
         <label className={styles.toggle}><input type="checkbox" checked={draft.pinned} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, pinned: event.target.checked }))} />{t('settings.pinned')}</label>
         <label className={styles.field}><span>{t('settings.expiresAt')}</span><input value={draft.expiresAt} inputMode="numeric" disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, expiresAt: event.target.value }))} /></label>
+        </details>
         <footer className={styles.actions} data-dock-save-bar={dock || undefined}>
           {selectedId !== undefined && <button type="button" className={styles.danger} disabled={saving || !settingsSnapshot.writable} onClick={remove}>{t('settings.delete')}</button>}
           <button type="button" className={styles.button} disabled={saving} onClick={() => { setSelectedId(undefined); setDraft(emptyDraft()); setCleanDraft(JSON.stringify(emptyDraft())); setEditorOpen(!dock) }}>{t('settings.cancel')}</button>
           <button type="button" className={styles.primary} data-dock-save="true" disabled={saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
         </footer>
       </section>
+      <MemoryActivityPanel t={t} enabled={enabled} onEdit={select} />
     </section>
   )
 }

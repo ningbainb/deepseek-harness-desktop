@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   DEFAULT_MODEL_PREFERENCES,
@@ -25,7 +25,7 @@ export interface ModelPreferencesCardFace {
   loadCatalog: () => Promise<ModelPreferenceCatalog>
 }
 
-export type ModelPreferencesCardProps = PropsRuntime<'settings.models.content'>
+export type ModelPreferencesCardProps = PropsRuntime<'settings.models.footer'>
   & PropsLocale<'model-preferences'>
   & PropsRenderSlots<'model-preferences.onboarding'>
   & ModelPreferencesCardFace

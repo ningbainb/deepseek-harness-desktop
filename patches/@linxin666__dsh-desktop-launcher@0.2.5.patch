@@ -1,0 +1,210 @@
+diff --git a/lib/client.js b/lib/client.js
+index 56aa699a322469f93de5af000c6d3eeb1c7ddcf3..cfdd5d3fa55fbdd8deebb49e18cb9b1131582570 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
+ 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+ 		let react = require("react");
+ 		let react_jsx_runtime = require("react/jsx-runtime");
+-		let _deepseek_ai_dsh_client_runtime_client = require("@deepseek-ai/dsh-client-runtime/client");
++		let _deepseek_ai_dsh_client_store = require("@deepseek-ai/dsh-client-store");
+ 		let react_dom_client = require("react-dom/client");
+ 		let react_dom = require("react-dom");
+ 		//#region src/protocol.ts
+@@ -569,7 +569,7 @@ window.__ModuleLoader__.load({
+ 			}
+ 			/** Publish a projection of this form, rebuilt whenever the scope or a draft changes. */
+ 			bind(project) {
+-				const store = (0, _deepseek_ai_dsh_client_runtime_client.createSnapshotStore)(project());
++				const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(project());
+ 				this.listeners.add(() => {
+ 					store.set(project());
+ 				});
+diff --git a/lib/index.js b/lib/index.js
+index ed4bb692f2282a7ff6df93264eefda4647fdd504..849b753adaebf16c43d40b85a55bbaf7104edfbd 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,4 +1,3 @@
+-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
+ import z from "schemastery";
+ import { execFile } from "node:child_process";
+ import { existsSync } from "node:fs";
+@@ -635,7 +634,7 @@ const inject = ["webServer", "systemPrompt"];
+ * web settings surface edits. Spelled here rather than imported so the
+ * browser half can spell the same value without depending on a Host package.
+ */
+-const DESKTOP_LAUNCHER_SETTINGS_NAMESPACE = settingsNamespace("desktop-launcher");
++const DESKTOP_LAUNCHER_SETTINGS_NAMESPACE = "desktop-launcher";
+ const Config = z.object({
+ 	announceToAgent: z.boolean().default(true),
+ 	enabled: z.boolean().default(true),
+@@ -703,12 +702,14 @@ function applyImpl(ctx, config) {
+ 			text: DESKTOP_LAUNCHER_GUIDANCE
+ 		});
+ 	};
+-	installSettingsSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, Config, config ?? {}, {
+-		setSource: (source) => {
+-			current = source;
+-			sync();
+-		},
+-		onChange: sync
++	ctx.inject(["settings"], (settingsCtx) => {
++		settingsCtx.settings.installSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, Config, config ?? {}, {
++			setSource: (source) => {
++				current = source;
++				sync();
++			},
++			onChange: sync
++		});
+ 	});
+ 	sync();
+ }
+diff --git a/lib/types/client/DesktopLauncherSettingsCard.d.ts b/lib/types/client/DesktopLauncherSettingsCard.d.ts
+index d082150c606ad091350c5945b508e28c14e00555..c5435d29e4db93bebfedcb9e46d9bbacee37d9ea 100644
+--- a/lib/types/client/DesktopLauncherSettingsCard.d.ts
++++ b/lib/types/client/DesktopLauncherSettingsCard.d.ts
+@@ -5,7 +5,8 @@
+  * renders, bound to the `desktop-launcher` settings namespace.
+  */
+ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
++import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
++import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+ import { type CardActions, type CardShell, type FieldState } from './settings-form.ts';
+ /** The desktop-launcher fields this card edits (the namespace full schema). */
+ export interface DesktopLauncherSettings {
+diff --git a/lib/types/client/index.d.ts b/lib/types/client/index.d.ts
+index 6bc0efffe87c63782635c8852bb1df54728b08ab..701c49e680a59f56464e1a3a8b586ca69977ba84 100644
+--- a/lib/types/client/index.d.ts
++++ b/lib/types/client/index.d.ts
+@@ -1,4 +1,5 @@
+-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client';
++import type { Context as ClientContext } from '@deepseek-ai/cordis';
++import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client';
+ import { type DesktopLauncherKey } from './locales.ts';
+ export { DesktopLauncherSettingsCard, DesktopLauncherSettingsCardController } from './DesktopLauncherSettingsCard.tsx';
+ export type { DesktopLauncherSettings, DesktopLauncherSettingsCardFace, DesktopLauncherSettingsCardState } from './DesktopLauncherSettingsCard.tsx';
+diff --git a/lib/types/client/settings-form.d.ts b/lib/types/client/settings-form.d.ts
+index ef84c2fb4129db4efb4c0b212f810d6c4a8292f6..d25091bf4788769741af86d000803e5108cc7be2 100644
+--- a/lib/types/client/settings-form.d.ts
++++ b/lib/types/client/settings-form.d.ts
+@@ -6,7 +6,8 @@
+  * each plugin's client bundle; mirrors the official ui-plugin-config
+  * card-store pattern.
+  */
+-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
++import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
++import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+ /** The write one field's staged text performs when the card is saved. */
+ export type FieldWrite = {
+     kind: 'set';
+diff --git a/package.json b/package.json
+index cb81ecd2f8057d94ce1face90894d1a2c7d71fa4..6a85e26e13e58dc16210d5cc6972d9df5a7014e7 100644
+--- a/package.json
++++ b/package.json
+@@ -30,7 +30,7 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
++        "@deepseek-ai/dsh-client-store",
+         "@deepseek-ai/dsh-client-connection",
+         "@deepseek-ai/dsh-client-ui-conversation",
+         "@deepseek-ai/dsh-client-ui-settings",
+@@ -50,7 +50,7 @@
+     "@deepseek-ai/cordis": "^4.0.1",
+     "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.8",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.8",
++    "@deepseek-ai/dsh-client-store": "0.1.5-alpha.1",
+     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.8",
+     "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.0-rc.8",
+diff --git a/src/client/DesktopLauncherSettingsCard.tsx b/src/client/DesktopLauncherSettingsCard.tsx
+index 82f884e25fbeb043d3426802a685a0ac17c14f46..0433cbe43eb781cc3b8aa62dacac497e532706c5 100644
+--- a/src/client/DesktopLauncherSettingsCard.tsx
++++ b/src/client/DesktopLauncherSettingsCard.tsx
+@@ -7,7 +7,8 @@
+ 
+ import { useState } from 'react'
+ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
++import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
++import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+ import type { CreateResult } from '../protocol.ts'
+ import { createDesktopShortcut } from './api.ts'
+ import { BooleanField, PluginSettingsCard, ValueField } from './PluginSettingsCard.tsx'
+diff --git a/src/client/index.ts b/src/client/index.ts
+index 8f007035cbf0e11a3c5b774b35326bd21b3d9932..54da6cab4fef6e4cada71a95ef391299a0cb68cc 100644
+--- a/src/client/index.ts
++++ b/src/client/index.ts
+@@ -1,10 +1,10 @@
+-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client'
++import type { Context as ClientContext } from '@deepseek-ai/cordis'
++import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+ // Type-only: pulls the locale plugin's Context merge (ctx.locale).
+ import type {} from '@deepseek-ai/dsh-client-locale/client'
+ // Type-only: pulls the settings-surface SlotMap merge (the definitions that
+ // name the 'settings.*' holes) and the ctx.settingsScope Context merge.
+ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+ import { DesktopLauncherSettingsCard, DesktopLauncherSettingsCardController, type DesktopLauncherSettings } from './DesktopLauncherSettingsCard.tsx'
+ import { en, zh, type DesktopLauncherKey } from './locales.ts'
+ import { mountShutdownButton } from './floating-mount.tsx'
+diff --git a/src/client/settings-form.ts b/src/client/settings-form.ts
+index a789fc72ceb85b2665ee4ef3c52c4b9db034b307..85227910a8d9551e018eeae402d970796ec0654a 100644
+--- a/src/client/settings-form.ts
++++ b/src/client/settings-form.ts
+@@ -8,8 +8,8 @@
+  * card-store pattern.
+  */
+ 
+-import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
++import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
++import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+ 
+ /** The write one field's staged text performs when the card is saved. */
+ export type FieldWrite =
+diff --git a/src/index.ts b/src/index.ts
+index b92e7bb6b0b5c4d91820391c7eea05c6705834d0..68934c32b65aeac5ea3559070a8a805d33a1e9d8 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -11,7 +11,7 @@
+  */
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
++import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+ import z from 'schemastery'
+ import type {} from '@deepseek-ai/dsh-host-webserver'
+ import type {} from '@deepseek-ai/dsh-system-prompt'
+@@ -41,7 +41,7 @@ export const inject = ['webServer', 'systemPrompt']
+  * web settings surface edits. Spelled here rather than imported so the
+  * browser half can spell the same value without depending on a Host package.
+  */
+-export const DESKTOP_LAUNCHER_SETTINGS_NAMESPACE = settingsNamespace('desktop-launcher')
++export const DESKTOP_LAUNCHER_SETTINGS_NAMESPACE = 'desktop-launcher' as SettingsNamespace
+ 
+ /** Plugin config, validated by the same-named schemastery schema. */
+ export interface Config {
+@@ -147,12 +147,14 @@ function applyImpl(ctx: Context, config?: Config): void {
+     }
+   }
+ 
+-  installSettingsSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, Config, config ?? {}, {
+-    setSource: (source) => { current = source; sync() },
+-    onChange: sync,
++  ctx.inject(['settings'], (settingsCtx) => {
++    settingsCtx.settings.installSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, Config, config ?? {}, {
++      setSource: (source) => { current = source; sync() },
++      onChange: sync,
++    })
+   })
+ 
+-  // Initial registration from the composition entry (covers deployments with
+-  // no settings service, whose installSettingsSection never fires its hooks).
++  // Initial registration from the composition entry also covers deployments
++  // without the optional settings service.
+   sync()
+ }

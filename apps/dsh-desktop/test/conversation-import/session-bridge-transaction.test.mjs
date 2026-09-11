@@ -58,7 +58,10 @@ test('DSHSessionBridge validates directory and imports legitimate session with s
   assert.ok(createdSession.options.seed.length >= 5)
   assert.equal(createdSession.options.seed.every((e, index) => e.seq === index && Number.isSafeInteger(e.time)), true)
   assert.equal(createdSession.options.seed.every((e) => !Object.hasOwn(e, 'historical')), true)
-  assert.equal(Session.create(SessionId('bridge-seed-check'), createdSession.options.seed).events.at(-1).type, 'session/end-seed')
+  assert.equal(
+    Session.create(SessionId('bridge-seed-check'), createdSession.options.seed).snapshotEvents().at(-1).type,
+    'session/end-seed',
+  )
 })
 
 test('DSHSessionBridge detaches a prepared import session after the durability flush', async () => {

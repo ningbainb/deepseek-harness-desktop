@@ -5,11 +5,13 @@
 
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts'
 import { hasExplicitModelRoutes, VALUE_MODE_SETTINGS_NAMESPACE } from '../core/config.ts'
@@ -19,6 +21,7 @@ import { ValueModeHeaderStatus } from './ValueModeHeaderStatus.tsx'
 import { ValueModeHeroOnboarding } from './ValueModeHeroOnboarding.tsx'
 import type { ValueModeModelCatalog } from './ModelPicker.tsx'
 import { reportValueModeTelemetry } from './telemetry.ts'
+import { createModelCatalogLoader } from './model-catalog.ts'
 
 export { ValueModeSettingsCard } from './ValueModeSettingsCard.tsx'
 export { ValueModeHeaderStatus } from './ValueModeHeaderStatus.tsx'
@@ -52,7 +55,7 @@ function isSettingsBinderFace(value: unknown): value is SettingsBinderFace {
   return typeof value === 'object' && value !== null && typeof (value as { bind?: unknown }).bind === 'function'
 }
 
-export const inject = ['slots', 'locale', 'connection', 'settingsScope']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session']
 
 interface HeroOnboardingMountOptions {
   scope: ValueModeSettingsScope<ValueModeConfig>
@@ -150,6 +153,7 @@ function mountHeroOnboarding({ scope, defaultModelScope, onChange, fetchModels }
       enableRequested = false
       reportValueModeTelemetry({
         kind: 'entry',
+        source: 'hero',
         configured: hasExplicitModelRoutes(scope.getSnapshot().value ?? {}),
       }, 'value-mode-entry')
     }
@@ -216,23 +220,7 @@ export function apply(ctx: ClientContext): void {
   const scope = binder.bind<ValueModeConfig>({ namespace: VALUE_MODE_SETTINGS_NAMESPACE as string })
   const defaultModelScope = binder.bind<ModelRouteSelection>({ namespace: 'agent-default-model' })
 
-  const fetchModels = async (): Promise<ValueModeModelCatalog> => {
-    const api = ctx.get('connection')?.api
-    if (!api || typeof api.llm?.models !== 'function') {
-      throw new Error('当前运行时不支持模型目录，请更新或重启 DeepSeek Harness 后重试。')
-    }
-
-    const response = await api.llm.models({})
-    if (!response.result.ok) {
-      const message = response.result.error?.message?.trim()
-      throw new Error(message || '模型目录加载失败，请稍后重试。')
-    }
-
-    return {
-      groups: response.result.value.groups ?? [],
-      failures: response.result.value.failures ?? [],
-    }
-  }
+  const fetchModels = createModelCatalogLoader(ctx, ctx.locale.bind('value-mode'))
 
   const onChange = async (patch: Partial<ValueModeConfig>): Promise<void> => {
     for (const [key, value] of Object.entries(patch)) {

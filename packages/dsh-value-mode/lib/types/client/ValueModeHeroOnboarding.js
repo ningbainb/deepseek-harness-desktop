@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isCompleteModelRoute, resolveResolvedConfig } from "../core/config.js";
 import { ModelPicker } from "./ModelPicker.js";
 import { useSettingsValue, useValueModeConfig } from "./useValueModeConfig.js";
@@ -52,7 +52,7 @@ export const ValueModeHeroOnboarding = ({ config, settingsScope, defaultModelSco
     useEffect(() => {
         setError(initialError ?? null);
     }, [initialError]);
-    const loadModels = async () => {
+    const loadModels = useCallback(async () => {
         const catalog = await fetchModels();
         if (isCompleteModelRoute(defaultExpert)) {
             const defaultExists = catalog.groups.some((group) => (group.id === defaultExpert.provider && group.models.some((model) => model.id === defaultExpert.model)));
@@ -61,7 +61,7 @@ export const ValueModeHeroOnboarding = ({ config, settingsScope, defaultModelSco
             }
         }
         return catalog;
-    };
+    }, [fetchModels, defaultExpert?.provider, defaultExpert?.model]);
     useEffect(() => {
         dialogRef.current?.querySelector('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus();
         const handleClickOutside = (event) => {

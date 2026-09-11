@@ -2,7 +2,7 @@
 /** SessionListView: owned-row filtering, incremental pages, session creation. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { WorkspaceView as WorkspaceRow } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
+import type { WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { SessionListView, type SessionListViewProps } from './SessionListView.tsx'
 import { type SessionView } from './App.tsx'
 

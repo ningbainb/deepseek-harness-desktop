@@ -502,6 +502,7 @@ export function createScmStore(api: PanelApi): ScmStore {
   const persistDebounced = createDebounced()
   let persistState: ScmState | null = null
   let loadSeq = 0
+  let rootEpoch = 0
   const persistWrite = (): void => {
     if (persistState !== null && persistState.root !== '') {
       writeJson(`${KEY_SCM_UI}${persistState.root}`, {
@@ -521,6 +522,7 @@ export function createScmStore(api: PanelApi): ScmStore {
 
   /** Fetch the status and land it (guarded against root switches + out-of-order). */
   const load = async (root: string, keepBusy: string[] = []): Promise<void> => {
+    if (root === '' || handle.getSnapshot().root !== root) return
     const seq = ++loadSeq
     handle.update((prev) => ({ ...prev, loading: true }))
     const result = await api.gitStatus(root)
@@ -541,6 +543,9 @@ export function createScmStore(api: PanelApi): ScmStore {
 
   const store: ScmStore = Object.assign(handle, {
     setRoot(root: string) {
+      if (handle.getSnapshot().root === root) return
+      rootEpoch++
+      loadSeq++
       handle.update((prev) => {
         if (prev.root === root) return prev
         const ui = readScmUi(root)
@@ -549,7 +554,7 @@ export function createScmStore(api: PanelApi): ScmStore {
           root,
           status: null,
           gitMissing: false,
-          loading: true,
+          loading: root !== '',
           busy: [],
           failed: [],
           viewMode: ui.viewMode,
@@ -566,9 +571,11 @@ export function createScmStore(api: PanelApi): ScmStore {
     },
     async stage(paths: string[]) {
       const root = handle.getSnapshot().root
+      const epoch = rootEpoch
       if (root === '' || paths.length === 0) return
       handle.update((prev) => ({ ...prev, busy: [...prev.busy, ...paths] }))
       const result = await api.gitStage(root, paths)
+      if (epoch !== rootEpoch) return
       handle.update((prev) => ({
         ...prev,
         failed: result.ok && Array.isArray(result.value?.failed) ? result.value.failed : (result.ok ? [] : paths),
@@ -578,9 +585,11 @@ export function createScmStore(api: PanelApi): ScmStore {
     },
     async unstage(paths: string[]) {
       const root = handle.getSnapshot().root
+      const epoch = rootEpoch
       if (root === '' || paths.length === 0) return
       handle.update((prev) => ({ ...prev, busy: [...prev.busy, ...paths] }))
       const result = await api.gitUnstage(root, paths)
+      if (epoch !== rootEpoch) return
       handle.update((prev) => ({
         ...prev,
         failed: result.ok && Array.isArray(result.value?.failed) ? result.value.failed : (result.ok ? [] : paths),
@@ -590,9 +599,11 @@ export function createScmStore(api: PanelApi): ScmStore {
     },
     async discard(paths: string[]) {
       const root = handle.getSnapshot().root
+      const epoch = rootEpoch
       if (root === '' || paths.length === 0) return
       handle.update((prev) => ({ ...prev, busy: [...prev.busy, ...paths] }))
       const result = await api.gitDiscard(root, paths)
+      if (epoch !== rootEpoch) return
       handle.update((prev) => ({
         ...prev,
         failed: result.ok && Array.isArray(result.value?.failed) ? result.value.failed : (result.ok ? [] : paths),
@@ -673,11 +684,12 @@ export interface PreviewState {
 /** The preview store with its async actions. */
 export interface PreviewStore extends StateHandle<PreviewState> {
   setRoot: (root: string) => void
-  openFile: (root: string, path: string) => void
+  openFile: (root: string, path: string, options?: { preferLegacy?: boolean }) => void
   openDiff: (root: string, path: string, staged: boolean) => void
   switchTab: (id: string) => void
   closeTabs: (ids: string[]) => void
   updateContent: (id: string, content: string) => void
+  navigateUrl: (id: string, address: string) => void
   saveTab: (id: string) => Promise<void>
   reloadTab: (id: string) => Promise<void>
   setOpen: (open: boolean) => void
@@ -690,7 +702,8 @@ export const PREVIEW_CONTENT_CAP = 8
 
 /** Unload least-recently-used clean payloads while preserving tabs and edits. */
 function boundPreviewContent(tabs: PreviewTabState[], activeTabId: string | null): PreviewTabState[] {
-  const loaded = tabs.filter((tab) => tab.content !== null)
+  // Addresses are tiny tab state, not re-fetchable file payloads.
+  const loaded = tabs.filter((tab) => tab.content !== null && tab.contentType !== 'url')
   const excess = loaded.length - PREVIEW_CONTENT_CAP
   if (excess <= 0) return tabs
   const evictable = loaded
@@ -712,6 +725,8 @@ interface PersistedTab {
   contentType: PreviewContentType
   diff?: { staged: boolean }
   savedAt: number
+  /** URL previews have no filesystem content to re-fetch. */
+  address?: string
 }
 
 /** Read persisted tabs for a root (guarded, content-less). */
@@ -736,13 +751,14 @@ export function readPreviewTabs(root: string): PersistedTab[] {
       contentType: typeof record.contentType === 'string' ? record.contentType as PreviewContentType : 'text',
       diff,
       savedAt: typeof record.savedAt === 'number' ? record.savedAt : 0,
+      address: record.contentType === 'url' && typeof record.address === 'string' ? record.address.slice(0, 8192) : undefined,
     })
   }
   return out
 }
 
 /** Create the preview store (per-root tab persistence with LRU scopes). */
-export function createPreviewStore(api: PanelApi): PreviewStore {
+export function createPreviewStore(api: PanelApi, openNative?: (root: string, path: string) => boolean, activateEditor?: () => void): PreviewStore {
   const handle = createState<PreviewState>({
     root: '',
     open: false,
@@ -763,6 +779,7 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
       contentType: tab.contentType,
       diff: tab.diff,
       savedAt: tab.savedAt,
+      address: tab.contentType === 'url' ? (tab.content ?? '').slice(0, 8192) : undefined,
     }))
     writeJson(`preview-ui:${current.root}`, { savedAt: Date.now(), tabs: meta })
     evictPreviewScopes(current.root)
@@ -777,6 +794,10 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
   const loadContent = async (root: string, id: string): Promise<void> => {
     const tab = handle.getSnapshot().tabs.find((item) => item.id === id)
     if (tab === undefined || tab.content !== null || tab.loading) return
+    if (tab.contentType === 'url') {
+      handle.update(prev => ({ ...prev, tabs: prev.tabs.map(item => item.id === id ? { ...item, content: '' } : item) }))
+      return
+    }
     handle.update((prev) => ({
       ...prev,
       tabs: prev.tabs.map((item) => (item.id === id ? { ...item, loading: true, error: null } : item)),
@@ -848,6 +869,7 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
 
   const store: PreviewStore = Object.assign(handle, {
     setRoot(root: string) {
+      if (handle.getSnapshot().root !== root) flushPersist()
       handle.update((prev) => {
         if (prev.root === root) return prev
         const persisted = readPreviewTabs(root)
@@ -858,7 +880,7 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
           path: meta.path,
           contentType: meta.contentType,
           diff: meta.diff,
-          content: null,
+          content: meta.contentType === 'url' ? meta.address ?? '' : null,
           dirty: false,
           updated: false,
           loading: false,
@@ -872,10 +894,16 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
       const state = handle.getSnapshot()
       if (state.activeTabId !== null) void loadContent(root, state.activeTabId)
     },
-    openFile(root: string, path: string) {
+    openFile(root: string, path: string, options?: { preferLegacy?: boolean }) {
       const type = detectContentType(path)
       const id = tabIdOf(root, path, type)
       const existing = handle.getSnapshot().tabs.find((tab) => tab.id === id)
+      // Existing editor tabs (especially dirty buffers) keep their owner.
+      if (!existing && !options?.preferLegacy && openNative?.(root, path)) {
+        handle.update(prev => prev.open ? { ...prev, open: false } : prev)
+        return
+      }
+      if (handle.getSnapshot().root === root) activateEditor?.()
       if (existing !== undefined) {
         handle.update((prev) => ({
           ...prev,
@@ -910,6 +938,7 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
       schedulePersist(handle.getSnapshot())
     },
     openDiff(root: string, path: string, staged: boolean) {
+      if (handle.getSnapshot().root === root) activateEditor?.()
       // A distinct id space (scm-diff: side + root + path) so the same file
       // can carry a diff tab AND a file tab, and staged/unstaged diffs of one
       // path are separate tabs — each reflects the side it was opened from.
@@ -980,6 +1009,11 @@ export function createPreviewStore(api: PanelApi): PreviewStore {
         ...prev,
         tabs: prev.tabs.map((tab) => (tab.id === id ? { ...tab, content, dirty: true, updated: false } : tab)),
       }))
+    },
+    navigateUrl(id: string, address: string) {
+      handle.update(prev => ({ ...prev, tabs: prev.tabs.map(tab => tab.id === id && tab.contentType === 'url'
+        ? { ...tab, content: address.slice(0, 8192), dirty: false } : tab) }))
+      schedulePersist(handle.getSnapshot())
     },
     async saveTab(id: string) {
       const state = handle.getSnapshot()
@@ -1115,11 +1149,11 @@ export interface PanelStoresWithFlush extends PanelStores {
 }
 
 /** Create the full store bundle. */
-export function createPanelStores(api: PanelApi): PanelStoresWithFlush {
+export function createPanelStores(api: PanelApi, openNative?: (root: string, path: string) => boolean, activateEditor?: () => void): PanelStoresWithFlush {
   const layout = createLayoutStore()
   const explorer = createExplorerStore(api)
   const scm = createScmStore(api)
-  const preview = createPreviewStore(api)
+  const preview = createPreviewStore(api, openNative, activateEditor)
   const flushNow = (): void => {
     for (const store of [explorer, scm, preview]) {
       const flush = (store as unknown as Record<symbol, unknown>)[FLUSH_PERSIST]

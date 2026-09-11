@@ -9,10 +9,10 @@
  * entry.
  */
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { RemoteEntry } from './RemoteEntry.tsx'
+import { RemoteEntry, type RemoteEntryServices } from './RemoteEntry.tsx'
 
 /** Entry props: footer owner props plus the renderer's global standard kit. */
-export type FooterRemoteEntryProps = PropsRuntime<'sidebar.footer.action'> & PropsLocale<'remote'>
+export type FooterRemoteEntryProps = PropsRuntime<'sidebar.footer.action'> & PropsLocale<'remote'> & RemoteEntryServices
 
 /**
  * Render the remote-control trigger + pairing panel from the footer seat.
@@ -20,13 +20,6 @@ export type FooterRemoteEntryProps = PropsRuntime<'sidebar.footer.action'> & Pro
  * @returns the entry element tree.
  */
 export function FooterRemoteEntry(props: FooterRemoteEntryProps) {
-  return (
-    <RemoteEntry
-      wide={props.wide}
-      useWorkspaces={props.useWorkspaces}
-      useSessions={props.useSessions}
-      t={props.t}
-    />
-  )
+  return <RemoteEntry {...props} />
 }
 

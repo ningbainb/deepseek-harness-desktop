@@ -23,6 +23,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@linxin666/dsh-desktop-compat',
   '@deepseek-ai/dsh-web-app',
   '@linxin666/dsh-value-mode',
+  'dsh-better-sidebar',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   'reasoning-slider',
@@ -58,7 +59,6 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-tool-describe-image',
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-user-scope',
-  'dsh-better-sidebar',
 ].toSorted())
 
 // Skin Center v1 exposed every shipped theme as a separate Cordis package.
@@ -110,7 +110,7 @@ export const RETIRED_MANAGED_PACKAGES = Object.freeze([
   'dshmarket',
 ].toSorted())
 
-// RC.1's @deepseek-ai/dsh-base owns the native llm-pi-ai adapter, including
+// DSH 0.1.5's @deepseek-ai/dsh-base owns the native llm-pi-ai adapter, including
 // openai-codex. These older add-ons declared the same provider and now make the
 // Cordis tree fail before readiness. Retire only their profile rows/managed
 // links; user package bytes outside Desktop's link ledger remain untouched.
@@ -129,6 +129,7 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
   'personal-prompt',
   'remote-web-ui',
   'skin-background',
+  'skin-wallpaper',
   'task-board',
   'value-mode',
 ].toSorted())
@@ -229,6 +230,7 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-git-graph',
   '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-client-ui-task-board',
+  '@linxin666/dsh-tool-describe-image',
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-memory',
   '@ningbainb/dsh-personal-prompt',
@@ -246,12 +248,21 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   DESKTOP_REPAIR_BUNDLE,
 ].toSorted())
 
-// DSH v0.1.1-rc.1 exposes these runtime modules as peers. Keep them explicit so the
+// DSH 0.1.5 exposes these runtime modules as peers. Keep them explicit so the
 // packaged host is hermetic instead of resolving through a developer machine.
 export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/cordis-plugin-group',
+  '@deepseek-ai/cordis-plugin-hmr',
+  '@deepseek-ai/cordis-plugin-include',
+  '@deepseek-ai/cordis-plugin-loader',
+  '@deepseek-ai/cordis-plugin-timer',
   '@deepseek-ai/dsh',
   '@deepseek-ai/dsh-anonymous-user-id',
+  '@deepseek-ai/dsh-api-gateway',
+  '@deepseek-ai/dsh-api-remotes',
+  '@deepseek-ai/dsh-api-session-controller',
+  '@deepseek-ai/dsh-api-settings-controller',
+  '@deepseek-ai/dsh-api-workspace-controller',
   '@deepseek-ai/dsh-app-boot',
   '@deepseek-ai/dsh-attachment',
   '@deepseek-ai/dsh-atomic-write',
@@ -259,18 +270,31 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-bash-local',
   '@deepseek-ai/dsh-brand',
+  '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-client-locale',
-  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-client-modules',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-conversation',
+  '@deepseek-ai/dsh-client-ui-renderer',
+  '@deepseek-ai/dsh-client-ui-session',
+  '@deepseek-ai/dsh-client-ui-sidebar',
   '@deepseek-ai/dsh-client-ui-settings',
   '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-workspace',
   '@deepseek-ai/dsh-code-runtime',
+  '@deepseek-ai/dsh-cmdline',
   '@deepseek-ai/dsh-compaction',
   '@deepseek-ai/dsh-fs',
+  '@deepseek-ai/dsh-hook-protocol',
+  '@deepseek-ai/dsh-http-proxy',
+  '@deepseek-ai/dsh-jobs',
+  '@deepseek-ai/dsh-launch-environment',
   '@deepseek-ai/dsh-output-retention',
   '@deepseek-ai/dsh-sandbox',
   '@deepseek-ai/dsh-sandbox-policy',
   '@deepseek-ai/dsh-scope',
+  '@deepseek-ai/dsh-sdk-protocol',
+  '@deepseek-ai/dsh-session-query',
   '@deepseek-ai/dsh-session-telemetry',
   '@deepseek-ai/dsh-session-title-llm',
   '@deepseek-ai/dsh-shell',
@@ -280,6 +304,10 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-subprocess',
   '@deepseek-ai/dsh-timeout',
   '@deepseek-ai/dsh-typert-protocol',
+  '@deepseek-ai/dsh-typert-registry',
+  '@deepseek-ai/dsh-user-approval',
+  '@deepseek-ai/dsh-util-time',
+  '@deepseek-ai/dsh-util-workspace-path',
   '@deepseek-ai/dsh-workflow',
   '@deepseek-ai/dsh-web',
   '@deepseek-ai/dsh-web-app',

@@ -1,7 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
@@ -551,10 +550,30 @@ async function assessValueModeHealth(config, llm) {
 //#endregion
 //#region src/core/runtime-telemetry.ts
 const VALUE_MODE_RUNTIME_TELEMETRY_PREFIX = "DSH_VALUE_MODE_METRIC ";
+function routeErrorType(failure) {
+	const value = failure;
+	if ([401, 403].includes(value?.status ?? 0)) return "auth";
+	if (value?.status === 429) return "rate_limit";
+	if (/timeout|timed.?out/i.test(value?.code ?? "")) return "timeout";
+	if (/network|connection|fetch|ECONN/i.test(value?.code ?? "")) return "network";
+	if ((value?.status ?? 0) >= 500) return "provider";
+	if ((value?.status ?? 0) >= 400) return "invalid_request";
+	return "unknown";
+}
+function routeParameters(role, strategy, model) {
+	return {
+		role,
+		result: "started",
+		strategy: strategy === "saver" ? "saving" : strategy === "powerful" ? "stronger" : strategy === "balanced" ? "balanced" : "unknown",
+		model: /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$/u.test(model) ? model : "unknown",
+		error_type: "none"
+	};
+}
 /**
 * Send only a fixed, privacy-safe route marker to the Desktop main process.
 * Product transport remains owned by Electron; this plugin never performs a
-* network request and never writes model, session, prompt, or error details.
+* network request. Only bounded model IDs and error categories leave the host;
+* session IDs, provider error text, prompts and credentials are excluded.
 */
 function emitValueModeRuntimeTelemetry(payload) {
 	const runtimeProcess = globalThis.process;
@@ -924,21 +943,23 @@ function apply(ctx, initialConfig = {}) {
 	let currentConfig = initialConfig;
 	let currentSource = () => currentConfig;
 	const routedRequestAttempts = /* @__PURE__ */ new Map();
+	const streams = /* @__PURE__ */ new Map();
 	const requestKey = (payload) => {
 		const value = payload;
 		if (typeof value?.agent?.id !== "string" || !Number.isSafeInteger(value.turn) || !Number.isSafeInteger(value.step)) return void 0;
 		return `${value.agent.id}:${value.turn}:${value.step}`;
 	};
 	const pruneRoutedRequestAttempts = (now) => {
-		for (const [key, timestamp] of routedRequestAttempts) if (now - timestamp > 10 * 6e4) routedRequestAttempts.delete(key);
+		for (const [key, { timestamp }] of routedRequestAttempts) if (now - timestamp > 10 * 6e4) routedRequestAttempts.delete(key);
 		while (routedRequestAttempts.size > 2048) {
 			const oldest = routedRequestAttempts.keys().next().value;
 			if (typeof oldest !== "string") break;
 			routedRequestAttempts.delete(oldest);
 		}
+		for (const [stream, key] of streams) if (!routedRequestAttempts.has(key)) streams.delete(stream);
 	};
 	syncBundledPreset(ctx);
-	installSettingsSection(ctx, settingsNamespace(VALUE_MODE_SETTINGS_NAMESPACE), Config, initialConfig, {
+	ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
 		setSource: (source) => {
 			currentSource = source;
 			currentConfig = source();
@@ -978,15 +999,19 @@ function apply(ctx, initialConfig = {}) {
 		if (isSubagent) valueModeState.recordSubagentCall(sessionId);
 		else valueModeState.recordControllerCall(sessionId);
 		const key = requestKey(payload);
+		const params = routeParameters(isSubagent ? "subagent" : "main", effectiveConfig.strategy ?? "balanced", route.model);
 		if (key !== void 0) {
 			const now = Date.now();
 			pruneRoutedRequestAttempts(now);
-			routedRequestAttempts.set(key, now);
+			routedRequestAttempts.set(key, {
+				timestamp: now,
+				params
+			});
 		}
 		emitValueModeRuntimeTelemetry({
-			event: "call",
-			outcome: "started",
-			role: isSubagent ? "subagent" : "controller"
+			event: "cost_mode_route",
+			params,
+			timestamp: (/* @__PURE__ */ new Date()).toISOString()
 		});
 		return {
 			...resolved,
@@ -996,17 +1021,51 @@ function apply(ctx, initialConfig = {}) {
 		};
 	});
 	ctx.on("agent/request-error", async (payload, next) => {
-		const result = await next();
 		const key = requestKey(payload);
-		if (key === void 0 || !routedRequestAttempts.has(key)) return result;
+		const attempt = key === void 0 ? void 0 : routedRequestAttempts.get(key);
+		if (attempt && key !== void 0) {
+			routedRequestAttempts.delete(key);
+			emitValueModeRuntimeTelemetry({
+				event: "cost_mode_route",
+				timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+				params: {
+					...attempt.params,
+					result: "failure",
+					error_type: routeErrorType(payload.failure)
+				}
+			});
+		}
+		return next();
+	});
+	ctx.on("agent/assistant-stream", ({ agent, frame }) => {
+		const stream = `${agent.id}:${frame.attemptId}`;
+		if (frame.type === "start") {
+			const key = requestKey({
+				agent,
+				turn: frame.turn,
+				step: frame.step
+			});
+			if (key && routedRequestAttempts.has(key)) streams.set(stream, key);
+			return;
+		}
+		if (frame.type !== "end") return;
+		const key = streams.get(stream);
+		streams.delete(stream);
+		const attempt = key === void 0 ? void 0 : routedRequestAttempts.get(key);
+		if (!attempt || key === void 0) return;
+		if (frame.outcome.kind === "committed" && frame.outcome.eventType === "assistant/attempt") return;
 		routedRequestAttempts.delete(key);
+		const success = frame.outcome.kind === "committed" && frame.outcome.eventType === "assistant/message";
 		emitValueModeRuntimeTelemetry({
-			event: "call",
-			outcome: "failed",
-			role: payload.agent?.session?.header?.origin === "subagent" ? "subagent" : "controller"
+			event: "cost_mode_route",
+			timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+			params: {
+				...attempt.params,
+				result: success ? "success" : "cancelled",
+				error_type: success ? "none" : "cancelled"
+			}
 		});
-		return result;
 	});
 }
 //#endregion
-export { Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionConfig, valueModeState };
+export { Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionConfig, routeErrorType, routeParameters, valueModeState };

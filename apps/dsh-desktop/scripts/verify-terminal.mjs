@@ -159,6 +159,9 @@ try {
   await terminal.keyboard.press('Enter')
   await terminal.waitForFunction(() => /11\.22\.0/u.test(document.querySelector('.xterm-rows')?.textContent ?? ''), undefined, {
     timeout: 15_000,
+  }).catch(async error => {
+    console.error(`isolated terminal pnpm probe output: ${(await terminal.locator('.xterm-rows').textContent() ?? '').slice(-5_000)}`)
+    throw error
   })
   const expectedPnpmShim = resolve(userData, 'runtime-bin', 'pnpm.cmd')
   await terminal.keyboard.type('Write-Output ("__DSH_PNPM__" + (Get-Command pnpm).Source)')
@@ -192,6 +195,82 @@ try {
   await startup.waitForTimeout(300)
   assert.equal(electronApp.windows().some((page) => page.url().includes('/ui/terminal.html')), false)
   assert.equal(startup.isClosed(), false)
+  if (!packagedExecutable) {
+    // Real renderer check: a slow main-process PATH resolver must not hold
+    // loadFile/visibility hostage, and closing during that wait creates no PTY.
+    const delayed = await electronApp.evaluate(async ({ BrowserWindow, WebContentsView, ipcMain }, modulePath) => {
+      const { createDesktopTerminalPanel } = process.getBuiltinModule('module').createRequire(modulePath)(modulePath)
+      const parent = BrowserWindow.getAllWindows()[0]
+      const probe = { started: false, spawned: 0, release: undefined, panel: undefined }
+      globalThis.__dshTerminalDelayProbe = probe
+      const pendingPaths = new Promise(resolve => { probe.release = resolve })
+      probe.panel = await createDesktopTerminalPanel({
+        WebContentsView, browserWindow: parent, ipcMain, cwd: process.cwd(),
+        resolvePathEntries: () => { probe.started = true; return pendingPaths },
+        loadPty: async () => ({ spawn: () => { probe.spawned += 1; throw new Error('late PTY spawn') } }),
+        installContextMenu: () => () => {},
+      })
+      return { visible: probe.panel.view.getVisible(), spawned: probe.spawned }
+    }, fileURLToPath(new URL('../src/terminal-window.mjs', import.meta.url)))
+    assert.equal(delayed.visible, true)
+    assert.equal(delayed.spawned, 0)
+    const waitingTerminal = electronApp.windows().find(page => page.url().includes('/ui/terminal.html'))
+    assert.ok(waitingTerminal)
+    await waitingTerminal.getByRole('button', { name: '收起内置终端', exact: true }).click()
+    const closedWhileWaiting = await electronApp.evaluate(async () => {
+      const probe = globalThis.__dshTerminalDelayProbe
+      probe.release([])
+      await new Promise(resolve => setTimeout(resolve, 50))
+      const result = { disposed: probe.panel.disposed, spawned: probe.spawned, started: probe.started }
+      delete globalThis.__dshTerminalDelayProbe
+      return result
+    })
+    assert.deepEqual(closedWhileWaiting, { disposed: true, spawned: 0, started: true })
+    console.log('verified real terminal renderer stays visible and closes safely while PATH verification is stalled')
+    await electronApp.evaluate(async ({ BrowserWindow, WebContentsView, ipcMain }, modulePath) => {
+      const { createDesktopTerminalPanel } = process.getBuiltinModule('module').createRequire(modulePath)(modulePath)
+      const probe = { calls: 0, spawns: 0, kills: 0, reject: undefined, panel: undefined }
+      globalThis.__dshTerminalRestartProbe = probe
+      const pendingPaths = new Promise((_resolve, reject) => { probe.reject = reject })
+      probe.panel = await createDesktopTerminalPanel({
+        WebContentsView, browserWindow: BrowserWindow.getAllWindows()[0], ipcMain, cwd: process.cwd(),
+        resolvePathEntries: () => ++probe.calls === 1 ? pendingPaths : [],
+        loadPty: async () => ({ spawn: () => {
+          probe.spawns += 1
+          return { write() {}, resize() {}, kill() { probe.kills += 1 }, onData() { return { dispose() {} } }, onExit() { return { dispose() {} } } }
+        } }),
+        installContextMenu: () => () => {},
+      })
+    }, fileURLToPath(new URL('../src/terminal-window.mjs', import.meta.url)))
+    const restartingTerminal = electronApp.windows().find(page => page.url().includes('/ui/terminal.html'))
+    assert.ok(restartingTerminal)
+    await restartingTerminal.locator('#terminal-status[data-state="starting"]').waitFor()
+    await restartingTerminal.getByRole('button', { name: '重启会话', exact: true }).click()
+    await restartingTerminal.locator('#terminal-status[data-state="ready"]').waitFor()
+    await electronApp.evaluate(() => globalThis.__dshTerminalRestartProbe.reject(new Error('obsolete PATH probe')))
+    await restartingTerminal.waitForTimeout(100)
+    assert.equal(await restartingTerminal.locator('#terminal-status').getAttribute('data-state'), 'ready')
+    assert.deepEqual(await electronApp.evaluate(() => {
+      const probe = globalThis.__dshTerminalRestartProbe
+      return { calls: probe.calls, spawns: probe.spawns, kills: probe.kills }
+    }), { calls: 2, spawns: 1, kills: 0 })
+    // Playwright waitForEvent rejects on the deliberately injected crash
+    // before Electron emits destroyed/close; observe the actual close event.
+    const rendererClosed = new Promise((resolveClosed, rejectClosed) => {
+      const timeout = setTimeout(() => rejectClosed(new Error('crashed terminal was not closed')), 15_000)
+      restartingTerminal.once('close', () => { clearTimeout(timeout); resolveClosed() })
+    })
+    await electronApp.evaluate(() => globalThis.__dshTerminalRestartProbe.panel.webContents.forcefullyCrashRenderer())
+    await rendererClosed
+    assert.deepEqual(await electronApp.evaluate(() => {
+      const probe = globalThis.__dshTerminalRestartProbe
+      const result = { disposed: probe.panel.disposed, kills: probe.kills }
+      delete globalThis.__dshTerminalRestartProbe
+      return result
+    }), { disposed: true, kills: 1 })
+    assert.equal(startup.isClosed(), false)
+    console.log('verified real terminal restart ignores stale PATH failure and renderer crash reclaims its isolated panel')
+  }
   console.log('verified embedded PowerShell PTY, no popup BrowserWindow, no visible console subprocess, packaged Git and pnpm PATH, persistent Desktop Profile cwd, terminal output, and close cleanup')
 } finally {
   await electronApp?.close()

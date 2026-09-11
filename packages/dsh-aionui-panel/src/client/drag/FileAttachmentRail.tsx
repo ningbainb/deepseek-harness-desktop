@@ -3,7 +3,7 @@ import { t } from '../locales.ts'
 import type { FileAttachmentQueue } from './attachments.ts'
 import css from '../styles/drag.module.css'
 
-export function FileAttachmentRail({ queue, addImages }: { queue: FileAttachmentQueue; addImages: (files: readonly File[]) => void }) {
+export function FileAttachmentRail({ queue, addImages, nativeUploads = false }: { queue: FileAttachmentQueue; addImages: (files: readonly File[]) => void; nativeUploads?: boolean }) {
   const entries = useSyncExternalStore(queue.subscribe, queue.snapshot)
   const root = useRef<HTMLDivElement>(null)
   const picker = useRef<HTMLInputElement>(null)
@@ -14,14 +14,16 @@ export function FileAttachmentRail({ queue, addImages }: { queue: FileAttachment
       if (!(event.target instanceof Element)) return
       const conversation = root.current?.closest('[data-slot="conversation"]')
       if (!conversation?.contains(event.target)) return
-      if (event instanceof KeyboardEvent && (event.key !== 'Enter' || event.shiftKey || event.isComposing || !event.target.matches('textarea'))) return
-      if (event instanceof MouseEvent && !event.target.closest('button[type="submit"],button[aria-label="发送"],button[aria-label="Send"],button[title="发送"],button[title="Send"]')) return
+      if (event instanceof KeyboardEvent && (event.key !== 'Enter' || event.shiftKey || event.isComposing || !event.target.closest('textarea, [data-composer-input][contenteditable="true"]'))) return
+      if (event instanceof MouseEvent && !event.target.closest('button[type="submit"],button[aria-label="发送消息"],button[aria-label="Send message"],button[aria-label="发送"],button[aria-label="Send"],button[title="发送"],button[title="Send"]')) return
       event.preventDefault(); event.stopImmediatePropagation()
       root.current?.querySelector<HTMLElement>('[role="status"]')?.focus()
     }
     document.addEventListener('keydown', guard, true); document.addEventListener('click', guard, true)
     return () => { document.removeEventListener('keydown', guard, true); document.removeEventListener('click', guard, true) }
   }, [blocked])
+  // Native attachments own new picks. Keep recovered legacy references and guards.
+  if (nativeUploads && entries.length === 0) return null
   return <div ref={root} className={css.attachments} data-dsh-file-attachments>
     <div className={css.fileList}>{entries.map(entry => <div key={entry.id} className={css.fileCard} data-state={entry.state}>
       <strong title={entry.name}>{entry.name}</strong>
@@ -33,12 +35,12 @@ export function FileAttachmentRail({ queue, addImages }: { queue: FileAttachment
       <button type="button" aria-label={`${t('attachment.remove')} ${entry.name}`} onClick={() => queue.remove(entry.id)}>×</button>
     </div>)}</div>
     {blocked && <div role="status" tabIndex={-1}>{t('attachment.blocked')}</div>}
-    <button type="button" className={css.addFile} onClick={() => picker.current?.click()}>{t('attachment.add')}</button>
+    {!nativeUploads && <><button type="button" className={css.addFile} onClick={() => picker.current?.click()}>{t('attachment.add')}</button>
     <input ref={picker} type="file" multiple hidden onChange={event => {
       const files = [...(event.target.files ?? [])]
       queue.add(files.filter(file => !file.type.startsWith('image/')))
       addImages(files.filter(file => file.type.startsWith('image/')))
       event.target.value = ''
-    }} />
+    }} /></>}
   </div>
 }

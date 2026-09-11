@@ -5,8 +5,8 @@ import type { SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {
   ModelSelection,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ModelCatalogModel } from '@deepseek-ai/dsh-client-connection/client'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   flattenModelOptions,
   modelKeyFromOptionId,
@@ -55,17 +55,49 @@ export function selectionFromOptionId(
   return option === undefined ? undefined : selectionForModel(option, state.current)
 }
 
-/** Shared persistence path used by both `/model` and the composer seat. */
+interface RecentWrite {
+  recent: ModelKey[]
+  revision: number
+}
+const recentWrites = new WeakMap<SettingsScope<ModelPreferencesConfig>, RecentWrite>()
+
+/** One write in flight per settings scope; coalesce rapid choices into eight entries. */
+function persistRecentSelection(settingsScope: SettingsScope<ModelPreferencesConfig>, selection: ModelKey): void {
+  const pending = recentWrites.get(settingsScope)
+  const current = normalizeModelPreferences(settingsScope.getSnapshot().value)
+  const next = recordRecentModel(pending ? { ...current, recentModels: pending.recent } : current, selection)
+  if (pending) {
+    pending.recent = next.recentModels
+    pending.revision += 1
+    return
+  }
+  const write: RecentWrite = { recent: next.recentModels, revision: 0 }
+  recentWrites.set(settingsScope, write)
+  void (async () => {
+    try {
+      let revision: number
+      do {
+        revision = write.revision
+        try { await settingsScope.set('recentModels', write.recent) } catch {
+          // Preference storage failure must not undo an accepted model route.
+          // Retry only if another confirmed choice arrived; no retry timer.
+        }
+      } while (revision !== write.revision)
+    } finally {
+      recentWrites.delete(settingsScope)
+    }
+  })()
+}
+
+/** Shared selection path used by both `/model` and the composer seat. */
 export async function selectModelWithPreferences(
   directory: { select(selection: ModelSelection): Promise<void>; store: { getSnapshot(): ModelDirectoryState } },
   settingsScope: SettingsScope<ModelPreferencesConfig>,
   selection: ModelSelection,
 ): Promise<void> {
   await directory.select(selection)
-  const current = normalizeModelPreferences(settingsScope.getSnapshot().value)
-  const next = recordRecentModel(current, { provider: selection.provider, model: selection.model })
   try {
-    await settingsScope.set('recentModels', next.recentModels)
+    persistRecentSelection(settingsScope, { provider: selection.provider, model: selection.model })
   } catch {
     // The host selection already succeeded. A read-only or temporarily
     // unavailable settings mirror must not make a valid model switch appear

@@ -52,11 +52,11 @@ test('registry caches successful manifests until the bounded TTL expires', async
   assert.equal(calls, 2)
 })
 
-test('multi-package checks preserve order and cap registry concurrency at four', async () => {
+test('multi-package checks preserve order and cap registry concurrency at eight', async () => {
   let active = 0
   let maxActive = 0
   const registry = new PluginRegistry({
-    concurrency: 4,
+    concurrency: 8,
     fetchImpl: async (url) => {
       active += 1
       maxActive = Math.max(maxActive, active)
@@ -71,7 +71,7 @@ test('multi-package checks preserve order and cap registry concurrency at four',
   const results = await registry.check(names)
   assert.deepEqual(results.map((item) => item.name), names)
   assert.equal(results.every((item) => item.manifest?.version === '2.0.0'), true)
-  assert.equal(maxActive, 4)
+  assert.equal(maxActive, 8)
 })
 
 test('registry failures become bounded per-package unavailable results', async () => {

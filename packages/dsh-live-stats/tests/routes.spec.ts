@@ -1,10 +1,12 @@
 ﻿import { createServer, request as httpRequest } from 'node:http'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AddressInfo, Server } from 'node:net'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { makeLiveStatsRoutes, BALANCE_API_PATH, STATS_API_PATH } from '../src/routes.ts'
 import { BalanceService } from '../src/balance-service.ts'
 import { LedgerStore } from '../src/ledger-store.ts'
+
+afterEach(() => vi.unstubAllGlobals())
 
 interface TestServer {
   port: number
@@ -36,6 +38,11 @@ async function serve(routes: WebRoute[]): Promise<TestServer> {
 
 describe('Live stats balance & stats routes', () => {
   it('serves /api/live-stats/balance and /api/live-stats/stats via makeLiveStatsRoutes', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      is_available: true,
+      balance_infos: [{ currency: 'CNY', total_balance: '12.50', granted_balance: '2.50', topped_up_balance: '10.00' }],
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
     const service = new BalanceService('test-key')
     const ledger = new LedgerStore()
     const routes = makeLiveStatsRoutes({ service, ledger })
@@ -66,6 +73,8 @@ describe('Live stats balance & stats routes', () => {
       expect(balanceRes.status).toBe(200)
       expect(balanceRes.body).toHaveProperty('modelName')
       expect(balanceRes.body).toHaveProperty('provider')
+      expect(balanceRes.body).toMatchObject({ ok: true, totalBalance: '12.50' })
+      expect(fetchMock).toHaveBeenCalledOnce()
 
       // Test stats endpoint
       const statsRes = await new Promise<{ status: number; body: any }>((resolve, reject) => {

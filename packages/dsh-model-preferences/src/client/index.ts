@@ -4,7 +4,8 @@
  * projection inside the official Models page and a preference-aware composer seat.
  */
 
-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { CommandDecoration, CommandUiContract, CommandUiSpec } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
@@ -12,7 +13,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 import {
   MODEL_PREFERENCES_SETTINGS_NAMESPACE,
@@ -35,12 +38,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 
   interface SlotMap {
-    /** Additive model-owned content rendered inside the official Models page. */
-    'settings.models.content': {
-      kind: 'list'
-      scope: 'root'
-      owner: ModelPreferencesContentOwnerProps
-    }
     /** Additive onboarding content rendered at the top of model preferences. */
     'model-preferences.onboarding': {
       kind: 'list'
@@ -55,10 +52,6 @@ export interface ModelPreferencesOnboardingOwnerProps {
   children?: never
 }
 
-export interface ModelPreferencesContentOwnerProps {
-  children?: never
-}
-
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Optional compatibility binder supplied by dsh-web-ui-settings. */
@@ -68,7 +61,7 @@ declare module '@deepseek-ai/cordis' {
 
 // The nested composer/command injections inherit `sessions` from this
 // package fiber while resolving the official model directory service.
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session', 'sessions']
 
 const EMPTY_CONFIG: ModelPreferencesConfig = {
   version: 1,
@@ -76,17 +69,6 @@ const EMPTY_CONFIG: ModelPreferencesConfig = {
   providerOrder: [],
   disabledProviders: [],
   recentModels: [],
-}
-
-interface CatalogConnection {
-  api?: {
-    llm?: {
-      models: (request: Record<string, never>) => Promise<{ result: {
-        ok: true
-        value: { groups: ModelProviderGroup[]; failures: ModelCatalogFailure[] }
-      } | { ok: false; error?: { message?: string } } }>
-    }
-  }
 }
 
 function settingsBinder(ctx: ClientContext): { bind<S>(spec: SettingsScopeSpec<S>): SettingsScope<S> } {
@@ -107,14 +89,13 @@ function currentConfig(scope: SettingsScope<ModelPreferencesConfig>): ModelPrefe
 
 function catalogLoader(ctx: ClientContext): () => Promise<ModelPreferenceCatalog> {
   return async () => {
-    const api = (ctx.get('connection') as CatalogConnection | undefined)?.api
-    const models = api?.llm?.models
-    if (models === undefined) throw new Error('model catalog is unavailable')
-    const response = await models({})
-    if (!response.result.ok) throw new Error(response.result.error?.message || 'model catalog request failed')
+    // DSH 0.1.5 exposes the shared Host-generation catalog through the typed
+    // Remote service, the same public seam used by the official model picker.
+    const response = await ctx.remote.session.modelCatalog()
+    if (!response.ok) throw new Error(response.error?.message || 'model catalog request failed')
     return {
-      groups: response.result.value.groups ?? [],
-      failures: response.result.value.failures ?? [],
+      groups: response.value.groups ?? [],
+      failures: response.value.failures ?? [],
     }
   }
 }
@@ -137,8 +118,8 @@ export function apply(ctx: ClientContext): void {
 
   ctx.inject(['slots'], scope => {
     // The official Models page owns this extension slot.
-    scope.slots.inject('settings.models.content', () => scope.slots.register({
-      name: 'settings.models.content',
+    scope.slots.inject('settings.models.footer', () => scope.slots.register({
+      name: 'settings.models.footer',
       id: 'model-preferences',
       order: 10,
       locale: 'model-preferences',
@@ -155,7 +136,7 @@ export function apply(ctx: ClientContext): void {
   // The public command seam can decorate a Host command. It cannot replace a
   // same-name client contribution, and the current official model-selection
   // plugin registers `/model` as exactly such a contribution.
-  ctx.inject(['commandUi', 'modelDirectories'], (scope) => {
+  ctx.inject(['commandUi', 'modelDirectories', 'remote.session'], (scope) => {
     const command = scope.get('commandUi') as CommandUiContract
     const models = scope.modelDirectories as ModelDirectoryResolver
     const sessions = scope.sessions
@@ -191,7 +172,7 @@ export function apply(ctx: ClientContext): void {
     }, 'model-preferences: decorate /model when supported')
   })
 
-  ctx.inject(['slots', 'modelDirectories'], (scope) => {
+  ctx.inject(['slots', 'modelDirectories', 'remote.session'], (scope) => {
     const models = scope.modelDirectories as ModelDirectoryResolver
     const sessions = scope.sessions
     scope.slots.inject('conversation.input.model', () => scope.slots.register({

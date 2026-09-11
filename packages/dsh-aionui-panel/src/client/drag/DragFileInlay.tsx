@@ -7,10 +7,8 @@
  * workspace-relative path into the active session's draft through the
  * conversation input facade.
  *
- * The document-level listeners only claim drags carrying our custom MIME —
- * the composer host's own drop handling (OS image files) is untouched. The
- * host's `dragover` refuses every drop it does not claim, so this inlay
- * must `preventDefault` its own drags to make the drop land.
+ * Current DSH owns ordinary OS file drops. This layer handles internal paths,
+ * oversized-image preprocessing and legacy shells without generic uploads.
  * @module dsh-aionui-panel/client/drag/DragFileInlay
  */
 
@@ -41,6 +39,8 @@ export interface DragFileInjected {
   insertPath: (path: string) => boolean
   /** Add image files into the active session's draft image attachments. */
   addImages?: (files: readonly File[]) => boolean
+  /** Present only when the official generic-file upload lifecycle is available. */
+  addFiles?: (files: readonly File[]) => boolean
 }
 
 /** Composed props: the dock's runtime share (sessionId) + the injected verb. */
@@ -73,7 +73,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       if (mounted && batch === generation.current) setPhase(next)
     }
 
-    const processImages = (files: readonly File[]): void => {
+    const processImages = (files: readonly File[], nativeBatch?: readonly File[]): void => {
       if (files.length === 0) return
       if (!props.addImages) {
         generation.current += 1
@@ -91,7 +91,11 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       }).then(processed => {
         if (controller.signal.aborted || batch !== generation.current) return
         setCurrentPhase(batch, 'submitting')
-        if (!props.addImages?.(processed)) throw new Error('image attachment submission was rejected')
+        let imageIndex = 0
+        const accepted = nativeBatch
+          ? props.addFiles?.(nativeBatch.map(file => isImageFile(file) ? processed[imageIndex++]! : file))
+          : props.addImages?.(processed)
+        if (!accepted) throw new Error('attachment submission was rejected')
         setCurrentPhase(batch, 'idle')
       }).catch(reason => {
         if (reason instanceof ImageProcessingError && reason.code === 'aborted') {
@@ -107,7 +111,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     const onDragEnter = (event: DragEvent): void => {
       if (event.target instanceof Element && event.target.closest('[data-dsh-panel-host], [data-aionui-explorer-col], [data-aionui-preview-col], [role="dialog"]')) return
       if (!hasAnyFileDrag(event.dataTransfer?.types)) return
-      if (isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
+      if ((props.addFiles && !hasFileDrag(event.dataTransfer?.types)) || isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
         return
       }
       event.preventDefault()
@@ -119,7 +123,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     const onDragOver = (event: DragEvent): void => {
       if (event.target instanceof Element && event.target.closest('[data-dsh-panel-host], [data-aionui-explorer-col], [data-aionui-preview-col], [role="dialog"]')) return
       if (!hasAnyFileDrag(event.dataTransfer?.types)) return
-      if (isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
+      if ((props.addFiles && !hasFileDrag(event.dataTransfer?.types)) || isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
         return
       }
       event.preventDefault()
@@ -132,7 +136,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
 
     const onDragLeave = (event: DragEvent): void => {
       if (!hasAnyFileDrag(event.dataTransfer?.types)) return
-      if (isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
+      if ((props.addFiles && !hasFileDrag(event.dataTransfer?.types)) || isPureImageDrag(event.dataTransfer?.types, event.dataTransfer?.items)) {
         return
       }
       depth.current = Math.max(0, depth.current - 1)
@@ -192,8 +196,8 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
         (f) => f.size > MAX_SAFE_IMAGE_BYTES || f.size > 2 * 1024 * 1024
       )
 
-      // Case A: Pure image drop where all images are already small -> yield to native handler
-      if (imageFiles.length > 0 && nonImageFiles.length === 0 && !anyImageNeedsCompression) {
+      // Native DSH owns all ordinary picks, including mixed image/document drops.
+      if (!anyImageNeedsCompression && (props.addFiles || imageFiles.length > 0 && nonImageFiles.length === 0)) {
         reset()
         return
       }
@@ -207,6 +211,12 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       // handler learned that the image needed preprocessing. It cannot observe the
       // stopped drop, so explicitly close every drag overlay before async work.
       window.dispatchEvent(new Event('dragend'))
+
+      if (props.addFiles) {
+        // Admit the complete batch once, in its original order, after compression.
+        processImages(imageFiles, files)
+        return
+      }
 
       // Process images serially; a new batch or session teardown cancels stale work.
       processImages(imageFiles)
@@ -280,7 +290,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       window.removeEventListener('paste', onPaste, true)
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [props.insertPath, props.addImages, props.fileQueue])
+  }, [props.insertPath, props.addImages, props.addFiles, props.fileQueue])
 
   const statusText = phase === 'idle'
     ? t('explorer.drag.dropHint')
@@ -302,7 +312,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
     >
       {visible ? <span className={dragCss.stripText}>{statusText}</span> : null}
     </div>
-    {props.fileQueue && <FileAttachmentRail queue={props.fileQueue} addImages={files => {
+    {props.fileQueue && <FileAttachmentRail queue={props.fileQueue} nativeUploads={!!props.addFiles} addImages={files => {
       if (!files.length) return
       const controller = new AbortController()
       imageBatch.current?.abort(); imageBatch.current = controller

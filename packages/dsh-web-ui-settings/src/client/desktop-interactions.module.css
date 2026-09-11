@@ -19,6 +19,11 @@
 .browserClose { flex: 0 0 32px; width: 32px; height: 32px; border: 0; border-radius: 6px; color: inherit; background: transparent; cursor: pointer; font-size: 22px; }
 .browserClose:hover { background: var(--dsw-alias-bg-layer-2, #eee); }
 .browserClose:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #416bd4); }
+/* The retained terminal/browser workbench owns a 60px corner cluster.
+   Reserve it inside the native strip's flex layout, not by moving controls
+   over tabs. Fullscreen also shares the corner below the Desktop caption. */
+:global(body:has([data-dsh-panel-host]) [data-sidebar-right-panel="push"] [data-sidebar-right-toggle]),
+:global(body:has([data-dsh-panel-host]) [data-sidebar-right-panel="fullscreen"] [data-sidebar-right-toggle]) { margin-right: 76px; }
 @media (max-width: 600px) { .dialog { padding: 20px; } }
 
 .existing { display: grid; gap: 4px; max-height: 160px; overflow: auto; margin-bottom: 12px; }

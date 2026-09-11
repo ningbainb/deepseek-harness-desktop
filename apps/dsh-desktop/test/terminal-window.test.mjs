@@ -188,3 +188,91 @@ test('terminal panel removes itself after a failed local page load', async () =>
   assert.equal(ipcMain.handlers.size, 0)
   assert.equal(ipcMain.listeners.size, 0)
 })
+
+test('terminal panel is visible and closable before optional PATH verification completes', async () => {
+  const parent = new FakeParentWindow()
+  const ipcMain = createIpcMain()
+  let finishPaths
+  let probes = 0
+  let spawns = 0
+  const panel = await createDesktopTerminalPanel({
+    WebContentsView: FakeWebContentsView, browserWindow: parent, ipcMain,
+    cwd: 'C:\\workspace', platform: 'win32', environment: {},
+    resolvePathEntries: () => { probes += 1; return new Promise(resolve => { finishPaths = resolve }) },
+    loadPty: async () => ({ spawn: () => { spawns += 1; throw new Error('must not start after close') } }),
+    installContextMenu: () => () => {},
+  })
+  assert.equal(panel.view.visible.at(-1), true)
+  assert.equal(probes, 0)
+  const starting = ipcMain.handlers.get(TERMINAL_IPC_CHANNELS.START)({ sender: panel.webContents })
+  assert.equal(probes, 1)
+  await ipcMain.handlers.get(TERMINAL_IPC_CHANNELS.CLOSE)({ sender: panel.webContents })
+  assert.equal(panel.disposed, true)
+  finishPaths([])
+  await assert.rejects(starting, /disposed/u)
+  assert.equal(spawns, 0)
+})
+
+test('terminal initialization and cleanup failures leave no child view or IPC handlers', async () => {
+  for (const stage of ['menu', 'session', 'ipc', 'load']) {
+    const parent = new FakeParentWindow()
+    const ipcMain = createIpcMain()
+    let disposed = 0
+    if (stage === 'ipc') {
+      const handle = ipcMain.handle
+      ipcMain.handle = (channel, handler) => {
+        if (channel === TERMINAL_IPC_CHANNELS.RESTART) throw new Error(stage)
+        handle(channel, handler)
+      }
+    }
+    class View extends FakeWebContentsView {
+      constructor(options) {
+        super(options)
+        if (stage === 'load') this.webContents.loadFile = async () => { throw new Error(stage) }
+      }
+    }
+    await assert.rejects(createDesktopTerminalPanel({
+      WebContentsView: View, browserWindow: parent, ipcMain, cwd: 'C:\\workspace',
+      installContextMenu: () => {
+        if (stage === 'menu') throw new Error(stage)
+        return () => { throw new Error('cleanup also failed') }
+      },
+      sessionFactory: () => {
+        if (stage === 'session') throw new Error(stage)
+        return { dispose() { disposed += 1; throw new Error('session cleanup failed') } }
+      },
+    }), new RegExp(stage))
+    assert.equal(parent.children.length, 0, stage)
+    assert.equal(ipcMain.handlers.size, 0, stage)
+    assert.equal(ipcMain.listeners.size, 0, stage)
+    assert.equal(View.instances.at(-1).webContents.destroyed, true, stage)
+    assert.equal(disposed, stage === 'ipc' || stage === 'load' ? 1 : 0)
+  }
+})
+
+test('renderer loss reclaims the shell and IPC ownership without affecting a later panel', async () => {
+  for (const event of ['render-process-gone', 'destroyed']) {
+    const parent = new FakeParentWindow()
+    const ipcMain = createIpcMain()
+    let disposals = 0
+    const options = {
+      WebContentsView: FakeWebContentsView, browserWindow: parent, ipcMain, cwd: 'C:\\workspace',
+      installContextMenu: () => () => {},
+      sessionFactory: () => ({ dispose: () => { disposals += 1 } }),
+    }
+    const first = await createDesktopTerminalPanel(options)
+    const handler = ipcMain.handlers.get(TERMINAL_IPC_CHANNELS.START)
+    await assert.rejects(createDesktopTerminalPanel(options), /already owns/u)
+    assert.equal(ipcMain.handlers.get(TERMINAL_IPC_CHANNELS.START), handler)
+    first.webContents.emit(event)
+    assert.equal(first.disposed, true)
+    assert.equal(disposals, 1)
+    assert.equal(parent.children.length, 0)
+    assert.equal(ipcMain.handlers.size, 0)
+    const second = await createDesktopTerminalPanel(options)
+    first.dispose()
+    assert.equal(ipcMain.handlers.size, 3)
+    assert.equal(second.disposed, false)
+    second.dispose()
+  }
+})

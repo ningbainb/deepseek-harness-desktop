@@ -60,3 +60,17 @@ it('rechecks restored references and keeps missing files visibly failed', async 
   expect(input.read()).toContain('lost.pdf')
   queue.dispose()
 })
+
+it('detects references restored after mount and releases guards when the reference is removed', async () => {
+  const input = draft(), check = vi.fn(async () => false)
+  const queue = new FileAttachmentQueue(input, vi.fn(), check)
+  const reference = attachmentReference('late.pdf', './.dsh-attachments/old/file/late.pdf')
+  expect(queue.snapshot()).toHaveLength(0)
+  input.insert(reference)
+  expect(queue.snapshot()).toHaveLength(1)
+  await vi.waitFor(() => expect(queue.snapshot()[0]?.state).toBe('failed'))
+  expect(check).toHaveBeenCalledExactlyOnceWith('./.dsh-attachments/old/file/late.pdf')
+  input.remove(reference)
+  expect(queue.snapshot()).toHaveLength(0)
+  queue.dispose()
+})

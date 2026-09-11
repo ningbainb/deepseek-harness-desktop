@@ -36,13 +36,17 @@ window.__ModuleLoader__.load({
 		const NAVIGATOR_STYLE = `
 [data-dsh-turn-navigator] {
   position: absolute;
-  bottom: 80px;
-  right: 16px;
+  bottom: 12px;
+  left: 16px;
   z-index: 200;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--dsw-alias-border-l2, #64748b);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2, #1e293b);
   pointer-events: none;
 }
 
@@ -50,17 +54,17 @@ window.__ModuleLoader__.load({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-layer-2, rgba(30, 41, 59, 0.92));
   color: var(--dsw-alias-label-secondary, #94a3b8);
   font-size: 14px;
   cursor: pointer;
   pointer-events: all;
   transition: background 120ms ease, color 120ms ease, transform 80ms ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  box-shadow: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -81,6 +85,10 @@ window.__ModuleLoader__.load({
   transform: none;
 }
 
+[data-dsh-turn-navigator] button[hidden] {
+  display: none;
+}
+
 [data-dsh-turn-navigator] .dsh-turn-counter {
   font-size: 11px;
   font-weight: 600;
@@ -92,7 +100,7 @@ window.__ModuleLoader__.load({
   pointer-events: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  box-shadow: none;
 }
 `.trim();
 		const USER_MSG_SELECTORS = [
@@ -105,8 +113,10 @@ window.__ModuleLoader__.load({
 		].join(", ");
 		/** Collect all user message elements in DOM order. */
 		function getUserMessages(pane) {
-			const matches = Array.from(pane.querySelectorAll(USER_MSG_SELECTORS));
-			return matches.filter((turn) => !matches.some((other) => other !== turn && other.contains(turn)));
+			return Array.from(pane.querySelectorAll(USER_MSG_SELECTORS)).filter((turn) => {
+				const ancestor = turn.parentElement?.closest(USER_MSG_SELECTORS);
+				return !ancestor || ancestor === pane || !pane.contains(ancestor);
+			});
 		}
 		/** Find the conversation scrollable area inside the pane. */
 		function findScrollRoot(pane, turns = getUserMessages(pane)) {
@@ -174,6 +184,7 @@ window.__ModuleLoader__.load({
 		}
 		/** Update button disabled state and counter text. */
 		function syncNavigator(nav, scrollRoot, pane) {
+			positionNavigator(nav, scrollRoot, pane);
 			const turns = getUserMessages(pane);
 			const total = turns.length;
 			const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 40;
@@ -184,13 +195,27 @@ window.__ModuleLoader__.load({
 			const bottomBtn = nav.querySelector("[data-role=\"bottom\"]");
 			if (prevBtn) prevBtn.disabled = idx <= 0 || total === 0;
 			if (nextBtn) nextBtn.disabled = idx >= total - 1 || total === 0;
-			if (bottomBtn) bottomBtn.disabled = atBottom;
+			if (bottomBtn) {
+				bottomBtn.disabled = atBottom;
+				const hidden = atBottom || hasNativeBottomAction(pane);
+				if (bottomBtn.hidden !== hidden) bottomBtn.hidden = hidden;
+			}
 			const nextCounterText = total === 0 ? "–" : String(idx + 1) + "/" + String(total);
 			if (counter && counter.textContent !== nextCounterText) counter.textContent = nextCounterText;
 		}
+		/** Keep navigation above the composer and away from its send/search controls. */
+		function positionNavigator(nav, scrollRoot, pane) {
+			const bounds = pane.getBoundingClientRect();
+			if (bounds.height <= 0) return;
+			const composerTop = (pane.querySelector("[data-composer-seat]") ?? document.querySelector("[data-composer-seat]"))?.getBoundingClientRect().top ?? bounds.bottom;
+			const contentBottom = Math.min(bounds.bottom, scrollRoot.getBoundingClientRect().bottom, composerTop);
+			const bottom = Math.max(12, Math.round(bounds.bottom - contentBottom + 12)) + "px";
+			if (nav.style.bottom !== bottom) nav.style.bottom = bottom;
+		}
 		/** Attach click handlers to the navigator buttons. */
 		function bindNavigator(nav, scrollRoot, pane) {
-			nav.addEventListener("click", (e) => {
+			let settleTimer;
+			const onClick = (e) => {
 				const btn = e.target.closest("button");
 				if (!btn) return;
 				const role = btn.dataset.role;
@@ -203,15 +228,23 @@ window.__ModuleLoader__.load({
 					top: root.scrollHeight,
 					behavior: "smooth"
 				});
-				setTimeout(() => syncNavigator(nav, scrollRoot(), pane), 350);
-			});
+				clearTimeout(settleTimer);
+				settleTimer = setTimeout(() => syncNavigator(nav, scrollRoot(), pane), 350);
+			};
+			nav.addEventListener("click", onClick);
+			return () => {
+				clearTimeout(settleTimer);
+				nav.removeEventListener("click", onClick);
+			};
 		}
 		/**
 		* Mount the conversation turn navigator into the given conversation pane.
 		* @returns disposer.
 		*/
 		function mountTurnNavigator(pane) {
-			if (getComputedStyle(pane).position === "static") pane.style.position = "relative";
+			const previousPosition = pane.style.position;
+			const ownsPosition = getComputedStyle(pane).position === "static";
+			if (ownsPosition) pane.style.position = "relative";
 			const nav = createNavigator();
 			pane.appendChild(nav);
 			let scrollRoot = findScrollRoot(pane);
@@ -225,19 +258,39 @@ window.__ModuleLoader__.load({
 				}
 				syncNavigator(nav, scrollRoot, pane);
 			};
-			bindNavigator(nav, () => scrollRoot, pane);
+			const disposeClicks = bindNavigator(nav, () => scrollRoot, pane);
 			scrollRoot.addEventListener("scroll", onScroll, { passive: true });
-			const mutationObs = new MutationObserver(refresh);
+			const mutationObs = new MutationObserver((records) => {
+				if (records.some((record) => !nav.contains(record.target))) refresh();
+			});
 			mutationObs.observe(pane, {
 				childList: true,
-				subtree: true
+				subtree: true,
+				attributes: true,
+				attributeFilter: [
+					"class",
+					"style",
+					"hidden",
+					"aria-hidden",
+					"aria-label",
+					"disabled",
+					"inert"
+				]
 			});
+			const resizeObs = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(refresh);
+			resizeObs?.observe(pane);
+			const composer = document.querySelector("[data-composer-seat]");
+			if (composer) resizeObs?.observe(composer);
+			window.addEventListener("resize", refresh);
 			syncNavigator(nav, scrollRoot, pane);
 			return () => {
 				mutationObs.disconnect();
+				resizeObs?.disconnect();
+				window.removeEventListener("resize", refresh);
 				scrollRoot.removeEventListener("scroll", onScroll);
+				disposeClicks();
 				nav.remove();
-				if (pane.style.position === "relative") pane.style.position = "";
+				if (ownsPosition && pane.style.position === "relative") pane.style.position = previousPosition;
 			};
 		}
 		/** Install styles once into <head>. */
@@ -253,29 +306,68 @@ window.__ModuleLoader__.load({
 		* Watches for the conversation pane to mount / re-mount and re-injects the widget.
 		* @returns disposer.
 		*/
+		function isVisibleControl(element, pane) {
+			if (!element.isConnected || element.closest("[hidden], [aria-hidden=\"true\"], [inert]")) return false;
+			for (let node = element; node; node = node.parentElement) {
+				const style = getComputedStyle(node);
+				if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || style.opacity === "0") return false;
+				if (node === pane) break;
+			}
+			return true;
+		}
+		/** Native labels are from the pinned SDK locale contract, not CSS hashes. */
+		function hasNativeBottomAction(pane) {
+			return Array.from(pane.querySelectorAll("button[aria-label=\"回到底部\"], button[aria-label=\"Back to bottom\"]")).some((button) => !button.disabled && !button.closest("[data-chat-flow], [data-dsh-turn-navigator]") && isVisibleControl(button, pane));
+		}
+		function hasNativeTurnNavigator(pane) {
+			return Array.from(pane.querySelectorAll("nav[aria-label=\"轮次导航\"], nav[aria-label=\"Turn navigation\"]")).some((nav) => {
+				if (nav.querySelectorAll("button").length < 2) return false;
+				return isVisibleControl(nav, pane);
+			});
+		}
 		function installTurnNavigator() {
 			ensureStyle();
 			let disposeNavigator;
 			let currentPane;
+			let fallbackNeeded = false;
 			const PANE_SELECTOR = "[data-pane=\"conversation\"]";
 			const tryMount = () => {
 				const pane = document.querySelector(PANE_SELECTOR);
-				if (pane === currentPane) return;
+				const native = pane !== null && hasNativeTurnNavigator(pane);
+				const turns = pane && !native ? getUserMessages(pane) : [];
+				const scroll = pane && !native && turns.length === 0 ? findScrollRoot(pane, turns) : null;
+				const needed = pane !== null && !native && (turns.length > 0 || scroll !== null && scroll.scrollHeight > scroll.clientHeight + 40);
+				if (pane === currentPane && needed === fallbackNeeded && (!needed || pane?.querySelector(`[${NAVIGATOR_ATTR}]`))) return;
+				if (pane !== currentPane) {
+					resizeObserver?.disconnect();
+					if (pane) resizeObserver?.observe(pane);
+				}
 				disposeNavigator?.();
 				disposeNavigator = void 0;
 				currentPane = void 0;
+				fallbackNeeded = needed;
 				if (!pane) return;
 				currentPane = pane;
-				disposeNavigator = mountTurnNavigator(pane);
+				if (needed) disposeNavigator = mountTurnNavigator(pane);
 			};
 			const observer = new MutationObserver(tryMount);
+			const resizeObserver = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(tryMount);
 			observer.observe(document.body, {
 				childList: true,
-				subtree: true
+				subtree: true,
+				attributes: true,
+				attributeFilter: [
+					"aria-label",
+					"aria-hidden",
+					"hidden"
+				]
 			});
+			window.addEventListener("resize", tryMount);
 			tryMount();
 			return () => {
 				observer.disconnect();
+				resizeObserver?.disconnect();
+				window.removeEventListener("resize", tryMount);
 				disposeNavigator?.();
 				document.getElementById("dsh-turn-navigator-style")?.remove();
 			};

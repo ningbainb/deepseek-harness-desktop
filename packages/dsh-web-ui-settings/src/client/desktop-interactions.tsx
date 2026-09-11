@@ -1,5 +1,5 @@
 import { createRoot, type Root } from 'react-dom/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { ProjectDialog } from './ProjectDialog.tsx'
 import css from './desktop-interactions.module.css'
 

@@ -9,7 +9,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -30,7 +30,7 @@ export const inject = ['webServer', 'tools', 'systemPrompt']
  * surface edits. Spelled here rather than imported: the browser half spells
  * the same value and must not depend on a Host package.
  */
-export const SSH_SETTINGS_NAMESPACE = settingsNamespace('dsh-ssh')
+export const SSH_SETTINGS_NAMESPACE = 'dsh-ssh'
 
 /** Plugin config, validated by the same-named schemastery schema. */
 export interface Config {
@@ -141,15 +141,17 @@ export function apply(ctx: Context, config?: Config): void {
     )
   }
 
-  installSettingsSection(ctx, SSH_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => {
-      current = source
-      sync()
-    },
-    onChange: sync,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, SSH_SETTINGS_NAMESPACE, Config, config ?? {}, {
+      setSource: (source) => {
+        current = source
+        sync()
+      },
+      onChange: sync,
+    })
   })
 
   // Initial registration from the composition entry (covers deployments with
-  // no settings service, whose installSettingsSection never fires its hooks).
+  // no settings service, whose section installation never fires its hooks).
   sync()
 }

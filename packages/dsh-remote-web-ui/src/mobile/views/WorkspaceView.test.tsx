@@ -2,7 +2,7 @@
 /** Mobile workspace landing: roster rendering and QR deep-link selection. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import type { WorkspaceView as WorkspaceRow } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
+import type { WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { mobileWorkspaceTarget } from './App.tsx'
 import { WorkspaceView } from './WorkspaceView.tsx'
 

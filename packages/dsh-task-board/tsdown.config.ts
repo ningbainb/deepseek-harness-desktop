@@ -16,7 +16,7 @@ export default clientBundle('@linxin666/dsh-client-ui-task-board', ['src/index.t
   libExternal: [
     '@deepseek-ai/dsh-client-connection',
     '@deepseek-ai/dsh-client-locale',
-    '@deepseek-ai/dsh-client-runtime',
+    '@deepseek-ai/dsh-client-store',
     '@deepseek-ai/dsh-client-ui-settings',
     '@deepseek-ai/dsh-client-ui-slots',
     '@deepseek-ai/dsh-host-webserver',

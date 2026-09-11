@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CardForm, booleanField, choiceField, numberField, textField } from '../client/settings/settings-form.ts'
 
 /** Minimal in-memory scope backing a CardForm test. */
@@ -10,6 +10,10 @@ class FakeScope<T extends Record<string, unknown>> implements SettingsScope<T> {
   writable = true
   status: 'ready' | 'loading' = 'ready'
   private listeners = new Set<() => void>()
+  mutate = vi.fn(async (
+    _ops: Parameters<SettingsScope<T>['mutate']>[0],
+    _expectedRevision?: number,
+  ) => {})
   set = vi.fn(async (field: string, value: unknown) => { (this.user as Record<string, unknown>)[field] = value })
   unset = vi.fn(async (field: string) => { delete (this.user as Record<string, unknown>)[field] })
   subscribe(listener: () => void): () => void {

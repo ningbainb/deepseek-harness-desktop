@@ -25,7 +25,11 @@ export interface SessionsExecutionFace {
     }
     subscribe(fn: () => void): () => void
   }
-  binding(id: string): { session: SessionDriver } | undefined
+  binding(id: string): {
+    session: SessionDriver
+    /** DSH 1.1.5 keeps transcript events beside, rather than inside, the Session snapshot. */
+    eventSource?: SessionEventSourceFace
+  } | undefined
 }
 
 /** The narrow workspaces face the service needs. */
@@ -45,6 +49,14 @@ export interface ExecutionHistoryEvent {
   data?: unknown
 }
 
+/** Narrow slice of the DSH 1.1.5 Session event window. */
+export interface SessionEventSourceFace {
+  getSnapshot(): {
+    entries: readonly { event: ExecutionHistoryEvent }[]
+  }
+  subscribe(fn: () => void): () => void
+}
+
 /** Optional raw-history face used to detect failures of never-opened sessions. */
 export interface HistoryExecutionFace {
   loadTail(sessionId: string): Promise<{ events: readonly ExecutionHistoryEvent[] } | undefined>
@@ -57,7 +69,12 @@ export interface SessionDriver {
     content: readonly unknown[],
     mode: 'queue',
   ): Promise<{ ok: true } | { ok: false; error: unknown }>
-  getSnapshot(): { running: boolean; lastAgentError: string | null; turnEnds: ReadonlyMap<number, number> }
+  getSnapshot(): {
+    running: boolean
+    lastAgentError: string | null
+    /** Pre-1.1.5 compatibility seam; current runtimes expose turn/end through eventSource. */
+    turnEnds?: ReadonlyMap<number, number>
+  }
   subscribe(fn: () => void): () => void
 }
 
@@ -109,17 +126,18 @@ export class ExecutionService {
     try {
       const { sessionId, workspaceId } = await this.connectSession()
       onEvent({ kind: 'started', taskId: task.id, executionId: execution.id, sessionId, workspaceId })
-      const driver = this.driverOf(sessionId)
-      if (driver === undefined) {
+      const binding = this.bindingOf(sessionId)
+      if (binding === undefined) {
         onEvent({ kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'failed', error: 'execution session is not ready' })
         return
       }
+      const { session: driver } = binding
       // Best-effort rename so the execution is recognizable in the session list.
       await driver.rename(task.title).catch(() => { /* rename is cosmetic */ })
       // Baseline the turn counter BEFORE the prompt round-trip: a turn that
       // completes while prompt is in flight must still advance past this
       // baseline, or the watch below would never observe it settle.
-      const baseline = driver.getSnapshot().turnEnds.size
+      const baseline = this.turnEndCount(binding)
       const accepted = await this.sendPrompt(driver, task)
       if (!accepted.ok) {
         onEvent({
@@ -128,7 +146,7 @@ export class ExecutionService {
         })
         return
       }
-      this.watchForSettlement(driver, task.id, execution.id, onEvent, baseline)
+      this.watchForSettlement(binding, task.id, execution.id, onEvent, baseline)
     } catch (error) {
       onEvent({
         kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'failed',
@@ -165,10 +183,10 @@ export class ExecutionService {
       return { kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'cancelled', error: 'execution session no longer exists' }
     }
     if (summary.running) return undefined
-    const driver = this.driverOf(execution.sessionId)
-    if (driver !== undefined) {
-      const snapshot = driver.getSnapshot()
-      if (snapshot.turnEnds.size > 0) {
+    const binding = this.bindingOf(execution.sessionId)
+    if (binding !== undefined) {
+      const snapshot = binding.session.getSnapshot()
+      if (this.turnEndCount(binding) > 0) {
         const outcome = snapshot.lastAgentError !== null ? 'failed' : 'succeeded'
         return {
           kind: 'settled', taskId: task.id, executionId: execution.id, outcome,
@@ -207,8 +225,20 @@ export class ExecutionService {
     return { sessionId: await this.env.workspaces.connectWorkspace(workspaceId), workspaceId }
   }
 
-  private driverOf(sessionId: string): SessionDriver | undefined {
-    return this.env.sessions.binding(sessionId)?.session
+  private bindingOf(sessionId: string): ReturnType<SessionsExecutionFace['binding']> {
+    return this.env.sessions.binding(sessionId)
+  }
+
+  /** Count durable turn completions on both current and legacy Session faces. */
+  private turnEndCount(binding: NonNullable<ReturnType<SessionsExecutionFace['binding']>>): number {
+    const eventSource = binding.eventSource
+    if (eventSource !== undefined) {
+      return eventSource.getSnapshot().entries.reduce(
+        (count, entry) => count + (entry.event.type === 'turn/end' ? 1 : 0),
+        0,
+      )
+    }
+    return binding.session.getSnapshot().turnEnds?.size ?? 0
   }
 
   private async sendPrompt(
@@ -231,27 +261,31 @@ export class ExecutionService {
    * still running; unsubscribes on settle.
    */
   private watchForSettlement(
-    driver: SessionDriver,
+    binding: NonNullable<ReturnType<SessionsExecutionFace['binding']>>,
     taskId: string,
     executionId: string,
     onEvent: (event: ExecutionEvent) => void,
     baseline: number,
   ): void {
+    const driver = binding.session
     let settled = false
-    let unsubscribe: () => void = () => {}
+    let unsubscribeSession: () => void = () => {}
+    let unsubscribeEvents: () => void = () => {}
     const check = (): void => {
       if (settled) return
       const snapshot = driver.getSnapshot()
-      if (snapshot.running || snapshot.turnEnds.size <= baseline) return
+      if (snapshot.running || this.turnEndCount(binding) <= baseline) return
       settled = true
-      unsubscribe()
+      unsubscribeSession()
+      unsubscribeEvents()
       onEvent({
         kind: 'settled', taskId, executionId,
         outcome: snapshot.lastAgentError !== null ? 'failed' : 'succeeded',
         error: snapshot.lastAgentError ?? undefined,
       })
     }
-    unsubscribe = driver.subscribe(check)
+    unsubscribeSession = driver.subscribe(check)
+    unsubscribeEvents = binding.eventSource?.subscribe(check) ?? (() => {})
     // A turn can complete during the prompt round-trip (before subscribe):
     // re-check immediately so a fast turn is never missed.
     check()

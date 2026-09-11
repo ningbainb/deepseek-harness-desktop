@@ -1,0 +1,73 @@
+diff --git a/lib/index.js b/lib/index.js
+index e06cf8d5faf9755710420623908478c704b225b8..bc38d32f54678ea76b9862f16d11c46929ac62aa 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1011,6 +1011,7 @@ const profile = z.object({
+ 	maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
+ 	requestImagePixelBudget: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
+ 	requestImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES),
++	toolsCapability: z.union(["auto", "native", "none"]).default("auto"),
+ 	retryPolicy: RetryPolicySchema
+ });
+ /** Runtime schema for {@link Config}. */
+@@ -1102,6 +1103,7 @@ function resolveProfiles(providers, validation = "strict") {
+ 			...rest,
+ 			provider,
+ 			displayName,
++			toolsCapability: source.toolsCapability ?? "auto",
+ 			...apiKeyEnv === void 0 ? {} : { apiKeyEnv: credentialRef(apiKeyEnv) },
+ 			streamIdleTimeoutMs,
+ 			maxRequestImageBytes,
+@@ -1195,6 +1197,9 @@ function toolsOf(options) {
+ 		parameters: tool.parameters
+ 	}));
+ }
++function hasToolHistory(options) {
++	return options.messages?.some((message) => message?.role === "tool" || Array.isArray(message?.content) && message.content.some((block) => block?.type === "tool-call" || block?.type === "tool-result")) ?? false;
++}
+ /**
+ * Select the pi-ai `systemPrompt` source shared by both conversion paths.
+ * `options.system` wins when defined and every history message converts,
+@@ -1834,6 +1839,9 @@ var PiAiAdapter = class extends LlmAdapter {
+ 			if (options.stop !== void 0) throw new LlmError("llm-pi-ai does not support GenerateOptions.stop", "UNSUPPORTED_OPTION");
+ 			const profile = this.profileOf(snapshot, options.provider);
+ 			const model = this.modelOf(snapshot, options.provider, options.model);
++			const toolsCapability = profile.toolsCapability ?? "auto";
++			if (toolsCapability === "none" && hasToolHistory(options)) throw new LlmError("provider route does not support tool history", "UNSUPPORTED_TOOLS");
++			const requestOptions = toolsCapability === "none" ? (({ tools: _tools, ...rest }) => rest)(options) : options;
+ 			const reasoning = resolveReasoningLevel(model, options.reasoningEffort ?? profile.reasoning);
+ 			const apiKey = await this.config.resolveApiKey(options.provider, profile);
+ 			const consumer = new AbortController();
+@@ -1852,8 +1860,8 @@ var PiAiAdapter = class extends LlmAdapter {
+ 						reason
+ 					});
+ 				};
+-				const context = attachments === void 0 ? toPiContext(options, void 0, onReplayDegrade) : await toPiContext({
+-					...options,
++				const context = attachments === void 0 ? toPiContext(requestOptions, void 0, onReplayDegrade) : await toPiContext({
++					...requestOptions,
+ 					signal: watchdog.signal
+ 				}, {
+ 					attachments,
+diff --git a/lib/types/config.d.ts b/lib/types/config.d.ts
+index 1391c2dcd0e6b8486ddfc8f2834be33f43fa47b1..b0ce531df2f9fa10d5a48d955ee30f9b663d9f31 100644
+--- a/lib/types/config.d.ts
++++ b/lib/types/config.d.ts
+@@ -139,6 +139,8 @@ export interface PiAiProviderProfile {
+      * the smallest quality-ladder output is used when no quality fits.
+      */
+     requestImageMaxBytes?: number;
++    /** Request-side tools capability for this route; model names never override it. */
++    toolsCapability?: 'auto' | 'native' | 'none';
+     /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
+     retryPolicy?: RetryPolicyConfig;
+ }
+@@ -158,6 +160,8 @@ export interface ResolvedPiAiProviderProfile extends Omit<PiAiProviderProfile, '
+     requestImagePixelBudget: number;
+     /** Positive raw request-version byte target after defaulting; the smallest quality-ladder output is used when no quality fits. */
+     requestImageMaxBytes: number;
++    /** Resolved request-side tools capability for this route. */
++    toolsCapability: 'auto' | 'native' | 'none';
+     /** Immutable retry policy captured with this provider route. */
+     retryPolicy: ResolvedRetryPolicy;
+     /**

@@ -1,0 +1,15 @@
+diff --git a/package.json b/package.json
+index ee9a9fbe16a51c34758a224a93e5dca572e9f0ec..8ef35b39e5551cdcf9dc3d7668a57c05b6b7d915 100644
+--- a/package.json
++++ b/package.json
+@@ -22,6 +22,10 @@
+     "./package.json": "./package.json"
+   },
+   "license": "MIT",
++  "dependencies": {
++    "immer": "^10.1.1",
++    "zustand": "~4.4.7"
++  },
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "^4.0.2"
+   },

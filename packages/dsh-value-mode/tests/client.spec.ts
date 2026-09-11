@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { zh, en, type ValueModeLocaleKey } from '../src/client/locales.ts'
 import { apply, inject } from '../src/client/index.ts'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 
 const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/u
 
@@ -10,6 +10,16 @@ interface RegisteredSlot {
     inject: () => Record<string, unknown>
   }
   component: unknown
+}
+
+function runtimeContext(modelCatalog = vi.fn()) {
+  const connection = { generation: { subscribe: vi.fn(() => () => {}) } }
+  Object.defineProperty(connection, 'api', { get() { throw new Error('Legacy connection.api must not be read') } })
+  return {
+    on: vi.fn(() => () => {}),
+    remote: { session: { modelCatalog }, $on: vi.fn(() => () => {}) },
+    get: vi.fn((name: string) => name === 'connection' ? connection : undefined),
+  }
 }
 
 describe('ValueMode Client Plugin & Locales', () => {
@@ -39,7 +49,7 @@ describe('ValueMode Client Plugin & Locales', () => {
     const registeredSlots: Record<string, RegisteredSlot> = {}
     const mockCtx = {
       effect: vi.fn((fn) => fn()),
-      locale: { register: vi.fn() },
+      locale: { register: vi.fn(), bind: () => (key: ValueModeLocaleKey) => zh[key] },
       slots: {
         inject: vi.fn((_slotName, registerFn) => { registerFn() }),
         register: vi.fn((descriptor, component) => {
@@ -52,13 +62,14 @@ describe('ValueMode Client Plugin & Locales', () => {
           set: vi.fn(),
         }),
       },
-      get: vi.fn().mockReturnValue(undefined),
+      ...runtimeContext(),
     } as unknown as ClientContext
 
     expect(inject).toContain('slots')
     expect(inject).toContain('locale')
     expect(inject).toContain('connection')
     expect(inject).toContain('settingsScope')
+    expect(inject).toContain('remote.session')
 
     apply(mockCtx)
 
@@ -77,11 +88,11 @@ describe('ValueMode Client Plugin & Locales', () => {
     }]
     const failures = [{ id: 'openai', name: 'OpenAI', message: 'temporarily unavailable' }]
     const models = vi.fn().mockResolvedValue({
-      result: { ok: true, value: { groups, failures } },
+      ok: true, value: { groups, failures },
     })
     const mockCtx = {
       effect: vi.fn((fn) => fn()),
-      locale: { register: vi.fn() },
+      locale: { register: vi.fn(), bind: () => (key: ValueModeLocaleKey) => zh[key] },
       slots: {
         inject: vi.fn((_slotName, registerFn) => { registerFn() }),
         register: vi.fn((descriptor, component) => {
@@ -94,7 +105,7 @@ describe('ValueMode Client Plugin & Locales', () => {
           set: vi.fn(),
         }),
       },
-      get: vi.fn((name: string) => name === 'connection' ? { api: { llm: { models } } } : undefined),
+      ...runtimeContext(models),
     } as unknown as ClientContext
 
     apply(mockCtx)
@@ -104,18 +115,19 @@ describe('ValueMode Client Plugin & Locales', () => {
     const fetchModels = settingsProps.fetchModels as () => Promise<unknown>
     expect(headerProps.fetchModels).toBe(fetchModels)
     await expect(fetchModels()).resolves.toEqual({ groups, failures })
+    await expect((headerProps.fetchModels as typeof fetchModels)()).resolves.toEqual({ groups, failures })
     expect(models).toHaveBeenCalledTimes(1)
-    expect(models).toHaveBeenCalledWith({})
+    expect(models).toHaveBeenCalledWith()
   })
 
   it('surfaces a host model-catalog refusal instead of silently showing an empty list', async () => {
     const registeredSlots: Record<string, RegisteredSlot> = {}
     const models = vi.fn().mockResolvedValue({
-      result: { ok: false, error: { message: '模型目录服务暂不可用' } },
+      ok: false, error: { message: '模型目录服务暂不可用' },
     })
     const mockCtx = {
       effect: vi.fn((fn) => fn()),
-      locale: { register: vi.fn() },
+      locale: { register: vi.fn(), bind: () => (key: ValueModeLocaleKey) => zh[key] },
       slots: {
         inject: vi.fn((_slotName, registerFn) => { registerFn() }),
         register: vi.fn((descriptor, component) => {
@@ -128,7 +140,7 @@ describe('ValueMode Client Plugin & Locales', () => {
           set: vi.fn(),
         }),
       },
-      get: vi.fn((name: string) => name === 'connection' ? { api: { llm: { models } } } : undefined),
+      ...runtimeContext(models),
     } as unknown as ClientContext
 
     apply(mockCtx)

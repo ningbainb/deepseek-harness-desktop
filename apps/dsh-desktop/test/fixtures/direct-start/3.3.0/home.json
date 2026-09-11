@@ -1,0 +1,24 @@
+{
+  "fixtureSchema": 1,
+  "release": "3.3.0",
+  "profile": {
+    "name": "dsh-profile-desktop",
+    "private": true,
+    "dependencies": {},
+    "dsh": {
+      "profile": {
+        "bundles": [
+          "@deepseek-ai/dsh-base",
+          "@linxin666/dsh-desktop-compat",
+          "@deepseek-ai/dsh-web-app",
+          "@linxin666/dsh-value-mode",
+          "@linxin666/dsh-web-ui-all",
+          "@tencent-connect/dsh-qqbot",
+          "reasoning-slider"
+        ]
+      }
+    }
+  },
+  "profilePatch": "[]\n",
+  "sessionMarker": "direct-start-session-330"
+}

@@ -47,7 +47,6 @@ describe('tsdown bundle dependency policy', () => {
       'scheduler',
       'react-dom',
       'zod',
-      '@deepseek-ai/dsh-host-apiproxy',
     ])
   })
 })

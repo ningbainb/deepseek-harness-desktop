@@ -26,7 +26,7 @@ function errorKind(error: unknown): SurfaceError {
   return 'authorization'
 }
 
-/** First-level settings surface for the official RC.1 OpenAI Codex flow. */
+/** First-level settings surface for the official DSH 0.1.5 OpenAI Codex flow. */
 export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
   const [state, setState] = useState<ChatGptAuthState>()
   const [pending, setPending] = useState(false)

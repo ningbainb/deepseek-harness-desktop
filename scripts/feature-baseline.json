@@ -4,11 +4,22 @@
   "description": "DeepSeek Harness Desktop & dsh-web-ui 核心功能与内置插件保全基线清单",
   "plugins": [
     {
+      "id": "ui-web-ui-compat",
+      "package": "@linxin666/dsh-web-ui-all",
+      "path": "packages/dsh-web-ui-all",
+      "description": "聚合包自身的桌面布局兼容与会话导航插件",
+      "patchId": "ui-web-ui-compat",
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
       "id": "ui-web-ui-settings",
       "package": "@linxin666/dsh-client-ui-web-ui-settings",
       "path": "packages/dsh-web-ui-settings",
       "description": "Web UI 插件主设置组与安全宿主槽位",
       "patchId": "ui-web-ui-settings",
+      "features": ["latest-settings-write-wins-with-revision-fence"],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
       "requiredInDesktop": true
@@ -36,7 +47,12 @@
       "patchId": "ui-model-preferences",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
-      "requiredInDesktop": false
+      "requiredInDesktop": false,
+      "features": [
+        "menu-open-does-not-reload",
+        "recovery-event-refresh-throttle",
+        "same-session-broadcast-refresh"
+      ]
     },
     {
       "id": "personal-prompt",
@@ -103,6 +119,7 @@
       "package": "@linxin666/dsh-client-ui-mode-switcher",
       "path": "packages/dsh-mode-switcher",
       "description": "专家/极简/标准交互模式切换器",
+      "features": ["same-workspace-or-original-cwd-only", "preserve-current-session-on-switch-failure", "late-mode-switch-preserves-user-navigation", "native-remote-and-session-projection", "native-mode-switch-keeps-global-default", "legacy-mode-api-fallback", "loaded-history-projection-vetoes-stale-blank-reuse"],
       "patchId": "ui-mode-switcher",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -146,7 +163,8 @@
       "patchId": "live-stats",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
-      "requiredInDesktop": true
+      "requiredInDesktop": true,
+      "features": ["bounded-balance-query-and-retry", "native-primary-stats-with-desktop-disclosure", "empty-session-has-no-stats-supplement", "distinct-rolling-and-peak-throughput", "balance-follows-native-model-selection", "provider-key-cache-isolation", "relay-balance-and-site-quota"]
     },
     {
       "id": "ssh",
@@ -173,6 +191,7 @@
       "package": "@linxin666/dsh-liangshen",
       "path": "packages/dsh-liangshen",
       "description": "量身定制交互与功能扩展",
+      "features": ["official-sdk-persona-prefix-suffix", "legacy-owned-preset-auto-refresh", "bootstrap-persona-retained-and-workspace-restored"],
       "patchId": "liangshen",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -202,18 +221,32 @@
     {
       "id": "window-chrome",
       "name": "桌面自定义窗口边框、阴影与窗口控件",
-      "e2eScript": "scripts/verify-window-chrome.mjs"
+      "e2eScript": "scripts/verify-window-chrome.mjs",
+      "features": [
+        "preload-shell-context",
+        "dsh-1.1.5-query-sanitization-safe",
+        "dsh-1.1.5-layout-anchor-bridge",
+        "restored-window-geometry-does-not-accumulate-native-dpi-rounding",
+        "native-sidebar-fullscreen-reserves-desktop-caption",
+        "native-fullscreen-controls-clear-desktop-workbench",
+        "native-browser-split-float-dock-retain-independent-drafts",
+        "native-browser-cross-session-close-and-history-isolation",
+        "native-browser-close-owner-with-legacy-and-keyboard-fallback",
+        "incremental-modal-layer-tracking-with-document-lifecycle"
+      ]
     },
     {
       "id": "settings-window",
+      "features": ["dom-ready-settings-adaptation", "one-controller-per-document", "navigation-and-disposal-cancel-stale-mounts"],
       "name": "设置窗口与导航标签系统",
       "e2eScript": "scripts/verify-settings-window.mjs"
     },
     {
       "id": "conversation-scroll-navigation",
       "name": "长对话固定输入区、滚轮转发与轮次导航",
-      "uiSelector": "[data-dsh-turn-navigator]",
-      "e2eScript": "scripts/verify-conversation-scroll.mjs"
+      "uiSelector": "nav[aria-label=\"轮次导航\"], nav[aria-label=\"Turn navigation\"], [data-dsh-turn-navigator]",
+      "e2eScript": "scripts/verify-conversation-scroll.mjs",
+      "features": ["native-turn-navigation-first", "legacy-navigation-fallback", "compact-navigation-above-composer", "shipped-aggregate-navigation-parity", "empty-conversation-no-idle-navigation", "navigation-disposal-clears-pending-scroll", "native-bottom-action-deduplication", "navigation-remount-and-empty-session-roundtrip", "offscreen-message-layout-with-native-content-retained", "bounded-native-jump-settling-yields-to-reader"]
     },
     {
       "id": "directory-picker",
@@ -223,12 +256,63 @@
     {
       "id": "runtime-provider",
       "name": "运行时环境提供器与调度状态服务",
-      "e2eScript": "scripts/verify-runtime-provider.mjs"
+      "e2eScript": "scripts/verify-runtime-provider.mjs",
+      "features": [
+        "official-dsh-0.1.5-exact-pin",
+        "sdk-composed-runtime-launcher",
+        "bounded-runtime-startup-phase-timings",
+        "production-client-compression-preserves-names-and-source-maps",
+        "official-cli-install-anchor",
+        "startup-token-cookie-isolation",
+        "windows-hidden-subprocess",
+        "electron-job-runner-console-preload-propagation",
+        "real-windows-background-console-regression",
+        "quit-invalidates-pending-runtime-presentation",
+        "private-runtime-graceful-shutdown-with-force-fallback",
+        "bounded-shutdown-waits-for-inflight-http-responses",
+        "quit-cancel-does-not-revive-stale-navigation"
+      ]
     },
     {
       "id": "preset-deep-link",
       "name": "预设与协议唤起处理 (dsh://)",
-      "e2eScript": "scripts/verify-preset-deep-link.mjs"
+      "e2eScript": "scripts/verify-preset-deep-link.mjs",
+      "features": [
+        "normal-packaged-protocol-registration",
+        "isolated-qa-preserves-system-protocol-association"
+      ]
+    },
+    {
+      "id": "upgrade-and-session-recovery",
+      "name": "安装事务提速与历史会话格式恢复",
+      "e2eScript": "scripts/verify-package.mjs",
+      "features": [
+        "normal-installer-compression",
+        "deferred-committed-backup-cleanup",
+        "isolated-per-generation-committed-cleanup",
+        "locked-legacy-committed-backup-does-not-block-next-upgrade",
+        "stable-installer-transaction-helper",
+        "compiled-nsis-commit-and-failure-callback-regression",
+        "bounded-post-exit-replacement-file-release",
+        "verified-rollback-result-messaging",
+        "noncommitted-upgrade-rollback",
+        "plaintext-zstd-session-recovery",
+        "released-v0-permission-preset-origin-recovery",
+        "released-v0-subagent-descriptor-v2-recovery",
+        "official-jsonl-historical-open-and-resume-recovery",
+        "concurrent-legacy-recovery-preserves-single-backup",
+        "legacy-recovery-rejects-concurrently-changed-source",
+        "legacy-recovery-bounded-byte-batching-preserves-validation",
+        "official-full-session-migration-validation",
+        "original-session-backup-preserved",
+        "update-failure-stage-and-code-diagnostics",
+        "update-attempt-receipt-correlation",
+        "update-telemetry-remains-active-until-exit",
+        "reversible-installer-launch-failure-recovery",
+        "quit-during-recovery-stops-replacement-runtime",
+        "late-preparation-cannot-own-next-install-attempt",
+        "historical-3.3-profile-bundle-preservation"
+      ]
     },
     {
       "id": "network-proxy-routing",
@@ -238,13 +322,15 @@
     {
       "id": "terminal",
       "name": "内置 ConPTY / xterm 终端侧边栏",
-      "e2eScript": "scripts/verify-terminal.mjs"
+      "e2eScript": "scripts/verify-terminal.mjs",
+      "features": ["panel-visible-before-git-inspection", "cancel-pending-terminal-without-late-shell", "terminal-restart-generation-isolation", "terminal-renderer-loss-reclaims-panel", "terminal-initialization-rollback", "terminal-single-ipc-owner"]
     },
     {
       "id": "personal-prompt-card",
       "name": "个性化 Prompt 设置卡片",
       "uiSelector": "[data-personal-prompt-card=\"true\"]",
-      "e2eScript": "scripts/verify-packaged-personalization.mjs"
+      "e2eScript": "scripts/verify-packaged-personalization.mjs",
+      "features": ["plain-language-response-preferences", "on-demand-preview-and-priority", "single-save-action"]
     },
     {
       "id": "memory-card",
@@ -260,7 +346,9 @@
         "session-memory-activity",
         "session-ignore",
         "empty-query-guard",
-        "tag-and-phrase-ranking"
+        "tag-and-phrase-ranking",
+        "settings-only-memory-entry",
+        "on-demand-memory-advanced-fields"
       ]
     },
     {
@@ -268,7 +356,18 @@
       "name": "性价比模式 (Value Mode) 设置卡片",
       "uiSelector": "[data-value-mode-card=\"true\"]",
       "desktopLocation": "extension-dock/value-mode",
-      "e2eScript": "scripts/verify-dock-settings.mjs"
+      "e2eScript": "scripts/verify-dock-settings.mjs",
+      "features": [
+        "canonical-cost-mode-events",
+        "official-sdk-persona-prefix-suffix",
+        "route-success-and-failure-observation",
+        "aggregate-only-success-analytics",
+        "analytics-failure-isolation",
+        "native-remote-model-catalog",
+        "shared-bounded-catalog-read",
+        "catalog-refresh-on-runtime-and-provider-changes",
+        "real-expert-worker-selection-and-timeout-retry"
+      ]
     },
     {
       "id": "dock-settings-navigation",
@@ -290,7 +389,17 @@
         "synchronized-theme",
         "relay-browser-connect",
         "skip-redundant-view-layout",
-        "frame-coalesced-settings-drag"
+        "frame-coalesced-settings-drag",
+        "read-only-refresh-outside-mutation-lock",
+        "market-cache-and-request-dedup",
+        "settings-loading-state-settles",
+        "warm-tabs-preserve-visible-runtime-document",
+        "bounded-navigation-with-latest-selection-fence",
+        "windows-taskbar-minimize-restore",
+        "bounded-close-inspection",
+        "relay-content-only-collapse",
+        "relay-top-left-up-down-toggle",
+        "search-results-replace-navigation"
       ],
       "settings": [
         "relay",
@@ -305,7 +414,13 @@
     {
       "id": "model-preferences-card",
       "name": "模型偏好与自定义供应商排序卡片",
-      "e2eScript": "scripts/verify-packaged-model-preferences.mjs"
+      "e2eScript": "scripts/verify-packaged-model-preferences.mjs",
+      "features": [
+        "menu-open-does-not-reload",
+        "recovery-event-refresh-throttle",
+        "same-session-broadcast-refresh",
+        "nonblocking-bounded-recent-model-persistence"
+      ]
     },
     {
       "id": "remote-settings-card",
@@ -328,6 +443,7 @@
         "duplicate-workspace-protection",
         "native-directory-picker",
         "browser-picker-preserved",
+        "native-directory-editor-rejects-unsolicited-composer-focus",
         "home-workspace-selector",
         "existing-workspace-selection",
         "anonymous-project-outcome-metrics",
@@ -339,28 +455,52 @@
       "name": "侧栏按钮避让与面板重挂载恢复",
       "uiSelector": "[data-aionui-explorer-toolbar]",
       "e2eScript": "scripts/verify-directory-picker.mjs",
-      "features": ["non-overlapping-panel-controls", "reopen-explorer", "restore-replaced-frame"]
+      "features": ["non-overlapping-panel-controls", "reopen-explorer", "restore-replaced-frame", "native-common-file-preview-first", "explicit-compatibility-editor", "preserve-dirty-editor-on-preview-switch", "native-dock-space-handoff-preserves-preferences", "native-toolbar-workbench-clearance", "native-git-and-file-tools-tabs", "native-files-toolbar-route", "shared-workspace-store-no-duplicate-tab-strip", "git-action-root-epoch-guard", "native-browser-tabs-and-record-lifetime-state", "sandboxed-browser-no-popup-authority", "legacy-browser-address-restore-without-filesystem-read", "native-collapse-does-not-reactivate-legacy-columns", "empty-conversation-native-sidebar-return", "frame-coalesced-native-sidebar-return-with-disposal", "native-default-surface-without-forced-session-navigation", "optional-native-service-removal-restores-compatibility"]
+    },
+    {
+      "id": "particle-native-composer-clearance",
+      "name": "粒子避让原生输入与附件",
+      "uiSelector": "canvas[data-dsh-particle-theme]",
+      "e2eScript": "scripts/verify-particle-theme.mjs",
+      "features": ["native-composer-boundary", "legacy-attachment-boundary", "resize-scroll-remount", "theme-settings-preserved", "multi-window-settings-delivery", "loopback-only-connection-cap-exemption", "pet-read-backpressure-and-recovery", "native-message-pixel-clearance", "scroll-viewport-message-clearance", "incremental-dialog-detection-preserves-live-visibility", "membership-cached-content-targets-with-live-geometry"]
     },
     {
       "id": "conversation-file-attachments",
       "name": "会话文件附件队列、重试与移除",
-      "uiSelector": "[data-dsh-file-attachments]",
+      "uiSelector": "[aria-label=\"待发送文件\"], [aria-label=\"Pending files\"], [data-dsh-file-attachments]",
       "e2eScript": "scripts/verify-directory-picker.mjs",
       "features": [
         "session-owned-stream-upload",
+        "native-generic-file-upload-first",
+        "legacy-reference-recovery-without-duplicate-picker",
+        "ordered-mixed-image-document-admission",
         "arbitrary-file-types",
         "per-file-status",
         "preserve-draft",
         "cancel-stale-upload",
+        "pending-and-failed-attachment-send-guard-for-rich-editor",
         "anonymous-attachment-outcome-metrics"
       ]
     },
     {
+      "id": "dock-model-catalog",
+      "name": "拓展坞真实模型选择、目录复用与超时恢复",
+      "uiSelector": "[data-value-mode-model-picker]",
+      "e2eScript": "scripts/verify-dock-model-catalog.mjs"
+    },
+    {
+      "id": "selected-model-balance",
+      "name": "余额跟随原生模型选择与服务商凭据隔离",
+      "uiSelector": "[data-dsh-balance-entry]",
+      "e2eScript": "scripts/verify-selected-balance.mjs",
+      "features": ["native-picker-official-relay-round-trip", "provider-owned-credentials", "no-paid-model-probes", "failed-refresh-clears-stale-balance"]
+    },
+    {
       "id": "star-prompt",
-      "name": "3.3.0 升级后每个本机用户显示一次 Star 提示",
+      "name": "3.4.0 升级后每个本机用户显示一次 Star 提示",
       "uiSelector": "#dsh-desktop-star-prompt",
       "e2eScript": "scripts/verify-star-prompt.mjs",
-      "features": ["version-3.3.0-once", "previous-version-claim-preserved", "restart-does-not-repeat"]
+      "features": ["version-3.4.0-once", "previous-version-claim-preserved", "restart-does-not-repeat", "defer-behind-existing-dialogs", "cancel-deferred-reveal-on-navigation", "combined-star-afdian-support", "offline-author-url-qr", "optional-sponsorship-with-dismiss"]
     },
     {
       "id": "image-drop-compression",

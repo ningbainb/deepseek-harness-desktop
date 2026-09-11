@@ -3,6 +3,9 @@
 # edit aggregate.yml and rerun `node scripts/aggregate.mjs`.
 
 # from self
+- insert:
+    - id: ui-web-ui-compat
+      name: '@linxin666/dsh-web-ui-all'
 
 # from ../dsh-web-ui-settings
 - insert:

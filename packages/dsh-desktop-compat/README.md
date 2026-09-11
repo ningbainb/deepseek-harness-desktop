@@ -24,6 +24,12 @@ Each recovery or refusal writes a bounded runtime-log diagnostic with the
 provider, model, tool name, call id, source, and reason. Raw tool arguments are
 never written to that diagnostic.
 
+## Historical Session recovery
+
+Desktop handles three confirmed historical variants without modifying DSH source: plaintext JSONL mislabeled as Zstandard, released-v0 `permission/preset` data containing exactly `preset` and `origin: "default"`, and released-v0 `subagent/descriptor` generation-2 data matching the published one-shot or continuable schema. The latter two repairs remove only the legacy `origin` or change only descriptor version 2 to 3; no model, permission, tool filter or reasoning setting is invented. Mixed logs are validated as one complete candidate. Original bytes are backed up before replacement, and the candidate must pass the complete official Session migration catalog. A Runtime retry failure restores the original bytes.
+
+Recovery covers both the stored-log reader and the native historical preparation entry used by current DSH. Shared repair tasks prevent concurrent reads from competing over backups; native migration publication and cancellation remain authoritative. A source change detected during normalization rejects the stale candidate; a change detected after repair prevents rollback from overwriting newer data and retains the original backup for recovery. Unknown fields or generations, other origin values, incomplete frames, identity mismatches, conflicting backups and unrelated migration failures remain unchanged. Diagnostics report counts and bounded kinds only; Session ids, paths, prompts and responses are omitted.
+
 ## Install
 
 DeepSeek Harness Desktop 2.0 mounts this bundle automatically in its isolated desktop profile. The package is not intended as a general Web UI plugin.

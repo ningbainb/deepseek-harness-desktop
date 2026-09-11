@@ -15,14 +15,20 @@
 
 /** Settings namespaces the dsh-web-ui family plugins register. */
 export const FAMILY_NAMESPACES = [
+  'llm-pi-ai',
   'dsh-ssh',
+  'memory',
+  'model-preferences',
   'task-board',
   'remote-web-ui',
   'live-stats',
   'pet',
+  'personal-prompt',
   'particle-theme',
   'describe-image',
   'skin-background',
+  'skin-wallpaper',
+  'value-mode',
 ] as const
 
 /**
@@ -33,6 +39,15 @@ export const FAMILY_NAMESPACES = [
 const NAMESPACE_ALIASES: Readonly<Record<string, string | null>> = {
   'dsh-ssh': 'dsh-ssh',
   ssh: 'dsh-ssh',
+  'dsh-llm-pi-ai': 'llm-pi-ai',
+  'llm-pi-ai': 'llm-pi-ai',
+  'dsh-memory': 'memory',
+  memory: 'memory',
+  'dsh-client-ui-model-preferences': 'model-preferences',
+  'dsh-model-preferences': 'model-preferences',
+  'model-preferences': 'model-preferences',
+  'dsh-personal-prompt': 'personal-prompt',
+  'personal-prompt': 'personal-prompt',
   'dsh-client-ui-task-board': 'task-board',
   'dsh-task-board': 'task-board',
   'task-board': 'task-board',
@@ -48,6 +63,9 @@ const NAMESPACE_ALIASES: Readonly<Record<string, string | null>> = {
   'dsh-client-ui-skin-center': 'skin-background',
   'skin-center': 'skin-background',
   'skin-background': 'skin-background',
+  'skin-wallpaper': 'skin-wallpaper',
+  'dsh-value-mode': 'value-mode',
+  'value-mode': 'value-mode',
   'describe-image': 'describe-image',
   'dsh-tool-describe-image': 'describe-image',
   'dsh-aionui-panel': null,

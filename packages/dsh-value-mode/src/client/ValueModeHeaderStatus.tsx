@@ -173,7 +173,7 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
     const entryKey = `${sessionId}:value-mode`
     if (handledEntryRef.current === entryKey) return
     handledEntryRef.current = entryKey
-    reportValueModeTelemetry({ kind: 'entry', configured: explicitlyConfigured }, 'value-mode-entry')
+    reportValueModeTelemetry({ kind: 'entry', configured: explicitlyConfigured, source: 'header' }, 'value-mode-entry')
 
     if (explicitlyConfigured) {
       if (!resolved.enabled) void enableCurrentScope('auto')

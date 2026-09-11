@@ -2,7 +2,7 @@ import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
-import type { SettingsNamespace, SettingsPathOp } from '@deepseek-ai/dsh-settings'
+import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import {
   RELAY_API_PREFIX,
   RELAY_BASE_URL,
@@ -23,8 +23,8 @@ function fakeSettings() {
   let nextFailure: Error | undefined
   const seam = {
     writable: true,
-    get: (ns: SettingsNamespace): unknown => String(ns) === 'llm-pi-ai' ? value : undefined,
-    mutate: async (ns: SettingsNamespace, ops: readonly SettingsPathOp[]): Promise<void> => {
+    get: (ns: string): unknown => ns === 'llm-pi-ai' ? value : undefined,
+    mutate: async (ns: string, ops: readonly SettingsPathOp[]): Promise<void> => {
       writes.push({ ns: String(ns), ops })
       if (nextFailure !== undefined) {
         const failure = nextFailure

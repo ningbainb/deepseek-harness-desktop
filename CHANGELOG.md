@@ -1,5 +1,67 @@
 # Changelog
 
+## 3.4.0 - 2026-09-09
+
+中文：
+
+- 宠物状态与目录读取增加在途去重、八秒超时和取消保护，网络卡住时不会持续积压；交互后的刷新只补发一次最新读取，隐藏、禁用及卸载后不再回写迟到结果。多宠物设置的延迟加载与重试也会在卸载时清理，保留宠物切换及会话气泡跳转。
+- 修复主窗口和拓展坞同时开启时，长连接占满本机 HTTP 连接池导致设置保存、读取等请求持续排队的问题；仅调整本机 Runtime 的连接限制，外网连接与代理规则保持不变。
+- 粒子背景跟随原生输入区、草稿高度和滚动避让，不覆盖附件或未聚焦的草稿；保留旧附件栏保护和主题开关。原生预览工具栏为终端/浏览器工作台控件预留空间，避免右上角按钮重叠。
+
+- 记忆管理与引用反馈集中在拓展坞设置，主聊天页不再显示记忆入口。个人偏好使用直白的回复偏好文案，保留单一保存区，将预览、优先级与记忆高级字段改为按需展开。
+- 拓展坞在 Windows 使用独立任务栏窗口，最小化时隐藏设置子视图，恢复后重新布局；关闭状态检查增加超时与显式确认，保留草稿保护。中转卡片独立折叠，功能搜索结果不再与完整导航重复展示。
+- 对话优先使用 DSH 原生完整轮次导航，原生导航可用时停用桌面重复入口；缺少原生导航的旧会话保留紧凑横排兼容导航，并随输入框边界定位。
+- 普通文档和图片优先在原生 Sidebar 预览；保留明确的编辑/兼容预览入口，以及已有未保存编辑缓冲区。切换原生预览和桌面编辑时保留标签，只切换可见面板，避免重复展开挤压控件。
+- 普通文件优先使用 DSH 原生上传、状态和重试，去掉重复附件选择器；保留旧附件引用恢复和缺失检查、大图压缩及混合附件顺序。修复晚恢复的旧引用未检查、删除失效引用后仍阻止发送，以及附件提交异常时资源未释放的问题。
+- 修复 Electron 内核中间进程未继承控制台预加载而反复弹出空白终端的问题：桌面适配层仅为官方 Windows Job runner 传递预加载，保留输出、IPC 与进程树回收，并增加真实闪窗事件及未适配路径的对照测试。
+- 内置终端先展示可关闭的界面，再并行准备 PTY 与已验证 PATH；关闭等待中的面板不再产生迟到的 Shell。模型切换不再等待最近使用记录保存，连续选择的记录写入按作用域串行合并且最多保留八项。
+- 修复快速调整皮肤等插件设置时旧响应覆盖新选择的回跳：兼容设置层只发布最新写入结果，同时保留版本校验，最后一次写入失败时重新读取真实保存值。
+- 全面适配 DSH 1.1.5 对应的官方 NPM SDK `0.1.5-rc.1`：所有直接官方依赖精确锁定到同一版本，并迁移到拆分后的 Settings、Client Store、Session/Workspace Controller、Session Projection、Renderer 与 Typert 接口。
+- 新增 Desktop Runtime 启动器，使用官方 `dsh-app-boot`、`dsh-cmdline`、`dsh-http-proxy` 和 `dsh-launch-environment` 公共 API 组合 Profile；保留官方 CLI 作为安装锚点，避免开发工作区同名包或提升依赖改变实际运行图。
+- 升级会话导入、手动压缩、任务面板、移动端远程界面、模型偏好、记忆、皮肤中心、桌宠和附件草稿到 Session v3 与新 Controller 契约；保留既有入口、状态与多桌宠能力。
+- 修复 Windows 原生子进程可能闪现控制台窗口的问题，为 DSH 1.1.5 的本地子进程实现补齐 `windowsHide`，同时覆盖原生 Job、回退进程树与 `taskkill` 路径。
+- 加固本机 Runtime 的启动令牌与 Cookie 传递、官方 CLI 路径校验、Profile 隔离及打包运行时身份检查；退役的单体客户端 Runtime 与 Host API Proxy 不再进入依赖图。
+- 插件 peer 范围同时声明已验证的旧 RC 与 DSH 1.1.5，不再让独立安装产生错误兼容警告；候选准备器会扫描所有 manifest、拒绝退役包和非精确候选版本，并限制并发。
+- 修复升级后个别历史对话被会话列表静默略过的问题：仅在确认旧文件是有效明文 JSONL 却误带 Zstandard 后缀时，先保留原始字节备份，再转换为官方多帧格式并重试；无法确认的损坏文件仍原样保留并隔离。
+- 修复旧版 `permission/preset` 记录携带 `origin: "default"` 时无法打开历史对话的问题：仅移除这一项已确认的遗留字段，候选文件必须通过官方完整迁移校验后才原子替换，复读失败自动恢复原文件；其他未知字段和值保持严格拒绝。
+- 收敛模型目录刷新：打开选择器和父组件重新渲染不再重复发起加载，窗口聚焦、恢复可见和联网事件使用 30 秒节流，同会话的明确广播更新仍立即生效。
+- 优化拓展坞等待状态：目录与版本检查不再锁住全部按钮，社区目录使用 5 分钟缓存和并发去重，手动刷新仍强制校验；NPM 检查缩短超时并提高有界并发，更新、市场和 Registry 三项诊断改为并行探测，设置加载成功后立即移除等待提示。
+- 优化 Windows 安装耗时：安装包改用 normal 压缩，成功提交后在隐藏后台清理旧版本备份，并裁剪 Runtime 不读取的 README、CHANGELOG 等通用包文档，减少升级时的小文件写入与删除；失败或中断时仍保留事务回滚边界。
+- 余额查询增加 8 秒超时，网络停滞时结束等待并允许重试；保留已有缓存余额，不伪造新余额。新增可执行 NSIS 安装事务回归，覆盖中文路径、提交失败与安装中断后的程序及注册表恢复。
+- 修复 Windows 覆盖升级运行旧版卸载器后丢失事务脚本、导致 PowerShell 错误码 `-196608` 的问题：事务脚本改在独立支持目录中按阶段重建；提交失败时先执行并确认回滚，再准确提示“已恢复”或“恢复失败并保留备份”。
+- 内置 QQ Bot 升级到 `@tencent-connect/dsh-qqbot@0.5.0`，同时打包 DSH 1.1.5 的用户审批服务；保留加密凭据、Profile 隔离和绑定或解绑失败时的事务回滚。
+- 3.4.0 Star 提示按本机用户和版本只显示一次，同时保留 3.3.0 的已显示记录；预览不会改写状态。
+
+English:
+
+- Bound pet state and registry reads with in-flight deduplication, an eight-second timeout, and cancellation. Interaction refreshes queue one latest read; hidden, disabled and unloaded pets reject late results. Clean up multi-pet settings startup/retry work on disposal while preserving pet selection and session-bubble navigation.
+- Prevent long-lived streams from exhausting the local HTTP connection pool when the main window and Dock are open together, stalling settings reads and saves. Adjust the connection cap only for the loopback Runtime; external connections and proxy routing retain their existing rules.
+- Keep particles outside the native composer through draft resizing and scrolling, including attachments and unfocused drafts, while preserving legacy attachment protection and theme settings. Reserve native preview toolbar space for terminal/browser workbench controls to prevent corner overlap.
+
+- Keep memory management and activity in Dock settings, without a main conversation header entry. Simplify response-preference copy and use one save bar with on-demand previews, priority options, and advanced memory fields.
+- Use an independent taskbar window for the Windows Dock, hide the settings child view while minimized, and restore its layout. Bound close inspections while preserving explicit draft confirmation. Collapse relay content independently and replace navigation with search results while searching.
+- Prefer DSH's native whole-history turn navigation and unmount duplicate Desktop controls while it is available. Retain compact composer-aware fallback navigation for older conversations without a native rail.
+- Prefer native Sidebar readers for common documents and images, retaining an explicit compatibility editor and existing unsaved buffers. Switch visible preview owners without closing their tabs to avoid overlapping expanded controls.
+- Prefer native DSH generic-file upload, status and retry without a duplicate picker. Preserve legacy reference recovery and missing-file checks, large-image compression and mixed-file order. Fix unchecked late-restored references, stale send guards after reference removal, and resource leaks after rejected attachment admission.
+- Prevents repeated blank consoles by propagating the Desktop console preload only to the official Windows Job runner, preserving output, IPC, and process-tree cleanup. Real window-show observation includes an unadapted positive control.
+- Shows a closable terminal panel before optional PATH verification, prepares PTY and PATH concurrently, and prevents late shells after cancellation. Model selection no longer waits for recent-history storage; per-scope writes are serialized and coalesced into at most eight entries.
+- Prevents older settings responses from reverting newer slider choices. The compatibility bridge publishes only the latest queued write while retaining revision checks and reloading the saved value if the final write fails.
+- Fully adapts Desktop to the official DSH 1.1.5 NPM SDK release `0.1.5-rc.1`. Every direct official dependency is pinned to one exact version, and integrations now use the split Settings, Client Store, Session/Workspace Controller, Session Projection, Renderer, and Typert APIs.
+- Adds a Desktop Runtime launcher composed from the public `dsh-app-boot`, `dsh-cmdline`, `dsh-http-proxy`, and `dsh-launch-environment` APIs. The official CLI remains the installation anchor so workspace packages and hoisting cannot silently change the packaged runtime graph.
+- Migrates transcript import, manual compaction, Task Board, mobile remote UI, model preferences, memory, Skin Center, Pet, and attachment drafts to Session v3 and the new controller contracts while preserving existing entry points, state, and multi-pet behavior.
+- Fixes native Windows subprocesses that could flash a console window by adding `windowsHide` to the DSH 1.1.5 local subprocess implementation, with coverage for native Job, fallback process-tree, and `taskkill` paths.
+- Hardens local Runtime startup-token and cookie handling, official CLI path validation, Profile isolation, and packaged runtime identity checks. Retired client-runtime and host API proxy monoliths are excluded from the dependency graph.
+- Plugin peer ranges now cover both the previously verified RC and DSH 1.1.5, avoiding false compatibility warnings for standalone installs. Candidate preparation scans every manifest, rejects retired packages and inexact candidate versions, and bounds concurrency.
+- Fixes historical conversations being silently omitted after an upgrade. A valid plaintext JSONL artifact carrying a Zstandard suffix is backed up byte-for-byte, converted to the official multi-frame format, and retried; unconfirmed corrupt artifacts remain unchanged and isolated.
+- Restores released-v0 conversations whose `permission/preset` row carries the confirmed legacy `origin: "default"` member. Only that member is removed, the candidate must pass the complete official migration catalog before atomic replacement, and a failed Runtime retry restores the original; every other unknown field or value remains fail-closed.
+- Coalesces model-directory refreshes. Opening the selector and parent rerenders no longer reload it, focus/visibility/online recovery events are throttled for 30 seconds, and an explicit same-session broadcast still refreshes immediately.
+- Removes read-only Dock work from the page-wide mutation lock. The community catalog has a five-minute cache and in-flight deduplication while manual refresh still revalidates; NPM checks use a shorter timeout and higher bounded concurrency, update/market/registry diagnostics run in parallel, and successful settings loads clear their waiting state.
+- Reduces Windows installation latency with normal compression, deferred hidden cleanup of the committed old-version backup, and pruning of general package documentation that the Runtime never reads. This reduces small-file writes and removals while retaining rollback safety for failures and interruptions.
+- Bounds balance requests to eight seconds so stalled networks settle and allow retry while preserving cached values. Executable NSIS regression now covers Unicode paths and restoration of application files and registry state after commit failures and interrupted installation sections.
+- Fixes PowerShell error `-196608` during Windows overlay upgrades when the old uninstaller removes the transaction helper. The installer now re-stages that helper in a separate support directory for every phase and reports restoration only after rollback has actually succeeded, retaining the backup when recovery fails.
+- Updates the built-in QQ Bot to `@tencent-connect/dsh-qqbot@0.5.0` and packages the DSH 1.1.5 user-approval service while preserving encrypted credentials, Profile isolation, and transactional rollback for failed bind or unbind operations.
+- The 3.4.0 Star prompt is claimed once per local user and version while preserving the 3.3.0 claim; preview mode never mutates persisted state.
+
 ## 3.3.0 - 2026-09-09
 
 中文：

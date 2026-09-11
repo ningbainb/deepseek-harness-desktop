@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelRouteSelection } from '../core/config.ts'
+import { en, zh, type ValueModeLocaleKey } from './locales.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
 import picker from './value-mode-picker.module.css'
@@ -21,10 +22,14 @@ export interface ModelPickerProps {
   fetchModels?: () => Promise<ValueModeModelCatalog>
 }
 
+function catalogText(key: ValueModeLocaleKey): string {
+  return (typeof document !== 'undefined' && document.documentElement.lang.startsWith('en') ? en : zh)[key]
+}
+
 function errorText(reason: unknown): string {
   if (reason instanceof Error && reason.message.trim()) return reason.message.trim()
   if (typeof reason === 'string' && reason.trim()) return reason.trim()
-  return '模型目录加载失败，请稍后重试。'
+  return catalogText('catalogLoadFailed')
 }
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSelect, onClose, fetchModels }) => {
@@ -66,22 +71,29 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
     setFailures([])
 
     if (!fetchModels) {
-      setError('模型目录服务未连接，请更新或重启 DeepSeek Harness 后重试。')
+      setError(catalogText('catalogUnavailable'))
       setLoading(false)
       return () => { active = false }
     }
 
-    void fetchModels().then((result) => {
+    // Also bound third-party loaders supplied through this public component API.
+    const timer = setTimeout(() => {
+      if (!active) return
+      active = false
+      setError(catalogText('catalogTimeout'))
+      setLoading(false)
+    }, 12_000)
+    void Promise.resolve().then(() => fetchModels()).then((result) => {
       if (!active) return
       setGroups(result.groups ?? [])
       setFailures(result.failures ?? [])
       setLoading(false)
-    }, (reason) => {
+    }).catch((reason) => {
       if (!active) return
       setError(errorText(reason))
       setLoading(false)
-    })
-    return () => { active = false }
+    }).finally(() => clearTimeout(timer))
+    return () => { active = false; clearTimeout(timer) }
   }, [fetchModels, reloadToken])
 
   const choiceCount = groups.reduce((count, group) => count + group.models.length, 0)

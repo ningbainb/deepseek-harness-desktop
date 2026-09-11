@@ -33,13 +33,13 @@ export const name = 'anchored-tool-bootstrap'
 export const inject = ['systemPrompt', 'tools']
 
 /**
- * Prompt section names that carry the preset persona. The `dsh-persona` row
- * registers the preset persona as `deployment:persona` (the PERSONA_SECTION
- * name of `@deepseek-ai/dsh-system-prompt`), shadowing the deployment
- * default for the preset scope; `persona` is the legacy name kept for older
- * harnesses that registered the persona section without the prefix.
+ * The current SDK splits the scoped persona into prefix and suffix sections.
+ * Keep the older single-section names for existing runtimes. These literals
+ * also allow the copied preset helper to run without its own node_modules;
+ * tests compare against the installed official SDK's exported constants.
  */
-const PERSONA_SECTION_NAMES = new Set(['deployment:persona', 'persona'])
+const PERSONA_PREFIX_SECTION_NAMES = new Set(['deployment:persona-prefix', 'deployment:persona', 'persona'])
+const PERSONA_SECTION_NAMES = new Set([...PERSONA_PREFIX_SECTION_NAMES, 'deployment:persona-suffix'])
 
 /**
  * Workspace line a promoted persona gains. Phase 1 keeps the exact one-line
@@ -231,7 +231,7 @@ function withWorkspaceLine(assembly, agent) {
   if (!Array.isArray(assembly.sections)) return assembly
   const line = `${WORKSPACE_LINE_PREFIX}${cwd}.`
   const persona = assembly.sections.find(section =>
-    PERSONA_SECTION_NAMES.has(section?.name)
+    PERSONA_PREFIX_SECTION_NAMES.has(section?.name)
     && typeof section?.text === 'string'
     && !section.text.includes(line))
   if (persona === undefined) return assembly

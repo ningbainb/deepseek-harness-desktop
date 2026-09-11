@@ -115,3 +115,50 @@ test('shutdown is best effort and never waits past its deadline', async () => {
   assert.equal(await client.shutdown({ deadlineMs: 20 }), false)
   assert.ok(Date.now() - started < 500)
 })
+
+test('bad identity providers, validation and timers cannot throw into business callers', async () => {
+  const base = { endpoint:'https://telemetry.example/v1/events',context:CONTEXT,actorProvider:()=>ACTORS, schedule(){throw new Error('timer')},cancelSchedule(){throw new Error('timer')},fetchImpl:async()=>{throw new Error('offline')} }
+  for (const options of [base,{...base,actorProvider(){throw new Error('identity')} }]) {
+    const client=new ProductTelemetryClient(options)
+    assert.doesNotThrow(()=>client.record('surface_opened',SURFACE_EVENT))
+    assert.doesNotThrow(()=>client.record('unrecognized',{}))
+    assert.equal(await client.flush(),false)
+    await assert.doesNotReject(() => client.shutdown())
+  }
+})
+
+test('queued route parameters cannot acquire raw fields through caller mutation', async () => {
+  let sent
+  const client = new ProductTelemetryClient({ endpoint: 'https://telemetry.example/v1/events', context: CONTEXT,
+    actorProvider: () => ACTORS, schedule: () => 1, cancelSchedule() {},
+    fetchImpl: async (_url, init) => { sent = JSON.parse(init.body); return new Response(null, { status: 204 }) },
+  })
+  const params = { role: 'main', result: 'success', strategy: 'balanced', model: 'deepseek-chat', error_type: 'none' }
+  assert.equal(client.record('cost_mode_route', { params }), true)
+  params.error = 'private provider response'
+  params.model = 'private mutation'
+  await client.flush()
+  assert.equal(sent.events[0].params.model, 'deepseek-chat')
+  assert.equal(Object.hasOwn(sent.events[0].params, 'error'), false)
+})
+
+test('saturated queues prioritize route failures and send canonical schema 5', async () => {
+  const bodies=[]
+  let finish
+  const client=new ProductTelemetryClient({endpoint:'https://telemetry.example/v1/events',context:CONTEXT,actorProvider:()=>ACTORS,schedule:()=>1,cancelSchedule(){},fetchImpl:async(_url,init)=>{
+    bodies.push(JSON.parse(init.body))
+    if(bodies.length===1) await new Promise(resolve=>{finish=resolve})
+    return new Response(null,{status:204})
+  }})
+  for(let i=0;i<240;i++)client.record('value_mode_call',{outcome:'started',detail:'controller',bucket:'none'})
+  await Promise.resolve(); await Promise.resolve()
+  assert.equal(client.queued,200)
+  assert.equal(client.record('cost_mode_route',{params:{role:'subagent',result:'failure',strategy:'saving',model:'deepseek-chat',error_type:'timeout'}}),true)
+  assert.equal(client.queued,200)
+  finish()
+  await client.shutdown({deadlineMs:1000})
+  assert.equal(bodies[1].schema,5)
+  assert.equal(bodies[1].events[0].params.result,'failure')
+  assert.equal(bodies[1].events[0].params.model,'deepseek-chat')
+  assert.ok(bodies.every(body=>body.events.every(e=>!e.name.startsWith('value_mode_'))))
+})

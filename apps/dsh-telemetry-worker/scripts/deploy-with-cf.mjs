@@ -1,5 +1,5 @@
 // Reuses the installed Cloudflare CLI login without printing or copying secrets.
-// Default is inspection. --apply uploads these four local modules to the existing Worker.
+// Default is inspection. --apply uploads the reviewed module set to the existing Worker.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -24,26 +24,39 @@ assert.equal(settings.bindings.find(binding => binding.name === 'METRICS')?.id ?
 assert.equal(settings.bindings.find(binding => binding.name === 'INGEST_ENABLED')?.text, '1')
 for (const name of ['ADMIN_PASSWORD_SHA256', 'ADMIN_SESSION_SECRET']) assert.equal(settings.bindings.find(binding => binding.name === name)?.type, 'secret_text')
 const deployments = await api(`/workers/scripts/${script}/deployments`)
-const files = ['index.mjs', 'admin-auth.mjs', 'admin-dashboard.mjs', 'release-analytics.mjs']
-const modules = await Promise.all(files.map(async file => ({ file, source: await readFile(new URL('../src/' + file, import.meta.url), 'utf8') })))
+const files = ['index.mjs', 'admin-auth.mjs', 'admin-dashboard.mjs', 'release-analytics.mjs', 'analytics-service.mjs', 'analytics-sql.mjs', 'analytics-rollup.mjs', 'cost-mode-summary.mjs', 'update-diagnostics-summary.mjs']
+const modules = await Promise.all(files.map(async file => ({ file, source: (await readFile(new URL('../src/' + file, import.meta.url), 'utf8')).replaceAll('../../dsh-desktop/src/cost-mode-events.mjs', './cost-mode-events.mjs').replaceAll('../../dsh-desktop/src/update-diagnostics.mjs', './update-diagnostics.mjs') })))
+modules.push({ file: 'cost-mode-events.mjs', source: await readFile(new URL('../../dsh-desktop/src/cost-mode-events.mjs', import.meta.url), 'utf8') })
+modules.push({ file: 'update-diagnostics.mjs', source: await readFile(new URL('../../dsh-desktop/src/update-diagnostics.mjs', import.meta.url), 'utf8') })
 console.log(JSON.stringify({ mode, account, script, database, previous: deployments.deployments?.[0]?.versions, modules: modules.map(module => ({ file: module.file, sha256: createHash('sha256').update(module.source).digest('hex') })) }))
 if (mode === '--apply') {
-  const tables = await api(`/d1/database/${database}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql: "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('product_release_daily','product_measurement_coverage')" }) })
-  assert.equal(tables[0].results.length, 2, 'Apply migration 0005 before uploading')
+  const tables = await api(`/d1/database/${database}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql: "SELECT name FROM sqlite_master WHERE name IN ('product_release_daily','product_measurement_coverage','analytics_daily','analytics_failure','metric_daily_all','download_click_daily_all')" }) })
+  assert.equal(tables[0].results.length, 6, 'Apply migration 0006 before uploading')
+  const columns = await api(`/d1/database/${database}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql: 'PRAGMA table_info(analytics_failure)' }) })
+  assert.ok(columns[0].results.some(column => column.name === 'diagnostic'), 'Apply migration 0007 before uploading')
+  assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS_READ_TOKEN')?.type, 'secret_text', 'Configure the Account Analytics Read token before deploying')
+  const bindings = settings.bindings.filter(binding => binding.type !== 'secret_text' && !['ANALYTICS','ANALYTICS_ACCOUNT_ID'].includes(binding.name)).map(binding => binding.type === 'd1' ? { type: 'd1', name: binding.name, id: binding.id ?? binding.database_id } : binding)
+  bindings.push({ type: 'analytics_engine', name: 'ANALYTICS', dataset: 'dsh_desktop_events' }, { type: 'plain_text', name: 'ANALYTICS_ACCOUNT_ID', text: account })
   const metadata = {
     main_module: 'index.mjs', compatibility_date: settings.compatibility_date,
     compatibility_flags: settings.compatibility_flags ?? [],
-    bindings: settings.bindings.filter(binding => binding.type !== 'secret_text').map(binding => binding.type === 'd1' ? { type: 'd1', name: binding.name, id: binding.id ?? binding.database_id } : binding),
+    bindings,
     keep_bindings: ['secret_text'], logpush: settings.logpush ?? false,
     tail_consumers: settings.tail_consumers ?? [], tags: settings.tags ?? [],
-    annotations: { 'workers/message': 'Desktop 3.3.0 release analytics: bounded batches, schema 4 observations, version report' },
+    annotations: { 'workers/message': 'Analytics Engine counters, bounded D1 summaries and failure diagnostics' },
   }
   const body = new FormData(); body.set('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
   for (const module of modules) body.set(module.file, new Blob([module.source], { type: 'application/javascript+module' }), module.file)
   const deployed = await api(`/workers/scripts/${script}`, { method: 'PUT', body })
+  await api(`/workers/scripts/${script}/schedules`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ cron: '7 * * * *' }, { cron: '17 3 * * *' }]) })
   console.log(JSON.stringify({ deployed: true, id: deployed.id, modified: deployed.modified_on, etag: deployed.etag, startupMs: deployed.startup_time_ms }))
 }
 if (mode === '--verify') {
+  assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS')?.dataset, 'dsh_desktop_events')
+  assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS_ACCOUNT_ID')?.text, account)
+  assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS_READ_TOKEN')?.type, 'secret_text')
+  const schedules = await api(`/workers/scripts/${script}/schedules`)
+  assert.deepEqual(schedules.map(item => item.cron).sort(), ['17 3 * * *', '7 * * * *'])
   const result = await fetch(base + `/workers/scripts/${script}`, { headers: { authorization: 'Bearer ' + credentials.oauth_token }, signal: AbortSignal.timeout(30_000) })
   assert.equal(result.ok, true)
   const body = await result.formData()

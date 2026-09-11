@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope, ValueModeStrategy } from '../core/config.ts'
 import { isCompleteModelRoute, resolveResolvedConfig } from '../core/config.ts'
 import { ModelPicker, type ValueModeModelCatalog } from './ModelPicker.tsx'
@@ -81,7 +81,7 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
     setError(initialError ?? null)
   }, [initialError])
 
-  const loadModels = async (): Promise<ValueModeModelCatalog> => {
+  const loadModels = useCallback(async (): Promise<ValueModeModelCatalog> => {
     const catalog = await fetchModels()
     if (isCompleteModelRoute(defaultExpert)) {
       const defaultExists = catalog.groups.some((group) => (
@@ -92,7 +92,7 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
       }
     }
     return catalog
-  }
+  }, [fetchModels, defaultExpert?.provider, defaultExpert?.model])
 
   useEffect(() => {
     dialogRef.current?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus()

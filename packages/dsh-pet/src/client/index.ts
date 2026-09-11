@@ -10,12 +10,14 @@
  * @module @linxin666/dsh-pet/client
  */
 
-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface Context merge (ctx.settingsScope).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PetDisplayConfig } from '../persist.ts'
 import type { PetInteractResult, PetStateView } from '../service.ts'
@@ -26,10 +28,11 @@ import { createPetStore, type PetStoreInstance } from './pet-store.ts'
 import { PetDockEntry, type PetInjected } from './PetDockEntry.tsx'
 import { PetSettingsCard, PetSettingsCardController, type PetSettings } from './PetSettingsCard.tsx'
 import { NS, en, zh, t } from './locales.ts'
+import { PetPollRequest } from './poll-request.ts'
 
 /** The host pet API as the browser sees it (same-origin JSON endpoints). */
 interface PetHttpApi {
-  state(): Promise<PetStateView>
+  state(signal?: AbortSignal): Promise<PetStateView>
   interact(kind: PetInteraction): Promise<PetInteractResult>
   setVisible(visible: boolean): Promise<{ ok: true; display: PetDisplayConfig }>
   setConfig(patch: Partial<PetDisplayConfig>): Promise<{ ok: true; display: PetDisplayConfig }>
@@ -37,11 +40,12 @@ interface PetHttpApi {
 }
 
 /** Same-origin JSON fetch helper (GET without body, POST with JSON body). */
-async function petFetch<T>(path: string, body?: unknown): Promise<T> {
+async function petFetch<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, body === undefined
-    ? {}
+    ? { signal }
     : {
         method: 'POST',
+        signal,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       })
@@ -53,7 +57,7 @@ async function petFetch<T>(path: string, body?: unknown): Promise<T> {
 
 /** The live host API instance (always defined; failures surface per call). */
 const petApi: PetHttpApi = {
-  state: () => petFetch('/api/pet/state'),
+  state: signal => petFetch('/api/pet/state', undefined, signal),
   interact: (kind) => petFetch('/api/pet/interact', { kind }),
   setVisible: (visible) => petFetch('/api/pet/set-visible', { visible }),
   setConfig: (patch) => petFetch('/api/pet/set-config', patch),
@@ -146,14 +150,17 @@ export function apply(ctx: ClientContext): void {
       const petStore: PetStoreInstance = createPetStore().create()
       const setSnapshot = petStore.actions.setSnapshot
       const setState = petStore.actions.setState
-      const setFeedback = petStore.actions.setFeedback
+      let alive = true
+      const setFeedback: typeof petStore.actions.setFeedback = feedback => {
+        if (alive) petStore.actions.setFeedback(feedback)
+      }
 
-      const pollNow = (): void => {
-        petApi.state().then((snapshot) => {
-          setSnapshot(snapshot)
-        }, () => {
-          setState('error', 'pet.state transport error')
-        })
+      const stateRead = new PetPollRequest(signal => petApi.state(signal), setSnapshot,
+        () => { setState('error', 'pet.state transport error') })
+      const cancelReads = (): void => { stateRead.cancel() }
+      const disposeReads = (): void => { stateRead.dispose() }
+      const pollNow = (fresh = false): void => {
+        if (alive && document.visibilityState === 'visible') stateRead.run(fresh)
       }
 
       const disposePoll = ctx.effect(() => {
@@ -180,12 +187,14 @@ export function apply(ctx: ClientContext): void {
             start()
           } else {
             stop()
+            cancelReads()
           }
         }
         start()
         document.addEventListener('visibilitychange', onVisibility)
         return () => {
           stop()
+          disposeReads()
           document.removeEventListener('visibilitychange', onVisibility)
         }
       }, 'pet: poll')
@@ -217,28 +226,28 @@ export function apply(ctx: ClientContext): void {
         },
         hide: () => {
           petApi.setVisible(false).then(() => {
-            pollNow()
+            pollNow(true)
           }, () => {
             // Ignore; next poll resyncs.
           })
         },
         summon: () => {
           petApi.setVisible(true).then(() => {
-            pollNow()
+            pollNow(true)
           }, () => {
             // Ignore; next poll resyncs.
           })
         },
         dragEnd: (right, bottom) => {
           petApi.setConfig({ right, bottom }).then(() => {
-            pollNow()
+            pollNow(true)
           }, () => {
             // Ignore; next poll resyncs.
           })
         },
         rename: (name) => {
           petApi.setName(name).then((result) => {
-            if (result.ok) pollNow()
+            if (result.ok) pollNow(true)
           }, () => {
             // Ignore; next poll resyncs.
           })
@@ -262,9 +271,10 @@ export function apply(ctx: ClientContext): void {
       petRoot.render(createElement(PetDockEntry, { ...injected(), t }))
 
       disposeUi = () => {
+        alive = false
+        disposePoll()
         petRoot.unmount()
         container.remove()
-        disposePoll()
         disposeUi = undefined
       }
     } else if (!enabled() && disposeUi !== undefined) {
@@ -272,6 +282,9 @@ export function apply(ctx: ClientContext): void {
       disposeUi = undefined
     }
   }
-  settingsScope.subscribe(syncUi)
-  syncUi()
+  ctx.effect(() => {
+    const unsubscribe = settingsScope.subscribe(syncUi)
+    syncUi()
+    return () => { unsubscribe(); disposeUi?.() }
+  }, 'pet: lifetime')
 }

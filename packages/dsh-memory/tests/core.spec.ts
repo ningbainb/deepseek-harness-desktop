@@ -89,7 +89,7 @@ describe('memory schema, rank and prompt boundaries', () => {
   it('extracts only direct user text from the latest turn', () => {
     const session = {
       header: { origin: undefined },
-      events: [
+      snapshotEvents: () => [
         { type: 'turn/start', seq: 0, time: 0, data: { turn: 0 } },
         { type: 'user/message', seq: 1, time: 1, data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'old' }] } },
         { type: 'turn/start', seq: 2, time: 2, data: { turn: 1 } },

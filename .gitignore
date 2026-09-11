@@ -6,6 +6,11 @@ node_modules/
 
 # 本地工具缓存
 /.tmp/
+/.artifacts/
+/.electron-builder-cache/
+/.patch-work/
+/.tmp-profile-debug/
+*.tsbuildinfo
 *.log
 .DS_Store
 
@@ -39,6 +44,10 @@ apps/dsh-desktop/artifacts/
 REVIEW-PROMPT.md
 # 营销视频工程：本地生成，不上传
 /marketing/dsh-web-ui-promo-60s/
+/docs/launch/desktop-v3.3.0-feature-posters/
+/docs/launch/desktop-v3.3.0-moments-grid/
+/docs/launch/desktop-v3.3.0-poster/
+/design-qa.md
 
 # pnpm 11 项目内包存储（本地依赖缓存，不入库）
 .pnpm-store/

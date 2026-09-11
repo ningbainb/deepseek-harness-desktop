@@ -3,12 +3,14 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import {
-  createMessage, createToolResultMessage, createUserMessage,
+  createMessage, createSystemMessage, createToolResultMessage, createUserMessage,
 } from '@deepseek-ai/dsh-llm'
-import type { CallId, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { StreamChunk, TokenUsage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { SettingsProvider } from '@deepseek-ai/dsh-settings'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { apply, inject, resolveEstimatorConfig } from '../src/index.ts'
 import { createLiveTokenUsageProjectionDefinition } from '../src/projection.ts'
 import type { LiveTokenUsageProjection } from '../src/projection.ts'
@@ -22,10 +24,23 @@ import {
 
 afterEach(() => { vi.useRealTimers() })
 
+class MemorySettings extends SettingsProvider {
+  readonly writable = true
+
+  protected load(): Promise<Record<string, unknown>> {
+    return Promise.resolve({})
+  }
+
+  protected persist(_ns: SettingsNamespace, _section: Record<string, unknown>): Promise<void> {
+    return Promise.resolve()
+  }
+}
+
 async function harness(): Promise<{ ctx: Context; session: Session; ledgerFilePath: string }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(MemorySettings)
   // Keep the bridge's ledger writes out of the real user state directory.
   const ledgerFilePath = join(tmpdir(), `test-projection-ledger-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
   await ctx.plugin({ inject, apply: (context: Context) => apply(context, {}, { ledgerFilePath }) })
@@ -71,8 +86,13 @@ describe('liveTokenUsage projection', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('step/start', { turn: 1, step: 1 })
+    session.append('system/message', {
+      turn: 1,
+      step: 1,
+      message: createSystemMessage('abcd', 'live-stats-test'),
+    }, { surfaceOp: 'append' })
     session.append('request/header', {
-      header: { config: { provider: 'mock', model: 'mock' }, system: 'abcd' },
+      header: { config: { provider: 'mock', model: 'mock' } },
       reason: 'initial',
     })
     expect(projected(ctx, session)).toMatchObject({
@@ -285,7 +305,7 @@ describe('liveTokenUsage projection', () => {
     session.append('step/end', { turn: 1, step: 1 })
 
     session.append('step/start', { turn: 1, step: 1 })
-    const source = usageChunk(session, { inputTokens: 20, outputTokens: 5, cacheReadTokens: 80 })
+    usageChunk(session, { inputTokens: 20, outputTokens: 5, cacheReadTokens: 80 })
     session.append('assistant/message', {
       turn: 1,
       step: 1,
@@ -294,8 +314,9 @@ describe('liveTokenUsage projection', () => {
         content: [{ type: 'text', text: 'done' }],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       }),
+      stream: [],
       usage: { inputTokens: 20, outputTokens: 5, cacheReadTokens: 80 },
-    }, { surfaceOp: 'append', sourceEventSeqs: [source] })
+    }, { surfaceOp: 'append' })
     session.append('step/end', { turn: 1, step: 1 })
     expect(projected(ctx, session)).toMatchObject({
       uncachedInputTokens: 20,
@@ -326,13 +347,18 @@ describe('liveTokenUsage projection', () => {
     const { ctx, session } = await harness()
     // A header arriving before any step only refreshes the stored header.
     session.append('request/header', {
-      header: { config: { provider: 'mock', model: 'mock' }, system: 'pre' },
+      header: { config: { provider: 'mock', model: 'mock' } },
       reason: 'initial',
     })
     session.append('step/start', { turn: 1, step: 1 })
+    session.append('system/message', {
+      turn: 1,
+      step: 1,
+      message: createSystemMessage('abcd', 'live-stats-test'),
+    }, { surfaceOp: 'append' })
     // A header arriving mid-step refreshes the input estimate.
     session.append('request/header', {
-      header: { config: { provider: 'mock', model: 'mock' }, system: 'abcd' },
+      header: { config: { provider: 'mock', model: 'mock' } },
       reason: 'change',
     })
     session.append('assistant/chunk', {
@@ -354,21 +380,21 @@ describe('liveTokenUsage projection', () => {
     })
     session.append('assistant/chunk', {
       turn: 1, step: 1,
-      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as CallId, argumentsDelta: '' },
+      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as ToolCallId, argumentsDelta: '' },
     })
     session.append('assistant/chunk', {
       turn: 1, step: 1,
-      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as CallId, name: 'bash', argumentsDelta: '{}' },
+      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as ToolCallId, name: 'bash', argumentsDelta: '{}' },
     })
     // A nameless continuation extends the existing tool-call block.
     session.append('assistant/chunk', {
       turn: 1, step: 1,
-      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as CallId, argumentsDelta: ' more' },
+      chunk: { type: 'tool-call-delta', index: 1, id: 'call_1' as ToolCallId, argumentsDelta: ' more' },
     })
     // A nameless delta on a fresh index prices with zero name characters.
     session.append('assistant/chunk', {
       turn: 1, step: 1,
-      chunk: { type: 'tool-call-delta', index: 4, id: 'call_2' as CallId, argumentsDelta: 'x' },
+      chunk: { type: 'tool-call-delta', index: 4, id: 'call_2' as ToolCallId, argumentsDelta: 'x' },
     })
     // Block-start chunks are inert for estimation.
     session.append('assistant/chunk', {
@@ -414,6 +440,7 @@ describe('liveTokenUsage projection', () => {
         content: [{ type: 'text', text: 'settled' }],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       }),
+      stream: [],
     }, { surfaceOp: 'append' })
     expect(projected(ctx, session).tokensPerSecond).toBeGreaterThan(0)
   })
@@ -479,6 +506,7 @@ describe('liveTokenUsage projection', () => {
         content: [{ type: 'text', text: 'none' }],
         source: { kind: 'model', provider: 'mock', model: 'mock' },
       }),
+      stream: [],
     }, { surfaceOp: 'append' })
     session.append('step/end', { turn: 1, step: 1 })
     expect(projected(ctx, session).tokensPerSecond).toBeUndefined()
@@ -491,7 +519,7 @@ describe('liveTokenUsage projection', () => {
       turn: 1,
       step: 1,
       message: createToolResultMessage({
-        callId: 'call_1' as CallId,
+        callId: 'call_1' as ToolCallId,
         content: [{ type: 'text', text: 'abcd' }],
         isError: false,
       }),
@@ -518,7 +546,10 @@ describe('liveTokenUsage projection', () => {
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'three' }],
       source: { kind: 'user' },
-    }), { surfaceOp: { op: 'replace', start: first.seq, end: second.seq }, sourceEventSeqs: [first.seq, second.seq] })
+    }), {
+      surfaceOp: { op: 'replace', startSeq: first.seq, endSeq: second.seq },
+      sourceEventSeqs: [first.seq, second.seq],
+    })
     session.append('step/start', { turn: 1, step: 1 })
     // One message (5 chars → 2 + 4 + 4): the replaced pair is gone.
     expect(projected(ctx, session).uncachedInputTokens).toBe(10)
@@ -538,7 +569,7 @@ describe('liveTokenUsage projection', () => {
       } as unknown as SessionEvent)
     }
     append('one', 'append')
-    expect(() => { append('bad', { op: 'replace', start: 5, end: 2 }) }).toThrow('invalid current range')
+    expect(() => { append('bad', { op: 'replace', startSeq: 5, endSeq: 2 }) }).toThrow('invalid current range')
   })
 
   it('incremental output pricing matches a straight rescan on a large sparse block index space', async () => {
@@ -643,7 +674,7 @@ describe('liveTokenUsage projection', () => {
         chunk = {
           type: 'tool-call-delta',
           index,
-          id: `call_${callId++}` as CallId,
+          id: `call_${callId++}` as ToolCallId,
           ...(kind < 0.4 ? { name: NAMES[Math.floor(random() * NAMES.length)] } : {}),
           argumentsDelta: kind >= 0.2 && kind < 0.9 ? textOf(Math.floor(random() * 50)) : '',
         }
@@ -705,7 +736,7 @@ describe('liveTokenUsage projection', () => {
     state = definition.apply(state, chunkEvent({ type: 'reasoning-delta', index: 7, text: 'think' }, 5))
     expect(state.active?.blocks).toBe(blocks)
     state = definition.apply(state, chunkEvent({
-      type: 'tool-call-delta', index: 7, id: 'call_1' as CallId, name: 'bash', argumentsDelta: '{}',
+      type: 'tool-call-delta', index: 7, id: 'call_1' as ToolCallId, name: 'bash', argumentsDelta: '{}',
     }, 6))
     expect(state.active?.blocks).toBe(blocks)
     state = definition.apply(state, chunkEvent({
@@ -714,7 +745,7 @@ describe('liveTokenUsage projection', () => {
     expect(state.active?.blocks).toBe(blocks)
     // A kind switch on an occupied slot re-prices without recounting blocks.
     state = definition.apply(state, chunkEvent({
-      type: 'tool-call-delta', index: 7, id: 'call_2' as CallId, argumentsDelta: 'x',
+      type: 'tool-call-delta', index: 7, id: 'call_2' as ToolCallId, argumentsDelta: 'x',
     }, 8))
     expect(state.active?.blocks).toBe(blocks)
     expect(state.active?.pricedBlocks).toBe(2)
@@ -750,7 +781,7 @@ describe('liveTokenUsage projection', () => {
     state = definition.init()
     state = definition.apply(state, surfaceEvent(1, 'one', 'append'))
     state = definition.apply(state, surfaceEvent(2, 'two', 'append'))
-    state = definition.apply(state, surfaceEvent(3, 'three', { op: 'replace', start: 1, end: 2 }))
+    state = definition.apply(state, surfaceEvent(3, 'three', { op: 'replace', startSeq: 1, endSeq: 2 }))
     expect(Object.hasOwn(state.surface, 1)).toBe(false)
     expect(Object.hasOwn(state.surface, 2)).toBe(false)
     expect(Object.hasOwn(state.surface, 3)).toBe(true)
@@ -758,9 +789,9 @@ describe('liveTokenUsage projection', () => {
       createUserMessage({ content: [{ type: 'text', text: 'three' }], source: { kind: 'user' } }),
       spec,
     ))
-    expect(() => definition.apply(state, surfaceEvent(4, 'bad', { op: 'replace', start: 5, end: 2 })))
+    expect(() => definition.apply(state, surfaceEvent(4, 'bad', { op: 'replace', startSeq: 5, endSeq: 2 })))
       .toThrow('invalid current range')
-    expect(() => definition.apply(state, surfaceEvent(4, 'bad', { op: 'replace', start: 3, end: 99 })))
+    expect(() => definition.apply(state, surfaceEvent(4, 'bad', { op: 'replace', startSeq: 3, endSeq: 99 })))
       .toThrow('invalid current range')
     expect(JSON.parse(JSON.stringify(state))).toEqual(state)
     expect(() => definition.stateSchema.parse(state)).not.toThrow()
@@ -777,8 +808,13 @@ describe('ledger bridge', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('step/start', { turn: 1, step: 1 })
+    session.append('system/message', {
+      turn: 1,
+      step: 1,
+      message: createSystemMessage('abcd', 'live-stats-test'),
+    }, { surfaceOp: 'append' })
     session.append('request/header', {
-      header: { config: { provider: 'deepseek', model: 'deepseek-chat' }, system: 'abcd' },
+      header: { config: { provider: 'deepseek', model: 'deepseek-chat' } },
       reason: 'initial',
     })
     vi.setSystemTime(2_000)

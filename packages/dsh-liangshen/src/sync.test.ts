@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { syncOnePreset, syncPresetTrees } from './sync.ts'
 
 /** Minimal structurally valid agent.cordis.yml used by the sync fixtures. */
@@ -19,6 +20,27 @@ function fixture(): { source: string; target: string; dispose: () => void } {
 }
 
 describe('syncPresetTrees', () => {
+  it('upgrades an old bundled text persona and bootstrap without touching user presets', () => {
+    const f = fixture()
+    try {
+      const source = fileURLToPath(new URL('../presets', import.meta.url))
+      const current = readFileSync(join(source, 'liangshen', 'agent.cordis.yml'), 'utf8')
+      expect(current).toContain('prefix: You are a helpful software engineer assistant.')
+      mkdirSync(join(f.target, 'liangshen'), { recursive: true })
+      writeFileSync(join(f.target, 'liangshen', 'agent.cordis.yml'), current.replace('prefix:', 'text:'))
+      writeFileSync(join(f.target, 'liangshen', 'tool-bootstrap.mjs'), '// old bootstrap')
+      mkdirSync(join(f.target, 'user-authored'), { recursive: true })
+      writeFileSync(join(f.target, 'user-authored', 'agent.cordis.yml'), 'user-owned')
+      const result = syncPresetTrees(source, f.target)
+      expect(result.failed).toEqual([])
+      expect(result.synced).toEqual(['liangshen'])
+      expect(readFileSync(join(f.target, 'liangshen', 'agent.cordis.yml'), 'utf8')).toBe(current)
+      expect(readFileSync(join(f.target, 'liangshen', 'tool-bootstrap.mjs'), 'utf8')).toContain('deployment:persona-prefix')
+      expect(readFileSync(join(f.target, 'user-authored', 'agent.cordis.yml'), 'utf8')).toBe('user-owned')
+      expect(syncPresetTrees(source, f.target).current).toEqual(['liangshen'])
+    } finally { f.dispose() }
+  })
+
   it('copies the bundled preset tree into the target root', () => {
     const f = fixture()
     try {

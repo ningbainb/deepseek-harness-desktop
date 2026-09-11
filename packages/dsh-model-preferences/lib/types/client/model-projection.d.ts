@@ -1,8 +1,8 @@
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client';
 import type { SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client';
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client';
-import type { ModelCatalogModel } from '@deepseek-ai/dsh-client-connection/client';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
+import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog, type ModelCatalogSnapshot, type ModelKey, type ModelPreferencesConfig, type SortedModelCatalog, type SortedModelOption } from '../core/config.ts';
 export { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog };
 export type { ModelCatalogSnapshot, ModelKey, ModelPreferencesConfig, SortedModelCatalog, SortedModelOption };
@@ -10,7 +10,7 @@ export type { ModelCatalogSnapshot, ModelKey, ModelPreferencesConfig, SortedMode
 export declare function catalogFromDirectory(state: ModelDirectoryState): ModelCatalogSnapshot;
 /** Build the model selection represented by one option id. */
 export declare function selectionFromOptionId(state: ModelDirectoryState, id: string, config: ModelPreferencesConfig): ModelSelection | undefined;
-/** Shared persistence path used by both `/model` and the composer seat. */
+/** Shared selection path used by both `/model` and the composer seat. */
 export declare function selectModelWithPreferences(directory: {
     select(selection: ModelSelection): Promise<void>;
     store: {

@@ -3,7 +3,8 @@ import { z } from 'zod'
 // liveTokenUsage projection key registers against it (augmentation lives in
 // @deepseek-ai/dsh-token-meter/projection).
 import type {} from '@deepseek-ai/dsh-session-projection/types'
-import type { Message, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
+import type { AssistantStreamRecord, Message, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SurfaceEvent } from '@deepseek-ai/dsh-session'
 import { isSurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
@@ -12,6 +13,7 @@ import {
   estimateContentTokens,
   estimateHeaderTokens,
   estimateMessageTokens,
+  estimateSystemMessageTokens,
   estimateTextBlockTokens,
   estimateToolCallBlockTokens,
 } from './estimator.ts'
@@ -115,7 +117,7 @@ interface SettledSample {
   rateAlgorithmVersion?: number
 }
 
-/** Plain-JSON fold state persisted by the RC.1 projection cache. */
+/** Plain-JSON fold state persisted by the DSH 0.1.5 projection cache. */
 export interface LiveTokenUsageState {
   settled: TokenUsageProjection
   settledEstimates: number
@@ -186,6 +188,8 @@ const stateSchema = z.object({
 
 function surfaceMessage(event: SurfaceEvent): Message {
   switch (event.type) {
+    case 'system/message':
+      return event.data.message
     case 'user/message':
       return event.data
     case 'assistant/message':
@@ -199,7 +203,10 @@ function applySurface(
   event: SurfaceEvent,
   spec: EstimatorSpec,
 ): Pick<State, 'surface' | 'surfaceTokens'> {
-  const tokens = estimateMessageTokens(surfaceMessage(event), spec)
+  const message = surfaceMessage(event)
+  const tokens = event.type === 'system/message'
+    ? estimateSystemMessageTokens(message, spec)
+    : estimateMessageTokens(message, spec)
   if (event.surfaceOp === 'append') {
     state.surface[event.seq] = tokens
     return {
@@ -208,20 +215,21 @@ function applySurface(
     }
   }
   const operation = event.surfaceOp
-  if (!Object.hasOwn(state.surface, operation.start)
-    || !Object.hasOwn(state.surface, operation.end)
-    || operation.start > operation.end) {
+  if (!Object.hasOwn(state.surface, operation.startSeq)
+    || !Object.hasOwn(state.surface, operation.endSeq)
+    || operation.startSeq > operation.endSeq) {
     throw new Error(
-      'live-stats: replace at seq ' + event.seq + ' has invalid current range ' + operation.start + '-' + operation.end,
+      'live-stats: replace at seq ' + event.seq + ' has invalid current range '
+      + operation.startSeq + '-' + operation.endSeq,
     )
   }
   // Integer object keys enumerate in increasing order. This keeps the state
-  // plain JSON for RC.1 checkpoint persistence without losing the early exit.
+  // plain JSON for DSH 0.1.5 checkpoint persistence without losing the early exit.
   let removed = 0
   for (const sequence of Object.keys(state.surface)) {
     const seq = Number(sequence)
-    if (seq < operation.start) continue
-    if (seq > operation.end) break
+    if (seq < operation.startSeq) continue
+    if (seq > operation.endSeq) break
     removed += state.surface[sequence] ?? 0
     delete state.surface[sequence]
   }
@@ -353,6 +361,52 @@ function exactStep(step: ActiveStep, usage: TokenUsage): ActiveStep {
   }
 }
 
+interface LegacyAssistantChunkEvent {
+  type: 'assistant/chunk'
+  time: number
+  data: {
+    turn: number
+    step: number
+    chunk: StreamChunk
+  }
+}
+
+function legacyAssistantChunk(event: SessionEvent): LegacyAssistantChunkEvent | undefined {
+  return (event as { type: string }).type === 'assistant/chunk'
+    ? event as unknown as LegacyAssistantChunkEvent
+    : undefined
+}
+
+/** Fold one compact durable model stream with its original chunk timestamps. */
+function applyAssistantStream(
+  initial: ActiveStep,
+  stream: readonly AssistantStreamRecord[],
+  spec: EstimatorSpec,
+): { active: ActiveStep; changed: boolean } {
+  let active = initial
+  let changed = false
+  for (const { time, chunk } of expandAssistantStream(stream)) {
+    if (chunk.type === 'usage') {
+      active = exactStep(active, chunk.usage)
+      changed = true
+      continue
+    }
+    if (active.exact || !applyOutputChunk(active, chunk, spec)) continue
+    changed = true
+    const previousStreamTokens = active.streamOutputTokens ?? active.buckets.outputTokens
+    const tokens = active.pricedBlocks === 0 ? 0 : active.pricedTokens + spec.roleOverhead
+    active.buckets = { ...active.buckets, outputTokens: tokens }
+    active.streamOutputTokens = tokens
+    const increment = tokens - previousStreamTokens
+    if (increment > 0) addRollingOutputSample(active, time, increment)
+    if (tokens > 0) {
+      if (active.firstOutputTime === undefined) active.firstOutputTime = time
+      active.latestOutputTime = time
+    }
+  }
+  return { active, changed }
+}
+
 function residentRate(last: SettledSample | null): number | undefined {
   // Old state can contain the elapsed-average rate but has no rolling metric
   // version. Do not let that stale value re-enter the UI or ledger.
@@ -425,6 +479,7 @@ export function createLiveTokenUsageProjectionDefinition(
     }),
     apply: (state, event: SessionEvent) => {
       let next = state
+      const legacyChunk = legacyAssistantChunk(event)
       if (event.type === 'step/start') {
         next = {
           ...next,
@@ -456,35 +511,21 @@ export function createLiveTokenUsageProjectionDefinition(
             },
           }),
         }
-      } else if (event.type === 'assistant/chunk' && next.active !== null) {
-        const { chunk } = event.data
-        if (chunk.type === 'usage') {
-          next = { ...next, active: exactStep(next.active, chunk.usage) }
-        } else if (!next.active.exact) {
-          // Reuse the active step in place instead of rebuilding a fresh
-          // object (and copying buckets) on every streamed delta: only the
-          // mutated fields change, and the blocks buffer is untouched between
-          // steps. The settle/usage paths still build a fresh active step.
-          const active = next.active
-          if (applyOutputChunk(active, chunk, spec)) {
-            const previousStreamTokens = active.streamOutputTokens ?? active.buckets.outputTokens
-            const tokens = active.pricedBlocks === 0 ? 0 : active.pricedTokens + spec.roleOverhead
-            active.buckets = { ...active.buckets, outputTokens: tokens }
-            active.streamOutputTokens = tokens
-            const increment = tokens - previousStreamTokens
-            if (increment > 0) addRollingOutputSample(active, event.time, increment)
-            if (tokens > 0) {
-              if (active.firstOutputTime === undefined) active.firstOutputTime = event.time
-              active.latestOutputTime = event.time
-            }
-          }
-        }
-      } else if (event.type === 'assistant/message' && next.active !== null) {
+      } else if (legacyChunk !== undefined && next.active !== null) {
+        const folded = applyAssistantStream(next.active, [{
+          type: 'chunk',
+          time: legacyChunk.time,
+          chunk: legacyChunk.data.chunk,
+        }], spec)
+        if (folded.changed) next = { ...next, active: folded.active }
+      } else if ((event.type === 'assistant/message' || event.type === 'assistant/attempt')
+      && next.active !== null) {
+        const folded = applyAssistantStream(next.active, event.data.stream, spec)
         next = {
           ...next,
-          active: event.data.usage === undefined
-            ? next.active
-            : exactStep(next.active, event.data.usage),
+          active: event.type !== 'assistant/message' || event.data.usage === undefined
+            ? folded.active
+            : exactStep(folded.active, event.data.usage),
         }
       } else if (event.type === 'step/end' && next.active !== null) {
         const active = next.active

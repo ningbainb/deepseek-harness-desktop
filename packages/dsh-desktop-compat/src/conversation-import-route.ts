@@ -288,11 +288,10 @@ export async function importConversationIntoHost(
     }
     if (session === undefined) {
       const created = createPreparedSession(ctx.sessions, requestedSessionId, {
-        seed: request.seed,
+        seed: [...request.seed],
         meta: {
           cwd: canonicalCwd,
           ...(request.createdAt === undefined ? {} : { createdAt: request.createdAt }),
-          seedLength: request.seed.length,
         },
       })
       session = created.session
@@ -321,7 +320,7 @@ export async function importConversationIntoHost(
     projectCwd: canonicalCwd,
     title: persistedTitle,
     seedEventCount: request.seed.length,
-    eventCount: session.events.length,
+    eventCount: session.seq,
   }
 }
 

@@ -29,7 +29,7 @@ describe('memory reliability and visible controls', () => {
   it('blocks empty direct-user queries, including subagent extraction, at search and prompt boundaries', async () => {
     const { service, context, session } = await fixture()
     await service.save(context, { scope: 'global', content: 'typescript preference' })
-    const query = extractCurrentUserQuery({ header: { origin: 'subagent' }, events: [] } as any)
+    const query = extractCurrentUserQuery({ header: { origin: 'subagent' }, snapshotEvents: () => [] } as any)
     expect(service.searchCached(session, query)).toEqual([])
     expect(await service.search(session, query)).toEqual({ ok: true, value: [] })
     expect(service.prepare(session, query, true)).toBe('')

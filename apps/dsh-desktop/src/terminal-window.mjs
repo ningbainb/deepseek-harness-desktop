@@ -8,6 +8,7 @@ const SOURCE_DIR = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_PANEL_HEIGHT = 420
 const MIN_PANEL_HEIGHT = 260
 const MIN_PARENT_REMAINDER = 140
+const terminalOwners = new WeakMap()
 
 export const DESKTOP_TERMINAL_PARTITION = 'dsh-desktop-terminal'
 export const TERMINAL_PRELOAD_PATH = join(SOURCE_DIR, 'preload-terminal.cjs')
@@ -67,20 +68,6 @@ function registerTerminalIpc({ ipcMain, webContents, session, close, onError }) 
     }
   }
 
-  ipcMain.handle(TERMINAL_IPC_CHANNELS.START, async (event, size) => {
-    assertSender(event)
-    return session.start(size)
-  })
-  ipcMain.handle(TERMINAL_IPC_CHANNELS.RESTART, async (event, size) => {
-    assertSender(event)
-    return session.restart(size)
-  })
-  ipcMain.handle(TERMINAL_IPC_CHANNELS.CLOSE, async (event) => {
-    assertSender(event)
-    close()
-    return true
-  })
-
   const onWrite = (event, data) => {
     if (disposed || event?.sender !== webContents || webContents.isDestroyed?.()) return
     try { session.write(data) } catch (error) { report(error) }
@@ -89,16 +76,34 @@ function registerTerminalIpc({ ipcMain, webContents, session, close, onError }) 
     if (disposed || event?.sender !== webContents || webContents.isDestroyed?.()) return
     try { session.resize(size) } catch (error) { report(error) }
   }
-  ipcMain.on(TERMINAL_IPC_CHANNELS.WRITE, onWrite)
-  ipcMain.on(TERMINAL_IPC_CHANNELS.RESIZE, onResize)
-
-  return () => {
+  const cleanup = () => {
     if (disposed) return
     disposed = true
     for (const channel of handlerChannels) ipcMain.removeHandler(channel)
     ipcMain.removeListener(TERMINAL_IPC_CHANNELS.WRITE, onWrite)
     ipcMain.removeListener(TERMINAL_IPC_CHANNELS.RESIZE, onResize)
   }
+  try {
+    ipcMain.handle(TERMINAL_IPC_CHANNELS.START, async (event, size) => {
+      assertSender(event)
+      return session.start(size)
+    })
+    ipcMain.handle(TERMINAL_IPC_CHANNELS.RESTART, async (event, size) => {
+      assertSender(event)
+      return session.restart(size)
+    })
+    ipcMain.handle(TERMINAL_IPC_CHANNELS.CLOSE, async (event) => {
+      assertSender(event)
+      close()
+      return true
+    })
+    ipcMain.on(TERMINAL_IPC_CHANNELS.WRITE, onWrite)
+    ipcMain.on(TERMINAL_IPC_CHANNELS.RESIZE, onResize)
+  } catch (error) {
+    cleanup()
+    throw error
+  }
+  return cleanup
 }
 
 /**
@@ -114,6 +119,7 @@ export async function createDesktopTerminalPanel({
   cwd,
   environment = process.env,
   pathEntries = [],
+  resolvePathEntries,
   platform = process.platform,
   theme: rawTheme = 'dark',
   loadPty = () => import('node-pty'),
@@ -132,6 +138,7 @@ export async function createDesktopTerminalPanel({
   if (typeof sessionFactory !== 'function') throw new TypeError('terminal session factory must be a function')
   if (typeof onError !== 'function') throw new TypeError('terminal error reporter must be a function')
   if (typeof onDidDispose !== 'function') throw new TypeError('terminal dispose callback must be a function')
+  if (terminalOwners.has(ipcMain)) throw new Error('a terminal panel already owns these IPC channels')
 
   const theme = normalizeTheme(rawTheme)
   const view = new WebContentsView({
@@ -151,58 +158,65 @@ export async function createDesktopTerminalPanel({
     },
   })
   const { webContents } = view
-  view.setBackgroundColor?.(theme === 'dark' ? '#071118' : '#f7f9fb')
-  view.setVisible?.(false)
-  browserWindow.contentView.addChildView(view)
-  installTerminalNavigationPolicy(webContents)
-  const removeContextMenu = installContextMenu({ webContents, Menu })
-  const send = (channel, payload) => {
-    if (!webContents.isDestroyed?.()) webContents.send(channel, payload)
-  }
-  const session = sessionFactory({
-    cwd,
-    platform,
-    environment,
-    pathEntries,
-    loadPty,
-    emit: (kind, payload) => {
-      if (kind === 'output') send(TERMINAL_IPC_CHANNELS.OUTPUT, payload)
-      else if (kind === 'exit') send(TERMINAL_IPC_CHANNELS.EXITED, payload)
-      else send(TERMINAL_IPC_CHANNELS.ERROR, payload)
-    },
-  })
-
   let disposed = false
+  let session
+  let removeContextMenu
   let unregisterIpc = () => {}
+  const send = (channel, payload) => {
+    if (!disposed && !webContents.isDestroyed?.()) webContents.send(channel, payload)
+  }
   const layout = () => {
     if (!disposed && !browserWindow.isDestroyed?.()) view.setBounds(terminalPanelBounds(browserWindow))
   }
   const dispose = () => {
     if (disposed) return
     disposed = true
+    if (terminalOwners.get(ipcMain) === dispose) terminalOwners.delete(ipcMain)
     browserWindow.removeListener?.('resize', layout)
     browserWindow.removeListener?.('closed', dispose)
-    unregisterIpc()
-    session.dispose()
-    removeContextMenu?.()
-    try { browserWindow.contentView.removeChildView(view) } catch {}
-    if (!webContents.isDestroyed?.()) webContents.close?.({ waitForBeforeUnload: false })
+    webContents.removeListener?.('destroyed', dispose)
+    webContents.removeListener?.('render-process-gone', dispose)
+    // One failing cleanup must not leave an invisible PTY/view/IPC behind.
+    for (const release of [
+      unregisterIpc,
+      () => session?.dispose(),
+      () => removeContextMenu?.(),
+      () => browserWindow.contentView.removeChildView(view),
+      () => { if (!webContents.isDestroyed?.()) webContents.close?.({ waitForBeforeUnload: false }) },
+    ]) {
+      try { release() } catch (error) { try { onError(error) } catch {} }
+    }
     try { onDidDispose() } catch {}
   }
-  unregisterIpc = registerTerminalIpc({ ipcMain, webContents, session, close: dispose, onError })
-  browserWindow.on?.('resize', layout)
-  browserWindow.once?.('closed', dispose)
-  layout()
-
+  terminalOwners.set(ipcMain, dispose)
   try {
+    view.setBackgroundColor?.(theme === 'dark' ? '#071118' : '#f7f9fb')
+    view.setVisible?.(false)
+    browserWindow.contentView.addChildView(view)
+    browserWindow.once?.('closed', dispose)
+    webContents.once?.('destroyed', dispose)
+    webContents.once?.('render-process-gone', dispose)
+    installTerminalNavigationPolicy(webContents)
+    removeContextMenu = installContextMenu({ webContents, Menu })
+    session = sessionFactory({
+      cwd, platform, environment, pathEntries, resolvePathEntries, loadPty,
+      emit: (kind, payload) => {
+        if (kind === 'output') send(TERMINAL_IPC_CHANNELS.OUTPUT, payload)
+        else if (kind === 'exit') send(TERMINAL_IPC_CHANNELS.EXITED, payload)
+        else send(TERMINAL_IPC_CHANNELS.ERROR, payload)
+      },
+    })
+    unregisterIpc = registerTerminalIpc({ ipcMain, webContents, session, close: dispose, onError })
+    browserWindow.on?.('resize', layout)
+    layout()
     await webContents.loadFile(TERMINAL_HTML_PATH, { query: { theme, embedded: '1' } })
+    if (disposed || browserWindow.isDestroyed?.() || webContents.isDestroyed?.()) throw new Error('terminal parent window closed before the panel loaded')
+    view.setVisible?.(true)
+    webContents.focus?.()
   } catch (error) {
     dispose()
     throw error
   }
-  if (disposed || browserWindow.isDestroyed?.()) throw new Error('terminal parent window closed before the panel loaded')
-  view.setVisible?.(true)
-  webContents.focus?.()
 
   const setTheme = (value) => {
     if (disposed || webContents.isDestroyed?.()) return

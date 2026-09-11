@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModePreset } from './mode-controller.ts'
+import { sessionPreset } from './session-preset.ts'
 import css from './ModeSwitcher.module.css'
 
 export interface ModeSwitcherProps {
   sessionId: string
-  useSessions: <T>(selector: (state: { byId: Record<string, { agentPreset?: string }> }) => T) => T
+  useSessions: <T>(selector: (state: { byId: Record<string, { agentPreset?: string; projectionValues?: Readonly<{ agentPreset?: unknown }> }> }) => T) => T
   loadModes: () => Promise<ModePreset[]>
   switchMode: (sessionId: string, preset: string) => Promise<string>
+  nativePresetLabel?: boolean
 }
 
-export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode }: ModeSwitcherProps): JSX.Element | null {
-  const current = useSessions((state) => state.byId[sessionId]?.agentPreset)
+export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode, nativePresetLabel = false }: ModeSwitcherProps): JSX.Element | null {
+  const current = useSessions((state) => sessionPreset(state.byId[sessionId]))
   const [modes, setModes] = useState<ModePreset[]>([])
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
@@ -90,10 +92,10 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode }: 
         aria-label={`当前模式：${currentLabel}，点击切换模式`}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span className={css.modeIcon} aria-hidden="true">
+        {!nativePresetLabel && <span className={css.modeIcon} aria-hidden="true">
           <ModeSparkleIcon />
-        </span>
-        <span className={css.label}>{currentLabel}</span>
+        </span>}
+        <span className={css.label}>{nativePresetLabel ? '切换模式' : currentLabel}</span>
         {busy ? (
           <span className={css.spinner} aria-hidden="true" />
         ) : (

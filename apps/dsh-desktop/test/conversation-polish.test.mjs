@@ -17,10 +17,12 @@ test('expanded reasoning header remains sticky without targeting generated class
 
 test('conversation polish inserts author CSS and follows navigations', async () => {
   const calls = []
+  const scripts = []
   const listeners = new Map()
   const webContents = {
     isDestroyed: () => false,
     insertCSS: async (css, options) => calls.push([css, options]),
+    executeJavaScript: async script => scripts.push(script),
     on: (name, listener) => listeners.set(name, listener),
     removeListener: (name, listener) => {
       if (listeners.get(name) === listener) listeners.delete(name)
@@ -29,9 +31,11 @@ test('conversation polish inserts author CSS and follows navigations', async () 
 
   assert.equal(await applyConversationPolish(webContents), true)
   assert.deepEqual(calls, [[CONVERSATION_POLISH_CSS, { cssOrigin: 'author' }]])
+  assert.match(scripts[0], /installConversationRendering/u)
 
   const dispose = installConversationPolish({ browserWindow: { webContents } })
   assert.equal(typeof listeners.get('did-finish-load'), 'function')
   dispose()
   assert.equal(listeners.has('did-finish-load'), false)
+  assert.equal(scripts.at(-1), 'globalThis.dshConversationRenderingController?.dispose()')
 })

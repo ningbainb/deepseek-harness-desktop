@@ -5,12 +5,13 @@
  * their per-plugin cards there.
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the 'settings.section'
 // entry) and the ctx.settingsScope Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: imports the model options page's additive onboarding slot.
 import type {} from '@linxin666/dsh-client-ui-model-preferences/client'
 // Type-only: pulls the sidebar footer action slot contract.
@@ -23,6 +24,7 @@ import { DesktopExtensionDockEntry } from './desktop-extension-dock.tsx'
 import { DockSettingsPage, dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { projectCopy } from './ProjectDialog.tsx'
 import { installBrowserClose, installProjectDialog } from './desktop-interactions.tsx'
+import { protectDirectoryEditorFocus } from './directory-editor-focus.ts'
 import {
   chatGptAuthEn,
   chatGptAuthZh,
@@ -79,8 +81,9 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
  */
 export function apply(ctx: ClientContext): void {
   if (!dockSettingFromUrl()) {
+    ctx.effect(() => protectDirectoryEditorFocus(document), 'web-ui-settings: native directory editor focus')
     ctx.effect(() => installBrowserClose(document), 'web-ui-settings: browser close action')
-    ctx.inject?.(['workspaces', 'sessions'], scope => {
+    ctx.inject?.(['workspaces', 'sessions', 'uiWorkspace'], scope => {
       scope.effect(() => installProjectDialog(scope as ClientContext), 'web-ui-settings: project dialog')
     })
   }

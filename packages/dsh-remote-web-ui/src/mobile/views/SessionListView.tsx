@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WorkspaceView as WorkspaceRow } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
-import type { SessionSummary } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
+import type { SessionSummary, WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { createSession, listSessions, listWorkspaces } from '../api.ts'
 import { errorText, formatTime, staleHostHint, toSessionView, type SessionView } from './App.tsx'
 import { ThemeToggle } from '../theme-toggle.tsx'

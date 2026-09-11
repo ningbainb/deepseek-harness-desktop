@@ -133,7 +133,6 @@ async function awaitWithTimeout(value, timeoutMs, label) {
     timer = setTimeout(() => {
       reject(new Error(`${label} timed out after ${boundedTimeout}ms`))
     }, boundedTimeout)
-    timer?.unref?.()
   })
   try {
     return await Promise.race([value, timeout])
@@ -600,9 +599,10 @@ export function registerExtensionIpc({
     return networkDiagnostics.run()
   })
   handleExtension('extensions:community-open', (_event, id) => shell.openExternal(resolveCommunityPluginUrl(id)))
-  handleExtension('extensions:market-list', () => {
+  handleExtension('extensions:market-list', (_event, force = false) => {
     if (typeof communityMarket?.list !== 'function') throw new Error('community market is unavailable')
-    return communityMarket.list()
+    if (typeof force !== 'boolean') throw new TypeError('invalid community market refresh request')
+    return communityMarket.list({ force })
   })
   handleExtension('extensions:market-install', async (_event, id) => {
     if (typeof communityMarket?.resolveInstall !== 'function') throw new Error('community market is unavailable')

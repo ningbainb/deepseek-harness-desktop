@@ -3,7 +3,8 @@
  * state machine and Host transport; this package only supplies a preference
  * projection inside the official Models page and a preference-aware composer seat.
  */
-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { type ModelPreferencesLocaleKey } from './locales.ts';
 export * from './locales.ts';
 export { ModelPreferencesCard } from './ModelPreferencesCard.tsx';
@@ -14,12 +15,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'model-preferences': ModelPreferencesLocaleKey;
     }
     interface SlotMap {
-        /** Additive model-owned content rendered inside the official Models page. */
-        'settings.models.content': {
-            kind: 'list';
-            scope: 'root';
-            owner: ModelPreferencesContentOwnerProps;
-        };
         /** Additive onboarding content rendered at the top of model preferences. */
         'model-preferences.onboarding': {
             kind: 'list';
@@ -29,9 +24,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     }
 }
 export interface ModelPreferencesOnboardingOwnerProps {
-    children?: never;
-}
-export interface ModelPreferencesContentOwnerProps {
     children?: never;
 }
 declare module '@deepseek-ai/cordis' {

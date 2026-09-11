@@ -39,6 +39,9 @@ function fixture({
         : []),
       { seq: persistedPrompt ? 6 : 5, type: 'turn/end', data: { turn: 1, reason } },
     ],
+    snapshotEvents() {
+      return this.events
+    },
   }
   const agent = {
     id: 'task-board-session-1',
@@ -60,7 +63,7 @@ function fixture({
     defaultModel: { currentSelection: () => model ? ({ provider: 'deepseek', model: 'deepseek-chat' }) : ({ provider: '', model: '' }) } as never,
     sessions: { flush: async (value: unknown) => { calls.flush.push(value); return true } } as never,
     sessionPersistence: {
-      list: async () => persisted ? [{ id: 'task-board-session-1' }] : [],
+      list: async () => persisted ? [{ header: { id: 'task-board-session-1' } }] : [],
     } as never,
     workspaceRegistry: {
       get: () => workspace

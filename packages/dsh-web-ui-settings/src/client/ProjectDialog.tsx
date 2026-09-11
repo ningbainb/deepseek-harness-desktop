@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import css from './desktop-interactions.module.css'
 import { reportFeatureEvent } from './feature-telemetry.ts'
 
-export type ProjectServices = Pick<ClientContext, 'workspaces' | 'sessions'>
+export type ProjectServices = Pick<ClientContext, 'workspaces' | 'sessions' | 'uiWorkspace'>
 export const projectCopy = {
   zh: { chooseTitle: '选择工作区', existingGroup: '已有项目', title: '创建项目', name: '项目名称', folder: '源文件夹', pick: '点击选择项目文件夹', hint: '将此文件夹作为项目的工作目录', change: '更换', remove: '移除', cancel: '取消', close: '关闭', busy: '正在创建…', picking: '正在选择…', failed: '项目操作失败，请重试。', exists: '该文件夹已属于项目', open: '打开已有项目' },
   en: { chooseTitle: 'Choose workspace', existingGroup: 'Existing projects', title: 'Create project', name: 'Project name', folder: 'Source folder', pick: 'Choose a project folder', hint: 'Use this folder as the project working directory', change: 'Change', remove: 'Remove', cancel: 'Cancel', close: 'Close', busy: 'Creating…', picking: 'Choosing…', failed: 'Project operation failed. Please retry.', exists: 'This folder already belongs to a project', open: 'Open existing project' },
@@ -37,7 +40,7 @@ export function ProjectDialog({ services, onClose, language = 'zh', pickFolder, 
     if (lock.current) return
     lock.current = true; setPicking(true); setError('')
     try {
-      const selected = await (pickFolder ? pickFolder() : services.workspaces.pickDirectory())
+      const selected = await (pickFolder ? pickFolder() : services.uiWorkspace.pickDirectory())
       if (!mounted.current || !selected) return
       setPath(selected); created.current = undefined
       if (!edited.current) setName(selected.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? selected)
@@ -62,7 +65,7 @@ export function ProjectDialog({ services, onClose, language = 'zh', pickFolder, 
       }
       if (!attempted) { reportFeatureEvent({ feature: 'project', outcome: 'started', detail }); attempted = true }
       if (!duplicate) await services.workspaces.rename(workspace.workspaceId, name.trim())
-      const sessionId = await services.workspaces.connectWorkspace(workspace.workspaceId)
+      const sessionId = await services.uiWorkspace.connectWorkspace(workspace.workspaceId)
       if (!mounted.current) return
       services.sessions.open(sessionId)
       reportFeatureEvent({ feature: 'project', outcome: 'succeeded', detail })

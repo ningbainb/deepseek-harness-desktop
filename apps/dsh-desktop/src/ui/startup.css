@@ -251,6 +251,9 @@ h1 {
   pointer-events: none;
 }
 
+.meter-tick-1 { left: 34%; }
+.meter-tick-2 { left: 72%; }
+
 .meter-tick::after {
   content: '';
   position: absolute;

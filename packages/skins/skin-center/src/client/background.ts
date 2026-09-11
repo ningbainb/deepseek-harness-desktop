@@ -13,7 +13,7 @@
  * through as a 0..1 alpha for the CSS variable. Dragging the control applies
  * instantly (live) and persists through the settings scope.
  */
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /** The namespace string the Host registers (mirrors src/index.ts). */
 export const SKIN_BACKGROUND_NS = 'skin-background'

@@ -11,6 +11,7 @@ describe('model refresh bridge', () => {
     const documentTarget = new TestDocument()
     const callbacks: Array<() => void> = []
     const refresh = vi.fn()
+    let now = 1_000
     const channel = { onmessage: null as ((event: MessageEvent<unknown>) => void) | null, postMessage: vi.fn(), close: vi.fn() }
     const bridge = installModelRefreshBridge({
       sessionId: 'session-a',
@@ -22,8 +23,14 @@ describe('model refresh bridge', () => {
         return channel
       },
       schedule: callback => { callbacks.push(callback) },
+      now: () => now,
+      minIntervalMs: 30_000,
     })
 
+    windowTarget.dispatchEvent(new Event('focus'))
+    windowTarget.dispatchEvent(new Event('online'))
+    expect(callbacks).toHaveLength(0)
+    now += 30_001
     windowTarget.dispatchEvent(new Event('focus'))
     windowTarget.dispatchEvent(new Event('online'))
     expect(callbacks).toHaveLength(1)
@@ -34,6 +41,9 @@ describe('model refresh bridge', () => {
     documentTarget.dispatchEvent(new Event('visibilitychange'))
     expect(callbacks).toHaveLength(0)
     documentTarget.visibilityState = 'visible'
+    documentTarget.dispatchEvent(new Event('visibilitychange'))
+    expect(callbacks).toHaveLength(0)
+    now += 30_001
     documentTarget.dispatchEvent(new Event('visibilitychange'))
     callbacks.shift()?.()
     expect(refresh).toHaveBeenCalledTimes(2)

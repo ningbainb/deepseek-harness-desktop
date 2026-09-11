@@ -7,6 +7,7 @@ const read = (name) => readFile(new URL(`../src/${name}`, import.meta.url), 'utf
 test('main preload exposes product actions without extension mutation channels', async () => {
   const source = await read('preload-main.cjs')
   assert.match(source, /desktop:contract/u)
+  assert.match(source, /shellContext:\s*Object\.freeze\(\{ mode: 'advanced', platform: process\.platform \}\)/u)
   assert.match(source, /createBufferedSubscription/u)
   assert.match(source, /onDeepLink:\s*createBufferedSubscription/u)
   assert.doesNotMatch(source, /require\(['"]\.\/preload-common\.cjs['"]\)/u)

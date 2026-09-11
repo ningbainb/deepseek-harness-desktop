@@ -3,7 +3,7 @@ import type {
   ModelProviderGroup,
   ModelSelection,
 } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ModelCatalogModel } from '@deepseek-ai/dsh-client-connection/client'
+import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types'
 
 /** Settings namespace registered by the Host half. */
 export const MODEL_PREFERENCES_SETTINGS_NAMESPACE = 'model-preferences'

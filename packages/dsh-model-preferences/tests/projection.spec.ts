@@ -72,4 +72,38 @@ describe('model preference client projection', () => {
     expect(select).toHaveBeenCalledWith({ provider: 'beta', model: 'b:two' })
     expect(set).toHaveBeenCalledWith('recentModels', [{ provider: 'beta', model: 'b:two' }])
   })
+
+  it('does not hold model selection busy while recent history is slow, and serializes rapid choices', async () => {
+    let finish!: () => void
+    const firstWrite = new Promise<void>(resolve => { finish = resolve })
+    const set = vi.fn().mockReturnValueOnce(firstWrite).mockResolvedValue(undefined)
+    const scope = { getSnapshot: () => ({ value: config }), set } as any
+    const directory = { select: vi.fn(async () => {}), store: { getSnapshot: () => state } }
+    let accepted = false
+    const first = selectModelWithPreferences(directory, scope, { provider: 'beta', model: 'b:two' }).then(() => { accepted = true })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(accepted).toBe(true)
+    await first
+    for (let index = 0; index < 12; index += 1) {
+      await selectModelWithPreferences(directory, scope, { provider: 'beta', model: `m${index}` })
+    }
+    expect(set).toHaveBeenCalledTimes(1)
+    finish()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(set).toHaveBeenCalledTimes(2)
+    expect(set.mock.calls[1]![1]).toEqual(Array.from({ length: 8 }, (_, index) => ({ provider: 'beta', model: `m${11 - index}` })))
+  })
+
+  it('does not persist a rejected selection or convert a preference failure into a model failure', async () => {
+    const set = vi.fn().mockRejectedValue(new Error('settings unavailable'))
+    const scope = { getSnapshot: () => ({ value: config }), set } as any
+    const directory = { select: vi.fn().mockRejectedValueOnce(new Error('route rejected')).mockResolvedValue(undefined), store: { getSnapshot: () => state } }
+    await expect(selectModelWithPreferences(directory, scope, { provider: 'beta', model: 'b:two' })).rejects.toThrow('route rejected')
+    expect(set).not.toHaveBeenCalled()
+    await expect(selectModelWithPreferences(directory, scope, { provider: 'beta', model: 'b:two' })).resolves.toBeUndefined()
+    await Promise.resolve()
+    expect(set).toHaveBeenCalledTimes(1)
+  })
 })

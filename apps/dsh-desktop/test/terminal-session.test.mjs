@@ -144,3 +144,91 @@ test('PTY load and spawn failures become terminal errors instead of unhandled pr
   assert.equal(events[0][1].code, 'terminal-start-failed')
   assert.equal(session.active, false)
 })
+
+test('terminal initializes PTY in parallel with lazy PATH verification and shares concurrent starts', async () => {
+  let resolvePaths
+  const paths = new Promise(resolve => { resolvePaths = resolve })
+  let loads = 0
+  let probes = 0
+  const spawns = []
+  const session = new DesktopTerminalSession({
+    cwd: 'C:\\workspace', platform: 'win32', environment: { Path: 'C:\\Windows' },
+    resolvePathEntries: () => { probes += 1; return paths },
+    loadPty: async () => { loads += 1; return { spawn: (...args) => { spawns.push(args); return new FakePty() } } },
+  })
+  assert.equal(probes, 0)
+  const first = session.start()
+  const second = session.start()
+  assert.equal(loads, 1)
+  assert.equal(probes, 1)
+  assert.equal(spawns.length, 0)
+  assert.equal(session.resize({ cols: 140, rows: 35 }), false)
+  resolvePaths(['C:\\Verified Git\\cmd'])
+  await Promise.all([first, second])
+  assert.equal(spawns.length, 1)
+  assert.equal(spawns[0][2].env.Path, 'C:\\Verified Git\\cmd;C:\\Windows')
+  assert.equal(spawns[0][2].cols, 140)
+  assert.equal(spawns[0][2].rows, 35)
+  session.dispose()
+})
+
+test('closing a terminal while PATH inspection is pending never creates a late shell', async () => {
+  let resolvePaths
+  let spawns = 0
+  const session = new DesktopTerminalSession({
+    cwd: 'C:\\workspace', platform: 'win32', environment: {},
+    resolvePathEntries: () => new Promise(resolve => { resolvePaths = resolve }),
+    loadPty: async () => ({ spawn: () => { spawns += 1; return new FakePty() } }),
+  })
+  const starting = session.start()
+  session.dispose()
+  resolvePaths([])
+  await assert.rejects(starting, /disposed/u)
+  assert.equal(spawns, 0)
+})
+
+test('restart supersedes a pending load and a stale failure cannot kill the replacement shell', async () => {
+  let failFirst
+  const pty = new FakePty()
+  let loads = 0
+  const session = new DesktopTerminalSession({
+    cwd: 'C:\\workspace', platform: 'win32', environment: {},
+    loadPty: () => ++loads === 1 ? new Promise((_resolve, reject) => { failFirst = reject })
+      : Promise.resolve({ spawn: () => pty }),
+  })
+  const starting = session.start()
+  const failed = assert.rejects(starting, /obsolete load/u)
+  const restarting = session.restart()
+  assert.equal(loads, 2, 'restart must begin a fresh generation instead of sharing the stalled first load')
+  await restarting
+  failFirst(new Error('obsolete load'))
+  await failed
+  assert.equal(session.active, true)
+  assert.equal(pty.killed, 0)
+  session.dispose()
+})
+
+test('a superseded load cannot create an extra shell after restart succeeds', async () => {
+  let finishFirst
+  let loads = 0
+  let spawns = 0
+  const pty = new FakePty()
+  const module = { spawn: () => { spawns += 1; return pty } }
+  const events = []
+  const session = new DesktopTerminalSession({
+    cwd: 'C:\\workspace', platform: 'win32', environment: {},
+    loadPty: () => ++loads === 1 ? new Promise(resolve => { finishFirst = resolve }) : Promise.resolve(module),
+    emit: (...event) => events.push(event),
+  })
+  const starting = session.start()
+  const superseded = assert.rejects(starting, /superseded/u)
+  const restarted = session.restart()
+  assert.equal(loads, 2)
+  await restarted
+  finishFirst(module)
+  await superseded
+  assert.equal(spawns, 1)
+  assert.equal(session.active, true)
+  assert.deepEqual(events, [], 'a superseded startup must not report an error into the replacement view')
+  session.dispose()
+})

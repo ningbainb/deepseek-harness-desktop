@@ -9,12 +9,14 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { AffinityConfig, PetAffinityView, PetInteraction } from './affinity.ts'
 import type { TreatConfig } from './treats.ts'
 import {
   emptyProjectionRuntime,
   isActivityPhase,
+  projectAssistantStreamFrame,
   projectOfficialEvent,
   type ActivityStatusEventLike,
   type ProjectionRuntime,
@@ -201,6 +203,13 @@ export class PetService extends Service {
           if (transition.completedTurn !== undefined) {
             this.rewardTurn(String(session.id), transition.completedTurn)
           }
+        }),
+        this.ctx.on('agent/assistant-stream', ({ agent, frame }: { agent: Agent; frame: AssistantStreamFrame }) => {
+          const transition = projectAssistantStreamFrame(frame)
+          if (transition === undefined) return
+          const session = agent.session
+          this.activityRuntime(session).officialEventsSeen = true
+          this.applyActivity(session, transition.input)
         }),
         this.ctx.on('session/disposed', (session: Session) => {
           if (session !== this.displaySession) return

@@ -1,3 +1,6 @@
 # Direct-start matrix fixtures must survive checkouts byte-for-byte:
 # their SHA-256 hashes are pinned in provenance.json.
 apps/dsh-desktop/test/fixtures/direct-start/** -text
+# Unified diffs prefix context lines with a space, including empty/tabbed lines.
+# Preserve that required patch syntax; normal source whitespace checks remain.
+patches/*.patch whitespace=-blank-at-eol,-space-before-tab

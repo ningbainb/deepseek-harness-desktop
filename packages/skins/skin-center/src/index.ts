@@ -9,7 +9,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 // Type-only: pulls the dsh-host-webserver service seat (ctx.webServer).
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -28,7 +28,7 @@ export const inject = ['webServer']
  * skin center. The browser half spells the same string so it can bind the
  * scope without depending on this Host package.
  */
-export const SKIN_BACKGROUND_NAMESPACE = settingsNamespace('skin-background')
+export const SKIN_BACKGROUND_NAMESPACE = 'skin-background'
 
 /** Plugin-configuration fields for the main-interface background. */
 export interface SkinBackgroundConfig {
@@ -58,11 +58,13 @@ export function apply(ctx: Context): void {
   // Optional-settings wiring for the background scrim namespace. The browser
   // half binds the scope and applies the value to the body CSS variable;
   // this side just declares the namespace + schema so the value persists and
-  // re-resolves across reloads. installSettingsSection is a no-op when no
+  // re-resolves across reloads. The settings service is a no-op when no
   // settings service is mounted (pure skin-center installs skip it).
-  installSettingsSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
-    setSource: () => { /* application is browser-side; value is read from the scope */ },
-    onChange: () => { /* browser half re-applies on scope publish */ },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
+      setSource: () => { /* application is browser-side; value is read from the scope */ },
+      onChange: () => { /* browser half re-applies on scope publish */ },
+    })
   })
 
   const routes = makeSkinCenterRoutes()

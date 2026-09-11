@@ -54,11 +54,14 @@ describe('resolveNamespaceEntry', () => {
     expect(resolveNamespaceEntry('dsh-skins')).toBe('skin-background')
     expect(resolveNamespaceEntry('dsh-ssh')).toBe('dsh-ssh')
     expect(resolveNamespaceEntry('dsh-particle-theme')).toBe('particle-theme')
+    expect(resolveNamespaceEntry('dsh-memory')).toBe('memory')
+    expect(resolveNamespaceEntry('dsh-value-mode')).toBe('value-mode')
   })
 
   it('passes bare family namespaces through', () => {
     expect(resolveNamespaceEntry('live-stats')).toBe('live-stats')
     expect(resolveNamespaceEntry('remote-web-ui')).toBe('remote-web-ui')
+    expect(resolveNamespaceEntry('skin-wallpaper')).toBe('skin-wallpaper')
   })
 
   it('ignores packages without a settings namespace and unknown names', () => {
@@ -72,12 +75,18 @@ describe('resolveNamespaceEntry', () => {
 describe('composeAllowlist', () => {
   const registered = [
     'dsh-ssh',
+    'llm-pi-ai',
     'task-board',
     'remote-web-ui',
     'live-stats',
+    'memory',
+    'model-preferences',
     'pet',
+    'personal-prompt',
     'particle-theme',
     'skin-background',
+    'skin-wallpaper',
+    'value-mode',
     'web-search-deepseek',
   ]
 
@@ -85,11 +94,17 @@ describe('composeAllowlist', () => {
     expect(composeAllowlist([], registered)).toEqual([
       'dsh-ssh',
       'live-stats',
+      'llm-pi-ai',
+      'memory',
+      'model-preferences',
       'particle-theme',
+      'personal-prompt',
       'pet',
       'remote-web-ui',
       'skin-background',
+      'skin-wallpaper',
       'task-board',
+      'value-mode',
     ])
   })
 

@@ -7,9 +7,11 @@
  * rendered by {@link UpdateEntry}. Component-local state per the client
  * stack rules: nothing here survives remounts or crosses entries.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PairingPhase } from '../pairing.ts'
 import { RemotePanel, type PanelState } from './RemotePanel.tsx'
 import { copyText, issuePair, stopPair, type IssueResponse, type PairStateFrame, type TunnelStatusFrame } from './pair-api.ts'
@@ -18,7 +20,14 @@ import { UpdateEntry } from './UpdateEntry.tsx'
 import css from './remote.module.css'
 
 /** Entry props: the sidebar column state + the standard locale seat. */
-export type RemoteEntryProps = PropsRuntime<'sidebar.remote'> & PropsLocale<'remote'>
+export interface RemoteEntryServices {
+  sessions?: ISessions
+  workspaces?: IWorkspaces
+  /** Compatibility input for callers mounted against the pre-1.1.5 slot kit. */
+  useWorkspaces?: (selector: (state: { recentWorkspaceId?: string }) => unknown) => unknown
+}
+
+export type RemoteEntryProps = PropsRuntime<'sidebar.remote'> & PropsLocale<'remote'> & RemoteEntryServices
 
 /** Apply one status frame onto the current ready state. */
 function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
@@ -37,7 +46,32 @@ function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
  * @param props - composed slot props (contract in this package).
  * @returns the entry element tree.
  */
-export function RemoteEntry({ wide, useWorkspaces, t }: RemoteEntryProps) {
+const EMPTY_SESSION_LIST = {
+  ids: [],
+  byId: {},
+  current: undefined,
+  phase: 'ready',
+  subagentsByParent: {},
+  jobsBySession: {},
+  currentAddress: undefined,
+} as const
+const EMPTY_WORKSPACE_LIST = {
+  items: [],
+  archivedSessionIds: [],
+  state: 'idle',
+  phase: 'ready',
+  error: null,
+} as const
+const EMPTY_SESSION_SOURCE = {
+  subscribe: () => () => {},
+  getSnapshot: () => EMPTY_SESSION_LIST,
+}
+const EMPTY_WORKSPACE_SOURCE = {
+  subscribe: () => () => {},
+  getSnapshot: () => EMPTY_WORKSPACE_LIST,
+}
+
+export function RemoteEntry({ wide, sessions, workspaces, useWorkspaces, t }: RemoteEntryProps) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<PanelState>({ kind: 'lan-required' })
   const [copied, setCopied] = useState(false)
@@ -45,7 +79,23 @@ export function RemoteEntry({ wide, useWorkspaces, t }: RemoteEntryProps) {
 
   // The current workspace (the recent-workspace projection the shell's New
   // Session flow targets) — the deep-link target for the phone.
-  const workspaceId = useWorkspaces(s => s.recentWorkspaceId)
+  const sessionSource = sessions?.list ?? EMPTY_SESSION_SOURCE
+  const workspaceSource = workspaces?.list ?? EMPTY_WORKSPACE_SOURCE
+  const sessionList = useSyncExternalStore(
+    listener => sessionSource.subscribe(listener),
+    () => sessionSource.getSnapshot(),
+    () => sessionSource.getSnapshot(),
+  )
+  const workspaceList = useSyncExternalStore(
+    listener => workspaceSource.subscribe(listener),
+    () => workspaceSource.getSnapshot(),
+    () => workspaceSource.getSnapshot(),
+  )
+  const legacyWorkspaceId = useWorkspaces?.(state => state.recentWorkspaceId) as string | undefined
+  const currentWorkspaceId = sessionList.current === undefined
+    ? undefined
+    : workspaceList.items.find(workspace => workspace.sessionIds.includes(sessionList.current!))?.workspaceId
+  const workspaceId = currentWorkspaceId ?? workspaceList.items[0]?.workspaceId ?? legacyWorkspaceId
 
   const closeEventSource = useCallback(() => {
     eventSource.current?.close()

@@ -62,7 +62,7 @@ test('deep-link and preset schemas reject unsupported inputs with actionable ver
 test('schema validation fails deterministically when a registered patch test is absent', async () => {
   await assert.rejects(
     validatePublicSchemas({
-      today: '2026-08-21',
+      today: '2026-09-10',
       testExists: () => false,
     }),
     /references missing test/u,

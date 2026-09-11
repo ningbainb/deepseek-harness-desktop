@@ -1,4 +1,8 @@
 export declare const zh: {
+    catalogUnavailable: string;
+    catalogTimeout: string;
+    catalogChanged: string;
+    catalogLoadFailed: string;
     title: string;
     description: string;
     descSupplement: string;

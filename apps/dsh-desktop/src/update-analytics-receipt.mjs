@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { validUpdateDiagnostic } from './update-diagnostics.mjs'
 
 const VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
 
@@ -13,8 +14,9 @@ function normalizeReceipt(value) {
     value === null
     || typeof value !== 'object'
     || Array.isArray(value)
-    || Object.keys(value).length !== 5
-    || value.schemaVersion !== 1
+    || ![1, 2].includes(value.schemaVersion)
+    || Object.keys(value).length !== (value.schemaVersion === 2 ? 6 : 5)
+    || (value.schemaVersion === 2 && (!validUpdateDiagnostic(value.update) || value.update.source_version !== value.sourceVersion || value.update.target_version !== value.targetVersion))
     || value.phase !== 'install-requested'
     || !validVersion(value.sourceVersion)
     || !validVersion(value.targetVersion)
@@ -67,7 +69,7 @@ export class UpdateAnalyticsReceiptStore {
     return result
   }
 
-  recordInstallRequested({ sourceVersion, targetVersion } = {}) {
+  recordInstallRequested({ sourceVersion, targetVersion, update } = {}) {
     if (!validVersion(sourceVersion) || !validVersion(targetVersion) || sourceVersion === targetVersion) {
       return Promise.reject(new TypeError('update analytics receipt version is invalid'))
     }
@@ -77,17 +79,18 @@ export class UpdateAnalyticsReceiptStore {
         throw new TypeError('update analytics receipt clock is invalid')
       }
       await atomicWrite(this.path, `${JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: validUpdateDiagnostic(update) ? 2 : 1,
         sourceVersion,
         targetVersion,
         phase: 'install-requested',
         updatedAt: updatedAt.toISOString(),
+        ...(validUpdateDiagnostic(update) ? { update } : {}),
       }, null, 2)}\n`)
       return true
     })
   }
 
-  consumeCompleted(currentVersion) {
+  consumeCompleted(currentVersion, { withReceipt = false } = {}) {
     if (!validVersion(currentVersion)) return Promise.resolve(false)
     return this.#enqueue(async () => {
       let receipt
@@ -98,7 +101,7 @@ export class UpdateAnalyticsReceiptStore {
       }
       if (receipt?.targetVersion !== currentVersion) return false
       await rm(this.path, { force: true })
-      return true
+      return withReceipt ? receipt : true
     })
   }
 }

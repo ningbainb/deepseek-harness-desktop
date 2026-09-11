@@ -305,7 +305,7 @@ for (const { pkgDir, ymlPath } of aggregates) {
       } catch (e) {
         errors.push(`cannot read self package name: ${e.message}`)
       }
-      if (selfName) blocks.unshift({ entry: 'self', via: [], rows: [{ id: manifest.self, name: selfName }] })
+      if (selfName) blocks.unshift({ entry: 'self', via: [], rows: [{ id: manifest.self, name: selfName, operation: 'insert' }] })
     }
   }
   if (manifest.patchFrom.length === 0 && !manifest.self) {

@@ -11,6 +11,7 @@ import {
   SECONDARY_WINDOW_PARTITION,
   beginDesktopStartup,
   createSerializedStartupSurfaceLoader,
+  desktopLocalSurfaceUrl,
   createDesktopShutdownLifecycle,
   prepareDesktopRuntimeInputs,
   requestsUpdateShutdown,
@@ -26,6 +27,7 @@ import {
 } from '../src/profile.mjs'
 import { DshRuntimeController } from '../src/runtime-controller.mjs'
 import { parseUpdateShutdownRequest } from '../src/update-shutdown-receipt.mjs'
+import { createRuntimePresentationGuard } from '../src/runtime-presentation.mjs'
 
 async function availableLoopbackPort(excludedPort) {
   for (;;) {
@@ -57,6 +59,28 @@ async function readJsonIfPresent(path) {
   } catch (error) {
     if (error?.code === 'ENOENT') return undefined
     throw error
+  }
+}
+
+async function createAuthenticatedRuntimeFetch(launchUrl) {
+  const exchange = await fetch(launchUrl, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(5_000),
+  })
+  let cookie
+  if (exchange.status === 303) {
+    assert.equal(exchange.headers.get('location'), '/')
+    const setCookie = exchange.headers.getSetCookie?.()[0] ?? exchange.headers.get('set-cookie')
+    assert.equal(typeof setCookie, 'string', 'runtime launch-token exchange omitted its session cookie')
+    cookie = setCookie.split(';', 1)[0]
+  } else {
+    assert.equal(exchange.ok, true, `runtime launch-token exchange returned HTTP ${exchange.status}`)
+  }
+  const baseUrl = new URL('/', launchUrl)
+  return async (path = '/', init = {}) => {
+    const headers = new Headers(init.headers)
+    if (cookie !== undefined) headers.set('cookie', cookie)
+    return fetch(new URL(path, baseUrl), { ...init, headers })
   }
 }
 
@@ -182,6 +206,38 @@ test('rapid direct-start states serialize local startup-page navigations', async
     'start:starting-full',
     'finish:starting-full',
   ])
+})
+
+test('desktop local surfaces use canonical file URLs with encoded query values', () => {
+  const url = desktopLocalSurfaceUrl('D:\\DeepSeek Harness\\startup.html', {
+    query: { directState: 'starting full', omitted: undefined },
+  })
+  assert.equal(url, 'file:///D:/DeepSeek%20Harness/startup.html?directState=starting+full')
+  assert.equal(url.includes('\\'), false)
+})
+
+test('queued startup navigation is invalidated by shutdown even after recovery', async () => {
+  const guard = createRuntimePresentationGuard()
+  const loaded = []
+  let release
+  const loader = createSerializedStartupSurfaceLoader({
+    capture: () => guard.capture(),
+    load: state => {
+      loaded.push(state)
+      if (state === 'initial') return new Promise(resolve => { release = resolve })
+    },
+  })
+  const initial = loader('initial')
+  await Promise.resolve()
+  await Promise.resolve()
+  const stale = loader('stopping')
+  guard.suspend()
+  const duringQuit = loader('crashed')
+  guard.resume()
+  const recovered = loader('recovered')
+  release()
+  await Promise.all([initial, stale, duringQuit, recovered])
+  assert.deepEqual(loaded, ['initial', 'recovered'])
 })
 
 test('planned Extension Dock maintenance keeps the current main surface visible', () => {
@@ -344,11 +400,12 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
         startupTimeoutMs: 45_000,
       })
       const url = await controller.start()
-      const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+      const runtimeFetch = await createAuthenticatedRuntimeFetch(url)
+      const response = await runtimeFetch('/', { signal: AbortSignal.timeout(5_000) })
       assert.equal(response.ok, true)
       assert.match(await response.text(), /__DSH_BOOT__/)
 
-      const activeResponse = await fetch(new URL('/api/skin-center/v2/active', url), {
+      const activeResponse = await runtimeFetch('/api/skin-center/v2/active', {
         signal: AbortSignal.timeout(5_000),
       })
       assert.equal(activeResponse.ok, true)
@@ -385,42 +442,29 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       startupTimeoutMs: 45_000,
     })
     let url = await controller.start()
-    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    let runtimeFetch = await createAuthenticatedRuntimeFetch(url)
+    const response = await runtimeFetch('/', { signal: AbortSignal.timeout(5_000) })
     assert.equal(response.ok, true)
     assert.match(await response.text(), /__DSH_BOOT__/)
 
-    const settingsResponse = await fetch(new URL('/api/settings.describe', url), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId: 'desktop-runtime-settings',
-        method: 'settings.describe',
-        payload: {},
-      }),
-      signal: AbortSignal.timeout(5_000),
-    })
-    const settings = await settingsResponse.json()
-    assert.equal(settings.result.ok, true)
-    const namespaces = new Set(settings.result.value.namespaces.map((entry) => entry.ns))
-    for (const namespace of WEB_UI_SETTINGS_NAMESPACES) {
-      assert.equal(namespaces.has(namespace), true, `settings namespace ${namespace} is hidden`)
-    }
-
-    const particleSettingsResponse = await fetch(new URL('/api/dsh-web-ui-settings/describe', url), {
+    const particleSettingsResponse = await runtimeFetch('/api/dsh-web-ui-settings/describe', {
       method: 'POST',
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(particleSettingsResponse.ok, true, 'particle settings bridge was not served')
     const particleSettings = await particleSettingsResponse.json()
     assert.equal(particleSettings.ok, true)
+    const namespaces = new Set(particleSettings.value.namespaces.map((entry) => entry.ns))
+    for (const namespace of WEB_UI_SETTINGS_NAMESPACES) {
+      assert.equal(namespaces.has(namespace), true, `settings namespace ${namespace} is hidden`)
+    }
     const particleNamespace = particleSettings.value.namespaces.find(entry => entry.ns === 'particle-theme')
     assert.equal(
       particleNamespace?.value?.enabled,
       true,
       `particle-theme is not exposed through the settings bridge: ${JSON.stringify(particleSettings)}`,
     )
-    const particleDisableResponse = await fetch(new URL('/api/dsh-web-ui-settings/mutate', url), {
+    const particleDisableResponse = await runtimeFetch('/api/dsh-web-ui-settings/mutate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -434,7 +478,7 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     const particleDisabled = await particleDisableResponse.json()
     assert.equal(particleDisabled.ok, true)
     assert.equal(particleDisabled.value.value.enabled, false, 'particle-theme toggle did not persist')
-    const particleEnableResponse = await fetch(new URL('/api/dsh-web-ui-settings/mutate', url), {
+    const particleEnableResponse = await runtimeFetch('/api/dsh-web-ui-settings/mutate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -449,8 +493,8 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     assert.equal(particleEnabled.ok, true)
     assert.equal(particleEnabled.value.value.enabled, true, 'particle-theme toggle did not restore')
 
-    const taskBoardUrl = new URL('/api/dsh-task-board/tasks', url)
-    const taskBoardInitial = await fetch(taskBoardUrl, { signal: AbortSignal.timeout(5_000) })
+    const taskBoardUrl = '/api/dsh-task-board/tasks'
+    const taskBoardInitial = await runtimeFetch(taskBoardUrl, { signal: AbortSignal.timeout(5_000) })
     const initialLedgerText = await taskBoardInitial.text()
     assert.equal(taskBoardInitial.ok, true, `Task Board HostStore was not served: ${taskBoardInitial.status} ${initialLedgerText}`)
     const initialLedger = JSON.parse(initialLedgerText)
@@ -468,7 +512,7 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       updatedAt: 1,
       executions: [],
     }
-    const taskBoardWrite = await fetch(taskBoardUrl, {
+    const taskBoardWrite = await runtimeFetch(taskBoardUrl, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ tasks: [savedTask] }),
@@ -497,9 +541,10 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       startupTimeoutMs: 45_000,
     })
     url = await controller.start()
+    runtimeFetch = await createAuthenticatedRuntimeFetch(url)
     assert.equal(Number(new URL(url).port), replacementPort)
     assert.notEqual(replacementPort, originalPort)
-    const restartedTaskBoard = await fetch(new URL('/api/dsh-task-board/tasks', url), {
+    const restartedTaskBoard = await runtimeFetch('/api/dsh-task-board/tasks', {
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(restartedTaskBoard.ok, true, 'Task Board HostStore was not restored after a port-changing restart')
@@ -508,14 +553,15 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     const unicodeWorkspacePath = join(root, '模拟 D 盘', '中文名字d')
     await mkdir(unicodeWorkspacePath, { recursive: true })
     const callRuntime = async (method, payload) => {
-      const apiResponse = await fetch(new URL(`/api/${method}`, url), {
+      const endpoint = method.replace('.', '/')
+      const apiResponse = await runtimeFetch(`/api/${endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           type: 'client-request',
           rpcId: `desktop-runtime-${method}`,
-          method,
-          payload,
+          method: endpoint,
+          payload: { args: { request: payload } },
         }),
         signal: AbortSignal.timeout(10_000),
       })
@@ -531,19 +577,19 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     assert.equal(controller.status.state, 'ready', 'Unicode workspace creation crashed the runtime')
 
     for (const path of ['/api/pet/state', '/pet/whale/pet.json', '/pet/whale/spritesheet.webp']) {
-      const asset = await fetch(new URL(path, url), { signal: AbortSignal.timeout(5_000) })
+      const asset = await runtimeFetch(path, { signal: AbortSignal.timeout(5_000) })
       assert.equal(asset.ok, true, `${path} was not served`)
     }
-    const petsResponse = await fetch(new URL('/api/pet/pets', url), { signal: AbortSignal.timeout(5_000) })
+    const petsResponse = await runtimeFetch('/api/pet/pets', { signal: AbortSignal.timeout(5_000) })
     assert.equal(petsResponse.ok, true, 'pet registry was not served')
     const pets = await petsResponse.json()
     const whaleGirl = pets.find((pet) => pet.id === 'whale-girl')
     assert.equal(whaleGirl?.displayName, '鲸鱼娘（原版）')
     for (const path of [whaleGirl.manifestUrl, whaleGirl.atlasUrl]) {
-      const asset = await fetch(new URL(path, url), { signal: AbortSignal.timeout(5_000) })
+      const asset = await runtimeFetch(path, { signal: AbortSignal.timeout(5_000) })
       assert.equal(asset.ok, true, `${path} was not served`)
     }
-    const skinCatalogResponse = await fetch(new URL('/api/skin-center/v2/catalog', url), {
+    const skinCatalogResponse = await runtimeFetch('/api/skin-center/v2/catalog', {
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(skinCatalogResponse.ok, true, 'Skin Center v2 catalog was not served')
@@ -556,13 +602,13 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       assert.equal(entry.manifest.skinManifestVersion, 2)
       assert.equal(typeof entry.manifest.contributes?.stylesheet, 'string')
     }
-    const initialSkinStateResponse = await fetch(new URL('/api/skin-center/v2/active', url), {
+    const initialSkinStateResponse = await runtimeFetch('/api/skin-center/v2/active', {
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(initialSkinStateResponse.ok, true)
     assert.deepEqual(await initialSkinStateResponse.json(), { ok: true, active: null })
     for (const skinId of BUILTIN_SKIN_IDS) {
-      const stylesheet = await fetch(new URL(`/api/skin-center/v2/skins/${skinId}/stylesheet`, url), {
+      const stylesheet = await runtimeFetch(`/api/skin-center/v2/skins/${skinId}/stylesheet`, {
         signal: AbortSignal.timeout(5_000),
       })
       assert.equal(stylesheet.ok, true, `${skinId} Skin Center stylesheet was not served`)
@@ -587,7 +633,7 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       'retired Runtime market entry must not remain mounted',
     )
 
-    const applySkin = await fetch(new URL('/api/skin-center/v2/active', url), {
+    const applySkin = await runtimeFetch('/api/skin-center/v2/active', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ active: 'xp' }),
@@ -599,11 +645,11 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       JSON.parse(await readFile(join(root, 'skin-center-active.json'), 'utf8')),
       { active: 'xp' },
     )
-    const selectedSkinStateResponse = await fetch(new URL('/api/skin-center/v2/active', url), {
+    const selectedSkinStateResponse = await runtimeFetch('/api/skin-center/v2/active', {
       signal: AbortSignal.timeout(5_000),
     })
     assert.deepEqual(await selectedSkinStateResponse.json(), { ok: true, active: 'xp' })
-    const selectedSkinPage = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+    const selectedSkinPage = await runtimeFetch('/', { signal: AbortSignal.timeout(5_000) })
     assert.equal(selectedSkinPage.ok, true)
     const selectedSkinHtml = await selectedSkinPage.text()
     assert.match(selectedSkinHtml, /<html[^>]*\sdata-dsh-skin="xp"/u)

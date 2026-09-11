@@ -27,6 +27,7 @@ const HELP_ACTIONS = new Set([
   'export-diagnostics',
   'feedback',
   'project',
+  'sponsor',
   'privacy',
   'updates',
 ])

@@ -4,6 +4,8 @@
  */
 import type { BalanceController } from './balance-controller.ts'
 import css from './balance.module.css'
+import { zh, type SettingsCardKey } from './locales.ts'
+type Translate = (key: SettingsCardKey) => string
 
 export const BALANCE_ENTRY_SELECTOR = '[data-dsh-balance-entry]'
 const SURFACE_NAVIGATION_EVENT = 'dsh-web-ui:surface-navigation'
@@ -18,7 +20,7 @@ function sidebarRoot(): HTMLElement | undefined {
   return logoOwner ?? (column.firstElementChild as HTMLElement | undefined)
 }
 
-function createEntry(controller: BalanceController): HTMLButtonElement {
+function createEntry(controller: BalanceController, t: Translate): HTMLButtonElement {
   const entry = document.createElement('button')
   entry.type = 'button'
   entry.dataset.dshBalanceEntry = ''
@@ -30,7 +32,7 @@ function createEntry(controller: BalanceController): HTMLButtonElement {
 
   const labelSpan = document.createElement('span')
   labelSpan.className = css.sidebarLabel
-  labelSpan.textContent = '大模型用量'
+  labelSpan.textContent = t('balance.usage')
 
   const amountSpan = document.createElement('span')
   amountSpan.className = css.sidebarAmount
@@ -50,14 +52,15 @@ function createEntry(controller: BalanceController): HTMLButtonElement {
   return entry
 }
 
-function updateEntryAmount(entry: HTMLButtonElement, state: ReturnType<BalanceController['getSnapshot']>): void {
+function updateEntryAmount(entry: HTMLButtonElement, state: ReturnType<BalanceController['getSnapshot']>, t: Translate): void {
   const amountSpan = entry.querySelector<HTMLSpanElement>('[data-dsh-balance-amount]')
   const balanceKnown = state.totalBalance !== '--'
-  const amount = balanceKnown ? `${state.totalBalance} ${state.currency}` : '未知'
+  const amount = balanceKnown ? `${state.totalBalance} ${state.source === 'relay-quota' ? t('balance.quotaUnit') : state.currency}` : t('balance.unknown')
   if (amountSpan) {
     amountSpan.textContent = state.loading ? '…' : amount
   }
-  entry.title = state.loading ? '大模型用量' : `大模型用量 · 官方余额${balanceKnown ? ` ${amount}` : '未知'}`
+  const label = t(state.source === 'relay-quota' || state.source === 'relay-allowance' ? 'balance.quota' : state.provider === 'deepseek-official' ? 'balance.official' : 'balance.available')
+  entry.title = state.loading ? t('balance.usage') : `${t('balance.usage')} · ${state.provider} · ${label}${balanceKnown ? ` ${amount}` : t('balance.unknown')}`
   entry.toggleAttribute('data-active', state.open)
 }
 
@@ -91,7 +94,7 @@ function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
   return true
 }
 
-export function mountBalanceSidebarEntry(controller: BalanceController): () => void {
+export function mountBalanceSidebarEntry(controller: BalanceController, t: Translate = key => zh[key]): () => void {
   let entry: HTMLButtonElement | undefined
   let observer: MutationObserver | undefined
   let unsubState: (() => void) | undefined
@@ -100,13 +103,13 @@ export function mountBalanceSidebarEntry(controller: BalanceController): () => v
     const root = sidebarRoot()
     if (root === undefined) return
     if (entry === undefined) {
-      entry = createEntry(controller)
+      entry = createEntry(controller, t)
       // Subscribe at creation time, not only at bootstrap: when the shell is
       // not mounted yet on first pass, the observer creates the entry later
       // and a bootstrap-only subscription would never attach, leaving the
       // amount and tooltip empty forever.
       unsubState = controller.subscribe((state) => {
-        if (entry) updateEntryAmount(entry, state)
+        if (entry) updateEntryAmount(entry, state, t)
       })
       // Kick off initial balance fetch
       void controller.fetchBalance()

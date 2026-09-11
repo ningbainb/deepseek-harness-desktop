@@ -419,7 +419,7 @@ test('community market resolves an opaque catalog ID and installs it without an 
     onRuntimeMaintenanceChange: (active) => events.push(['maintenance', active]),
   })
 
-  assert.equal(await ipcMain.handlers.get('extensions:market-list')(), publicCatalog)
+  assert.equal(await ipcMain.handlers.get('extensions:market-list')(undefined, true), publicCatalog)
   assert.deepEqual(
     await ipcMain.handlers.get('extensions:market-install')(undefined, 'opaque-market-id'),
     { name: '@community/plugin', fullAccess: true, isolated: false },

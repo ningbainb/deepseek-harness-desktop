@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { MemoryConfig } from '../core/config.ts'
 import type { MemoryActivity } from '../core/activity.ts'
 import type { MemoryPublicItem } from '../core/schema.ts'

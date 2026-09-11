@@ -19,9 +19,10 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 // the forwarded settings invalidation face (ctx.remote).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { SettingsScope, SettingsScopeSnapshot, SettingsScopeSpec, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope, SettingsScopeSnapshot, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../protocol.ts'
 import type { BridgeDescribeResult, BridgeMutateRequest, BridgeMutateResult } from '../protocol.ts'
 
@@ -97,6 +98,8 @@ class BridgeScopeController<T> implements SettingsScope<T> {
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
   private tail: Promise<void> = Promise.resolve()
   private disposed = false
+  private writeGeneration = 0
+  private pendingRevision: number | undefined
 
   constructor(
     private readonly api: BridgeSettingsFace,
@@ -123,15 +126,25 @@ class BridgeScopeController<T> implements SettingsScope<T> {
 
   /** Queue a Host refresh through the bridge. */
   load(): Promise<void> {
-    return this.enqueue(() => this.read())
+    const generation = this.writeGeneration
+    return this.enqueue(() => this.read(generation))
   }
 
   set(field: string, value: unknown): Promise<void> {
-    return this.enqueue(() => this.write({ op: 'set', path: [field], value }))
+    const generation = ++this.writeGeneration
+    return this.enqueue(() => this.write([{ op: 'set', path: [field], value }], generation))
   }
 
   unset(field: string): Promise<void> {
-    return this.enqueue(() => this.write({ op: 'unset', path: [field] }))
+    return this.mutate([{ op: 'unset', path: [field] }])
+  }
+
+  mutate(ops: readonly SettingsPathOpView[], expectedRevision?: number): Promise<void> {
+    const generation = ++this.writeGeneration
+    const copied = ops.map(op => op.op === 'set'
+      ? { op: 'set' as const, path: [...op.path], value: op.value }
+      : { op: 'unset' as const, path: [...op.path] })
+    return this.enqueue(() => this.write(copied, generation, expectedRevision))
   }
 
   /** Stop queued operations and wait for the current bridge call to settle. */
@@ -150,7 +163,7 @@ class BridgeScopeController<T> implements SettingsScope<T> {
     return task
   }
 
-  private async read(): Promise<void> {
+  private async read(generation: number): Promise<void> {
     let response: { result: BridgeDescribeResult }
     try {
       response = await this.api.settings.describe({})
@@ -158,19 +171,23 @@ class BridgeScopeController<T> implements SettingsScope<T> {
       // A dropped bridge call must not strand the card in a permanent
       // loading state: report the namespace unavailable, which the card
       // renders as its explanation instead of a form.
-      if (!this.disposed) {
+      if (!this.disposed && generation === this.writeGeneration) {
         this.store.update((draft) => { draft.status = 'unavailable' })
       }
       return
     }
     if (!response.result.ok || this.disposed) {
-      if (!this.disposed) {
+      if (!this.disposed && generation === this.writeGeneration) {
         this.store.update((draft) => { draft.status = 'unavailable' })
       }
       return
     }
     const { namespaces, writable } = response.result.value
     const view = namespaces.find(candidate => candidate.ns === this.spec.namespace)
+    if (generation !== this.writeGeneration) {
+      if (view !== undefined) this.pendingRevision = view.revision
+      return
+    }
     if (view === undefined) {
       this.store.update((draft) => {
         draft.status = 'unavailable'
@@ -178,26 +195,37 @@ class BridgeScopeController<T> implements SettingsScope<T> {
       })
       return
     }
+    this.pendingRevision = undefined
     this.accept(view.value, view, writable)
   }
 
-  private async write(op: { op: 'set' | 'unset'; path: string[]; value?: unknown }): Promise<void> {
-    const revision = this.getSnapshot().revision
+  private async write(
+    ops: Array<{ op: 'set' | 'unset'; path: string[]; value?: unknown }>,
+    generation: number,
+    expectedRevision = this.pendingRevision ?? this.getSnapshot().revision,
+  ): Promise<void> {
     let response: { result: BridgeMutateResult }
     try {
       response = await this.api.settings.mutate({
         ns: this.spec.namespace,
-        ops: [op],
-        ...revision === undefined ? {} : { expectedRevision: revision },
+        ops,
+        ...expectedRevision === undefined ? {} : { expectedRevision },
       })
     } catch {
-      await this.read()
+      if (!this.disposed && generation === this.writeGeneration) await this.read(generation)
       return
     }
     if (!response.result.ok || this.disposed) {
-      await this.read()
+      if (!this.disposed && generation === this.writeGeneration) await this.read(generation)
       return
     }
+    // A newer user edit is already queued. Retain the revision fence without
+    // publishing an intermediate value over the controller's latest preview.
+    if (generation !== this.writeGeneration) {
+      this.pendingRevision = response.result.value.revision
+      return
+    }
+    this.pendingRevision = undefined
     this.accept(response.result.value.value, response.result.value, undefined)
   }
 
@@ -264,6 +292,7 @@ export function createCompatScope<T>(options: CompatScopeOptions<T>): SettingsSc
   return {
     getSnapshot: () => store.getSnapshot(),
     subscribe: listener => store.subscribe(listener),
+    mutate: (ops, expectedRevision) => active().mutate(ops, expectedRevision),
     set: (field, value) => active().set(field, value),
     unset: field => active().unset(field),
     load: async () => {

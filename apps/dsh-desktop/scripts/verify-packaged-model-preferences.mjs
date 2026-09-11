@@ -5,18 +5,24 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { _electron as electron } from 'playwright'
+import electronPath from 'electron'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const appPath = resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
-  ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
+const sourceMode = process.env.DSH_DESKTOP_E2E_SOURCE === '1'
+const appPath = sourceMode
+  ? electronPath
+  : resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
+    ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
 const temporary = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-model-preferences-')))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const workspace = join(temporary, 'workspace')
 let app
+let latestPage
+const lifecycleErrors = []
 
 async function dismissStartup(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
@@ -50,7 +56,7 @@ async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
   const instance = await electron.launch({
     executablePath: appPath,
-    args: ['--force-renderer-accessibility'],
+    args: [...sourceMode ? [appDir] : [], '--force-renderer-accessibility'],
     cwd: appDir,
     env: {
       ...process.env,
@@ -63,7 +69,9 @@ async function launch() {
   })
   await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
+  latestPage = page
   const errors = []
+  lifecycleErrors.push(errors)
   page.on('pageerror', (error) => errors.push(`pageerror:${error.message}`))
   page.on('console', (message) => {
     if (message.type() !== 'error') return
@@ -81,6 +89,7 @@ async function openSettings(page) {
   const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
   await settings.waitFor({ state: 'visible', timeout: 30_000 })
   await settings.getByText('Web UI 插件', { exact: true }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[data-relay-onboarding-card="true"]').length === 0, undefined, { timeout: 10_000 })
   assert.equal(await page.locator('[data-relay-onboarding-card="true"]').count(), 0)
   const modelNav = settings.getByRole('button', { name: '模型', exact: true })
   assert.equal(await modelNav.count(), 1)
@@ -88,7 +97,12 @@ async function openSettings(page) {
   await modelNav.click()
   const card = page.locator('[data-model-preferences-card="true"]')
   await card.waitFor({ state: 'visible', timeout: 30_000 })
-  await card.locator('[class*="providerRow"]').filter({ hasText: 'openai-codex' }).locator('[class*="modelRow"]').first().waitFor({ state: 'visible', timeout: 30_000 })
+  try {
+    await card.locator('[class*="providerRow"]').filter({ hasText: 'openai-codex' }).locator('[class*="modelRow"]').first().waitFor({ state: 'visible', timeout: 30_000 })
+  } catch (error) {
+    const text = (await card.innerText().catch(() => '')).replaceAll(/\s+/gu, ' ').trim()
+    throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
+  }
   const relay = card.locator('[data-relay-onboarding-card="true"]')
   await relay.getByRole('heading', { name: '推荐：使用 bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   return { settings, card }
@@ -136,7 +150,7 @@ async function configurePreferences(card) {
   const openaiRow = providerRows(card).filter({ hasText: 'openai-codex' }).first()
   const deepseekRow = providerRows(card).filter({ hasText: 'deepseek-official' }).first()
   const modelRows = openaiRow.locator('[class*="modelRow"]')
-  assert.equal(await modelRows.count(), 7)
+  assert.equal(await modelRows.count(), 8)
   const expectedPins = await modelRows.evaluateAll((rows) => ({
     modelIds: rows.slice(0, 2).map((row) => row.querySelector('code')?.textContent?.trim() || ''),
     labels: rows.slice(0, 2).map((row) => row.querySelector('span')?.textContent?.trim() || ''),
@@ -188,7 +202,7 @@ async function readComposerSelector(page) {
 }
 
 async function readModelCommand(page) {
-  const commandButton = page.getByRole('button', { name: '命令', exact: true }).last()
+  const commandButton = page.getByRole('button', { name: '指令', exact: true }).last()
   await commandButton.click({ force: true })
   const commandList = page.locator('[role="listbox"][aria-label="触发候选建议"]')
   await commandList.waitFor({ state: 'visible', timeout: 30_000 })
@@ -241,9 +255,9 @@ try {
   const firstRows = await readModelCommand(firstPage)
   assertComposerProjection(firstSections, expectedPins.labels)
   assertOfficialModelCommand(firstRows)
-  const firstErrors = first.errors.length
   await app.close()
   app = undefined
+  assert.deepEqual(first.errors, [], 'first model-preference lifecycle must close without renderer errors')
 
   const second = await launch()
   app = second.instance
@@ -259,8 +273,10 @@ try {
   const restartedRows = await readModelCommand(second.page)
   assertComposerProjection(restartedSections, expectedPins.labels)
   assertOfficialModelCommand(restartedRows)
-  assert.equal(firstErrors, 0, JSON.stringify(first.errors))
-  assert.equal(second.errors.length, 0, JSON.stringify(second.errors))
+  await app.close()
+  app = undefined
+  assert.deepEqual(first.errors, [], 'first model-preference lifecycle must remain error-free')
+  assert.deepEqual(second.errors, [], 'restarted model-preference lifecycle must close without renderer errors')
   console.log(JSON.stringify({
     settings: {
       firstPass: firstSettingsState,
@@ -276,8 +292,28 @@ try {
       firstPass: firstRows.slice(0, 3),
       restartPass: restartedRows.slice(0, 3),
     },
-    pageErrorCount: firstErrors + second.errors.length,
+    pageErrorCount: first.errors.length + second.errors.length,
   }, null, 2))
+} catch (error) {
+  const diagnostic = await latestPage?.evaluate(() => ({
+    title: document.title,
+    documentState: document.readyState,
+    settingsControllerInstalled: Boolean(window.__dshDesktopSettingsWindowController),
+    settingsHeaderSlots: document.querySelectorAll('[data-slot="settings.header"]').length,
+    dialogs: [...document.querySelectorAll('[role="dialog"]')].map(element => ({
+      className: element.className, label: element.getAttribute('aria-label'),
+      visible: element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0,
+      text: element.textContent?.slice(0, 500),
+    })),
+    settingsButtons: [...document.querySelectorAll('button')].filter(element => element.textContent?.trim() === '设置')
+      .map(element => ({ className: element.className, disabled: element.disabled, html: element.outerHTML.slice(0, 600) })),
+  })).catch(() => undefined)
+  console.error('model-preference lifecycle failure', JSON.stringify({ diagnostic, errors: lifecycleErrors }))
+  const output = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ?? resolve(appDir, '../../.artifacts/model-preferences'))
+  const screenshot = join(output, `failure-${Date.now()}.png`)
+  await mkdir(output, { recursive: true }).catch(() => {})
+  await latestPage?.screenshot({ path: screenshot }).catch(() => {})
+  throw error
 } finally {
   await app?.close()
   await rm(temporary, { recursive: true, force: true })

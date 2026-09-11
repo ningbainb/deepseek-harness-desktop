@@ -1,3 +1,5 @@
+import { summarizeCostMode } from './cost-mode-summary.mjs'
+import { updateDiagnosticsSummary } from './update-diagnostics-summary.mjs'
 import { releaseFilters, releaseSummary } from './release-analytics.mjs'
 import {
   adminConfigured,
@@ -23,62 +25,62 @@ const ADMIN_CSP = [
 
 const DOWNLOAD_TOTAL_SQL = [
   'SELECT COALESCE(SUM(count), 0) AS total',
-  'FROM download_click_daily',
+  'FROM download_click_daily_all',
   "WHERE day >= date('now', ?)",
 ].join(' ')
 
 const DOWNLOAD_TREND_SQL = [
   'SELECT day, SUM(count) AS count',
-  'FROM download_click_daily',
+  'FROM download_click_daily_all',
   "WHERE day >= date('now', ?)",
   'GROUP BY day ORDER BY day',
 ].join(' ')
 
 const DOWNLOAD_COUNTRIES_SQL = [
   'SELECT country_code AS countryCode, SUM(count) AS count',
-  'FROM download_click_daily',
+  'FROM download_click_daily_all',
   "WHERE day >= date('now', ?)",
   'GROUP BY country_code ORDER BY count DESC, country_code LIMIT 250',
 ].join(' ')
 
 const DOWNLOAD_SOURCES_SQL = [
   'SELECT source, SUM(count) AS count',
-  'FROM download_click_daily',
+  'FROM download_click_daily_all',
   "WHERE day >= date('now', ?)",
   'GROUP BY source ORDER BY count DESC, source',
 ].join(' ')
 
 const DOWNLOAD_VERSIONS_SQL = [
   'SELECT release_version AS version, SUM(count) AS count',
-  'FROM download_click_daily',
+  'FROM download_click_daily_all',
   "WHERE day >= date('now', ?)",
   'GROUP BY release_version ORDER BY count DESC, release_version LIMIT 30',
 ].join(' ')
 
 const DESKTOP_LAUNCHES_SQL = [
   'SELECT COALESCE(SUM(count), 0) AS total',
-  'FROM metric_daily',
+  'FROM metric_daily_all',
   "WHERE day >= date('now', ?) AND event = 'app_launch'",
 ].join(' ')
 
 const DESKTOP_SURFACES_SQL = [
   'SELECT detail AS surface, SUM(count) AS count',
-  'FROM metric_daily',
+  'FROM metric_daily_all',
   "WHERE day >= date('now', ?) AND event = 'surface_opened'",
   'GROUP BY detail ORDER BY count DESC, detail',
 ].join(' ')
 
 const DESKTOP_EVENTS_SQL = [
   'SELECT event, SUM(count) AS count',
-  'FROM metric_daily',
-  "WHERE day >= date('now', ?) AND event NOT LIKE 'value_mode_%'",
+  'FROM metric_daily_all',
+  "WHERE day >= date('now', ?) AND event NOT LIKE 'value_mode_%' AND event NOT LIKE 'cost_mode_%'",
   'GROUP BY event ORDER BY count DESC, event',
 ].join(' ')
 
 const VALUE_MODE_USAGE_SQL = [
   'SELECT event, outcome, detail, SUM(count) AS count',
-  'FROM metric_daily',
-  "WHERE day >= date('now', ?) AND event LIKE 'value_mode_%'",
+  'FROM metric_daily_all',
+  "WHERE day >= date('now', ?) AND (event LIKE 'value_mode_%' OR event LIKE 'cost_mode_%')",
   'GROUP BY event, outcome, detail ORDER BY count DESC, event, outcome, detail',
 ].join(' ')
 
@@ -137,9 +139,8 @@ const UPDATE_FUNNEL_SQL = [
 ].join(' ')
 
 const DOCK_FUNNEL_SQL = [
-  'SELECT event, COUNT(DISTINCT monthly_actor) AS count',
-  'FROM product_actor_monthly',
-  "WHERE month >= substr(date('now', ?), 1, 7)",
+  'SELECT event, SUM(count) AS count FROM metric_daily_all',
+  "WHERE day >= date('now', ?)",
   "AND event IN ('dock_entry_impression', 'dock_nudge_shown', 'dock_entry_click', 'dock_opened', 'extension_operation')",
   'GROUP BY event ORDER BY count DESC, event',
 ].join(' ')
@@ -159,7 +160,7 @@ const RETENTION_COHORTS_SQL = [
 
 const SESSION_DURATION_SQL = [
   'SELECT bucket, SUM(count) AS count',
-  'FROM metric_daily',
+  'FROM metric_daily_all',
   "WHERE day >= date('now', ?) AND event = 'app_session_end'",
   'GROUP BY bucket ORDER BY count DESC, bucket',
 ].join(' ')
@@ -550,6 +551,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     .trend-point { fill: var(--signal); stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
     .chart-label { fill: var(--muted); font: 12px "Bahnschrift", sans-serif; }
     .bars { display: grid; gap: 15px; }
+    #update-diagnostics-recent { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
     .bar-row { display: grid; gap: 7px; }
     .bar-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
     .bar-meta b { font-weight: 800; }
@@ -628,7 +630,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
   </style>
 </head>
 <body>
-  <div class="topline"><span><span class="topline-wide">DSH / SIGNAL ROOM / </span>AGGREGATE ONLY</span><span class="live">SERVICE ONLINE</span></div>
+  <div class="topline"><span><span class="topline-wide">DSH / SIGNAL ROOM / </span>PRODUCT ANALYTICS</span><span class="live">SERVICE ONLINE</span></div>
   <main class="shell">
     <header>
       <div>
@@ -648,7 +650,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="notice">
       <b>统计口径</b>
-      <span>DAU、WAU、MAU 使用稳定匿名安装实例哈希去重：DAU 为服务端 UTC 当日，WAU 为最近 7 个 UTC 日，MAU 为最近 30 个 UTC 日；累计安装实例统计近 400 个 UTC 日内首次见到的实例。国家、版本和漏斗沿用月度匿名观察口径；多台设备分别计数。系统不保存 IP、账号、机器码、硬件信息或原始事件。</span>
+      <span>DAU、WAU、MAU 使用稳定匿名安装实例哈希去重：DAU 为服务端 UTC 当日，WAU 为最近 7 个 UTC 日，MAU 为最近 30 个 UTC 日；累计安装实例统计近 400 个 UTC 日内首次见到的实例。国家、版本和更新漏斗沿用月度匿名观察口径；拓展坞和引导转化采用事件次数；多台设备分别计数。系统不保存 IP、账号、机器码、硬件信息。仅失败保留受限诊断字段；事件计数为按小时汇总的采样加权观察值。</span>
     </section>
 
     <section class="metrics" aria-label="核心指标">
@@ -669,7 +671,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       <div class="panel-body">
         <p id="release-coverage" role="status">正在读取发布统计…</p>
         <p>启动实例：<strong id="release-active">--</strong> · 启动成功率：<strong id="release-startup">--</strong> <span id="release-denominator"></span></p>
-        <p style="color:var(--muted);font-size:12px">仅覆盖新版统计协议（schema 4），按稳定匿名安装实例去重，次数包含重复操作。各阶段为独立观察，不代表有序转化。普通文件添加不代表消息已发送或任务已完成。下方旧报表的周期独立控制。</p>
+        <p style="color:var(--muted);font-size:12px">次数包含重复操作，高频行为使用聚合统计。安装实例仅在保留去重数据的指标中展示，其他指标以 -- 表示。各阶段为独立观察，不代表有序转化。普通文件添加不代表消息已发送或任务已完成。下方旧报表的周期独立控制。</p>
       </div>
       <div class="table-wrap"><table><thead><tr><th>功能 / 事件</th><th>结果</th><th>细分</th><th>实例数</th><th>次数</th></tr></thead><tbody id="release-rows"></tbody></table></div>
     </section>
@@ -715,14 +717,25 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     <section class="grid equal">
       <article class="panel">
         <div class="panel-head"><h2>性价比模式使用</h2><span>选择、引导、启停与路由</span></div>
-        <div class="panel-body"><div id="value-mode-bars" class="bars accent"></div></div>
+        <div class="panel-body"><p id="cost-mode-summary" class="muted"></p><div id="value-mode-bars" class="bars accent"></div></div>
       </article>
       <article class="panel">
         <div class="panel-head"><h2>性价比模式口径</h2><span>仅统计固定枚举</span></div>
         <div class="panel-body">
-          <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.8">专家主控和副模型子代理只记录粗粒度调用次数与结果；模型名称、Provider、提示词、会话内容、Token 和错误原文不会进入产品分析。</p>
+          <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.8">成功路由使用聚合计数；失败保留模型标识、角色、策略、错误类别、版本和时间用于排障。提示词、会话内容、Token 和错误原文不会进入产品分析。</p>
         </div>
       </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>更新失败诊断</h2><span>最近最多 30 天，按当前运行版本筛选</span></div>
+      <div class="panel-body">
+        <p id="update-diagnostics-state" class="muted">尚未加载诊断</p>
+        <label>当前运行版本 <input id="update-diagnostics-version" placeholder="全部版本" maxlength="40"></label>
+        <button id="update-diagnostics-refresh" type="button">查询诊断</button>
+        <div id="update-diagnostics-bars" class="bars accent"></div>
+        <details><summary>最近失败记录</summary><pre id="update-diagnostics-recent"></pre></details>
+      </div>
     </section>
 
     <section class="metrics retention-metrics" aria-label="留存率">
@@ -734,10 +747,10 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     <section class="grid equal">
       <article class="panel">
         <div class="panel-head"><h2>应用内更新漏斗</h2><span>月度匿名观察去重</span></div>
-        <div class="panel-body"><div id="update-funnel-bars" class="bars accent"></div></div>
+        <div class="panel-body"><div id="update-funnel-bars" class="bars accent"></div><p class="muted">更新失败包括检查、下载、校验和安装器启动；次数不代表安装失败人数。</p></div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>拓展坞漏斗</h2><span>曝光、点击、打开、操作</span></div>
+        <div class="panel-head"><h2>拓展坞漏斗</h2><span>事件次数：曝光、点击、打开、操作</span></div>
         <div class="panel-body"><div id="dock-funnel-bars" class="bars"></div></div>
       </article>
     </section>
@@ -777,7 +790,7 @@ const releaseLabels = {
   create: '新建并连接', connect: '连接已有项目', file: '普通文件', relay: '供应商接入',
   'value-mode': '性价比模式', 'personal-prompt': '个性化 Prompt', memory: '记忆', 'particle-theme': '粒子主题', 'describe-image': '图像理解',
 }
-function releaseLabel(value) { return releaseLabels[value] || eventLabels[value] || value }
+function releaseLabel(value) { return releaseLabels[value] || eventLabels[value] || valueModeEventLabels[value] || value }
 async function loadRelease() {
   const sequence = ++releaseRequest
   const days = element('release-days').value
@@ -801,7 +814,7 @@ async function loadRelease() {
       const option = document.createElement('option'); option.value = row.version; option.textContent = 'v' + row.version; select.append(option)
     }
     setText('release-coverage', data.coverage.from
-      ? '覆盖 UTC ' + data.coverage.from + ' 至 ' + data.coverage.to + (data.coverage.partial ? '；此窗口尚未完整覆盖。' : '；当日数据仍在更新。')
+      ? '覆盖 UTC ' + data.coverage.from + ' 至 ' + data.coverage.to + (data.coverage.partial ? '；此窗口尚未完整覆盖。' : '；当日数据仍在更新。') + ' 计数按小时汇总；仅聚合事件的实例数显示 --。'
       : '尚无新版统计记录；等待正式客户端上报。')
     setText('release-active', numberFormat.format(data.activeInstances))
     setText('release-startup', data.startup.successRate === null ? '暂无样本' : (data.startup.successRate * 100).toFixed(1) + '%')
@@ -809,7 +822,7 @@ async function loadRelease() {
     const body = element('release-rows')
     for (const row of data.events) {
       const tr = document.createElement('tr')
-      for (const value of [releaseLabel(row.event), releaseLabel(row.outcome), releaseLabel(row.detail), numberFormat.format(row.instances), numberFormat.format(row.count)]) {
+      for (const value of [releaseLabel(row.event), releaseLabel(row.outcome), releaseLabel(row.detail), row.instances == null ? '--' : numberFormat.format(row.instances), numberFormat.format(row.count)]) {
         const td = document.createElement('td'); td.textContent = value; tr.append(td)
       }
       body.append(tr)
@@ -872,6 +885,7 @@ const eventLabels = Object.freeze({
   app_session_end: '会话结束',
 })
 const valueModeEventLabels = Object.freeze({
+  cost_mode_enter: '进入性价比模式', cost_mode_toggle: '性价比模式启停', cost_mode_strategy: '性价比模式策略', cost_mode_route: '性价比模式路由调用', cost_mode_guide: '性价比模式引导',
   value_mode_entry: '进入性价比模式',
   value_mode_onboarding: '性价比模式引导',
   value_mode_state: '性价比模式启停',
@@ -879,6 +893,7 @@ const valueModeEventLabels = Object.freeze({
   value_mode_call: '性价比模式路由调用',
 })
 const valueModeOutcomeLabels = Object.freeze({
+  success: '成功', failure: '失败', cancelled: '已取消',
   selected: '已选择',
   shown: '已展示',
   completed: '已完成',
@@ -889,6 +904,7 @@ const valueModeOutcomeLabels = Object.freeze({
   failed: '失败',
 })
 const valueModeDetailLabels = Object.freeze({
+  main: '专家主控', saving: '更省', stronger: '更强', unknown: '旧版未采集',
   configured: '已有配置',
   unconfigured: '待配置',
   hero: '空白会话',
@@ -1122,6 +1138,8 @@ function render(data) {
   renderBars('version-bars', data.active.versions, (row) => 'v' + row.version)
   renderBars('surface-bars', data.desktop.surfaces, (row) => surfaceLabels[row.surface] || row.surface)
   renderBars('event-bars', data.desktop.events, (row) => eventLabels[row.event] || row.event)
+  const cost = data.valueMode.summary
+  if (element('cost-mode-summary')) element('cost-mode-summary').textContent = cost ? '完成调用失败率 ' + formatPercent(cost.failureRate == null ? null : cost.failureRate * 100) + '；引导完成/展示 ' + formatPercent(cost.guideCompletionRate == null ? null : cost.guideCompletionRate * 100) + '；更省/平衡/更强调用 ' + [cost.strategies.saving, cost.strategies.balanced, cost.strategies.stronger].map(formatCount).join(' / ') + '；汇总时间 ' + (data.analytics.snapshotAt || '尚未取得汇总') + '。旧版未采集成功回执；失败率不含取消和未完成调用。' : '尚未取得汇总'
   renderBars('value-mode-bars', data.valueMode.usage, (row) => [
     valueModeEventLabels[row.event] || row.event,
     valueModeOutcomeLabels[row.outcome] || row.outcome,
@@ -1135,7 +1153,35 @@ function render(data) {
   setText('generated-at', '更新于 ' + new Date(data.generatedAt).toLocaleString('zh-CN') + asOf)
 }
 
+let diagnosticDays = 7
+let diagnosticRequest = 0
+async function loadUpdateDiagnostics(days = diagnosticDays) {
+  const requestId = ++diagnosticRequest
+  diagnosticDays = Math.min(Number(days), 30)
+  const status = element('update-diagnostics-state')
+  if (!status) return
+  status.textContent = '正在查询更新失败诊断'
+  try {
+    const version = element('update-diagnostics-version').value.trim()
+    const response = await fetch('/admin/api/update-diagnostics?' + new URLSearchParams({ days: String(diagnosticDays), version }), { credentials: 'same-origin' })
+    if (!response.ok) throw new Error('unavailable')
+    const data = await response.json()
+    if (requestId !== diagnosticRequest) return
+    const stages = { check: '检查更新', download: '下载安装包', verify: '校验文件', prepare: '退出旧进程', install: '启动安装器', unknown: '旧数据或未知阶段' }
+    status.textContent = 'UTC ' + data.from + ' 至 ' + data.to + '：保留失败记录 ' + formatCount(data.failures) + '，含诊断 ' + formatCount(data.classifiedFailures) + '，失败尝试 ' + formatCount(data.failedAttempts) + '，可去重安装实例 ' + formatCount(data.observedInstances) + '。仅覆盖已上报诊断的版本，不是安装失败率；退出后没有回执的结果仍为未知。'
+    renderBars('update-diagnostics-bars', data.groups, (row) => (stages[row.stage] || row.stage) + ' · ' + row.errorType + ' · ' + row.errorCode + ' · ' + row.sourceVersion + ' → ' + row.targetVersion)
+    element('update-diagnostics-recent').textContent = JSON.stringify(data.recent, null, 2)
+  } catch {
+    if (requestId !== diagnosticRequest) return
+    status.textContent = '诊断暂不可用；需服务端迁移及客户端新版本支持，不能解释为零失败。'
+    element('update-diagnostics-bars').textContent = ''
+    element('update-diagnostics-recent').textContent = ''
+  }
+}
+element('update-diagnostics-refresh')?.addEventListener('click', () => void loadUpdateDiagnostics())
+
 async function load(days) {
+  void loadUpdateDiagnostics(days)
   const state = element('load-state')
   state.dataset.state = 'loading'
   state.textContent = 'LOADING DATA'
@@ -1218,6 +1264,8 @@ async function executeSummary(env, days, seams) {
     [DOCK_FUNNEL_SQL, [period]],
     [RETENTION_COHORTS_SQL, [period]],
     [SESSION_DURATION_SQL, [period]],
+    ["SELECT event,outcome,detail,bucket,SUM(count) AS count FROM metric_daily_all WHERE day >= date('now', ?) AND (event LIKE 'cost_mode_%' OR event LIKE 'value_mode_%') GROUP BY event,outcome,detail,bucket", [period]],
+    ["SELECT MAX(snapshot_at) AS snapshotAt, MAX(sample_interval) AS sampleInterval FROM analytics_rollup_events", []],
   ].map(([sql, bindings]) => env.METRICS.prepare(sql).bind(...bindings).all())
   const [
     downloadTotal,
@@ -1238,6 +1286,8 @@ async function executeSummary(env, days, seams) {
     dockFunnel,
     retentionCohorts,
     sessionDurations,
+    costModeDetails,
+    analyticsStatus,
   ] = await Promise.all(queries)
 
   const normalizedDailyTrend = normalizeRows(activeDailyTrend, ['day', 'count'])
@@ -1248,6 +1298,7 @@ async function executeSummary(env, days, seams) {
     schema: 5,
     rangeDays: days,
     generatedAt: generatedAt.toISOString(),
+    analytics: { snapshotAt: analyticsStatus?.results?.[0]?.snapshotAt ?? null, sampleInterval: Number(analyticsStatus?.results?.[0]?.sampleInterval ?? 1), mode: 'hourly-weighted-aggregate' },
     downloads: {
       totalClicks: normalizedCount(downloadTotal?.results?.[0]?.total),
       trend: normalizeRows(downloadTrend, ['day', 'count']),
@@ -1262,6 +1313,7 @@ async function executeSummary(env, days, seams) {
     },
     valueMode: {
       usage: normalizeRows(valueModeUsage, ['event', 'outcome', 'detail', 'count']),
+      summary: summarizeCostMode(costModeDetails?.results ?? []),
     },
     active: {
       asOfDay,
@@ -1370,6 +1422,16 @@ export async function handleAdminRequest(request, env, seams = {}) {
     } catch {
       return adminResponse(503, JSON.stringify({ error: 'temporarily unavailable' }), 'application/json; charset=utf-8')
     }
+  }
+
+  if (pathname === '/admin/api/update-diagnostics') {
+    if (request.method !== 'GET') return methodNotAllowed('GET')
+    if (!await hasValidSession(request, env, seams)) return adminResponse(401, JSON.stringify({ error: 'unauthorized' }), 'application/json; charset=utf-8')
+    const filters = releaseFilters(searchParams)
+    if (!filters) return adminResponse(400, JSON.stringify({ error: 'invalid filters' }), 'application/json; charset=utf-8')
+    try {
+      return adminResponse(200, JSON.stringify(await updateDiagnosticsSummary(env.METRICS, filters, currentDate(seams))), 'application/json; charset=utf-8')
+    } catch { return adminResponse(503, JSON.stringify({ error: 'temporarily unavailable' }), 'application/json; charset=utf-8') }
   }
 
   if (pathname === '/admin/api/release') {

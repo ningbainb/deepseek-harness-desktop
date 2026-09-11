@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createCompatScope, isLoopbackHostname } from '../src/client/compat-settings-scope.ts'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../src/protocol.ts'
 
@@ -16,7 +16,7 @@ import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../src/protocol.ts'
 // loader, so importing its value under vitest yields no exports. Provide a
 // minimal snapshot store with the same contract (getSnapshot / subscribe /
 // set / draft-style update) for the bridge controller and the fake primary.
-vi.mock('@deepseek-ai/dsh-client-runtime/client', () => ({
+vi.mock('@deepseek-ai/dsh-client-store', () => ({
   createSnapshotStore: <T>(initial: T) => {
     let snapshot = { ...initial }
     const listeners = new Set<() => void>()
@@ -43,7 +43,7 @@ vi.mock('@deepseek-ai/dsh-client-runtime/client', () => ({
   },
 }))
 
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /** A manual primary scope: a snapshot store plus recorded writes. */
 function fakePrimary<T>(initial: SettingsScopeSnapshot<T>) {
@@ -53,6 +53,7 @@ function fakePrimary<T>(initial: SettingsScopeSnapshot<T>) {
     scope: {
       getSnapshot: () => store.getSnapshot(),
       subscribe: (listener: () => void) => store.subscribe(listener),
+      mutate: async () => {},
       set: async (field: string, value: unknown) => { sets.push([field, value]) },
       unset: async () => {},
     } satisfies SettingsScope<T>,
@@ -161,6 +162,121 @@ describe('createCompatScope', () => {
     expect(mutateCalls[0].url).toBe(WEB_UI_SETTINGS_BRIDGE_PREFIX + '/mutate')
     expect(mutateCalls[0].body.ns).toBe('task-board')
     expect(mutateCalls[0].body.expectedRevision).toBe(3)
+  })
+
+  it('preserves atomic path operations and an explicit revision fence', async () => {
+    const primary = fakePrimary<{ enabled: boolean; nested?: { label?: string } }>(unavailable())
+    const mutateCalls: Array<Record<string, unknown>> = []
+    const { fetchFn } = fakeFetch(async (url, init) => {
+      if (url === WEB_UI_SETTINGS_BRIDGE_PREFIX + '/describe') {
+        return describeResult([bridgeView('task-board', { enabled: true }, 7)])
+      }
+      mutateCalls.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+      return { ok: true, value: bridgeView('task-board', { enabled: false, nested: {} }, 8) }
+    })
+    const scope = createCompatScope<{ enabled: boolean; nested?: { label?: string } }>({
+      namespace: 'task-board', primary: primary.scope, fetchFn,
+    })
+    await vi.waitFor(() => { expect(scope.getSnapshot().status).toBe('ready') })
+    const path = ['nested', 'label']
+    await scope.mutate([
+      { op: 'set', path: ['enabled'], value: false },
+      { op: 'unset', path },
+    ], 6)
+    path[0] = 'changed-after-call'
+    expect(mutateCalls).toEqual([{
+      ns: 'task-board',
+      ops: [
+        { op: 'set', path: ['enabled'], value: false },
+        { op: 'unset', path: ['nested', 'label'] },
+      ],
+      expectedRevision: 6,
+    }])
+    expect(scope.getSnapshot().revision).toBe(8)
+    expect(scope.getSnapshot().value).toEqual({ enabled: false, nested: {} })
+  })
+
+  it('does not publish superseded writes over a newer slider value and carries the revision forward', async () => {
+    const primary = fakePrimary<{ blur: number }>(unavailable())
+    let releaseFirst!: () => void
+    const firstWrite = new Promise<void>(resolve => { releaseFirst = resolve })
+    const revisions: unknown[] = []
+    const { fetchFn } = fakeFetch(async (url, init) => {
+      if (url.endsWith('/describe')) return describeResult([bridgeView('skin-background', { blur: 0 }, 1)])
+      const body = JSON.parse(String(init.body))
+      revisions.push(body.expectedRevision)
+      if (revisions.length === 1) await firstWrite
+      return { ok: true, value: bridgeView('skin-background', { blur: body.ops[0].value }, revisions.length + 1) }
+    })
+    const scope = createCompatScope<{ blur: number }>({ namespace: 'skin-background', primary: primary.scope, fetchFn })
+    await scope.load()
+    const published: number[] = []
+    scope.subscribe(() => { published.push(scope.getSnapshot().value!.blur) })
+    const older = scope.set('blur', 8)
+    await vi.waitFor(() => { expect(revisions).toHaveLength(1) })
+    const newer = scope.set('blur', 0)
+    releaseFirst()
+    await Promise.all([older, newer])
+    expect(revisions).toEqual([1, 2])
+    expect(published).toEqual([0])
+    expect(scope.getSnapshot().revision).toBe(3)
+  })
+
+  it('fences a refresh that began before a newer local edit', async () => {
+    const primary = fakePrimary<{ blur: number }>(unavailable())
+    let releaseRead!: () => void
+    const readGate = new Promise<void>(resolve => { releaseRead = resolve })
+    let holdRead = false
+    let readStarted = false
+    const revisions: unknown[] = []
+    const { fetchFn } = fakeFetch(async (url, init) => {
+      if (url.endsWith('/describe')) {
+        if (holdRead) {
+          readStarted = true
+          await readGate
+          return describeResult([bridgeView('skin-background', { blur: 8 }, 2)])
+        }
+        return describeResult([bridgeView('skin-background', { blur: 0 }, 1)])
+      }
+      revisions.push(JSON.parse(String(init.body)).expectedRevision)
+      return { ok: true, value: bridgeView('skin-background', { blur: 0 }, 3) }
+    })
+    const scope = createCompatScope<{ blur: number }>({ namespace: 'skin-background', primary: primary.scope, fetchFn })
+    await scope.load()
+    const published: number[] = []
+    scope.subscribe(() => { published.push(scope.getSnapshot().value!.blur) })
+    holdRead = true
+    const refresh = scope.load()
+    await vi.waitFor(() => { expect(readStarted).toBe(true) })
+    const edit = scope.set('blur', 0)
+    releaseRead()
+    await Promise.all([refresh, edit])
+    expect(published).toEqual([0])
+    expect(revisions).toEqual([2])
+  })
+
+  it('recovers the actual Host value when the newest queued edit is refused', async () => {
+    const primary = fakePrimary<{ blur: number }>(unavailable())
+    let hostValue = 0
+    let hostRevision = 1
+    let mutations = 0
+    const { fetchFn } = fakeFetch(async (url) => {
+      if (url.endsWith('/describe')) return describeResult([bridgeView('skin-background', { blur: hostValue }, hostRevision)])
+      if (++mutations === 1) {
+        hostValue = 8
+        hostRevision = 2
+        return { ok: true, value: bridgeView('skin-background', { blur: hostValue }, hostRevision) }
+      }
+      return { ok: false, code: 'conflict', message: 'fixture refusal' }
+    })
+    const scope = createCompatScope<{ blur: number }>({ namespace: 'skin-background', primary: primary.scope, fetchFn })
+    await scope.load()
+    const published: number[] = []
+    scope.subscribe(() => { published.push(scope.getSnapshot().value!.blur) })
+    await Promise.all([scope.set('blur', 8), scope.set('blur', 0)])
+    expect(mutations).toBe(2)
+    expect(published).toEqual([8])
+    expect(scope.getSnapshot().revision).toBe(2)
   })
 
   it('turns a dropped bridge call into a quiet unavailable', async () => {

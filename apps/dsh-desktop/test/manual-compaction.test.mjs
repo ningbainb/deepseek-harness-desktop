@@ -11,12 +11,13 @@ import {
   toolPairingBalancedBefore,
 } from '@deepseek-ai/dsh-compaction'
 import {
-  CallId,
+  ToolCallId,
   createMessage,
   createToolResultMessage,
   createUserMessage,
 } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 
 const provider = 'compaction-fixture'
@@ -44,6 +45,7 @@ function appendTextTurn(session, turn, userText, assistantText) {
   const assistant = session.append('assistant/message', {
     turn,
     step: 1,
+    stream: [],
     message: assistantMessage([{ type: 'text', text: assistantText }]),
   }, { surfaceOp: 'append' })
   session.append('step/end', { turn, step: 1 })
@@ -76,10 +78,11 @@ test('manual compaction preserves history and tool pairing across failure, retry
 
   try {
     await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(TokenMeter)
     const engine = new FixtureCompactionEngine(ctx, { auto: false })
     const session = ctx.sessions.create()
-    const callId = CallId('compaction-fixture-call')
+    const callId = ToolCallId('compaction-fixture-call')
 
     session.append('turn/start', { turn: 1 })
     const firstUser = session.append('user/message', userMessage(`Inspect the fixture. ${'a'.repeat(1_200)}`), {
@@ -89,6 +92,7 @@ test('manual compaction preserves history and tool pairing across failure, retry
     const toolRequest = session.append('assistant/message', {
       turn: 1,
       step: 1,
+      stream: [],
       message: assistantMessage([{
         type: 'tool-call',
         id: callId,
@@ -117,6 +121,7 @@ test('manual compaction preserves history and tool pairing across failure, retry
     session.append('assistant/message', {
       turn: 1,
       step: 2,
+      stream: [],
       message: assistantMessage([{ type: 'text', text: `Tool processing complete. ${'c'.repeat(1_200)}` }]),
     }, { surfaceOp: 'append' })
     session.append('step/end', { turn: 1, step: 2 })
@@ -133,7 +138,7 @@ test('manual compaction preserves history and tool pairing across failure, retry
     assert.equal(toolPairingBalancedAfter(session, toolResult.seq), true)
 
     const originalSurface = [...session.surface.nodes]
-    const originalLog = session.events.map(event => JSON.stringify(event))
+    const originalLog = session.snapshotEvents().map(event => JSON.stringify(event))
     const agent = {
       session,
       options: { provider, model },
@@ -152,7 +157,7 @@ test('manual compaction preserves history and tool pairing across failure, retry
     await assert.rejects(
       engine.compactNow(agent, new AbortController().signal, 'command-fixture'),
       error => {
-        assert.ok(error instanceof ManualCompactionError)
+        assert.ok(error instanceof ManualCompactionError, error?.stack ?? String(error))
         assert.equal(error.code, 'summary')
         assert.match(error.cause?.message ?? '', /injected compaction summary failure/u)
         return true
@@ -160,11 +165,11 @@ test('manual compaction preserves history and tool pairing across failure, retry
     )
     assert.deepEqual(session.surface.nodes, originalSurface, 'failed compaction changed the visible surface')
     assert.deepEqual(
-      session.events.slice(0, originalLog.length).map(event => JSON.stringify(event)),
+      session.snapshotEvents(0, originalLog.length).map(event => JSON.stringify(event)),
       originalLog,
       'failed compaction rewrote original history',
     )
-    const failedEnd = session.events.at(-1)
+    const failedEnd = session.snapshotEvents().at(-1)
     assert.equal(failedEnd.type, 'compaction/end')
     assert.match(failedEnd.data.error ?? '', /injected compaction summary failure/u)
 
@@ -175,7 +180,7 @@ test('manual compaction preserves history and tool pairing across failure, retry
     assert.equal(result.shadowedSeqs.includes(toolResult.seq), true)
     assert.equal(result.shadowedSeqs.includes(secondTurn.assistant.seq), false)
     assert.deepEqual(
-      session.events.slice(0, originalLog.length).map(event => JSON.stringify(event)),
+      session.snapshotEvents(0, originalLog.length).map(event => JSON.stringify(event)),
       originalLog,
       'successful compaction rewrote the append-only source history',
     )
@@ -197,9 +202,9 @@ test('manual compaction preserves history and tool pairing across failure, retry
     )
     const continuedMessages = session.deriveMessages()
     assert.equal(continuedMessages.at(-1)?.id, continuation.assistant.data.message.id)
-    assert.equal(session.events[firstUser.seq].data.id, firstUser.data.id)
-    assert.equal(session.events[toolRequest.seq].data.message.id, toolRequest.data.message.id)
-    assert.equal(session.events[toolResult.seq].data.message.id, toolResult.data.message.id)
+    assert.equal(session.eventAt(firstUser.seq)?.data.id, firstUser.data.id)
+    assert.equal(session.eventAt(toolRequest.seq)?.data.message.id, toolRequest.data.message.id)
+    assert.equal(session.eventAt(toolResult.seq)?.data.message.id, toolResult.data.message.id)
   } finally {
     await ctx.fiber.dispose()
   }

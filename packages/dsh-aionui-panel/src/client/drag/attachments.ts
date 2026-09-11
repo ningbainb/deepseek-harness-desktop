@@ -25,9 +25,23 @@ export class FileAttachmentQueue {
   private running = false
   private disposed = false
   private off: () => void
-  constructor(private draft: AttachmentDraft, private upload: UploadFile, check?: (path: string) => Promise<boolean>) {
-    // Restored drafts contain durable workspace references even after a reload.
-    for (const match of draft.read().matchAll(/\[((?:\\.|[^\]\\\n])+)\]\(<(\.\/\.dsh-attachments\/[^>\n]+)>\)/g)) {
+  constructor(private draft: AttachmentDraft, private upload: UploadFile, private check?: (path: string) => Promise<boolean>) {
+    this.restoreReferences()
+    this.off = draft.subscribe(() => {
+      const text = draft.read()
+      const next = this.entries.filter(entry => !entry.reference || text.includes(entry.reference))
+      const removed = next.length !== this.entries.length
+      this.entries = next
+      // Input persistence may restore the draft after the queue mounts.
+      if (this.restoreReferences() || removed) this.publish()
+    })
+  }
+  private restoreReferences(): boolean {
+    let added = false
+    for (const match of this.draft.read().matchAll(/\[((?:\\.|[^\]\\\n])+)\]\(<(\.\/\.dsh-attachments\/[^>\n]+)>\)/g)) {
+      if (this.entries.some(entry => entry.reference === match[0])) continue
+      added = true
+      const check = this.check
       const entry: FileEntry = { id: crypto.randomUUID(), name: match[1]!.replace(/\\([\\[\]])/g, '$1'), size: 0, state: check ? 'pending' : 'ready', reference: match[0] }
       this.entries.push(entry)
       if (check) void check(match[2]!).catch(() => false).then(exists => {
@@ -37,11 +51,7 @@ export class FileAttachmentQueue {
         this.publish()
       })
     }
-    this.off = draft.subscribe(() => {
-      const text = draft.read()
-      const next = this.entries.filter(entry => entry.state !== 'ready' || !entry.reference || text.includes(entry.reference))
-      if (next.length !== this.entries.length) { this.entries = next; this.publish() }
-    })
+    return added
   }
   snapshot = (): readonly FileEntry[] => this.entries
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
@@ -91,12 +101,15 @@ export class FileAttachmentQueue {
             reportFeatureEvent({ feature: 'attachment', outcome: 'cancelled', detail: 'file' }); continue
           }
           const reference = attachmentReference(entry.name, result.path)
+          // Draft notifications can be synchronous; mark ownership before insert.
+          entry.reference = reference
           if (!this.draft.insert(reference)) throw new Error('draft-unavailable')
           entry.reference = reference; entry.state = 'ready'; entry.file = undefined
           reportFeatureEvent({ feature: 'attachment', outcome: 'succeeded', detail: 'file' })
         } catch (error) {
           reportFeatureEvent({ feature: 'attachment', outcome: abort.signal.aborted || this.disposed ? 'cancelled' : 'failed', detail: 'file' })
           if (!this.entries.includes(entry) || this.disposed) continue
+          if (entry.reference && !this.draft.read().includes(entry.reference)) entry.reference = undefined
           entry.state = 'failed'; entry.error = error instanceof Error ? error.message : 'upload-failed'
         }
         entry.abort = undefined; this.publish()

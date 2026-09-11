@@ -1,13 +1,16 @@
 import { memo } from 'react'
-import type { UseProjection } from '@deepseek-ai/dsh-client-runtime/client'
+import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
-import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { zh, type SettingsCardKey } from './locales.ts'
+import styles from './TpsLine.module.css'
 // Type-only: pulls the ui-conversation SlotMap merge (conversation.composer.dock).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 /** Props supplied by the session-scoped composer dock. */
 export interface TpsLineProps {
   useProjection: UseProjection
+  t?: (key: SettingsCardKey) => string
 }
 
 /** Format throughput with one decimal below 100 tok/s. */
@@ -76,26 +79,43 @@ export const UsageCostLine = memo(function UsageCostLine({ projection }: UsageCo
   )
 })
 
-/** Composer-status lines for the current cost estimate and response throughput. */
-export const TpsLine = memo(function TpsLine({ useProjection }: TpsLineProps) {
+const defaultTranslation = (key: SettingsCardKey): string => zh[key]
+const validMeasurement = (value: number | undefined): value is number =>
+  value !== undefined && Number.isFinite(value) && value >= 0
+
+/** Native stats stay authoritative; desktop-only readings live in one disclosure. */
+export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTranslation }: TpsLineProps) {
   const projection = useProjection('liveTokenUsage')
   const rate = projection?.tokensPerSecond
+  const peak = projection?.peakTokensPerSecond
+  const input = projection === undefined ? 0 : projection.uncachedInputTokens
+    + projection.cacheReadTokens + projection.cacheWriteTokens
+  const output = projection?.outputTokens ?? 0
+  // A zero initial projection is not evidence of a billed conversation.
+  if (projection === undefined || !(input > 0 || output > 0 || validMeasurement(rate) || validMeasurement(peak))) return null
+  const estimated = projection.estimated ? '~' : ''
   return (
-    <>
-      <UsageCostLine projection={projection} />
-      {rate === undefined ? null : <div style={STYLE}>TPS {formatTokensPerSecond(rate)} tok/s</div>}
-    </>
+    <details className={styles.root} data-dsh-live-stats>
+      <summary className={styles.summary}>
+        {validMeasurement(projection.estimatedCost)
+          ? `≈${formatEstimatedCost(projection.estimatedCost, projection.costCurrency)}`
+          : t('stats.live')}
+        {' · '}{t('stats.details')}
+      </summary>
+      <div className={styles.panel}>
+        <dl className={styles.metrics}>
+          <dt>{t('stats.input')}</dt><dd>{estimated}{formatCompactTokens(input)}</dd>
+          <dt>{t('stats.output')}</dt><dd>{estimated}{formatCompactTokens(output)}</dd>
+          {validMeasurement(rate) && <><dt>{t('stats.rolling')}</dt><dd>{formatTokensPerSecond(rate)} tok/s</dd></>}
+          {validMeasurement(peak) && <><dt>{t('stats.peak')}</dt><dd>{formatTokensPerSecond(peak)} tok/s</dd></>}
+        </dl>
+        <p className={styles.note}>{t('stats.explanation')}</p>
+      </div>
+    </details>
   )
 })
 
-/**
- * Composer-dock entry: adapts the session-scoped `conversation.composer.dock`
- * runtime share to the TPS line. The dock is the shipped stats-line seat, and
- * its standard kit supplies `useProjection` (the fifth framework hook seat),
- * which reads the host's `liveTokenUsage` projection. Registering here makes
- * the live TPS row actually mount — previously the TpsLine was only exported
- * and never mounted on rc.6 (issue #56).
- */
-export const TpsLineDockEntry = memo(function TpsLineDockEntry(props: PropsRuntime<'conversation.composer.dock'>) {
-  return <TpsLine useProjection={props.useProjection} />
+/** The official composer dock supplies the session projection and localized copy. */
+export const TpsLineDockEntry = memo(function TpsLineDockEntry(props: PropsRuntime<'conversation.composer.dock'> & PropsLocale<'live-stats'>) {
+  return <TpsLine useProjection={props.useProjection} t={props.t} />
 })

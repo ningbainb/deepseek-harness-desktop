@@ -1,5 +1,5 @@
 import type { ModelCatalogFailure, ModelProviderGroup, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client';
-import type { ModelCatalogModel } from '@deepseek-ai/dsh-client-connection/client';
+import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types';
 /** Settings namespace registered by the Host half. */
 export declare const MODEL_PREFERENCES_SETTINGS_NAMESPACE = "model-preferences";
 /** Structured provider/model identity. Never collapse this into a display label. */

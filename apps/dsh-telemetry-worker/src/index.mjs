@@ -1,3 +1,7 @@
+import { AnalyticsService } from './analytics-service.mjs'
+import * as sql from './analytics-sql.mjs'
+import { validCostEvent } from '../../dsh-desktop/src/cost-mode-events.mjs'
+import { validUpdateEventDiagnostic } from '../../dsh-desktop/src/update-diagnostics.mjs'
 import { handleAdminRequest } from './admin-dashboard.mjs'
 
 const MAX_REQUEST_BYTES = 16_384
@@ -214,99 +218,6 @@ const EVENT_POLICY = Object.freeze({
   }),
 })
 
-const UPSERT_SQL = `
-INSERT INTO metric_daily (
-  day,
-  event,
-  app_version,
-  channel,
-  os_family,
-  language,
-  outcome,
-  detail,
-  bucket,
-  count
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (
-  day,
-  event,
-  app_version,
-  channel,
-  os_family,
-  language,
-  outcome,
-  detail,
-  bucket
-) DO UPDATE SET count = count + excluded.count
-`
-
-const DOWNLOAD_CLICK_UPSERT_SQL = `
-INSERT INTO download_click_daily (
-  day,
-  country_code,
-  release_version,
-  source,
-  count
-) VALUES (?, ?, ?, ?, ?)
-ON CONFLICT (
-  day,
-  country_code,
-  release_version,
-  source
-) DO UPDATE SET count = count + excluded.count
-`
-
-const DAILY_ACTOR_INSERT_SQL = `
-INSERT OR IGNORE INTO product_actor_daily (
-  day,
-  daily_actor,
-  country_code,
-  app_version,
-  event,
-  outcome,
-  detail
-) VALUES (?, ?, ?, ?, ?, ?, ?)
-`
-
-const MONTHLY_ACTOR_INSERT_SQL = `
-INSERT OR IGNORE INTO product_actor_monthly (
-  month,
-  monthly_actor,
-  country_code,
-  app_version,
-  event,
-  outcome,
-  detail
-) VALUES (?, ?, ?, ?, ?, ?, ?)
-`
-
-const INSTALLATION_FIRST_SEEN_INSERT_SQL = `
-INSERT OR IGNORE INTO product_installation_first_seen (
-  installation_actor,
-  first_seen_day,
-  first_version
-) VALUES (?, ?, ?)
-`
-
-const INSTALLATION_DAILY_INSERT_SQL = `
-INSERT OR IGNORE INTO product_installation_daily (
-  day,
-  installation_actor
-) VALUES (?, ?)
-`
-
-const RELEASE_DAILY_INSERT_SQL = `INSERT INTO product_release_daily
-  (day, installation_actor, app_version, event, outcome, detail, count) VALUES (?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT (day, installation_actor, app_version, event, outcome, detail) DO UPDATE SET count = count + excluded.count`
-const RELEASE_RETENTION_SQL = "DELETE FROM product_release_daily WHERE day < date('now', '-89 days')"
-
-const RETENTION_SQL = "DELETE FROM metric_daily WHERE day < date('now', '-400 days')"
-const DOWNLOAD_RETENTION_SQL = "DELETE FROM download_click_daily WHERE day < date('now', '-400 days')"
-const DAILY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_daily WHERE day < date('now', '-35 days')"
-const MONTHLY_ACTOR_RETENTION_SQL = "DELETE FROM product_actor_monthly WHERE month < strftime('%Y-%m', date('now', '-13 months'))"
-const INSTALLATION_FIRST_SEEN_RETENTION_SQL = "DELETE FROM product_installation_first_seen WHERE first_seen_day < date('now', '-400 days')"
-const INSTALLATION_DAILY_RETENTION_SQL = "DELETE FROM product_installation_daily WHERE day < date('now', '-400 days')"
-
 function response(status, body = null, headers = {}) {
   return new Response(body, {
     status,
@@ -330,63 +241,20 @@ function exactSearchParams(params, fields) {
 }
 
 function validEvent(event, schema = 3) {
-  const fields = schema === 2 ? EVENT_FIELDS_V2 : [3, 4].includes(schema) ? EVENT_FIELDS_V3 : undefined
+  if ([5, 6].includes(schema) && event?.name?.startsWith('cost_mode_')) return validCostEvent(event)
+  const hasUpdate = schema === 6 && event?.update !== undefined
+  if (hasUpdate && !validUpdateEventDiagnostic(event)) return false
+  const fields = schema === 2 ? EVENT_FIELDS_V2 : [3, 4, 5, 6].includes(schema) ? [...EVENT_FIELDS_V3, ...(hasUpdate ? ['update'] : [])] : undefined
   if (fields === undefined || !exactFields(event, fields)) return false
   if (typeof event.appVersion !== 'string' || !APP_VERSION_PATTERN.test(event.appVersion)) return false
   if (!ACTOR_PATTERN.test(event.dailyActor) || !ACTOR_PATTERN.test(event.monthlyActor)) return false
-  if ([3, 4].includes(schema) && !ACTOR_PATTERN.test(event.installationActor)) return false
+  if ([3, 4, 5, 6].includes(schema) && !ACTOR_PATTERN.test(event.installationActor)) return false
   if (!CHANNELS.has(event.channel) || !OPERATING_SYSTEMS.has(event.os) || !LANGUAGES.has(event.language)) return false
-  const policy = EVENT_POLICY[event.name]
+  const policy = Object.hasOwn(EVENT_POLICY, event.name) ? EVENT_POLICY[event.name] : undefined
   return policy !== undefined
     && policy.outcomes.has(event.outcome)
     && policy.details.has(event.detail)
     && policy.buckets.has(event.bucket)
-}
-
-function aggregateEvents(events) {
-  const groups = new Map()
-  for (const event of events) {
-    const dimensions = [
-      event.name,
-      event.appVersion,
-      event.channel,
-      event.os,
-      event.language,
-      event.outcome,
-      event.detail,
-      event.bucket,
-    ]
-    const key = JSON.stringify(dimensions)
-    const current = groups.get(key)
-    if (current) current.count += 1
-    else groups.set(key, { dimensions, count: 1 })
-  }
-  return groups.values()
-}
-
-function uniqueInstallationLaunches(events) {
-  const launches = new Map()
-  for (const event of events) {
-    if (event.name !== 'app_launch' || launches.has(event.installationActor)) continue
-    launches.set(event.installationActor, event)
-  }
-  return launches.values()
-}
-
-function uniqueActorEvents(events, country) {
-  const groups = new Map()
-  for (const event of events) {
-    const dimensions = [
-      country,
-      event.appVersion,
-      event.name,
-      event.outcome,
-      event.detail,
-    ]
-    const key = JSON.stringify([event.dailyActor, event.monthlyActor, ...dimensions])
-    if (!groups.has(key)) groups.set(key, Object.freeze({ event, dimensions }))
-  }
-  return groups.values()
 }
 
 async function parseBody(request) {
@@ -438,61 +306,22 @@ async function handleProductEvents(request, env, seams) {
   if (request.method !== 'POST') return response(405, 'method not allowed', { allow: 'POST' })
   if (request.headers.has('origin')) return response(403, 'forbidden')
   if (env?.INGEST_ENABLED !== '1') return response(204)
-  if (!env?.METRICS || typeof env.METRICS.prepare !== 'function' || typeof env.METRICS.batch !== 'function') {
-    return response(503, 'temporarily unavailable')
-  }
 
   const parsed = await parseBody(request)
   if (parsed.status) return response(parsed.status, parsed.status === 413 ? 'request too large' : 'invalid request')
   const body = parsed.value
-  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3, 4].includes(body.schema) || !Array.isArray(body.events)) {
+  if (!exactFields(body, TOP_LEVEL_FIELDS) || ![2, 3, 4, 5, 6].includes(body.schema) || !Array.isArray(body.events)) {
     return response(400, 'invalid request')
   }
   if (body.events.length < 1 || body.events.length > MAX_BATCH_EVENTS || body.events.some(event => !validEvent(event, body.schema))) {
     return response(400, 'invalid request')
   }
 
-  const now = typeof seams.now === 'function' ? seams.now() : new Date()
-  const day = now.toISOString().slice(0, 10)
-  const month = day.slice(0, 7)
-  const country = countryCode(request, seams, 'ZZ')
-  const statements = [...aggregateEvents(body.events)].map(({ dimensions, count }) => (
-    env.METRICS.prepare(UPSERT_SQL).bind(day, ...dimensions, count)
-  ))
-  for (const { event, dimensions } of uniqueActorEvents(body.events, country)) {
-    statements.push(
-      env.METRICS.prepare(DAILY_ACTOR_INSERT_SQL).bind(day, event.dailyActor, ...dimensions),
-      env.METRICS.prepare(MONTHLY_ACTOR_INSERT_SQL).bind(month, event.monthlyActor, ...dimensions),
-    )
-  }
-  if (body.schema === 4) {
-    const observations = new Map()
-    for (const event of body.events) {
-      const values = [day, event.installationActor, event.appVersion, event.name, event.outcome, event.detail]
-      const key = JSON.stringify(values)
-      const current = observations.get(key)
-      if (current) current.count += 1
-      else observations.set(key, { values, count: 1 })
-    }
-    for (const { values, count } of observations.values()) statements.push(env.METRICS.prepare(RELEASE_DAILY_INSERT_SQL).bind(...values, count))
-    statements.push(env.METRICS.prepare("INSERT OR IGNORE INTO product_measurement_coverage (metric, started_day) VALUES ('release-observations', ?)").bind(day))
-  }
-  if ([3, 4].includes(body.schema)) {
-    for (const event of uniqueInstallationLaunches(body.events)) {
-      statements.push(
-        env.METRICS.prepare(INSTALLATION_FIRST_SEEN_INSERT_SQL)
-          .bind(event.installationActor, day, event.appVersion),
-        env.METRICS.prepare(INSTALLATION_DAILY_INSERT_SQL)
-          .bind(day, event.installationActor),
-      )
-    }
-  }
-  try {
-    await env.METRICS.batch(statements)
-    return response(204)
-  } catch {
-    return response(503, 'temporarily unavailable')
-  }
+  const service = new AnalyticsService(env, { ...seams, countryCode: countryCode(request, seams, 'ZZ') })
+  const operation = service.record(body.events, body.schema)
+  if (typeof seams.waitUntil === 'function') seams.waitUntil(operation)
+  else await operation
+  return response(204)
 }
 
 async function handleDownloadClick(request, env, seams) {
@@ -502,9 +331,6 @@ async function handleDownloadClick(request, env, seams) {
     return downloadResponse(405, 'method not allowed', origin, { allow: 'POST' })
   }
   if (env?.INGEST_ENABLED !== '1') return downloadResponse(204, null, origin)
-  if (!env?.METRICS || typeof env.METRICS.prepare !== 'function') {
-    return downloadResponse(503, 'temporarily unavailable', origin)
-  }
   const parsed = await parseDownloadClick(request)
   if (parsed.status) {
     return downloadResponse(
@@ -513,16 +339,8 @@ async function handleDownloadClick(request, env, seams) {
       origin,
     )
   }
-  const now = typeof seams.now === 'function' ? seams.now() : new Date()
-  const { source, version } = parsed.value
-  try {
-    await env.METRICS.prepare(DOWNLOAD_CLICK_UPSERT_SQL)
-      .bind(now.toISOString().slice(0, 10), countryCode(request, seams), version, source, 1)
-      .run()
-    return downloadResponse(204, null, origin)
-  } catch {
-    return downloadResponse(503, 'temporarily unavailable', origin)
-  }
+  await new AnalyticsService(env, seams).download(parsed.value, countryCode(request, seams))
+  return downloadResponse(204, null, origin)
 }
 
 async function handleFetch(request, env, seams = {}) {
@@ -538,15 +356,8 @@ async function handleFetch(request, env, seams = {}) {
   return response(404, 'not found')
 }
 
-async function handleScheduled(_controller, env) {
-  if (!env?.METRICS || typeof env.METRICS.prepare !== 'function') return
-  await env.METRICS.prepare(RETENTION_SQL).run()
-  await env.METRICS.prepare(DOWNLOAD_RETENTION_SQL).run()
-  await env.METRICS.prepare(DAILY_ACTOR_RETENTION_SQL).run()
-  await env.METRICS.prepare(MONTHLY_ACTOR_RETENTION_SQL).run()
-  await env.METRICS.prepare(INSTALLATION_FIRST_SEEN_RETENTION_SQL).run()
-  await env.METRICS.prepare(INSTALLATION_DAILY_RETENTION_SQL).run()
-  await env.METRICS.prepare(RELEASE_RETENTION_SQL).run()
+async function handleScheduled(controller, env) {
+  await new AnalyticsService(env).scheduled(controller)
 }
 
 export const __test = Object.freeze({
@@ -555,25 +366,25 @@ export const __test = Object.freeze({
   EVENT_FIELDS_V3,
   EVENT_POLICY,
   DOWNLOAD_CLICK_FIELDS,
-  DOWNLOAD_CLICK_UPSERT_SQL,
-  DOWNLOAD_RETENTION_SQL,
-  DAILY_ACTOR_INSERT_SQL,
-  MONTHLY_ACTOR_INSERT_SQL,
-  INSTALLATION_FIRST_SEEN_INSERT_SQL,
-  INSTALLATION_DAILY_INSERT_SQL,
-  DAILY_ACTOR_RETENTION_SQL,
-  MONTHLY_ACTOR_RETENTION_SQL,
-  INSTALLATION_FIRST_SEEN_RETENTION_SQL,
-  INSTALLATION_DAILY_RETENTION_SQL,
+  DOWNLOAD_CLICK_UPSERT_SQL: sql.DOWNLOAD_CLICK_UPSERT_SQL,
+  DOWNLOAD_RETENTION_SQL: sql.DOWNLOAD_RETENTION_SQL,
+  DAILY_ACTOR_INSERT_SQL: sql.DAILY_ACTOR_INSERT_SQL,
+  MONTHLY_ACTOR_INSERT_SQL: sql.MONTHLY_ACTOR_INSERT_SQL,
+  INSTALLATION_FIRST_SEEN_INSERT_SQL: sql.INSTALLATION_FIRST_SEEN_INSERT_SQL,
+  INSTALLATION_DAILY_INSERT_SQL: sql.INSTALLATION_DAILY_INSERT_SQL,
+  DAILY_ACTOR_RETENTION_SQL: sql.DAILY_ACTOR_RETENTION_SQL,
+  MONTHLY_ACTOR_RETENTION_SQL: sql.MONTHLY_ACTOR_RETENTION_SQL,
+  INSTALLATION_FIRST_SEEN_RETENTION_SQL: sql.INSTALLATION_FIRST_SEEN_RETENTION_SQL,
+  INSTALLATION_DAILY_RETENTION_SQL: sql.INSTALLATION_DAILY_RETENTION_SQL,
   DOWNLOAD_SOURCES,
   MAX_BATCH_EVENTS,
   MAX_DOWNLOAD_CLICK_BYTES,
   MAX_REQUEST_BYTES,
   OFFICIAL_WEBSITE_ORIGINS,
-  RETENTION_SQL,
-  UPSERT_SQL,
-  RELEASE_DAILY_INSERT_SQL,
-  RELEASE_RETENTION_SQL,
+  RETENTION_SQL: sql.RETENTION_SQL,
+  UPSERT_SQL: sql.UPSERT_SQL,
+  RELEASE_DAILY_INSERT_SQL: sql.RELEASE_DAILY_INSERT_SQL,
+  RELEASE_RETENTION_SQL: sql.RELEASE_RETENTION_SQL,
   validEvent,
 })
 

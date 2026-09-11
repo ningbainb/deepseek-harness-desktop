@@ -8,6 +8,7 @@ The one-click aggregate package for the whole dsh web UI family: installing it b
 
 - **One install, everything on**: its dependencies pull in all sub-plugin packages (dsh-client-ui-aionui-panel / dsh-client-ui-task-board / dsh-client-ui-git-graph / dsh-pet / dsh-remote-web-ui / dsh-live-stats / dsh-chat-artifacts / dsh-ssh / dsh-client-ui-web-ui-settings / dsh-skins).
 - **Aggregation carrier**: `cordis.patch.yml` aggregates the `insert` lines of each sub-plugin, mounted through the dsh plugin profile mechanism.
+- **Native-first navigation**: use the visible DSH turn rail when available; retain a compact fallback for older conversations and narrow layouts where the native rail is hidden. Window resizing switches between them without showing duplicate turn rails. Empty conversations do not show inactive navigation; imported scrollable output retains the bottom action even without user turns. A visible, enabled native bottom action takes precedence over the compatibility button; at the bottom, the inactive compatibility button is hidden. Navigation recovers after container replacement or remounting.
 
 ## Install
 

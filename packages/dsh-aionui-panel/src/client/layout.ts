@@ -101,8 +101,21 @@ export class PanelLayoutController {
   private shellTracks: string[] = []
   private instantTimer: ReturnType<typeof setTimeout> | undefined
   private disposers: Array<() => void> = []
+  private nativeOwner = false
+  private nativeWasOpen = false
+  private nativeAvailable = false
 
-  constructor(private readonly layout: LayoutStore) {}
+  constructor(private readonly layout: LayoutStore, private readonly activateExplorer?: () => void) {}
+
+  /** Prefer native chrome from startup without navigating its session-owned tabs. */
+  setNativeAvailable(available: boolean): void {
+    if (this.nativeAvailable === available) return
+    this.nativeAvailable = available
+    this.instant(() => {
+      this.nativeOwner = available
+      this.applyGrid()
+    })
+  }
 
   /** Start watching for the frame and attach once it appears. */
   mount(): void {
@@ -173,6 +186,7 @@ export class PanelLayoutController {
       if (tracks.length >= 2 && tracks.length <= 3) {
         // The shell's own write (3 tracks) — remember it and re-append ours.
         this.shellTracks = tracks
+        measure()
         this.applyGrid()
         return
       }
@@ -195,7 +209,11 @@ export class PanelLayoutController {
       if (Math.abs(state.availableWidth - available) > 0.5) {
         this.layout.update((prev) => ({ ...prev, availableWidth: available }))
       }
-      this.layout.shrinkToFit(this.layout.getSnapshot())
+      // A native dock temporarily borrows space; it must not permanently
+      // shrink the hidden editor/tree preferences when the window resizes.
+      if (!this.nativeOwner && !(trackPx(this.shellTracks[2] ?? '') > 0 && this.activateExplorer)) {
+        this.layout.shrinkToFit(this.layout.getSnapshot())
+      }
     }
     this.sizeObserver = new ResizeObserver(() => {
       measure()
@@ -290,6 +308,14 @@ export class PanelLayoutController {
   /** Toggle explorer collapse (width 0, kept mounted; no transition). */
   toggleExplorer(): void {
     const state = this.layout.getSnapshot()
+    // The native dock is absolutely positioned at the right edge. Appending
+    // an explorer while it is open both covers the tree and squeezes chat.
+    // Restore the tree on demand without rewriting its persisted preference.
+    if ((this.nativeOwner || trackPx(this.shellTracks[2] ?? '') > 0) && this.activateExplorer) {
+      this.activateCompatibility()
+      this.activateExplorer()
+      if (!state.explorerCollapsed) return
+    }
     const next = !state.explorerCollapsed
     this.instant(() => {
       this.layout.update((prev) => ({ ...prev, explorerCollapsed: next }))
@@ -298,6 +324,14 @@ export class PanelLayoutController {
       } catch {
         // best-effort
       }
+      this.applyGrid()
+    })
+  }
+
+  /** Collapsing native chrome does not ask to reopen compatibility columns. */
+  activateCompatibility(): void {
+    this.instant(() => {
+      this.nativeOwner = false
       this.applyGrid()
     })
   }
@@ -324,6 +358,9 @@ export class PanelLayoutController {
       frame.removeAttribute('data-aionui-instant')
     }, 0)
     fn()
+    // Commit this user-triggered geometry change while transitions are off.
+    // A timer alone can clear the marker before the browser computes styles.
+    void frame.offsetWidth
   }
 
   /** Re-write the frame grid and reposition handles + floating button. */
@@ -336,8 +373,12 @@ export class PanelLayoutController {
     // the shell's own 3-track grid.
     if (this.shellTracks.length !== 3) return
     const state = this.layout.getSnapshot()
-    const explorer = this.layout.explorerWidthPx(state)
-    const preview = this.layout.previewWidthPx(state)
+    const nativeDockOpen = trackPx(this.shellTracks[2]) > 0 && !!this.activateExplorer
+    if (nativeDockOpen && !this.nativeWasOpen) this.nativeOwner = true
+    this.nativeWasOpen = nativeDockOpen
+    const yieldToNative = nativeDockOpen || this.nativeOwner
+    const explorer = yieldToNative ? 0 : this.layout.explorerWidthPx(state)
+    const preview = yieldToNative ? 0 : this.layout.previewWidthPx(state)
 
     // Five tracks: shell sidebar, center, shell details, preview, explorer.
     frame.style.gridTemplateColumns =
@@ -368,7 +409,7 @@ export class PanelLayoutController {
 
     // Floating expand button: visible only when the explorer is collapsed.
     if (this.floatingButton !== null) {
-      const show = state.root !== '' && state.explorerCollapsed
+      const show = state.root !== '' && (state.explorerCollapsed || yieldToNative)
       this.floatingButton.style.display = show ? 'flex' : 'none'
     }
   }
@@ -389,6 +430,7 @@ export class PanelLayoutController {
     this.previewHandle?.remove()
     this.floatingButton?.remove()
     if (this.instantTimer !== undefined) clearTimeout(this.instantTimer)
+    this.frame?.removeAttribute('data-aionui-instant')
     if (this.frame && this.shellTracks.length === 3 && parseGridTracks(this.frame.style.gridTemplateColumns).length === 5) {
       this.frame.style.gridTemplateColumns = this.shellTracks.join(' ')
     }

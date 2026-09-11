@@ -1,5 +1,5 @@
 export type ValueModeProductTelemetryEvent =
-  | { kind: 'entry'; configured: boolean }
+  | { kind: 'entry'; configured: boolean; source?: 'hero' | 'header' | 'settings' }
   | { kind: 'onboarding'; outcome: 'shown' | 'completed' | 'dismissed' | 'failed'; surface: 'hero' | 'header' | 'settings' }
   | { kind: 'state'; state: 'enabled' | 'disabled' | 'failed'; source: 'onboarding' | 'manual' | 'auto' | 'settings' }
   | { kind: 'strategy'; strategy: 'saver' | 'balanced' | 'powerful' }

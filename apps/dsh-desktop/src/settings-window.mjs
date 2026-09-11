@@ -302,17 +302,55 @@ export function createSettingsWindowScript() {
   })()`
 }
 
-export async function applySettingsWindow({ webContents }) {
-  if (!webContents || webContents.isDestroyed?.()) return false
+export async function applySettingsWindow({ webContents, isCurrent = () => true }) {
+  if (!webContents || webContents.isDestroyed?.() || !isCurrent()) return false
   await webContents.insertCSS(SETTINGS_WINDOW_CSS, { cssOrigin: 'author' })
+  if (webContents.isDestroyed?.() || !isCurrent()) return false
+  // WebContents.executeJavaScript waits for the whole page to finish loading.
+  // The already-ready main frame can install the controller while resources wait.
+  const frame = webContents.mainFrame
+  if (typeof frame?.executeJavaScript === 'function') {
+    if (frame.isDestroyed?.()) return false
+    return frame.executeJavaScript(createSettingsWindowScript(), true)
+  }
   return webContents.executeJavaScript(createSettingsWindowScript(), true)
 }
 
 export function installSettingsWindow({ browserWindow, onError = () => {} }) {
   const { webContents } = browserWindow
-  const apply = () => {
-    void applySettingsWindow({ webContents }).catch(onError)
+  let disposed = false
+  const createState = () => ({ applied: false, pending: undefined, retry: false })
+  let state = createState()
+  const navigation = (details, _url, legacyInPlace, legacyMainFrame) => {
+    const mainFrame = details?.isMainFrame ?? legacyMainFrame
+    const inPlace = details?.isSameDocument ?? legacyInPlace
+    if (mainFrame && !inPlace) state = createState()
   }
+  const apply = () => {
+    if (disposed || state.applied) return
+    if (state.pending) { state.retry = true; return }
+    const current = state
+    const operation = applySettingsWindow({ webContents, isCurrent: () => !disposed && state === current })
+    current.pending = operation
+    void operation.then((applied) => { current.applied = Boolean(applied) })
+      .catch((error) => { if (!disposed && state === current) onError(error) })
+      .finally(() => {
+        current.pending = undefined
+        if (state !== current || disposed) return
+        const retry = current.retry
+        current.retry = false
+        if (retry && !current.applied) apply()
+      })
+  }
+  // Settings can already be used while images or other resources are pending.
+  // Keep the load event as a fallback, not a second controller installation.
+  webContents.on('did-start-navigation', navigation)
+  webContents.on('dom-ready', apply)
   webContents.on('did-finish-load', apply)
-  return () => webContents.removeListener('did-finish-load', apply)
+  return () => {
+    disposed = true
+    webContents.removeListener('did-start-navigation', navigation)
+    webContents.removeListener('dom-ready', apply)
+    webContents.removeListener('did-finish-load', apply)
+  }
 }

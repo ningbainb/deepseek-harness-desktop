@@ -19,6 +19,7 @@ if (typeof Terminal !== 'function' || typeof FitAddon !== 'function') {
 
 const terminal = new Terminal({
   allowProposedApi: false,
+  disableStdin: true,
   convertEol: false,
   cursorBlink: true,
   cursorStyle: 'bar',
@@ -47,6 +48,7 @@ terminal.loadAddon(fitAddon)
 terminal.open(terminalHost)
 
 let disposed = false
+let operation = 0
 let resizeFrame
 const subscriptions = []
 
@@ -69,13 +71,14 @@ function scheduleResize() {
 }
 
 function setState(state, text) {
+  if (disposed) return
   status.dataset.state = state
   status.textContent = text
 }
 
 subscriptions.push(terminal.onData((data) => window.dshTerminal.write(data)))
 subscriptions.push({ dispose: window.dshTerminal.onOutput((data) => {
-  if (typeof data === 'string') terminal.write(data)
+  if (!disposed && typeof data === 'string') terminal.write(data)
 }) })
 subscriptions.push({ dispose: window.dshTerminal.onExit((event) => {
   setState('exited', `会话已结束 (${Number.isInteger(event?.exitCode) ? event.exitCode : 0})`)
@@ -90,18 +93,21 @@ resizeObserver.observe(terminalHost)
 window.addEventListener('resize', scheduleResize)
 
 restartButton.addEventListener('click', async () => {
+  const current = ++operation
   restartButton.disabled = true
   try {
-    terminal.options.disableStdin = false
+    terminal.options.disableStdin = true
     terminal.write('\r\n\x1b[90m[Desktop 正在重启终端会话]\x1b[0m\r\n')
     const info = await window.dshTerminal.restart(size())
+    if (disposed || current !== operation) return
+    terminal.options.disableStdin = false
     context.textContent = `${info.label} · ${info.cwd}`
     setState('ready', '运行中')
     terminal.focus()
   } catch {
-    setState('error', '终端启动失败')
+    if (current === operation) setState('error', '终端启动失败')
   } finally {
-    restartButton.disabled = false
+    if (!disposed && current === operation) restartButton.disabled = false
   }
 })
 
@@ -113,6 +119,7 @@ clearButton.addEventListener('click', () => {
 closeButton.addEventListener('click', () => {
   closeButton.disabled = true
   void window.dshTerminal.close().catch(() => {
+    if (disposed) return
     closeButton.disabled = false
     setState('error', '无法收起终端')
   })
@@ -120,6 +127,7 @@ closeButton.addEventListener('click', () => {
 
 window.addEventListener('beforeunload', () => {
   disposed = true
+  operation += 1
   if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame)
   resizeObserver.disconnect()
   window.removeEventListener('resize', scheduleResize)
@@ -127,13 +135,19 @@ window.addEventListener('beforeunload', () => {
   terminal.dispose()
 })
 
+const initialOperation = ++operation
 try {
   fitAddon.fit()
   const info = await window.dshTerminal.start(size())
-  context.textContent = `${info.label} · ${info.cwd}`
-  setState('ready', '运行中')
-  terminal.focus()
+  if (!disposed && initialOperation === operation) {
+    terminal.options.disableStdin = false
+    context.textContent = `${info.label} · ${info.cwd}`
+    setState('ready', '运行中')
+    terminal.focus()
+  }
 } catch {
-  setState('error', '终端启动失败')
-  context.textContent = '请收起后重新打开；Desktop 和 DSH Runtime 不会因此退出。'
+  if (!disposed && initialOperation === operation) {
+    setState('error', '终端启动失败')
+    context.textContent = '请收起后重新打开；Desktop 和 DSH Runtime 不会因此退出。'
+  }
 }

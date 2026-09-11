@@ -14,7 +14,15 @@ database_id = "ae704c84-608e-4b60-a16c-703ebf2c1961"
 migrations_dir = "migrations"
 
 [triggers]
-crons = ["17 3 * * *"]
+crons = ["7 * * * *", "17 3 * * *"]
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "dsh_desktop_events"
+
+[vars]
+ANALYTICS_ACCOUNT_ID = "2bb454806328793bb1891295126e8880"
+# Set ANALYTICS_READ_TOKEN as a Worker secret (Account Analytics: Read).
 
 # Ingestion fails closed until the deployed environment defines
 # INGEST_ENABLED=1 through its Cloudflare Worker configuration.

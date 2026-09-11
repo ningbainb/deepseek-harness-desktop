@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "3.3.0",
-  "upstreamVersion": "0.1.1-rc.1",
-  "lockfileSha256": "7d3e335c387ceb62e2fb326d7edb21fd48683d7c484e5c1881d61b052db8ee9c",
+  "desktopVersion": "3.4.0",
+  "upstreamVersion": "0.1.5-rc.1",
+  "lockfileSha256": "c759b8a40cb0f9a2a4c006f7f30af49932ada7eb7b9c56b65fa004cf87663e32",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -43,6 +43,42 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session",
       "line": 10,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-app-boot",
+      "line": 1,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-cmdline",
+      "line": 17,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-http-proxy",
+      "line": 18,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-launch-environment",
+      "line": 19,
       "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
@@ -113,8 +149,17 @@
     {
       "path": "apps/dsh-desktop/test/manual-compaction.test.mjs",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-token-meter",
+      "specifier": "@deepseek-ai/dsh-session-projection",
       "line": 20,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "apps/dsh-desktop/test/manual-compaction.test.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-token-meter",
+      "line": 21,
       "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
@@ -123,7 +168,7 @@
       "path": "packages/dsh-aionui-panel/src/client/drag/DragFileInlay.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 17,
+      "line": 15,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -132,6 +177,33 @@
       "path": "packages/dsh-aionui-panel/src/client/drag/DragFileInlay.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
+      "line": 17,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session/types",
+      "line": 16,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 18,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
       "line": 19,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -140,26 +212,8 @@
     {
       "path": "packages/dsh-aionui-panel/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 16,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-aionui-panel/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 17,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-aionui-panel/src/client/index.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 18,
+      "line": 20,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -168,7 +222,61 @@
       "path": "packages/dsh-aionui-panel/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 20,
+      "line": 22,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-sidebar-right/client",
+      "line": 23,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/native-browser.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 2,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/native-browser.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-sidebar-right/client",
+      "line": 4,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/native-panels.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 2,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/native-panels.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-sidebar-right/client",
+      "line": 4,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-aionui-panel/src/client/native-preview.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-sidebar-right/client",
+      "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -284,7 +392,7 @@
     {
       "path": "packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 8,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -302,17 +410,8 @@
     {
       "path": "packages/dsh-chat-artifacts/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 10,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-chat-artifacts/src/client/index.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 11,
+      "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -333,6 +432,15 @@
       "line": 13,
       "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-chat-artifacts/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 14,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -572,8 +680,17 @@
     {
       "path": "packages/dsh-desktop-compat/src/session-recovery.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-session-persistence",
+      "specifier": "@deepseek-ai/dsh-session-format-catalog",
       "line": 1,
+      "typeOnly": true,
+      "classification": "compatibility-patch",
+      "controlled": true
+    },
+    {
+      "path": "packages/dsh-desktop-compat/src/session-recovery.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session-persistence",
+      "line": 3,
       "typeOnly": true,
       "classification": "compatibility-patch",
       "controlled": true
@@ -590,8 +707,17 @@
     {
       "path": "packages/dsh-desktop-compat/src/tool-call-normalization.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-tools",
+      "specifier": "@deepseek-ai/dsh-llm/brand",
       "line": 3,
+      "typeOnly": true,
+      "classification": "compatibility-patch",
+      "controlled": true
+    },
+    {
+      "path": "packages/dsh-desktop-compat/src/tool-call-normalization.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-tools",
+      "line": 4,
       "typeOnly": false,
       "classification": "compatibility-patch",
       "controlled": true
@@ -635,8 +761,26 @@
     {
       "path": "packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-llm",
+      "specifier": "@deepseek-ai/dsh-session",
       "line": 5,
+      "typeOnly": true,
+      "classification": "compatibility-patch",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-llm",
+      "line": 6,
+      "typeOnly": false,
+      "classification": "compatibility-patch",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-desktop-compat/tests/legacy-subagent-recovery.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session-format-catalog",
+      "line": 1,
       "typeOnly": false,
       "classification": "compatibility-patch",
       "controlled": false
@@ -824,7 +968,7 @@
     {
       "path": "packages/dsh-git-graph/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-connection/client",
       "line": 31,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -834,7 +978,7 @@
       "path": "packages/dsh-git-graph/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 32,
+      "line": 33,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -843,7 +987,7 @@
       "path": "packages/dsh-git-graph/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 36,
+      "line": 37,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -852,9 +996,18 @@
       "path": "packages/dsh-git-graph/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 37,
+      "line": 38,
       "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-git-graph/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 39,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -923,7 +1076,7 @@
     {
       "path": "packages/dsh-git-graph/tests/client.spec.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-connection/client",
       "line": 11,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -934,6 +1087,33 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-system-prompt",
       "line": 17,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-liangshen/tests/tool-bootstrap.test.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-system-prompt",
+      "line": 1,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/balance-service.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-credentials",
+      "line": 11,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/balance-service.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-credentials",
+      "line": 14,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -950,8 +1130,17 @@
     {
       "path": "packages/dsh-live-stats/src/client/LiveStatsSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 8,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/LiveStatsSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -959,7 +1148,7 @@
     {
       "path": "packages/dsh-live-stats/src/client/TpsLine.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -987,7 +1176,25 @@
       "path": "packages/dsh-live-stats/src/client/TpsLine.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 6,
+      "line": 5,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/balance-selection.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/balance-selection.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
+      "line": 2,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -995,7 +1202,7 @@
     {
       "path": "packages/dsh-live-stats/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1005,7 +1212,7 @@
       "path": "packages/dsh-live-stats/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 3,
+      "line": 4,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1014,15 +1221,6 @@
       "path": "packages/dsh-live-stats/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 6,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-live-stats/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 7,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1031,17 +1229,53 @@
     {
       "path": "packages/dsh-live-stats/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-token-meter/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 8,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
     {
-      "path": "packages/dsh-live-stats/src/client/settings-form.ts",
+      "path": "packages/dsh-live-stats/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 9,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-token-meter/client",
+      "line": 10,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
       "line": 11,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
+      "line": 19,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
+      "line": 20,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1049,9 +1283,18 @@
     {
       "path": "packages/dsh-live-stats/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 12,
+      "specifier": "@deepseek-ai/dsh-client-store",
+      "line": 11,
       "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/client/settings-form.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 12,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -1123,14 +1366,14 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-llm",
       "line": 6,
-      "typeOnly": true,
+      "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-live-stats/src/projection.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-session",
+      "specifier": "@deepseek-ai/dsh-llm",
       "line": 7,
       "typeOnly": true,
       "classification": "public-stable",
@@ -1141,6 +1384,15 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session",
       "line": 8,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/projection.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 9,
       "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
@@ -1149,18 +1401,9 @@
       "path": "packages/dsh-live-stats/src/projection.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session-projection",
-      "line": 9,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-live-stats/src/projection.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-token-meter/client",
       "line": 10,
       "typeOnly": true,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
@@ -1174,9 +1417,18 @@
     },
     {
       "path": "packages/dsh-live-stats/src/projection.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-token-meter/client",
+      "line": 12,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/src/projection.ts",
       "kind": "static-export",
       "specifier": "@deepseek-ai/dsh-token-meter/client",
-      "line": 22,
+      "line": 24,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1245,6 +1497,24 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-live-stats/tests/projection.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-settings",
+      "line": 12,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-live-stats/tests/projection.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-settings",
+      "line": 13,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-live-stats/tests/routes.spec.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-host-webserver",
@@ -1256,7 +1526,7 @@
     {
       "path": "packages/dsh-live-stats/tests/tps-line.spec.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
       "line": 3,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1265,7 +1535,7 @@
     {
       "path": "packages/dsh-memory/src/client/MemoryActivityPanel.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1274,7 +1544,7 @@
     {
       "path": "packages/dsh-memory/src/client/MemorySettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1292,7 +1562,7 @@
     {
       "path": "packages/dsh-memory/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1302,7 +1572,7 @@
       "path": "packages/dsh-memory/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 2,
+      "line": 3,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -1311,15 +1581,6 @@
       "path": "packages/dsh-memory/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 3,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-memory/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 4,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1328,7 +1589,7 @@
     {
       "path": "packages/dsh-memory/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 5,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1337,10 +1598,28 @@
     {
       "path": "packages/dsh-memory/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 6,
       "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 7,
+      "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 8,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -1472,17 +1751,8 @@
     {
       "path": "packages/dsh-mode-switcher/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 1,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-mode-switcher/src/client/index.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 2,
+      "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1506,6 +1776,33 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-mode-switcher/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 5,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-mode-switcher/src/client/runtime-adapter.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-remotes/client",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-mode-switcher/src/client/runtime-adapter.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
+      "line": 3,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-model-preferences/src/client/ModelPreferencesCard.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-api-remotes/client",
@@ -1517,7 +1814,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/ModelPreferencesCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 3,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1562,7 +1859,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/ModelSelect.tsx",
       "kind": "dynamic-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 21,
       "typeOnly": false,
       "classification": "public-experimental",
@@ -1571,7 +1868,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 7,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1581,15 +1878,6 @@
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-commands/client",
-      "line": 8,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
       "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1598,7 +1886,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-api-remotes/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
       "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1607,7 +1895,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-locale/client",
+      "specifier": "@deepseek-ai/dsh-api-remotes/client",
       "line": 11,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1616,7 +1904,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-commands/client",
+      "specifier": "@deepseek-ai/dsh-client-locale/client",
       "line": 12,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1625,7 +1913,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-commands/client",
       "line": 13,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1634,7 +1922,7 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 14,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1643,10 +1931,37 @@
     {
       "path": "packages/dsh-model-preferences/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 15,
       "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-model-preferences/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings-models/client",
+      "line": 16,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-model-preferences/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 17,
+      "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-model-preferences/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 18,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -1679,16 +1994,16 @@
     {
       "path": "packages/dsh-model-preferences/src/client/model-projection.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/types",
       "line": 8,
       "typeOnly": true,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-model-preferences/src/client/model-projection.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1706,10 +2021,10 @@
     {
       "path": "packages/dsh-model-preferences/src/core/config.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/types",
       "line": 6,
       "typeOnly": true,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
@@ -1733,8 +2048,17 @@
     {
       "path": "packages/dsh-particle-theme/src/client/ParticleThemeSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 1,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-particle-theme/src/client/ParticleThemeSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 2,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1743,7 +2067,7 @@
       "path": "packages/dsh-particle-theme/src/client/ParticleThemeSettingsCard.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 2,
+      "line": 3,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -1751,7 +2075,7 @@
     {
       "path": "packages/dsh-particle-theme/src/client/controller.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1760,7 +2084,7 @@
     {
       "path": "packages/dsh-particle-theme/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1770,15 +2094,6 @@
       "path": "packages/dsh-particle-theme/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 2,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-particle-theme/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 3,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1787,7 +2102,7 @@
     {
       "path": "packages/dsh-particle-theme/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 4,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1796,17 +2111,26 @@
     {
       "path": "packages/dsh-particle-theme/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 5,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-particle-theme/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 6,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
     },
     {
-      "path": "packages/dsh-particle-theme/src/client/settings-form.ts",
+      "path": "packages/dsh-particle-theme/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 11,
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 7,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -1814,9 +2138,18 @@
     {
       "path": "packages/dsh-particle-theme/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 12,
+      "specifier": "@deepseek-ai/dsh-client-store",
+      "line": 11,
       "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-particle-theme/src/client/settings-form.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 12,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -1832,7 +2165,7 @@
     {
       "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1841,7 +2174,7 @@
     {
       "path": "packages/dsh-particle-theme/tests/settings-card.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1850,7 +2183,7 @@
     {
       "path": "packages/dsh-personal-prompt/src/client/PersonalPromptCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1868,7 +2201,7 @@
     {
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1878,7 +2211,7 @@
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 2,
+      "line": 3,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -1887,15 +2220,6 @@
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 3,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-personal-prompt/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 4,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -1904,10 +2228,28 @@
     {
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 5,
       "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-personal-prompt/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 6,
+      "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-personal-prompt/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 7,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -1965,6 +2307,33 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-personal-prompt/tests/official-assembly.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-system-prompt",
+      "line": 1,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-personal-prompt/tests/official-assembly.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-scope",
+      "line": 4,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-personal-prompt/tests/official-assembly.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 5,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-pet/src/client/PetDockEntry.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
@@ -1985,8 +2354,17 @@
     {
       "path": "packages/dsh-pet/src/client/PetSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 8,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-pet/src/client/PetSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2003,7 +2381,7 @@
     {
       "path": "packages/dsh-pet/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 13,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2013,7 +2391,7 @@
       "path": "packages/dsh-pet/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 15,
+      "line": 16,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2022,7 +2400,7 @@
       "path": "packages/dsh-pet/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 17,
+      "line": 18,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2031,7 +2409,7 @@
       "path": "packages/dsh-pet/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 18,
+      "line": 19,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2039,8 +2417,17 @@
     {
       "path": "packages/dsh-pet/src/client/index.ts",
       "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 20,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-pet/src/client/index.ts",
+      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 19,
+      "line": 21,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2048,36 +2435,36 @@
     {
       "path": "packages/dsh-pet/src/client/pet-store.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 9,
       "typeOnly": false,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-pet/src/client/pet-store.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 10,
       "typeOnly": true,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-pet/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 11,
-      "typeOnly": true,
-      "classification": "public-experimental",
+      "typeOnly": false,
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-pet/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 12,
-      "typeOnly": false,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -2091,11 +2478,20 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-pet/src/event-projection.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-agent",
+      "line": 10,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-pet/src/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-settings",
       "line": 10,
-      "typeOnly": false,
+      "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
     },
@@ -2120,8 +2516,35 @@
     {
       "path": "packages/dsh-pet/src/service.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-session",
+      "specifier": "@deepseek-ai/dsh-agent",
       "line": 11,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-pet/src/service.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 13,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-pet/tests/service-enabled.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-agent",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-pet/tests/service-enabled.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-llm",
+      "line": 7,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2130,7 +2553,7 @@
       "path": "packages/dsh-pet/tests/service-enabled.spec.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session",
-      "line": 1,
+      "line": 8,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2163,6 +2586,24 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-remote-web-ui/src/client/RemoteEntry.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
+      "line": 13,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/RemoteEntry.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
+      "line": 14,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-remote-web-ui/src/client/RemotePanel.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-primitives",
@@ -2192,8 +2633,17 @@
     {
       "path": "packages/dsh-remote-web-ui/src/client/RemoteSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 8,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/RemoteSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2237,8 +2687,26 @@
     {
       "path": "packages/dsh-remote-web-ui/src/client/deep-link.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
       "line": 13,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/deep-link.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
+      "line": 15,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/deep-link.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
+      "line": 16,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2246,7 +2714,7 @@
     {
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 9,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2256,7 +2724,7 @@
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 14,
+      "line": 15,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2265,15 +2733,6 @@
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 17,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-sidebar/client",
       "line": 18,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2282,17 +2741,44 @@
     {
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-sidebar/client",
       "line": 19,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
     {
-      "path": "packages/dsh-remote-web-ui/src/client/settings-form.ts",
+      "path": "packages/dsh-remote-web-ui/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 11,
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 20,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "line": 21,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
+      "line": 22,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
+      "line": 23,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2300,9 +2786,18 @@
     {
       "path": "packages/dsh-remote-web-ui/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 12,
+      "specifier": "@deepseek-ai/dsh-client-store",
+      "line": 11,
       "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/client/settings-form.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 12,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -2318,8 +2813,17 @@
     {
       "path": "packages/dsh-remote-web-ui/src/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-webserver",
+      "specifier": "@deepseek-ai/dsh-api-gateway",
       "line": 16,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-host-webserver",
+      "line": 18,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2343,48 +2847,57 @@
       "controlled": false
     },
     {
-      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
+      "path": "packages/dsh-remote-web-ui/src/mobile-contract.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/types",
+      "line": 3,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/mobile-contract.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/types",
+      "line": 11,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/mobile-gateway.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-gateway",
+      "line": 3,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/mobile-gateway.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-llm",
+      "line": 4,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-remote-web-ui/src/mobile-gateway.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/types",
       "line": 9,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
     },
     {
-      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
+      "path": "packages/dsh-remote-web-ui/src/mobile-gateway.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/rpc",
-      "line": 10,
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/types",
+      "line": 20,
       "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/rpc",
-      "line": 11,
-      "typeOnly": false,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/events",
-      "line": 12,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile-authorization.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/events",
-      "line": 9,
-      "typeOnly": true,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
@@ -2394,141 +2907,6 @@
       "line": 11,
       "typeOnly": true,
       "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/api.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 8,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/api.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/sessions",
-      "line": 9,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/api.ts",
-      "kind": "dynamic-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/sessions",
-      "line": 29,
-      "typeOnly": false,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/mux.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/events",
-      "line": 27,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/mux.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/events.schema",
-      "line": 28,
-      "typeOnly": false,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/mux.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/rpc.schema",
-      "line": 29,
-      "typeOnly": false,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/App.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 8,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/ChatView.test.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/sessions",
-      "line": 3,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/ChatView.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/events",
-      "line": 14,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/ChatView.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/sessions",
-      "line": 16,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/SessionListView.test.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 3,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/SessionListView.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 14,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/SessionListView.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/sessions",
-      "line": 16,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/WorkspaceView.test.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 3,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/src/mobile/views/WorkspaceView.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy/api/workspace",
-      "line": 8,
-      "typeOnly": true,
-      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -2577,28 +2955,10 @@
       "controlled": false
     },
     {
-      "path": "packages/dsh-remote-web-ui/tests/mobile-api.spec.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy",
-      "line": 11,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-remote-web-ui/tests/mobile-isolation.spec.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-host-apiproxy",
-      "line": 1,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
       "path": "packages/dsh-remote-web-ui/tests/mobile-isolation.spec.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-host-webserver",
-      "line": 6,
+      "line": 1,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2624,17 +2984,8 @@
     {
       "path": "packages/dsh-ssh/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 13,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-ssh/src/client/index.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 15,
+      "line": 13,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2646,6 +2997,15 @@
       "line": 17,
       "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-ssh/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 18,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -2741,8 +3101,17 @@
     {
       "path": "packages/dsh-task-board/src/client/TaskBoardSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 9,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-task-board/src/client/TaskBoardSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2750,7 +3119,7 @@
     {
       "path": "packages/dsh-task-board/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
       "line": 11,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2759,8 +3128,26 @@
     {
       "path": "packages/dsh-task-board/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-connection/client",
-      "line": 12,
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
+      "line": 13,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-task-board/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session/types",
+      "line": 14,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-task-board/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 15,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2769,7 +3156,7 @@
       "path": "packages/dsh-task-board/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 13,
+      "line": 16,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2777,8 +3164,17 @@
     {
       "path": "packages/dsh-task-board/src/client/index.ts",
       "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 17,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-task-board/src/client/index.ts",
+      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 16,
+      "line": 20,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2787,7 +3183,7 @@
       "path": "packages/dsh-task-board/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 18,
+      "line": 22,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2795,18 +3191,18 @@
     {
       "path": "packages/dsh-task-board/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 11,
-      "typeOnly": true,
-      "classification": "public-experimental",
+      "typeOnly": false,
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "packages/dsh-task-board/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 12,
-      "typeOnly": false,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -2876,8 +3272,17 @@
     {
       "path": "packages/dsh-tool-describe-image/src/client/DescribeImageSettingsCard.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 12,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-tool-describe-image/src/client/DescribeImageSettingsCard.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 13,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2885,7 +3290,7 @@
     {
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 15,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2895,7 +3300,7 @@
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 16,
+      "line": 17,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -2903,16 +3308,7 @@
     {
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 17,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-tool-describe-image/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
       "line": 18,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -2921,17 +3317,26 @@
     {
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-locale/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 19,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
     {
-      "path": "packages/dsh-tool-describe-image/src/client/settings-form.ts",
+      "path": "packages/dsh-tool-describe-image/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 11,
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 20,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-tool-describe-image/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-locale/client",
+      "line": 21,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -2939,9 +3344,18 @@
     {
       "path": "packages/dsh-tool-describe-image/src/client/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 12,
+      "specifier": "@deepseek-ai/dsh-client-store",
+      "line": 11,
       "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-tool-describe-image/src/client/settings-form.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 12,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
@@ -2968,15 +3382,6 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-launch-environment",
       "line": 14,
-      "typeOnly": false,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-tool-describe-image/src/config-resolve.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-settings",
-      "line": 15,
       "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
@@ -3272,7 +3677,7 @@
     {
       "path": "packages/dsh-value-mode/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 6,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3282,15 +3687,6 @@
       "path": "packages/dsh-value-mode/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 9,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-value-mode/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3299,7 +3695,7 @@
     {
       "path": "packages/dsh-value-mode/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
       "line": 11,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3308,10 +3704,46 @@
     {
       "path": "packages/dsh-value-mode/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 12,
       "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-value-mode/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 13,
+      "typeOnly": true,
       "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-value-mode/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 14,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-value-mode/src/client/model-catalog.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-remotes/client",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-value-mode/src/client/model-catalog.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "line": 3,
+      "typeOnly": true,
+      "classification": "public-experimental",
       "controlled": false
     },
     {
@@ -3396,15 +3828,6 @@
       "controlled": false
     },
     {
-      "path": "packages/dsh-value-mode/tests/client.spec.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 1,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
       "path": "packages/dsh-value-mode/tests/routing.spec.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-llm",
@@ -3479,8 +3902,26 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/ProjectDialog.tsx",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-api-session-controller/client",
       "line": 1,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-web-ui-settings/src/client/ProjectDialog.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-api-workspace-controller/client",
+      "line": 4,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-web-ui-settings/src/client/ProjectDialog.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-workspace/client",
+      "line": 5,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3524,7 +3965,7 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-connection/client",
+      "specifier": "@deepseek-ai/dsh-api-remotes/client",
       "line": 22,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3533,7 +3974,7 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-connection/client",
       "line": 23,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3542,26 +3983,17 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 24,
       "typeOnly": false,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
-      "path": "packages/dsh-web-ui-settings/src/client/desktop-interactions.tsx",
+      "path": "packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 1,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 8,
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 25,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3570,7 +4002,7 @@
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 10,
+      "line": 8,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3580,6 +4012,15 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 13,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
+      "line": 14,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3632,17 +4073,8 @@
     {
       "path": "packages/dsh-web-ui-settings/src/relay-routes.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-settings",
-      "line": 15,
-      "typeOnly": false,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-web-ui-settings/src/relay-routes.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-host-webserver",
-      "line": 16,
+      "line": 15,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -3668,7 +4100,7 @@
     {
       "path": "packages/dsh-web-ui-settings/tests/compat-scope.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3677,10 +4109,10 @@
     {
       "path": "packages/dsh-web-ui-settings/tests/compat-scope.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-store",
       "line": 12,
       "typeOnly": false,
-      "classification": "public-experimental",
+      "classification": "public-stable",
       "controlled": false
     },
     {
@@ -3722,7 +4154,7 @@
     {
       "path": "packages/skins/skin-center/src/client/background.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 16,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3731,7 +4163,7 @@
     {
       "path": "packages/skins/skin-center/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 10,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3741,7 +4173,7 @@
       "path": "packages/skins/skin-center/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-theme/client",
-      "line": 11,
+      "line": 12,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3750,7 +4182,7 @@
       "path": "packages/skins/skin-center/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 13,
+      "line": 14,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3759,7 +4191,7 @@
       "path": "packages/skins/skin-center/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 15,
+      "line": 16,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -3769,7 +4201,7 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-settings",
       "line": 11,
-      "typeOnly": false,
+      "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
     },
@@ -3828,27 +4260,45 @@
       "controlled": false
     },
     {
-      "path": "shared/client/settings/settings-form.ts",
+      "path": "scripts/dsh-import-boundary.test.mjs",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 10,
-      "typeOnly": true,
-      "classification": "public-experimental",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 84,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "scripts/dsh-import-boundary.test.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-settings",
+      "line": 85,
+      "typeOnly": false,
+      "classification": "public-stable",
       "controlled": false
     },
     {
       "path": "shared/client/settings/settings-form.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
-      "line": 11,
+      "specifier": "@deepseek-ai/dsh-client-store",
+      "line": 10,
       "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
+      "path": "shared/client/settings/settings-form.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
+      "line": 11,
+      "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
     },
     {
       "path": "shared/tests/settings-form.spec.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-runtime/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -3856,6 +4306,12 @@
     }
   ],
   "seams": [
+    {
+      "category": "host-service",
+      "path": "apps/dsh-desktop/scripts/history-host-probe.mjs",
+      "line": 66,
+      "operation": "string"
+    },
     {
       "category": "host-service",
       "path": "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -3871,7 +4327,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-aionui-panel/src/client/index.ts",
-      "line": 38,
+      "line": 45,
       "operation": "locale"
     },
     {
@@ -3883,7 +4339,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-chat-artifacts/src/client/index.ts",
-      "line": 27,
+      "line": 28,
       "operation": "locale"
     },
     {
@@ -3901,7 +4357,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 81,
+      "line": 83,
       "operation": "locale"
     },
     {
@@ -3925,7 +4381,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-live-stats/src/client/index.ts",
-      "line": 61,
+      "line": 67,
       "operation": "remote"
     },
     {
@@ -3943,7 +4399,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-memory/src/client/index.ts",
-      "line": 32,
+      "line": 33,
       "operation": "locale"
     },
     {
@@ -3955,13 +4411,13 @@
     {
       "category": "host-service",
       "path": "packages/dsh-mode-switcher/src/client/index.ts",
-      "line": 8,
-      "operation": "connection"
+      "line": 10,
+      "operation": "function"
     },
     {
       "category": "host-service",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 71,
+      "line": 64,
       "operation": "sessions"
     },
     {
@@ -3973,13 +4429,13 @@
     {
       "category": "host-service",
       "path": "packages/dsh-particle-theme/src/client/index.ts",
-      "line": 29,
+      "line": 31,
       "operation": "object"
     },
     {
       "category": "host-service",
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
-      "line": 33,
+      "line": 35,
       "operation": "locale"
     },
     {
@@ -3991,14 +4447,14 @@
     {
       "category": "host-service",
       "path": "packages/dsh-pet/src/client/index.ts",
-      "line": 70,
+      "line": 74,
       "operation": "remote"
     },
     {
       "category": "host-service",
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
-      "line": 93,
-      "operation": "remote"
+      "line": 97,
+      "operation": "workspaces"
     },
     {
       "category": "host-service",
@@ -4009,7 +4465,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-ssh/src/client/index.ts",
-      "line": 35,
+      "line": 36,
       "operation": "locale"
     },
     {
@@ -4021,13 +4477,13 @@
     {
       "category": "host-service",
       "path": "packages/dsh-task-board/src/client/index.ts",
-      "line": 80,
+      "line": 84,
       "operation": "remote"
     },
     {
       "category": "host-service",
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
-      "line": 61,
+      "line": 63,
       "operation": "locale"
     },
     {
@@ -4039,8 +4495,8 @@
     {
       "category": "host-service",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 55,
-      "operation": "connection"
+      "line": 58,
+      "operation": "remote.session"
     },
     {
       "category": "host-service",
@@ -4051,13 +4507,13 @@
     {
       "category": "host-service",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 74,
+      "line": 76,
       "operation": "remote"
     },
     {
       "category": "host-service",
       "path": "packages/skins/skin-center/src/client/index.ts",
-      "line": 63,
+      "line": 64,
       "operation": "remote"
     },
     {
@@ -4177,8 +4633,14 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/direct-start-matrix-runner.mjs",
-      "line": 219,
+      "line": 220,
       "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/history-host-probe.mjs",
+      "line": 70,
+      "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
@@ -4237,7 +4699,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-smoke-runner.mjs",
-      "line": 61,
+      "line": 62,
       "operation": "DSH_HOME"
     },
     {
@@ -4255,19 +4717,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-scroll.mjs",
-      "line": 65,
+      "line": 104,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-scroll.mjs",
-      "line": 317,
+      "line": 456,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-scroll.mjs",
-      "line": 320,
+      "line": 459,
       "operation": "profileDir"
     },
     {
@@ -4279,13 +4741,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-directory-picker.mjs",
-      "line": 54,
+      "line": 55,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs",
-      "line": 60,
+      "line": 59,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-dock-model-catalog.mjs",
+      "line": 32,
       "operation": "DSH_HOME"
     },
     {
@@ -4296,14 +4764,68 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 9,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 9,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 9,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 112,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 112,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 113,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-large-legacy-history.mjs",
+      "line": 14,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-large-legacy-history.mjs",
+      "line": 41,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-large-legacy-history.mjs",
+      "line": 221,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-image-drop.mjs",
-      "line": 402,
+      "line": 410,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs",
-      "line": 60,
+      "line": 66,
       "operation": "DSH_HOME"
     },
     {
@@ -4333,7 +4855,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-personalization.mjs",
-      "line": 60,
+      "line": 62,
       "operation": "DSH_HOME"
     },
     {
@@ -4351,7 +4873,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-particle-theme.mjs",
-      "line": 26,
+      "line": 37,
       "operation": "DSH_HOME"
     },
     {
@@ -4465,55 +4987,61 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 5,
+      "line": 7,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 5,
+      "line": 7,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 5,
+      "line": 7,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 12,
+      "line": 17,
       "operation": "resolveRuntimePackages"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 13,
-      "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
       "line": 18,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
+      "line": 42,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 43,
+      "line": 134,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-provider.mjs",
-      "line": 43,
+      "line": 134,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-selected-balance.mjs",
+      "line": 42,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-settings-window.mjs",
-      "line": 57,
+      "line": 58,
       "operation": "DSH_HOME"
     },
     {
@@ -4525,7 +5053,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-star-prompt.mjs",
-      "line": 27,
+      "line": 29,
       "operation": "DSH_HOME"
     },
     {
@@ -4537,19 +5065,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-update-shutdown.mjs",
-      "line": 71,
+      "line": 76,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-update-shutdown.mjs",
-      "line": 134,
+      "line": 139,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-window-chrome.mjs",
-      "line": 43,
+      "line": 54,
       "operation": "DSH_HOME"
     },
     {
@@ -4567,13 +5095,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 170,
+      "line": 168,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 174,
+      "line": 172,
       "operation": "profileDir"
     },
     {
@@ -4627,127 +5155,127 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 91,
+      "line": 94,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 92,
+      "line": 95,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 93,
+      "line": 96,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 172,
+      "line": 175,
       "operation": "runtimeHome"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 173,
+      "line": 176,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 543,
+      "line": 600,
       "operation": "runtimeHome"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1024,
+      "line": 1096,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1038,
+      "line": 1110,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1057,
+      "line": 1129,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1059,
+      "line": 1131,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1062,
+      "line": 1134,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1075,
+      "line": 1147,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1119,
+      "line": 1191,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1228,
+      "line": 1300,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1233,
+      "line": 1305,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1238,
+      "line": 1310,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1388,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1914,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1946,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2010,
+      "line": 1460,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 2016,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2048,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2112,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2118,
       "operation": "profileDir"
     },
     {
@@ -5551,73 +6079,61 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 738,
+      "line": 766,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 765,
+      "line": 793,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 940,
+      "line": 968,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 945,
+      "line": 973,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1007,
+      "line": 1035,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1009,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1034,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1036,
-      "operation": "resolveRuntimePackages"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1059,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1060,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1061,
+      "line": 1037,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
       "line": 1062,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1064,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1087,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1088,
       "operation": "profileDir"
     },
     {
@@ -5635,43 +6151,55 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1110,
+      "line": 1117,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1135,
+      "line": 1118,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1153,
+      "line": 1138,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1165,
+      "line": 1163,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1179,
+      "line": 1181,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1230,
+      "line": 1193,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1207,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1258,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1279,
+      "line": 1307,
       "operation": "resolveDshCliPath"
     },
     {
@@ -5797,14 +6325,38 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-controller.mjs",
-      "line": 581,
+      "line": 635,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-controller.mjs",
-      "line": 582,
+      "line": 636,
       "operation": "DSH_PROFILE"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "line": 112,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "line": 113,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "line": 120,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-launcher.mjs",
+      "line": 122,
+      "operation": "profileDir"
     },
     {
       "category": "profile-home",
@@ -6072,6 +6624,30 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 7,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 7,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 27,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 28,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
       "line": 1380,
       "operation": "profileDir"
@@ -6259,7 +6835,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/packaged-direct-start-matrix.test.mjs",
-      "line": 36,
+      "line": 37,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/packaged-direct-start-matrix.test.mjs",
+      "line": 96,
       "operation": "profileDir"
     },
     {
@@ -7849,458 +8431,452 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 28,
+      "line": 29,
       "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 33,
-      "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
       "line": 34,
-      "operation": "resolveDshCliPath"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 182,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 183,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 196,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 197,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 200,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 202,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 347,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 349,
-      "operation": "profileDir"
+      "line": 35,
+      "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 349,
+      "line": 39,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 193,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 353,
+      "line": 194,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 363,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 423,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 429,
+      "line": 207,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 433,
+      "line": 208,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 436,
+      "line": 211,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 445,
+      "line": 213,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 365,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 367,
       "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 367,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 371,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 381,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 441,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 447,
+      "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
       "line": 451,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 454,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 463,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 469,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 453,
+      "line": 471,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 458,
+      "line": 476,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 462,
+      "line": 480,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 465,
+      "line": 483,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 484,
+      "line": 502,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 485,
+      "line": 503,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 486,
+      "line": 504,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 487,
+      "line": 505,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 488,
+      "line": 506,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 489,
+      "line": 507,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 489,
+      "line": 507,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 493,
+      "line": 511,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 495,
+      "line": 513,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 499,
+      "line": 517,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 516,
+      "line": 534,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 520,
+      "line": 538,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 523,
+      "line": 541,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 529,
+      "line": 547,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 539,
+      "line": 557,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 543,
+      "line": 561,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 551,
+      "line": 569,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 558,
+      "line": 576,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 565,
+      "line": 583,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 575,
+      "line": 593,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 577,
+      "line": 595,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 586,
+      "line": 604,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 598,
+      "line": 616,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 599,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 608,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 614,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 625,
+      "line": 617,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
       "line": 626,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 631,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 639,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 645,
+      "line": 632,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 655,
+      "line": 643,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 656,
+      "line": 644,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 665,
+      "line": 649,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 657,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 677,
+      "line": 663,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 709,
+      "line": 673,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 710,
+      "line": 674,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 714,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 717,
+      "line": 683,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 718,
+      "line": 695,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 720,
+      "line": 727,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 734,
+      "line": 728,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 732,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 735,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 744,
+      "line": 736,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 738,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 752,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 762,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 750,
+      "line": 768,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 750,
+      "line": 768,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 763,
+      "line": 781,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 776,
+      "line": 794,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 792,
+      "line": 810,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 793,
+      "line": 811,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 797,
+      "line": 815,
       "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 799,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 801,
-      "operation": "profileDir"
     },
     {
       "category": "profile-home",
@@ -8317,32 +8893,20 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 828,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 829,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 832,
+      "line": 835,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
       "line": 837,
-      "operation": "resolveDshCliPath"
+      "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 840,
-      "operation": "DSH_HOME"
+      "line": 846,
+      "operation": "profileDir"
     },
     {
       "category": "profile-home",
@@ -8353,61 +8917,79 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 857,
-      "operation": "ensureDesktopProfile"
+      "line": 850,
+      "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 864,
+      "line": 855,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 867,
+      "line": 855,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 858,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 879,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 881,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 882,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 884,
+      "line": 865,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 888,
+      "line": 875,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 882,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 882,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 885,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 897,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 890,
+      "line": 899,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 893,
+      "line": 900,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 902,
       "operation": "ensureDesktopProfile"
     },
     {
@@ -8425,13 +9007,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 919,
-      "operation": "profileDir"
+      "line": 911,
+      "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 922,
+      "line": 924,
       "operation": "profileDir"
     },
     {
@@ -8443,73 +9025,91 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 929,
+      "line": 937,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 931,
+      "line": 940,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 944,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 947,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/profile.test.mjs",
+      "line": 949,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 932,
+      "line": 950,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 933,
+      "line": 951,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 934,
+      "line": 952,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 946,
+      "line": 964,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 954,
+      "line": 972,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 999,
+      "line": 1018,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 1055,
+      "line": 1074,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 1073,
+      "line": 1092,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 1086,
+      "line": 1105,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/profile.test.mjs",
-      "line": 1093,
+      "line": 1112,
       "operation": "DSH_HOME"
     },
     {
@@ -8737,115 +9337,115 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 334,
+      "line": 393,
       "operation": "DSH_PROFILE"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 24,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
       "line": 25,
-      "operation": "resolveDshCliPath"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 90,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 99,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 107,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 112,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 119,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 316,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 317,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 318,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 320,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 322,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 329,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 334,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 340,
+      "line": 26,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 379,
+      "line": 114,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 123,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 131,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 136,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 143,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 381,
+      "line": 372,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 373,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 374,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 376,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 378,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 385,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 390,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 396,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 492,
+      "line": 436,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 438,
+      "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 536,
       "operation": "resolveDshCliPath"
     },
     {
@@ -8877,6 +9477,24 @@
       "path": "apps/dsh-desktop/test/runtime-provider.test.mjs",
       "line": 211,
       "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/sdk-contracts.test.mjs",
+      "line": 8,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/sdk-contracts.test.mjs",
+      "line": 18,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/sdk-contracts.test.mjs",
+      "line": 35,
+      "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
@@ -9312,18 +9930,6 @@
     },
     {
       "category": "profile-home",
-      "path": "packages/dsh-live-stats/src/balance-service.ts",
-      "line": 47,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "packages/dsh-live-stats/src/balance-service.ts",
-      "line": 74,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
       "path": "packages/dsh-live-stats/src/ledger-store.ts",
       "line": 89,
       "operation": "DSH_HOME"
@@ -9415,19 +10021,19 @@
     {
       "category": "profile-home",
       "path": "packages/dsh-pet/src/service.ts",
-      "line": 50,
+      "line": 52,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "packages/dsh-remote-web-ui/src/index.ts",
-      "line": 358,
+      "line": 357,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "packages/dsh-remote-web-ui/src/index.ts",
-      "line": 358,
+      "line": 357,
       "operation": "profileDir"
     },
     {
@@ -10008,38 +10614,44 @@
     },
     {
       "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1000,
-      "operation": "recover"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1390,
-      "operation": "recover"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1871,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1872,
+      "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
+      "line": 117,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2294,
+      "line": 1072,
+      "operation": "recover"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 1462,
+      "operation": "recover"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 1964,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2296,
+      "line": 1966,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2395,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2397,
       "operation": "start"
     },
     {
@@ -10272,237 +10884,261 @@
     },
     {
       "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 328,
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 30,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/install-recovery.test.mjs",
+      "line": 24,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 351,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 373,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 414,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 456,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 462,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 464,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 472,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 489,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 527,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 575,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 608,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 616,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 637,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 647,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 666,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 688,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 714,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 718,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 719,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 731,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 761,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 766,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 767,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 809,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 815,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 816,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 817,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 833,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 863,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 901,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 999,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 1004,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 1130,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
-      "line": 1133,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 346,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
       "line": 387,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 490,
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 410,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 432,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 473,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 515,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 521,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 523,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 531,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 548,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 586,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 634,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 667,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 675,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 696,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 706,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 725,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 747,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 773,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 777,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 778,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 790,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 820,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 825,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 826,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 868,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 874,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 875,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 876,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 892,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 922,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 960,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1058,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1063,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1189,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-controller.test.mjs",
+      "line": 1192,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 499,
+      "line": 402,
       "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 444,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 534,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 543,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-shutdown-control.test.mjs",
+      "line": 93,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/runtime-shutdown-control.test.mjs",
+      "line": 103,
+      "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
@@ -10566,26 +11202,68 @@
     },
     {
       "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/update-diagnostics.test.mjs",
+      "line": 45,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/test/update-diagnostics.test.mjs",
+      "line": 83,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/updater.test.mjs",
-      "line": 80,
+      "line": 81,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "packages/dsh-particle-theme/src/client/index.ts",
-      "line": 70,
+      "line": 72,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
-      "line": 35,
+      "line": 31,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
+      "line": 57,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
+      "line": 74,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
+      "line": 97,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
+      "line": 127,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "packages/dsh-particle-theme/tests/controller.spec.ts",
+      "line": 162,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "packages/dsh-task-board/src/client/index.ts",
-      "line": 186,
+      "line": 199,
       "operation": "start"
     },
     {
@@ -10687,7 +11365,7 @@
     {
       "category": "session",
       "path": "apps/dsh-desktop/test/manual-compaction.test.mjs",
-      "line": 81,
+      "line": 84,
       "operation": "create"
     },
     {
@@ -10711,19 +11389,19 @@
     {
       "category": "session",
       "path": "packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts",
-      "line": 81,
+      "line": 82,
       "operation": "get"
     },
     {
       "category": "session",
       "path": "packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts",
-      "line": 154,
+      "line": 155,
       "operation": "get"
     },
     {
       "category": "session",
       "path": "packages/dsh-live-stats/tests/projection.spec.ts",
-      "line": 32,
+      "line": 47,
       "operation": "create"
     },
     {
@@ -10735,7 +11413,13 @@
     {
       "category": "session",
       "path": "packages/dsh-mode-switcher/src/client/mode-controller.ts",
-      "line": 111,
+      "line": 116,
+      "operation": "create"
+    },
+    {
+      "category": "session",
+      "path": "packages/dsh-mode-switcher/src/client/runtime-adapter.ts",
+      "line": 22,
       "operation": "create"
     },
     {
@@ -10746,26 +11430,38 @@
     },
     {
       "category": "session",
-      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "line": 335,
+      "path": "packages/dsh-remote-web-ui/src/client/deep-link.ts",
+      "line": 131,
       "operation": "create"
     },
     {
       "category": "session",
       "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "line": 369,
+      "line": 340,
+      "operation": "create"
+    },
+    {
+      "category": "session",
+      "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
+      "line": 374,
       "operation": "list"
     },
     {
       "category": "session",
       "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "line": 429,
+      "line": 434,
       "operation": "prompt"
     },
     {
       "category": "session",
       "path": "packages/dsh-remote-web-ui/src/mobile/views/SessionListView.tsx",
       "line": 9,
+      "operation": "create"
+    },
+    {
+      "category": "session",
+      "path": "packages/dsh-task-board/src/client/index.ts",
+      "line": 171,
       "operation": "create"
     },
     {
@@ -10843,169 +11539,181 @@
     {
       "category": "slot",
       "path": "packages/dsh-aionui-panel/src/client/index.ts",
-      "line": 113,
+      "line": 151,
       "operation": "conversation.input.dock"
     },
     {
       "category": "slot",
+      "path": "packages/dsh-aionui-panel/src/client/native-browser.tsx",
+      "line": 48,
+      "operation": "sidebar.right.pane.tab"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-aionui-panel/src/client/native-browser.tsx",
+      "line": 122,
+      "operation": "conversation.input.left"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-aionui-panel/src/client/native-panels.tsx",
+      "line": 71,
+      "operation": "sidebar.right.pane.tab"
+    },
+    {
+      "category": "slot",
       "path": "packages/dsh-chat-artifacts/src/client/index.ts",
-      "line": 32,
+      "line": 33,
       "operation": "tool.call.toolview"
     },
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 202,
+      "line": 204,
       "operation": "conversation.input.selector.context"
     },
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 211,
+      "line": 213,
       "operation": "conversation.input.dock"
     },
     {
       "category": "slot",
       "path": "packages/dsh-live-stats/src/client/index.ts",
-      "line": 79,
+      "line": 83,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-live-stats/src/client/index.ts",
-      "line": 91,
+      "line": 93,
       "operation": "conversation.composer.dock"
     },
     {
       "category": "slot",
       "path": "packages/dsh-memory/src/client/index.ts",
-      "line": 51,
+      "line": 52,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
-      "path": "packages/dsh-memory/src/client/index.ts",
-      "line": 61,
-      "operation": "conversation.session.header.actions"
-    },
-    {
-      "category": "slot",
       "path": "packages/dsh-mode-switcher/src/client/index.ts",
-      "line": 20,
+      "line": 29,
       "operation": "conversation.session.header.actions"
     },
     {
       "category": "slot",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 140,
-      "operation": "settings.models.content"
+      "line": 121,
+      "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 197,
+      "line": 178,
       "operation": "conversation.input.model"
     },
     {
       "category": "slot",
       "path": "packages/dsh-particle-theme/src/client/index.ts",
-      "line": 75,
+      "line": 77,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-personal-prompt/src/client/index.ts",
-      "line": 50,
+      "line": 52,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-pet/src/client/index.ts",
-      "line": 128,
+      "line": 132,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
-      "line": 117,
+      "line": 121,
       "operation": "sidebar.remote"
     },
     {
       "category": "slot",
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
-      "line": 139,
+      "line": 147,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-remote-web-ui/src/client/index.ts",
-      "line": 160,
+      "line": 173,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-task-board/src/client/index.ts",
-      "line": 110,
+      "line": 114,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-tool-describe-image/src/client/index.ts",
-      "line": 92,
+      "line": 94,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 253,
+      "line": 241,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 276,
+      "line": 264,
       "operation": "conversation.session.header.actions"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 97,
+      "line": 100,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 105,
+      "line": 108,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 115,
+      "line": 118,
       "operation": "model-preferences.onboarding"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 122,
+      "line": 125,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 129,
+      "line": 132,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 144,
+      "line": 147,
       "operation": "root"
     },
     {
       "category": "slot",
       "path": "packages/skins/skin-center/src/client/index.ts",
-      "line": 101,
+      "line": 102,
       "operation": "web-ui.plugin.item"
     },
     {
@@ -11047,7 +11755,7 @@
     {
       "category": "workspace",
       "path": "packages/dsh-remote-web-ui/src/mobile-api-secure.ts",
-      "line": 305,
+      "line": 310,
       "operation": "list"
     },
     {
@@ -11059,7 +11767,7 @@
     {
       "category": "workspace",
       "path": "packages/dsh-web-ui-settings/src/client/ProjectDialog.tsx",
-      "line": 60,
+      "line": 63,
       "operation": "create"
     },
     {

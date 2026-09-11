@@ -5,7 +5,15 @@ import {
   createWhaleParticleField,
   deriveWhalePalette,
   parseCssColor,
+  particleContentArea,
 } from '../src/client/whale.ts'
+
+it('fits the whale above native drafts in canvas rather than viewport coordinates', () => {
+  const bounds = { left: 280, top: 32, width: 700, height: 720 }
+  expect(particleContentArea(bounds, 32, 400)).toEqual({ x: 280, y: 0, width: 700, height: 368 })
+  expect(particleContentArea(bounds, 32).height).toBe(720)
+  expect(particleContentArea(bounds, 32, 20).height).toBe(0)
+})
 
 describe('whale palette derivation', () => {
   it('parses hex and rgb() colors', () => {

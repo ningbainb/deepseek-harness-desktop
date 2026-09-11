@@ -9,14 +9,13 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings';
 import { VALUE_MODE_SETTINGS_NAMESPACE, isEffectivelyActive, isCompleteModelRoute, resolveEffectiveConfig, resolveSessionConfig, } from "./core/config.js";
 import { Config } from "./core/schema.js";
 import { buildSystemPromptGuidance, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, } from "./core/policy.js";
 import { createConsultExpertTool } from "./core/expert.js";
 import { valueModeState } from "./core/state.js";
 import { assessValueModeHealth } from "./core/model-selection.js";
-import { emitValueModeRuntimeTelemetry } from "./core/runtime-telemetry.js";
+import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters } from "./core/runtime-telemetry.js";
 import { dshHome } from "./dsh-home.js";
 import { syncPresetTrees } from "./sync.js";
 export const name = 'value-mode';
@@ -71,6 +70,7 @@ export function apply(ctx, initialConfig = {}) {
     let currentConfig = initialConfig;
     let currentSource = () => currentConfig;
     const routedRequestAttempts = new Map();
+    const streams = new Map();
     const requestKey = (payload) => {
         const value = payload;
         if (typeof value?.agent?.id !== 'string'
@@ -80,7 +80,7 @@ export function apply(ctx, initialConfig = {}) {
         return `${value.agent.id}:${value.turn}:${value.step}`;
     };
     const pruneRoutedRequestAttempts = (now) => {
-        for (const [key, timestamp] of routedRequestAttempts) {
+        for (const [key, { timestamp }] of routedRequestAttempts) {
             if (now - timestamp > 10 * 60_000)
                 routedRequestAttempts.delete(key);
         }
@@ -90,13 +90,16 @@ export function apply(ctx, initialConfig = {}) {
                 break;
             routedRequestAttempts.delete(oldest);
         }
+        for (const [stream, key] of streams)
+            if (!routedRequestAttempts.has(key))
+                streams.delete(stream);
     };
     // Register the named agent preset independently of the settings switch so
     // it appears beside the other modes in dsh-mode-switcher immediately after
     // startup. Routing below remains session-scoped to this preset.
     syncBundledPreset(ctx);
     // Install settings section with canonical optional-settings consumer wiring
-    installSettingsSection(ctx, settingsNamespace(VALUE_MODE_SETTINGS_NAMESPACE), Config, initialConfig, {
+    ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
         setSource: (source) => {
             currentSource = source;
             currentConfig = source();
@@ -165,15 +168,14 @@ export function apply(ctx, initialConfig = {}) {
         else
             valueModeState.recordControllerCall(sessionId);
         const key = requestKey(payload);
+        const params = routeParameters(isSubagent ? 'subagent' : 'main', effectiveConfig.strategy ?? 'balanced', route.model);
         if (key !== undefined) {
             const now = Date.now();
             pruneRoutedRequestAttempts(now);
-            routedRequestAttempts.set(key, now);
+            routedRequestAttempts.set(key, { timestamp: now, params });
         }
         emitValueModeRuntimeTelemetry({
-            event: 'call',
-            outcome: 'started',
-            role: isSubagent ? 'subagent' : 'controller',
+            event: 'cost_mode_route', params, timestamp: new Date().toISOString(),
         });
         return {
             ...resolved,
@@ -183,17 +185,35 @@ export function apply(ctx, initialConfig = {}) {
         };
     });
     ctx.on('agent/request-error', async (payload, next) => {
-        const result = await next();
         const key = requestKey(payload);
-        if (key === undefined || !routedRequestAttempts.has(key))
-            return result;
+        const attempt = key === undefined ? undefined : routedRequestAttempts.get(key);
+        if (attempt && key !== undefined) {
+            routedRequestAttempts.delete(key);
+            emitValueModeRuntimeTelemetry({ event: 'cost_mode_route', timestamp: new Date().toISOString(),
+                params: { ...attempt.params, result: 'failure', error_type: routeErrorType(payload.failure) } });
+        }
+        return next();
+    });
+    ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+        const stream = `${agent.id}:${frame.attemptId}`;
+        if (frame.type === 'start') {
+            const key = requestKey({ agent, turn: frame.turn, step: frame.step });
+            if (key && routedRequestAttempts.has(key))
+                streams.set(stream, key);
+            return;
+        }
+        if (frame.type !== 'end')
+            return;
+        const key = streams.get(stream);
+        streams.delete(stream);
+        const attempt = key === undefined ? undefined : routedRequestAttempts.get(key);
+        if (!attempt || key === undefined)
+            return;
+        if (frame.outcome.kind === 'committed' && frame.outcome.eventType === 'assistant/attempt')
+            return;
         routedRequestAttempts.delete(key);
-        const value = payload;
-        emitValueModeRuntimeTelemetry({
-            event: 'call',
-            outcome: 'failed',
-            role: value.agent?.session?.header?.origin === 'subagent' ? 'subagent' : 'controller',
-        });
-        return result;
+        const success = frame.outcome.kind === 'committed' && frame.outcome.eventType === 'assistant/message';
+        emitValueModeRuntimeTelemetry({ event: 'cost_mode_route', timestamp: new Date().toISOString(),
+            params: { ...attempt.params, result: success ? 'success' : 'cancelled', error_type: success ? 'none' : 'cancelled' } });
     });
 }

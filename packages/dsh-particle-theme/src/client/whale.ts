@@ -19,6 +19,20 @@ const EYE_X = 388
 const EYE_Y = 354
 const SPARK_KEY = 6
 
+/** Convert the reading area's viewport bounds into the canvas coordinate space. */
+export function particleContentArea(
+  bounds: { left: number; top: number; width: number; height: number },
+  canvasTop: number,
+  contentBottom?: number,
+): { x: number; y: number; width: number; height: number } {
+  return {
+    x: bounds.left,
+    y: bounds.top - canvasTop,
+    width: bounds.width,
+    height: Math.max(0, Math.min(bounds.top + bounds.height, contentBottom ?? Infinity) - bounds.top),
+  }
+}
+
 interface WhalePoint {
   /** Unit-square coordinates inside the silhouette mask space. */
   x: number
@@ -251,7 +265,7 @@ class WhaleParticleScene implements ParticleThemeScene {
   private ambient: AmbientPoint[] = []
   private mask: WhaleMask | undefined
   private palette: { at: number; dark: boolean; colors: string[] } | undefined
-  private areaCache: { at: number; rect: { x: number; y: number; width: number; height: number } } | undefined
+  private areaCache: { at: number; bottom?: number; rect: { x: number; y: number; width: number; height: number } } | undefined
   private state: ParticleRuntimeState | undefined
   private frame: number | undefined
   private lastFrame = 0
@@ -328,13 +342,15 @@ class WhaleParticleScene implements ParticleThemeScene {
    *  main surface instead of floating across the sidebar / right panel.
    *  getBoundingClientRect forces layout, so the lookup is throttled. */
   private conversationArea(width: number, height: number, now: number): { x: number; y: number; width: number; height: number } {
-    if (this.areaCache && now - this.areaCache.at < 500) return this.areaCache.rect
+    const rawBottom = Number(this.canvas.dataset.dshParticleContentBottom)
+    const bottom = Number.isFinite(rawBottom) ? rawBottom : undefined
+    if (this.areaCache && this.areaCache.bottom === bottom && now - this.areaCache.at < 500) return this.areaCache.rect
     const pane = this.document.querySelector('[data-pane="conversation"], [class*="centerCol"]')
     const bounds = pane?.getBoundingClientRect()
     const rect = bounds && bounds.width > 100 && bounds.height > 100
-      ? { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height }
+      ? particleContentArea(bounds, this.canvas.getBoundingClientRect().top, bottom)
       : { x: 0, y: 0, width, height }
-    this.areaCache = { at: now, rect }
+    this.areaCache = { at: now, bottom, rect }
     return rect
   }
 
@@ -460,6 +476,13 @@ class WhaleParticleScene implements ParticleThemeScene {
     context.shadowBlur = 0
 
     context.restore()
+
+    // Clear after every layer (including ambient motes and the eye glow).
+    // The existing DPR transform maps these CSS coordinates to actual pixels;
+    // overlapping message rectangles remain clear, unlike XOR clip masks.
+    for (const rect of state.contentRects ?? []) {
+      context.clearRect(rect.x, rect.y, rect.width, rect.height)
+    }
 
     if (state.profile.speed > 0) this.schedule()
   }

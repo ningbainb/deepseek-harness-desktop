@@ -19,6 +19,9 @@ test('package gate detects altered ASAR contents before launching the desktop', 
     await writeFile(join(source, 'main.mjs'), 'export const release = "3.3.0"\n')
     await asar.createPackage(source, archive)
     assert.equal(verifyAsarIntegrity(archive), 1)
+    assert.equal(verifyAsarIntegrity(archive, { requiredFiles: ['main.mjs'] }), 1)
+    assert.throws(() => verifyAsarIntegrity(archive, { requiredFiles: [join('src', 'runtime-shutdown-control.mjs')] }),
+      /ASAR required packed file missing/)
 
     const contents = await readFile(archive)
     const { headerSize } = asar.getRawHeader(archive)

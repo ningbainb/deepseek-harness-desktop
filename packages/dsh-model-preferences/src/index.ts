@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import {
   MODEL_PREFERENCES_SETTINGS_NAMESPACE,
@@ -30,8 +30,7 @@ export const Config: z<ModelPreferencesConfig> = z.object({
 /** Install the Host settings namespace; model routing remains official SDK-owned. */
 export function apply(ctx: Context, initialConfig: ModelPreferencesConfig = { ...DEFAULT_CONFIG }): void {
   let currentSource: () => ModelPreferencesConfig = () => initialConfig
-  const namespace = settingsNamespace(MODEL_PREFERENCES_SETTINGS_NAMESPACE)
-  installSettingsSection(ctx, namespace, Config, initialConfig, {
+  ctx.settings.installSection(ctx, MODEL_PREFERENCES_SETTINGS_NAMESPACE, Config, initialConfig, {
     setSource: source => {
       currentSource = () => source()
     },

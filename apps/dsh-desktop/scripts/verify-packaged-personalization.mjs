@@ -5,13 +5,15 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { _electron as electron } from 'playwright'
+import electronPath from 'electron'
 
-import { openDockSetting } from './dock-settings-fixture.mjs'
+import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const appPath = resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
+const sourceMode = process.env.DSH_DESKTOP_E2E_SOURCE === '1'
+const appPath = sourceMode ? electronPath : resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
   ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-personalization-'))
 const userData = join(temporary, 'user-data')
@@ -50,7 +52,7 @@ async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
   const instance = await electron.launch({
     executablePath: appPath,
-    args: ['--force-renderer-accessibility'],
+    args: [...(sourceMode ? [resolve(appDir, 'src/main.mjs')] : []), '--force-renderer-accessibility'],
     cwd: appDir,
     env: {
       ...process.env,
@@ -61,18 +63,31 @@ async function launch() {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
   const errors = []
-  page.on('pageerror', error => errors.push(`pageerror:${error.message}`))
+  const diagnostics = []
+  let phase = 'running'
+  const record = event => {
+    diagnostics.push({ phase, time: Date.now(), ...event })
+    if (diagnostics.length > 64) diagnostics.shift()
+  }
+  page.on('requestfailed', request => record({ type: 'requestfailed', url: request.url(),
+    method: request.method(), resourceType: request.resourceType(), failure: request.failure() }))
+  page.on('pageerror', error => {
+    errors.push(`pageerror:${error.message}`)
+    record({ type: 'pageerror', message: error.message })
+  })
   page.on('console', message => {
     if (message.type() !== 'error') return
     if (/style-src 'self'/u.test(message.text())) return
     errors.push(`console:${message.text()}`)
+    record({ type: 'console', message: message.text(), location: message.location() })
   })
   await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: 120_000 })
   await page.waitForSelector('#dsh-desktop-window-chrome', { timeout: 120_000 })
   await dismissStartup(page)
-  return { instance, page, errors }
+  return { instance, page, errors, diagnostics, beginClose: () => { phase = 'closing-app' } }
 }
 
 async function openSettings(page) {
@@ -92,7 +107,7 @@ async function closeSettings(settings) {
 }
 
 async function savePrompt(prompt) {
-  await prompt.getByRole('button', { name: '新建 Profile', exact: true }).click()
+  await prompt.getByRole('button', { name: '新建偏好', exact: true }).click()
   await prompt.locator('input[placeholder="例如：简洁代码审查"]').fill('Packaged Prompt')
   await prompt.locator('textarea[placeholder="写下你希望模型长期遵循的工作偏好…"]').fill('Prefer concise Chinese explanations.')
   const enabled = prompt.locator('input[type="checkbox"]').first()
@@ -101,6 +116,8 @@ async function savePrompt(prompt) {
   await prompt.getByText('Packaged Prompt', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   await prompt.getByText('已保存', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   const preview = prompt.locator('pre').last()
+  assert.equal(await preview.isVisible(), false, 'technical preview starts collapsed')
+  await prompt.locator('[data-preference-preview] > summary').click()
   await preview.waitFor({ state: 'visible', timeout: 15_000 })
   return {
     profileListed: true,
@@ -141,6 +158,7 @@ try {
   await openDockSetting(app, first.page, 'memory')
   const memoryPass = await saveMemory(firstSettings.memory)
   await closeSettings(firstSettings.settings)
+  first.beginClose()
   await app.close()
   app = undefined
 
@@ -162,9 +180,10 @@ try {
   await secondSettings.memory.getByRole('button', { name: '清空当前结果', exact: true }).click()
   await secondSettings.memory.getByRole('button', { name: '确认删除', exact: true }).click()
   await savedMemorySection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  await savedMemorySection.getByText('还没有记忆。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
+  await savedMemorySection.getByText('这里还没有记忆。点击“新建”添加，或调整筛选条件。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   const clearPass = { countZero: true, empty: true }
   await closeSettings(secondSettings.settings)
+  second.beginClose()
   await app.close()
   app = undefined
 
@@ -178,10 +197,13 @@ try {
   await openDockSetting(app, third.page, 'memory')
   const thirdSavedSection = thirdSettings.memory.locator('section').first()
   await thirdSavedSection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  await thirdSavedSection.getByText('还没有记忆。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
+  await thirdSavedSection.getByText('这里还没有记忆。点击“新建”添加，或调整筛选条件。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   const corruptPass = { startupAvailable: true, memoryDegradedToEmpty: true, cardVisible: true }
   const expectedCorruptErrors = third.errors.filter(error => /Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/u.test(error))
   const unexpectedThirdErrors = third.errors.filter(error => !/Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/u.test(error))
+  console.log('personalization lifecycle diagnostics', JSON.stringify({
+    first: first.diagnostics, second: second.diagnostics, third: third.diagnostics,
+  }))
   assert.deepEqual(unexpectedThirdErrors, [], JSON.stringify(third.errors))
   assert.deepEqual(second.errors, [], JSON.stringify(second.errors))
   assert.deepEqual(first.errors, [], JSON.stringify(first.errors))

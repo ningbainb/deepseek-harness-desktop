@@ -40,3 +40,29 @@ test('Extension Dock exposes scoped network diagnostics without claiming API or 
   assert.match(script, /pnpm-proxy-transport-unverified/u)
   assert.match(script, /runNetworkDiagnostics\(\)/u)
 })
+
+test('Extension Dock keeps migration spacing in CSP-compatible stylesheet rules', async () => {
+  const [html, css] = await Promise.all([
+    readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/extensions.css', import.meta.url), 'utf8'),
+  ])
+  assert.doesNotMatch(html, /style=/u)
+  assert.match(html, /class="panel-head migration-panel-head"/u)
+  assert.match(css, /\.migration-panel-head\s*\{\s*margin-top: 32px;\s*\}/u)
+})
+
+test('Extension Dock keeps read-only startup work outside the mutation-wide busy queue', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8'),
+  ])
+  assert.match(html, /id="dock-settings-state"[^>]*hidden/u)
+  assert.match(html, /id="dock-settings-retry"[^>]*hidden/u)
+  assert.match(script, /let marketRefreshPromise/u)
+  assert.match(script, /let pluginUpdatePromise/u)
+  assert.match(script, /listCommunityMarket\(force\)/u)
+  assert.match(script, /refreshMarket\(\{ force: true \}\)/u)
+  assert.match(script, /await refresh\(\)[\s\S]*void refreshMarket\(\)[\s\S]*void checkPluginUpdates/u)
+  assert.doesNotMatch(script, /await extensionOperations\.run\(refresh\)/u)
+  assert.doesNotMatch(script, /extensionOperations\.run\(\(\) => checkPluginUpdates/u)
+})

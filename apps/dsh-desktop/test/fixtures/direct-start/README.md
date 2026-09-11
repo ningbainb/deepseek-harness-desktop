@@ -16,3 +16,10 @@ Runtime loaded the same Home and read the existing session marker.
 
 No real conversation, project file, credential, API key, machine path, or
 model output is included.
+
+The 3.3.0 descriptor retains the seven default bundle names from
+`createDesktopProfileManifest()` / `BUILTIN_BUNDLES` at the recorded 3.3.0
+source commit. The matrix also checks that none of these enabled bundles is
+silently dropped. It is a reconstructed profile contract, not an installed
+3.3.0 image or a genuine user conversation migration. Real installer overlay,
+rollback and complete historical-conversation recovery require separate tests.

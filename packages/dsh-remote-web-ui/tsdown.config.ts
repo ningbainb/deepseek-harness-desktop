@@ -6,7 +6,7 @@ export const REMOTE_WEB_UI_LIB_EXTERNAL = [
   /^@deepseek-ai\/dsh-host-apiproxy/,
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-client-locale',
-  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-primitives',
   '@deepseek-ai/dsh-client-ui-settings',
   '@deepseek-ai/dsh-client-ui-sidebar',
@@ -15,6 +15,7 @@ export const REMOTE_WEB_UI_LIB_EXTERNAL = [
   '@deepseek-ai/dsh-cmdline',
   'commander',
   '@deepseek-ai/dsh-invariants',
+  '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-settings',
 ]
 

@@ -28,13 +28,15 @@
  * @module dsh-git-graph/client
  */
 
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the conversation
 // slots); the selector-context hole is spelled locally below because the
 // published npm SDK (rc.6) dropped it while the running shell still renders it.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {
   BranchesView, GitError, GraphView, RepoStatus, SwitchResult,
 } from '../core/types.ts'

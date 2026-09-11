@@ -24,6 +24,7 @@ const machineIdPath = [
   'machine-id',
   'getMachineId.js',
 ].join('/')
+const DSH_1_1_5_SDK_VERSION = '0.1.5-rc.1'
 
 test('runtime integrity includes the OpenTelemetry machine identifier reported missing in the field', () => {
   assert.ok(Object.isFrozen(CRITICAL_RUNTIME_FILES))
@@ -32,29 +33,41 @@ test('runtime integrity includes the OpenTelemetry machine identifier reported m
 
 test('desktop directly declares the telemetry package required during bootstrap', async () => {
   const manifest = JSON.parse(await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
-  assert.equal(manifest.dependencies['@deepseek-ai/dsh-session-telemetry-otel'], '0.1.1-rc.1')
+  assert.equal(manifest.dependencies['@deepseek-ai/dsh-session-telemetry-otel'], DSH_1_1_5_SDK_VERSION)
 })
 
 test('desktop directly declares the directory-picker host imported by the browse implementation', async () => {
   const manifest = JSON.parse(await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
-  assert.equal(manifest.dependencies['@deepseek-ai/dsh-host-directory-picker'], '0.1.1-rc.1')
+  assert.equal(manifest.dependencies['@deepseek-ai/dsh-host-directory-picker'], DSH_1_1_5_SDK_VERSION)
 })
 
-test('desktop directly declares RC.1 authorization and sidebar client peers', async () => {
+test('desktop directly declares the split DSH 1.1.5 client runtime peers', async () => {
   const manifest = JSON.parse(await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
   for (const packageName of [
     '@deepseek-ai/dsh-authorization',
+    '@deepseek-ai/dsh-api-gateway',
+    '@deepseek-ai/dsh-api-remotes',
+    '@deepseek-ai/dsh-api-session-controller',
+    '@deepseek-ai/dsh-api-settings-controller',
+    '@deepseek-ai/dsh-api-workspace-controller',
+    '@deepseek-ai/dsh-client-connection',
     '@deepseek-ai/dsh-client-locale',
-    '@deepseek-ai/dsh-client-runtime',
+    '@deepseek-ai/dsh-client-modules',
+    '@deepseek-ai/dsh-client-store',
     '@deepseek-ai/dsh-client-ui-conversation',
+    '@deepseek-ai/dsh-client-ui-renderer',
+    '@deepseek-ai/dsh-client-ui-session',
+    '@deepseek-ai/dsh-client-ui-sidebar',
     '@deepseek-ai/dsh-client-ui-settings',
     '@deepseek-ai/dsh-client-ui-slots',
+    '@deepseek-ai/dsh-client-ui-workspace',
+    '@deepseek-ai/dsh-typert-registry',
   ]) {
-    assert.equal(manifest.dependencies[packageName], '0.1.1-rc.1')
+    assert.equal(manifest.dependencies[packageName], DSH_1_1_5_SDK_VERSION)
   }
 })
 
-test('desktop directly pins every RC.1 boot layer used by the packaged runtime', async () => {
+test('desktop directly pins every DSH 1.1.5 boot layer used by the packaged runtime', async () => {
   const manifest = JSON.parse(await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'))
   for (const packageName of [
     '@deepseek-ai/dsh',
@@ -62,7 +75,7 @@ test('desktop directly pins every RC.1 boot layer used by the packaged runtime',
     '@deepseek-ai/dsh-base',
     '@deepseek-ai/dsh-web-app',
   ]) {
-    assert.equal(manifest.dependencies[packageName], '0.1.1-rc.1')
+    assert.equal(manifest.dependencies[packageName], DSH_1_1_5_SDK_VERSION)
   }
 })
 
@@ -106,4 +119,15 @@ test('package verification consumes the shared critical runtime file contract', 
   assert.match(source, /packaged SSH client eagerly bundles xterm/u)
   assert.match(source, /'@xterm', 'xterm', 'lib', 'xterm\.js'/u)
   assert.match(source, /'node-pty', 'prebuilds', 'win32-x64', 'conpty\.node'/u)
+  assert.match(source, /PACKAGED_PATCH_CONTRACTS/u)
+  assert.match(source, /'@linxin666\/dsh-desktop-launcher'/u)
+  assert.match(source, /'dsh-better-sidebar'/u)
+  assert.match(source, /'@linxin666\/dsh-chat-recovery'/u)
+  assert.match(source, /ctx\.uiConversation/u)
+  assert.match(source, /chat\.legacy/u)
+  assert.match(source, /sessions\.create/u)
+  assert.match(source, /installLayoutCompatibilityAnchors/u)
+  assert.match(source, /\[data-rightbar-col\]/u)
+  assert.match(source, /'@deepseek-ai\/dsh-client-ui-renderer'/u)
+  assert.match(source, /retains retired DSH API marker/u)
 })

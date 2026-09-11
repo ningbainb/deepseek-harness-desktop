@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { MuxFrame } from '@deepseek-ai/dsh-host-apiproxy/api/events'
-import type { SessionModels } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
+import type { HistoryEntry, MobileMuxFrame, SessionModels } from '../../mobile-contract.ts'
 import { loadHistory, prompt, type SessionView } from './App.tsx'
 import { errorText, formatTime, staleHostHint } from './App.tsx'
 import { fetchMobilePreferences, models, selectModel, sendCommand } from '../api.ts'
@@ -37,8 +36,21 @@ export interface ChatViewProps {
 export const MAX_TAIL_BUFFER_EVENTS = 500
 
 /** Extract the raw event from one history entry (the fold consumes events only). */
-function eventOf(entry: { event: WireEvent }): WireEvent {
-  return entry.event
+function eventOf(entry: HistoryEntry): WireEvent {
+  const event = entry.event
+  const sourceEventSeqs = Array.isArray(event.sourceEventSeqs)
+    && event.sourceEventSeqs.every(value => typeof value === 'number')
+    ? event.sourceEventSeqs
+    : undefined
+  return {
+    type: event.type,
+    seq: event.seq,
+    time: event.time,
+    data: event.data,
+    ...(sourceEventSeqs === undefined ? {} : { sourceEventSeqs }),
+    ...(event.surfaceOp === undefined ? {} : { surfaceOp: event.surfaceOp }),
+    ...(event.ignorable === true ? { ignorable: true } : {}),
+  }
 }
 
 /** Defensive runtime guard for projection payloads. */
@@ -244,7 +256,7 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
   // Live frames: fold session events for this session in as they arrive.
   useEffect(() => {
     if (mux === undefined) return
-    return mux.onFrame((frame: MuxFrame) => {
+    return mux.onFrame((frame: MobileMuxFrame) => {
       if (frame.type === 'session/event') {
         if (frame.sessionId !== session.sessionId) return
         const event = frame.event as WireEvent
@@ -320,7 +332,13 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
         pendingRef.current = false
         setLoading(false)
         const older = foldEvents(page.events.map(eventOf))
-        setMessages(previous => [...older, ...previous])
+        setMessages((previous) => {
+          // History pages can overlap at the cursor boundary. Keep the live
+          // or already-rendered copy authoritative so React keys stay unique
+          // and a repeated boundary row never flashes twice.
+          const retainedIds = new Set(previous.map(message => message.id))
+          return [...older.filter(message => !retainedIds.has(message.id)), ...previous]
+        })
         setHasOlder(page.hasMore)
       },
       (reason: unknown) => {

@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('Begin', 'Commit', 'Rollback')]
+  [ValidateSet('Begin', 'Commit', 'Rollback', 'Cleanup')]
   [string] $Mode,
 
   [Parameter(Mandatory = $true)]
@@ -8,7 +8,9 @@ param(
 
   [string] $InstallRegistryKey = '',
 
-  [string] $UninstallRegistryKey = ''
+  [string] $UninstallRegistryKey = '',
+
+  [string] $CleanupTransactionDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -42,7 +44,26 @@ function Get-TransactionId([string] $normalizedInstallDirectory) {
 
 $normalizedInstallDirectory = Get-NormalizedPath $InstallDirectory
 $transactionId = Get-TransactionId $normalizedInstallDirectory
-$transactionRoot = Join-Path ([System.IO.Path]::GetTempPath()) "dsh-desktop-installer-transaction-$transactionId"
+$transactionTemp = Get-NormalizedPath ([System.IO.Path]::GetTempPath())
+$legacyTransactionRoot = Join-Path $transactionTemp "dsh-desktop-installer-transaction-$transactionId"
+# Old asynchronous helpers only know the legacy path. Never reuse it for a new
+# rollback journal, even if an old helper wakes after the next upgrade begins.
+$activeTransactionRoot = Join-Path $transactionTemp "dsh-desktop-installer-active-$transactionId"
+$cleanupPrefix = "dsh-desktop-installer-cleanup-$transactionId-"
+$transactionRoot = $activeTransactionRoot
+if (-not [string]::IsNullOrWhiteSpace($CleanupTransactionDirectory)) {
+  $candidate = Get-NormalizedPath $CleanupTransactionDirectory
+  if ($Mode -cne 'Cleanup' -or
+      -not ([System.IO.Path]::GetDirectoryName($candidate)).Equals($transactionTemp, [StringComparison]::OrdinalIgnoreCase) -or
+      [System.IO.Path]::GetFileName($candidate) -notmatch ('^' + [regex]::Escape($cleanupPrefix) + '[a-f0-9]{32}$')) {
+    throw 'installer cleanup directory is outside its isolated queue'
+  }
+  if ((Test-Path -LiteralPath $candidate) -and
+      ((Get-Item -LiteralPath $candidate -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    throw 'installer cleanup directory cannot be a link'
+  }
+  $transactionRoot = $candidate
+}
 $journalPath = Join-Path $transactionRoot 'transaction.json'
 $registryExecutable = Join-Path $env:SystemRoot 'System32\reg.exe'
 
@@ -154,7 +175,13 @@ function Invoke-RegistryImport([string] $exportPath) {
 
 function Remove-TransactionRootIfEmpty {
   if (Test-Path -LiteralPath $transactionRoot -PathType Container) {
-    Remove-Item -LiteralPath $transactionRoot -Recurse -Force -ErrorAction Stop
+    try {
+      Remove-Item -LiteralPath $transactionRoot -Recurse -Force -ErrorAction Stop
+    } catch {
+      if (Test-Path -LiteralPath $transactionRoot -PathType Container) {
+        throw
+      }
+    }
   }
 }
 
@@ -166,7 +193,9 @@ function Complete-CommittedTransaction([object] $journal) {
       try {
         Remove-Item -LiteralPath $install.Backup -Recurse -Force -ErrorAction Stop
       } catch {
-        $retained.Add($install.Backup)
+        if (Test-Path -LiteralPath $install.Backup -PathType Container) {
+          $retained.Add($install.Backup)
+        }
       }
     }
   }
@@ -178,9 +207,83 @@ function Complete-CommittedTransaction([object] $journal) {
   }
 }
 
+function ConvertTo-PowerShellLiteral([string] $value) {
+  "'$($value.Replace("'", "''"))'"
+}
+
+function Start-DeferredCommittedCleanup([object] $journal, [string] $cleanupDirectory) {
+  if ($journal.state -cne 'committed') {
+    throw 'deferred installer cleanup requires a committed transaction'
+  }
+  try {
+    $cleanupScript = Join-Path $cleanupDirectory 'cleanup-committed.ps1'
+    [System.IO.File]::Copy($PSCommandPath, $cleanupScript, $true)
+    $powershellExecutable = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $command = @(
+      '&',
+      (ConvertTo-PowerShellLiteral $cleanupScript),
+      '-Mode Cleanup',
+      '-InstallDirectory',
+      (ConvertTo-PowerShellLiteral $normalizedInstallDirectory),
+      '-InstallRegistryKey',
+      (ConvertTo-PowerShellLiteral $InstallRegistryKey),
+      '-UninstallRegistryKey',
+      (ConvertTo-PowerShellLiteral $UninstallRegistryKey),
+      '-CleanupTransactionDirectory',
+      (ConvertTo-PowerShellLiteral $cleanupDirectory)
+    ) -join ' '
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+    Start-Process -FilePath $powershellExecutable -ArgumentList @(
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-EncodedCommand',
+      $encodedCommand
+    ) -WindowStyle Hidden | Out-Null
+    Write-Output 'upgrade-transaction-cleanup-deferred'
+  } catch {
+    # The new install is already committed and valid. Retain the journal and
+    # backup in the isolated queue; cleanup cannot block the next upgrade.
+    Write-Output "upgrade-transaction-backup-retained reason=deferred-cleanup-start-failed"
+  }
+}
+
+function Retire-CommittedTransaction([object] $journal) {
+  if ($journal.state -cne 'committed') { throw 'only a committed transaction may enter the cleanup queue' }
+  if (-not (Test-ProductInstall $normalizedInstallDirectory)) {
+    throw 'committed installation is missing; retained backup requires recovery'
+  }
+  foreach ($install in @($journal.installs)) { Assert-InstallBackup $install | Out-Null }
+  $queueDirectory = Join-Path $transactionTemp "$cleanupPrefix$([Guid]::NewGuid().ToString('N'))"
+  # Move only the validated journal directory, not the possibly locked backup.
+  [IO.Directory]::Move($transactionRoot, $queueDirectory)
+  Write-Output 'upgrade-transaction-backup-queued'
+  Start-DeferredCommittedCleanup $journal $queueDirectory
+}
+
+function Resolve-LegacyTransaction {
+  if (-not (Test-Path -LiteralPath (Join-Path $legacyTransactionRoot 'transaction.json') -PathType Leaf)) { return }
+  $savedRoot = $script:transactionRoot
+  $savedJournal = $script:journalPath
+  try {
+    $script:transactionRoot = $legacyTransactionRoot
+    $script:journalPath = Join-Path $legacyTransactionRoot 'transaction.json'
+    $legacy = Read-Journal
+    if ($null -ne $legacy) {
+      if ($legacy.state -ceq 'committed') { Retire-CommittedTransaction $legacy }
+      else { Invoke-Rollback $legacy }
+    }
+  } finally {
+    $script:transactionRoot = $savedRoot
+    $script:journalPath = $savedJournal
+  }
+}
+
 function Invoke-Rollback([object] $journal) {
   if ($journal.state -eq 'committed') {
-    Complete-CommittedTransaction $journal
+    Retire-CommittedTransaction $journal
     return
   }
 
@@ -230,13 +333,11 @@ function Invoke-Rollback([object] $journal) {
 }
 
 function Begin-Transaction {
+  Resolve-LegacyTransaction
   $existingJournal = Read-Journal
   if ($null -ne $existingJournal) {
     if ($existingJournal.state -eq 'committed') {
-      Complete-CommittedTransaction $existingJournal
-      if (Test-Path -LiteralPath $journalPath -PathType Leaf) {
-        throw 'previous committed installer backup still requires cleanup'
-      }
+      Retire-CommittedTransaction $existingJournal
     } else {
       Invoke-Rollback $existingJournal
     }
@@ -337,7 +438,7 @@ function Commit-Transaction {
     return
   }
   if ($journal.state -eq 'committed') {
-    Complete-CommittedTransaction $journal
+    Retire-CommittedTransaction $journal
     return
   }
   if (-not (Test-ProductInstall $normalizedInstallDirectory)) {
@@ -353,9 +454,32 @@ function Commit-Transaction {
   }
   $journal.state = 'committed'
   Write-Journal $journal
-  Complete-CommittedTransaction $journal
+  try { Retire-CommittedTransaction $journal } catch {
+    # The commit is durable. Do not report an installation failure for a
+    # journal move blocked by a scanner; Begin can retry it without data loss.
+    Write-Output 'upgrade-transaction-backup-retained reason=cleanup-queue-unavailable'
+  }
 }
 
+function Invoke-QueuedCleanup {
+  # Manual/next-maintenance cleanup only enumerates this installation's queue.
+  $directories = @(Get-ChildItem -LiteralPath $transactionTemp -Directory -Force |
+    Where-Object { $_.Name -match ('^' + [regex]::Escape($cleanupPrefix) + '[a-f0-9]{32}$') })
+  foreach ($directory in $directories) {
+    & $PSCommandPath -Mode Cleanup -InstallDirectory $normalizedInstallDirectory `
+      -InstallRegistryKey $InstallRegistryKey -UninstallRegistryKey $UninstallRegistryKey `
+      -CleanupTransactionDirectory $directory.FullName
+  }
+}
+
+# Serialize readers/writers of the same journal. Queue workers have a different
+# mutex from active upgrades, so a slow backup deletion cannot hold up Begin.
+$mutexId = Get-TransactionId $transactionRoot
+$mutex = [Threading.Mutex]::new($false, "Local\DSHInstaller-$mutexId")
+$ownsMutex = $false
+try {
+  try { $ownsMutex = $mutex.WaitOne(5000) } catch [Threading.AbandonedMutexException] { $ownsMutex = $true }
+  if (-not $ownsMutex) { throw 'installer transaction is busy; retry after the other installer finishes' }
 switch ($Mode) {
   'Begin' { Begin-Transaction }
   'Commit' { Commit-Transaction }
@@ -367,4 +491,19 @@ switch ($Mode) {
       Invoke-Rollback $journal
     }
   }
+  'Cleanup' {
+    if ([string]::IsNullOrWhiteSpace($CleanupTransactionDirectory)) { Invoke-QueuedCleanup }
+    $journal = Read-Journal
+    if ($null -eq $journal) {
+      Write-Output 'upgrade-transaction-not-required'
+    } elseif ($journal.state -cne 'committed') {
+      throw 'installer cleanup refused an uncommitted transaction'
+    } else {
+      Complete-CommittedTransaction $journal
+    }
+  }
+}
+} finally {
+  if ($ownsMutex) { $mutex.ReleaseMutex() }
+  $mutex.Dispose()
 }

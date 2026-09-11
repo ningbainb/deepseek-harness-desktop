@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -11,6 +11,7 @@ import {
   compareImportBoundary,
   createBoundaryBaseline,
   listRepositoryFiles,
+  scanRepositoryImports,
   scanSourceText,
 } from './dsh-import-boundary.mjs'
 
@@ -70,6 +71,26 @@ test('repository file listing omits tracked files deleted from the working tree'
     await writeFile(resolve(root, 'untracked.mjs'), 'export const untracked = true\n')
 
     assert.deepEqual((await listRepositoryFiles(root)).toSorted(), ['kept.mjs', 'untracked.mjs'])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('repository import scan excludes patch construction scratch trees', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'dsh-import-scratch-'))
+  try {
+    await execFileAsync('git', ['init'], { cwd: root, windowsHide: true })
+    await mkdir(resolve(root, '.patch-work'), { recursive: true })
+    await writeFile(resolve(root, 'kept.mjs'), "import '@deepseek-ai/dsh-session'\n")
+    await writeFile(resolve(root, '.patch-work', 'scratch.mjs'), "import '@deepseek-ai/dsh-settings'\n")
+
+    assert.deepEqual(await scanRepositoryImports(root), [{
+      path: 'kept.mjs',
+      kind: 'static-import',
+      specifier: '@deepseek-ai/dsh-session',
+      line: 1,
+      typeOnly: false,
+    }])
   } finally {
     await rm(root, { recursive: true, force: true })
   }

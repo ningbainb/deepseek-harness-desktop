@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 
@@ -53,7 +53,7 @@ async function boot(ctx: Context, baseURL: string): Promise<void> {
 function callDescribe(ctx: Context, args: unknown) {
   return ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: CallId('cache-vision-call'),
+    callId: ToolCallId('cache-vision-call'),
     name: 'describe_image',
     arguments: args,
   })

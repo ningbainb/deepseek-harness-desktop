@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "schemastery";
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -1090,7 +1089,7 @@ const inject = ["webServer"];
 * skin center. The browser half spells the same string so it can bind the
 * scope without depending on this Host package.
 */
-const SKIN_BACKGROUND_NAMESPACE = settingsNamespace("skin-background");
+const SKIN_BACKGROUND_NAMESPACE = "skin-background";
 /** Runtime schema for SkinBackgroundConfig. */
 const SkinBackgroundConfigSchema = z.object({ backgroundOpacity: z.number().min(0).max(100).step(5).default(0) });
 /**
@@ -1102,9 +1101,11 @@ const SkinBackgroundConfigSchema = z.object({ backgroundOpacity: z.number().min(
 * @param ctx - cordis context.
 */
 function apply(ctx) {
-	installSettingsSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
-		setSource: () => {},
-		onChange: () => {}
+	ctx.inject(["settings"], (settingsCtx) => {
+		settingsCtx.settings.installSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
+			setSource: () => {},
+			onChange: () => {}
+		});
 	});
 	const routes = makeSkinCenterRoutes();
 	try {

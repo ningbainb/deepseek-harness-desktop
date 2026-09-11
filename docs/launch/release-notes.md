@@ -1,49 +1,93 @@
-# DeepSeek Harness Desktop 3.3.0
+# DeepSeek Harness Desktop 3.4.0
 
 ## 中文
 
 ### 本次亮点
 
-- **Star 提示**：升级到 3.3.0 后，每个本机用户显示一次社区支持提示；关闭后，同一版本重启不再弹出。
-- **拓展坞与设置**：按功能组织侧栏，集中管理模型接入、性价比模式、个性化 Prompt、记忆、粒子主题和图像理解。设置窗口统一主题并居中打开，调整尺寸与间距，性价比模式提供中文说明。拖动窗口合并位置更新，减少连续拖动时的卡顿。
-- **项目与工作区**：创建项目和选择工作区使用统一弹窗，点击源文件夹区域即可打开系统文件夹选择器；已有项目可以直接打开，避免重复创建。
-- **文件交给模型研究**：外部普通文件先保存到当前工作区，再以附件卡片和真实文件引用加入草稿；发送后模型可以使用工具按需读取。不会预先解析文本、文档或压缩包，也不会自动把全文塞入对话。内部文件树拖动保留路径引用语义，预览与发送相互独立。
-- **图片与预览**：保留图片拖入、粘贴和缩略图交互，超限图片通过软件画布进行自适应压缩，减少连续拖入时的 GPU 内存占用。浏览器与文件预览提供关闭操作，修复按钮重叠和面板重建后控件消失的问题。
-- **可感知的记忆**：展示当前会话的记忆活动、匹配结果和可操作入口，优化检索与排序。记忆继续按用户和作用域隔离，模型建议需要用户确认后才会保存。
-- **版本数据分析**：补齐项目操作、附件交付、拓展坞设置的结果埋点，管理看板支持按版本和时间范围分析、导出汇总数据，并标示新数据的覆盖范围。仅记录固定枚举与计数，不采集对话、文件内容、路径、记忆正文或密钥。自动化构建测试不向生产服务上报。
+DeepSeek Harness Desktop 3.4.0 正式版更新通知
+
+从读懂截图、分析项目，到调用工具推进任务，我们期待的 AI，不只是能回答问题，更能参与手头的工作。
+
+DeepSeek V4.1 Flash 已正式发布。根据官方介绍，新模型具备原生视觉理解能力，增强了文本与 Agent 表现，并通过架构和缓存优化，改善推理效率、降低使用成本。[官方发布说明](https://deepseek.com/news/deepseek-v4-1-flash/)
+
+模型在进步，桌面体验也该跟上。
+
+这次，DeepSeek Harness Desktop 3.4.0 围绕新内核适配，也认真处理了大家反馈的那些“小麻烦”。
+
+**新内核，更自然的工作流**
+
+升级至官方 SDK `0.1.5-rc.1`，包含 `deepseek-flash` 模型定义。文件上传、侧栏预览和对话轮次导航优先使用原生能力，减少重复按钮，让文件、对话和工具之间的衔接更清晰。补齐梁神模式、性价比模式的新版配置和提示词分段适配，更新旧预设并保留原对话。
+
+**少一点转圈，少一点打断**
+
+修复拓展坞模型目录报错，减少重复加载；已加载的设置页直接切换，保留草稿，超时可以重试。优化模型切换和终端打开流程，修复部分环境反复弹出空白终端窗口的问题。
+
+**你的历史对话，值得被认真保护**
+
+修复已定位的旧对话兼容问题。恢复前先备份、再校验，不直接删除无法确认的数据，让过去的工作能够继续。
+
+**用哪家的模型，就看哪家的余额**
+
+余额跟随当前模型供应商，支持 DeepSeek 官方及兼容中转接口。区分钱包余额与使用额度，避免切换后仍显示上一家的金额。
+
+**把细节放回合适的位置**
+
+记忆管理集中到拓展坞，个人偏好更简洁；整理关闭、最小化、搜索和中转折叠交互，并修复部分覆盖升级失败问题。已提交的旧备份清理与下一次升级隔离，避免备份文件被占用时卡住安装，同时保留失败回滚保护。
+
+很多改动不会出现在模型排行榜上，却会出现在你每天使用软件的那几分钟里。
+
+你发来的每一份日志、每一张截图，都在帮助这个项目变得更好。如果它曾替你省下一点时间，或陪你把一个想法变成现实，欢迎给项目一个 Star，也可以通过爱发电支持后续维护。
+
+不赞助也没关系。愿意使用、分享和认真反馈，本身就是支持。
+
+[项目与反馈](https://github.com/ningbainb/deepseek-harness-desktop) · [爱发电支持](https://afdian.com/a/ningbai)
 
 ### 验证
 
-发布流程检查类型、单元测试、功能保全基线、官方 SDK 导入边界及运行时依赖，并对打包后的应用验证启动、文件夹选择器、终端、窗口控件、设置、拓展坞与更新退出。安装包附带发布清单和 SHA-256 校验文件。
+发布流程覆盖代码类型、单元测试、功能保全、官方 SDK 接口、运行时依赖，以及打包应用的启动、文件、模式切换、拓展坞、终端与升级退出。安装清理与模式切换的新增回归保留在代码中。DPI 窗口位置问题按维护者决定列为本版已知问题，测试仍执行并单独记录；其他失败不在放行范围内。具体结果以本次 GitHub Actions 记录为准。
+
+匿名统计继续采用高频行为聚合、低频关键事件保留的方式；统计失败不影响软件功能，不收集对话正文、文件内容或 API Key。
 
 ### 下载与校验
 
-从本次 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe` 与 `SHA256SUMS.txt`。安装前可用 PowerShell 的 `Get-FileHash -Algorithm SHA256` 核对文件完整性；自动更新元数据与安装包来自同一发布流程。
+从本次 GitHub Release 下载 `DeepSeek-Harness-Desktop-Setup-3.4.0-x64.exe`，使用同一 Release 的 `SHA256SUMS.txt` 核对完整性。可在 PowerShell 中运行 `Get-FileHash -Algorithm SHA256`。自动更新元数据与安装包来自同一发布流程，签名状态见发布清单及下方签名说明。
 
 ### 说明
 
-DeepSeek Harness Desktop 是社区维护的开源桌面发行版。普通文件的读取能力取决于模型可用工具和文件格式；添加附件表示文件已交付，不表示模型已经读完。新版本事件覆盖自升级后开始，不能用历史版本缺失的事件推算转化率。
+本项目是社区开源桌面端，并非 DeepSeek 官方客户端。模型通过服务商 API 使用，费用与可用性以服务商为准。当前为 3.4.0 正式版，升级前请备份重要会话。
+
+已知问题：部分多显示器或 DPI 缩放场景下，窗口恢复位置可能偏移；本次未修复，维护者已确认不阻塞 3.4.0 发布。
 
 ## English
 
 ### Highlights
 
-- **Star reminder**: Each local user sees the community support prompt once after upgrading to 3.3.0. It does not appear again on subsequent launches of the same version.
-- **Dock and settings**: A grouped sidebar brings provider setup, Value Mode, personal prompts, memory, particles, and image understanding into one place. Settings windows use a consistent theme and centered placement. Compact spacing and coalesced window movement improve everyday interaction, and Value Mode includes Chinese guidance.
-- **Projects and workspaces**: A shared dialog supports project creation and workspace selection. Clicking the source folder area opens the native folder picker, while existing projects can be opened directly without creating duplicates.
-- **Files for the model to study**: External ordinary files are saved into the current workspace and added to the draft as attachment cards and real file references. After sending, the model can read them through its available tools. The application does not pre-parse documents or insert their full text automatically. Internal file-tree drops remain path references, and local previews remain separate from sending.
-- **Images and previews**: Image drops, clipboard pastes, thumbnails, and adaptive compression remain available. Software canvas encoding reduces GPU memory use during repeated large image drops. Browser and file previews provide close controls, with fixes for overlapping buttons and disappearing controls after panel recreation.
-- **Visible memory activity**: Session memory activity and matches are visible with actions to inspect and manage them. Retrieval and ranking are improved. User and scope isolation remain enforced, and model suggestions require user confirmation before persistence.
-- **Release analytics**: Outcome events cover project operations, file delivery, and Dock settings. The administration dashboard supports version and date filters, aggregate exports, and explicit coverage information. Metrics contain fixed categories and counts, excluding conversations, file contents, paths, memory text, and credentials. Automated build tests do not report to the production service.
+DeepSeek Harness Desktop 3.4.0 is a stable community release focused on the official `0.1.5-rc.1` SDK and smoother everyday desktop workflows.
+
+DeepSeek describes V4.1 Flash as a model with native visual understanding, stronger text and Agent performance, and architecture and cache improvements that reduce inference costs. These are model-provider claims, not Desktop benchmark results. [Official announcement](https://deepseek.com/news/deepseek-v4-1-flash/)
+
+- Prefer native uploads, sidebar previews, and turn navigation, reducing duplicate controls. Update LiangShen and Value Mode persona configuration and prompt sections while preserving existing conversations.
+- Repair the Dock model catalog, reuse loaded settings pages and drafts, and support retry after timeouts. Improve model switching and terminal initialization, including repeated empty console flashes in affected environments.
+- Recover identified legacy conversation formats with backups and validation. Unconfirmed data is not deleted or guessed at.
+- Follow the selected model provider when displaying balances. Support DeepSeek and compatible relay interfaces, distinguish wallet balance from usage quota, and prevent stale provider amounts.
+- Keep memory management in the Dock, simplify personal preferences, and refine close, minimize, search, and relay-collapse interactions. Isolate committed backup cleanup from subsequent upgrades while retaining rollback protection.
+
+Every log and screenshot helps this project improve. If it has saved you time or helped turn an idea into working software, a Star, shared feedback, or voluntary sponsorship supports continued maintenance. Financial support is never required.
+
+[Project and feedback](https://github.com/ningbainb/deepseek-harness-desktop) · [Sponsor on Afdian](https://afdian.com/a/ningbai)
 
 ### Verification
 
-The release pipeline checks types, unit tests, feature preservation, official SDK import boundaries, and runtime dependencies. Packaged application checks cover startup, native folder selection, terminal interaction, window controls, settings, the Dock, and update shutdown. Release assets include a manifest and SHA-256 checksums.
+Release checks cover types, unit tests, feature preservation, official SDK contracts, runtime dependencies, and packaged desktop workflows. Installer and custom-mode regressions remain in the repository. The maintainer explicitly accepted the known DPI position issue for this release; its test still runs and reports separately. Other failures are not waived. See the release's GitHub Actions record for exact outcomes.
+
+Anonymous metrics retain high-frequency aggregation and bounded critical events. Telemetry failure does not block features, and prompts, file contents, and API keys are excluded.
 
 ### Download and verification
 
-Download `DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe` and `SHA256SUMS.txt` from this GitHub Release. Use PowerShell `Get-FileHash -Algorithm SHA256` to verify file integrity before installation. Update metadata and the installer are produced by the same release pipeline.
+Download `DeepSeek-Harness-Desktop-Setup-3.4.0-x64.exe` and `SHA256SUMS.txt` from this Release. Verify integrity using PowerShell `Get-FileHash -Algorithm SHA256`. The installer and updater metadata share the same release pipeline. Refer to the manifest and signing notice for the actual signature status.
 
 ### Notice
 
-DeepSeek Harness Desktop is a community-maintained open-source distribution. Reading ordinary files depends on the model's tools and format support; delivery does not mean the model has already read a file. New event coverage begins after upgrading and should not be used to infer missing historical conversion data.
+This is a community open-source desktop application, not an official DeepSeek client. Models are accessed through provider APIs; pricing and availability depend on the provider. This is the stable 3.4.0 release. Back up important conversations before upgrading.
+
+Known issue: restored window positions can shift in some multi-monitor or DPI scaling configurations. This remains unfixed and was explicitly accepted by the maintainer for 3.4.0.

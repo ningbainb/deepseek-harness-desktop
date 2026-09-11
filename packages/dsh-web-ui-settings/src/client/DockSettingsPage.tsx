@@ -51,7 +51,7 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
           const next = event.key === 'Home' ? 'personal-prompt' : event.key === 'End' ? 'memory' : selected === 'memory' ? 'personal-prompt' : 'memory'
           navigateTo(next)
           document.getElementById(`${next}-tab`)?.focus()
-        }}>{id === 'personal-prompt' ? 'Prompt' : t('dockMemory')}</button>)}
+        }}>{id === 'personal-prompt' ? t('dockResponsePreferences') : t('dockMemory')}</button>)}
       </div>
     </>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>

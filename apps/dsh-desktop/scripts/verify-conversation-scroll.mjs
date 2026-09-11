@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createMessage, createUserMessage, expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
@@ -30,7 +30,46 @@ const workspacePath = join(temporary, 'conversation-scroll-workspace')
 const profileDir = join(dshHome, 'profiles', 'desktop')
 const runtimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
 const messageCount = 20
+const nativeTurns = process.argv.includes('--native-turns')
 let activeApp
+let activeDiagnostics
+
+async function verifyMessageParticleClearance(page) {
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('canvas[data-dsh-particle-theme="whale"]')
+    if (!(canvas instanceof HTMLCanvasElement)) return false
+    const rects = JSON.parse(canvas.dataset.dshParticleContentRects || '[]')
+    if (!rects.length) return false
+    const bounds = canvas.getBoundingClientRect()
+    const messages = [...document.querySelectorAll('[data-pane="conversation"] [data-chat-flow-kind]')]
+      .map(element => element.getBoundingClientRect())
+      .filter(box => box.width > 0 && box.height > 0 && box.top > bounds.top
+        && box.bottom < Number(canvas.dataset.dshParticleContentBottom))
+    if (!messages.length || !messages.every(box => rects.some(rect =>
+      rect.x <= box.left - bounds.left && rect.y <= box.top - bounds.top
+      && rect.x + rect.width >= box.right - bounds.left
+      && rect.y + rect.height >= box.bottom - bounds.top))) return false
+    const context = canvas.getContext('2d')
+    if (!context || !canvas.width || !canvas.height) return false
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    let themeStillVisible = false
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] > 0) { themeStillVisible = true; break }
+    }
+    if (!themeStillVisible) return false
+    const ratioX = canvas.width / bounds.width, ratioY = canvas.height / bounds.height
+    for (const rect of rects) {
+      const left = Math.max(0, Math.ceil(rect.x * ratioX) + 2)
+      const top = Math.max(0, Math.ceil(rect.y * ratioY) + 2)
+      const right = Math.min(canvas.width, Math.floor((rect.x + rect.width) * ratioX) - 2)
+      const bottom = Math.min(canvas.height, Math.floor((rect.y + rect.height) * ratioY) - 2)
+      for (let y = top; y < bottom; y += 1) for (let x = left; x < right; x += 1) {
+        if (pixels[(y * canvas.width + x) * 4 + 3] !== 0) return false
+      }
+    }
+    return true
+  }, undefined, { timeout: 20_000 })
+}
 
 async function dismissStartup(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
@@ -66,10 +105,17 @@ async function launch() {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  activeApp = instance
   await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
   const rendererErrors = []
   const rendererConsole = []
+  const failedRequests = []
+  activeDiagnostics = { rendererErrors, rendererConsole, failedRequests }
+  page.on('requestfailed', request => failedRequests.push({
+    method: request.method(), path: new URL(request.url()).pathname,
+    failure: request.failure()?.errorText,
+  }))
   page.on('pageerror', error => rendererErrors.push(error.message))
   page.on('console', message => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -86,6 +132,11 @@ async function launch() {
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
     console.error(`runtime did not become ready; recent log:\n${runtimeLog.slice(-8_000) || '(no runtime log)'}`)
+    console.error(`renderer readiness diagnostics:\n${JSON.stringify({
+      error: error instanceof Error ? error.stack ?? error.message : String(error),
+      rendererErrors,
+      rendererConsole,
+    }, null, 2)}`)
     throw error
   }
   return { instance, page, rendererErrors, rendererConsole }
@@ -93,14 +144,16 @@ async function launch() {
 
 async function rpc(page, method, payload) {
   const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const result = await fetch(`/api/${rpcMethod}`, {
+    const endpoint = rpcMethod.replace('.', '/')
+    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
+    const result = await fetch(`/api/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'client-request',
         rpcId,
-        method: rpcMethod,
-        payload: rpcPayload,
+        method: endpoint,
+        payload: { args: { [requestField]: rpcPayload } },
       }),
     })
     return { status: result.status, body: await result.json().catch(() => undefined) }
@@ -146,7 +199,13 @@ async function seedConversationLog(sessionId) {
   // Replaying that valid prefix lets the official Session implementation mint
   // the end-seed marker and all following event sequence numbers correctly.
   const session = Session.create(SessionId(sessionId), existingEvents)
+  // A user-message-only log is still a provisional blank session in the
+  // official sessionListMetadata projection. Keep one real enclosing turn
+  // for the compatibility fixture: it has no per-message native turn rail,
+  // but New Session must not legitimately reuse it as an untouched draft.
+  if (!nativeTurns) session.append('turn/start', { turn: 1 })
   for (let index = 1; index <= messageCount; index += 1) {
+    if (nativeTurns) session.append('turn/start', { turn: index })
     session.append('user/message', createUserMessage({
       content: [{
         type: 'text',
@@ -154,11 +213,56 @@ async function seedConversationLog(sessionId) {
       }],
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
+    if (nativeTurns && index === messageCount) {
+      // A real durable settlement drives both official and desktop projections.
+      // No provider request, injected DOM metric, or real user log is involved.
+      session.append('step/start', { turn: index, step: 1 })
+      const time0 = Date.now()
+      await new Promise(resolve => setTimeout(resolve, 30))
+      const stream = [{ type: 'text-chunks', time0, index: 0, dt: [20], texts: ['Statistics fixture. ', 'Completed.'] }]
+      assert.equal(expandAssistantStream(stream).length, 2, 'validate compact stream before persisting the fixture')
+      session.append('assistant/message', {
+        turn: index, step: 1,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Statistics fixture. Completed.' }],
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+        }),
+        stream,
+        usage: { inputTokens: 100, outputTokens: 40, cacheReadTokens: 200 },
+      }, { surfaceOp: 'append' })
+      session.append('step/end', { turn: index, step: 1 })
+    }
+    if (nativeTurns) session.append('turn/end', { turn: index, reason: { kind: 'completed' } })
   }
-  const appended = session.events.slice(existingEvents.length)
-  assert.equal(appended.length, messageCount + 1)
+  if (!nativeTurns) session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  const appended = session.snapshotEvents().slice(existingEvents.length)
+  assert.equal(appended.length, nativeTurns ? messageCount * 3 + 4 : messageCount + 3)
   await appendFile(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
-  return logPath
+  return { logPath, asOfSeq: session.snapshotEvents().at(-1).seq }
+}
+
+// The public cold list is a checkpoint hint, while opening history hydrates
+// the exact log and writes its projection checkpoint asynchronously. Wait for
+// that precise cut, not for blank=false, so an incorrect value still fails.
+async function waitForSeededSummary(page, sessionId, asOfSeq) {
+  const deadline = Date.now() + 10_000
+  let summary
+  let reads = 0
+  while (Date.now() < deadline) {
+    summary = (await rpc(page, 'session.list', {})).items.find(item => item.id === sessionId || item.sessionId === sessionId)
+    assert.ok(summary, 'restored session must remain listed while its checkpoint converges')
+    reads += 1
+    if (reads === 1) console.log('restored session checkpoint', JSON.stringify({ expectedSeq: asOfSeq,
+      observedSeq: summary.projections?.asOfSeq, blank: summary.blank }))
+    if (summary.projections?.asOfSeq >= asOfSeq) {
+      console.log('restored session checkpoint ready', JSON.stringify({ reads,
+        asOfSeq: summary.projections.asOfSeq, blank: summary.blank }))
+      return summary
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 100))
+  }
+  assert.fail(`restored checkpoint did not reach log cut ${asOfSeq}: ${JSON.stringify(summary)}`)
 }
 
 async function openSeededSession(page, sessionId) {
@@ -201,6 +305,41 @@ async function openSeededSession(page, sessionId) {
     console.error(`restored session open diagnostic:\n${JSON.stringify({ summary, diagnostic, renderedTurns: await turns.count() }, null, 2)}`)
     throw error
   }
+}
+
+async function verifyStatsSupplement(page) {
+  const native = page.locator('[data-composer-stats]')
+  const supplement = page.locator('[data-dsh-live-stats]')
+  await native.waitFor({ state: 'visible' })
+  await supplement.waitFor({ state: 'visible' })
+  assert.equal(await native.count(), 1, 'the official cumulative stats have one owner')
+  assert.equal(await supplement.count(), 1, 'desktop contributes one compact supplement')
+  assert.match(await native.innerText(), /340/u, 'official provider usage remains visible')
+  assert.match(await native.innerText(), /tok\/s/u, 'official average speed remains visible')
+  const summary = supplement.locator('summary')
+  assert.match(await summary.innerText(), /^≈¥[\d.,]+ · 明细$/u)
+  assert.equal(await supplement.evaluate(element => element.open), false)
+  assert.equal(await supplement.locator('dl').isVisible(), false, 'detailed metrics do not duplicate the primary row')
+  await summary.focus()
+  await page.keyboard.press('Enter')
+  await supplement.locator('dl').waitFor({ state: 'visible' })
+  const metrics = await supplement.locator('dl').innerText()
+  assert.match(metrics, /API 输入\s*300/u)
+  assert.match(metrics, /API 输出\s*40/u)
+  assert.match(metrics, /滚动 1 秒\s*[\d.]+ tok\/s/u)
+  assert.match(metrics, /步骤峰值\s*[\d.]+ tok\/s/u)
+  const bounds = await supplement.boundingBox()
+  assert.ok(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.height < 220, JSON.stringify(bounds))
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    await page.screenshot({ path: join(resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS), 'native-stats-details.png') })
+  }
+  await summary.click()
+  assert.equal(await supplement.evaluate(element => element.open), false)
+  assert.equal(await supplement.locator('dl').isVisible(), false)
+  // Native drill-down is still usable; we never mutate or replace its controls.
+  await native.getByRole('button').filter({ hasText: '340' }).click()
+  await page.locator('[data-session-stats-usage]').waitFor({ state: 'visible', timeout: 5_000 })
+  await page.keyboard.press('Escape')
 }
 
 async function conversationGeometry(page) {
@@ -307,8 +446,8 @@ async function assertDarkReadability(page) {
   })
   assert.ok(state.contrast >= 3, `dark navigator counter contrast is too low: ${JSON.stringify(state)}`)
   assert.equal(state.navigatorPosition, 'absolute', JSON.stringify(state))
-  assert.equal(state.buttonWidth, '32px', JSON.stringify(state))
-  assert.equal(state.buttonHeight, '32px', JSON.stringify(state))
+  assert.equal(state.buttonWidth, '28px', JSON.stringify(state))
+  assert.equal(state.buttonHeight, '28px', JSON.stringify(state))
   assert.deepEqual(state.overlaps, [], `visible sidebar rows overlap: ${JSON.stringify(state.overlaps)}`)
   return state
 }
@@ -333,25 +472,37 @@ try {
   const created = await rpc(first.page, 'session.create', { workspaceId })
   assert.equal(typeof created?.sessionId, 'string', JSON.stringify(created))
   const sessionId = created.sessionId
+  await first.page.locator('[data-pane="conversation"]').waitFor({ state: 'visible' })
+  assert.equal(await first.page.locator('[data-chat-flow-kind="user"]').count(), 0)
+  await first.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
+  await first.page.locator('[data-dsh-live-stats]').waitFor({ state: 'detached' })
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    const screenshots = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS)
+    await mkdir(screenshots, { recursive: true })
+    await first.page.screenshot({ path: join(screenshots, 'conversation-empty-no-navigation.png') })
+  }
   assert.deepEqual(first.rendererErrors, [])
   await waitForSessionLog(join(dshHome, 'sessions'), sessionId)
   await activeApp.close()
   activeApp = undefined
 
-  const logPath = await seedConversationLog(sessionId)
+  const { logPath, asOfSeq } = await seedConversationLog(sessionId)
 
   const second = await launch()
   activeApp = second.instance
   await openSeededSession(second.page, sessionId)
-  const memoryActivity = second.page.locator('[data-memory-activity="true"]')
-  await memoryActivity.locator('summary').click()
-  await memoryActivity.getByText('记忆已关闭，可在个人偏好中开启。', { exact: true }).waitFor()
-  await second.page.keyboard.press('Escape')
-  assert.equal(await memoryActivity.getAttribute('open'), null, 'memory context panel closes with Escape')
+  const seededSummary = await waitForSeededSummary(second.page, sessionId, asOfSeq)
+  assert.equal(seededSummary?.blank, false, 'the restored history must not be classified as a reusable blank draft')
+  if (nativeTurns) {
+    await (await activeApp.browserWindow(second.page)).evaluate(window => window.setSize(1700, 820))
+    await second.page.waitForFunction(() => document.querySelector('[data-pane="conversation"]')?.getBoundingClientRect().width > 900)
+  }
+  assert.equal(await second.page.locator('[data-memory-activity="true"]').count(), 0, 'memory controls live in Dock settings, not the conversation header')
   const turns = second.page.locator('[data-chat-flow-kind="user"]')
   assert.equal(await turns.count(), messageCount)
   assert.match(await turns.first().innerText(), /G02\.5 turn 01/u)
   assert.match(await turns.last().innerText(), /G02\.5 turn 20/u)
+  if (nativeTurns) await verifyStatsSupplement(second.page)
 
   await second.page.evaluate(() => {
     const scroll = document.querySelector('[data-conversation-scroll]')
@@ -361,10 +512,47 @@ try {
     inputScroll.scrollTop = inputScroll.scrollHeight
   })
   await second.page.waitForTimeout(200)
+  await verifyMessageParticleClearance(second.page)
   const beforeWheel = await conversationGeometry(second.page)
+  const nativeBottom = second.page.getByRole('button', { name: '回到底部', exact: true })
+  await nativeBottom.waitFor({ state: 'visible' })
+  console.log('native bottom control', await nativeBottom.evaluate(button => ({
+    label: button.getAttribute('aria-label'),
+    conversationOwned: Boolean(button.closest('[data-pane="conversation"]')),
+  })))
+  if (!nativeTurns) {
+    assert.equal(await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').isVisible(), false,
+      'the native bottom action owns the visible control, including legacy histories')
+  }
   assert.ok(beforeWheel.scrollHeight > beforeWheel.scrollClientHeight * 2, JSON.stringify(beforeWheel))
   assert.ok(beforeWheel.composer.top >= beforeWheel.scrollRect.top, JSON.stringify(beforeWheel))
   assert.ok(beforeWheel.composer.bottom <= beforeWheel.viewportHeight + 2, JSON.stringify(beforeWheel))
+  if (nativeTurns) {
+    try {
+      await second.page.getByRole('navigation', { name: '轮次导航', exact: true }).waitFor()
+    } catch (error) {
+      console.error('Native navigation diagnostic:', await second.page.evaluate(() => ({
+        navigation: [...document.querySelectorAll('nav')].map(nav => ({ label: nav.getAttribute('aria-label'), buttons: nav.querySelectorAll('button').length, bounds: nav.getBoundingClientRect().toJSON(), display: getComputedStyle(nav).display })),
+        turns: [...document.querySelectorAll('[data-chat-turn]')].map(node => node.getAttribute('data-chat-turn')),
+        fallback: document.querySelectorAll('[data-dsh-turn-navigator]').length,
+      })))
+      throw error
+    }
+    await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
+  }
+  const navigationBox = nativeTurns ? null : await second.page.locator('[data-dsh-turn-navigator]').boundingBox()
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    const screenshots = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS)
+    await mkdir(screenshots, { recursive: true })
+    await second.page.screenshot({ path: join(screenshots, nativeTurns ? 'conversation-native-navigation.png' : 'conversation-navigation.png') })
+  }
+  if (!nativeTurns) {
+    const navigationLayout = await second.page.locator('[data-dsh-turn-navigator]').evaluate(nav => {
+      const style = getComputedStyle(nav)
+      return { pane: nav.parentElement.getBoundingClientRect().toJSON(), offsetParent: nav.offsetParent?.getBoundingClientRect().toJSON(), bottom: style.bottom, inline: nav.style.bottom, position: style.position, direction: style.flexDirection }
+    })
+    assert.ok(navigationBox && navigationBox.y + navigationBox.height <= beforeWheel.composer.top, `turn navigation stays above the composer: ${JSON.stringify({ navigationBox, beforeWheel, navigationLayout })}`)
+  }
 
   const inputScroll = second.page.locator('[data-input-scroll]')
   await inputScroll.hover()
@@ -382,53 +570,148 @@ try {
     scroll.scrollTop = 0
   })
   await second.page.waitForTimeout(200)
-  assert.equal((await navigatorState(second.page)).counter, `1/${messageCount}`)
+  let dark
+  if (nativeTurns) {
+    const rail = second.page.getByRole('navigation', { name: '轮次导航', exact: true })
+    assert.equal(await rail.getByRole('button').count(), messageCount, 'native rail includes every real turn')
+    for (const turn of [2, 3, 2, 20, 1]) {
+      const mark = rail.getByRole('button', { name: `跳转到第 ${turn} 轮`, exact: true })
+      await mark.focus()
+      await mark.press('Enter')
+      await second.page.waitForFunction(turn => document.querySelector(`nav[aria-label="轮次导航"] button[aria-label="跳转到第 ${turn} 轮"]`)?.getAttribute('aria-current') === 'true', turn)
+      assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'fallback stays unmounted during native navigation')
+    }
+    await second.page.getByRole('button', { name: '回到底部', exact: true }).click()
+    await second.page.waitForFunction(() => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
+    })
+    await second.page.evaluate(() => document.body.setAttribute('data-ds-dark-theme', ''))
+    assert.equal(await rail.isVisible(), true, 'native navigation remains visible in dark mode')
+    assert.equal(await rail.getByRole('button').count(), messageCount)
+    assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0)
+    const nativeWindow = await activeApp.browserWindow(second.page)
+    // Native-default layout no longer spends 260px on a legacy Explorer.
+    // Narrow the actual conversation, not a window size that used to imply it.
+    await nativeWindow.evaluate(window => window.setSize(1000, 820))
+    await second.page.waitForFunction(() => document.querySelector('[data-pane="conversation"]')?.getBoundingClientRect().width < 800)
+    await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'visible' })
+    assert.equal(await rail.isVisible(), false, 'DSH hides its native rail in a narrow container')
+    assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 1, 'narrow layout retains one functional fallback')
+    await nativeWindow.evaluate(window => window.setSize(1700, 820))
+    await rail.waitFor({ state: 'visible' })
+    await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
+  } else {
+    assert.equal((await navigatorState(second.page)).counter, `1/${messageCount}`)
 
-  await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
-  await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
-  await second.page.waitForTimeout(450)
-  let navigation = await navigatorState(second.page)
-  assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
+    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
+    await second.page.waitForTimeout(450)
+    let navigation = await navigatorState(second.page)
+    assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
 
-  await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
-  await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `3/${messageCount}`)
-  await second.page.locator('[data-dsh-turn-navigator] [data-role="prev"]').click()
-  await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
-  await second.page.waitForTimeout(450)
-  navigation = await navigatorState(second.page)
-  assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
+    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `3/${messageCount}`)
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="prev"]').click()
+    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
+    await second.page.waitForTimeout(450)
+    navigation = await navigatorState(second.page)
+    assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
 
-  await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').click()
-  await second.page.waitForFunction(expected => {
-    const scroll = document.querySelector('[data-conversation-scroll]')
-    const counter = document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')
-    const bottom = document.querySelector('[data-dsh-turn-navigator] [data-role="bottom"]')
-    // The scroll position can settle one renderer frame before the navigator.
-    // Await both observable results, then keep the exact assertions below.
-    return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
-      && counter?.textContent === expected && bottom instanceof HTMLButtonElement && bottom.disabled
-  }, `${messageCount}/${messageCount}`)
-  navigation = await navigatorState(second.page)
-  assert.equal(navigation.counter, `${messageCount}/${messageCount}`)
-  assert.equal(navigation.bottomDisabled, true)
+    await nativeBottom.click()
+    await second.page.waitForFunction(() => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
+    })
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').waitFor({ state: 'hidden' })
+    // Exercise the compatibility path too, without changing any SDK file.
+    await second.page.evaluate(() => { document.querySelector('[data-conversation-scroll]').scrollTop = 0 })
+    await nativeBottom.waitFor({ state: 'visible' })
+    await nativeBottom.evaluate(button => { button.parentElement.style.display = 'none' })
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').waitFor({ state: 'visible' })
+    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').click()
+    await second.page.waitForFunction(expected => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      const counter = document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')
+      const bottom = document.querySelector('[data-dsh-turn-navigator] [data-role="bottom"]')
+      // The scroll position can settle one renderer frame before the navigator.
+      // Await both observable results, then keep the exact assertions below.
+      return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
+        && counter?.textContent === expected && bottom instanceof HTMLButtonElement && bottom.disabled
+    }, `${messageCount}/${messageCount}`)
+    navigation = await navigatorState(second.page)
+    assert.equal(navigation.counter, `${messageCount}/${messageCount}`)
+    assert.equal(navigation.bottomDisabled, true)
 
-  const dark = await assertDarkReadability(second.page)
+    dark = await assertDarkReadability(second.page)
+  }
+  // The brand logo also has this accessible name; choose the explicit action.
+  await second.page.getByRole('button', { name: '新建会话', exact: true }).filter({ hasText: '新会话' }).click()
+  try {
+    await second.page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
+  } catch (error) {
+    console.error('new-session roundtrip diagnostic', await second.page.evaluate(() => ({
+      panes: [...document.querySelectorAll('[data-pane="conversation"]')].map(pane => ({
+        bounds: pane.getBoundingClientRect().toJSON(),
+        users: pane.querySelectorAll('[data-chat-flow-kind="user"]').length,
+        text: pane.textContent.slice(-1_500),
+      })),
+      dialogs: [...document.querySelectorAll('[role="dialog"]')].map(dialog => dialog.textContent.slice(0, 1_000)),
+      selected: [...document.querySelectorAll('[role="treeitem"][aria-selected="true"]')].map(item => item.textContent),
+    })))
+    if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+      await second.page.screenshot({ path: join(resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS), 'new-session-roundtrip-failure.png') })
+    }
+    throw error
+  }
+  await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
+  await second.page.locator('[data-dsh-live-stats]').waitFor({ state: 'detached' })
+  await openSeededSession(second.page, sessionId)
+  assert.equal(await turns.count(), messageCount, 'history remains navigable after leaving for an empty session')
+  if (nativeTurns) {
+    await second.page.locator('[data-dsh-live-stats]').waitFor({ state: 'visible' })
+    assert.match(await second.page.locator('[data-dsh-live-stats] summary').innerText(), /^≈¥[\d.,]+ · 明细$/u)
+  }
+  if (process.argv.includes('--native-tabs')) {
+    const { verifyNativeBrowserSessionIsolation } = await import('./native-browser-session-fixture.mjs')
+    await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession })
+  }
   assert.deepEqual(second.rendererErrors, [])
   const seriousConsole = second.rendererConsole.filter(line => !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
   assert.deepEqual(seriousConsole, [])
+
+  if (process.argv.includes('--mode-switch')) {
+    const { verifyModeSwitchLifecycle } = await import('./mode-switch-lifecycle-fixture.mjs')
+    await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
+      workspacePath, messageCount, logPath, openSeededSession })
+    await activeApp.close()
+    activeApp = undefined
+    assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
+    assert.deepEqual(second.rendererConsole.filter(line =>
+      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line)), [],
+    'mode switching and shutdown must not introduce unexpected console errors')
+  }
 
   console.log(JSON.stringify({
     mode: packagedExecutable === undefined ? 'development-electron' : 'packaged-electron',
     sessionId,
     logPath,
     restoredTurns: messageCount,
+    emptyConversationHasNoCompatibilityNavigation: true,
     wheelForwardedFromInput: true,
     composerStayedFixed: true,
     navigatorPreviousNextAndBottom: true,
-    darkCounterContrast: Number(dark.contrast.toFixed(2)),
-    sidebarRowsOverlap: false,
+    nativeBottomActionDeduplicated: true,
+    emptySessionRoundTrip: true,
+    nativeStatsSupplement: nativeTurns,
+    navigationOwner: nativeTurns ? 'native-dsh' : 'desktop-compatibility',
+    darkCounterContrast: dark ? Number(dark.contrast.toFixed(2)) : undefined,
+    sidebarRowsOverlap: dark ? false : undefined,
   }, null, 2))
+} catch (error) {
+  console.error('conversation lifecycle failure diagnostics', JSON.stringify(activeDiagnostics))
+  throw error
 } finally {
   await activeApp?.close()
-  await rm(temporary, { recursive: true, force: true })
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
 }

@@ -8,7 +8,8 @@
  */
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { ClientContext, SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale) and the
 // ui-sidebar SlotMap merge (the 'sidebar.remote' hole).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -16,7 +17,10 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // entry) and the ctx.settingsScope Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { FooterRemoteEntry } from './FooterRemoteEntry.tsx'
 import { RemoteEntry } from './RemoteEntry.tsx'
 import { PairFailedNotice } from './PairFailedNotice.tsx'
@@ -90,7 +94,7 @@ const REMOTE_WEB_UI_NS = 'remote-web-ui'
 const HEARTBEAT_INTERVAL_MS = 10_000
 
 /** Services required by this plugin. */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions', 'workspaces']
 
 /**
  * Register the remote-control surface.
@@ -118,7 +122,11 @@ export function apply(ctx: ClientContext): void {
     let disposeEntry: (() => void) | undefined
     const syncEntry = (): void => {
       if (enabled() && disposeEntry === undefined) {
-        disposeEntry = ctx.slots.register({ name: 'sidebar.remote', locale: NS }, RemoteEntry)
+        disposeEntry = ctx.slots.register({
+          name: 'sidebar.remote',
+          locale: NS,
+          inject: () => ({ sessions: ctx.sessions, workspaces: ctx.workspaces }),
+        }, RemoteEntry)
       } else if (!enabled() && disposeEntry !== undefined) {
         disposeEntry()
         disposeEntry = undefined
@@ -140,7 +148,12 @@ export function apply(ctx: ClientContext): void {
     let disposeEntry: (() => void) | undefined
     const syncEntry = (): void => {
       if (enabled() && disposeEntry === undefined) {
-        disposeEntry = ctx.slots.register({ name: 'sidebar.footer.action', id: 'remote-web-ui', locale: NS }, FooterRemoteEntry)
+        disposeEntry = ctx.slots.register({
+          name: 'sidebar.footer.action',
+          id: 'remote-web-ui',
+          locale: NS,
+          inject: () => ({ sessions: ctx.sessions, workspaces: ctx.workspaces }),
+        }, FooterRemoteEntry)
       } else if (!enabled() && disposeEntry !== undefined) {
         disposeEntry()
         disposeEntry = undefined

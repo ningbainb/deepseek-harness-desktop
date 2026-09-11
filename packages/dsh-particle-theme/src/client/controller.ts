@@ -1,7 +1,11 @@
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { messageClearanceRects } from './content-clearance.ts'
+import { CONTENT_TARGET_ATTRIBUTES, ContentTargets } from './content-targets.ts'
+import { DialogIndex } from './dialog-index.ts'
 import {
   pageProfile,
   type ParticlePageMode,
+  type ParticleContentRect,
   type ParticleRuntimeState,
   ParticleThemeRegistry,
   type ParticleThemeScene,
@@ -42,9 +46,8 @@ function visible(element: Element): boolean {
   return box.width > 0 && box.height > 0
 }
 
-function currentPageMode(document: Document, window: Window): ParticlePageMode {
+function currentPageMode(document: Document, window: Window, dialogs: readonly Element[]): ParticlePageMode {
   const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-  const dialogs = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')]
   return resolvePageMode({
     hidden: document.hidden,
     reducedMotion: media?.matches === true,
@@ -67,6 +70,12 @@ export class ParticleThemeController {
   private style: HTMLStyleElement | undefined
   private unsubscribe: (() => void) | undefined
   private observer: MutationObserver | undefined
+  private dialogs: DialogIndex | undefined
+  private contentTargets: ContentTargets | undefined
+  private sizeObserver: ResizeObserver | undefined
+  private clipTargets = new Set<Element>()
+  private contentRects: ParticleContentRect[] = []
+  private contentKey = ''
   private mode: ParticlePageMode = 'normal'
   private settings = resolveParticleThemeSettings(undefined)
   private started = false
@@ -89,7 +98,11 @@ export class ParticleThemeController {
     this.options.document.addEventListener('visibilitychange', refresh)
     this.options.document.addEventListener('focusin', refresh)
     this.options.document.addEventListener('focusout', refresh)
+    this.options.document.addEventListener('scroll', refresh, true)
     this.options.window.addEventListener('resize', refresh)
+    if (typeof ResizeObserver === 'function') this.sizeObserver = new ResizeObserver(refresh)
+    const reducedMotion = this.options.window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    reducedMotion?.addEventListener?.('change', refresh)
     const motion = (event: Event) => {
       this.interacting = (event as CustomEvent).detail === true
       this.refreshPageMode()
@@ -99,13 +112,21 @@ export class ParticleThemeController {
       () => this.options.document.removeEventListener('visibilitychange', refresh),
       () => this.options.document.removeEventListener('focusin', refresh),
       () => this.options.document.removeEventListener('focusout', refresh),
+      () => this.options.document.removeEventListener('scroll', refresh, true),
       () => this.options.window.removeEventListener('resize', refresh),
+      () => reducedMotion?.removeEventListener?.('change', refresh),
       () => this.options.window.removeEventListener('dsh:window-motion', motion),
     )
-    const observer = new MutationObserver(refresh)
-    observer.observe(this.options.document.body, {
+    this.dialogs = new DialogIndex(this.options.document)
+    this.contentTargets = new ContentTargets(this.options.document)
+    const observer = new MutationObserver(records => {
+      this.dialogs?.update(records)
+      this.contentTargets?.update(records)
+      refresh()
+    })
+    observer.observe(this.options.document.documentElement, {
       attributes: true,
-      attributeFilter: ['hidden', 'open', 'aria-hidden', 'aria-modal', 'style', 'class'],
+      attributeFilter: ['hidden', 'open', 'role', 'aria-hidden', 'aria-modal', 'style', 'class', ...CONTENT_TARGET_ATTRIBUTES],
       childList: true,
       subtree: true,
     })
@@ -115,18 +136,41 @@ export class ParticleThemeController {
   }
 
   refreshPageMode(): void {
+    // Public refresh and synchronous focus events can precede observer delivery.
+    const records = this.observer?.takeRecords() ?? []
+    this.dialogs?.update(records)
+    this.contentTargets?.update(records)
     if (!this.clipFrame && !this.interacting) {
       this.clipFrame = this.options.window.requestAnimationFrame(() => {
         this.clipFrame = 0
         if (!this.canvas) return
-        const rail = this.options.document.querySelector('[data-dsh-file-attachments]:has([data-state])')
-        const box = rail?.getBoundingClientRect()
-        // Leave the attachment/composer band clear; all upper-page effects remain enabled.
-        const clip = box && box.height > 0 ? `inset(0px 0px ${Math.max(0, this.options.window.innerHeight - box.top)}px 0px)` : ''
-        if (this.lastClip !== clip) { this.lastClip = clip; this.canvas.style.clipPath = clip }
+        const { composers, messages } = this.contentTargets?.read() ?? { composers: [], messages: [] }
+        const targets = new Set([...composers, ...messages])
+        for (const old of this.clipTargets) if (!targets.has(old)) this.sizeObserver?.unobserve(old)
+        for (const target of targets) if (!this.clipTargets.has(target)) this.sizeObserver?.observe(target)
+        this.clipTargets = targets
+        const tops = composers.filter(visible).map(target => target.getBoundingClientRect().top)
+        const contentRects = messageClearanceRects(messages, this.canvas.getBoundingClientRect(),
+          tops.length ? Math.min(...tops) : this.options.window.innerHeight)
+        const contentKey = JSON.stringify(contentRects)
+        // Native drafts need protection even without attachments or focus.
+        // Retain the old attachment-rail boundary for older shells.
+        const clip = tops.length ? `inset(0px 0px ${Math.max(0, this.options.window.innerHeight - Math.min(...tops))}px 0px)` : ''
+        if (this.lastClip !== clip || this.contentKey !== contentKey) {
+          this.contentKey = contentKey
+          this.contentRects = contentRects
+          this.canvas.dataset.dshParticleContentRects = contentKey
+          this.lastClip = clip
+          this.canvas.style.clipPath = clip
+          if (tops.length) this.canvas.dataset.dshParticleContentBottom = String(Math.min(...tops))
+          else delete this.canvas.dataset.dshParticleContentBottom
+          // Reduced-motion scenes have no continuous loop; redraw their static
+          // frame when the protected area changes as well.
+          this.pushState()
+        }
       })
     }
-    const mode = this.interacting ? 'hidden' : currentPageMode(this.options.document, this.options.window)
+    const mode = this.interacting ? 'hidden' : currentPageMode(this.options.document, this.options.window, this.dialogs?.elements() ?? [])
     if (mode === this.mode) return
     this.mode = mode
     this.pushState()
@@ -142,6 +186,13 @@ export class ParticleThemeController {
     this.unsubscribe = undefined
     this.observer?.disconnect()
     this.observer = undefined
+    this.dialogs = undefined
+    this.contentTargets = undefined
+    this.sizeObserver?.disconnect()
+    this.sizeObserver = undefined
+    this.clipTargets.clear()
+    this.contentRects = []
+    this.contentKey = ''
     this.disposeScene()
     this.style?.remove()
     this.style = undefined
@@ -184,6 +235,7 @@ export class ParticleThemeController {
       settings: this.settings,
       mode: this.mode,
       profile: pageProfile(this.mode),
+      contentRects: this.contentRects,
     }
     this.scene.update(state)
   }

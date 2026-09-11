@@ -1,3 +1,4 @@
+import { exactKeys, validCostParams } from './cost-mode-events.mjs'
 const VALUE_MODE_RUNTIME_TELEMETRY_PREFIX = 'DSH_VALUE_MODE_METRIC '
 
 const VALUE_MODE_EVENT_KINDS = new Set(['entry', 'onboarding', 'state', 'strategy'])
@@ -16,8 +17,8 @@ function exactFields(value, fields) {
 
 /**
  * Parse the internal runtime-to-main-process bridge. The bridge is deliberately
- * stricter than the product event schema: it accepts only the route outcome and
- * a coarse role, never a session id, model name, error, or timing value.
+ * bounded to approved route dimensions and an ISO timestamp. Session ids,
+ * prompts, credentials, and raw error messages are never accepted.
  */
 export function parseValueModeRuntimeTelemetryLine(line) {
   if (typeof line !== 'string') return undefined
@@ -29,6 +30,10 @@ export function parseValueModeRuntimeTelemetryLine(line) {
   } catch {
     return undefined
   }
+  if (exactKeys(value, ['event', 'params', 'timestamp']) && value.event === 'cost_mode_route'
+    && validCostParams(value.event, value.params) && typeof value.timestamp === 'string'
+    && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(value.timestamp)
+    && Number.isFinite(Date.parse(value.timestamp))) return Object.freeze(value)
   if (
     !exactFields(value, ['event', 'outcome', 'role'])
     || value.event !== 'call'
@@ -50,10 +55,11 @@ export function normalizeValueModeProductEvent(value) {
     throw new TypeError('invalid value mode telemetry event')
   }
   if (value.kind === 'entry') {
-    if (!exactFields(value, ['kind', 'configured']) || typeof value.configured !== 'boolean') {
+    if ((!exactFields(value, ['kind', 'configured']) && !exactFields(value, ['kind', 'configured', 'source']))
+      || typeof value.configured !== 'boolean' || (value.source !== undefined && !VALUE_MODE_ONBOARDING_SURFACES.has(value.source))) {
       throw new TypeError('invalid value mode telemetry event')
     }
-    return Object.freeze({ kind: 'entry', configured: value.configured })
+    return Object.freeze({ kind: 'entry', configured: value.configured, ...(value.source ? { source: value.source } : {}) })
   }
   if (value.kind === 'onboarding') {
     if (

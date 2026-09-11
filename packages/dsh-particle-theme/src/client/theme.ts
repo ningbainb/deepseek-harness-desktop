@@ -26,10 +26,19 @@ export interface ParticlePageProfile {
   speed: number
 }
 
+export interface ParticleContentRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export interface ParticleRuntimeState {
   settings: ResolvedParticleThemeSettings
   mode: ParticlePageMode
   profile: ParticlePageProfile
+  /** Visible message areas in CSS canvas coordinates; optional for older scenes. */
+  contentRects?: readonly ParticleContentRect[]
 }
 
 export interface ParticleThemeScene {

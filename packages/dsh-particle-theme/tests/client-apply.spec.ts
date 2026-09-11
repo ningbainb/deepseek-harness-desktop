@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@deepseek-ai/dsh-client-runtime/client', () => ({
+vi.mock('@deepseek-ai/dsh-client-store', () => ({
   createSnapshotStore: (initial: unknown) => {
     let value = initial
     return { get: () => value, set: (next: unknown) => { value = next }, subscribe: () => () => {} }

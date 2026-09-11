@@ -1,4 +1,4 @@
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { MemoryConfig } from '../core/config.ts';
 import type { MemoryPublicItem } from '../core/schema.ts';
 import type { MemoryLocaleKey } from './locales.ts';

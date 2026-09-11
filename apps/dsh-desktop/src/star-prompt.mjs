@@ -1,9 +1,17 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { deferModalReveal } from './modal-reveal.mjs'
+import { AFDIAN_SPONSOR_URL } from './community-links.mjs'
+import { renderQrDataUrl } from './optional-integrations.mjs'
+
+let sponsorQr
+export function renderSponsorQr() {
+  return sponsorQr ??= renderQrDataUrl(AFDIAN_SPONSOR_URL, { width: 288, margin: 4, errorCorrectionLevel: 'M', color: { dark: '#10131aff', light: '#ffffffff' } }).catch(error => { sponsorQr = undefined; throw error })
+}
 
 // Bump the once-per-release claim key so the community prompt is shown again
-// after upgrading to the 3.3.0 release, while remaining idempotent thereafter.
-export const STAR_PROMPT_VERSION = '3.3.0'
+// after upgrading to the 3.4.0 release, while remaining idempotent thereafter.
+export const STAR_PROMPT_VERSION = '3.4.0'
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {
@@ -100,9 +108,11 @@ html[data-dsh-desktop-chrome-theme="dark"] #${STAR_PROMPT_SURFACE_ID} .dsh-star-
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-panel {
   position: relative;
-  width: min(520px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 48px));
   max-height: min(700px, calc(100vh - 88px));
-  overflow: hidden auto;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2, #dce1eb) 52%, transparent);
   border-radius: 24px;
   background:
@@ -155,11 +165,12 @@ html[data-dsh-desktop-chrome-theme="dark"] #${STAR_PROMPT_SURFACE_ID} .dsh-star-
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-visual {
   position: relative;
+  flex: none;
   display: grid;
   place-items: center;
-  width: 126px;
-  height: 126px;
-  margin: 30px auto 10px;
+  width: 100px;
+  height: 100px;
+  margin: 22px auto 8px;
   opacity: 0;
   transform: translateY(10px) scale(0.96);
   transition: opacity 420ms ease 120ms, transform 720ms cubic-bezier(0.22, 1, 0.36, 1) 90ms;
@@ -225,7 +236,7 @@ html[data-dsh-desktop-chrome-theme="dark"] #${STAR_PROMPT_SURFACE_ID} .dsh-star-
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-core svg { width: 36px; height: 36px; filter: drop-shadow(0 3px 8px rgba(239, 190, 82, 0.42)); }
 
-#${STAR_PROMPT_SURFACE_ID} .dsh-star-content { padding: 0 40px 34px; text-align: center; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-content { min-height: 0; overflow: auto; padding: 0 32px 14px; text-align: center; }
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-content > * {
   opacity: 0;
@@ -297,7 +308,15 @@ html[data-dsh-desktop-chrome-theme="dark"] #${STAR_PROMPT_SURFACE_ID} .dsh-star-
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-repo i { width: 5px; height: 5px; border-radius: 50%; background: #4e78ea; box-shadow: 0 0 0 4px rgba(78, 120, 234, 0.12); }
 
-#${STAR_PROMPT_SURFACE_ID} .dsh-star-actions { display: grid; gap: 10px; margin-top: 22px; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-actions { flex: none; display: grid; gap: 8px; padding: 12px 32px 18px; border-top: 1px solid var(--dsh-star-layer); }
+
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: center; margin-top: 18px; padding: 14px; border-radius: 14px; background: var(--dsh-star-layer); text-align: left; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor img { display: block; width: 120px; height: 120px; border-radius: 8px; background: white; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor img[hidden] { display: none; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor p { margin: 8px 0; color: var(--dsh-star-muted); font-size: 12px; line-height: 1.6; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor-link { overflow-wrap: anywhere; color: var(--dsw-alias-state-business-primary, #4d78e8); font-size: 12px; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor button { padding-inline: 12px; }
+#${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor-link:focus-visible { outline: 2px solid #5c83eb; outline-offset: 3px; }
 
 #${STAR_PROMPT_SURFACE_ID} .dsh-star-action-row {
   display: grid;
@@ -422,15 +441,20 @@ html[data-dsh-desktop-chrome-theme="dark"] #${STAR_PROMPT_SURFACE_ID} .dsh-star-
   #${STAR_PROMPT_SURFACE_ID} .dsh-star-content { padding-inline: 24px; }
   #${STAR_PROMPT_SURFACE_ID} .dsh-star-action-row { grid-template-columns: 1fr; }
 }
+@media (max-width: 360px) {
+  #${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor { grid-template-columns: 1fr; }
+  #${STAR_PROMPT_SURFACE_ID} .dsh-star-sponsor img { margin-inline: auto; }
+}
 `
 
-export function createStarPromptSurfaceScript({ forceVisible = false, showDelayMs = 1_100 } = {}) {
-  const options = JSON.stringify({ forceVisible, showDelayMs })
+export function createStarPromptSurfaceScript({ forceVisible = false, showDelayMs = 1_100, sponsorQrDataUrl = '' } = {}) {
+  const options = JSON.stringify({ forceVisible, showDelayMs, sponsorUrl: AFDIAN_SPONSOR_URL, sponsorQrDataUrl: /^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(sponsorQrDataUrl) ? sponsorQrDataUrl : '' })
   return `(() => {
     const id = '${STAR_PROMPT_SURFACE_ID}';
     document.getElementById(id)?.remove();
     const api = window.dshDesktop;
     const options = ${options};
+    const english = document.documentElement.lang.toLowerCase().startsWith('en');
     const isHarnessPage = location.protocol === 'http:' || location.protocol === 'https:';
     if (!options.forceVisible && (!isHarnessPage || typeof api?.claimStarPrompt !== 'function')) return false;
 
@@ -449,7 +473,7 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'dsh-star-close';
-    close.setAttribute('aria-label', '关闭 GitHub Star 提示');
+    close.setAttribute('aria-label', english ? 'Close community support' : '关闭 Star 与赞助提示');
     close.textContent = '×';
 
     const visual = document.createElement('div');
@@ -467,15 +491,15 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     content.className = 'dsh-star-content';
     const kicker = document.createElement('p');
     kicker.className = 'dsh-star-kicker';
-    kicker.textContent = '3.3.0 · 社区支持';
+    kicker.textContent = '3.4.0 · 社区支持';
     const title = document.createElement('h2');
     title.id = 'dsh-star-title';
     title.className = 'dsh-star-title';
-    title.textContent = '愿意为这个项目点个 Star 吗？';
+    title.textContent = english ? 'Help this little project go further' : '愿这个小项目，陪你走得更远';
     const copy = document.createElement('p');
     copy.id = 'dsh-star-copy';
     copy.className = 'dsh-star-copy';
-    copy.textContent = '如果它为你省下了时间，欢迎到 GitHub 点个 Star。你的支持会帮助更多人发现项目，也让我们更有动力继续修复问题、打磨体验。';
+    copy.textContent = english ? 'If this app has saved you a little time, or helped turn an idea into something real, that is why I keep building it. A Star, thoughtful feedback, or a small contribution tells me: someone on the other side of the screen cares about this work too.' : '如果它曾替你省下一点时间，陪你把一个想法变成现实，这些看似微小的瞬间，就是我继续打磨它的意义。一个 Star、一条认真反馈，或一份力所能及的赞助，都会让我知道：屏幕的另一端，有人也珍惜这份努力。';
     const note = document.createElement('p');
     note.className = 'dsh-star-note';
     note.textContent = '如果你以前点过 Star，也欢迎重新确认一次：仓库恢复公开后，原有 Star 未能保留。感谢你再次支持。';
@@ -486,6 +510,29 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     const repoName = document.createElement('span');
     repoName.textContent = 'ningbainb / deepseek-harness-desktop';
     repo.append(repoDot, repoName);
+
+    const sponsor = document.createElement('section');
+    sponsor.className = 'dsh-star-sponsor';
+    sponsor.setAttribute('aria-label', english ? 'Support on Afdian' : '爱发电赞助');
+    const qr = document.createElement('img');
+    qr.alt = english ? 'Scan to open Ningbai on Afdian' : '扫码打开凝白的爱发电主页';
+    qr.width = 120; qr.height = 120;
+    if (options.sponsorQrDataUrl) qr.src = options.sponsorQrDataUrl;
+    else qr.hidden = true;
+    const sponsorDetails = document.createElement('div');
+    const sponsorButton = document.createElement('button');
+    sponsorButton.type = 'button';
+    sponsorButton.className = 'dsh-star-community';
+    sponsorButton.textContent = english ? 'Support on Afdian' : '在爱发电支持我';
+    const sponsorNote = document.createElement('p');
+    sponsorNote.textContent = english ? 'Scan or open my page to contribute, only if it feels right. Using and sharing the app already means a lot. Thank you for being here.' : '扫码或打开主页，自愿、量力而行。不赞助也没关系，你愿意使用、分享和反馈，已经很珍贵。谢谢你，让这份热爱有了回声。';
+    const sponsorLink = document.createElement('a');
+    sponsorLink.className = 'dsh-star-sponsor-link';
+    sponsorLink.href = options.sponsorUrl;
+    sponsorLink.textContent = options.sponsorUrl;
+    sponsorLink.rel = 'noreferrer';
+    sponsorDetails.append(sponsorButton, sponsorNote, sponsorLink);
+    sponsor.append(qr, sponsorDetails);
 
     const actions = document.createElement('div');
     actions.className = 'dsh-star-actions';
@@ -505,8 +552,8 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     secondary.textContent = '先继续使用';
     actionRow.append(community, secondary);
     actions.append(primary, actionRow);
-    content.append(kicker, title, copy, note, repo, actions);
-    panel.append(close, visual, content);
+    content.append(kicker, title, copy, sponsor, note, repo);
+    panel.append(close, visual, content, actions);
     root.append(mask, panel);
     document.body.append(root);
 
@@ -581,6 +628,12 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     close.addEventListener('click', hide);
     mask.addEventListener('click', hide);
     secondary.addEventListener('click', hide);
+    const openSponsor = (event) => {
+      event.preventDefault();
+      if (!options.forceVisible) void api?.helpAction?.('sponsor').catch(() => {});
+    };
+    sponsorButton.addEventListener('click', openSponsor);
+    sponsorLink.addEventListener('click', openSponsor);
     community.addEventListener('click', () => {
       if (!options.forceVisible) void api?.helpAction?.('community').catch(() => {});
       hide();
@@ -598,7 +651,7 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
       if (root.hidden) return;
       if (event.key === 'Escape') hide();
       if (event.key === 'Tab') {
-        const focusable = [close, primary, community, secondary];
+        const focusable = [close, sponsorButton, sponsorLink, primary, community, secondary];
         const current = focusable.indexOf(document.activeElement);
         const next = event.shiftKey
           ? (current <= 0 ? focusable.length - 1 : current - 1)
@@ -608,12 +661,10 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
       }
     });
 
-    const reveal = async () => {
-      const shouldShow = options.forceVisible || await api.claimStarPrompt();
-      if (!shouldShow) return;
-      setTimeout(show, Math.max(0, Number(options.showDelayMs) || 0));
-    };
-    void reveal().catch(() => root.remove());
+    const delayMs = Math.max(0, Number(options.showDelayMs) || 0);
+    if (options.forceVisible) setTimeout(show, delayMs);
+    else (${deferModalReveal.toString()})({ root, document, window, delayMs,
+      claim: () => api.claimStarPrompt(), reveal: show, onError: () => root.remove() });
     return true;
   })()`
 }
@@ -621,7 +672,9 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
 export async function applyStarPromptSurface({ webContents, forceVisible = false, showDelayMs } = {}) {
   if (!webContents || webContents.isDestroyed?.()) return false
   await webContents.insertCSS(STAR_PROMPT_CSS, { cssOrigin: 'author' })
-  return webContents.executeJavaScript(createStarPromptSurfaceScript({ forceVisible, showDelayMs }), true)
+  const sponsorQrDataUrl = await renderSponsorQr().catch(() => '')
+  if (webContents.isDestroyed?.()) return false
+  return webContents.executeJavaScript(createStarPromptSurfaceScript({ forceVisible, showDelayMs, sponsorQrDataUrl }), true)
 }
 
 export function installStarPromptSurface({ browserWindow, forceVisible = false, onError = () => {} }) {

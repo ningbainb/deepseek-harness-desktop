@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "schemastery";
 //#region src/core/config.ts
 /** Settings namespace registered by the Host half. */
@@ -247,7 +246,7 @@ const Config = z.object({
 /** Install the Host settings namespace; model routing remains official SDK-owned. */
 function apply(ctx, initialConfig = { ...DEFAULT_CONFIG }) {
 	let currentSource = () => initialConfig;
-	installSettingsSection(ctx, settingsNamespace(MODEL_PREFERENCES_SETTINGS_NAMESPACE), Config, initialConfig, {
+	ctx.settings.installSection(ctx, MODEL_PREFERENCES_SETTINGS_NAMESPACE, Config, initialConfig, {
 		setSource: (source) => {
 			currentSource = () => source();
 		},

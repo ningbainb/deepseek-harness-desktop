@@ -11,7 +11,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-llm'
@@ -40,7 +40,7 @@ import {
 import { createConsultExpertTool } from './core/expert.ts'
 import { valueModeState } from './core/state.ts'
 import { assessValueModeHealth } from './core/model-selection.ts'
-import { emitValueModeRuntimeTelemetry } from './core/runtime-telemetry.ts'
+import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters, type RouteParameters } from './core/runtime-telemetry.ts'
 import { dshHome } from './dsh-home.ts'
 import { syncPresetTrees } from './sync.ts'
 
@@ -102,7 +102,8 @@ function syncBundledPreset(ctx: Context): void {
 export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   let currentConfig: ValueModeConfig = initialConfig
   let currentSource: () => ValueModeConfig = () => currentConfig
-  const routedRequestAttempts = new Map<string, number>()
+  const routedRequestAttempts = new Map<string, { timestamp: number; params: RouteParameters }>()
+  const streams = new Map<string, string>()
 
   const requestKey = (payload: unknown): string | undefined => {
     const value = payload as {
@@ -119,7 +120,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   }
 
   const pruneRoutedRequestAttempts = (now: number): void => {
-    for (const [key, timestamp] of routedRequestAttempts) {
+    for (const [key, { timestamp }] of routedRequestAttempts) {
       if (now - timestamp > 10 * 60_000) routedRequestAttempts.delete(key)
     }
     while (routedRequestAttempts.size > 2_048) {
@@ -127,6 +128,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
       if (typeof oldest !== 'string') break
       routedRequestAttempts.delete(oldest)
     }
+    for (const [stream, key] of streams) if (!routedRequestAttempts.has(key)) streams.delete(stream)
   }
 
   // Register the named agent preset independently of the settings switch so
@@ -135,7 +137,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   syncBundledPreset(ctx)
 
   // Install settings section with canonical optional-settings consumer wiring
-  installSettingsSection(ctx, settingsNamespace(VALUE_MODE_SETTINGS_NAMESPACE), Config, initialConfig, {
+  ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
     setSource: (source) => {
       currentSource = source
       currentConfig = source()
@@ -214,15 +216,14 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
     if (isSubagent) valueModeState.recordSubagentCall(sessionId)
     else valueModeState.recordControllerCall(sessionId)
     const key = requestKey(payload)
+    const params = routeParameters(isSubagent ? 'subagent' : 'main', effectiveConfig.strategy ?? 'balanced', route.model)
     if (key !== undefined) {
       const now = Date.now()
       pruneRoutedRequestAttempts(now)
-      routedRequestAttempts.set(key, now)
+      routedRequestAttempts.set(key, { timestamp: now, params })
     }
     emitValueModeRuntimeTelemetry({
-      event: 'call',
-      outcome: 'started',
-      role: isSubagent ? 'subagent' : 'controller',
+      event: 'cost_mode_route', params, timestamp: new Date().toISOString(),
     })
 
     return {
@@ -234,16 +235,32 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   })
 
   ctx.on('agent/request-error', async (payload, next) => {
-    const result = await next()
     const key = requestKey(payload)
-    if (key === undefined || !routedRequestAttempts.has(key)) return result
+    const attempt = key === undefined ? undefined : routedRequestAttempts.get(key)
+    if (attempt && key !== undefined) {
+      routedRequestAttempts.delete(key)
+      emitValueModeRuntimeTelemetry({ event: 'cost_mode_route', timestamp: new Date().toISOString(),
+        params: { ...attempt.params, result: 'failure', error_type: routeErrorType(payload.failure) } })
+    }
+    return next()
+  })
+
+  ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+    const stream = `${agent.id}:${frame.attemptId}`
+    if (frame.type === 'start') {
+      const key = requestKey({ agent, turn: frame.turn, step: frame.step })
+      if (key && routedRequestAttempts.has(key)) streams.set(stream, key)
+      return
+    }
+    if (frame.type !== 'end') return
+    const key = streams.get(stream)
+    streams.delete(stream)
+    const attempt = key === undefined ? undefined : routedRequestAttempts.get(key)
+    if (!attempt || key === undefined) return
+    if (frame.outcome.kind === 'committed' && frame.outcome.eventType === 'assistant/attempt') return
     routedRequestAttempts.delete(key)
-    const value = payload as { agent?: { session?: { header?: { origin?: string } } } }
-    emitValueModeRuntimeTelemetry({
-      event: 'call',
-      outcome: 'failed',
-      role: value.agent?.session?.header?.origin === 'subagent' ? 'subagent' : 'controller',
-    })
-    return result
+    const success = frame.outcome.kind === 'committed' && frame.outcome.eventType === 'assistant/message'
+    emitValueModeRuntimeTelemetry({ event: 'cost_mode_route', timestamp: new Date().toISOString(),
+      params: { ...attempt.params, result: success ? 'success' : 'cancelled', error_type: success ? 'none' : 'cancelled' } })
   })
 }

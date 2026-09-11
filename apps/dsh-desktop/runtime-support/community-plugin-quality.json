@@ -6,9 +6,9 @@
     "evidence": "apps/dsh-desktop/runtime-support/community-plugin-quality.source.json",
     "normalStartupNetwork": false
   },
-  "verifiedAt": "2026-08-20",
-  "desktopVersion": "3.3.0",
-  "upstreamVersion": "0.1.1-rc.1",
+  "verifiedAt": "2026-09-10",
+  "desktopVersion": "3.4.0",
+  "upstreamVersion": "0.1.5-rc.1",
   "entries": [
     {
       "packageName": "@linxin666/dsh-client-ui-aionui-panel",
@@ -21,12 +21,12 @@
           "api": "^1.2.0"
         },
         "runtime": {
-          "range": ">=0.1.1-rc.1 <0.2.0",
+          "range": "^0.1.1-rc.1 || ^0.1.5-alpha.1",
           "evidence": {
             "providerId": "dsh-cli-provider-v1",
-            "runtime": "0.1.1-rc.1",
-            "desktop": "3.0.0",
-            "verifiedAt": "2026-08-20",
+            "runtime": "0.1.5-alpha.1",
+            "desktop": "3.4.0",
+            "verifiedAt": "2026-09-09",
             "matrixArtifact": "runtime-support/supported-runtimes.json"
           }
         },
@@ -48,8 +48,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-aionui-panel build",
           "pnpm --filter @linxin666/dsh-client-ui-aionui-panel test",
@@ -61,7 +61,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -92,8 +92,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-git-graph build",
           "pnpm --filter @linxin666/dsh-client-ui-git-graph test",
@@ -105,7 +105,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -136,8 +136,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher build",
           "pnpm --filter @linxin666/dsh-client-ui-mode-switcher test",
@@ -149,7 +149,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -180,8 +180,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-model-preferences build",
           "pnpm --filter @linxin666/dsh-client-ui-model-preferences test",
@@ -193,7 +193,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -224,8 +224,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-blue-fantasy build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-blue-fantasy test"
@@ -236,7 +236,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -267,8 +267,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-center build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-center test"
@@ -279,7 +279,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -310,8 +310,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-dragon-heir build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-dragon-heir test"
@@ -322,7 +322,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -353,8 +353,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-harbor build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-harbor test"
@@ -365,7 +365,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -396,8 +396,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-miku build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-miku test"
@@ -408,7 +408,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -439,8 +439,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-minecraft build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-minecraft test"
@@ -451,7 +451,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -482,8 +482,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq2006 build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq2006 test"
@@ -494,7 +494,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -525,8 +525,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq98 build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-qq98 test"
@@ -537,7 +537,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -568,8 +568,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-ths build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-ths test"
@@ -580,7 +580,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -611,8 +611,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-trading build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-trading test"
@@ -623,7 +623,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -654,8 +654,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-whale-song build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-whale-song test"
@@ -666,7 +666,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -697,8 +697,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-skin-xp build",
           "pnpm --filter @linxin666/dsh-client-ui-skin-xp test"
@@ -709,7 +709,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -734,12 +734,12 @@
           "api": "^1.2.0"
         },
         "runtime": {
-          "range": ">=0.1.1-rc.1 <0.2.0",
+          "range": "^0.1.1-rc.1 || ^0.1.5-alpha.1",
           "evidence": {
             "providerId": "dsh-cli-provider-v1",
-            "runtime": "0.1.1-rc.1",
-            "desktop": "3.0.0",
-            "verifiedAt": "2026-08-20",
+            "runtime": "0.1.5-alpha.1",
+            "desktop": "3.4.0",
+            "verifiedAt": "2026-09-09",
             "matrixArtifact": "runtime-support/supported-runtimes.json"
           }
         },
@@ -758,8 +758,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-task-board build",
           "pnpm --filter @linxin666/dsh-client-ui-task-board test",
@@ -771,7 +771,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -802,8 +802,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-client-ui-web-ui-settings build",
           "pnpm --filter @linxin666/dsh-client-ui-web-ui-settings test",
@@ -815,7 +815,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -846,8 +846,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-compat build",
           "pnpm --filter @linxin666/dsh-desktop-compat test",
@@ -859,7 +859,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -890,8 +890,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-desktop-repair build",
           "pnpm --filter @linxin666/dsh-desktop-repair test",
@@ -903,7 +903,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -934,8 +934,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-liangshen build",
           "pnpm --filter @linxin666/dsh-liangshen test",
@@ -947,7 +947,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -978,8 +978,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-live-stats build",
           "pnpm --filter @linxin666/dsh-live-stats test",
@@ -991,7 +991,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1022,8 +1022,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-particle-theme build",
           "pnpm --filter @linxin666/dsh-particle-theme test",
@@ -1035,7 +1035,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1066,8 +1066,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-pet build",
           "pnpm --filter @linxin666/dsh-pet test",
@@ -1079,7 +1079,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1110,8 +1110,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-remote-web-ui build",
           "pnpm --filter @linxin666/dsh-remote-web-ui test",
@@ -1123,7 +1123,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1154,8 +1154,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-skins build"
         ]
@@ -1165,7 +1165,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1196,8 +1196,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-ssh build",
           "pnpm --filter @linxin666/dsh-ssh test",
@@ -1209,7 +1209,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1240,8 +1240,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-tool-describe-image build",
           "pnpm --filter @linxin666/dsh-tool-describe-image test",
@@ -1253,7 +1253,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1284,8 +1284,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-value-mode build",
           "pnpm --filter @linxin666/dsh-value-mode test",
@@ -1297,7 +1297,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1328,8 +1328,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @linxin666/dsh-web-ui-all build",
           "pnpm --filter @linxin666/dsh-web-ui-all test"
@@ -1340,7 +1340,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1371,8 +1371,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @ningbainb/dsh-chat-artifacts build",
           "pnpm --filter @ningbainb/dsh-chat-artifacts test",
@@ -1384,7 +1384,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1415,8 +1415,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @ningbainb/dsh-memory build",
           "pnpm --filter @ningbainb/dsh-memory test",
@@ -1428,7 +1428,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1459,8 +1459,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @ningbainb/dsh-personal-prompt build",
           "pnpm --filter @ningbainb/dsh-personal-prompt test",
@@ -1472,7 +1472,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,
@@ -1503,8 +1503,8 @@
         "status": "not-recorded"
       },
       "testCombination": {
-        "desktopVersion": "3.3.0",
-        "upstreamVersion": "0.1.1-rc.1",
+        "desktopVersion": "3.4.0",
+        "upstreamVersion": "0.1.5-rc.1",
         "commands": [
           "pnpm --filter @ningbainb/dsh-user-scope build",
           "pnpm --filter @ningbainb/dsh-user-scope test",
@@ -1516,7 +1516,7 @@
         "status": "not-recorded"
       },
       "smoke": {
-        "date": "2026-08-20",
+        "date": "2026-09-10",
         "status": "not-recorded"
       },
       "desktopVerified": false,

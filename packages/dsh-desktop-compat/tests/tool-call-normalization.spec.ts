@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { BlockAssembler, CallId } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { BlockAssembler, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 
@@ -54,7 +54,7 @@ function wrapped(value: unknown): string {
 }
 
 function exactToolCallStream(raw: string): StreamChunk[] {
-  const id = CallId('call-pwsh')
+  const id = ToolCallId('call-pwsh')
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
     { type: 'tool-call-delta', index: 0, id, name: 'Pwsh', argumentsDelta: raw.slice(0, 12) },
@@ -146,7 +146,7 @@ describe('schema-aware tool call argument recovery', () => {
 
     expect(assembler.blocks()).toEqual([{
       type: 'tool-call',
-      id: CallId('call-pwsh'),
+      id: ToolCallId('call-pwsh'),
       name: 'Pwsh',
       arguments: JSON.stringify({
         command: 'Get-ChildItem # must-not-appear-in-diagnostic',
@@ -177,8 +177,12 @@ describe('schema-aware tool call argument recovery', () => {
         },
         providerRetryPolicy() { return undefined },
         async listModels() { return [] },
-        async resolveModel(provider, model) { return { provider, id: model, name: model } },
-        async *stream() { yield* exactToolCallStream(raw) },
+        async prepareCall(provider, model) {
+          return {
+            model: { provider, id: model, name: model },
+            stream: async function* () { yield* exactToolCallStream(raw) },
+          }
+        },
       } as never)
 
       const chunks = await collect(ctx.llm.stream(request()))
@@ -199,7 +203,7 @@ describe('schema-aware tool call argument recovery', () => {
 
   it('normalizes a complete delta-only payload immediately before finish', async () => {
     const raw = wrapped(VALID_PWSH_ARGUMENTS)
-    const id = CallId('call-delta')
+    const id = ToolCallId('call-delta')
     const diagnostics: ToolCallNormalizationDiagnostic[] = []
     const chunks = await collect(normalizeToolCallArgumentStream(
       request(),
@@ -229,7 +233,7 @@ describe('schema-aware tool call argument recovery', () => {
 
   it('waits for a complete delta-only payload and refuses an unknown tool without exposing its arguments', async () => {
     const raw = wrapped({ command: 'secret-value', description: 'Sensitive model payload' })
-    const id = CallId('call-unknown')
+    const id = ToolCallId('call-unknown')
     const diagnostics: ToolCallNormalizationDiagnostic[] = []
     const chunks = await collect(normalizeToolCallArgumentStream(
       request([]),
@@ -260,7 +264,7 @@ describe('schema-aware tool call argument recovery', () => {
 
   it('flushes a complete pending delta before propagating an upstream stream error', async () => {
     const raw = wrapped(VALID_PWSH_ARGUMENTS)
-    const id = CallId('call-interrupted')
+    const id = ToolCallId('call-interrupted')
     async function* interrupted(): AsyncGenerator<StreamChunk> {
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
       yield { type: 'tool-call-delta', index: 0, id, name: 'Pwsh', argumentsDelta: raw }

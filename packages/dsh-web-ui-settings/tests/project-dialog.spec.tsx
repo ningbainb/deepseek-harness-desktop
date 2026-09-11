@@ -7,7 +7,8 @@ import { installBrowserClose, installProjectDialog } from '../src/client/desktop
 afterEach(cleanup)
 function services(items: unknown[] = []) {
   return {
-    workspaces: { list: { getSnapshot: () => ({ items }) }, pickDirectory: vi.fn(async () => 'D:\\example'), create: vi.fn(async () => ({ workspaceId: 'w', path: 'D:\\example' })), rename: vi.fn(async () => ({})), connectWorkspace: vi.fn(async () => 'session') },
+    workspaces: { list: { getSnapshot: () => ({ items }) }, create: vi.fn(async () => ({ workspaceId: 'w', path: 'D:\\example' })), rename: vi.fn(async () => ({})) },
+    uiWorkspace: { pickDirectory: vi.fn(async () => 'D:\\example'), connectWorkspace: vi.fn(async () => 'session') },
     sessions: { open: vi.fn() },
   }
 }

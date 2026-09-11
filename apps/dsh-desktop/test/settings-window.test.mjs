@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { EventEmitter } from 'node:events'
 
 import {
   applySettingsWindow,
@@ -50,6 +51,93 @@ test('settings controller applies CSS before mounting and follows navigation', a
 
   const dispose = installSettingsWindow({ browserWindow: { webContents } })
   assert.equal(typeof listeners.get('did-finish-load'), 'function')
+  assert.equal(typeof listeners.get('dom-ready'), 'function')
+  assert.equal(typeof listeners.get('did-start-navigation'), 'function')
   dispose()
   assert.equal(listeners.has('did-finish-load'), false)
+  assert.equal(listeners.size, 0)
+})
+
+const settled = () => new Promise(resolve => setImmediate(resolve))
+function fixture() {
+  const calls = []
+  const webContents = Object.assign(new EventEmitter(), {
+    isDestroyed: () => false,
+    insertCSS: async () => { calls.push('css') },
+    mainFrame: { isDestroyed: () => false, executeJavaScript: async () => { calls.push('frame'); return true } },
+    executeJavaScript: async () => { throw new Error('must use the DOM-ready main frame') },
+  })
+  return { calls, webContents }
+}
+
+test('DOM readiness uses the main frame and load completion does not reinstall an active controller', async () => {
+  const { calls, webContents } = fixture()
+  const dispose = installSettingsWindow({ browserWindow: { webContents } })
+  webContents.emit('dom-ready')
+  webContents.emit('did-finish-load')
+  await settled()
+  webContents.emit('did-finish-load')
+  await settled()
+  assert.deepEqual(calls, ['css', 'frame'])
+  webContents.emit('did-start-navigation', { isMainFrame: false, isSameDocument: false })
+  webContents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: true })
+  webContents.emit('did-finish-load')
+  await settled()
+  assert.deepEqual(calls, ['css', 'frame'])
+  webContents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false })
+  webContents.emit('dom-ready')
+  await settled()
+  assert.deepEqual(calls, ['css', 'frame', 'css', 'frame'])
+  dispose()
+})
+
+test('navigation cancels stale CSS completion before it can mount into the next document', async () => {
+  const { calls, webContents } = fixture()
+  let completeCss
+  webContents.insertCSS = () => new Promise(resolve => { completeCss = resolve })
+  const dispose = installSettingsWindow({ browserWindow: { webContents } })
+  webContents.emit('dom-ready')
+  webContents.emit('did-start-navigation', {}, 'http://localhost/next', false, true)
+  completeCss()
+  await settled()
+  assert.deepEqual(calls, [])
+  webContents.emit('dom-ready')
+  completeCss()
+  await settled()
+  assert.deepEqual(calls, ['frame'])
+  dispose()
+})
+
+test('disposal cancels a pending controller and removes every lifecycle listener', async () => {
+  const { calls, webContents } = fixture()
+  let completeCss
+  webContents.insertCSS = () => new Promise(resolve => { completeCss = resolve })
+  const dispose = installSettingsWindow({ browserWindow: { webContents } })
+  webContents.emit('dom-ready')
+  dispose()
+  completeCss()
+  await settled()
+  assert.deepEqual(calls, [])
+  assert.equal(webContents.eventNames().length, 0)
+})
+
+test('load event retries an unavailable DOM-ready API without polling or suppressing errors', async () => {
+  const { webContents } = fixture()
+  const failures = []
+  let attempts = 0
+  webContents.mainFrame.executeJavaScript = async () => {
+    attempts++
+    if (attempts === 1) throw new Error('fixture document context not ready')
+    return true
+  }
+  const dispose = installSettingsWindow({ browserWindow: { webContents }, onError: error => failures.push(error.message) })
+  webContents.emit('dom-ready')
+  webContents.emit('did-finish-load')
+  await settled()
+  assert.equal(attempts, 2)
+  assert.deepEqual(failures, ['fixture document context not ready'])
+  webContents.emit('did-finish-load')
+  await settled()
+  assert.equal(attempts, 2)
+  dispose()
 })

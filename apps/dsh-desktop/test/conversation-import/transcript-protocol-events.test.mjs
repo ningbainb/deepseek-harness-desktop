@@ -74,7 +74,7 @@ test('Transcript Protocol converts ExternalConversationV2 events to canonical DS
   // The real Session constructor validates the complete seed and appends the
   // lifecycle marker itself. This is the same path used by the Host route.
   const session = Session.create(SessionId('import-protocol-test'), dshEvents)
-  assert.equal(session.events.at(-1).type, 'session/end-seed')
+  assert.equal(session.snapshotEvents().at(-1).type, 'session/end-seed')
   assert.ok(session.deriveMessages().some((message) => message.role === 'assistant'))
   assert.ok(session.deriveMessages().some((message) => message.content[0]?.type === 'tool-result'))
 
@@ -122,13 +122,7 @@ test('Transcript Protocol bounds an oversized seed and leaves a valid Session', 
 
   assert.equal(dshEvents.truncated, true)
   assert.ok(dshEvents.byteLength <= 24 * 1024 * 1024)
-  const session = Session.create(SessionId('import-large'), dshEvents, {
-    version: 0,
-    id: 'import-large',
-    createdAt: Date.now(),
-    cwd: process.cwd(),
-    seedLength: dshEvents.length,
-  })
-  assert.equal(session.events.at(-1).type, 'session/end-seed')
+  const session = Session.create(SessionId('import-large'), dshEvents)
+  assert.equal(session.snapshotEvents().at(-1).type, 'session/end-seed')
   assert.ok(session.deriveMessages().some((message) => message.content?.[0]?.text?.includes('safe size limit')))
 })

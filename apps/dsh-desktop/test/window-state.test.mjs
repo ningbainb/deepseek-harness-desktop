@@ -71,3 +71,71 @@ test('window close persists the final geometry before BrowserWindow destruction'
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('restored logical bounds do not accumulate native constructor DPI rounding on save', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-rounding-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  const intended = { x: 80, y: 60, width: 1280, height: 820 }
+  let bounds = { x: 82, y: 60, width: 1286, height: 824 }
+  let maximized = false
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => maximized
+  try {
+    const save = attachWindowStatePersistence(window, statePath, { restoredBounds: intended })
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
+    // A cancelled gesture has not changed native geometry and must not
+    // accidentally turn the constructor rounding into a user preference.
+    window.emit('will-resize')
+    window.emit('will-move')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
+    maximized = true
+    window.emit('maximize')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: true })
+    maximized = false
+    window.emit('unmaximize')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
+    // A real resize adopts the user's new dimensions, including a later
+    // deliberate return to the native dimensions seen at construction.
+    window.emit('will-resize')
+    bounds = { ...bounds, width: 1000, height: 700 }
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, width: 1000, height: 700, maximized: false })
+    bounds = { ...bounds, width: 1286, height: 824 }
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, width: 1286, height: 824, maximized: false })
+    window.emit('will-move')
+    bounds = { ...bounds, x: 200, y: 180 }
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...bounds, maximized: false })
+  } finally {
+    window.emit('closed')
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('programmatic geometry changes replace only changed restored coordinates', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-programmatic-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  let bounds = { x: 82, y: 60, width: 1286, height: 824 }
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  try {
+    const save = attachWindowStatePersistence(window, statePath,
+      { restoredBounds: { x: 80, y: 60, width: 1280, height: 820 } })
+    bounds = { ...bounds, x: 240, width: 1100 }
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')),
+      { x: 240, y: 60, width: 1100, height: 820, maximized: false })
+  } finally {
+    window.emit('closed')
+    await rm(root, { recursive: true, force: true })
+  }
+})

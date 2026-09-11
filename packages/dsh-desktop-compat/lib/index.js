@@ -163,7 +163,7 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 						assembled: void 0
 					});
 				};
-				const persisted = options.sessionPersistence === void 0 ? false : (await options.sessionPersistence.list()).some((header) => String(header.id) === String(sessionId));
+				const persisted = options.sessionPersistence === void 0 ? false : (await options.sessionPersistence.list()).some((snapshot) => String(snapshot.header.id) === String(sessionId));
 				handle = persisted ? await options.agents.resume({
 					resumeSessionId: sessionId,
 					agentOptions,
@@ -177,7 +177,7 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 				const { agent } = handle;
 				await agent.whenIdle();
 				const firstSequence = agent.session.seq;
-				const promptAlreadyAccepted = persisted && hasScheduledPrompt(agent.session.events, prompt);
+				const promptAlreadyAccepted = persisted && hasScheduledPrompt(agent.session.snapshotEvents(), prompt);
 				if (!promptAlreadyAccepted) {
 					agent.followup(createUserMessage({
 						content: [{
@@ -189,7 +189,7 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 					await agent.whenIdle();
 				}
 				await options.sessions.flush(agent.session);
-				const reason = terminalReason(agent.session.events, promptAlreadyAccepted ? 0 : firstSequence);
+				const reason = terminalReason(agent.session.snapshotEvents(), promptAlreadyAccepted ? 0 : firstSequence);
 				const outcome = terminalOutcome(reason);
 				const error = outcome === "failed" ? reason?.kind === "error" ? `${reason.error.code}: ${reason.error.message}`.slice(0, 500) : promptAlreadyAccepted ? `scheduled session was already accepted before recovery and ended with ${reason?.kind ?? "no terminal outcome"}` : `scheduled turn ended with ${reason?.kind ?? "no terminal outcome"}` : void 0;
 				return {
@@ -906,11 +906,10 @@ async function importConversationIntoHost(ctx, request) {
 		if (session !== void 0 && session.header.cwd !== canonicalCwd) return failure$1("session-conflict", "requested session belongs to a different project directory");
 		if (session === void 0) {
 			const created = createPreparedSession(ctx.sessions, requestedSessionId, {
-				seed: request.seed,
+				seed: [...request.seed],
 				meta: {
 					cwd: canonicalCwd,
-					...request.createdAt === void 0 ? {} : { createdAt: request.createdAt },
-					seedLength: request.seed.length
+					...request.createdAt === void 0 ? {} : { createdAt: request.createdAt }
 				}
 			});
 			session = created.session;
@@ -936,7 +935,7 @@ async function importConversationIntoHost(ctx, request) {
 		projectCwd: canonicalCwd,
 		title: persistedTitle,
 		seedEventCount: request.seed.length,
-		eventCount: session.events.length
+		eventCount: session.seq
 	};
 }
 function createDesktopConversationImportRoute(ctx, { capabilityToken = process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] } = {}) {
@@ -1270,73 +1269,101 @@ function validateCompatPatchRegistry(entries, options = {}) {
 const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
 	{
 		id: "queued-turn-continuation",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-agent 0.1.1-rc.1 agent/status public hook behavior",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-agent 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 agent/status public hook behavior",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/recovery.spec.ts"],
 		reason: "Resume a queued user turn after the active turn reaches a terminal status.",
 		removeWhen: "The upstream agent loop natively and deterministically resumes queued turns.",
-		lastVerified: "2026-08-21"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "cancellation-presentation",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-tools 0.1.1-rc.1 tools/post-execute public hook behavior",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-tools 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 tools/post-execute public hook behavior",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/recovery.spec.ts"],
 		reason: "Translate the known object-shaped cancellation result into a stable user-facing message.",
 		removeWhen: "The upstream tool runtime returns a stable cancellation presentation contract.",
-		lastVerified: "2026-08-21"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "tool-call-arguments-envelope",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-llm 0.1.1-rc.1 llm/stream waterfall plus dsh-tools schema validation",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-llm 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 llm/stream waterfall plus dsh-tools schema validation",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts"],
 		reason: "Recover only a schema-proven single-key arguments envelope before the agent loop parses tool JSON.",
 		removeWhen: "The upstream adapter or agent loop normalizes this malformed transport envelope with the same ambiguity guard.",
-		lastVerified: "2026-08-21"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "desktop-skin-profile-isolation",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh 0.1.1-rc.1 profile-scoped runtime behavior and Skin Center v2 state isolation",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 profile-scoped runtime behavior and Skin Center v2 state isolation",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/skin-state.spec.ts"],
 		reason: "Keep Desktop skin selection inside the isolated desktop profile patch.",
 		removeWhen: "The upstream skin service exposes a profile-scoped public persistence contract.",
-		lastVerified: "2026-08-21"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "tools-capability-request-side",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-llm-pi-ai 0.1.1-rc.1 GenerateOptions tools request path",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-llm-pi-ai 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 GenerateOptions tools request path",
 		owner: "desktop-platform",
 		tests: ["apps/dsh-desktop/test/tools-capability.test.mjs"],
 		reason: "Add a route-level auto/native/none request-side tools capability while preserving ordinary chat and stable tool-history failure semantics.",
 		removeWhen: "The upstream adapter exposes a request-side tools capability contract with the same route-level behavior.",
-		lastVerified: "2026-08-24"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "session-startup-corruption",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-session-persistence-jsonl 0.1.1-rc.1 listArtifacts/readFirstZstdLine invalid frame magic at byte 0",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-session-persistence-jsonl 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 listArtifacts/readFirstZstdLine invalid frame magic at byte 0",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/session-recovery.spec.ts"],
-		reason: "Skip only a confirmed invalid zstd frame header while preserving every original session artifact.",
+		reason: "Recover a valid plaintext JSONL artifact mislabeled with the zstd suffix while preserving its original bytes, and isolate only artifacts that remain corrupt.",
 		removeWhen: "The upstream JSONL persistence backend isolates an invalid session artifact during metadata enumeration.",
-		lastVerified: "2026-08-25"
+		lastVerified: "2026-09-10"
 	},
 	{
 		id: "transcript-tool-call-balance",
-		appliesTo: ["0.1.1-rc.1"],
-		upstreamReference: "@deepseek-ai/dsh-agent-loop 0.1.1-rc.1 buildRequest interrupted assistant tool_calls transcript projection",
+		appliesTo: [
+			"0.1.1-rc.1",
+			"0.1.5-alpha.1",
+			"0.1.5-rc.1"
+		],
+		upstreamReference: "@deepseek-ai/dsh-agent-loop 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 buildRequest interrupted assistant tool_calls transcript projection",
 		owner: "desktop-platform",
 		tests: ["packages/dsh-desktop-compat/tests/transcript-balance.spec.ts"],
 		reason: "Strip trailing incomplete assistant messages with unresponded tool calls from outbound stream requests without mutating disk session logs.",
 		removeWhen: "The upstream agent loop strips or repairs interrupted assistant tool calls before assembling outbound LLM messages.",
-		lastVerified: "2026-08-26"
+		lastVerified: "2026-09-10"
 	}
 ], { enforceFreshness: false });
 //#endregion

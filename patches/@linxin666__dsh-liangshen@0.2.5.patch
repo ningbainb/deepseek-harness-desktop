@@ -1,0 +1,22 @@
+diff --git a/presets/liangshen/agent.cordis.yml b/presets/liangshen/agent.cordis.yml
+--- a/presets/liangshen/agent.cordis.yml
++++ b/presets/liangshen/agent.cordis.yml
+@@ -40,7 +40,7 @@
+ - id: persona
+   name: '@deepseek-ai/dsh-persona'
+   config:
+-    text: You are a helpful software engineer assistant.
++    prefix: You are a helpful software engineer assistant.
+ 
+ # Two-phase input bootstrap with the exact Minimal phase-1 tools. Before the
+ # first durable tool/call event the model sees only persistent `bash` plus
+diff --git a/presets/liangshen/tool-bootstrap.mjs b/presets/liangshen/tool-bootstrap.mjs
+--- a/presets/liangshen/tool-bootstrap.mjs
++++ b/presets/liangshen/tool-bootstrap.mjs
+@@ -64,1 +64,2 @@
+-const PERSONA_SECTION_NAMES = new Set(['deployment:persona', 'persona'])
++const PERSONA_PREFIX_SECTION_NAMES = new Set(['deployment:persona-prefix', 'deployment:persona', 'persona'])
++const PERSONA_SECTION_NAMES = new Set([...PERSONA_PREFIX_SECTION_NAMES, 'deployment:persona-suffix'])
+@@ -393,1 +394,1 @@
+-    PERSONA_SECTION_NAMES.has(section?.name)
++    PERSONA_PREFIX_SECTION_NAMES.has(section?.name)

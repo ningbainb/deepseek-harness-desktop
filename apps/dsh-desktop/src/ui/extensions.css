@@ -133,6 +133,7 @@ main::-webkit-scrollbar-thumb {
 .panel { max-width: 780px; margin: 0 auto; }
 .market-panel { max-width: 980px; }
 .panel-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 18px; }
+.migration-panel-head { margin-top: 32px; }
 .panel-head > div { display: flex; align-items: center; gap: 9px; }
 .panel-head > p { max-width: 480px; margin: 0; color: var(--harness-text-secondary); font-size: 12px; line-height: 1.55; }
 h2 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }

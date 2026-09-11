@@ -20,6 +20,7 @@ $shutdownReceiptMarkerValue = 'dsh-desktop-update-shutdown-receipt=2'
 $gracefulShutdownTimeoutMs = 7000
 $receiptShutdownTimeoutMs = 15000
 $receiptProcessExitTimeoutMs = 5000
+$replacementFileReleaseTimeoutMs = 5000
 $forceAttempts = 12
 $retryDelayMs = 400
 $script:receiptProtocolFailed = $false
@@ -480,7 +481,8 @@ namespace DshInstaller
 
   function Complete-Preflight {
     $blockers = @()
-    for ($attempt = 0; $attempt -lt 10; $attempt += 1) {
+    $replacementWait = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
       $blockers = @(Get-ReplacementFileBlockers)
       if ($blockers.Count -eq 0) {
         if ($PrepareExistingUpgrade) {
@@ -491,9 +493,11 @@ namespace DshInstaller
       if ($blockers | Where-Object { $_.Kind -eq 'permission' } | Select-Object -First 1) {
         break
       }
-      if ($attempt + 1 -lt 10) {
-        Start-Sleep -Milliseconds 200
-      }
+      $remainingWaitMs = $replacementFileReleaseTimeoutMs - $replacementWait.ElapsedMilliseconds
+      if ($remainingWaitMs -le 0) { break }
+      # PID exit and release of executable mappings need not happen together.
+      # Poll only while blocked; never replace an image until the exclusive probe succeeds.
+      Start-Sleep -Milliseconds ([Math]::Min(200, $remainingWaitMs))
     }
     foreach ($blocker in $blockers) {
       Write-Output "$($blocker.Kind) path=$($blocker.Path): $($blocker.Message)"

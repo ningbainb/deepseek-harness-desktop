@@ -6,10 +6,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
-import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
-import type { MuxFrame } from '@deepseek-ai/dsh-host-apiproxy/api/events'
+import type { MobileApiProxy } from './mobile-contract.ts'
 import type { PairingService } from './pairing.ts'
 import {
   canAccessSession,
@@ -51,7 +48,7 @@ export const MOBILE_API_PATHS = {
 /** Route dependencies; user-scope is mandatory for the production surface. */
 export interface MobileApiDeps {
   service: PairingService
-  apiProxy: ApiProxy
+  apiProxy: MobileApiProxy
   userScope: MobileScopeAuthority
   mobileEnterToSend: () => boolean
   /** Host-side search already restricted to the supplied authorized session IDs. */
@@ -232,6 +229,14 @@ export function makeMobileApiRoutes(deps: MobileApiDeps): WebRoute[] {
       res.end('forbidden')
       return
     }
+    const rawSessionId = new URL(req.url ?? '/', 'http://x').searchParams.get('sessionId')
+    const requestedSessionId = rawSessionId === null ? undefined : sessionIdFromPayload({ sessionId: rawSessionId })
+    if ((rawSessionId !== null && requestedSessionId === undefined)
+      || (requestedSessionId !== undefined && !canAccessSession(userScope, resolved.scope, requestedSessionId))) {
+      res.writeHead(403)
+      res.end('forbidden')
+      return
+    }
     res.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache',
@@ -258,8 +263,8 @@ export function makeMobileApiRoutes(deps: MobileApiDeps): WebRoute[] {
     req.on('close', onClose)
     try {
       const frames = userScope.run(resolved.scope, () => apiProxy.events.mux({
-        rpcId: RpcId(`mobile-mux-${Date.now().toString(36)}`),
-        payload: {},
+        rpcId: `mobile-mux-${Date.now().toString(36)}`,
+        payload: requestedSessionId === undefined ? {} : { sessionId: requestedSessionId },
       }, controller.signal))
       for await (const frame of frames) {
         if (closed) break
@@ -288,7 +293,7 @@ export function makeMobileApiRoutes(deps: MobileApiDeps): WebRoute[] {
 }
 
 interface DispatchDeps {
-  apiProxy: ApiProxy
+  apiProxy: MobileApiProxy
   userScope: MobileScopeAuthority
   scope: import('@ningbainb/dsh-user-scope').AccessScope
   method: string
@@ -302,7 +307,7 @@ async function dispatch(deps: DispatchDeps): Promise<MobileResponse> {
   const { apiProxy, userScope, scope, method, payload, rpcId, sessionSearch, isLive } = deps
   if (!isLive()) return denied(rpcId)
   if (method === 'workspace.list') {
-    const raw = await apiProxy.workspace.list({ rpcId: RpcId(rpcId), payload: {} })
+    const raw = await apiProxy.workspace.list({ rpcId, payload: {} })
     if (!isLive()) return denied(rpcId)
     if (!raw.result.ok) return safeProxyResponse(rpcId, raw)
     const value = raw.result.value
@@ -332,7 +337,7 @@ async function dispatch(deps: DispatchDeps): Promise<MobileResponse> {
     // able to name an arbitrary local working directory, even if the Host
     // create contract accepts an optional cwd for trusted local callers.
     if (Object.prototype.hasOwnProperty.call(record, 'cwd')) return denied(rpcId, 'forbidden')
-    const raw = await apiProxy.sessions.create({ rpcId: RpcId(rpcId), payload: { workspaceId } } as never)
+    const raw = await apiProxy.sessions.create({ rpcId, payload: { workspaceId } })
     if (!canUseWorkspace()) return denied(rpcId)
     if (!raw.result.ok) return safeProxyResponse(rpcId, raw)
     const created = raw.result.value
@@ -350,7 +355,7 @@ async function dispatch(deps: DispatchDeps): Promise<MobileResponse> {
       ok: true,
       value: {
         sessionId,
-        ...(typeof created.agentPreset === 'string' ? { agentPreset: created.agentPreset } : {}),
+        ...(isRecord(created) && typeof created.agentPreset === 'string' ? { agentPreset: created.agentPreset } : {}),
       },
     })
   }
@@ -366,7 +371,7 @@ async function dispatch(deps: DispatchDeps): Promise<MobileResponse> {
     // it to the Host. Fetch, authorize, sort, and page locally; otherwise a
     // future Host pagination implementation could page before our filter and
     // leak ordering information or skip an authorized row behind a hidden one.
-    const raw = await apiProxy.sessions.list({ rpcId: RpcId(rpcId), payload: {} })
+    const raw = await apiProxy.sessions.list({ rpcId, payload: {} })
     if (!isLive()) return denied(rpcId)
     if (!raw.result.ok) return safeProxyResponse(rpcId, raw)
     const visible = new Set(userScope.visibleSessions(scope).map(item => item.sessionId))
@@ -418,7 +423,7 @@ async function dispatch(deps: DispatchDeps): Promise<MobileResponse> {
   const canUseSession = (): boolean => isLive() && sessionId !== undefined && canAccessSession(userScope, scope, sessionId)
   if (!canUseSession()) return denied(rpcId)
   const record = isRecord(payload) ? { ...payload, sessionId } : { sessionId }
-  const request: RpcRequest<unknown> = { rpcId: RpcId(rpcId), payload: record }
+  const request = { rpcId, payload: record }
   if (method === 'session.history') {
     if (!canUseSession()) return denied(rpcId)
     const raw = await apiProxy.sessions.history(request as never)

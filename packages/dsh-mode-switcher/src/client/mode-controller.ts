@@ -2,6 +2,7 @@ export interface SessionSummaryLike {
   id: string
   cwd?: string
   agentPreset?: string
+  projectionValues?: Readonly<{ agentPreset?: unknown; sessionListMetadata?: unknown }>
   blank: boolean
 }
 
@@ -35,7 +36,7 @@ export interface ModeSwitcherDeps {
     open(sessionId: string): void
     refresh(): Promise<void>
     clear(): void
-    noteAgentPreset(sessionId: string, agentPreset: string): void
+    noteAgentPreset?(sessionId: string, agentPreset: string): void
   }
   workspaces: {
     list: { getSnapshot(): { items: ReadonlyArray<WorkspaceSummaryLike> } }
@@ -78,9 +79,15 @@ export class ModeSwitcherController {
     const summary = this.deps.sessions.list.getSnapshot().byId[sessionId]
     if (summary === undefined) throw new Error('session is no longer available')
 
-    if (summary.blank) {
+    // A cold list may lag the projection hydrated by opening history. Either
+    // source witnessing a started conversation is enough to prohibit reuse.
+    const metadata = summary.projectionValues?.sessionListMetadata
+    const projectedHistory = typeof metadata === 'object' && metadata !== null
+      && 'blank' in metadata && metadata.blank === false
+    if (summary.blank && !projectedHistory) {
       const selected = await this.selectWithRetry(sessionId, agentPreset)
-      this.deps.sessions.noteAgentPreset(sessionId, selected)
+      if (this.deps.sessions.noteAgentPreset) this.deps.sessions.noteAgentPreset(sessionId, selected)
+      else await this.deps.sessions.refresh()
       return sessionId
     }
 
@@ -96,7 +103,6 @@ export class ModeSwitcherController {
     const items = this.deps.workspaces.list.getSnapshot().items
     const workspace = items.find((item) => item.sessionIds?.includes(summary.id) === true)
       ?? items.find((item) => item.path === summary.cwd)
-      ?? items[0]
     const workspaceId = workspace?.workspaceId ?? workspace?.id
     if (workspaceId === undefined && (summary.cwd === undefined || summary.cwd === '')) {
       throw new Error('当前会话没有可用的工作区，无法切换模式')
@@ -107,7 +113,6 @@ export class ModeSwitcherController {
       // Do not create a standard draft and then race a second preset select.
       // session.create already accepts agentPreset and makes the new session's
       // official hero state correct before it becomes current.
-      this.deps.sessions.clear()
       const response = await this.deps.api.sessions.create({
         ...workspaceId === undefined ? { cwd: summary.cwd } : { workspaceId },
         agentPreset,
@@ -118,8 +123,13 @@ export class ModeSwitcherController {
 
       const targetSessionId = response.result.value.sessionId
       await this.deps.sessions.refresh()
-      this.deps.sessions.noteAgentPreset(targetSessionId, response.result.value.agentPreset ?? agentPreset)
-      this.deps.sessions.open(targetSessionId)
+      this.deps.sessions.noteAgentPreset?.(targetSessionId, response.result.value.agentPreset ?? agentPreset)
+      // Preserve the old view through both fallible operations. A late result
+      // may register its new session, but must not replace newer user navigation.
+      if (this.deps.sessions.list.getSnapshot().current === summary.id) {
+        this.deps.sessions.clear()
+        this.deps.sessions.open(targetSessionId)
+      }
       await restoreDefault()
       return targetSessionId
     } finally {

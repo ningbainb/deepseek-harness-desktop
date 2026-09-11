@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings';
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope';
 import z from 'schemastery';
 import { DEFAULT_MEMORY_CONFIG, normalizeMemoryConfig, assertMemoryConfig, } from "./core/config.js";
@@ -116,10 +115,12 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     // ownership. Prompt injection still requires an actual scoped carrier key.
     for (const session of ctx.sessions.list())
         rememberSession(undefined, session);
-    installSettingsSection(ctx, settingsNamespace(MEMORY_SETTINGS_NAMESPACE), Config, initialConfig, {
-        setSource: next => { source = next; },
-        onChange: () => { },
-        validate: value => { assertMemoryConfig(value); },
+    ctx.inject(['settings'], (settingsCtx) => {
+        settingsCtx.settings.installSection(ctx, MEMORY_SETTINGS_NAMESPACE, Config, initialConfig, {
+            setSource: next => { source = next; },
+            onChange: () => { },
+            validate: value => { assertMemoryConfig(value); },
+        });
     });
     ctx.effect(() => {
         const disposeSection = ctx.systemPrompt.section({

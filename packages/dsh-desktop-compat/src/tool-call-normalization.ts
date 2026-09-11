@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { CallId, GenerateOptions, StreamChunk, ToolSchema } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk, ToolSchema } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 
 /**
@@ -39,7 +40,7 @@ type ToolSchemaLookup =
 
 interface BufferedToolCall {
   readonly chunks: StreamChunk[]
-  id: CallId
+  id: ToolCallId
   name?: string
   arguments: string
 }

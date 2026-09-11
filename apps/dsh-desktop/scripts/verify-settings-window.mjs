@@ -11,6 +11,7 @@ const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-settings-window-e2e-'))
 const runtimeReadyTimeoutMs = process.env.CI ? 120_000 : 90_000
 let electronApp
+let page
 
 const panelState = (dialog) => dialog.evaluate((element) => {
   const layer = element.parentElement
@@ -58,7 +59,7 @@ try {
       DSH_DESKTOP_VERIFY_UPDATER: '0',
     },
   })
-  const page = await electronApp.firstWindow()
+  page = await electronApp.firstWindow()
   page.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
   await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: runtimeReadyTimeoutMs })
   await page.waitForSelector('style[data-plugin="@linxin666/dsh-client-ui-mode-switcher"]', {
@@ -66,17 +67,25 @@ try {
     timeout: runtimeReadyTimeoutMs,
   })
 
-  const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
-  if (await starPrompt.isVisible()) {
-    await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
-    await starPrompt.waitFor({ state: 'hidden' })
-  }
+  const starPrompt = page.locator('#dsh-desktop-star-prompt')
   const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
-  const introDialog = page.getByRole('dialog').filter({ has: continueButton })
-  if (await introDialog.isVisible()) {
+  const introDialog = page.locator('[role="dialog"]:visible').filter({ has: continueButton })
+  const openStarPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
+  // Plugin styles can arrive before React mounts the introductory disclosure.
+  // Wait for the actual surface, not one instantaneous isVisible() snapshot.
+  const startupDeadline = Date.now() + 10_000
+  for (;;) {
+    await introDialog.or(openStarPrompt).first().waitFor({ state: 'visible', timeout: Math.max(1, startupDeadline - Date.now()) })
+    if (await openStarPrompt.isVisible()) break
+    assert.equal(await page.locator('#dsh-desktop-star-prompt[data-open="true"]').count(), 0)
     await introDialog.getByRole('button', { name: /^(?:继续|Continue)$/u }).click()
     await introDialog.waitFor({ state: 'hidden' })
   }
+  // The optional prompt waits for the introductory disclosure to close.
+  // Still await and dismiss it before exercising Settings in this fresh profile.
+  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
+  await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
+  await starPrompt.waitFor({ state: 'hidden' })
 
   const openSettings = async () => {
     await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate((button) => button.click())
@@ -218,6 +227,23 @@ try {
   const saved = JSON.parse(await readFile(resolve(temporary, 'user-data', 'settings-window-state.json'), 'utf8'))
   assert.deepEqual(Object.keys(saved).toSorted(), ['height', 'width', 'x', 'y'])
   console.log(`verified settings window movement, resize, persistence, responsive clamp, and DPI scale ${displayScale}`)
+} catch (error) {
+  // Isolated empty-profile fixture only. Keep actionable modal diagnostics
+  // while retaining the original failure and timeout.
+  console.error('settings fixture failure state', JSON.stringify(await page?.evaluate(() => ({
+    readyState: document.readyState,
+    visibility: document.visibilityState,
+    focused: document.hasFocus(),
+    starOpen: document.querySelector('#dsh-desktop-star-prompt')?.getAttribute('data-open'),
+    starHidden: document.querySelector('#dsh-desktop-star-prompt')?.hasAttribute('hidden'),
+    dialogs: [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')].map(element => ({
+      className: element.className,
+      visible: element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0,
+      hidden: element.hasAttribute('hidden'),
+      buttons: [...element.querySelectorAll('button')].map(button => button.textContent?.trim().slice(0, 80)),
+    })),
+  })).catch(() => undefined)))
+  throw error
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })

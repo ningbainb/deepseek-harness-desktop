@@ -33,8 +33,24 @@ test('release pruner classifies only non-runtime package files', () => {
   assert.equal(classifyPrunableFile('zod/v4/index.d.cts'), 'type-declaration')
   assert.equal(classifyPrunableFile('sdk/examples/client/demo.js'), 'development-material')
   assert.equal(classifyPrunableFile('cytoscape-fcose/demo/constraints.gif'), 'development-material')
+  assert.equal(classifyPrunableFile('rxjs/README.md'), 'package-documentation')
+  assert.equal(classifyPrunableFile('openai/README.zh.md'), 'package-documentation')
+  assert.equal(classifyPrunableFile('@linxin666/example/README.i18n.yaml'), 'package-documentation')
+  assert.equal(classifyPrunableFile('undici/CHANGELOG.md'), 'package-documentation')
+  assert.equal(classifyPrunableFile('undici/LICENSE'), undefined)
+  assert.equal(classifyPrunableFile('undici/NOTICE.txt'), undefined)
+  assert.equal(classifyPrunableFile('undici/history.js'), undefined)
+  assert.equal(classifyPrunableFile('undici/changes.js'), undefined)
   assert.equal(classifyPrunableFile('node-pty/prebuilds/win32-arm64/pty.node'), 'foreign-native-binary')
   assert.equal(classifyPrunableFile('node-pty/prebuilds/win32-x64/pty.node'), undefined)
+  assert.equal(
+    classifyPrunableFile('dsh-better-sidebar/node_modules/node-pty/prebuilds/win32-arm64/pty.node'),
+    'foreign-native-binary',
+  )
+  assert.equal(
+    classifyPrunableFile('dsh-better-sidebar/node_modules/node-pty/prebuilds/win32-x64/pty.node'),
+    undefined,
+  )
   assert.equal(classifyPrunableFile('pnpm/artifacts/exe/dist/pnpm.mjs'), 'duplicate-runtime-artifact')
   assert.equal(
     classifyPrunableFile('pnpm/dist/vendor/fastlist-0.3.0-x86.exe'),
@@ -76,8 +92,12 @@ test('release pruner removes classified files and preserves runtime entries', as
       ['openai/src/client.ts', 'source'],
       ['openai/index.js', 'runtime'],
       ['zod/index.d.cts', 'types'],
+      ['rxjs/README.md', 'documentation'],
+      ['rxjs/LICENSE', 'license'],
       ['node-pty/prebuilds/win32-arm64/pty.node', 'arm64'],
       ['node-pty/prebuilds/win32-x64/pty.node', 'x64'],
+      ['dsh-better-sidebar/node_modules/node-pty/prebuilds/win32-arm64/pty.node', 'nested-arm64'],
+      ['dsh-better-sidebar/node_modules/node-pty/prebuilds/win32-x64/pty.node', 'nested-x64'],
       ['@linxin666/dsh-client-ui-task-board/docs/e2e/demo.png', 'docs'],
       ['@linxin666/dsh-client-ui-task-board/lib/client.js', 'runtime'],
       ['@linxin666/dsh-client-ui-skin-dragon-heir/preview/light.png', 'preview'],
@@ -90,11 +110,19 @@ test('release pruner removes classified files and preserves runtime entries', as
     }
 
     const report = await prunePackagedRuntime(root)
-    assert.equal(report.removedFiles, 5)
+    assert.equal(report.removedFiles, 7)
     assert.equal(await readFile(join(root, 'openai', 'index.js'), 'utf8'), 'runtime')
+    assert.equal(await readFile(join(root, 'rxjs', 'LICENSE'), 'utf8'), 'license')
     assert.equal(
       await readFile(join(root, 'node-pty', 'prebuilds', 'win32-x64', 'pty.node'), 'utf8'),
       'x64',
+    )
+    assert.equal(
+      await readFile(
+        join(root, 'dsh-better-sidebar', 'node_modules', 'node-pty', 'prebuilds', 'win32-x64', 'pty.node'),
+        'utf8',
+      ),
+      'nested-x64',
     )
     assert.equal(
       await readFile(join(root, '@linxin666', 'dsh-client-ui-task-board', 'lib', 'client.js'), 'utf8'),
@@ -215,6 +243,7 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
       '@deepseek-ai/dsh-settings',
       '@deepseek-ai/dsh-timeout',
       '@deepseek-ai/dsh-typert-protocol',
+      '@deepseek-ai/dsh-user-approval',
       '@deepseek-ai/dsh-workspace',
     ])
     for (const packageName of restored) {
@@ -270,12 +299,12 @@ test('release recovery restores Windows native optional bindings omitted by elec
   }
 })
 
-test('Windows packaging uses maximum compression and retains only supported Electron locales', async () => {
+test('Windows packaging favors install speed and retains only supported Electron locales', async () => {
   const config = YAML.parse(await readFile(
     resolve(import.meta.dirname, '..', 'electron-builder.yml'),
     'utf8',
   ))
   assert.equal(config.npmRebuild, false)
-  assert.equal(config.compression, 'maximum')
+  assert.equal(config.compression, 'normal')
   assert.deepEqual(config.electronLanguages, ['en-US', 'zh-CN', 'zh-TW'])
 })

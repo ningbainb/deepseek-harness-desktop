@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -19,7 +19,7 @@ export const inject = ['sessionProjections']
  * Settings namespace of the live-stats capability — the section the web
  * settings surface edits.
  */
-export const LIVE_STATS_SETTINGS_NAMESPACE = settingsNamespace('live-stats')
+export const LIVE_STATS_SETTINGS_NAMESPACE = 'live-stats'
 
 /** Plugin configuration for provider-independent token estimation. */
 export interface Config extends EstimatorConfig {
@@ -113,9 +113,11 @@ export function apply(
     }, 'live-stats: routes')
   })
 
-  installSettingsSection(ctx, LIVE_STATS_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => { current = source },
-    onChange: rebuild,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, LIVE_STATS_SETTINGS_NAMESPACE, Config, config ?? {}, {
+      setSource: (source) => { current = source },
+      onChange: rebuild,
+    })
   })
   rebuild()
 }

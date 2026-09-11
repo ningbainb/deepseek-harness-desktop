@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
+import { runtimeEntryPath } from '../src/runtime-controller.mjs'
 
 import {
   AGGREGATED_BUNDLES,
@@ -33,6 +34,16 @@ import {
   resolveRuntimePackages,
   resolveDshCliPath,
 } from '../src/profile.mjs'
+
+test('Desktop aggregate ships the current conversation navigator build', () => {
+  const root = resolveRuntimePackages(['@linxin666/dsh-web-ui-all']).get('@linxin666/dsh-web-ui-all')
+  const shipped = readFileSync(join(root, 'lib/client.js'), 'utf8').replaceAll('\r\n', '\n')
+  const workspace = readFileSync(new URL('../../../packages/dsh-web-ui-all/lib/client.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
+  const region = /\t*\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\t*\/\/#endregion/u
+  const expected = workspace.match(region)?.[0]
+  assert.ok(expected?.includes('positionNavigator'), 'workspace build contains composer avoidance')
+  assert.equal(shipped.match(region)?.[0], expected, 'update the pinned aggregate patch when changing the navigator')
+})
 
 function aggregateLoaderPackageNames(source) {
   const packageNames = new Set()
@@ -254,7 +265,7 @@ test('profile manifest removes bundles already supplied by the web UI aggregate'
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('@linxin666/dsh-client-ui-skin-qq2006'), true)
 })
 
-test('desktop profile uses the RC.1 native Codex provider plus the native market and reasoning controls', () => {
+test('desktop profile uses the DSH 0.1.5 native Codex provider plus the native market and reasoning controls', () => {
   assert.equal(BUILTIN_BUNDLES.includes('dshmarket'), false)
   assert.equal(BUILTIN_BUNDLES.includes('dsh-plugin-hub'), false)
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dshmarket'), false)
@@ -307,6 +318,13 @@ test('desktop profile directly includes Value Mode as a first-class builtin bund
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@linxin666/dsh-value-mode'), true)
   assert.equal(AGGREGATED_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
   assert.equal(DEPENDENCY_ONLY_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
+})
+
+test('desktop profile directly mounts better sidebar for DSH 0.1.5 bundle composition', () => {
+  assert.equal(BUILTIN_BUNDLES.includes('dsh-better-sidebar'), true)
+  assert.equal(MANAGED_RUNTIME_PACKAGES.includes('dsh-better-sidebar'), true)
+  assert.equal(AGGREGATED_BUNDLES.includes('dsh-better-sidebar'), false)
+  assert.equal(DEPENDENCY_ONLY_BUNDLES.includes('dsh-better-sidebar'), false)
 })
 
 test('profile manifest adopts pre-installed community Value Mode bundle into builtins without duplication', () => {
@@ -406,7 +424,7 @@ test('profile manifest retires obsolete managed packages', () => {
   assert.equal(RETIRED_MANAGED_PACKAGES.includes('dsh-plugin-hub'), true)
 })
 
-test('profile manifest retires legacy Codex providers now owned by RC.1 llm-pi-ai', () => {
+test('profile manifest retires legacy Codex providers now owned by DSH 0.1.5 llm-pi-ai', () => {
   const manifest = createDesktopProfileManifest({
     dependencies: { 'dsh-codex': '0.2.2', 'dsh-codex-connect': '0.1.0-alpha.4.5' },
     dsh: { profile: { bundles: ['dsh-codex'] } },
@@ -417,7 +435,7 @@ test('profile manifest retires legacy Codex providers now owned by RC.1 llm-pi-a
   assert.equal(manifest.dependencies['dsh-codex-connect'], undefined)
 })
 
-test('profile bootstrap refuses to link the legacy Codex Connect provider on RC.1', async () => {
+test('profile bootstrap refuses to link the legacy Codex Connect provider on DSH 0.1.5', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-codex-conflict-'))
   const dshHome = join(root, 'home')
   const profileDir = join(dshHome, 'profiles', 'desktop')
@@ -834,7 +852,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
     assert.doesNotMatch(profilePatch, /^\{\}$/mu)
     const composed = spawnSync(
       process.execPath,
-      [resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
+      [runtimeEntryPath(resolveDshCliPath()), '--dsh-cli', resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
       {
         encoding: 'utf8',
         env: { ...process.env, DSH_HOME: dshHome },
@@ -861,7 +879,7 @@ test('profile bootstrap leaves a missing root patch absent when the pinned runti
     )
     const composed = spawnSync(
       process.execPath,
-      [resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
+      [runtimeEntryPath(resolveDshCliPath()), '--dsh-cli', resolveDshCliPath(), '--profile', 'desktop', '--dump-config'],
       {
         encoding: 'utf8',
         env: { ...process.env, DSH_HOME: root },
@@ -991,6 +1009,7 @@ test('runtime resolver finds every bundled and desktop support package', async (
     '@linxin666/dsh-client-ui-model-preferences',
     '@linxin666/dsh-client-ui-task-board',
     '@linxin666/dsh-ssh',
+    '@linxin666/dsh-tool-describe-image',
     '@ningbainb/dsh-chat-artifacts',
     '@ningbainb/dsh-memory',
     '@ningbainb/dsh-personal-prompt',
@@ -1027,7 +1046,7 @@ test('runtime resolver finds every bundled and desktop support package', async (
     assert.equal(manifest.version, aggregate.version, `${packageName} did not resolve from the aggregate release`)
   }
   for (const packageName of DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES) {
-    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-aionui-panel|dsh-chat-artifacts|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-ssh|dsh-user-scope)$/u)
+    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-aionui-panel|dsh-chat-artifacts|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-pet|dsh-ssh|dsh-tool-describe-image|dsh-user-scope|skins[\\/]skin-center)$/u)
   }
   const aionRoot = resolved.get('@linxin666/dsh-client-ui-aionui-panel')
   assert.match(aionRoot, /packages[\\/]dsh-aionui-panel$/u)
@@ -1080,14 +1099,14 @@ async function createIsolatedDshCli(root) {
   return join(isolatedDshRoot, 'lib', 'bin.js')
 }
 
-test('official DSH CLI composes the isolated desktop profile', async () => {
+test('desktop runtime launcher composes the isolated desktop profile', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-compose-'))
   try {
     await ensureDesktopProfile({ dshHome: root })
     const isolatedCliPath = await createIsolatedDshCli(root)
     const result = spawnSync(
       process.execPath,
-      [isolatedCliPath, '--profile', 'desktop', '--dump-config'],
+      [runtimeEntryPath(isolatedCliPath), '--dsh-cli', isolatedCliPath, '--profile', 'desktop', '--dump-config'],
       {
         encoding: 'utf8',
         env: { ...process.env, DSH_HOME: root },
@@ -1099,7 +1118,8 @@ test('official DSH CLI composes the isolated desktop profile', async () => {
     assert.equal(result.stdout.match(/- id: web-ui-mode-switcher/gu)?.length, 1)
     assert.match(result.stdout, /- id: web-ui-plugin-manager/)
     assert.match(result.stdout, /- id: web-ui-skill-explorer/)
-    assert.match(result.stdout, /- id: web-ui-better-sidebar/)
+    assert.match(result.stdout, /- id: better-sidebar/)
+    assert.doesNotMatch(result.stdout, /- id: web-ui-better-sidebar/u)
     assert.match(result.stdout, /- id: web-ui-skin-center/)
     assert.match(result.stdout, /- id: web-ui-pet/)
     assert.match(result.stdout, /- id: web-ui-remote-web-ui/)
@@ -1113,7 +1133,7 @@ test('official DSH CLI composes the isolated desktop profile', async () => {
     assert.match(result.stdout, /- id: llm-deepseek[\s\S]*?STREAM_CLOSED/u)
     assert.doesNotMatch(result.stdout, /- id: dsh-plugin-hub/)
     assert.match(result.stdout, /- id: llm-pi-ai/)
-    assert.match(result.stdout, /name: '@deepseek-ai\/dsh-llm-pi-ai'/)
+    assert.match(result.stdout, /name: ["']@deepseek-ai\/dsh-llm-pi-ai["']/u)
     assert.match(result.stdout, /- id: llm-pi-ai[\s\S]*?providers:\s*\n\s+openai-codex: \{\}/u)
     assert.doesNotMatch(result.stdout, /name: dsh-codex-connect/)
     assert.match(result.stdout, /- id: reasoning-slider/)

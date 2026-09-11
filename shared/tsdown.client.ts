@@ -35,7 +35,7 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
+export const INLINE_SAFE = /^@deepseek-ai\/dsh-(session|llm|tools|brand)(\/|$)/
 
 /** Generated descriptor/codec contribution with no shared runtime identity. */
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
@@ -47,16 +47,11 @@ const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 const SKIP_WORKSPACE_BUILD: UserConfig = { entry: '' }
 
 /**
- * Documented TEMPORARY exemption, not a platform module (hence not in
- * web-platform.ts): the snapshot-store engine (createSnapshotStore/defineStore/
- * shallowEqual) lives in runtime pending its promotion-time rehoming, and
- * five importers (locale, ui-layout, ui-conversation ×3) ride this single
- * exemption. At runtime the lazy CJS table answers the require natively:
- * runtime is an immediately-tier row, its factory is registered before any
- * dependent bundle materializes. TODO(webload/store-rehome): remove with the
- * store-engine relocation follow-up.
+ * The React-free snapshot-store engine is a shared client runtime module. It
+ * moved out of the retired dsh-client-runtime package in DSH 0.1.5, but it
+ * still has module identity and must remain external to every plugin bundle.
  */
-const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-runtime/client'
+const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-store'
 
 /** Externals resolved from the loader module table: the platform seed entries plus the documented runtime exemption. */
 export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_EXEMPTION]
@@ -144,7 +139,6 @@ export function mobileBundle(id: string, entry: string): UserConfig {
         'scheduler',
         'react-dom',
         'zod',
-        '@deepseek-ai/dsh-host-apiproxy',
       ],
     },
     define: {
@@ -247,6 +241,9 @@ function clientConfig(
     // Plugin code is fetched outside Vite's module graph, so its own bundle
     // must carry the TS/TSX mapping consumed by browser profiling tools.
     sourcemap: true,
+    // Native DSH composes these scripts at Runtime startup. Ship compact
+    // production artifacts while keeping development output readable.
+    minify: process.env.NODE_ENV !== 'development',
     clean: false,
     deps: {
       neverBundle: [...CLIENT_EXTERNALS],
@@ -341,6 +338,9 @@ function clientConfig(
     }],
     outputOptions: {
       entryFileNames: 'client.js',
+      // Cordis plugins and diagnostics can observe class/function names.
+      // Compression must not change this runtime identity surface.
+      keepNames: true,
       // The map is served from /plugins/<scoped-package>/client.js.map. The
       // browser resolves its local sources back into URLs that mirror the
       // /packages/<group>/<package>/src directories; sourcesContent keeps them usable

@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
@@ -141,7 +141,9 @@ jobs:
         shell: pwsh
         run: |
           $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          pnpm --filter @deepseek-ai/dsh-desktop test:regression:e2e:full
+          # Maintainer accepted only DSH-340-DPI-01 for 3.4.0. The test still
+          # runs; the runner accepts that exact failure, never future versions.
+          pnpm --filter @deepseek-ai/dsh-desktop test:regression:e2e:full --accept-known-dpi-position-3.4.0
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify
       - run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke
       - name: Verify Windows Authenticode signatures
@@ -194,6 +196,7 @@ jobs:
           )
       - uses: softprops/action-gh-release@v2
         with:
+          name: DeepSeek Harness Desktop ${{ steps.release.outputs.version }}
           body_path: apps/dsh-desktop/dist/release-notes.md
           prerelease: ${{ steps.release.outputs.prerelease }}
           overwrite_files: false

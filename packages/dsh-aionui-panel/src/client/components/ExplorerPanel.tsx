@@ -75,12 +75,20 @@ export function ExplorerPanel({
   stores,
   onToggleCollapse,
   onAddToConversation,
+  section,
+  onOpenNative,
+  suspended = false,
 }: {
   stores: PanelStores
   onToggleCollapse: () => void
   onAddToConversation: (path: string) => boolean
+  /** Native tabs already own their title, close button and section selection. */
+  section?: 'files' | 'changes'
+  onOpenNative?: (section: 'files' | 'changes') => boolean
+  suspended?: boolean
 }): JSX.Element {
   const state = useStore(stores.explorer)
+  const activeTab = section ?? state.activeTab
   const [searchFocus, setSearchFocus] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const openEntryMenu = useCallback<OpenEntryMenu>((event, entry, root) => {
@@ -98,32 +106,40 @@ export function ExplorerPanel({
     }]
     if (!entry.isDir) {
       entries.push({
+        key: 'open-editor',
+        label: t('explorer.openEditor'),
+        onSelect: () => {
+          if (stores.explorer.getSnapshot().root === root) stores.preview.openFile(root, entry.path, { preferLegacy: true })
+        },
+      })
+      entries.push({
         key: 'add-to-conversation',
         label: t('explorer.addToConversation'),
         onSelect: () => {
-          const inserted = onAddToConversation(entry.path)
+          const inserted = stores.explorer.getSnapshot().root === root && onAddToConversation(entry.path)
           toast(t(inserted ? 'explorer.addedToConversation' : 'explorer.noActiveConversation'))
         },
       })
     }
     setMenu({ x: event.clientX, y: event.clientY, entries })
-  }, [onAddToConversation, stores.explorer])
+  }, [onAddToConversation, stores.explorer, stores.preview])
 
+  if (suspended) return <></>
   return (
     <div className="aionui-root" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* The Files/Changes tab bar. */}
-      <div className={explorerCss.tabBar} data-aionui-explorer-toolbar>
+      {section === undefined && <div className={explorerCss.tabBar} data-aionui-explorer-toolbar>
         <button
           type="button"
           className={state.activeTab === 'files' ? explorerCss.tabBtnActive : explorerCss.tabBtn}
-          onClick={() => stores.explorer.setActiveTab('files')}
+          onClick={() => { if (!onOpenNative?.('files')) stores.explorer.setActiveTab('files') }}
         >
           {t('explorer.tabs.files')}
         </button>
         <button
           type="button"
           className={state.activeTab === 'changes' ? explorerCss.tabBtnActive : explorerCss.tabBtn}
-          onClick={() => stores.explorer.setActiveTab('changes')}
+          onClick={() => { if (!onOpenNative?.('changes')) stores.explorer.setActiveTab('changes') }}
         >
           {t('explorer.tabs.changes')}
         </button>
@@ -137,20 +153,20 @@ export function ExplorerPanel({
         >
           <CloseIcon size={16} />
         </button>
-      </div>
+      </div>}
 
       {/* Files tab: search + tree (kept mounted; hidden when changes is active). */}
-      <div style={{ display: state.activeTab === 'files' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {section !== 'changes' && <div style={{ display: activeTab === 'files' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <SearchArea
           stores={stores}
           searchFocus={searchFocus}
           onFocusChange={setSearchFocus}
         />
         <FileTree stores={stores} onOpenEntryMenu={openEntryMenu} />
-      </div>
+      </div>}
 
       {/* Changes tab: SCM (mounted on demand; its store outlives the tab). */}
-      {state.activeTab === 'changes' && <ScmPanel stores={stores} />}
+      {activeTab === 'changes' && <ScmPanel key={state.root} stores={stores} />}
       {menu !== null && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     </div>
   )
@@ -218,7 +234,7 @@ function SearchResults({ stores }: { stores: PanelStores }): JSX.Element {
   const state = useStore(explorer)
   const search = state.search
   return (
-    <div className={explorerCss.scrollArea}>
+    <div className={explorerCss.scrollArea} data-aionui-search-results data-search-status={search.status}>
       {search.status === 'searching' && search.hits.length === 0 && (
         <div className={explorerCss.searchStatus}>{t('explorer.search.searching')}</div>
       )}

@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 
-export const PARTICLE_THEME_SETTINGS_NAMESPACE = settingsNamespace('particle-theme')
+export const PARTICLE_THEME_SETTINGS_NAMESPACE = 'particle-theme'
 
 export interface Config {
   enabled?: boolean

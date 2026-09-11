@@ -5,13 +5,20 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 
 const desktopRoot = join(import.meta.dirname, '..')
 const execFileAsync = promisify(execFile)
 const upgradeTransactionScript = join(desktopRoot, 'build', 'installer-upgrade-transaction.ps1')
 
-async function runUpgradeTransaction(mode, installDirectory, installRegistryKey = '', uninstallRegistryKey = '') {
+async function runUpgradeTransactionFrom(
+  script,
+  mode,
+  installDirectory,
+  installRegistryKey = '',
+  uninstallRegistryKey = '',
+) {
   return execFileAsync('powershell.exe', [
     '-NoLogo',
     '-NoProfile',
@@ -19,7 +26,7 @@ async function runUpgradeTransaction(mode, installDirectory, installRegistryKey 
     '-ExecutionPolicy',
     'Bypass',
     '-File',
-    upgradeTransactionScript,
+    script,
     '-Mode',
     mode,
     '-InstallDirectory',
@@ -29,6 +36,16 @@ async function runUpgradeTransaction(mode, installDirectory, installRegistryKey 
     '-UninstallRegistryKey',
     uninstallRegistryKey,
   ], { timeout: 15_000, windowsHide: true })
+}
+
+async function runUpgradeTransaction(mode, installDirectory, installRegistryKey = '', uninstallRegistryKey = '') {
+  return runUpgradeTransactionFrom(
+    upgradeTransactionScript,
+    mode,
+    installDirectory,
+    installRegistryKey,
+    uninstallRegistryKey,
+  )
 }
 
 async function settleWithin(promise, timeoutMs, message) {
@@ -43,6 +60,15 @@ async function settleWithin(promise, timeoutMs, message) {
   } finally {
     clearTimeout(timer)
   }
+}
+
+async function waitUntil(predicate, timeoutMs, message) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await predicate()) return
+    await delay(50)
+  }
+  throw new Error(message)
 }
 
 async function describeWindowsProcesses(ownedProcesses) {
@@ -122,13 +148,22 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(include, /installer-upgrade-transaction\.ps1/u)
   assert.match(include, /SetOutPath "\$TEMP"/u)
   assert.doesNotMatch(include, /SetOutPath "\$PLUGINSDIR"/u)
+  assert.match(include, /!define DSH_UPGRADE_HELPER_DIR "\$TEMP\\dsh-desktop-installer-support"/u)
+  assert.match(include, /Function StageUpgradeTransactionScript[\s\S]*File \/oname=installer-upgrade-transaction\.ps1/u)
+  assert.match(include, /Function RemoveUpgradeTransactionScript[\s\S]*Delete "\$\{DSH_UPGRADE_HELPER_SCRIPT\}"/u)
+  assert.doesNotMatch(include, /\$PLUGINSDIR\\installer-upgrade-transaction\.ps1/u)
   assert.match(include, /-InstallRegistryKey "\$\{INSTALL_REGISTRY_KEY\}"/u)
   assert.match(include, /-UninstallRegistryKey "\$\{UNINSTALL_REGISTRY_KEY\}"/u)
   assert.match(include, /-PrepareExistingUpgrade/u)
-  assert.match(include, /-UpgradeTransactionScript "\$PLUGINSDIR\\installer-upgrade-transaction\.ps1"/u)
+  assert.match(include, /-UpgradeTransactionScript "\$\{DSH_UPGRADE_HELPER_SCRIPT\}"/u)
   assert.match(include, /!ifdef BUILD_UNINSTALLER[\s\S]*!else[\s\S]*-PrepareExistingUpgrade/u)
-  assert.match(include, /!macro customInstall[\s\S]*-Mode Commit/u)
-  assert.match(include, /Function \.onInstFailed[\s\S]*-Mode Rollback/u)
+  assert.match(include, /!macro customInstall[\s\S]*Call StageUpgradeTransactionScript[\s\S]*-Mode Commit/u)
+  assert.match(include, /!macro customInstall[\s\S]*-Mode Commit[\s\S]*-Mode Rollback[\s\S]*上一版本已恢复/u)
+  assert.match(include, /Function \.onInstFailed[\s\S]*Call StageUpgradeTransactionScript[\s\S]*-Mode Rollback/u)
+  assert.match(transaction, /ValidateSet\('Begin', 'Commit', 'Rollback', 'Cleanup'\)/u)
+  assert.match(transaction, /Start-DeferredCommittedCleanup/u)
+  assert.match(transaction, /Start-Process[\s\S]*-WindowStyle Hidden/u)
+  assert.match(transaction, /upgrade-transaction-cleanup-deferred/u)
   assert.match(cleanup, /DeepSeek Harness Desktop\.exe/u)
   assert.match(cleanup, /Registry::\$hive\\\$InstallRegistryKey/u)
   assert.match(cleanup, /Get-UninstallerDirectory/u)
@@ -193,6 +228,7 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(include, /StrCmp \$0 "35" cleanup_protocol/u)
   assert.match(include, /StrCmp \$0 "36" cleanup_locked/u)
   assert.match(include, /StrCmp \$0 "33" cleanup_script_error/u)
+  assert.doesNotMatch(include, /Download the installer again|请重新下载安装包|暂停实时扫描/u)
   for (const messageBox of include.split(/\r?\n/u).filter(line => line.trimStart().startsWith('MessageBox '))) {
     assert.match(messageBox, /\/SD (?:IDCANCEL|IDOK)/u)
   }
@@ -244,6 +280,65 @@ test('Windows installer reports a replacement-file lock separately from a runnin
       const exit = once(locker, 'exit')
       locker.kill('SIGKILL')
       await settleWithin(exit, 2_000, 'file-lock fixture did not exit').catch(() => {})
+    }
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
+
+test('Windows installer waits for a transient post-exit file lock without skipping replacement checks', {
+  skip: process.platform !== 'win32',
+  timeout: 30_000,
+}, async () => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-installer-transient-lock-'))
+  const installDirectory = join(temporary, 'previous-install')
+  const executable = join(installDirectory, 'DeepSeek Harness Desktop.exe')
+  const marker = join(temporary, 'probe-started')
+  const instrumentedScript = join(temporary, 'cleanup-observed.ps1')
+  let locker
+  try {
+    await mkdir(installDirectory, { recursive: true })
+    await writeFile(executable, 'transient fixture', 'utf8')
+    const source = await readFile(join(desktopRoot, 'build', 'cleanup-stale-processes.ps1'), 'utf8')
+    const entry = 'function Get-ReplacementFileBlockers {'
+    assert.equal(source.split(entry).length, 2, 'expected one real file-probe entry')
+    // Signal the first real probe so PowerShell startup latency cannot release the
+    // fixture before the code under test actually encounters its file lock.
+    await writeFile(instrumentedScript, source.replace(entry, `${entry}
+    if (-not [IO.File]::Exists($env:DSH_LOCK_OBSERVATION_MARKER)) {
+      [IO.File]::WriteAllText($env:DSH_LOCK_OBSERVATION_MARKER, 'started')
+    }`), 'utf8')
+    locker = spawn('powershell.exe', [
+      '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+      [
+        '$stream = [IO.File]::Open($env:DSH_LOCK_PATH, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)',
+        'Write-Output ready',
+        'try { $wait = [Diagnostics.Stopwatch]::StartNew(); while (-not [IO.File]::Exists($env:DSH_LOCK_OBSERVATION_MARKER)) { if ($wait.ElapsedMilliseconds -gt 20000) { throw "probe did not start" }; Start-Sleep -Milliseconds 25 }; Start-Sleep -Milliseconds 3000 } finally { $stream.Dispose() }',
+      ].join('; '),
+    ], {
+      env: { ...process.env, DSH_LOCK_PATH: executable, DSH_LOCK_OBSERVATION_MARKER: marker },
+      windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const exited = once(locker, 'exit')
+    const [ready] = await once(locker.stdout, 'data')
+    assert.match(ready.toString('utf8'), /ready/u)
+    const { stdout, stderr } = await execFileAsync('powershell.exe', [
+      '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', instrumentedScript, '-InstallDirectory', installDirectory,
+    ], {
+      timeout: 20_000, windowsHide: true,
+      env: { ...process.env, DSH_LOCK_OBSERVATION_MARKER: marker },
+    })
+    assert.equal(await readFile(marker, 'utf8'), 'started')
+    assert.equal(await readFile(executable, 'utf8'), 'transient fixture')
+    assert.doesNotMatch(stdout, /locked path=|stop-error|busy pid=/u)
+    assert.equal(stderr.trim(), '')
+    const [code] = await settleWithin(exited, 2_000, 'transient locker did not exit')
+    assert.equal(code, 0)
+  } finally {
+    if (locker?.exitCode === null) {
+      const exited = once(locker, 'exit')
+      locker.kill('SIGKILL')
+      await settleWithin(exited, 2_000, 'transient fixture did not stop').catch(() => {})
     }
     await rm(temporary, { recursive: true, force: true })
   }
@@ -503,6 +598,82 @@ test('Windows installer stages a marked 2.5 install instead of trusting its old 
   }
 })
 
+test('Windows upgrade transaction helper survives NSIS plugin cleanup for commit and rollback', {
+  skip: process.platform !== 'win32',
+  timeout: 35_000,
+}, async () => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-installer-stable-helper-'))
+  const installDirectory = join(temporary, '用户升级 3.4.0')
+  const resources = join(installDirectory, 'resources')
+  const supportDirectory = join(temporary, 'dsh-desktop-installer-support')
+  const stableTransactionScript = join(supportDirectory, 'installer-upgrade-transaction.ps1')
+
+  async function writeInstall(version, { complete = true } = {}) {
+    await mkdir(resources, { recursive: true })
+    await writeFile(join(installDirectory, 'DeepSeek Harness Desktop.exe'), `desktop-${version}\n`, 'utf8')
+    await writeFile(join(resources, 'app.asar'), `runtime-${version}\n`, 'utf8')
+    if (complete) {
+      await writeFile(join(resources, 'installer-upgrade-v3'), 'dsh-desktop-installer-upgrade=3\n', 'utf8')
+    }
+  }
+
+  async function beginFromEphemeralPlugin(name) {
+    const pluginDirectory = join(temporary, name)
+    const cleanupScript = join(pluginDirectory, 'cleanup-stale-processes.ps1')
+    await mkdir(pluginDirectory, { recursive: true })
+    await copyFile(join(desktopRoot, 'build', 'cleanup-stale-processes.ps1'), cleanupScript)
+    await execFileAsync('powershell.exe', [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      cleanupScript,
+      '-InstallDirectory',
+      installDirectory,
+      '-PrepareExistingUpgrade',
+      '-UpgradeTransactionScript',
+      stableTransactionScript,
+    ], { timeout: 15_000, windowsHide: true })
+    await rm(pluginDirectory, { recursive: true, force: true })
+    await assert.rejects(readFile(cleanupScript), error => error?.code === 'ENOENT')
+    assert.match(await readFile(stableTransactionScript, 'utf8'), /function Commit-Transaction/u)
+  }
+
+  try {
+    await mkdir(supportDirectory, { recursive: true })
+    await copyFile(upgradeTransactionScript, stableTransactionScript)
+    await writeInstall('3.3.0')
+
+    await beginFromEphemeralPlugin('nsm51FB.tmp')
+    await writeInstall('3.4.0')
+    await runUpgradeTransactionFrom(stableTransactionScript, 'Commit', installDirectory)
+    await waitUntil(
+      async () => (await readdir(temporary)).every(name => !name.startsWith('.dsh-desktop-update-old-')),
+      8_000,
+      'stable helper commit did not clean the previous install backup',
+    )
+    assert.equal(await readFile(join(resources, 'app.asar'), 'utf8'), 'runtime-3.4.0\n')
+
+    await beginFromEphemeralPlugin('nsmA21C.tmp')
+    await writeInstall('3.4.1', { complete: false })
+    await assert.rejects(
+      runUpgradeTransactionFrom(stableTransactionScript, 'Commit', installDirectory),
+      error => /upgrade marker/u.test(error.stderr ?? ''),
+    )
+    await runUpgradeTransactionFrom(stableTransactionScript, 'Rollback', installDirectory)
+    assert.equal(await readFile(join(resources, 'app.asar'), 'utf8'), 'runtime-3.4.0\n')
+    assert.deepEqual(
+      (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')),
+      [],
+    )
+  } finally {
+    await runUpgradeTransaction('Rollback', installDirectory).catch(() => {})
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
+
 test('Windows installer transaction commits two upgrades and restores the prior version after a failed third upgrade', {
   skip: process.platform !== 'win32',
   timeout: 45_000,
@@ -544,9 +715,10 @@ test('Windows installer transaction commits two upgrades and restores the prior 
       'QUERY', `HKCU\\${uninstallRegistryKey}`, '/v', 'DisplayVersion',
     ], { timeout: 5_000, windowsHide: true })
     assert.match(stdout, new RegExp(`DisplayVersion\\s+REG_SZ\\s+${version.replaceAll('.', '\\.')}`, 'u'))
-    assert.deepEqual(
-      (await readdir(temporary)).filter(name => name.startsWith('.dsh-desktop-update-old-')),
-      [],
+    await waitUntil(
+      async () => (await readdir(temporary)).every(name => !name.startsWith('.dsh-desktop-update-old-')),
+      8_000,
+      'deferred installer cleanup did not remove the previous install backup',
     )
   }
 
@@ -564,7 +736,8 @@ test('Windows installer transaction commits two upgrades and restores the prior 
       )
       await writeInstall(version)
       await writeRegistry(version)
-      await runUpgradeTransaction('Commit', installDirectory, installRegistryKey, uninstallRegistryKey)
+      const { stdout } = await runUpgradeTransaction('Commit', installDirectory, installRegistryKey, uninstallRegistryKey)
+      assert.match(stdout, /upgrade-transaction-cleanup-deferred/u)
       await assertVersion(version)
     }
 

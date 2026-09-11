@@ -19,11 +19,8 @@ describe('ValueMode Host Plugin', () => {
       section: vi.fn().mockImplementation((sec) => registeredSections.push(sec)),
     } as never
     ctx.settings = {
-      register: vi.fn().mockReturnValue({
-        get: () => ({}),
-        watch: () => () => {},
-        update: async () => {},
-        replace: async () => {},
+      installSection: vi.fn().mockImplementation((_ctx, _namespace, _schema, initial, options) => {
+        options.setSource(() => initial)
       }),
     } as never
     ctx.llm = {
@@ -50,6 +47,7 @@ describe('ValueMode Host Plugin', () => {
     })
 
     expect(ctx.tools.register).toHaveBeenCalled()
+    expect(ctx.settings.installSection).toHaveBeenCalled()
     expect(registeredTools.length).toBe(1)
     expect((registeredTools[0] as { name: string }).name).toBe('consult_expert')
 

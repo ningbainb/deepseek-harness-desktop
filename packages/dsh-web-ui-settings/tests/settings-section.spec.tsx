@@ -54,12 +54,14 @@ describe('Web UI settings section', () => {
     const bind = vi.fn(() => (key: string) => key === 'title' ? 'Web UI Plugins' : key)
     const ctx = {
       effect: (callback: () => unknown) => callback(),
+      inject: vi.fn(),
       locale: { register: localeRegister, bind },
       slots: { inject, register },
     }
 
     apply(ctx as never)
 
+    expect(ctx.inject).toHaveBeenCalledWith(['workspaces', 'sessions', 'uiWorkspace'], expect.any(Function))
     expect(localeRegister).toHaveBeenCalledWith('desktop-project', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))

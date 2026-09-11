@@ -8,9 +8,13 @@
  * shell fails the whole boot when a plugin apply throws, and an external
  * plugin must not take the GUI down.
  */
-import type { ClientContext, SessionId, SettingsScope, SettingsScopeSpec, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale) and its
 // LocaleNamespaceMap merge table.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -130,7 +134,6 @@ export function apply(ctx: ClientContext): void {
     void (async () => {
       const sessions = ctx.sessions
       const workspaces = ctx.workspaces
-      const connection = ctx.get('connection') as ConnectionHandle
 
       // HostTaskStore v3 is authoritative when reachable. Its Host half does
       // the copy-first v2 migration; the old v2/local path remains the safe
@@ -152,18 +155,28 @@ export function apply(ctx: ClientContext): void {
           binding: id => sessions.binding(id as SessionId),
         },
         workspaces: {
-          list: workspaces.list,
-          connectWorkspace: id => workspaces.connectWorkspace(id as WorkspaceId),
+          // DSH 1.1.5 moved Session creation out of the Workspace Controller.
+          // Preserve the core's narrow legacy-shaped seam while deriving the
+          // most recently selected Workspace from the current Session.
+          list: {
+            getSnapshot: () => {
+              const snapshot = workspaces.list.getSnapshot()
+              const currentSessionId = sessions.list.getSnapshot().current
+              const recentWorkspaceId = currentSessionId === undefined
+                ? undefined
+                : snapshot.items.find(item => item.sessionIds.includes(currentSessionId))?.workspaceId
+              return { items: snapshot.items, recentWorkspaceId }
+            },
+          },
+          connectWorkspace: id => sessions.create({ workspaceId: id as WorkspaceId }),
         },
         history: {
           loadTail: async sessionId => {
-            const response = await connection.api.sessions.history({
-              sessionId: sessionId as SessionId,
-              maxMessages: 20,
-            })
-            return response.result.ok
-              ? { events: response.result.value.events.map(entry => entry.event) }
-              : undefined
+            const binding = sessions.binding(sessionId as SessionId)
+            if (binding === undefined) return undefined
+            return {
+              events: binding.eventSource.getSnapshot().entries.map(entry => entry.event),
+            }
           },
         },
       })

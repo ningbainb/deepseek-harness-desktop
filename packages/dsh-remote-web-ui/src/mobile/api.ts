@@ -5,8 +5,13 @@
  * rpc/mux layers).
  */
 
-import type { WorkspaceView } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
-import type { SessionSummary, SessionModels, SessionProjectionsBlock } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
+import type {
+  HistoryEntry,
+  SessionModels,
+  SessionProjectionsBlock,
+  SessionSummary,
+  WorkspaceView,
+} from '../mobile-contract.ts'
 import { callUnary } from './rpc.ts'
 
 /** One session.list page. */
@@ -26,7 +31,7 @@ export interface CreatedSession {
 
 /** One history page (already bounded to whole messages by the host). */
 export interface HistoryPage {
-  events: import('@deepseek-ai/dsh-host-apiproxy/api/sessions').HistoryEntry[]
+  events: HistoryEntry[]
   hasMore: boolean
   /**
    * Projection baseline riding the tail page (permissions select etc.);

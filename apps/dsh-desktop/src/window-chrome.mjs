@@ -62,6 +62,14 @@ html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
   max-height: 100% !important;
 }
 
+/* Native Sidebar fullscreen is viewport-fixed, outside the padded root flow.
+   Reserve the same caption area without overriding native tab placement. */
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel="fullscreen"] {
+  top: var(--dsh-desktop-window-chrome-height) !important;
+  height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+  max-height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+}
+
 /* Optional skins render their own decorative fixed title bar outside #root.
    Keep it visible, but never underneath the native Desktop controls. */
 html[data-dsh-desktop-window-chrome="true"] body > [data-skin-chrome="titlebar"] {
@@ -263,6 +271,54 @@ export function decorateDesktopRuntimeUrl(rawUrl, { platform = process.platform 
   return url.toString()
 }
 
+/** Serialized into the renderer. Index dialogs without rescanning all history. */
+export function observeWindowChromeDocument({ document, window, chrome, syncTheme, markViewportRoot, markModalLayer }) {
+  const selector = '[role="dialog"], [aria-modal="true"], dialog[open]'
+  const membership = new Set(['role', 'aria-modal', 'open'])
+  const dialogs = new Set(document.querySelectorAll(selector))
+  let disposed = false
+  const dispose = () => {
+    if (disposed) return
+    disposed = true
+    observer.disconnect()
+    dialogs.clear()
+    window.removeEventListener('pagehide', pagehide)
+  }
+  const pagehide = event => { if (!event.persisted) dispose() }
+  const classify = element => {
+    if (element.matches(selector)) dialogs.add(element)
+    else dialogs.delete(element)
+  }
+  const sync = () => {
+    if (disposed) return
+    if (!chrome.isConnected) { dispose(); return }
+    syncTheme()
+    markViewportRoot()
+    for (const dialog of dialogs) {
+      if (!dialog.isConnected || dialog.ownerDocument !== document) dialogs.delete(dialog)
+      else markModalLayer(dialog)
+    }
+  }
+  const observer = new window.MutationObserver(records => {
+    if (disposed) return
+    for (const record of records) {
+      if (record.type === 'attributes' && membership.has(record.attributeName)) classify(record.target)
+      if (record.type !== 'childList') continue
+      for (const node of record.addedNodes) {
+        if (node.nodeType !== 1 || !node.isConnected || node.ownerDocument !== document) continue
+        classify(node)
+        if (node.firstElementChild) for (const dialog of node.querySelectorAll(selector)) dialogs.add(dialog)
+      }
+    }
+    sync()
+  })
+  observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
+    attributeFilter: ['class', 'style', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
+  window.addEventListener('pagehide', pagehide)
+  sync()
+  return dispose
+}
+
 export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu = false } = {}) {
   const data = JSON.stringify({
     id: WINDOW_CHROME_ID,
@@ -392,34 +448,25 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         Promise.resolve(window.dshDesktop?.setWindowChromeTheme?.(theme)).catch(() => {});
       }
     };
-    const markModalLayers = () => {
-      document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]').forEach((dialog) => {
-        let layer = dialog;
-        while (layer.parentElement && layer.parentElement !== document.body) {
-          if (getComputedStyle(layer).position === 'fixed') break;
-          layer = layer.parentElement;
-        }
-        if (getComputedStyle(layer).position === 'fixed' && !layer.classList.contains('dsh-desktop-modal-layer')) {
-          layer.classList.add('dsh-desktop-modal-layer');
-        }
-      });
+    const markModalLayer = (dialog) => {
+      let layer = dialog;
+      while (layer.parentElement && layer.parentElement !== document.body) {
+        if (getComputedStyle(layer).position === 'fixed') break;
+        layer = layer.parentElement;
+      }
+      if (getComputedStyle(layer).position === 'fixed' && !layer.classList.contains('dsh-desktop-modal-layer')) {
+        layer.classList.add('dsh-desktop-modal-layer');
+      }
     };
     const markViewportRoot = () => {
-      const root = document.body.querySelector(':scope > #root');
-      if (!root) return;
+      const root = document.getElementById('root');
+      if (!root || root.parentElement !== document.body) return;
       const position = getComputedStyle(root).position;
       const overlapsChrome = (position === 'fixed' || position === 'absolute')
         && root.getBoundingClientRect().top < data.chromeHeight;
       root.classList.toggle('dsh-desktop-viewport-root', overlapsChrome);
     };
-    const sync = () => { syncTheme(); markViewportRoot(); markModalLayers(); };
-    new MutationObserver(sync).observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'style', 'data-ds-dark-theme'],
-      childList: true,
-      subtree: true,
-    });
-    sync();
+    (${observeWindowChromeDocument.toString()})({ document, window, chrome, syncTheme, markViewportRoot, markModalLayer });
     return true;
   })()`
 }

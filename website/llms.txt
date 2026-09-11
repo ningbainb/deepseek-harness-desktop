@@ -1,11 +1,11 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop 3.3.0 is a community-maintained, open-source Windows AI coding workspace for DeepSeek Harness. Its headline capabilities are grouped Extension Dock settings, shared project/workspace dialogs with a native folder picker, real file references for model-driven investigation without preprocessing, adaptive image compression, and visible local memory activity. Value Mode, the live large-model usage dashboard, and Claude Code / Codex import remain available.
+> DeepSeek Harness Desktop 3.4.0 is a community-maintained, open-source Windows AI coding workspace fully adapted to the DSH 1.1.5 official NPM SDK (`0.1.5-rc.1`). It retains grouped Extension Dock settings, project/workspace dialogs, model-driven file references, adaptive image compression, visible memory, Value Mode, usage analytics, and Claude Code / Codex import.
 
 ## Canonical identity
 
 - Product: DeepSeek Harness Desktop
-- Version: 3.3.0
+- Version: 3.4.0
 - Platform: Windows 10 and Windows 11, x64
 - License: BSD-3-Clause
 - Maintainer: DeepSeek Harness Desktop Community
@@ -17,19 +17,22 @@
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.3.0-x64.exe
-- v3.3.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.3.0
+- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-3.4.0-x64.exe
+- v3.4.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v3.4.0
 - SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
 - Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
 
-## What makes 3.3.0 useful
+## What makes 3.4.0 useful
+
+- DSH 1.1.5 core: the official `0.1.5-rc.1` packages are exact-pinned. Desktop composes the Runtime from public split SDKs while validating the official CLI as the install anchor. Settings, Client Store, Session/Workspace controllers, Session Projection, Renderer, and Typert integrations use their current public contracts.
+- Reliability: Session v3 covers transcript import and manual compaction; startup-token and cookie handling, Profile isolation, runtime identity, and Windows hidden subprocess behavior have dedicated checks.
 
 - Dock: grouped model connection, Value Mode, Personal Prompt, Memory, particle theme, and image-understanding settings; consistent theme, centered default settings window, and coalesced dragging.
 - Projects: Create project and Choose workspace share a dialog with a system folder picker; an already connected directory opens its existing workspace.
 - Files: ordinary dropped files are stored under the current workspace and appear as attachment cards. Sending supplies real file references; the model chooses tools to read them. Desktop does not pre-parse files, automatically convert them to Markdown, or inject every file in full. Accepting a file does not guarantee model/tool support for its format. Images use a separate compression and vision path.
 - Memory: saved items, scope/search filters, pending suggestions, and recent preparation activity are visible under Dock > Personal preferences > Memory. Suggestions require confirmation. When memory references are enabled, matching content is sent to the selected model provider; unknown ownership or scope prevents injection.
-- Upgrade: each local user upgrading to 3.3.0 sees the Star prompt once, including users who saw 3.2.0. Closing persists that version; restarting does not repeat it. Previewing does not change the record, and starring is optional.
+- Upgrade: each local user upgrading to 3.4.0 sees the Star prompt once, including users who saw 3.3.0. Closing persists that version; restarting does not repeat it. Previewing does not change the record, and starring is optional.
 
 - Value Mode / 性价比模式: the expert controller model owns task understanding, decomposition, delegation, review, and final synthesis. The subagent worker model completes bounded delegated work. First selection opens a setup guide, preselects the current default model as the expert controller when no explicit controller exists, and requires both model roles plus a strategy before enabling.
 - Value Mode strategies: Saver, Balanced (default), and Powerful. The worker route is bounded to one subagent level, so worker agents do not recursively delegate or invoke expert consultation.
@@ -62,7 +65,7 @@
 - Local/source/test/Fork builds remain disconnected. Diagnostics are exported only after user confirmation and are redacted.
 - Read the full policy at https://ningbainb.github.io/deepseek-harness-desktop/privacy.html.
 
-## Desktop 3.3.0 interface screenshots
+## Desktop 3.3.0 interface screenshots preserved for 3.4.0
 
 - Main workspace: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-workspace.webp
 - Create project: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.3.0-create-project.webp
@@ -70,7 +73,7 @@
 
 ## Historical 3.2.0 interface references
 
-These features remain available; use the 3.3.0 Dock for current settings navigation and layout.
+These features remain available; use the 3.4.0 Dock for current settings navigation and layout. The linked captures remain version-labelled historical evidence.
 
 - Value Mode three-step setup: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp
 - Large-model usage dashboard: https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp

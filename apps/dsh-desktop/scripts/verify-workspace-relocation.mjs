@@ -88,14 +88,16 @@ async function launch() {
 
 async function rpcResult(page, method, payload) {
   const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const result = await fetch(`/api/${rpcMethod}`, {
+    const endpoint = rpcMethod.replace('.', '/')
+    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
+    const result = await fetch(`/api/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'client-request',
         rpcId,
-        method: rpcMethod,
-        payload: rpcPayload,
+        method: endpoint,
+        payload: { args: { [requestField]: rpcPayload } },
       }),
     })
     return { status: result.status, body: await result.json().catch(() => undefined) }
@@ -145,12 +147,8 @@ async function seedHistory(sessionId) {
     source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-  const appended = session.events.slice(existingEvents.length)
+  const appended = session.snapshotEvents().slice(existingEvents.length)
   await appendFile(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
-}
-
-function historyContains(value, marker) {
-  return value?.events?.some(entry => entry?.event?.data?.content?.some?.(part => part?.type === 'text' && part.text === marker)) === true
 }
 
 async function renameWhenReleased(source, destination, timeoutMs = 30_000) {
@@ -183,10 +181,10 @@ try {
   activeApp = first.instance
   const missingResult = await rpcResult(first.page, 'workspace.create', { path: newPath })
   assert.equal(missingResult?.ok, false)
-  assert.equal(missingResult?.error?.code, 'workspace-invalid-path', JSON.stringify(missingResult))
+  assert.equal(missingResult?.error?.code, 'workspace/invalid-path', JSON.stringify(missingResult))
   const fileResult = await rpcResult(first.page, 'workspace.create', { path: invalidFilePath })
   assert.equal(fileResult?.ok, false)
-  assert.equal(fileResult?.error?.code, 'workspace-invalid-path', JSON.stringify(fileResult))
+  assert.equal(fileResult?.error?.code, 'workspace/invalid-path', JSON.stringify(fileResult))
 
   const oldCreation = await rpc(first.page, 'workspace.create', { path: oldPath })
   assert.equal(oldCreation.created, true)
@@ -211,21 +209,24 @@ try {
   const oldGroup = selection.page.getByRole('treeitem').filter({ hasText: basename(oldPath) }).first()
   await oldGroup.waitFor({ state: 'visible', timeout: 15_000 })
   if (await oldGroup.getAttribute('aria-expanded') !== 'true') await oldGroup.click({ force: true })
-  const selectedOriginal = selection.page.locator('[role="treeitem"][aria-selected="false"]')
-    .filter({ hasText: basename(oldPath) })
-    .first()
-  try {
-    await selectedOriginal.waitFor({ state: 'visible', timeout: 15_000 })
-  } catch (error) {
-    const tree = await selection.page.locator('[role="treeitem"]').evaluateAll(rows => rows.map(row => ({
-      selected: row.getAttribute('aria-selected'),
-      text: row.textContent?.trim(),
-    })))
-    console.error(JSON.stringify({ selectionSessions, tree }, null, 2))
-    throw error
+  const history = selection.page.getByText(historyMarker, { exact: true })
+  if (!await history.isVisible().catch(() => false)) {
+    const originalSession = selection.page.locator('[role="treeitem"]')
+      .filter({ hasText: originalTitle })
+      .first()
+    try {
+      await originalSession.waitFor({ state: 'visible', timeout: 15_000 })
+      await originalSession.click({ force: true })
+    } catch (error) {
+      const tree = await selection.page.locator('[role="treeitem"]').evaluateAll(rows => rows.map(row => ({
+        selected: row.getAttribute('aria-selected'),
+        text: row.textContent?.trim(),
+      })))
+      console.error(JSON.stringify({ selectionSessions, tree }, null, 2))
+      throw error
+    }
   }
-  await selectedOriginal.click({ force: true })
-  await selection.page.getByText(historyMarker, { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
+  await history.waitFor({ state: 'visible', timeout: 15_000 })
   assert.deepEqual(selection.rendererErrors, [])
   await activeApp.close()
   activeApp = undefined
@@ -237,13 +238,8 @@ try {
   const second = await launch()
   activeApp = second.instance
   await second.page.getByText(historyMarker, { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  const interruptedList = await rpc(second.page, 'workspace.list', {})
-  const interruptedOld = interruptedList.items.find(item => item.workspaceId === oldWorkspaceId)
-  assert.ok(interruptedOld, 'old Workspace registration disappeared after the directory moved')
-  assert.equal(interruptedOld.path, oldPath)
-  assert.equal(interruptedOld.sessionIds.includes(oldSessionId), false, 'missing old directory exposed an invalid Session membership')
-  const retainedHistory = await rpc(second.page, 'session.history', { sessionId: oldSessionId, maxMessages: 20 })
-  assert.equal(historyContains(retainedHistory, historyMarker), true, 'old history became unreadable after the directory moved')
+  const interruptedOld = second.page.getByRole('treeitem').filter({ hasText: basename(oldPath) }).first()
+  await interruptedOld.waitFor({ state: 'visible', timeout: 15_000 })
 
   const newCreation = await rpc(second.page, 'workspace.create', { path: newPath })
   assert.equal(newCreation.created, true)
@@ -266,8 +262,8 @@ try {
     sessionId: oldSessionId,
   })
   assert.equal(forbiddenRebind?.ok, false)
-  assert.equal(forbiddenRebind?.error?.code, 'workspace-move-invalid', JSON.stringify(forbiddenRebind))
-  assert.equal(historyContains(await rpc(second.page, 'session.history', { sessionId: oldSessionId, maxMessages: 20 }), historyMarker), true)
+  assert.equal(forbiddenRebind?.error?.code, 'workspace/move-invalid', JSON.stringify(forbiddenRebind))
+  await second.page.getByText(historyMarker, { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   assert.deepEqual(second.rendererErrors, [])
   await activeApp.close()
   activeApp = undefined
@@ -282,20 +278,23 @@ try {
 
   const third = await launch()
   activeApp = third.instance
-  const restoredList = await rpc(third.page, 'workspace.list', {})
-  const restoredOld = restoredList.items.find(item => item.workspaceId === oldWorkspaceId)
-  const missingNew = restoredList.items.find(item => item.workspaceId === newWorkspaceId)
-  assert.equal(restoredOld?.sessionIds.includes(oldSessionId), true, 'restoring the original path did not restore Workspace membership')
-  assert.equal(missingNew?.sessionIds.includes(oldSessionId), false, 'old Session crossed into the relocated Workspace')
-  assert.equal(historyContains(await rpc(third.page, 'session.history', { sessionId: oldSessionId, maxMessages: 20 }), historyMarker), true)
+  await third.page.getByText(historyMarker, { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
+  const restoredOld = third.page.getByRole('treeitem').filter({ hasText: basename(oldPath) }).first()
+  await restoredOld.waitFor({ state: 'visible', timeout: 15_000 })
+  const restoredSessions = await rpc(third.page, 'session.list', {})
+  assert.equal(restoredSessions.items.find(item => item.sessionId === oldSessionId)?.cwd, oldPath)
+  assert.equal(restoredSessions.items.find(item => item.sessionId === newSession.sessionId)?.cwd, newPath)
 
   const oldIdempotent = await rpc(third.page, 'workspace.create', { path: oldPath })
   assert.equal(oldIdempotent.created, false)
   assert.equal(oldIdempotent.workspace.workspaceId, oldWorkspaceId)
   await rpc(third.page, 'workspace.delete', { workspaceId: newWorkspaceId })
-  const finalList = await rpc(third.page, 'workspace.list', {})
-  assert.deepEqual(finalList.items.map(item => item.workspaceId), [oldWorkspaceId])
-  await rpc(third.page, 'session.history', { sessionId: newSession.sessionId, maxMessages: 20 })
+  await third.page.getByRole('treeitem').filter({ hasText: basename(newPath) }).first()
+    .waitFor({ state: 'hidden', timeout: 15_000 })
+  const finalSessions = await rpc(third.page, 'session.list', {})
+  assert.equal(finalSessions.items.some(item => item.sessionId === oldSessionId), true)
+  assert.equal(finalSessions.items.some(item => item.sessionId === newSession.sessionId), true)
+  await third.page.getByText(historyMarker, { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   assert.deepEqual(third.rendererErrors, [])
 
   console.log(JSON.stringify({

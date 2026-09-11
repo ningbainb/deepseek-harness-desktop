@@ -12,8 +12,9 @@ import { createRequire } from 'node:module'
 import { setInterval as nodeSetInterval } from 'node:timers'
 import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
+import type {} from '@deepseek-ai/dsh-api-gateway'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { UserScopeService } from '@ningbainb/dsh-user-scope'
 import { isSafePairingCookieName, isSecurePublicBaseUrl, PairingService } from './pairing.ts'
@@ -21,6 +22,7 @@ import { makeGateListener, type RemoteApiMode } from './gate.ts'
 import { isTrustedApiRequest, makeRoutes } from './routes.ts'
 import { makeMobileRoutes } from './mobile-routes.ts'
 import { makeMobileApiRoutes } from './mobile-api.ts'
+import { createMobileGatewayProxy } from './mobile-gateway.ts'
 import { lanIPv4Addresses } from './lan.ts'
 import { TunnelManager, type TunnelInfo } from './tunnel.ts'
 import {
@@ -54,7 +56,7 @@ declare module '@deepseek-ai/cordis' {
 export const name = 'remote-web-ui'
 
 /** Services required before the pairing surfaces can mount. */
-export const inject = ['webServer', 'apiProxy', 'userScope']
+export const inject = ['webServer', 'typertGateway', 'userScope']
 
 /** Structural view of the official session-query service used for scoped mobile search. */
 interface SessionSearchEngine {
@@ -83,7 +85,7 @@ interface SessionSearchEngine {
  * settings surface edits. Spelled here rather than imported: the browser
  * half spells the same value and must not depend on a Host package.
  */
-export const REMOTE_WEB_UI_SETTINGS_NAMESPACE = settingsNamespace('remote-web-ui')
+export const REMOTE_WEB_UI_SETTINGS_NAMESPACE = 'remote-web-ui'
 
 /** Plugin config, validated by the same-named schemastery schema. */
 export interface Config {
@@ -189,7 +191,7 @@ export function apply(ctx: Context, config?: Config): void {
   }
   // The live source the pairing service and the gate read: the settings
   // section once the web settings surface is served, the composition entry
-  // otherwise (installSettingsSection swaps it when the namespace registers).
+  // otherwise (the settings service swaps it when the namespace registers).
   let current: () => Config = () => config ?? {}
   const resolve = (): ResolvedConfig => {
     const value = current()
@@ -290,12 +292,9 @@ export function apply(ctx: Context, config?: Config): void {
   // (now vetoing every non-loopback request) instead of opening the fence.
   let disposeRoutes: (() => void) | undefined
   let disposeSweep: (() => void) | undefined
-  // The phone's data channel: pairing routes + the /m page + the /m/api
-  // proxy (which needs the host ApiProxy service; the plugin injects it).
-  const apiProxy = ctx.get('apiProxy')
-  if (apiProxy === undefined) {
-    console.warn('remote-web-ui: apiProxy service unavailable — the mobile data channel is disabled')
-  }
+  // The phone's data channel: pairing routes + the /m page + a narrow adapter
+  // over the official Typert Gateway service.
+  const apiProxy = createMobileGatewayProxy(ctx.typertGateway)
   const sessionQuery = ctx.get('sessionQuery') as SessionSearchEngine | undefined
   const sessionSearch = sessionQuery === undefined ? undefined : async (
     query: string,
@@ -361,7 +360,7 @@ export function apply(ctx: Context, config?: Config): void {
   const routes = [
     ...makeRoutes({ service, lanAddresses, control: pairControl }),
     ...makeMobileRoutes(),
-    ...(apiProxy !== undefined && userScope !== undefined
+    ...(userScope !== undefined
       ? makeMobileApiRoutes({ service, apiProxy, userScope, sessionSearch, mobileEnterToSend: () => resolve().mobileEnterToSend })
       : []),
     ...updateRoutes,
@@ -428,12 +427,14 @@ export function apply(ctx: Context, config?: Config): void {
       disposeSweep = undefined
     }
   }
-  installSettingsSection(ctx, REMOTE_WEB_UI_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => {
-      current = source
-      sync()
-    },
-    onChange: sync,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, REMOTE_WEB_UI_SETTINGS_NAMESPACE, Config, config ?? {}, {
+      setSource: (source) => {
+        current = source
+        sync()
+      },
+      onChange: sync,
+    })
   })
   sync()
 }

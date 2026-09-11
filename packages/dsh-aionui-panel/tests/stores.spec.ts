@@ -62,6 +62,35 @@ beforeEach(() => {
   calls = setup.calls
 })
 
+it('prefers native previews without loading a second payload, while explicit and dirty editors keep their owner', async () => {
+  const { api } = fakeApi()
+  const native = vi.fn(() => true)
+  const activateEditor = vi.fn()
+  const preview = createPanelStores(api, native, activateEditor).preview
+  preview.setRoot('/w')
+  preview.openFile('/w', 'README.md')
+  expect(native).toHaveBeenCalledExactlyOnceWith('/w', 'README.md')
+  expect(preview.getSnapshot().tabs).toHaveLength(0)
+  expect(api.read).not.toHaveBeenCalled()
+  expect(activateEditor).not.toHaveBeenCalled()
+  preview.openFile('/w', 'README.md', { preferLegacy: true })
+  expect(activateEditor).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(preview.getSnapshot().tabs[0]?.content).toBe('# hi'))
+  const id = preview.getSnapshot().tabs[0]!.id
+  preview.updateContent(id, 'unsaved text')
+  preview.openFile('/w', 'README.md')
+  expect(native).toHaveBeenCalledTimes(1)
+  expect(preview.getSnapshot().tabs[0]?.content).toBe('unsaved text')
+  expect(preview.getSnapshot().tabs[0]?.dirty).toBe(true)
+  preview.openFile('/w', 'other.md')
+  expect(preview.getSnapshot().open).toBe(false)
+  expect(preview.getSnapshot().tabs[0]?.content).toBe('unsaved text')
+  preview.openFile('/w', 'README.md')
+  expect(preview.getSnapshot().open).toBe(true)
+  expect(preview.getSnapshot().tabs[0]?.dirty).toBe(true)
+  expect(native).toHaveBeenCalledTimes(2)
+})
+
 describe('explorer store', () => {
   it('loads the root listing on bind and toggles dirs lazily', async () => {
     stores.explorer.setRoot('/w')

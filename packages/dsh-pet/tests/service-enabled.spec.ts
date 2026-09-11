@@ -3,7 +3,9 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import type { Session, SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
+import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
+import type { LlmAttemptId, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { Session, SessionEvent, SessionSeq, TurnEndReason } from '@deepseek-ai/dsh-session'
 import { loadPetPersist } from '../src/persist.ts'
 import { PetService } from '../src/service.ts'
 
@@ -20,7 +22,6 @@ declare module '@deepseek-ai/dsh-session' {
   }
 }
 
-type AssistantChunk = SessionEvent<'assistant/chunk'>['data']['chunk']
 type AssistantMessage = SessionEvent<'assistant/message'>['data']['message']
 type ToolCallId = SessionEvent<'tool/call'>['data']['callId']
 type ToolResultMessage = SessionEvent<'tool/result'>['data']['message']
@@ -38,21 +39,36 @@ function messageId(value: string): ToolResultMessage['id'] {
   return value as ToolResultMessage['id']
 }
 
+function sessionSeq(value: number): SessionSeq {
+  return value as SessionSeq
+}
+
 function turnStart(turn: number, seq: number): SessionEvent<'turn/start'> {
-  return { type: 'turn/start', seq, time: seq, data: { turn } }
+  return { type: 'turn/start', seq: sessionSeq(seq), time: seq, data: { turn } }
 }
 
 function stepStart(turn: number, step: number, seq: number): SessionEvent<'step/start'> {
-  return { type: 'step/start', seq, time: seq, data: { turn, step } }
+  return { type: 'step/start', seq: sessionSeq(seq), time: seq, data: { turn, step } }
 }
 
 function assistantChunk(
+  session: Session,
   turn: number,
   step: number,
-  chunk: AssistantChunk,
+  chunk: StreamChunk,
   seq: number,
-): SessionEvent<'assistant/chunk'> {
-  return { type: 'assistant/chunk', seq, time: seq, data: { turn, step, chunk } }
+): { agent: Agent; frame: AssistantStreamFrame } {
+  return {
+    agent: { session } as Agent,
+    frame: {
+      type: 'chunk',
+      attemptId: `attempt-${turn}-${step}` as LlmAttemptId,
+      revision: 1,
+      index: seq,
+      time: seq,
+      chunk,
+    },
+  }
 }
 
 function assistantMessage(
@@ -67,7 +83,13 @@ function assistantMessage(
     source: { kind: 'model', provider: 'mock', model: 'mock' },
     content: [{ type: 'text', text }],
   }
-  return { type: 'assistant/message', seq, time: seq, data: { turn, step, message } }
+  return {
+    type: 'assistant/message',
+    seq: sessionSeq(seq),
+    time: seq,
+    data: { turn, step, message, stream: [] },
+    surfaceOp: 'append',
+  }
 }
 
 function toolCall(
@@ -79,7 +101,7 @@ function toolCall(
 ): SessionEvent<'tool/call'> {
   return {
     type: 'tool/call',
-    seq,
+    seq: sessionSeq(seq),
     time: seq,
     data: { turn, step, callId: callId(id), name, arguments: '{}' },
   }
@@ -96,7 +118,7 @@ function toolResult(
   const correlatedId = callId(id)
   return {
     type: 'tool/result',
-    seq,
+    seq: sessionSeq(seq),
     time: seq,
     data: {
       turn,
@@ -114,6 +136,7 @@ function toolResult(
       },
       ...(error === undefined ? {} : { error }),
     },
+    surfaceOp: 'append',
   }
 }
 
@@ -122,7 +145,7 @@ function turnEnd(
   reason: TurnEndReason,
   seq: number,
 ): SessionEvent<'turn/end'> {
-  return { type: 'turn/end', seq, time: seq, data: { turn, reason } }
+  return { type: 'turn/end', seq: sessionSeq(seq), time: seq, data: { turn, reason } }
 }
 
 function activity(
@@ -132,7 +155,7 @@ function activity(
 ): SessionEvent<'activity/status'> {
   return {
     type: 'activity/status',
-    seq,
+    seq: sessionSeq(seq),
     time: seq,
     data: { phase, ...(line === undefined ? {} : { line }) },
   }
@@ -181,7 +204,7 @@ describe('PetService (rc.6 session events)', () => {
       ctx.emit('session/event', session, stepStart(1, 1, 2))
       expect(await service.state()).toMatchObject({ animation: 'waiting', bubble: '等待模型响应' })
 
-      ctx.emit('session/event', session, assistantChunk(1, 1, {
+      ctx.emit('agent/assistant-stream', assistantChunk(session, 1, 1, {
         type: 'reasoning-delta', index: 0, text: '分析',
       }, 3))
       expect(await service.state()).toMatchObject({ animation: 'running', bubble: '正在思考' })
@@ -189,7 +212,7 @@ describe('PetService (rc.6 session events)', () => {
       ctx.emit('session/event', session, assistantMessage(1, 1, '完整回复', 4))
       expect(await service.state()).toMatchObject({ animation: 'review', bubble: '整理回复中' })
 
-      ctx.emit('session/event', session, assistantChunk(1, 1, {
+      ctx.emit('agent/assistant-stream', assistantChunk(session, 1, 1, {
         type: 'text-delta', index: 0, text: '回答',
       }, 5))
       expect(await service.state()).toMatchObject({ animation: 'review', bubble: '整理回复中' })
@@ -254,7 +277,7 @@ describe('PetService (rc.6 session events)', () => {
     try {
       const service = new PetService(ctx, { persistDir: dir })
 
-      ctx.emit('session/event', sessionA, assistantChunk(1, 1, {
+      ctx.emit('agent/assistant-stream', assistantChunk(sessionA, 1, 1, {
         type: 'reasoning-delta', index: 0, text: 'A',
       }, 1))
       expect(await service.state()).toMatchObject({ animation: 'running', bubble: '正在思考' })
@@ -265,7 +288,7 @@ describe('PetService (rc.6 session events)', () => {
         bubble: '正在使用 search',
       })
 
-      ctx.emit('session/event', sessionA, assistantChunk(1, 1, {
+      ctx.emit('agent/assistant-stream', assistantChunk(sessionA, 1, 1, {
         type: 'text-delta', index: 0, text: 'A',
       }, 2))
       expect(await service.state()).toMatchObject({ animation: 'review', bubble: '整理回复中' })
@@ -274,7 +297,7 @@ describe('PetService (rc.6 session events)', () => {
       expect(await service.state()).toMatchObject({ animation: 'jumping', bubble: '完成啦' })
       expect((await service.state()).affinity.turns).toBe(1)
 
-      ctx.emit('session/event', sessionA, assistantChunk(1, 1, {
+      ctx.emit('agent/assistant-stream', assistantChunk(sessionA, 1, 1, {
         type: 'text-delta', index: 0, text: 'A2',
       }, 3))
       ctx.emit('session/disposed', sessionB)

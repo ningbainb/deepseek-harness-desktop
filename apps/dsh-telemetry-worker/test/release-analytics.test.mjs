@@ -1,31 +1,18 @@
+import { database } from './analytics-fixture.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DatabaseSync } from 'node:sqlite'
-import { readFileSync, readdirSync } from 'node:fs'
 import worker, { __test as ingest } from '../src/index.mjs'
 import { releaseFilters, releaseSummary } from '../src/release-analytics.mjs'
 import { ProductTelemetryClient } from '../../dsh-desktop/src/telemetry-client.mjs'
 import { createProductEvent } from '../../dsh-desktop/src/telemetry-events.mjs'
 
-function database() {
-  const db = new DatabaseSync(':memory:')
-  const dir = new URL('../migrations/', import.meta.url)
-  for (const file of readdirSync(dir).filter(file => file.endsWith('.sql')).sort()) db.exec(readFileSync(new URL(file, dir), 'utf8'))
-  const wrapper = {
-    prepare(sql) {
-      let args = []
-      const statement = { bind(...values) { args = values; return statement }, async all() { return { results: db.prepare(sql).all(...args) } }, async run() { return db.prepare(sql).run(...args) } }
-      return statement
-    },
-    async batch(statements) { db.exec('BEGIN'); try { const out = []; for (const s of statements) out.push(await s.run()); db.exec('COMMIT'); return out } catch (e) { db.exec('ROLLBACK'); throw e } },
-  }
-  return { db, wrapper }
-}
 const actors = { installationActor: 'a'.repeat(64), dailyActor: 'b'.repeat(64), monthlyActor: 'c'.repeat(64) }
 const context = { appVersion: '3.3.0', channel: 'stable', os: 'windows-11', language: 'zh' }
 const launch = createProductEvent(context, actors, 'app_launch', { outcome: 'started', detail: 'normal', bucket: 'none' })
-function send(db, events, day = '2026-09-09') {
-  return worker.fetch(new Request('https://test.invalid/v1/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ schema: 4, events }) }), { INGEST_ENABLED: '1', METRICS: db }, { now: () => new Date(day + 'T12:00:00Z') })
+async function send(db, events, day = '2026-09-09') {
+  const response = await worker.fetch(new Request('https://test.invalid/v1/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ schema: 4, events }) }), { INGEST_ENABLED: '1', METRICS: db, ANALYTICS: db.analytics }, { now: () => new Date(day + 'T12:00:00Z') })
+  await db.flush(day)
+  return response
 }
 
 test('client maximum batch reaches the actual Worker, including long valid dimensions', async () => {
@@ -36,14 +23,16 @@ test('client maximum batch reaches the actual Worker, including long valid dimen
       schedule: () => 1, cancelSchedule() {},
       fetchImpl: async (url, init) => {
         assert.ok(new TextEncoder().encode(init.body).byteLength <= ingest.MAX_REQUEST_BYTES)
-        const response = await worker.fetch(new Request(url, init), { INGEST_ENABLED: '1', METRICS: wrapper })
+        const response = await worker.fetch(new Request(url, init), { INGEST_ENABLED: '1', METRICS: wrapper, ANALYTICS: wrapper.analytics })
         assert.equal(response.status, 204); received += JSON.parse(init.body).events.length; return response
       },
     })
     for (let i = 0; i < 20; i++) client.record('full_start_failed', { outcome: 'failed', detail: 'integrity-failed', bucket: 'over-60s' })
     await client.shutdown({ deadlineMs: 1000 })
+    await wrapper.flush(new Date().toISOString().slice(0,10))
     assert.equal(received, 20)
-    assert.equal(db.prepare('SELECT SUM(count) AS n FROM product_release_daily').get().n, 20)
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM analytics_failure').get().n, 20)
+    assert.equal(db.prepare('SELECT SUM(count) AS n FROM metric_daily_all').get().n, 20)
   } finally { db.close() }
 })
 
@@ -72,7 +61,8 @@ test('startup ratio has a real denominator and feature events carry no private f
     const summary = await releaseSummary(wrapper, { days: 7, version: '3.3.0' }, new Date('2026-09-09'))
     assert.equal(summary.startup.denominator, 3); assert.equal(summary.startup.successRate, 2 / 3)
     assert.equal((await send(wrapper, [{ ...events.at(-1), path: 'private' }])).status, 400)
-    assert.equal(db.prepare('SELECT SUM(count) AS n FROM product_release_daily').get().n, 5)
+    assert.equal(db.prepare('SELECT SUM(count) AS n FROM metric_daily_all').get().n, 5)
+    assert.equal(db.prepare('SELECT SUM(count) AS n FROM product_release_daily').get().n, 0)
     assert.equal((await worker.fetch(new Request('https://test.invalid/admin/api/release'), { ADMIN_PASSWORD_SHA256: 'a'.repeat(43), ADMIN_SESSION_SECRET: 'b'.repeat(43), METRICS: wrapper })).status, 401)
   } finally { db.close() }
 })

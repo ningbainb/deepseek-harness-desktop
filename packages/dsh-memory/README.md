@@ -10,7 +10,7 @@ Owner-isolated local memory for DeepSeek Harness. Each principal has a separate 
 - Reload reads local storage. Save, delete and confirmed replacements check item versions; conflicts preserve edits.
 - Clearing current results confirms the count and deletes only reviewed items; other scopes and subsequently created items remain.
 - Models search or suggest. Confirm suggestions as new items or replacements within the same scope; repeated suggestions coalesce and duplicate content is reported.
-- The conversation header and memory page show recently prepared context, match reasons, editing, deletion and session-only ignoring; collapsing the panel preserves its editing draft.
+- Access memory through Personal preferences / Memory in the Dock, without a main conversation button. The memory page retains recently prepared context, match reasons, editing, deletion and session-only ignoring; collapsing preserves editing drafts. Tags, pinning and expiry expand on demand.
 
 ## Install
 

@@ -15,7 +15,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import { registerAttachRoute } from './attach-routes.ts'
@@ -114,14 +114,16 @@ export function apply(ctx: Context, config: Config = {}): void {
     resolveConfig(config)
   }
   let current: () => Config = () => config
-  installSettingsSection(ctx, DESCRIBE_IMAGE_SETTINGS_NAMESPACE, Config, config, {
-    setSource: (source) => {
-      current = source
-    },
-    onChange: () => {},
-    validate: (value) => {
-      if (value.baseURL !== undefined || value.model !== undefined) resolveConfig(value)
-    },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, DESCRIBE_IMAGE_SETTINGS_NAMESPACE, Config, config, {
+      setSource: (source) => {
+        current = source
+      },
+      onChange: () => {},
+      validate: (value) => {
+        if (value.baseURL !== undefined || value.model !== undefined) resolveConfig(value)
+      },
+    })
   })
   const spec = (): ResolvedConfig => resolveConfig(current())
   // Short-lived semantic cache scoped to this mount: identical image + prompt

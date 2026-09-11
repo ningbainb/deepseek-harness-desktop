@@ -48,8 +48,14 @@ test('network endpoint timeout is observable even when the transport waits for c
 
 test('Desktop network diagnostics separate reachable transports from capability-only entries', async () => {
   const requested = []
+  let active = 0
+  let maximumActive = 0
   const fetch = async (url) => {
     requested.push(url)
+    active += 1
+    maximumActive = Math.max(maximumActive, active)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    active -= 1
     return response(200)
   }
   const safeStatus = {
@@ -74,5 +80,6 @@ test('Desktop network diagnostics separate reachable transports from capability-
   assert.equal(result.pluginInstaller.connectivity.status, 'not-probed')
   assert.equal(result.pluginInstaller.connectivity.reason, 'pnpm-child-runs-only-during-user-install')
   assert.equal(requested.length, 3)
+  assert.equal(maximumActive, 3)
   assert.doesNotMatch(JSON.stringify(result), /https:\/\//u)
 })

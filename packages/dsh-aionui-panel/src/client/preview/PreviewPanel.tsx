@@ -22,7 +22,7 @@ import previewCss from '../styles/preview.module.css'
 import { hasCapability } from '@linxin666/dsh-desktop-client'
 
 /** The preview panel (mounted in the preview grid column). */
-export function PreviewPanel({ stores }: { stores: PanelStores }): JSX.Element {
+export function PreviewPanel({ stores, onOpenBrowser }: { stores: PanelStores; onOpenBrowser?: () => boolean }): JSX.Element {
   const preview = stores.preview
   const state = useStore(preview)
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -98,6 +98,7 @@ export function PreviewPanel({ stores }: { stores: PanelStores }): JSX.Element {
 
   /** A fresh url tab (empty address; the viewer owns the input). */
   const newUrlTab = (): void => {
+    if (onOpenBrowser?.()) return
     const stamp = Date.now()
     const tab: PreviewTabState = {
       id: `url:${stamp}`,
@@ -154,9 +155,12 @@ export function PreviewPanel({ stores }: { stores: PanelStores }): JSX.Element {
             split={split}
             onClose={() => {
               requestClose([activeTab.id])
-              document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
+              document.querySelector<HTMLElement>(
+                '[data-composer-card] textarea, [data-composer-card] [data-composer-input][contenteditable="true"]',
+              )?.focus()
             }}
             onContentChange={(content) => preview.updateContent(activeTab.id, content)}
+            onNavigate={address => preview.navigateUrl(activeTab.id, address)}
             onSave={() => void preview.saveTab(activeTab.id)}
           />
         </>

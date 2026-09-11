@@ -48,24 +48,35 @@ export function mountPanels(
   stores: PanelStores,
   onToggleExplorer: () => void,
   onAddToConversation: (path: string) => boolean,
+  onOpenNative?: (section: 'files' | 'changes') => boolean,
+  onOpenBrowser?: () => boolean,
 ): () => void {
   let explorerRoot: Root | undefined
   let previewRoot: Root | undefined
+  let explorerVisibility: MutationObserver | undefined
   const disposers: Array<() => void> = []
 
   disposers.push(waitForElement(EXPLORER_COL_SELECTOR, (el) => {
     explorerRoot = createRoot(el)
-    explorerRoot.render(
+    const render = () => explorerRoot?.render(
       <ExplorerPanel
         stores={stores}
         onToggleCollapse={onToggleExplorer}
         onAddToConversation={onAddToConversation}
+        onOpenNative={onOpenNative}
+        suspended={el.dataset.aionuiVisible === 'false'}
       />,
     )
-  }, () => { explorerRoot?.unmount(); explorerRoot = undefined }))
+    render()
+    explorerVisibility = new MutationObserver(render)
+    explorerVisibility.observe(el, { attributes: true, attributeFilter: ['data-aionui-visible'] })
+  }, () => {
+    explorerVisibility?.disconnect(); explorerVisibility = undefined
+    explorerRoot?.unmount(); explorerRoot = undefined
+  }))
   disposers.push(waitForElement(PREVIEW_COL_SELECTOR, (el) => {
     previewRoot = createRoot(el)
-    previewRoot.render(<PreviewPanel stores={stores} />)
+    previewRoot.render(<PreviewPanel stores={stores} onOpenBrowser={onOpenBrowser} />)
   }, () => { previewRoot?.unmount(); previewRoot = undefined }))
 
   return () => {

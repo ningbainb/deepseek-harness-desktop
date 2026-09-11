@@ -307,11 +307,20 @@ function projectSessionRecovery(value) {
     && Number.isSafeInteger(value.skipped) && value.skipped > 0
     ? Math.min(value.skipped, 1_000_000)
     : 0
+  const recovered = value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Number.isSafeInteger(value.recovered) && value.recovered > 0
+    ? Math.min(value.recovered, 1_000_000)
+    : 0
   return Object.freeze({
     skipped,
+    recovered,
     ...(skipped === 0 ? {} : {
       kind: 'corrupt-zstd-header',
       originalFilesPreserved: true,
+    }),
+    ...(recovered === 0 ? {} : {
+      recoveredKind: 'plaintext-zstd-mismatch',
+      originalBackupsPreserved: true,
     }),
   })
 }

@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events'
+import { randomUUID } from 'node:crypto'
+import { updateDiagnostic } from './update-diagnostics.mjs'
 
 import { emitBestEffort } from './best-effort-events.mjs'
 import {
@@ -109,7 +111,11 @@ export class DesktopUpdateController extends EventEmitter {
     this.checking = false
     this.downloading = false
     this.installing = false
+    this.installOperation = undefined
     this.manualCheck = false
+    this.updateAttempt = undefined
+    this.updateStage = 'unknown'
+    this.lastDiagnosticTransition = undefined
     this.started = false
     this.startupTimer = undefined
     this.intervalTimer = undefined
@@ -147,6 +153,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.listeners = []
     this.started = false
     this.installing = false
+    this.installOperation = undefined
     this.installTimer = undefined
     this.#setProgress(-1)
   }
@@ -168,6 +175,8 @@ export class DesktopUpdateController extends EventEmitter {
     }
     this.checking = true
     this.manualCheck = manual
+    this.updateAttempt = { attemptId: randomUUID(), sourceVersion: this.currentVersion, channel: this.updateChannel, source: 'github', sourceAttempt: 0 }
+    this.updateStage = 'check'
     this.#publish({ phase: 'checking', visible: manual })
     this.#appendDiagnostic(`[updater] checking from ${this.currentVersion}`)
     try {
@@ -203,6 +212,8 @@ export class DesktopUpdateController extends EventEmitter {
     this.manualCheck = false
     this.#appendDiagnostic(`[updater] version ${info?.version || 'unknown'} is available`)
     this.downloading = true
+    this.updateStage = 'download'
+    if (this.updateAttempt) this.updateAttempt.targetVersion = info?.version
     this.#publish({
       phase: 'downloading',
       version: info?.version,
@@ -214,6 +225,10 @@ export class DesktopUpdateController extends EventEmitter {
     this.#setProgress(0)
     try {
       const onSource = (source) => {
+        if (this.updateAttempt) {
+          this.updateAttempt.source = source?.id === 'github' ? 'github' : source?.id ? 'configured_mirror' : 'unknown'
+          this.updateAttempt.sourceAttempt = Number.isInteger(source?.attempt) ? source.attempt : 1
+        }
         const label = typeof source?.label === 'string' ? source.label.slice(0, 160) : undefined
         this.#publish({ ...this.status, phase: 'downloading', source: label })
       }
@@ -255,36 +270,48 @@ export class DesktopUpdateController extends EventEmitter {
   async install() {
     if (!this.enabled || this.status.phase !== 'ready' || this.installing) return false
     this.installing = true
+    const installOperation = {}
+    this.installOperation = installOperation
+    this.updateStage = 'prepare'
     this.#publish({ ...this.status, phase: 'installing', visible: true })
     try {
       const preparation = Promise.resolve().then(() => this.beforeInstall())
       await new Promise((resolve, reject) => {
+        let timer
+        let settled = false
         const finish = (callback, value) => {
-          if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
-          this.installPreparationTimer = undefined
+          if (settled) return
+          settled = true
+          if (timer) this.clearTimeoutFn(timer)
+          if (this.installPreparationTimer === timer) this.installPreparationTimer = undefined
           callback(value)
         }
         preparation.then(
           (value) => finish(resolve, value),
           (error) => finish(reject, error),
         )
-        this.installPreparationTimer = this.setTimeoutFn(() => {
+        timer = this.setTimeoutFn(() => {
           finish(
             reject,
             new Error(`update preparation did not finish before the timeout (${this.installPreparationTimeoutMs}ms)`),
           )
         }, this.installPreparationTimeoutMs)
-        this.installPreparationTimer?.unref?.()
+        this.installPreparationTimer = timer
+        timer?.unref?.()
       })
-      if (!this.installing) return false
+      if (!this.installing || this.installOperation !== installOperation) return false
+      this.updateStage = 'install'
+      this.#publish({ ...this.status, phase: 'installing' })
       this.updater.quitAndInstall(false, true)
-      if (!this.installing) return false
+      if (!this.installing || this.installOperation !== installOperation) return false
       this.installTimer = this.setTimeoutFn(() => {
+        if (this.installOperation !== installOperation) return
         void this.#handleError(new Error('update installer did not start before the launch timeout'), true)
       }, this.installLaunchTimeoutMs)
       this.installTimer?.unref?.()
       return true
     } catch (error) {
+      if (this.installOperation !== installOperation) return false
       await this.#handleError(error, true)
       return false
     }
@@ -292,11 +319,13 @@ export class DesktopUpdateController extends EventEmitter {
 
   async #handleError(error, forceVisible = false) {
     if (this.downloading && this.downloadRouter?.shouldDeferError?.(error)) {
+      this.#logUpdateDiagnostic('retrying', error)
       this.#appendDiagnostic(`[updater] ${asErrorMessage(error)}; retrying another source`)
       return
     }
     const recoverInstall = this.installing
     this.installing = false
+    this.installOperation = undefined
     if (this.installTimer) this.clearTimeoutFn(this.installTimer)
     this.installTimer = undefined
     if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
@@ -308,7 +337,7 @@ export class DesktopUpdateController extends EventEmitter {
     this.#setProgress(-1)
     const message = asErrorMessage(error)
     this.#appendDiagnostic(`[updater] ${message}`)
-    this.#publish({ phase: 'error', message, visible: shouldShow })
+    this.#publish({ phase: 'error', message, visible: shouldShow }, error)
     if (recoverInstall) {
       try {
         await this.onInstallFailure(error)
@@ -339,8 +368,22 @@ export class DesktopUpdateController extends EventEmitter {
     this.updater.allowDowngrade = configuration.allowDowngrade
   }
 
-  #publish(status) {
-    this.status = Object.freeze({ currentVersion: this.currentVersion, ...status })
+  #logUpdateDiagnostic(phase, error) {
+    try {
+      if (!this.updateAttempt) return undefined
+      const update = updateDiagnostic({ ...this.updateAttempt, stage: this.updateStage, error })
+      const key = `${update?.attempt_id}:${phase}:${update?.stage}:${update?.source_attempt}`
+      if (update && key !== this.lastDiagnosticTransition) {
+        this.lastDiagnosticTransition = key
+        this.#appendDiagnostic(`[update-diagnostic] ${JSON.stringify({ phase, ...update })}`)
+      }
+      return update
+    } catch { return undefined }
+  }
+
+  #publish(status, error) {
+    const update = this.#logUpdateDiagnostic(status.phase, error)
+    this.status = Object.freeze({ currentVersion: this.currentVersion, ...status, ...(update ? { update } : {}) })
     emitBestEffort(this, 'status', [this.getStatus()], (error) => {
       this.#appendDiagnostic(`[updater] status observer failed: ${asErrorMessage(error).slice(0, 1_000)}`)
     })

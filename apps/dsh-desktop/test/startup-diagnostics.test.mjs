@@ -153,12 +153,15 @@ test('startup diagnostic package combines runtime, startup log, recovery, and pl
 
 test('session recovery diagnostics are bounded and contain only safe metadata', async () => {
   const diagnostics = await collectStartupDiagnostics({
-    sessionRecovery: { skipped: 2_000_000 },
+    sessionRecovery: { skipped: 2_000_000, recovered: 2 },
   })
   assert.deepEqual(diagnostics.sessionRecovery, {
     skipped: 1_000_000,
+    recovered: 2,
     kind: 'corrupt-zstd-header',
     originalFilesPreserved: true,
+    recoveredKind: 'plaintext-zstd-mismatch',
+    originalBackupsPreserved: true,
   })
   assert.doesNotMatch(JSON.stringify(diagnostics.sessionRecovery), /C:\\\\|session\\.jsonl|session-id/u)
 })

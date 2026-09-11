@@ -1,4 +1,5 @@
 import { FEATURE_EVENT_POLICY } from './feature-telemetry.mjs'
+import { UPDATE_DIAGNOSTIC_EVENTS, validUpdateEventDiagnostic } from './update-diagnostics.mjs'
 
 const APP_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
 const DIMENSION_FIELDS = Object.freeze(['outcome', 'detail', 'bucket'])
@@ -222,14 +223,16 @@ export function createProductEvent(context, actors, name, dimensions) {
   if (!exactFields(context, ['appVersion', 'channel', 'os', 'language'])) {
     throw new TypeError('invalid product telemetry context')
   }
-  if (!exactFields(dimensions, DIMENSION_FIELDS)) throw new TypeError('invalid product event dimensions')
+  const hasUpdate = UPDATE_DIAGNOSTIC_EVENTS.includes(name) && dimensions?.update !== undefined
+  if (!exactFields(dimensions, hasUpdate ? [...DIMENSION_FIELDS, 'update'] : DIMENSION_FIELDS)) throw new TypeError('invalid product event dimensions')
+  if (hasUpdate && !validUpdateEventDiagnostic({ name, appVersion: context.appVersion, update: dimensions.update })) throw new TypeError('invalid update diagnostic')
   if (
     !exactFields(actors, ACTOR_FIELDS)
     || !ACTOR_PATTERN.test(actors.installationActor)
     || !ACTOR_PATTERN.test(actors.dailyActor)
     || !ACTOR_PATTERN.test(actors.monthlyActor)
   ) throw new TypeError('invalid anonymous product actor')
-  const policy = EVENT_POLICY[name]
+  const policy = Object.hasOwn(EVENT_POLICY, name) ? EVENT_POLICY[name] : undefined
   if (
     policy === undefined
     || !policy.outcomes.has(dimensions.outcome)
@@ -245,6 +248,7 @@ export function createProductEvent(context, actors, name, dimensions) {
     outcome: dimensions.outcome,
     detail: dimensions.detail,
     bucket: dimensions.bucket,
+    ...(hasUpdate ? { update: Object.freeze({ ...dimensions.update }) } : {}),
   })
 }
 

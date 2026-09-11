@@ -10,6 +10,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { PreviewTabState } from '../store.ts'
+import { createState, type StateHandle } from '../store.ts'
+import { useStore } from '../hooks/useStore.ts'
+import { RefreshIcon } from '../components/icons.tsx'
 import { useResizableSplit } from '../hooks/useResizableSplit.ts'
 import { t } from '../locales.ts'
 import { renderMarkdown, resolveMarkdownImage } from './markdown.ts'
@@ -26,6 +29,7 @@ export function TabContent({
   onContentChange,
   onSave,
   onClose,
+  onNavigate,
 }: {
   tab: PreviewTabState
   viewMode: 'source' | 'preview'
@@ -33,6 +37,7 @@ export function TabContent({
   onContentChange: (content: string) => void
   onSave: () => void
   onClose?: () => void
+  onNavigate?: (address: string) => void
 }): JSX.Element {
   if (tab.error !== null) {
     return <div className={previewCss.placeholder}>
@@ -85,7 +90,7 @@ export function TabContent({
         <ImageViewer src={tab.content} meta={`${tab.image?.width ?? ''}${tab.image ? ' x ' : ''}${tab.image?.height ?? ''}`} />
       )}
       {tab.contentType === 'pdf' && tab.content !== null && <PdfViewer dataUrl={tab.content} title={tab.title} />}
-      {tab.contentType === 'url' && <UrlViewer tab={tab} onClose={onClose} />}
+      {tab.contentType === 'url' && <UrlViewer tab={tab} onClose={onClose} onNavigate={onNavigate} />}
       {(tab.contentType === 'word' || tab.contentType === 'excel' || tab.contentType === 'ppt' || tab.contentType === 'unsupported') && (
         <UnsupportedViewer tab={tab} />
       )}
@@ -405,15 +410,35 @@ export function dataUrlToBlob(dataUrl: string): Blob | null {
   }
 }
 
-/** URL tab: address bar + iframe. */
-function UrlViewer({ tab, onClose }: { tab: PreviewTabState; onClose?: () => void }): JSX.Element {
-  const [input, setInput] = useState(tab.content ?? '')
-  const [url, setUrl] = useState(() => normalizeUrl(tab.content ?? ''))
+export interface BrowserState { input: string; address: string; reloadNonce: number }
+export const createBrowserState = (address = ''): StateHandle<BrowserState> =>
+  createState({ input: address, address, reloadNonce: 0 })
+
+/** One viewer shared by native seats and the compatibility preview. */
+export function UrlViewer({ tab, onClose, onNavigate, browserState, canAct = () => true, showCloseButton = true }: {
+  tab: Pick<PreviewTabState, 'id' | 'content' | 'title' | 'reloadNonce'>
+  onClose?: () => void
+  onNavigate?: (address: string) => void
+  browserState?: StateHandle<BrowserState>
+  canAct?: () => boolean
+  /** Native tab/float chrome already owns the pointer close action. */
+  showCloseButton?: boolean
+}): JSX.Element {
+  const localState = useMemo(() => createBrowserState(tab.content ?? ''), [tab.id])
+  const state = browserState ?? localState
+  const { input, address, reloadNonce } = useStore(state)
+  const url = normalizeUrl(address)
+  const setInput = (value: string) => { if (canAct()) state.update(prev => ({ ...prev, input: value })) }
+  const navigate = () => {
+    if (!canAct()) return
+    const next = input.trim().slice(0, 8192)
+    state.update(prev => ({ ...prev, input: next, address: next }))
+    onNavigate?.(next)
+  }
   const frameRef = useRef<HTMLIFrameElement>(null)
   useEffect(() => {
-    setInput(tab.content ?? '')
-    setUrl(normalizeUrl(tab.content ?? ''))
-  }, [tab.id, tab.content])
+    if (!browserState) localState.update(prev => ({ ...prev, input: tab.content ?? '', address: tab.content ?? '' }))
+  }, [localState, browserState, tab.content])
 
   // The frame is sandboxed without popup authority. Embedded pages must stay
   // inside the preview instead of spawning a browser window behind Desktop.
@@ -446,19 +471,22 @@ function UrlViewer({ tab, onClose }: { tab: PreviewTabState; onClose?: () => voi
         <input
           className={previewCss.urlInput}
           value={input}
+          aria-label={t('preview.url.placeholder')}
           placeholder={t('preview.url.placeholder')}
           spellCheck={false}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') setUrl(normalizeUrl(input))
+            if (event.key === 'Enter') navigate()
             if (event.key === 'Escape') {
-              setInput(tab.content ?? '')
-              setUrl(normalizeUrl(tab.content ?? ''))
+              setInput(address)
             }
           }}
           onFocus={(event) => event.currentTarget.select()}
         />
-        {onClose && <button type="button" className={previewCss.urlClose}
+        {browserState && <button type="button" className={previewCss.urlClose}
+          aria-label={t('preview.refresh')} title={t('preview.refresh')}
+          onClick={() => { if (canAct()) state.update(prev => ({ ...prev, reloadNonce: prev.reloadNonce + 1 })) }}><RefreshIcon size={16} /></button>}
+        {onClose && showCloseButton && <button type="button" className={previewCss.urlClose}
           data-dsh-browser-close="true" aria-label={t('preview.url.close')}
           title={t('preview.url.close')} onClick={onClose}>×</button>}
       </div>
@@ -467,14 +495,13 @@ function UrlViewer({ tab, onClose }: { tab: PreviewTabState; onClose?: () => voi
         // the frame, which re-navigates it — cross-origin documents cannot
         // be reloaded in place from the parent, and re-setting the src
         // attribute does not re-navigate when the value is unchanged.
-        key={`${url}\u0000${tab.reloadNonce ?? 0}`}
+        key={`${url}\u0000${tab.reloadNonce ?? 0}\u0000${reloadNonce}`}
         ref={frameRef}
         className={previewCss.urlFrame}
         src={url}
         title={tab.title}
         sandbox={URL_PREVIEW_SANDBOX}
         allow="autoplay; fullscreen; picture-in-picture; encrypted-media; clipboard-write"
-        allowFullScreen
         onLoad={guardFrameNavigation}
       />
     </div>
@@ -491,10 +518,8 @@ export function normalizeUrl(input: string): string {
   if (/\s/.test(trimmed)) return `https://www.bing.com/search?q=${encodeURIComponent(trimmed)}`
   const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
   // Never embed a URL that points back at the harness host: the url frame
-  // runs with allow-scripts + allow-same-origin, so a same-origin page there
-  // could reach the shell document (the onLoad guard resets indirect
-  // same-origin navigations, but a directly typed address must not land at
-  // all). Degrade it instead.
+  // has an opaque sandbox origin; this additional guard also prevents loading
+  // the Harness itself inside a preview. Degrade a direct match to blank.
   if (typeof window !== 'undefined') {
     try {
       if (new URL(candidate).origin === window.location.origin) return 'about:blank'

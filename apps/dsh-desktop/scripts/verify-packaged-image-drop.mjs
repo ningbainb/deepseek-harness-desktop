@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 import { _electron as electron } from 'playwright'
+import electronPath from 'electron'
 import sharp from 'sharp'
 
 import { createMemorySample, normalizeProcessSnapshot } from './packaged-memory-metrics.mjs'
@@ -18,7 +19,8 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 
 const executeFile = promisify(execFile)
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const appPath = resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
+const sourceOnly = process.argv.includes('--source')
+const appPath = resolve(sourceOnly ? electronPath : process.env.DSH_DESKTOP_E2E_EXECUTABLE
   ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
 const operationCount = 20
 const maxSourceBytes = 32 * 1024 * 1024
@@ -63,14 +65,16 @@ async function dismissStartup(page) {
 
 async function rpc(page, method, payload) {
   const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const result = await fetch(`/api/${rpcMethod}`, {
+    const endpoint = rpcMethod.replace('.', '/')
+    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
+    const result = await fetch(`/api/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         type: 'client-request',
         rpcId,
-        method: rpcMethod,
-        payload: rpcPayload,
+        method: endpoint,
+        payload: { args: { [requestField]: rpcPayload } },
       }),
     })
     return { status: result.status, body: await result.json().catch(() => undefined) }
@@ -269,6 +273,7 @@ async function browserState(page) {
     if (!(inlay instanceof HTMLElement) || !(card instanceof HTMLElement) || harness === undefined) {
       throw new Error('image drop browser state is unavailable')
     }
+    const input = card.querySelector('textarea, [data-composer-input][contenteditable="true"]')
     return {
       phase: inlay.dataset.phase,
       phaseTrace: [...harness.phaseTrace],
@@ -277,7 +282,9 @@ async function browserState(page) {
       liveUrls: harness.liveUrls.size,
       createdUrls: harness.createdUrls,
       revokedUrls: harness.revokedUrls,
-      inputDisabled: card.querySelector('textarea')?.disabled,
+      inputDisabled: input instanceof HTMLTextAreaElement
+        ? input.disabled
+        : input?.getAttribute('aria-disabled') === 'true',
     }
   })
 }
@@ -393,6 +400,7 @@ try {
   await seedPrimaryRuntimePermissionForTest({ userData })
   activeApplication = await electron.launch({
     executablePath: appPath,
+    args: sourceOnly ? [join(appDir, 'src', 'main.mjs')] : [],
     cwd: appDir,
     env: {
       ...process.env,
@@ -403,7 +411,16 @@ try {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
-  const page = await activeApplication.firstWindow()
+  let page = await activeApplication.firstWindow()
+  if (sourceOnly) {
+    const deadline = Date.now() + runtimeReadyTimeoutMs
+    while (Date.now() < deadline) {
+      const runtimePage = activeApplication.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+      if (runtimePage) { page = runtimePage; break }
+      await wait(100)
+    }
+    assert.match(page.url(), /^http:\/\/127\.0\.0\.1:/u, 'source Runtime window must be ready')
+  }
   const rendererErrors = []
   const rendererConsole = []
   page.on('pageerror', error => rendererErrors.push(error.message))
@@ -431,7 +448,10 @@ try {
   assert.equal(typeof session?.sessionId, 'string', JSON.stringify(session))
   await openCreatedSession(page, session.sessionId)
   await page.waitForSelector('[data-testid="aionui-drag-inlay"]', { state: 'attached', timeout: 30_000 })
-  await page.waitForSelector('[data-composer-card] textarea:not([disabled])', { state: 'visible', timeout: 30_000 })
+  await page.waitForSelector(
+    '[data-composer-card] textarea:not([disabled]), [data-composer-card] [data-composer-input][contenteditable="true"]:not([aria-disabled="true"])',
+    { state: 'visible', timeout: 30_000 },
+  )
 
   let payload = await fixturePayload()
   const fixtureEvidence = { sizes: payload.sizes, dimensions: payload.dimensions }
@@ -538,6 +558,7 @@ try {
   assert.deepEqual(seriousConsole, [])
 
   console.log(JSON.stringify({
+    mode: sourceOnly ? 'development-electron' : 'packaged-electron',
     appPath,
     fixtureEvidence,
     compressedEvidence,

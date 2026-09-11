@@ -26,9 +26,8 @@
     "test": "vitest run"
   },
   "license": "BSD-3-Clause",
-  "peerDependencies": {},
   "devDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/cordis": "^4.0.2",
     "jsdom": "29.1.1",
     "lightningcss": "^1.32.0",
     "tsdown": "^0.22.2",

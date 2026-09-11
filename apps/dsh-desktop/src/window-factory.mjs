@@ -250,6 +250,7 @@ export function createDesktopWindowFactory({
     recordSurface('extensions')
     const existing = getAuxiliaryWindow('extensions')
     if (existing) {
+      if (existing.isMinimized()) existing.restore()
       existing.show()
       existing.focus()
       return existing
@@ -266,13 +267,17 @@ export function createDesktopWindowFactory({
       minWidth: 680,
       minHeight: 480,
       show: false,
-      parent: mainWindow,
+      // Windows Dock uses a normal taskbar window, not an owned mini-caption.
+      ...(process.platform === 'win32' ? { skipTaskbar: false } : { parent: mainWindow }),
       title: 'Extension Dock',
       icon: appIcon,
       backgroundColor: chromeTheme === 'dark' ? '#0a141b' : '#ffffff',
       ...windowChromeBrowserOptions(chromeTheme),
       webPreferences: secondaryWindowWebPreferences({ preload: extensionPreload }),
     })
+    const closeWithMain = () => { if (!browserWindow.isDestroyed()) browserWindow.destroy() }
+    mainWindow?.once('closed', closeWithMain)
+    browserWindow.once('closed', () => mainWindow?.removeListener('closed', closeWithMain))
     if (WebContentsView) {
       setWindowChromeTheme(browserWindow, chromeTheme)
       dockSettings = createDockSettingsView({ WebContentsView, window: browserWindow, mainWindow, getRuntimeOrigin, dialog, openExternal: url => shell.openExternal(url) })

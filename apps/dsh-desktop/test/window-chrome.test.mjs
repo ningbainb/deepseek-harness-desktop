@@ -10,9 +10,100 @@ import {
   WINDOW_CHROME_CSS,
   WINDOW_CHROME_HEIGHT,
   normalizeWindowChromeTheme,
+  observeWindowChromeDocument,
   setWindowChromeTheme,
   windowChromeBrowserOptions,
 } from '../src/window-chrome.mjs'
+
+function chromeObserverFixture() {
+  let callback, queries = 0, disconnected = false
+  const listeners = new Map(), marked = [], themeCalls = [], rootCalls = []
+  const document = { documentElement: {}, candidates: [], querySelectorAll() { queries++; return this.candidates } }
+  const chrome = { isConnected: true }
+  const window = {
+    MutationObserver: class {
+      constructor(next) { callback = next }
+      observe(_target, options) {
+        for (const attribute of ['class', 'style', 'role', 'aria-modal', 'open', 'data-dsh-desktop-theme']) {
+          assert.ok(options.attributeFilter.includes(attribute))
+        }
+      }
+      disconnect() { disconnected = true }
+    },
+    addEventListener: (key, fn) => listeners.set(key, fn),
+    removeEventListener: key => listeners.delete(key),
+  }
+  const node = (matches = true, children = []) => ({ nodeType: 1, isConnected: true, ownerDocument: document, matched: matches,
+    firstElementChild: children[0], matches() { return this.matched }, querySelectorAll: () => children.filter(child => child.matched) })
+  // Exercise the exact serialized function, without closures from its module.
+  const install = new Function(`return (${observeWindowChromeDocument.toString()})`)()
+  const start = () => install({ document, window, chrome, syncTheme: () => themeCalls.push(1),
+    markViewportRoot: () => rootCalls.push(1), markModalLayer: element => marked.push(element) })
+  return { document, chrome, listeners, marked, themeCalls, rootCalls, node, start,
+    mutate: records => callback(records), state: () => ({ queries, disconnected }) }
+}
+
+test('window chrome indexes initial and added dialogs without full history queries on style updates', () => {
+  const f = chromeObserverFixture(), initial = f.node()
+  f.document.candidates.push(initial)
+  const dispose = f.start()
+  assert.deepEqual(f.marked, [initial])
+  for (let i = 0; i < 100; i++) f.mutate([{ type: 'attributes', attributeName: 'class', target: f.node(false) }])
+  assert.equal(f.state().queries, 1)
+  assert.equal(f.themeCalls.length, 101)
+  assert.equal(f.rootCalls.length, 101)
+  const nested = f.node(), direct = f.node(), parent = f.node(false, [nested])
+  f.mutate([{ type: 'childList', addedNodes: [parent, direct, { nodeType: 3 }] }])
+  assert.deepEqual(f.marked.slice(-3), [initial, nested, direct])
+  assert.equal(f.state().queries, 1)
+  dispose()
+})
+
+test('window chrome tracks dynamic modal attributes and drops removed or adopted dialogs', () => {
+  const f = chromeObserverFixture(), candidate = f.node(false)
+  const dispose = f.start()
+  f.mutate([{ type: 'childList', addedNodes: [candidate] }])
+  assert.equal(f.marked.length, 0)
+  for (const attributeName of ['role', 'aria-modal', 'open']) {
+    candidate.matched = true
+    f.mutate([{ type: 'attributes', attributeName, target: candidate }])
+    assert.equal(f.marked.at(-1), candidate)
+    candidate.matched = false
+    const count = f.marked.length
+    f.mutate([{ type: 'attributes', attributeName, target: candidate }])
+    assert.equal(f.marked.length, count)
+  }
+  candidate.matched = true
+  f.mutate([{ type: 'childList', addedNodes: [candidate] }])
+  candidate.isConnected = false
+  let count = f.marked.length
+  f.mutate([{ type: 'childList', addedNodes: [] }])
+  assert.equal(f.marked.length, count)
+  candidate.isConnected = true
+  f.mutate([{ type: 'childList', addedNodes: [candidate] }])
+  candidate.ownerDocument = {}
+  count = f.marked.length
+  f.mutate([{ type: 'childList', addedNodes: [] }])
+  assert.equal(f.marked.length, count)
+  dispose()
+})
+
+test('window chrome observer releases replaced roots and final navigation, but survives page cache suspension', () => {
+  for (const reason of ['removed', 'navigation', 'dispose']) {
+    const f = chromeObserverFixture(), dispose = f.start()
+    f.listeners.get('pagehide')({ persisted: true })
+    assert.equal(f.state().disconnected, false)
+    if (reason === 'removed') { f.chrome.isConnected = false; f.mutate([]) }
+    if (reason === 'navigation') f.listeners.get('pagehide')({ persisted: false })
+    if (reason === 'dispose') dispose()
+    const count = f.themeCalls.length
+    f.mutate([{ type: 'childList', addedNodes: [f.node()] }])
+    assert.equal(f.themeCalls.length, count)
+    assert.equal(f.state().disconnected, true)
+    assert.equal(f.listeners.size, 0)
+    dispose()
+  }
+})
 
 test('window chrome uses a native overlay with a compact caption area', () => {
   assert.equal(WINDOW_CHROME_HEIGHT, 32)
@@ -42,6 +133,14 @@ test('window chrome uses a native overlay with a compact caption area', () => {
   assert.doesNotMatch(WINDOW_CHROME_CSS, /dsh-window-chrome-icon/)
   assert.match(WINDOW_CHROME_CSS, /dsh-window-chrome-menus/)
   assert.match(WINDOW_CHROME_CSS, /-webkit-app-region: no-drag/)
+})
+
+test('native sidebar fullscreen reserves the caption without rewriting docked tab geometry', () => {
+  const rule = WINDOW_CHROME_CSS.match(/html\[data-dsh-desktop-window-chrome="true"\] \[data-sidebar-right-panel="fullscreen"\] \{([^}]+)\}/u)?.[1]
+  assert.ok(rule)
+  assert.match(rule, /top: var\(--dsh-desktop-window-chrome-height\) !important/u)
+  assert.match(rule, /height: calc\(100vh - var\(--dsh-desktop-window-chrome-height\)\) !important/u)
+  assert.doesNotMatch(rule, /transform|z-index|pointer-events/u)
 })
 
 test('window chrome script keeps child-window caption areas visually quiet', () => {

@@ -6,6 +6,7 @@
 export const zh = {
   dockAiGroup: 'AI 设置', dockDesktopGroup: '桌面体验', dockPersonal: '个人偏好',
   dockModels: '模型接入',
+  dockResponsePreferences: '回复偏好',
   dockCollaboration: '模型协作', dockAppearance: '外观与动效', dockVision: '图像理解', dockMemory: '记忆',
   'title': 'Web UI 插件',
   'description': '统一管理 dsh-web-ui 全家桶插件的启用与配置。',
@@ -58,6 +59,7 @@ export type WebUIPluginsKey = keyof typeof zh
 export const en = {
   dockAiGroup: 'AI settings', dockDesktopGroup: 'Desktop', dockPersonal: 'Personal preferences',
   dockModels: 'Model connection',
+  dockResponsePreferences: 'Response preferences',
   dockCollaboration: 'Model collaboration', dockAppearance: 'Appearance and motion', dockVision: 'Image understanding', dockMemory: 'Memory',
   'dockSettingUnavailable': 'This setting is unavailable. Reload the Dock or restart the runtime.',
   'title': 'Web UI Plugins',
@@ -177,6 +179,7 @@ export const communityPluginsEn = {
 } satisfies Record<CommunityPluginKey, string>
 
 export const relayZh = {
+  collapseRelay: '收起中转设置', expandRelay: '展开中转设置',
   connect: '登录并连接 bai', reconnect: '更换授权 / 重新连接',
   manualConnect: '已有 API Key？手动接入', continueBrowser: '在浏览器继续', cancelConnect: '取消连接',
   waitingBrowser: '请在浏览器登录并确认授权。完成后将自动同步模型；连接有效期为 5 分钟。',
@@ -227,6 +230,7 @@ export const relayZh = {
 export type RelayLocaleKey = keyof typeof relayZh
 
 export const relayEn: Record<RelayLocaleKey, string> = {
+  collapseRelay: 'Collapse relay settings', expandRelay: 'Expand relay settings',
   connect: 'Sign in and connect bai', reconnect: 'Change authorization / reconnect',
   manualConnect: 'Already have an API Key? Connect manually', continueBrowser: 'Continue in browser', cancelConnect: 'Cancel connection',
   waitingBrowser: 'Sign in and authorize in your browser. Models will sync automatically. This connection expires in 5 minutes.',

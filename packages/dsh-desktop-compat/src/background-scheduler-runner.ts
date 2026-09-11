@@ -288,7 +288,7 @@ export function createDesktopTaskBoardHostScheduleRunner(
           // sessionPersistence can arrive from the runtime's peer graph while
           // SessionId is branded by this package's graph. Compare the durable
           // wire value instead of coupling those private TypeScript brands.
-          : (await options.sessionPersistence.list()).some(header => String(header.id) === String(sessionId))
+          : (await options.sessionPersistence.list()).some(snapshot => String(snapshot.header.id) === String(sessionId))
         handle = persisted
           ? await options.agents.resume({
               resumeSessionId: sessionId,
@@ -309,7 +309,7 @@ export function createDesktopTaskBoardHostScheduleRunner(
         // This recovery run owns the same SessionId, so never enqueue the
         // prompt a second time. SessionPersistence cold recovery supplies the
         // terminal boundary if the old process stopped mid-turn.
-        const promptAlreadyAccepted = persisted && hasScheduledPrompt(agent.session.events, prompt)
+        const promptAlreadyAccepted = persisted && hasScheduledPrompt(agent.session.snapshotEvents(), prompt)
         if (!promptAlreadyAccepted) {
           agent.followup(createUserMessage({
             content: [{ type: 'text', text: prompt }],
@@ -318,7 +318,7 @@ export function createDesktopTaskBoardHostScheduleRunner(
           await agent.whenIdle()
         }
         await options.sessions.flush(agent.session)
-        const reason = terminalReason(agent.session.events, promptAlreadyAccepted ? 0 : firstSequence)
+        const reason = terminalReason(agent.session.snapshotEvents(), promptAlreadyAccepted ? 0 : firstSequence)
         const outcome = terminalOutcome(reason)
         const error = outcome === 'failed'
           ? reason?.kind === 'error'

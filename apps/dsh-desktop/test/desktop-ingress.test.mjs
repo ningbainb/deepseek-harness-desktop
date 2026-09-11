@@ -1,7 +1,33 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { createDesktopIngress, desktopDeepLinkFrom } from '../src/desktop-ingress.mjs'
+import { createDesktopIngress, desktopDeepLinkFrom, registerDesktopProtocolClient } from '../src/desktop-ingress.mjs'
+
+test('isolated packaged runs do not replace the system protocol association', () => {
+  const calls = []
+  const app = { isPackaged: true, setAsDefaultProtocolClient: protocol => { calls.push(protocol); return true } }
+  assert.equal(registerDesktopProtocolClient({ app, protocol: 'dsh', env: { DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1' } }), false)
+  assert.deepEqual(calls, [])
+})
+
+test('normal packaged launches retain protocol registration, including custom data profiles', () => {
+  const calls = []
+  const app = { isPackaged: true, setAsDefaultProtocolClient: protocol => { calls.push(protocol); return true } }
+  for (const env of [{}, { DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '0' }, { DSH_DESKTOP_USER_DATA: 'custom-profile' }]) {
+    assert.equal(registerDesktopProtocolClient({ app, protocol: 'dsh', env }), true)
+  }
+  assert.deepEqual(calls, ['dsh', 'dsh', 'dsh'])
+})
+
+test('development launches never register the system protocol', () => {
+  const app = { isPackaged: false, setAsDefaultProtocolClient: () => { throw new Error('unexpected registration') } }
+  assert.equal(registerDesktopProtocolClient({ app, protocol: 'dsh', env: {} }), false)
+})
+
+test('protocol registration preserves the Electron result', () => {
+  const app = { isPackaged: true, setAsDefaultProtocolClient: () => false }
+  assert.equal(registerDesktopProtocolClient({ app, protocol: 'dsh', env: {} }), false)
+})
 
 function createFakeApp() {
   const listeners = new Map()

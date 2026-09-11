@@ -14,6 +14,8 @@ export interface ModelRefreshBridgeOptions {
     };
     channelFactory?: (name: string) => ChannelLike;
     schedule?: (callback: () => void) => void;
+    now?: () => number;
+    minIntervalMs?: number;
 }
 /**
  * Re-read confirmed host state on visibility/network recovery and after a

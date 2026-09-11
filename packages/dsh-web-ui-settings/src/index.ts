@@ -98,7 +98,7 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
     }, 'web-ui-settings: settings bridge')
   })
 
-  // RC.1 exposes ChatGPT authorization as a host service, but ships no Web
+  // DSH 0.1.5 exposes ChatGPT authorization as a host service, but ships no Web
   // settings surface for it. This bridge projects only value-free progress;
   // the official provider remains the sole reader and writer of the grant.
   ctx.inject(['authorization', 'credentials'], (authCtx) => {

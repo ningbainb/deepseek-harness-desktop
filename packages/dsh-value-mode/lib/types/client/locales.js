@@ -1,4 +1,8 @@
 export const zh = {
+    catalogUnavailable: '模型目录尚未连接，请稍后重试。',
+    catalogTimeout: '模型目录查询超时，请检查运行时连接后重试。',
+    catalogChanged: '模型配置或运行时已变化，请重试以读取最新目录。',
+    catalogLoadFailed: '模型目录加载失败，请稍后重试。',
     title: '性价比模式',
     description: '由专家主控模型理解、拆解和汇总任务，再按需派发副模型子代理，在交付质量与模型使用成本之间取得平衡。',
     descSupplement: '模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。',
@@ -63,6 +67,10 @@ export const zh = {
     tokens: 'Token',
 };
 export const en = {
+    catalogUnavailable: 'The model catalog is not connected yet. Please retry shortly.',
+    catalogTimeout: 'The model catalog request timed out. Check the runtime connection and retry.',
+    catalogChanged: 'The model configuration or runtime changed. Retry to load the current catalog.',
+    catalogLoadFailed: 'The model catalog could not be loaded. Please retry.',
     title: 'Value Mode',
     description: 'Use an expert controller to understand, delegate, review, and deliver the task, with a secondary worker model for delegated subtasks.',
     descSupplement: 'Models are selected from providers already configured in DeepSeek Harness without re-entering API keys.',

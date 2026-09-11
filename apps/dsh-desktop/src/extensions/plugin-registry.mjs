@@ -16,9 +16,9 @@ export function registryManifestUrl(name, version = 'latest') {
 export class PluginRegistry {
   constructor({
     fetchImpl = fetch,
-    timeoutMs = 10_000,
+    timeoutMs = 6_000,
     cacheTtlMs = 5 * 60_000,
-    concurrency = 4,
+    concurrency = 8,
     now = Date.now,
     schedule = setTimeout,
     cancelSchedule = clearTimeout,

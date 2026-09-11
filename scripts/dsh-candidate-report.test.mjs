@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { createCandidateReport, renderCandidateReportMarkdown } from './dsh-candidate-report.mjs'
-import { createCandidateInstallPlan, validateCandidateVersion } from './prepare-dsh-candidate.mjs'
+import {
+  collectWorkspaceDshPackages,
+  createCandidateInstallPlan,
+  validateCandidateVersion,
+} from './prepare-dsh-candidate.mjs'
 
 const stableEvidence = {
   desktop: { version: '2.7.0' },
@@ -56,6 +60,62 @@ test('Candidate Matrix accepts only exact versions and resolves exact peer insta
     version: '4.0.2',
     spec: '@deepseek-ai/cordis@4.0.2',
   }])
+  assert.deepEqual(plan.workspacePackages, [])
+  assert.deepEqual(plan.unavailableWorkspacePackages, [])
+  assert.deepEqual(plan.companionPackages, [])
+  assert.deepEqual(plan.unresolvedCompanionPackages, [])
+})
+
+test('Candidate Matrix plans every workspace DSH SDK package and exposes retired entry points', async () => {
+  const workspaceManifests = [{
+    dependencies: {
+      '@deepseek-ai/cordis': '4.0.1',
+      '@deepseek-ai/dsh': '0.1.1-rc.1',
+      '@deepseek-ai/dsh-session': '0.1.1-rc.1',
+    },
+    devDependencies: {
+      '@deepseek-ai/dsh-client-runtime': '^0.1.1-rc.1',
+      react: '^19.0.0',
+    },
+  }]
+  assert.deepEqual(collectWorkspaceDshPackages(workspaceManifests), [
+    '@deepseek-ai/dsh',
+    '@deepseek-ai/dsh-client-runtime',
+    '@deepseek-ai/dsh-session',
+  ])
+  const plan = await createCandidateInstallPlan({
+    candidateVersion: '0.1.5-alpha.1',
+    viewManifest: async () => ({
+      name: '@deepseek-ai/dsh',
+      version: '0.1.5-alpha.1',
+      dependencies: { '@deepseek-ai/cordis': '^4.0.2' },
+    }),
+    resolvePeerVersion: async (name) => name === '@deepseek-ai/cordis' ? '4.0.2' : [],
+    workspaceManifests,
+    viewPackageManifest: async (name, version) => name === '@deepseek-ai/dsh-client-runtime'
+      ? null
+      : { name, version },
+  })
+  assert.deepEqual(plan.workspacePackages, [
+    {
+      name: '@deepseek-ai/dsh',
+      version: '0.1.5-alpha.1',
+      spec: '@deepseek-ai/dsh@0.1.5-alpha.1',
+    },
+    {
+      name: '@deepseek-ai/dsh-session',
+      version: '0.1.5-alpha.1',
+      spec: '@deepseek-ai/dsh-session@0.1.5-alpha.1',
+    },
+  ])
+  assert.deepEqual(plan.unavailableWorkspacePackages, ['@deepseek-ai/dsh-client-runtime'])
+  assert.deepEqual(plan.companionPackages, [{
+    name: '@deepseek-ai/cordis',
+    ranges: ['^4.0.2'],
+    version: '4.0.2',
+    spec: '@deepseek-ai/cordis@4.0.2',
+  }])
+  assert.deepEqual(plan.unresolvedCompanionPackages, [])
 })
 
 test('Candidate Matrix successful report is diagnostic and leaves stable inputs unchanged', () => {

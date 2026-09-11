@@ -6,7 +6,7 @@ asar: true
 asarUnpack:
   - node_modules/**
 npmRebuild: false
-compression: maximum
+compression: normal
 electronLanguages:
   - en-US
   - zh-CN

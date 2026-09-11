@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -36,11 +36,10 @@ async function diagnosticFiles(root) {
 }
 
 async function dismissFirstRunSurfaces(page) {
-  const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
-  if (await starPrompt.isVisible().catch(() => false)) {
-    await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
-    await starPrompt.waitFor({ state: 'hidden' })
-  }
+  const starPrompt = page.locator('#dsh-desktop-star-prompt')
+  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
+  await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
+  await starPrompt.waitFor({ state: 'hidden' })
   const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
   const introDialog = page.getByRole('dialog').filter({ has: continueButton })
   if (await introDialog.isVisible().catch(() => false)) {
@@ -116,30 +115,33 @@ try {
     JSON.stringify(nudgeGeometry),
   )
 
-  const selectWorkspace = page.getByRole('button', { name: /选择工作区|Select workspace/iu }).first()
+  const workspacePath = resolve(temporary, 'discovery-workspace')
+  await mkdir(workspacePath)
+  await electronApp.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async (_parent, options) => {
+      if (!options?.properties?.includes('openDirectory')) throw new Error('expected a directory-only native picker')
+      return { canceled: false, filePaths: [path] }
+    }
+  }, workspacePath)
+  const selectWorkspace = page.getByRole('button', { name: /选择工作区|Choose workspace/iu }).first()
   await selectWorkspace.click()
-  const directoryDialog = page.getByRole('dialog').filter({ hasText: /选择工作区目录|Select Workspace Directory/iu })
+  const directoryDialog = page.getByRole('dialog', { name: /^(选择工作区|Choose workspace)$/iu })
   await directoryDialog.waitFor({ state: 'visible' })
-  await directoryDialog.getByRole('button', { name: /编辑路径|Edit path/iu }).click()
-  const pathInput = directoryDialog.getByRole('textbox', { name: /编辑路径|Edit path/iu })
-  await pathInput.fill(appDir)
-  await pathInput.press('Enter')
-  const openDirectory = directoryDialog.getByRole('button', { name: /^(?:打开|Open)$/u })
-  await openDirectory.waitFor({ state: 'visible' })
-  await openDirectory.click()
+  await directoryDialog.getByRole('button', { name: /点击选择项目文件夹|Choose a project folder/iu }).click()
+  await page.waitForFunction(() => document.querySelector('[data-dsh-project-dialog] input')?.value === 'discovery-workspace')
+  await directoryDialog.getByRole('button', { name: /^(创建项目|Create project)$/iu }).click()
   await directoryDialog.waitFor({ state: 'hidden' })
 
-  const modelTrigger = page.getByText('DeepSeek-V4-Flash', { exact: true }).locator('xpath=ancestor::button[1]')
+  const modelTrigger = page.locator('[data-slot="conversation.input.model"] button').first()
   await modelTrigger.waitFor({ state: 'visible' })
   await modelTrigger.click()
-  const modelMenu = page.getByRole('menu', { name: /模型与推理等级|Model and reasoning effort/u })
+  const modelMenu = page.getByRole('menu', { name: /模型选择器|Model selector/u })
   await modelMenu.waitFor({ state: 'visible' })
+  await modelMenu.getByRole('menuitem', { name: /^(模型|Models)/u }).click()
   await modelMenu.getByRole('menuitemradio').first().waitFor({ state: 'visible' })
 
-  const groups = await modelMenu.getByRole('group').evaluateAll((elements) => elements.map((element) => ({
-    name: element.getAttribute('aria-labelledby')
-      ? document.getElementById(element.getAttribute('aria-labelledby'))?.textContent?.trim()
-      : undefined,
+  const groups = await modelMenu.locator('section').evaluateAll((elements) => elements.map((element) => ({
+    name: element.getAttribute('aria-label') || element.querySelector('[class*="providerTitle"]')?.textContent?.trim(),
     models: Array.from(element.querySelectorAll('[role="menuitemradio"]')).map(model => model.textContent?.trim()),
   })))
   const codex = groups.find(group => /codex/iu.test(group.name ?? ''))
@@ -147,6 +149,7 @@ try {
   assert.ok(codex.models.length > 0, `OpenAI Codex has no selectable models: ${JSON.stringify(codex)}`)
   await page.screenshot({ path: output })
 
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   const dockTrigger = page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
   const extensionWindowPromise = electronApp.waitForEvent('window', {

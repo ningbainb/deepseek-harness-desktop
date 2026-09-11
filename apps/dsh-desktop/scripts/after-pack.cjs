@@ -16,6 +16,7 @@ const REQUIRED_PACKAGED_PEERS = Object.freeze([
   '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-timeout',
   '@deepseek-ai/dsh-typert-protocol',
+  '@deepseek-ai/dsh-user-approval',
   '@deepseek-ai/dsh-workspace',
 ])
 
@@ -104,6 +105,7 @@ const FIRST_PARTY_SOURCE_DIRECTORIES = new Set([
 ])
 
 const FIRST_PARTY_BUILD_FILES = /^(?:tsconfig(?:\.[^.]+)?\.json|tsdown\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s)$/u
+const PUBLISHED_DOCUMENTATION_FILES = /^(?:readme(?:\.[^.]+)?|changelog|changes|history|contributing|security|code_of_conduct)(?:\.(?:md|markdown|txt|rst|adoc|html|ya?ml))?$/iu
 const RETIRED_SKIN_CARRIER_ASSETS = ['@linxin666', 'dsh-skins', 'skins']
 const SKIN_CENTER_ROOT = ['@linxin666', 'dsh-client-ui-skin-center', 'skins']
 const SKIN_PREVIEW_BOUNDS = Object.freeze({ width: 1440, height: 900 })
@@ -178,6 +180,15 @@ function isForeignNodePtyBinary(packagePath, { platform, arch }) {
   return false
 }
 
+function nodePtyPackagePath(relativePath) {
+  const normalized = relativePath.replaceAll('\\', '/')
+  if (normalized.startsWith('node-pty/')) return normalized.slice('node-pty/'.length)
+  const marker = '/node_modules/node-pty/'
+  const markerIndex = normalized.lastIndexOf(marker)
+  if (markerIndex === -1) return undefined
+  return normalized.slice(markerIndex + marker.length)
+}
+
 function classifyPrunableFile(relativePath, target = DEFAULT_PACKING_TARGET) {
   const packingTarget = normalizePackingTarget(target)
   const normalized = relativePath.replaceAll('\\', '/')
@@ -186,6 +197,10 @@ function classifyPrunableFile(relativePath, target = DEFAULT_PACKING_TARGET) {
 
   if (/\.d\.(?:ts|mts|cts)$/u.test(fileName)) return 'type-declaration'
   if (packageParts.some((part) => DEVELOPMENT_DIRECTORIES.has(part))) return 'development-material'
+  // Keep LICENSE, LICENCE, COPYING, NOTICE and package manifests. General
+  // package documentation is not read by the Runtime and creates hundreds of
+  // extra small-file writes during every Windows in-place upgrade.
+  if (PUBLISHED_DOCUMENTATION_FILES.test(fileName)) return 'package-documentation'
 
   // Workspace packages arrive through pnpm links, so electron-builder sees
   // files that npm's package `files` allowlist would omit. Runtime entry
@@ -199,9 +214,9 @@ function classifyPrunableFile(relativePath, target = DEFAULT_PACKING_TARGET) {
   const sourceRoots = SOURCE_ROOTS.get(packageName) ?? []
   if (sourceRoots.includes(packageParts[0])) return 'published-source'
 
-  if (packageName === 'node-pty') {
-    const packagePath = packageParts.join('/')
-    if (isForeignNodePtyBinary(packagePath, packingTarget)) return 'foreign-native-binary'
+  const nodePtyPath = nodePtyPackagePath(normalized)
+  if (nodePtyPath !== undefined && isForeignNodePtyBinary(nodePtyPath, packingTarget)) {
+    return 'foreign-native-binary'
   }
 
   if (packageName === 'pnpm') {

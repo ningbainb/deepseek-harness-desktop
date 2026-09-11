@@ -3,7 +3,7 @@ import { homedir, release as osRelease } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { cp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
@@ -18,12 +18,15 @@ import {
   GITHUB_DOWNLOADS_URL,
   GITHUB_FEEDBACK_URL,
   GITHUB_PROJECT_URL,
+  AFDIAN_SPONSOR_URL,
   PRIVACY_POLICY_URL,
 } from './community-links.mjs'
 import { promptForDownloadDestination } from './download-destination.mjs'
 import { DockNudgeStore } from './dock-nudge-state.mjs'
 import { BoundedLogStore } from './log-store.mjs'
-import { createDesktopIngress } from './desktop-ingress.mjs'
+import { createDesktopIngress, registerDesktopProtocolClient } from './desktop-ingress.mjs'
+import { createRuntimePresentationGuard } from './runtime-presentation.mjs'
+import { createDesktopInstallPreparation } from './install-preparation.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
 import { createCommunityMarketService } from './extensions/community-market.mjs'
 import {
@@ -368,14 +371,32 @@ export function beginDesktopStartup({ loadShell, startRuntime, holdRuntime = fal
 }
 
 /** Keep local startup-page navigations from cancelling one another. */
-export function createSerializedStartupSurfaceLoader({ load } = {}) {
+export function createSerializedStartupSurfaceLoader({ load, capture = () => () => true } = {}) {
   if (typeof load !== 'function') throw new TypeError('startup surface load must be a function')
+  if (typeof capture !== 'function') throw new TypeError('startup surface capture must be a function')
   let queue = Promise.resolve()
   return (...argumentsList) => {
-    const operation = queue.catch(() => {}).then(() => load(...argumentsList))
+    const isCurrent = capture()
+    const operation = queue.catch(() => {}).then(() => {
+      if (isCurrent()) return load(...argumentsList)
+    })
     queue = operation
     return operation
   }
+}
+
+/** Build a canonical file URL instead of relying on Electron's platform path coercion. */
+export function desktopLocalSurfaceUrl(path, options = {}) {
+  const url = pathToFileURL(path)
+  if (options.search !== undefined) {
+    url.search = String(options.search)
+  } else {
+    for (const [key, value] of Object.entries(options.query ?? {})) {
+      if (value !== undefined) url.searchParams.set(key, String(value))
+    }
+  }
+  if (options.hash !== undefined) url.hash = String(options.hash)
+  return url.href
 }
 
 /** Coordinate reversible update preparation separately from final app disposal. */
@@ -393,6 +414,8 @@ export function createDesktopShutdownLifecycle({
   let resourcesDisposed = false
   let stopPromise
   let shutdownPromise
+  let recoveryPromise
+  let stopGeneration = 0
 
   const report = async (error) => {
     const message = error instanceof Error ? error.message : String(error)
@@ -403,9 +426,9 @@ export function createDesktopShutdownLifecycle({
     }
   }
 
-  const stop = () => {
-    if (runtimeStopped) return Promise.resolve()
-    if (stopPromise) return stopPromise
+  const stopNow = () => {
+    if (runtimeStopped && operationsQuiesced) return Promise.resolve()
+    if (stopPromise && !runtimeStopped) return stopPromise
     const operation = Promise.resolve()
       .then(prepareStop)
       .then(() => { operationsQuiesced = true })
@@ -427,6 +450,14 @@ export function createDesktopShutdownLifecycle({
       })
     stopPromise = operation
     return operation
+  }
+
+  const stop = () => {
+    stopGeneration += 1
+    // A quit during recovery must stop the Runtime that recovery is starting,
+    // not reuse the completed stop promise for the previous process.
+    if (recoveryPromise) return recoveryPromise.then(stopNow, stopNow)
+    return stopNow()
   }
 
   const dispose = async () => {
@@ -451,24 +482,38 @@ export function createDesktopShutdownLifecycle({
     return operation
   }
 
-  const recover = async () => {
-    if (resourcesDisposed) return false
-    try {
-      await stop()
-    } catch {
-      return false
-    }
-    try {
-      await resumeOperations()
-      operationsQuiesced = false
-      await startRuntime()
-    } catch (error) {
-      await report(error)
-      return false
-    }
-    runtimeStopped = false
-    stopPromise = undefined
-    return true
+  const recover = ({ canRecover = () => true } = {}) => {
+    if (typeof canRecover !== 'function') throw new TypeError('canRecover must be a function')
+    if (resourcesDisposed || !canRecover()) return Promise.resolve(false)
+    if (recoveryPromise) return recoveryPromise
+    const initialStop = stop()
+    const generation = stopGeneration
+    const isCurrent = () => !resourcesDisposed && generation === stopGeneration && canRecover()
+    const operation = (async () => {
+      try { await initialStop } catch { return false }
+      if (!isCurrent()) return false
+      try {
+        await resumeOperations()
+        operationsQuiesced = false
+        if (!isCurrent()) {
+          await stopNow()
+          return false
+        }
+        runtimeStopped = false
+        stopPromise = undefined
+        await startRuntime()
+        if (!isCurrent()) {
+          await stopNow()
+          return false
+        }
+        return true
+      } catch (error) {
+        await report(error)
+        return false
+      }
+    })().finally(() => { if (recoveryPromise === operation) recoveryPromise = undefined })
+    recoveryPromise = operation
+    return operation
   }
 
   return Object.freeze({
@@ -486,6 +531,10 @@ export async function startElectronApp(metadata) {
   const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
   const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
+  // Runtime pages share an HTTP/1 origin. Long-lived event streams in the main
+  // window and auxiliary views must not exhaust Chromium's per-host pool and
+  // queue settings/file requests indefinitely. External hosts keep the default.
+  app.commandLine.appendSwitch('ignore-connections-limit', '127.0.0.1')
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
   const initialUpdateShutdownRequest = parseUpdateShutdownRequest(process.argv)
   const updateShutdownCoordinator = createUpdateShutdownCoordinator({
@@ -496,6 +545,14 @@ export async function startElectronApp(metadata) {
     updateShutdownCoordinator.enqueue(request)
   }
   let mainWindow
+  const runtimePresentation = createRuntimePresentationGuard()
+  let quitInProgress = false
+  let appQuitStarted = false
+  const setQuitInProgress = value => {
+    quitInProgress = value
+    if (value) runtimePresentation.suspend()
+    else runtimePresentation.resume()
+  }
   let mainWindowChromeReady = false
   let terminalSurface
   let terminalPanelPromise
@@ -523,7 +580,7 @@ export async function startElectronApp(metadata) {
   app.setName(metadata.productName)
   app.setAppUserModelId(metadata.appId)
   await app.whenReady()
-  if (app.isPackaged) app.setAsDefaultProtocolClient(metadata.protocol)
+  registerDesktopProtocolClient({ app, protocol: metadata.protocol })
   const applicationReadyAt = performance.now()
 
   const appIconPath = resolveAppIconPath({
@@ -585,7 +642,7 @@ export async function startElectronApp(metadata) {
   let completedInAppUpdate = false
   if (productTelemetry.enabled) {
     try {
-      completedInAppUpdate = await updateAnalyticsReceiptStore.consumeCompleted(desktopVersion)
+      completedInAppUpdate = await updateAnalyticsReceiptStore.consumeCompleted(desktopVersion, { withReceipt: true })
     } catch (error) {
       await logStore.append(
         `[telemetry] update receipt unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
@@ -593,7 +650,10 @@ export async function startElectronApp(metadata) {
     }
   }
   productMetrics.recordLaunch(completedInAppUpdate ? 'updated' : launchDetail)
-  if (completedInAppUpdate) productMetrics.recordUpdateCompleted()
+  if (completedInAppUpdate) {
+    productMetrics.recordUpdateCompleted(completedInAppUpdate)
+    if (completedInAppUpdate.update) void logStore.append(`[update-diagnostic] ${JSON.stringify({ ...completedInAppUpdate.update, phase: 'completed', stage: 'complete', timestamp: new Date().toISOString() })}`).catch(() => {})
+  }
 
   const desktopProfileDir = join(dshHome, 'profiles', 'desktop')
   const primaryRuntimeBinDirectory = join(userData, 'runtime-bin')
@@ -746,14 +806,17 @@ export async function startElectronApp(metadata) {
     },
   })
   if (state.maximized) mainWindow.maximize()
-  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath)
+  const saveWindowState = attachWindowStatePersistence(mainWindow, statePath, {
+    restoredBounds: process.platform === 'win32' ? state : undefined,
+  })
   let activeOrigin
   let updateController
   let updateChannelWriteQueue = Promise.resolve()
   const loadStartupSurface = createSerializedStartupSurfaceLoader({
+    capture: () => runtimePresentation.capture(),
     load: async (options) => {
       if (!mainWindow || mainWindow.isDestroyed()) return
-      await mainWindow.loadFile(STARTUP_PATH, options)
+      await mainWindow.loadURL(desktopLocalSurfaceUrl(STARTUP_PATH, options))
     },
   })
   const recordDirectStartupState = async (startupState, { reason } = {}) => {
@@ -766,7 +829,10 @@ export async function startElectronApp(metadata) {
     return projection
   }
   const showDirectStartupState = async (startupState, options = {}) => {
+    const isCurrent = runtimePresentation.capture()
+    if (!isCurrent()) return
     const projection = await recordDirectStartupState(startupState, options)
+    if (!isCurrent()) return
     const currentUrl = mainWindow?.webContents?.getURL() ?? ''
     const isAlreadyOnStartup = currentUrl.startsWith('file:') && currentUrl.includes('startup.html')
     if (isAlreadyOnStartup && !mainWindow.isDestroyed()) {
@@ -824,27 +890,33 @@ export async function startElectronApp(metadata) {
     if (terminalPanelPromise) return terminalPanelPromise
     let operation
     operation = (async () => {
-      const runtimeBin = await ensurePnpmCommandShim({
-        directory: primaryRuntimeBinDirectory,
-        executable: process.execPath,
-        pnpmCli: resolvePnpmCliPath(),
-      })
-      let pathEntries = [runtimeBin]
-      try {
-        const git = await boundedManagedGitInspection(
-          entries => managedGitRuntimeService.inspect(entries),
-          pathEntries,
-        )
-        pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, git.pathEntries)
-        if (git.source === 'bundled') {
-          await logStore.append('[terminal] verified bundled Git added to the session PATH').catch(() => {})
-        } else if (git.source === 'managed') {
-          await logStore.append('[terminal] verified managed Git added to the session PATH').catch(() => {})
+      // Build the visible panel first. Optional Git verification must not
+      // block opening/closing the UI; the session waits for PATH alongside
+      // native PTY loading, before starting the actual shell.
+      const resolveTerminalPathEntries = async () => {
+        const runtimeBin = await ensurePnpmCommandShim({
+          directory: primaryRuntimeBinDirectory,
+          executable: process.execPath,
+          pnpmCli: resolvePnpmCliPath(),
+        })
+        let pathEntries = [runtimeBin]
+        try {
+          const git = await boundedManagedGitInspection(
+            entries => managedGitRuntimeService.inspect(entries),
+            pathEntries,
+          )
+          pathEntries = prioritizeRuntimeBinPathEntries(runtimeBin, git.pathEntries)
+          if (git.source === 'bundled') {
+            await logStore.append('[terminal] verified bundled Git added to the session PATH').catch(() => {})
+          } else if (git.source === 'managed') {
+            await logStore.append('[terminal] verified managed Git added to the session PATH').catch(() => {})
+          }
+        } catch (error) {
+          await logStore.append(
+            `[terminal] Git inspection unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+          ).catch(() => {})
         }
-      } catch (error) {
-        await logStore.append(
-          `[terminal] Git inspection unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
-        ).catch(() => {})
+        return pathEntries
       }
       const parent = mainWindow ?? desktopWindowFactory.extensionWindow
       if (!parent || parent.isDestroyed?.()) throw new Error('terminal parent window is unavailable')
@@ -856,7 +928,7 @@ export async function startElectronApp(metadata) {
         ipcMain,
         Menu,
         cwd: desktopProfileDir,
-        pathEntries,
+        resolvePathEntries: resolveTerminalPathEntries,
         theme,
         onError: (error) => {
           void logStore.append(`[terminal] ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
@@ -1449,18 +1521,29 @@ export async function startElectronApp(metadata) {
   })
 
   let sessionRecoverySkippedCount = 0
+  let sessionRecoveryRecoveredCount = 0
   const observeSessionRecoveryLine = (entry) => {
-    const match = /\[dsh-session-recovery\]\s+skipped=(\d+)\s+kind=corrupt-zstd-header(?:\s|$)/u.exec(String(entry?.line ?? ''))
-    if (match === null) return
-    const count = Number(match[1])
-    if (Number.isSafeInteger(count) && count > 0) {
-      sessionRecoverySkippedCount = Math.max(sessionRecoverySkippedCount, Math.min(count, 1_000_000))
+    const line = String(entry?.line ?? '')
+    const skipped = /\[dsh-session-recovery\]\s+skipped=(\d+)\s+kind=corrupt-zstd-header(?:\s|$)/u.exec(line)
+    if (skipped !== null) {
+      const count = Number(skipped[1])
+      if (Number.isSafeInteger(count) && count > 0) {
+        sessionRecoverySkippedCount = Math.max(sessionRecoverySkippedCount, Math.min(count, 1_000_000))
+      }
+    }
+    const recovered = /\[dsh-session-recovery\]\s+recovered=(\d+)\s+kind=plaintext-zstd-mismatch(?:\s|$)/u.exec(line)
+    if (recovered !== null) {
+      const count = Number(recovered[1])
+      if (Number.isSafeInteger(count) && count > 0) {
+        sessionRecoveryRecoveredCount = Math.max(sessionRecoveryRecoveredCount, Math.min(count, 1_000_000))
+      }
     }
   }
   runtimeProvider.on('line', observeSessionRecoveryLine)
   runtimeProvider.on('line', (entry) => {
     const metric = parseValueModeRuntimeTelemetryLine(String(entry?.line ?? ''))
-    if (metric) productMetrics.recordValueModeCall(metric.outcome, metric.role)
+    if (metric?.event === 'cost_mode_route') productMetrics.recordCostModeRoute(metric)
+    else if (metric) productMetrics.recordValueModeCall(metric.outcome, metric.role)
   })
   const exportDiagnostics = () => exportStartupDiagnostics({
     dialog,
@@ -1486,7 +1569,7 @@ export async function startElectronApp(metadata) {
     },
     network: desktopNetworkStatus,
     runtimeSupport: runtimeProvider.getSupportEvidence?.(),
-    sessionRecovery: { skipped: sessionRecoverySkippedCount },
+    sessionRecovery: { skipped: sessionRecoverySkippedCount, recovered: sessionRecoveryRecoveredCount },
     repairIncidentStore,
     startupAttempt: latestStartupAttempt,
     redactionRoots: [
@@ -1571,6 +1654,7 @@ export async function startElectronApp(metadata) {
       if (action === 'downloads') return shell.openExternal(GITHUB_DOWNLOADS_URL)
       if (action === 'feedback') return shell.openExternal(GITHUB_FEEDBACK_URL)
       if (action === 'project') return shell.openExternal(GITHUB_PROJECT_URL)
+      if (action === 'sponsor') return shell.openExternal(AFDIAN_SPONSOR_URL)
       return shell.openExternal(PRIVACY_POLICY_URL)
     },
     handleToolAction: (action) => {
@@ -1814,6 +1898,7 @@ export async function startElectronApp(metadata) {
   }
   desktopIngress.setDispatchers({ deepLink: dispatchDeepLink, presetFile: dispatchPresetFile })
   const loadStartup = async () => {
+    if (!runtimePresentation.active) return
     activeOrigin = undefined
     const preview = process.env.DSH_DESKTOP_STARTUP_PREVIEW_STATE
     await loadStartupSurface(preview ? { query: { preview } } : undefined)
@@ -1823,7 +1908,9 @@ export async function startElectronApp(metadata) {
   let runtimeStartedAt
   let startupRuntimePromise
   const showRuntime = async (status, runtimeReadyAt) => {
+    const isCurrent = runtimePresentation.capture()
     await startupSurfaceReady
+    if (!isCurrent()) return
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
     void inspectCompatibilityAfterReady()
@@ -1832,16 +1919,19 @@ export async function startElectronApp(metadata) {
     const maxAttempts = 5
     let lastError
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!isCurrent()) return
       if (!mainWindow || mainWindow.isDestroyed()) return
       if (runtimeProvider.status.state !== 'ready' || runtimeProvider.status.url !== status.url) return
       try {
         await mainWindow.loadURL(decorateDesktopRuntimeUrl(status.url))
+        if (!isCurrent()) return
         if (sessionRecoverySkippedCount > 0) {
           await notificationService.show(
             sessionRecoveryNotification(sessionRecoverySkippedCount),
             { force: true },
           ).catch(() => {})
         }
+        if (!isCurrent()) return
         deepLinkRouter.setReady(true)
         const rendererLoadedAt = performance.now()
         productMetrics.recordDirectStartReady({
@@ -1852,11 +1942,13 @@ export async function startElectronApp(metadata) {
         void logStore.append(`[startup] total-to-renderer=${Math.round(rendererLoadedAt - applicationStartedAt)}ms`)
         if (process.env.DSH_DESKTOP_SMOKE_EXIT === '1') {
           await startupRuntimePromise
+          if (!isCurrent()) return
           console.log(`desktop smoke ready: ${activeOrigin}`)
           app.quit()
         }
         return
       } catch (error) {
+        if (!isCurrent()) return
         lastError = error
         void logStore.append(`[renderer] load attempt ${attempt}/${maxAttempts} failed: ${error.message}`)
         if (attempt < maxAttempts) {
@@ -1866,20 +1958,30 @@ export async function startElectronApp(metadata) {
       }
     }
 
+    if (!isCurrent()) return
     void logStore.append(`[renderer] all ${maxAttempts} load attempts failed: ${lastError?.message}; restarting runtime`)
     try {
       await runtimeProvider.stop()
+      if (!isCurrent()) return
       await runtimeProvider.start()
     } catch (restartError) {
+      if (!isCurrent()) return
       void logStore.append(`[renderer] fallback restart failed: ${restartError.message}`)
       void loadStartup().catch(() => {})
     }
   }
   runtimeProvider.on('status', (status) => {
     productMetrics.observeRuntimeStatus(status)
+    if (!runtimePresentation.active) {
+      deepLinkRouter.setReady(false)
+      return
+    }
     void trayLifecycle?.refresh()
     if (status.state === 'starting') runtimeStartedAt = performance.now()
-    if (status.state === 'starting') sessionRecoverySkippedCount = 0
+    if (status.state === 'starting') {
+      sessionRecoverySkippedCount = 0
+      sessionRecoveryRecoveredCount = 0
+    }
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (status.state === 'ready' && status.url) {
       const runtimeReadyAt = performance.now()
@@ -2287,7 +2389,6 @@ export async function startElectronApp(metadata) {
   }
   releaseStartupSurface()
 
-  let quitInProgress = false
   const shutdownLifecycle = createDesktopShutdownLifecycle({
     prepareStop: () => unregisterExtensionIpc.quiesce(),
     saveState: saveWindowState,
@@ -2405,14 +2506,14 @@ export async function startElectronApp(metadata) {
       }
       return
     }
-    quitInProgress = true
+    setQuitInProgress(true)
     void shutdownLifecycle.shutdown()
       .then(async () => {
         await writeShutdownReceipt(request?.token)
         app.quit()
       })
       .catch((error) => {
-        quitInProgress = false
+        setQuitInProgress(false)
         closeBehaviorController?.cancelExplicitQuit()
         const message = error instanceof Error ? error.message : String(error)
         void logStore.append(`[shutdown] installer request deferred because runtime stop failed: ${message}`).catch(() => {})
@@ -2448,7 +2549,31 @@ export async function startElectronApp(metadata) {
     }),
     log: (line) => void logStore.append(line),
   }) : undefined
-  let appQuitStarted = false
+  const installPreparation = createDesktopInstallPreparation({
+    lifecycle: shutdownLifecycle,
+    isQuitRequested: () => appQuitStarted || updateShutdownCoordinator.requested,
+    setPreparing: value => {
+      setQuitInProgress(value)
+      if (value) closeBehaviorController?.beginExplicitQuit()
+      else closeBehaviorController?.cancelExplicitQuit()
+    },
+    recordInstallRequested: async () => {
+      if (productTelemetry.enabled && typeof updateController?.status?.version === 'string') {
+        await updateAnalyticsReceiptStore.recordInstallRequested({
+          sourceVersion: desktopVersion,
+          targetVersion: updateController.status.version,
+          update: updateController.status.update,
+        }).catch((error) => logStore.append(
+          `[telemetry] update receipt write failed: ${error instanceof Error ? error.name : 'unknown'}`,
+        ))
+      }
+    },
+    finishPreparation: async () => {
+      productMetrics.recordSessionEnd()
+      await productTelemetry.drain()
+    },
+    log: message => logStore.append(message),
+  })
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
     getWindow: () => mainWindow,
@@ -2460,34 +2585,8 @@ export async function startElectronApp(metadata) {
     updateChannel,
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
-    beforeInstall: async () => {
-      appQuitStarted = true
-      if (productTelemetry.enabled && typeof updateController?.status?.version === 'string') {
-        await updateAnalyticsReceiptStore.recordInstallRequested({
-          sourceVersion: desktopVersion,
-          targetVersion: updateController.status.version,
-        }).catch((error) => logStore.append(
-          `[telemetry] update receipt write failed: ${error instanceof Error ? error.name : 'unknown'}`,
-        ))
-      }
-      closeBehaviorController?.beginExplicitQuit()
-      quitInProgress = true
-      await shutdownLifecycle.stop()
-      productMetrics.recordSessionEnd()
-      await productTelemetry.shutdown()
-    },
-    onInstallFailure: async (error) => {
-      if (appQuitStarted || quitInProgress || updateShutdownCoordinator.requested) {
-        await logStore.append(`[updater] install recovery suppressed because app quit is in progress: ${error instanceof Error ? error.message : String(error)}`)
-        return
-      }
-      quitInProgress = false
-      closeBehaviorController?.cancelExplicitQuit()
-      const recovered = await shutdownLifecycle.recover()
-      await logStore.append(recovered
-        ? '[updater] runtime recovered after installer launch failure'
-        : '[updater] runtime recovery failed after installer launch failure')
-    },
+    beforeInstall: installPreparation.beforeInstall,
+    onInstallFailure: installPreparation.onInstallFailure,
   })
   trayLifecycle = new DesktopTrayLifecycle({
     Tray,
@@ -2565,15 +2664,18 @@ export async function startElectronApp(metadata) {
   updateController.start()
 
   app.on('before-quit', (event) => {
+    const wasQuitting = appQuitStarted
+    appQuitStarted = true
     closeBehaviorController?.beginExplicitQuit()
-    if (shutdownLifecycle.runtimeStopped) return
+    if (shutdownLifecycle.runtimeStopped && shutdownLifecycle.resourcesDisposed) return
     event.preventDefault()
-    if (quitInProgress) return
-    quitInProgress = true
+    if (wasQuitting) return
+    setQuitInProgress(true)
     void shutdownLifecycle.shutdown()
       .then(() => app.quit())
       .catch((error) => {
-        quitInProgress = false
+        appQuitStarted = false
+        setQuitInProgress(false)
         closeBehaviorController?.cancelExplicitQuit()
         const message = error instanceof Error ? error.message : String(error)
         void logStore.append(`[shutdown] quit deferred because runtime stop failed: ${message}`).catch(() => {})

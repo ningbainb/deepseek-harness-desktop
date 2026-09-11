@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 
 import {
   apply,
@@ -91,6 +92,27 @@ function turnEndEvent(turn = 1) {
 }
 
 describe('anchored-tool-bootstrap', () => {
+  test('current SDK persona prefix and suffix survive bootstrap and promotion', async () => {
+    const sections = [
+      { name: PERSONA_PREFIX_SECTION, text: SECTIONS[0].text },
+      SECTIONS[1],
+      { name: PERSONA_SUFFIX_SECTION, text: 'Persona closing instruction.' },
+    ]
+    const assembleListener = listener(register(), 'system-prompt/assemble')
+    const tools = [{ name: 'bash' }, { name: 'read' }, { name: 'edit' }]
+    const first = await assemble(assembleListener, [], tools, undefined, sections)
+    expect(first.sections).toEqual([sections[0], sections[2]])
+    expect(first.contexts).toEqual([])
+    const promoted = await assemble(assembleListener, [{ type: 'tool/call' }], tools, undefined, sections)
+    expect(promoted.sections).toEqual([
+      { ...sections[0], text: `${sections[0].text}\n\nYour working directory is /workspace.` },
+      sections[1], sections[2],
+    ])
+    expect(promoted.tools).toEqual(tools)
+    expect(promoted.contexts).not.toEqual([])
+    expect(sections[0].text).toBe(SECTIONS[0].text)
+  })
+
   test('exports a diagnostic plugin name', () => {
     expect(name).toBe('anchored-tool-bootstrap')
   })

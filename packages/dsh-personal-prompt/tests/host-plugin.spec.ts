@@ -3,12 +3,6 @@ import { scopeTarget } from '@deepseek-ai/dsh-scope'
 
 const mocks = vi.hoisted(() => ({
   install: vi.fn(),
-  namespace: vi.fn((name: string) => name),
-}))
-
-vi.mock('@deepseek-ai/dsh-settings', () => ({
-  installSettingsSection: mocks.install,
-  settingsNamespace: mocks.namespace,
 }))
 
 import { apply } from '../src/index.ts'
@@ -23,8 +17,12 @@ describe('personal prompt host contribution', () => {
       snapshot: () => ({ sessions: [] }),
     }
     const ctx: any = {
+      settings: { installSection: mocks.install },
       userScope,
-      inject: vi.fn((_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ workspaceRegistry: { list: () => [] } })),
+      inject: vi.fn((_dependencies: string[], callback: (scope: unknown) => unknown) => callback({
+        settings: { installSection: mocks.install },
+        workspaceRegistry: { list: () => [] },
+      })),
       on: vi.fn(),
       effect: (effect: () => unknown) => effect(),
       systemPrompt: {
@@ -52,12 +50,16 @@ describe('personal prompt host contribution', () => {
     const sections: any[] = []
     const variables: any[] = []
     const ctx: any = {
+      settings: { installSection: mocks.install },
       userScope: {
         availabilityState: () => 'unavailable',
         localPrincipal: () => ({ id: 'principal-local' }),
         snapshot: () => ({ sessions: [] }),
       },
-      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ workspaceRegistry: { list: () => [] } }),
+      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({
+        settings: { installSection: mocks.install },
+        workspaceRegistry: { list: () => [] },
+      }),
       on: vi.fn(),
       effect: (effect: () => unknown) => effect(),
       systemPrompt: {
@@ -84,11 +86,15 @@ describe('personal prompt host contribution', () => {
       availabilityState: () => 'ready',
       localPrincipal: () => ({ id: 'principal-local' }),
       snapshot: () => ({ sessions: [{ sessionId: 'session-a', createdByPrincipalId: 'principal-local' }] }),
-      currentScope: () => undefined,
+      currentScope: (): { source: 'remote' } | undefined => undefined,
     }
     const ctx: any = {
+      settings: { installSection: mocks.install },
       userScope,
-      inject: vi.fn((_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ workspaceRegistry: { list: () => [{ id: 'workspace-a', sessionIds: ['session-a'] }] } })),
+      inject: vi.fn((_dependencies: string[], callback: (scope: unknown) => unknown) => callback({
+        settings: { installSection: mocks.install },
+        workspaceRegistry: { list: () => [{ id: 'workspace-a', sessionIds: ['session-a'] }] },
+      })),
       on: vi.fn((event: string, listener: (this: unknown, session: { id: string }) => void) => { listeners.set(event, listener) }),
       effect: (effect: () => unknown) => effect(),
       systemPrompt: {
@@ -126,8 +132,12 @@ describe('personal prompt host contribution', () => {
       currentScope: () => source === undefined ? undefined : ({ source }),
     }
     const ctx: any = {
+      settings: { installSection: mocks.install },
       userScope,
-      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ workspaceRegistry: { list: () => [] } }),
+      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({
+        settings: { installSection: mocks.install },
+        workspaceRegistry: { list: () => [] },
+      }),
       on: (event: string, listener: (this: unknown, session: { id: string }) => void) => { listeners.set(event, listener) },
       effect: (effect: () => unknown) => effect(),
       systemPrompt: {
@@ -157,12 +167,16 @@ describe('personal prompt host contribution', () => {
     const variables: any[] = []
     const listeners = new Map<string, (this: unknown, session: { id: string }) => void>()
     const ctx: any = {
+      settings: { installSection: mocks.install },
       userScope: {
         availabilityState: () => 'ready',
         localPrincipal: () => ({ id: 'principal-local' }),
         snapshot: () => ({ sessions: [{ sessionId: 'session-a', createdByPrincipalId: 'principal-local' }] }),
       },
-      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ workspaceRegistry: { list: () => { throw new Error('registry unavailable') } } }),
+      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({
+        settings: { installSection: mocks.install },
+        workspaceRegistry: { list: () => { throw new Error('registry unavailable') } },
+      }),
       on: (event: string, listener: (this: unknown, session: { id: string }) => void) => { listeners.set(event, listener) },
       effect: (effect: () => unknown) => effect(),
       systemPrompt: {

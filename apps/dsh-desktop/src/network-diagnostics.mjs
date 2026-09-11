@@ -68,9 +68,11 @@ export function createDesktopNetworkDiagnostics({ updateFetch, marketFetch, netw
 
   return Object.freeze({
     async run() {
-      const update = await probeDesktopNetworkEndpoint(updateFetch, GITHUB_DOWNLOADS_URL)
-      const market = await probeDesktopNetworkEndpoint(marketFetch, COMMUNITY_MARKET_URL)
-      const pluginRegistry = await probeDesktopNetworkEndpoint(marketFetch, NPM_REGISTRY_ORIGIN)
+      const [update, market, pluginRegistry] = await Promise.all([
+        probeDesktopNetworkEndpoint(updateFetch, GITHUB_DOWNLOADS_URL),
+        probeDesktopNetworkEndpoint(marketFetch, COMMUNITY_MARKET_URL),
+        probeDesktopNetworkEndpoint(marketFetch, NPM_REGISTRY_ORIGIN),
+      ])
       return Object.freeze({
         api: Object.freeze({
           configuration: networkStatus.api,

@@ -124,6 +124,20 @@
 .headerActivity summary { white-space: nowrap; }
 
 .section[hidden], .editor[hidden] { display: none; }
+.enableRow { padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; background: var(--dsw-alias-bg-layer-2); }
+.enableRow > p { margin: 6px 0 0; line-height: 1.6; }
+.enableRow .toggle input[type='checkbox'] { appearance: none; position: relative; width: 32px; height: 19px; border-radius: 12px; background: var(--dsw-alias-label-dimmed); transition: background 120ms; flex: none; }
+.enableRow .toggle input[type='checkbox']::after { content: ''; position: absolute; left: 3px; top: 3px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform 120ms; }
+.enableRow .toggle input[type='checkbox']:checked { background: var(--dsw-alias-brand-primary); }
+.enableRow .toggle input[type='checkbox']:checked::after { transform: translateX(13px); }
+.enableRow .toggle input[type='checkbox']:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 3px; }
+.enableRow .toggle input[type='checkbox']:disabled { opacity: .45; cursor: not-allowed; }
+.empty { margin: 0; padding: 24px 18px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: 10px; color: var(--dsw-alias-label-tertiary); line-height: 1.7; text-align: center; }
+.details { border-top: 1px solid var(--dsw-alias-border-l2); padding-top: 10px; }
+.details > summary { cursor: pointer; font-size: 12px; color: var(--dsw-alias-label-secondary); padding: 4px 0; }
+.details > summary:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 3px; border-radius: 3px; }
+.details > .field, .details > .toggle { margin-top: 12px; }
+.actions > .danger:first-child { margin-right: auto; }
 .tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
 .tabs button { padding: 8px 0; border: 0; border-bottom: 2px solid transparent; color: var(--dsw-alias-label-secondary); background: transparent; font: inherit; cursor: pointer; }
 .tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-brand-primary); font-weight: 600; }
@@ -210,10 +224,10 @@
 }
 
 .itemMeta {
-  flex: none;
+  flex: 0 1 40%;
   color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 11px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .pendingList {

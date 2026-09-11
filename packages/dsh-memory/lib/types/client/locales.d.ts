@@ -1,5 +1,6 @@
 export declare const zh: {
-    readonly "settings.all": "全部作用域";
+    readonly "settings.all": "全部记忆";
+    readonly "settings.advanced": "更多选项：标签、置顶和有效期";
     readonly "settings.scopeFilter": "查看范围";
     readonly "settings.clearVisible": "清空当前结果";
     readonly "settings.clearConfirm": "确认删除当前显示的记忆？此操作无法撤销。";
@@ -37,9 +38,9 @@ export declare const zh: {
     readonly 'settings.ready': "无待保存修改";
     readonly 'settings.saving': "保存中…";
     readonly 'settings.title': "记忆";
-    readonly 'settings.description': "保存希望 AI 记住的事实和偏好。按本轮输入检索相关内容，模型建议由你确认后保存。";
-    readonly 'settings.enabled': "允许模型在请求中引用记忆";
-    readonly 'settings.ownerNotice': "记忆保存在本机并按用户隔离。引用内容会随请求发送给当前模型供应商；归属不明时不引用。";
+    readonly 'settings.description': "保存希望 AI 记住的事。AI 提出的新记忆，需要你确认才会保存。";
+    readonly 'settings.enabled': "使用已保存的记忆";
+    readonly 'settings.ownerNotice': "记忆仅保存在本机并按用户隔离。开启后，相关内容会随请求发送给模型服务商。";
     readonly 'settings.readonly': "当前设置不可写，或此页面不在本机回环环境中。";
     readonly 'settings.loading': "正在读取…";
     readonly 'settings.items': "已保存的记忆";
@@ -47,7 +48,7 @@ export declare const zh: {
     readonly 'settings.new': "新建";
     readonly 'settings.search': "筛选";
     readonly 'settings.searchPlaceholder': "按内容或标签筛选";
-    readonly 'settings.scope': "作用域";
+    readonly 'settings.scope': "适用范围";
     readonly 'settings.global': "全局";
     readonly 'settings.workspace': "工作区";
     readonly 'settings.session': "会话";
@@ -64,7 +65,7 @@ export declare const zh: {
     readonly 'settings.clear': "清空全部";
     readonly 'settings.confirm': "确认保存";
     readonly 'settings.reject': "忽略";
-    readonly 'settings.noItems': "还没有记忆。";
+    readonly 'settings.noItems': "这里还没有记忆。点击“新建”添加，或调整筛选条件。";
     readonly 'settings.noPending': "没有待确认建议。";
     readonly 'settings.suggestion': "模型建议保存一条记忆；确认前不会写入本地文件。";
     readonly 'settings.saved': "已保存";

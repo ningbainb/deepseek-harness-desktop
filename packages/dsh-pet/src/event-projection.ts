@@ -7,6 +7,7 @@
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 import type { PetStateInput } from './state.ts'
 
 /** Runtime shape of the optional legacy activity event. */
@@ -62,16 +63,6 @@ export function projectOfficialEvent(
       runtime.activeTools.clear()
       runtime.stepHadFailure = false
       return { input: { phase: 'waiting', line: '等待模型响应' } }
-    case 'assistant/chunk': {
-      const { chunk } = event.data
-      if (chunk.type === 'reasoning-delta' && chunk.text.length > 0) {
-        return { input: { phase: 'thinking', line: '正在思考' } }
-      }
-      if (chunk.type === 'text-delta' && chunk.text.length > 0) {
-        return { input: { phase: 'review', line: '整理回复中' } }
-      }
-      return undefined
-    }
     case 'assistant/message':
       return { input: { phase: 'review', line: '整理回复中' } }
     case 'tool/call':
@@ -125,4 +116,19 @@ export function projectOfficialEvent(
     default:
       return undefined
   }
+}
+
+/** Project the process-local 0.1.5 assistant stream without treating it as durable history. */
+export function projectAssistantStreamFrame(
+  frame: AssistantStreamFrame,
+): PetActivityTransition | undefined {
+  if (frame.type !== 'chunk') return undefined
+  const { chunk } = frame
+  if (chunk.type === 'reasoning-delta' && chunk.text.length > 0) {
+    return { input: { phase: 'thinking', line: '正在思考' } }
+  }
+  if (chunk.type === 'text-delta' && chunk.text.length > 0) {
+    return { input: { phase: 'review', line: '整理回复中' } }
+  }
+  return undefined
 }

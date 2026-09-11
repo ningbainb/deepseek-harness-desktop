@@ -1,6 +1,7 @@
 export type ValueModeProductTelemetryEvent = {
     kind: 'entry';
     configured: boolean;
+    source?: 'hero' | 'header' | 'settings';
 } | {
     kind: 'onboarding';
     outcome: 'shown' | 'completed' | 'dismissed' | 'failed';

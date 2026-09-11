@@ -6,8 +6,12 @@ export async function useChineseFixtureLocale(app) {
     // These interaction fixtures assert Chinese copy. Set the browser language
     // before the settings view is created, independent of the runner OS locale.
     await context.addInitScript(() => {
-      Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh'] })
-      Object.defineProperty(navigator, 'language', { get: () => 'zh-CN' })
+      // Electron can replay init scripts in an already-localized document.
+      // Keep the fixture idempotent, and do not redefine an immutable owner.
+      for (const [key, value] of [['languages', ['zh-CN', 'zh']], ['language', 'zh-CN']]) {
+        if (Object.getOwnPropertyDescriptor(navigator, key)?.configurable === false) continue
+        Object.defineProperty(navigator, key, { configurable: true, get: () => value })
+      }
     })
     localizedContexts.add(context)
   }

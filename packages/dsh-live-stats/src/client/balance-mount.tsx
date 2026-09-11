@@ -6,6 +6,7 @@ import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { BalanceController } from './balance-controller.ts'
 import { BalanceOverviewView } from './BalanceOverviewView.tsx'
+import type { SettingsCardKey } from './locales.ts'
 
 export const BALANCE_VIEW_SELECTOR = '[data-dsh-balance-view]'
 const CONVERSATION_COLUMN_SELECTOR = '[data-pane="conversation"], [class*="centerCol"]'
@@ -17,7 +18,7 @@ function conversationColumn(): HTMLElement | undefined {
   return document.querySelector<HTMLElement>(CONVERSATION_COLUMN_SELECTOR) ?? undefined
 }
 
-export function mountBalanceView(controller: BalanceController): () => void {
+export function mountBalanceView(controller: BalanceController, t?: (key: SettingsCardKey) => string): () => void {
   let root: Root | undefined
   let container: HTMLDivElement | undefined
 
@@ -39,7 +40,7 @@ export function mountBalanceView(controller: BalanceController): () => void {
     column.appendChild(container)
     root = createRoot(container)
     root.render(
-      createElement(BalanceOverviewView, { controller, onClose: () => sync() }),
+      createElement(BalanceOverviewView, { controller, t, onClose: () => sync() }),
     )
   }
 

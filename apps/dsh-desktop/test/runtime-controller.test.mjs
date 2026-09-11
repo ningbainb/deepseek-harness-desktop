@@ -22,6 +22,7 @@ import {
   forceKillChildProcessTree,
   parseDshReadyUrl,
   probeHttpReady,
+  redactDshReadyUrlToken,
   terminateChildProcessTree,
   resolveDesktopRuntimeHost,
   validateLoopbackUrl,
@@ -48,10 +49,30 @@ class FakeChild extends EventEmitter {
 
 test('ready parser accepts only the official loopback URL line', () => {
   assert.equal(parseDshReadyUrl('dsh web: http://127.0.0.1:43125'), 'http://127.0.0.1:43125/')
+  assert.equal(
+    parseDshReadyUrl('dsh web: http://127.0.0.1:43125/?token=launch_token-123'),
+    'http://127.0.0.1:43125/?token=launch_token-123',
+  )
   assert.equal(parseDshReadyUrl('prefix dsh web: http://127.0.0.1:43125'), undefined)
   assert.throws(() => validateLoopbackUrl('https://127.0.0.1:43125'), /loopback HTTP/)
   assert.throws(() => validateLoopbackUrl('http://example.com:43125'), /loopback HTTP/)
   assert.throws(() => validateLoopbackUrl('http://user:pass@127.0.0.1:43125'), /credentials/)
+  assert.throws(
+    () => parseDshReadyUrl('dsh web: http://127.0.0.1:43125/admin?token=launch_token-123'),
+    /loopback root/,
+  )
+  assert.throws(
+    () => parseDshReadyUrl('dsh web: http://127.0.0.1:43125/?token=launch_token-123&debug=1'),
+    /only one launch token/,
+  )
+  assert.throws(
+    () => parseDshReadyUrl('dsh web: http://127.0.0.1:43125/?token=short'),
+    /invalid launch token/,
+  )
+  assert.equal(
+    redactDshReadyUrlToken('dsh web: http://127.0.0.1:43125/?token=launch_token-123'),
+    'dsh web: http://127.0.0.1:43125/?token=[redacted]',
+  )
 })
 
 test('restart schedule is bounded and exponential', () => {
@@ -286,6 +307,44 @@ test('HTTP readiness probe waits through a short bind race', async () => {
     },
   })
   assert.equal(calls, 3)
+})
+
+test('desktop launcher receives the exact official DSH installation anchor', () => {
+  const invocation = createRuntimeInvocation({
+    platform: 'linux',
+    executable: '/opt/deepseek-harness',
+    cliPath: '/opt/desktop/runtime-launcher.mjs',
+    dshCliPath: '/opt/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+  })
+  assert.deepEqual(invocation.args.slice(0, 5), [
+    '--expose-internals',
+    '/opt/desktop/runtime-launcher.mjs',
+    '--dsh-cli',
+    '/opt/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    '--profile',
+  ])
+  assert.throws(() => createRuntimeInvocation({
+    platform: 'linux',
+    executable: '/opt/deepseek-harness',
+    cliPath: '/opt/desktop/runtime-launcher.mjs',
+    dshCliPath: '',
+  }), /official DSH CLI path/u)
+})
+
+test('HTTP readiness probe accepts the 1.1.5 launch-token cookie exchange', async () => {
+  let options
+  await probeHttpReady('http://127.0.0.1:43125/?token=launch-token', {
+    attempts: 1,
+    fetchImpl: async (_url, init) => {
+      options = init
+      return {
+        ok: false,
+        status: 303,
+        headers: new Headers({ location: '/', 'set-cookie': 'dsh_session=signed; HttpOnly' }),
+      }
+    },
+  })
+  assert.equal(options.redirect, 'manual')
 })
 
 test('controller reaches ready state from streamed output and stops cleanly', async () => {

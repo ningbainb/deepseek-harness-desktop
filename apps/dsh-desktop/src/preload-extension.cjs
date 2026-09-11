@@ -37,7 +37,7 @@ const api = Object.freeze({
   exportPluginDiagnostics: () => ipcRenderer.invoke('extensions:diagnostics-export'),
   runNetworkDiagnostics: () => ipcRenderer.invoke('extensions:network-diagnostics'),
   openCommunityPlugin: (id) => ipcRenderer.invoke('extensions:community-open', id),
-  listCommunityMarket: () => ipcRenderer.invoke('extensions:market-list'),
+  listCommunityMarket: (force = false) => ipcRenderer.invoke('extensions:market-list', force),
   installMarketPlugin: (id) => ipcRenderer.invoke('extensions:market-install', id),
   importSkill: () => ipcRenderer.invoke('extensions:skill-import'),
   openSkill: (id) => ipcRenderer.invoke('extensions:skill-open', id),

@@ -48,7 +48,7 @@ dsh-pet/
 |   |-- persist.ts      # 持久化（$DSH_HOME/pet.json，原子写入）
 |   |-- routes.ts       # /api/pet/* JSON API + /pet/whale/* 素材静态路由
 |   `-- client/         # 浏览器半区
-|       |-- index.ts    # 全局挂载（createRoot → body）+ 轮询（800ms）+ 交互接线（fetch）
+|       |-- index.ts    # 全局挂载（createRoot → body）+ 轮询（2s）+ 交互接线（fetch）
 |       |-- PetDockEntry.tsx  # 全局浮层入口（document.body，无会话/新会话/会话中全程显示）
 |       |-- WhalePet.tsx      # 浮层组件（portal + rAF 帧动画 + 拖动）
 |       |-- spritesheet.ts    # 图集几何 + 每状态动画轨道（帧/时长）
@@ -64,16 +64,18 @@ dsh-pet/
                                                     > PetService（host）
 可选的兼容事件 activity/status --------------/
                                                               | /api/pet/* JSON
-global React root（createRoot → document.body） <-- 轮询 800ms -- pet-client（浏览器）
+global React root（createRoot → document.body） <-- 轮询 2s -- pet-client（浏览器）
                                                               |
                                                    WhalePet 浮层（portal + rAF）
 ```
 
-- **状态源**：host 将官方 `turn/start`、`step/start`、`assistant/chunk`、`assistant/message`、`tool/call`、`tool/result` 和 `turn/end` 事件投影为 waiting/thinking/tool/review/done/failed 状态。可选的旧版 `activity/status` 事件仍作为兼容输入。
+- **状态源**：host 将官方持久化 `turn/start`、`step/start`、`assistant/message`、`tool/call`、`tool/result`、`turn/end` 事件以及进程内 `agent/assistant-stream` 帧投影为 waiting/thinking/tool/review/done/failed 状态。可选的旧版 `activity/status` 事件仍作为兼容输入。
 - **多会话语义**：API 和浏览器挂载是 host 全局的，也不提供前台会话标识，因此最近一条有效事件决定显示。各会话的完成回合仍独立奖励，销毁非当前会话不会重置可见状态。
 - **挂载点**：`document.body`（全局 React root，无会话/新会话/会话中全程显示——旧挂载点 `conversation.composer.dock` 只在活跃会话渲染，导致新会话界面看不到宠物），组件内部 `createPortal` 渲染全局浮层。
 - **渲染**：CSS sprite（background-position）逐帧动画，帧时长来自 `spritesheet.ts` 的轨道定义。
 - **通信**：浏览器 ↔ host 走同源 `/api/pet/*` JSON 端点（state/interact/set-visible/set-config），图集从 `/pet/whale/spritesheet.webp` 加载——RPC 域与 `/plugins/` 静态服务都是平台注册的，插件自足地提供自己的 API 与素材（与 dsh-remote-web-ui 的 `/api/pair` 同一模式）。
+
+页面可见时每两秒检查一次状态，每个轮询器最多一个在途读取，八秒超时。交互后的刷新合并为一次最新读取，避免旧快照覆盖新状态。隐藏页面或禁用、卸载宠物会取消展示层读取，并阻止迟到结果回写。
 
 ## 安装
 

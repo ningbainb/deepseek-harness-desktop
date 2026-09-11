@@ -10,10 +10,12 @@ import { TokenHeatmap } from './TokenHeatmap.tsx'
 import { UsageTrendChart } from './UsageTrendChart.tsx'
 import { ModelBreakdownChart } from './ModelBreakdownChart.tsx'
 import css from './balance.module.css'
+import { zh, type SettingsCardKey } from './locales.ts'
 
 export interface BalanceOverviewViewProps {
   controller: BalanceController
   onClose?: () => void
+  t?: (key: SettingsCardKey) => string
 }
 
 interface MetricSub {
@@ -46,7 +48,7 @@ function MetricCard({ label, value, valueTitle, subs }: MetricCardProps): ReactE
   )
 }
 
-export function BalanceOverviewView({ controller, onClose }: BalanceOverviewViewProps): ReactElement {
+export function BalanceOverviewView({ controller, onClose, t = key => zh[key] }: BalanceOverviewViewProps): ReactElement {
   const [state, setState] = useState<BalanceState>(() => controller.getSnapshot())
 
   useEffect(() => {
@@ -113,9 +115,9 @@ export function BalanceOverviewView({ controller, onClose }: BalanceOverviewView
           <div className={css.metricsGrid}>
             {isOfficialBalanceAvailable ? (
               <MetricCard
-                label="可用余额"
-                value={formatBalanceAmount(state.totalBalance, state.currency)}
-                subs={[
+                label={t(state.source === 'relay-quota' || state.source === 'relay-allowance' ? 'balance.quota' : 'balance.available')}
+                value={formatBalanceAmount(state.totalBalance, state.source === 'relay-quota' ? t('balance.quotaUnit') : state.currency)}
+                subs={state.source === 'relay-quota' || state.source === 'relay-allowance' ? [{ text: t('balance.quotaHint') }] : state.source === 'relay-wallet' ? [] : [
                   { text: `充值 ${formatBalanceAmount(state.toppedUpBalance, state.currency)}` },
                   { text: `赠送 ${formatBalanceAmount(state.grantedBalance, state.currency)}` },
                 ]}
@@ -166,7 +168,7 @@ export function BalanceOverviewView({ controller, onClose }: BalanceOverviewView
 
           {state.error ? (
             <div className={css.errorBanner} role="alert">
-              官方余额查询提示: {state.error}（本地 Token 统计与热力图仍正常运作）
+              {t('balance.queryHint')}: {state.error}（{t('balance.statsUnaffected')}）
             </div>
           ) : null}
         </section>

@@ -12,7 +12,7 @@
     <div class="settings-shell">
       <aside class="settings-sidebar">
         <header><h1>拓展坞</h1></header>
-        <label class="dock-search"><span class="sr-only">搜索功能</span><input id="dock-search" type="search" placeholder="搜索功能" autocomplete="off" aria-controls="dock-search-results"></label>
+        <label class="dock-search"><span class="sr-only">查找拓展坞功能</span><input id="dock-search" type="search" placeholder="查找功能…" autocomplete="off" aria-controls="dock-search-results"></label>
         <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
           <p class="nav-group-label">AI 设置</p>
@@ -45,7 +45,7 @@
           <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="backup" aria-controls="conversation-import">对话导入</button>
           <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="backup" aria-controls="migration">旧配置迁移</button>
         </nav>
-        <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status">正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary">重新加载</button></section>
+        <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status" hidden>正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary" hidden>重新加载</button></section>
         <div class="content-toolbar">
           <button type="button" class="secondary refresh" id="refresh">刷新列表</button>
         </div>
@@ -129,7 +129,7 @@
           <div id="community-plugin-list"></div>
         </section>
         <div class="market-controls">
-          <label class="market-search" for="market-query"><span>搜索</span><input type="search" id="market-query" placeholder="名称、作者或描述" autocomplete="off" spellcheck="false"></label>
+          <label class="market-search" for="market-query"><span>筛选社区插件</span><input type="search" id="market-query" placeholder="插件名称、作者或描述" autocomplete="off" spellcheck="false"></label>
           <label for="market-category"><span>分类</span><select id="market-category"><option value="all">全部分类</option></select></label>
           <label for="market-sort"><span>排序</span><select id="market-sort"><option value="popular">下载优先</option><option value="newest">最近收录</option><option value="name">名称</option></select></label>
         </div>
@@ -256,7 +256,7 @@
           </div>
         </article>
       </section>
-      <section id="migration" class="panel" role="tabpanel" aria-labelledby="migration-tab" hidden>        <div class="panel-head" style="margin-top: 32px">
+      <section id="migration" class="panel" role="tabpanel" aria-labelledby="migration-tab" hidden>        <div class="panel-head migration-panel-head">
           <div><h3>Web Profile 迁移</h3></div>
           <p>将历史 Web Profile 中的插件和允许的配置迁移到当前 Desktop Profile。</p>
         </div>

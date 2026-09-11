@@ -15,6 +15,8 @@ export interface ModelRefreshBridgeOptions {
   documentTarget?: EventTarget & { visibilityState?: string }
   channelFactory?: (name: string) => ChannelLike
   schedule?: (callback: () => void) => void
+  now?: () => number
+  minIntervalMs?: number
 }
 
 /**
@@ -25,17 +27,30 @@ export function installModelRefreshBridge(options: ModelRefreshBridgeOptions): {
   const windowTarget = options.windowTarget ?? window
   const documentTarget = options.documentTarget ?? document
   const schedule = options.schedule ?? queueMicrotask
+  const now = options.now ?? Date.now
+  const minIntervalMs = options.minIntervalMs ?? 30_000
+  if (!Number.isFinite(minIntervalMs) || minIntervalMs < 0 || minIntervalMs > 10 * 60_000) {
+    throw new TypeError('model refresh minimum interval is invalid')
+  }
   const channelFactory = options.channelFactory ?? (
     typeof BroadcastChannel === 'function' ? name => new BroadcastChannel(name) : undefined
   )
   let disposed = false
   let queued = false
-  const requestRefresh = (): void => {
+  // ModelSelect performs the initial read before this bridge mounts. Treat the
+  // bridge installation as that read's timestamp so the focus event caused by
+  // opening the window does not immediately start a duplicate catalog load.
+  let lastRefreshAt = now()
+  const requestRefresh = (force = false): void => {
     if (disposed || queued) return
+    if (!force && now() - lastRefreshAt < minIntervalMs) return
     queued = true
     schedule(() => {
       queued = false
-      if (!disposed) options.refresh()
+      if (!disposed) {
+        lastRefreshAt = now()
+        options.refresh()
+      }
     })
   }
   const onVisible = (): void => {
@@ -53,7 +68,7 @@ export function installModelRefreshBridge(options: ModelRefreshBridgeOptions): {
       channel.onmessage = event => {
         const message = event.data
         if (typeof message === 'object' && message !== null
-          && (message as { sessionId?: unknown }).sessionId === options.sessionId) requestRefresh()
+          && (message as { sessionId?: unknown }).sessionId === options.sessionId) requestRefresh(true)
       }
     }
   } catch {

@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { carrierKeyOf } from "@deepseek-ai/dsh-scope";
 import z from "schemastery";
 //#region src/core/config.ts
@@ -307,14 +306,16 @@ function apply(ctx, initialConfig = DEFAULT_CONFIG) {
 			return;
 		}
 	};
-	installSettingsSection(ctx, settingsNamespace(PERSONAL_PROMPT_SETTINGS_NAMESPACE), Config, initialConfig, {
-		setSource: (next) => {
-			source = next;
-		},
-		onChange: () => {},
-		validate: (value) => {
-			assertPersonalPrompt(value);
-		}
+	ctx.inject(["settings"], (settingsCtx) => {
+		settingsCtx.settings.installSection(ctx, PERSONAL_PROMPT_SETTINGS_NAMESPACE, Config, initialConfig, {
+			setSource: (next) => {
+				source = next;
+			},
+			onChange: () => {},
+			validate: (value) => {
+				assertPersonalPrompt(value);
+			}
+		});
 	});
 	ctx.effect(() => {
 		const disposeSection = ctx.systemPrompt.section({

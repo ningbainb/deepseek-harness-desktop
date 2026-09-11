@@ -6,8 +6,15 @@ const require = createRequire(import.meta.url)
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
 const asar = builderRequire('@electron/asar')
 
-export function verifyAsarIntegrity(archivePath) {
+export function verifyAsarIntegrity(archivePath, { requiredFiles = [] } = {}) {
   asar.uncache(archivePath)
+  for (const name of requiredFiles) {
+    let entry
+    try { entry = asar.statFile(archivePath, name) } catch { /* Report a stable package boundary error below. */ }
+    if (!entry || entry.files || entry.link || entry.unpacked) {
+      throw new Error(`ASAR required packed file missing: ${name}`)
+    }
+  }
   let verified = 0
   for (const archiveEntry of asar.listPackage(archivePath)) {
     const name = archiveEntry.replace(/^[/\\]/u, '')

@@ -2,7 +2,7 @@
  * @module @linxin666/dsh-value-mode/client
  * Browser half of the Value Mode (性价比模式) plugin.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
 import { type ValueModeLocaleKey } from './locales.ts';
 export { ValueModeSettingsCard } from './ValueModeSettingsCard.tsx';
 export { ValueModeHeaderStatus } from './ValueModeHeaderStatus.tsx';

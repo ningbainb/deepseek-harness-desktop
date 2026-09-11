@@ -1,6 +1,7 @@
 import { sessionDurationBucket, startupDurationBucket } from './telemetry-events.mjs'
 import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
 import { normalizeFeatureEvent } from './feature-telemetry.mjs'
+import { validUpdateDiagnostic } from './update-diagnostics.mjs'
 
 const UPDATE_EVENTS = Object.freeze({
   downloading: Object.freeze({ name: 'update_available', outcome: 'available' }),
@@ -162,14 +163,16 @@ export class ProductMetricsRecorder {
       outcome: event.outcome,
       detail: this.updateDetail,
       bucket: 'none',
+      ...(validUpdateDiagnostic(status.update) ? { update: status.update } : {}),
     })
   }
 
-  recordUpdateCompleted() {
+  recordUpdateCompleted(receipt) {
     return this.#recordMilestone('update-completed', 'update_completed', {
       outcome: 'completed',
       detail: 'receipt',
       bucket: 'none',
+      ...(validUpdateDiagnostic(receipt?.update) ? { update: { ...receipt.update, stage: 'complete', error_type: 'none', error_code: 'none', timestamp: new Date().toISOString() } } : {}),
     })
   }
 
@@ -213,7 +216,8 @@ export class ProductMetricsRecorder {
     })
   }
 
-  recordValueModeEntry(configured) {
+  recordValueModeEntry(configured, source) {
+    if (source) return this.#record('cost_mode_enter', { params: { config_status: configured === true ? 'configured' : 'unconfigured', source } })
     return this.#record('value_mode_entry', {
       outcome: 'selected',
       detail: configured === true ? 'configured' : 'unconfigured',
@@ -253,6 +257,10 @@ export class ProductMetricsRecorder {
     })
   }
 
+  recordCostModeRoute(metric) {
+    return this.#record('cost_mode_route', { params: metric.params, timestamp: metric.timestamp })
+  }
+
   recordValueModeEvent(value) {
     let event
     try {
@@ -260,7 +268,7 @@ export class ProductMetricsRecorder {
     } catch {
       return false
     }
-    if (event.kind === 'entry') return this.recordValueModeEntry(event.configured)
+    if (event.kind === 'entry') return this.recordValueModeEntry(event.configured, event.source)
     if (event.kind === 'onboarding') return this.recordValueModeOnboarding(event.outcome, event.surface)
     if (event.kind === 'state') return this.recordValueModeState(event.state, event.source)
     return this.recordValueModeStrategy(event.strategy)

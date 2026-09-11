@@ -10,6 +10,7 @@ import { ValueModeSettingsCard } from "./ValueModeSettingsCard.js";
 import { ValueModeHeaderStatus } from "./ValueModeHeaderStatus.js";
 import { ValueModeHeroOnboarding } from "./ValueModeHeroOnboarding.js";
 import { reportValueModeTelemetry } from "./telemetry.js";
+import { createModelCatalogLoader } from "./model-catalog.js";
 export { ValueModeSettingsCard } from "./ValueModeSettingsCard.js";
 export { ValueModeHeaderStatus } from "./ValueModeHeaderStatus.js";
 export { ValueModeHeroOnboarding } from "./ValueModeHeroOnboarding.js";
@@ -22,7 +23,7 @@ export * from "./locales.js";
 function isSettingsBinderFace(value) {
     return typeof value === 'object' && value !== null && typeof value.bind === 'function';
 }
-export const inject = ['slots', 'locale', 'connection', 'settingsScope'];
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session'];
 function heroPresetButton() {
     const candidates = [...document.querySelectorAll('button')];
     return candidates.find((button) => {
@@ -108,6 +109,7 @@ function mountHeroOnboarding({ scope, defaultModelScope, onChange, fetchModels }
             enableRequested = false;
             reportValueModeTelemetry({
                 kind: 'entry',
+                source: 'hero',
                 configured: hasExplicitModelRoutes(scope.getSnapshot().value ?? {}),
             }, 'value-mode-entry');
         }
@@ -170,21 +172,7 @@ export function apply(ctx) {
     const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : ctx.settingsScope;
     const scope = binder.bind({ namespace: VALUE_MODE_SETTINGS_NAMESPACE });
     const defaultModelScope = binder.bind({ namespace: 'agent-default-model' });
-    const fetchModels = async () => {
-        const api = ctx.get('connection')?.api;
-        if (!api || typeof api.llm?.models !== 'function') {
-            throw new Error('当前运行时不支持模型目录，请更新或重启 DeepSeek Harness 后重试。');
-        }
-        const response = await api.llm.models({});
-        if (!response.result.ok) {
-            const message = response.result.error?.message?.trim();
-            throw new Error(message || '模型目录加载失败，请稍后重试。');
-        }
-        return {
-            groups: response.result.value.groups ?? [],
-            failures: response.result.value.failures ?? [],
-        };
-    };
+    const fetchModels = createModelCatalogLoader(ctx, ctx.locale.bind('value-mode'));
     const onChange = async (patch) => {
         for (const [key, value] of Object.entries(patch)) {
             await scope.set(key, value);

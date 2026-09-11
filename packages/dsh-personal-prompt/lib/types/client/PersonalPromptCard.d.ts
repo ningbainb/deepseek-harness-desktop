@@ -1,4 +1,4 @@
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type PersonalPromptConfig } from '../core/config.ts';
 export type PersonalPromptCardProps = PropsRuntime<'web-ui.plugin.item'> & PropsLocale<'personal-prompt'> & {

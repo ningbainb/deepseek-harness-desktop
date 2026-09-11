@@ -19,9 +19,9 @@ function textFromEvent(event: SessionEvent): string {
 }
 
 /** Return only direct user text after the latest turn/start boundary. */
-export function extractCurrentUserQuery(session: Pick<Session, 'events' | 'header'>): string {
+export function extractCurrentUserQuery(session: Pick<Session, 'snapshotEvents' | 'header'>): string {
   if (session.header.origin === 'subagent') return ''
-  const events = session.events
+  const events = session.snapshotEvents()
   let start = -1
   for (let index = 0; index < events.length; index += 1) {
     if (events[index]?.type === 'turn/start') start = index

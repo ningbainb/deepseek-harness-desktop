@@ -10,11 +10,12 @@
  * Export discipline (packages/client rule): the /client surface carries what
  * cordis loading needs plus types only — all value exports stay internal.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the LocaleNamespaceMap merge table.
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { SshApi } from './api.ts'
 import { en, zh, type SshKey } from './locales.ts'
 import { mountPanel } from './mount.tsx'

@@ -8,9 +8,26 @@ import { RELAY_KEYS_URL, RELAY_SIGN_UP_URL, RELAY_WALLET_URL } from '../src/rela
 
 afterEach(cleanup)
 
-const t = (key: RelayLocaleKey): string => relayEn[key] ?? key
+const t = (key: string): string => relayEn[key as RelayLocaleKey] ?? key
 
 describe('RelayOnboardingCard external links', () => {
+  it('collapses only relay content and preserves the connection form draft', () => {
+    render(<RelayOnboardingCard t={t} />)
+    const field = screen.getByLabelText(t('keyLabel')) as HTMLInputElement
+    const collapse = screen.getByRole('button', { name: t('collapseRelay') })
+    expect(collapse.parentElement?.firstElementChild).toBe(collapse)
+    expect(collapse.getAttribute('aria-expanded')).toBe('true')
+    expect(collapse.querySelector('path')?.getAttribute('d')).toBe('M4 10l4-4 4 4')
+    fireEvent.change(field, { target: { value: 'local-draft-only' } })
+    fireEvent.click(screen.getByRole('button', { name: t('collapseRelay') }))
+    expect(document.getElementById('dsh-relay-content')?.hidden).toBe(true)
+    expect(collapse.querySelector('path')?.getAttribute('d')).toBe('M4 6l4 4 4-4')
+    expect(collapse.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('heading', { name: t('title') })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: t('expandRelay') }))
+    expect(document.getElementById('dsh-relay-content')?.hidden).toBe(false)
+    expect(field.value).toBe('local-draft-only')
+  })
   afterEach(() => {
     vi.restoreAllMocks()
   })

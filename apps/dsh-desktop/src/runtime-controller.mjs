@@ -9,6 +9,7 @@ import {
   isDesktopWorkspaceFileOpenToken,
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import { emitBestEffort } from './best-effort-events.mjs'
+import { createRuntimeShutdownControl, requestRuntimeShutdown, RUNTIME_SHUTDOWN_CONTROL_ENV } from './runtime-shutdown-control.mjs'
 import {
   STARTUP_OUTCOMES,
   STARTUP_PHASES,
@@ -24,7 +25,17 @@ export const DESKTOP_REMOTE_HOST_ENV = 'DSH_DESKTOP_REMOTE_HOST'
 const RUNTIME_HOSTS = new Set(['127.0.0.1', '0.0.0.0'])
 const STABLE_RUNTIME_RESET_MS = 60_000
 const WINDOWS_CONSOLE_PRELOAD_PATH = fileURLToPath(new URL('./windows-console-preload.cjs', import.meta.url))
+const DESKTOP_RUNTIME_LAUNCHER_PATH = fileURLToPath(new URL('./runtime-launcher.mjs', import.meta.url))
 const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/iu
+const shutdownControls = new WeakMap()
+
+/** The 1.1.5 CLI reserves `desktop`; Electron boots that profile through the public SDK. */
+export function runtimeEntryPath(cliPath) {
+  const normalized = String(cliPath).replaceAll('\\', '/').toLowerCase()
+  return normalized.endsWith('/@deepseek-ai/dsh/lib/bin.js')
+    ? DESKTOP_RUNTIME_LAUNCHER_PATH
+    : cliPath
+}
 
 export function validateRuntimeHost(value) {
   if (typeof value !== 'string' || !RUNTIME_HOSTS.has(value)) {
@@ -70,11 +81,20 @@ function validateRuntimePatchFiles(value) {
   return Object.freeze(normalized)
 }
 
-function runtimeArguments(cliPath, preferredPort, consolePreloadPath, profileName, runtimeHost, patchFiles = []) {
+function runtimeArguments(
+  cliPath,
+  preferredPort,
+  consolePreloadPath,
+  profileName,
+  runtimeHost,
+  patchFiles = [],
+  dshCliPath,
+) {
   return [
     '--expose-internals',
     ...(consolePreloadPath ? ['--require', consolePreloadPath] : []),
     cliPath,
+    ...(dshCliPath ? ['--dsh-cli', dshCliPath] : []),
     '--profile',
     profileName,
     ...patchFiles.flatMap((path) => ['--patch', path]),
@@ -125,6 +145,7 @@ export function createRuntimeInvocation({
   profileName = DESKTOP_PROFILE_NAME,
   patchFiles = [],
   runtimeHost,
+  dshCliPath,
   platform = process.platform,
   systemRoot = process.env.SystemRoot,
 } = {}) {
@@ -133,6 +154,9 @@ export function createRuntimeInvocation({
   }
   if (typeof cliPath !== 'string' || cliPath.length === 0) {
     throw new TypeError('runtime CLI path must be a non-empty path')
+  }
+  if (dshCliPath !== undefined && (typeof dshCliPath !== 'string' || dshCliPath.length === 0)) {
+    throw new TypeError('official DSH CLI path must be a non-empty path')
   }
   if (!Number.isInteger(preferredPort) || preferredPort < 0 || preferredPort > 65_535) {
     throw new TypeError('preferred runtime port must be an integer from 0 to 65535')
@@ -147,6 +171,7 @@ export function createRuntimeInvocation({
     normalizedProfileName,
     normalizedRuntimeHost,
     normalizedPatchFiles,
+    dshCliPath,
   )
   if (platform !== 'win32') return { executable, args }
 
@@ -213,7 +238,25 @@ export function validateLoopbackUrl(value) {
 export function parseDshReadyUrl(line) {
   const match = READY_LINE.exec(String(line).trim())
   if (match === null) return undefined
-  return validateLoopbackUrl(match[1])
+  const origin = validateLoopbackUrl(match[1])
+  const url = new URL(match[1])
+  if (url.pathname !== '/' || url.hash) {
+    throw new TypeError('runtime ready URL must use the loopback root without a fragment')
+  }
+  const parameters = [...url.searchParams.entries()]
+  if (parameters.length === 0) return origin
+  if (parameters.length !== 1 || parameters[0][0] !== 'token') {
+    throw new TypeError('runtime ready URL may contain only one launch token')
+  }
+  const token = parameters[0][1]
+  if (!/^[A-Za-z0-9_-]{8,512}$/u.test(token)) {
+    throw new TypeError('runtime ready URL contains an invalid launch token')
+  }
+  return `${origin}?token=${encodeURIComponent(token)}`
+}
+
+export function redactDshReadyUrlToken(value) {
+  return String(value).replace(/([?&]token=)[^&#\s]+/gu, '$1[redacted]')
 }
 
 export function computeRestartDelay(attempt, maxAttempts = 3) {
@@ -309,8 +352,19 @@ export async function probeHttpReady(
   let lastError
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(1_000) })
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(1_000),
+        // DSH 1.1.5 exchanges the launch token for a signed browser cookie
+        // with a 303. Following that redirect without a cookie jar turns a
+        // healthy Host into a misleading final 401.
+        redirect: 'manual',
+      })
       if (response.ok) return
+      if (
+        response.status === 303
+        && response.headers?.get?.('location') === '/'
+        && response.headers?.get?.('set-cookie') !== null
+      ) return
       lastError = new Error(`runtime health probe returned HTTP ${response.status}`)
     } catch (error) {
       lastError = error
@@ -426,7 +480,7 @@ export class DshRuntimeController extends EventEmitter {
   }
 
   #redactWorkspaceFileOpenToken(value, token = this.workspaceFileOpenToken) {
-    const message = String(value)
+    const message = redactDshReadyUrlToken(value)
     if (!isDesktopWorkspaceFileOpenToken(token) || !message.includes(token)) return message
     return message.replaceAll(token, '[redacted]')
   }
@@ -591,9 +645,15 @@ export class DshRuntimeController extends EventEmitter {
     let runtimeControlToken
     try {
       const launchPatchFiles = validateRuntimePatchFiles(this.patchFilesProvider() ?? [])
+      const runtimeCliPath = runtimeEntryPath(this.cliPath)
+      const shutdownControl = this.platform === 'win32' && runtimeCliPath === DESKTOP_RUNTIME_LAUNCHER_PATH
+        ? createRuntimeShutdownControl(this.platform) : undefined
+      delete environment[RUNTIME_SHUTDOWN_CONTROL_ENV]
+      if (shutdownControl) environment[RUNTIME_SHUTDOWN_CONTROL_ENV] = JSON.stringify(shutdownControl)
       const invocation = createRuntimeInvocation({
         executable: this.executable,
-        cliPath: this.cliPath,
+        cliPath: runtimeCliPath,
+        dshCliPath: runtimeCliPath === this.cliPath ? undefined : this.cliPath,
         platform: this.platform,
         systemRoot: this.systemRoot,
         preferredPort: this.preferredPort,
@@ -620,6 +680,7 @@ export class DshRuntimeController extends EventEmitter {
         },
       )
       this.child = child
+      if (shutdownControl) shutdownControls.set(child, shutdownControl)
       this.startupPhases.complete(STARTUP_PHASES.RUNTIME_SPAWN)
       this.startupPhases.enter(STARTUP_PHASES.RUNTIME_READY)
     } catch (error) {
@@ -994,7 +1055,13 @@ export class DshRuntimeController extends EventEmitter {
     })
     const forceTimer = this.schedule(() => this.#forceKillChild(child), this.shutdownTimeoutMs)
     try {
-      await this.#terminateChildProcessTree(child)
+      const control = shutdownControls.get(child)
+      shutdownControls.delete(child)
+      const clean = control && await requestRuntimeShutdown(control, Math.min(3000, this.shutdownTimeoutMs))
+      if (control) this.#appendDiagnostic(clean
+        ? '[process] Runtime graceful shutdown acknowledged'
+        : '[process] Runtime graceful shutdown unavailable; retaining process-tree fallback', redactionToken)
+      if (!clean && child.exitCode === null) await this.#terminateChildProcessTree(child)
     } catch (error) {
       this.#appendDiagnostic(
         `[process] process-tree shutdown failed: ${this.#errorMessage(error, redactionToken)}`,

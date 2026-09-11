@@ -9,10 +9,14 @@ The dsh web UI plugin group for the DSH settings page: it adds a first-level set
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.
 - **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
 - **One-click Desktop Dock entry**: on supported Desktop hosts, an Extension Dock button appears immediately beside Settings. The first three eligible launches show a non-modal hint; ordinary Web hosts render no Desktop-only entry.
-- **ChatGPT sign-in**: when the RC.1 authorization and OpenAI Codex provider services are present, a first-level settings section starts the official ChatGPT OAuth flow with one click and continues in the system browser.
+- **ChatGPT sign-in**: when the DSH 0.1.5 authorization and OpenAI Codex provider services are present, a first-level settings section starts the official ChatGPT OAuth flow with one click and continues in the system browser.
 - **bai provider onboarding**: `Settings → Models` and the Dock's `AI settings → Model connection` offer browser sign-in, explicit Key authorization, automatic model sync, and manual Key entry. A successful check discovers `/v1/models` and writes the official `llm-pi-ai` provider profile. Billing and Key management open the supplier console.
 
 The Desktop home workspace selector and sidebar project creation use the same centered folder form. The home selector also lists existing projects; selecting one opens it without renaming it. Browser-only hosts retain the official directory browser.
+
+While editing a native directory path, delayed composer autofocus cannot cancel the editor. Deliberate pointer/Tab navigation, other dialog targets, closing and window-focus loss keep their normal behavior. This narrow plugin guard does not modify the official directory browser.
+
+The docked native file-preview toolbar reserves space for the retained terminal/browser workbench controls, keeping both sets of actions directly accessible. Native fullscreen controls keep their own layout.
 
 ## Install
 

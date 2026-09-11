@@ -13,11 +13,13 @@
  * @module dsh-aionui-panel/client
  */
 
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input dock entry).
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ConversationController } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { PanelApi, subscribePanelEvents } from './api.ts'
 import { PanelLayoutController } from './layout.ts'
 import { createPanelStores, layoutSetRoot } from './store.ts'
@@ -26,6 +28,11 @@ import { NS, dictionaries, setLanguage, type AionUiPanelKey } from './locales.ts
 import { DragFileInlay, type DragFileInjected } from './drag/DragFileInlay.tsx'
 import { insertPathIntoDraft } from './drag/file-drag.ts'
 import { FileAttachmentQueue, uploadAttachment, checkAttachment } from './drag/attachments.ts'
+import { observeNativeUploadEvents } from './drag/native-upload-events.ts'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import { openNativePreview } from './native-preview.ts'
+import { bindNativePanelOwnership, openNativePanel, registerNativePanels } from './native-panels.tsx'
+import { openNativeBrowser, registerNativeBrowser, registerNativeSidebarReturn } from './native-browser.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -36,6 +43,49 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Required services: sessions for the project root, locale for the copy. */
 export const inject = ['sessions', 'locale']
+
+interface DraftAttachment {
+  id: unknown
+}
+
+interface DraftAttachmentConversation {
+  createDrafts?: (sessionId: SessionId, files: readonly File[]) => readonly DraftAttachment[]
+  releaseDraftAttachments?: (attachments: readonly DraftAttachment[]) => void
+  fileUploads?: { getSnapshot?: unknown; subscribe?: unknown }
+  retryFileUpload?: unknown
+}
+
+interface DraftAttachmentInput {
+  addAttachments(attachmentIds: readonly never[]): boolean
+}
+
+/** Older image-only SDKs also expose createDrafts; require the file lifecycle. */
+export function supportsNativeFileUploads(conversation: DraftAttachmentConversation): boolean {
+  return typeof conversation.createDrafts === 'function'
+    && typeof conversation.releaseDraftAttachments === 'function'
+    && typeof conversation.retryFileUpload === 'function'
+    && typeof conversation.fileUploads?.getSnapshot === 'function'
+    && typeof conversation.fileUploads?.subscribe === 'function'
+}
+
+/** Route drafts through the official lifecycle; keep the image helper API compatible. */
+export function attachDraftImages(
+  conversation: DraftAttachmentConversation,
+  input: DraftAttachmentInput,
+  sessionId: SessionId,
+  files: readonly File[],
+): boolean {
+  if (files.length === 0 || typeof conversation.createDrafts !== 'function') return false
+  let attachments: readonly DraftAttachment[] = []
+  try {
+    attachments = conversation.createDrafts(sessionId, files)
+    if (input.addAttachments(attachments.map(attachment => attachment.id as never))) return true
+  } catch {
+    // Rejected/throwing input must not orphan native uploads or image object URLs.
+  }
+  try { conversation.releaseDraftAttachments?.(attachments) } catch { /* Preserve admission failure. */ }
+  return false
+}
 
 /** Apply the browser half. */
 export function apply(ctx: ClientContext): void {
@@ -50,6 +100,10 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['slots', 'conversation', 'sessions'], (scope: ClientContext) => {
     const sessions = scope.sessions
     const conversation = scope.conversation
+    const nativeUploads = (conversation as Partial<ConversationController>).fileUploads
+    if (nativeUploads && supportsNativeFileUploads(conversation as unknown as DraftAttachmentConversation)) {
+      scope.effect(() => observeNativeUploadEvents(nativeUploads), 'aionui: native upload outcomes')
+    }
     const fileQueues = new Map<string, FileAttachmentQueue>()
     scope.effect(() => () => { for (const queue of fileQueues.values()) queue.dispose(); fileQueues.clear() }, 'aionui: attachment queues')
     const fileQueue = (sessionId: SessionId | undefined): FileAttachmentQueue | undefined => {
@@ -88,23 +142,7 @@ export function apply(ctx: ClientContext): void {
       const input = conversation.input
       if (input === undefined) return false
       const shell = input.for(actx)
-      try {
-        const conv = conversation as unknown as {
-          createDraftImages?: (files: readonly File[]) => Array<{ id: unknown }>
-          releaseDraftImages?: (images: Array<{ id: unknown }>) => void
-        }
-        if (typeof conv?.createDraftImages === 'function') {
-          const images = conv.createDraftImages(files)
-          if (!shell.addImages(images.map((img) => img.id as never))) {
-            conv.releaseDraftImages?.(images)
-            return false
-          }
-          return true
-        }
-      } catch {
-        return false
-      }
-      return false
+      return attachDraftImages(conversation as unknown as DraftAttachmentConversation, shell, sessionId, files)
     }
     insertPathIntoCurrentDraft = (path: string): boolean => {
       const sessionId = sessions.list.getSnapshot().current as SessionId | undefined
@@ -118,6 +156,9 @@ export function apply(ctx: ClientContext): void {
         locale: NS,
         inject: (sessionId: SessionId | undefined): DragFileInjected => ({
           fileQueue: fileQueue(sessionId),
+          addFiles: supportsNativeFileUploads(conversation as unknown as DraftAttachmentConversation)
+            ? (files: readonly File[]) => addDraftImages(sessionId, files)
+            : undefined,
           insertPath: (path: string): boolean => {
             return insertPath(sessionId, path)
           },
@@ -130,9 +171,33 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(() => {
     const api = new PanelApi()
-    const stores = createPanelStores(api)
-    const layout = new PanelLayoutController(stores.layout)
+    const stores = createPanelStores(api, (root, path) => {
+      const snapshot = ctx.sessions.list.getSnapshot()
+      const sessionId = snapshot.current
+      return openNativePreview({
+        sidebar: ctx.get('sidebarRight', false),
+        registry: ctx.get('sidebarRightTabs', false),
+        sessionId,
+        currentRoot: sessionId ? snapshot.byId[sessionId]?.cwd : undefined,
+      }, root, path)
+    }, () => {
+      layout.activateCompatibility()
+      const sidebar = ctx.get('sidebarRight', false)
+      // Switch the visible preview owner without closing native tabs or buffers.
+      if (sidebar?.isExpanded()) sidebar.toggleExpanded()
+    })
+    const layout = new PanelLayoutController(stores.layout, () => {
+      const sidebar = ctx.get('sidebarRight', false)
+      if (sidebar?.isExpanded()) sidebar.toggleExpanded()
+    })
     const disposers: Array<() => void> = []
+    disposers.push(bindNativePanelOwnership(ctx, layout))
+    disposers.push(registerNativeBrowser(ctx))
+    disposers.push(registerNativeSidebarReturn(ctx))
+    disposers.push(registerNativePanels(ctx, stores, (sessionId, path) => {
+      if (ctx.sessions.list.getSnapshot().current !== sessionId) return false
+      return insertPathIntoCurrentDraft(path)
+    }))
     let disposeEvents: (() => void) | undefined
     let currentRoot = ''
     let lastPreviewOpen = false
@@ -209,6 +274,8 @@ export function apply(ctx: ClientContext): void {
         stores,
         () => layout.toggleExplorer(),
         (path) => insertPathIntoCurrentDraft(path),
+        section => openNativePanel(ctx, section),
+        () => openNativeBrowser(ctx),
       ))
     } catch (error) {
       console.error('[dsh-aionui-panel] mount failed:', error)

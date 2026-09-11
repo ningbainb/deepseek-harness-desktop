@@ -63,6 +63,7 @@ export async function runPresetDeepLinkE2E({ appDir, executablePath, electronPat
         DSH_HOME: dshHome,
         DSH_DESKTOP_USER_DATA: userData,
         DSH_DESKTOP_DISABLE_UPDATES: '1',
+        DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
       },
     })
     const extensionPage = await waitForWindow(app, (page) => /extensions\.html/u.test(page.url()), timeoutMs)

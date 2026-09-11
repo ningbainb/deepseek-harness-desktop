@@ -42,6 +42,7 @@ function createBufferedSubscription(channel, label, maxPending = 32) {
 }
 
 const baseApi = {
+  shellContext: Object.freeze({ mode: 'advanced', platform: process.platform }),
   getContract: () => ipcRenderer.invoke('desktop:contract'),
   getInfo: () => ipcRenderer.invoke('desktop:info'),
   getStatus: () => ipcRenderer.invoke('desktop:status'),

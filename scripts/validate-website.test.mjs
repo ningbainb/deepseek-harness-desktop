@@ -9,6 +9,9 @@ import { sumInstallerDownloads } from '../website/release-stats.mjs'
 const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
 const privacyPath = resolve(import.meta.dirname, '..', 'website', 'privacy.html')
 const siteScriptPath = resolve(import.meta.dirname, '..', 'website', 'script.js')
+const desktopPackagePath = resolve(import.meta.dirname, '..', 'apps', 'dsh-desktop', 'package.json')
+const desktopPackage = JSON.parse(await readFile(desktopPackagePath, 'utf8'))
+const desktopVersion = desktopPackage.version
 
 test('privacy page states anonymous retention analytics and user-confirmed diagnostics boundaries', async () => {
   const html = await readFile(privacyPath, 'utf8')
@@ -23,27 +26,27 @@ test('public site does not upload installer-click telemetry', async () => {
 
 test('website fallback installer matches the desktop release version', async () => {
   const html = await readFile(websitePath, 'utf8')
-  assert.deepEqual(await collectWebsiteErrors(html, '3.3.0'), [])
+  assert.deepEqual(await collectWebsiteErrors(html, desktopVersion), [])
 })
 
 test('website validation rejects stale fallback installers', async () => {
-  const html = (await readFile(websitePath, 'utf8')).replaceAll('3.3.0', '0.1.9')
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+  const html = (await readFile(websitePath, 'utf8')).replaceAll(desktopVersion, '0.1.9')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.ok(errors.some(error => error.includes('stale installer version 0.1.9')))
   assert.ok(errors.some(error => error.includes('fallback label')))
 })
 
 test('website exposes canonical SEO and structured data markers', async () => {
   const html = await readFile(websitePath, 'utf8')
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.deepEqual(errors, [])
 })
 
 test('website validation rejects stale presentation versions', async () => {
   const html = (await readFile(websitePath, 'utf8'))
-    .replace('<title>DeepSeek Harness Desktop 3.3.0', '<title>DeepSeek Harness Desktop 2.2.0')
-    .replace('<h1>DeepSeek Harness<br>Desktop 3.3.0</h1>', '<h1>DeepSeek Harness<br>Desktop 2.1</h1>')
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+    .replace(`<title>DeepSeek Harness Desktop ${desktopVersion}`, '<title>DeepSeek Harness Desktop 2.2.0')
+    .replace(`<h1>DeepSeek Harness<br>Desktop ${desktopVersion}</h1>`, '<h1>DeepSeek Harness<br>Desktop 2.1</h1>')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.ok(errors.some(error => error.includes('page title')))
   assert.ok(errors.some(error => error.includes('page heading')))
 })
@@ -51,7 +54,7 @@ test('website validation rejects stale presentation versions', async () => {
 test('website structured FAQ questions remain visible', async () => {
   const html = (await readFile(websitePath, 'utf8'))
     .replace('<h3>桌面版能和官方 Web 端同时运行吗？</h3>', '<h3>已移除的问题</h3>')
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.ok(errors.some(error => error.includes('structured FAQ question is not visible')))
 })
 
@@ -59,7 +62,7 @@ test('website validation rejects missing GitHub Star guidance', async () => {
   const html = (await readFile(websitePath, 'utf8'))
     .replaceAll('data-star-cta', 'data-removed-star-cta')
     .replaceAll('data-star-count', 'data-removed-star-count')
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.ok(errors.some(error => error.includes('GitHub Star CTA')))
   assert.ok(errors.some(error => error.includes('GitHub Star count')))
 })
@@ -69,7 +72,7 @@ test('tracked installer links remain direct GitHub downloads', async () => {
     'data-download-source="hero" href="https://github.com/',
     'data-download-source="hero" href="https://telemetry.example/',
   )
-  const errors = await collectWebsiteErrors(html, '3.3.0')
+  const errors = await collectWebsiteErrors(html, desktopVersion)
   assert.ok(errors.some(error => error.includes('must remain a direct GitHub download')))
 })
 

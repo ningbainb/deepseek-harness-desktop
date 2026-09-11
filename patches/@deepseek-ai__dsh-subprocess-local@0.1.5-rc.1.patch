@@ -1,0 +1,14 @@
+diff --git a/lib/index.js b/lib/index.js
+index 8e1b9f91afddbc4bd2211a37e8abbec84823b009..973603bae283fe60e9a734bdeb4a9af76a59ba1a 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -503,7 +503,8 @@ function launchWindowsJob(spec, targetEnv, internals = {}) {
+ 		], {
+ 			cwd: process.cwd(),
+ 			env: runnerEnvironment(WINDOWS_RUNNER_SELECTION, invocation),
+-			stdio: runnerStdio(spec, true, ignoredStdinFd ?? "pipe")
++			stdio: runnerStdio(spec, true, ignoredStdinFd ?? "pipe"),
++			windowsHide: true
+ 		});
+ 	} finally {
+ 		if (ignoredStdinFd !== void 0) closeSync(ignoredStdinFd);

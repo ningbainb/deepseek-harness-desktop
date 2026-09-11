@@ -21,7 +21,7 @@ const catalog = await createCommunityMarketService().list()
 const plugins = Object.freeze([
   Object.freeze({
     name: '@deepseek-ai/dsh-base',
-    version: '0.1.1-rc.1',
+    version: '0.1.5-rc.1',
     requested: '@deepseek-ai/dsh-base',
     enabled: true,
     builtIn: true,

@@ -25,6 +25,9 @@ test('progress meter carries milestone ticks and a leading tip', async () => {
   assert.match(html, /meter-tip/u)
   assert.match(css, /\.meter\[data-phase="2"\] \.meter-tick-2/u)
   assert.match(css, /@keyframes tip-swim/u)
+  assert.doesNotMatch(html, /style=/u)
+  assert.match(css, /\.meter-tick-1\s*\{\s*left: 34%;\s*\}/u)
+  assert.match(css, /\.meter-tick-2\s*\{\s*left: 72%;\s*\}/u)
 })
 
 test('startup surface is status-only and exposes no recovery decisions', async () => {

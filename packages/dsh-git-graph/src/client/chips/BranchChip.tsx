@@ -112,7 +112,9 @@ export function BranchChip(props: BranchChipProps) {
   // conversation with an open session. A still-loading blank session already
   // lists as blank in the session store, so it may enter the hero row before
   // the composer snapshot settles to `open`.
-  const heroSeat = sessionSnapshot?.composerPhase === 'blank' && (sessionSnapshot.openState === 'open' || blankSession === true)
+  const legacyComposerPhase = (sessionSnapshot as { composerPhase?: 'blank' | 'active' } | undefined)?.composerPhase
+  const blankConversation = sessionSnapshot?.blank === true || legacyComposerPhase === 'blank'
+  const heroSeat = blankConversation && (sessionSnapshot?.openState === 'open' || blankSession === true)
 
   /** Repository state: undefined = loading, null = not a repository, else the snapshot. */
   const [repo, setRepo] = useState<RepoStatus | null | undefined>(undefined)

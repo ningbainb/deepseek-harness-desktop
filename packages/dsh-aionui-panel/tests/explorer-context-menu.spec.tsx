@@ -102,11 +102,31 @@ describe('Explorer file context menu', () => {
     expect(addToConversation).toHaveBeenCalledWith('docs/readme.md')
     expect(stores.preview.openFile).not.toHaveBeenCalled()
 
+    act(() => file.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })))
+    const editor = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find(item => item.textContent === '编辑 / 兼容预览')
+    expect(editor).toBeDefined()
+    act(() => editor!.click())
+    expect(stores.preview.openFile).toHaveBeenCalledWith('C:\\work\\demo', 'docs/readme.md', { preferLegacy: true })
+
     act(() => { root.unmount() })
   })
 
   it('normalizes Windows and POSIX roots without changing the relative-path contract', () => {
     expect(workspaceAbsolutePath('C:\\work\\demo\\', 'src/main.ts')).toBe('C:\\work\\demo\\src\\main.ts')
     expect(workspaceAbsolutePath('/work/demo/', 'src/main.ts')).toBe('/work/demo/src/main.ts')
+  })
+
+  it('lets native chrome own the tab strip and keeps file tools even if the legacy selection differs', () => {
+    const stores = fakeStores()
+    const root = createRoot(host)
+    const props = { stores, onToggleCollapse: vi.fn(), onAddToConversation: () => true }
+    act(() => root.render(<ExplorerPanel {...props} section="files" />))
+    expect(host.querySelector('[data-aionui-explorer-toolbar]')).toBeNull()
+    expect(host.querySelector('input')).not.toBeNull()
+    expect(host.querySelector('[draggable="true"]')).not.toBeNull()
+    act(() => root.render(<ExplorerPanel {...props} section="files" suspended />))
+    expect(host.innerHTML).toBe('')
+    act(() => root.unmount())
   })
 })

@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -46,14 +47,14 @@ describe('desktop conversation import route', () => {
     const project = join(root, 'project')
     await mkdir(project)
     const sessions = new Map<string, Session>()
-    const create = vi.fn((id: string | undefined, options: { seed: never[]; meta: { cwd: string; seedLength: number } }) => {
+    const create = vi.fn((id: string | undefined, options: { seed: readonly SessionEvent[]; meta: { cwd: string; createdAt?: number } }) => {
       const sessionId = SessionId(id ?? 'import-session-1')
       const session = Session.create(sessionId, options.seed, {
-        version: 0,
+        version: SESSION_FORMAT_VERSION,
         id: sessionId,
-        createdAt: Date.now(),
+        createdAt: options.meta.createdAt ?? Date.now(),
         cwd: options.meta.cwd,
-        seedLength: options.meta.seedLength,
+        isSeeded: false,
       })
       sessions.set(String(session.id), session)
       return session
@@ -123,14 +124,14 @@ describe('desktop conversation import route', () => {
     await mkdir(project)
     const sessions = new Map<string, Session>()
     let detached = 0
-    const prepare = vi.fn((id: SessionId | undefined, options: { seed: never[]; meta: { cwd: string; seedLength: number } }) => {
+    const prepare = vi.fn((id: SessionId | undefined, options: { seed: readonly SessionEvent[]; meta: { cwd: string; createdAt?: number } }) => {
       const sessionId = SessionId(id ?? 'import-session-prepared-1')
       return Session.create(sessionId, options.seed, {
-        version: 0,
+        version: SESSION_FORMAT_VERSION,
         id: sessionId,
-        createdAt: Date.now(),
+        createdAt: options.meta.createdAt ?? Date.now(),
         cwd: options.meta.cwd,
-        seedLength: options.meta.seedLength,
+        isSeeded: false,
       })
     })
     const enter = vi.fn((session: Session) => {

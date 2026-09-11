@@ -8,8 +8,28 @@ import { createTask, startExecution } from '../src/core/tasks.ts'
 
 const NOW = 1_700_000_000_000
 
+class FakeEventSource {
+  private entries: Array<{ event: { type: string } }> = []
+  private listeners = new Set<() => void>()
+
+  getSnapshot(): { entries: readonly { event: { type: string } }[] } {
+    return { entries: this.entries }
+  }
+
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn)
+    return () => { this.listeners.delete(fn) }
+  }
+
+  setTurnEnds(count: number): void {
+    this.entries = Array.from({ length: count }, () => ({ event: { type: 'turn/end' } }))
+    for (const fn of [...this.listeners]) fn()
+  }
+}
+
 /** Controllable SessionDriver fake. */
 class FakeDriver implements SessionDriver {
+  readonly eventSource = new FakeEventSource()
   renameCalls: string[] = []
   promptCalls: unknown[] = []
   promptResult: { ok: true } | { ok: false; error: unknown } = { ok: true }
@@ -43,6 +63,7 @@ class FakeDriver implements SessionDriver {
     const turns = new Map<number, number>()
     for (let i = 1; i <= (snapshot.turns ?? 0); i += 1) turns.set(i, i * 10)
     this.snapshot = { running: snapshot.running, lastAgentError: snapshot.lastAgentError ?? null, turnEnds: turns }
+    this.eventSource.setTurnEnds(snapshot.turns ?? 0)
     for (const fn of [...this.listeners]) fn()
   }
 }
@@ -64,7 +85,7 @@ function makeEnv(overrides: {
       },
       binding: (id: string) => {
         const driver = drivers.get(id)
-        return driver === undefined ? undefined : { session: driver }
+        return driver === undefined ? undefined : { session: driver, eventSource: driver.eventSource }
       },
     },
     workspaces: {
@@ -156,7 +177,7 @@ describe('ExecutionService.run', () => {
     const env: ExecutionEnvironment = {
       sessions: {
         list: { getSnapshot: () => ({ phase: 'ready', byId: {} }), subscribe: () => () => {} },
-        binding: () => ({ session: connected }),
+        binding: () => ({ session: connected, eventSource: connected.eventSource }),
       },
       workspaces: {
         list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-1' }], recentWorkspaceId: undefined }) },

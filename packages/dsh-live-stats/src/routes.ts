@@ -39,11 +39,16 @@ export function makeLiveStatsRoutes(options: {
         try {
           const url = new URL(req.url ?? '', 'http://127.0.0.1')
           const force = url.searchParams.get('force') === '1'
-          const result = await service.getBalance(force)
+          const provider = url.searchParams.get('provider')
+          const model = url.searchParams.get('model')
+          if ((provider !== null || model !== null) && (!provider || !model || provider.length > 256 || model.length > 256 || /[\u0000-\u001f\u007f]/u.test(provider + model))) {
+            writeJson(res, 400, { ok: false, error: 'Invalid model selection' })
+            return
+          }
+          const result = await service.getBalance(force, provider && model ? { provider, model } : undefined)
           writeJson(res, 200, result)
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          writeJson(res, 500, { ok: false, error: msg })
+          writeJson(res, 500, { ok: false, error: 'Balance query unavailable' })
         }
       },
     },
