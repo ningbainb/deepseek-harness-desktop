@@ -25,7 +25,7 @@ async function fixture() {
   }))
   const profileArchive = new UserPluginArchive({ profileDir, archiveDir })
   const manager = new PluginStagingManager({ profileDir, transactionRoot })
-  return { root, profileDir, transactionRoot, profileArchive, manager }
+  return { root, profileDir, transactionRoot, archiveDir, profileArchive, manager }
 }
 
 async function prepareChangedStage(value, { version = '2.0.0' } = {}) {
@@ -120,6 +120,59 @@ test('one persistent writer lock rejects concurrent mutations and stale staging 
     assert.equal(recovery.transactionId, staged.transactionId)
     assert.equal((await secondManager.list()).length, 0)
     assert.equal(dirname(value.transactionRoot), dirname(value.profileDir))
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('restart recovery restores a profile interrupted immediately after archive', async () => {
+  const value = await fixture()
+  try {
+    const originalManifest = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+    const staged = await prepareChangedStage(value)
+    await value.profileArchive.begin({ operation: 'plugin-install', nodeModulesTransfer: 'move' })
+    await value.manager.advance(staged.transactionId, 'OLD_ENV_ARCHIVED')
+    const recoveredArchive = new UserPluginArchive({
+      profileDir: value.profileDir,
+      archiveDir: value.archiveDir,
+    })
+    const archiveResult = await recoveredArchive.recover()
+    assert.equal(archiveResult.recovered, true)
+    const recoveredManager = new PluginStagingManager({
+      profileDir: value.profileDir,
+      transactionRoot: value.transactionRoot,
+    })
+    const stagingResult = await recoveredManager.recover({ profileArchive: recoveredArchive })
+    assert.equal(stagingResult.previousPhase, 'OLD_ENV_ARCHIVED')
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('restart recovery rolls back an activated environment that was never healthy', async () => {
+  const value = await fixture()
+  try {
+    const originalManifest = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+    const staged = await prepareChangedStage(value)
+    await staged.activate({ profileArchive: value.profileArchive })
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '2.0.0')
+
+    const recoveredArchive = new UserPluginArchive({
+      profileDir: value.profileDir,
+      archiveDir: value.archiveDir,
+    })
+    const archiveResult = await recoveredArchive.recover()
+    assert.equal(archiveResult.recovered, true)
+    const recoveredManager = new PluginStagingManager({
+      profileDir: value.profileDir,
+      transactionRoot: value.transactionRoot,
+    })
+    const stagingResult = await recoveredManager.recover({ profileArchive: recoveredArchive })
+    assert.equal(stagingResult.previousPhase, 'NEW_ENV_ACTIVATED')
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
   } finally {
     await rm(value.root, { recursive: true, force: true })
   }

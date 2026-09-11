@@ -3,11 +3,11 @@ import {
   copyFile,
   lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
   rm,
-  writeFile,
 } from 'node:fs/promises'
 import { dirname, join, parse, resolve } from 'node:path'
 
@@ -106,14 +106,52 @@ function assertJournal(value) {
 }
 
 async function writeExclusiveJson(path, value) {
-  await writeFile(path, stableJson(value), { flag: 'wx' })
+  const handle = await open(path, 'wx')
+  try {
+    await handle.writeFile(stableJson(value))
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+  await syncDirectory(dirname(path))
 }
 
 async function replaceJson(path, value) {
   const temporary = `${path}.tmp-${process.pid}-${Date.now()}`
+  const displaced = `${path}.old-${process.pid}-${Date.now()}`
   await writeExclusiveJson(temporary, value)
-  await rm(path, { force: true })
-  await rename(temporary, path)
+  let movedExisting = false
+  try {
+    try {
+      await rename(path, displaced)
+      movedExisting = true
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+    await rename(temporary, path)
+    await syncDirectory(dirname(path))
+    if (movedExisting) await rm(displaced, { force: true })
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {})
+    if (movedExisting) {
+      await rm(path, { force: true }).catch(() => {})
+      await rename(displaced, path).catch(() => {})
+    }
+    throw error
+  }
+}
+
+/** Directory fsync is not available on Windows; file fsync plus rename remains the durable boundary there. */
+async function syncDirectory(path) {
+  let handle
+  try {
+    handle = await open(path, 'r')
+    await handle.sync()
+  } catch (error) {
+    if (!['EINVAL', 'EPERM', 'EISDIR', 'UNKNOWN'].includes(error?.code)) throw error
+  } finally {
+    await handle?.close().catch(() => {})
+  }
 }
 
 async function replaceLeafFromStage(source, target, transactionId) {
@@ -135,6 +173,7 @@ async function replaceLeafFromStage(source, target, transactionId) {
       if (error?.code !== 'ENOENT') throw error
     }
     if (sourceStatus !== undefined) await rename(temporary, target)
+    await syncDirectory(dirname(target))
     if (targetMoved) await rm(displaced, { force: true })
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => {})
@@ -262,6 +301,7 @@ export class PluginStagingManager {
     if (active === undefined) return
     if (active.transactionId !== transactionId) throw new Error('another plugin transaction owns the profile lock')
     await rm(this.activePath, { force: true })
+    await syncDirectory(this.transactionRoot)
   }
 
   async #advance(transactionId, phase) {
@@ -380,6 +420,7 @@ export class PluginStagingManager {
         throw new Error('live plugin dependency tree was not atomically archived')
       }
       await rename(stagedNodeModules, liveNodeModules)
+      await syncDirectory(this.profileDir)
       await replaceLeafFromStage(
         join(stageDir, 'package.json'),
         join(this.profileDir, 'package.json'),
