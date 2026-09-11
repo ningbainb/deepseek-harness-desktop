@@ -166,6 +166,8 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
    *   is still up, so registry lookups and package warming cost no downtime
    * @param {(prepared: unknown) => Promise<object|undefined>} mutation.apply
    *   runs with the Runtime stopped; returns a plan
+   * @param {(prepared: unknown) => Promise<void>} [mutation.abandon]
+   *   releases prepared staging when Runtime never reaches the stopped state
    * @param {(plan: object|undefined) => Promise<unknown>} [mutation.finalize]
    *   runs after the Runtime is back and every transaction has committed
    * @param {(plan: object|undefined) => Promise<void>} [mutation.onRecovered]
@@ -180,6 +182,7 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
     label = 'plugin change',
     prepare,
     apply,
+    abandon,
     finalize,
     onRecovered,
     onRuntimeEvent,
@@ -190,7 +193,21 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
     // Stopping is outside the try: if the Runtime never went down there is
     // nothing to restore, and the caller must see the stop failure itself.
     onRuntimeEvent?.('stopping')
-    await controller.stop()
+    try {
+      await controller.stop()
+    } catch (error) {
+      if (typeof abandon !== 'function') throw error
+      try {
+        await abandon(prepared)
+      } catch (abandonError) {
+        throw new Error(
+          `${label} could not stop Runtime and prepared staging cleanup failed: `
+          + `${boundedMessage(error)}; ${boundedMessage(abandonError)}`,
+          { cause: new AggregateError([error, abandonError]) },
+        )
+      }
+      throw error
+    }
 
     let plan
     try {

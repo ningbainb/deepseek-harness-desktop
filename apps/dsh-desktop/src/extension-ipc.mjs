@@ -381,6 +381,7 @@ export function registerExtensionIpc({
               }
               return installationDescriptor
             },
+            abandon: async (prepared) => prepared?.staging?.cancel?.(),
             apply: async (prepared) => {
               const transaction = typeof pluginManager.applyPreparedFullAccessExternal === 'function'
                 && prepared?.staging !== undefined
@@ -401,6 +402,7 @@ export function registerExtensionIpc({
       // Registry inspection and package-store warming happen while the current
       // DSH process remains available. Only the exact offline switch is downtime.
       prepare: () => pluginManager.prepare(request.spec, { allowUnknown: request.allowUnknown }),
+      abandon: async (prepared) => prepared?.staging?.cancel?.(),
       apply: async (prepared) => {
         const transaction = await pluginManager.applyPrepared(prepared)
         return { transactions: [transaction], result: transaction.result }
@@ -428,6 +430,7 @@ export function registerExtensionIpc({
         emitProgress('plugin-batch', 'prefetched', { total: prepared.items.length })
         return prepared
       },
+      abandon: async (prepared) => prepared?.staging?.cancel?.(),
       apply: async (prepared) => {
         emitProgress('plugin-batch', 'applying')
         const transaction = await pluginManager.applyPreparedBatch(prepared)
@@ -450,6 +453,7 @@ export function registerExtensionIpc({
     return enqueuePluginMutation(() => mutation().run({
       label: 'plugin removal',
       prepare: () => pluginManager.prepareRemoval(name),
+      abandon: async (prepared) => prepared?.staging?.cancel?.(),
       apply: async (prepared) => {
         const transaction = await pluginManager.applyPreparedRemoval(prepared)
         return { transactions: [transaction], result: transaction.result }
@@ -492,6 +496,12 @@ export function registerExtensionIpc({
           skills: request.decisions.skills,
         })
         return { prepared, configTransaction }
+      },
+      abandon: async ({ prepared, configTransaction }) => {
+        const errors = []
+        try { await configTransaction.rollback() } catch (error) { errors.push(error) }
+        try { await prepared?.staging?.cancel?.() } catch (error) { errors.push(error) }
+        if (errors.length > 0) throw new AggregateError(errors, 'preset staging cleanup failed')
       },
       apply: async ({ prepared, configTransaction }) => {
         emitProgress('preset-import', 'applying')
@@ -804,6 +814,8 @@ export function registerExtensionIpc({
         try { await configTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
         if (packageTransaction) {
           try { await packageTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
+        } else {
+          try { await prepared?.staging?.cancel?.() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
         }
         if (stopped) {
           try { await ensureProfile() } catch (recoveryError) { recoveryErrors.push(recoveryError) }

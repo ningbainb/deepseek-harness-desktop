@@ -273,6 +273,7 @@
         "incompatible-plugin-rejected-before-prefetch",
         "same-volume-plugin-staging-profile",
         "persistent-single-writer-plugin-transaction",
+        "runtime-stop-failure-abandons-prepared-staging",
         "atomic-node-modules-activation-with-archive-rollback",
         "staged-atomic-plugin-removal",
         "full-access-git-local-staging-with-protected-graph-policy",

@@ -263,6 +263,39 @@ describe('recovery', () => {
     assert.deepEqual(calls, ['stop'])
   })
 
+  test('a stop failure abandons prepared staging without starting rollback', async () => {
+    const { coordinator, calls } = harness({
+      stop: async () => {
+        throw new Error('stop refused')
+      },
+    })
+    await assert.rejects(
+      coordinator.run({
+        prepare: async () => ({ transactionId: 'prepared' }),
+        abandon: async (prepared) => calls.push(`abandon:${prepared.transactionId}`),
+        apply: async () => undefined,
+      }),
+      /stop refused/u,
+    )
+    assert.deepEqual(calls, ['stop', 'abandon:prepared'])
+  })
+
+  test('stop and staging cleanup failures are both preserved', async () => {
+    const { coordinator } = harness({
+      stop: async () => {
+        throw new Error('stop refused')
+      },
+    })
+    const error = await coordinator.run({
+      label: 'plugin change',
+      prepare: async () => ({}),
+      abandon: async () => { throw new Error('cleanup refused') },
+      apply: async () => undefined,
+    }).then(() => undefined, (thrown) => thrown)
+    assert.ok(error.cause instanceof AggregateError)
+    assert.match(error.message, /stop refused.*cleanup refused/u)
+  })
+
   test('recovery failure is written to the log sink', async () => {
     const { coordinator, logLines } = harness({
       start: async () => {
