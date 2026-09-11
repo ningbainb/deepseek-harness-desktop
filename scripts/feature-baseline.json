@@ -274,6 +274,8 @@
         "same-volume-plugin-staging-profile",
         "persistent-single-writer-plugin-transaction",
         "atomic-node-modules-activation-with-archive-rollback",
+        "staged-atomic-plugin-removal",
+        "full-access-git-local-staging-with-protected-graph-policy",
         "structured-pnpm-v9-lock-graph-validation",
         "protected-runtime-link-source-validation",
         "protected-transitive-version-conflict-rejection",

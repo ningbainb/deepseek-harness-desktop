@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, win32 } from 'node:path'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import semver from 'semver'
 import { parse as parseYaml } from 'yaml'
 
@@ -1164,6 +1164,85 @@ export class PluginManager {
     })
   }
 
+  prepareRemoval(rawName) {
+    const { name } = validatePluginSpec(rawName)
+    if (name !== rawName) throw new TypeError('plugin removal requires a package name without a version')
+    if (PROTECTED_PACKAGES.has(name)) throw new Error(`${name} is a built-in desktop plugin and cannot be removed`)
+    return this.#enqueue(async () => {
+      const previous = await readInstalledManifest(this.profileDir, name)
+      if (previous === undefined) throw new Error(`${name} is not installed in the desktop profile`)
+      if (this.stagingManager === undefined) {
+        return Object.freeze({ name, previousVersion: previous.version })
+      }
+      const staged = await this.stagingManager.begin({
+        operation: 'plugin-remove',
+        pluginIds: [name],
+      })
+      try {
+        await this.#runPnpm(['remove', name, '--offline'], staged.stageDir)
+        // Removing the last community package may make pnpm omit the physical
+        // directory. Activation still swaps one complete dependency root.
+        await mkdir(join(staged.stageDir, 'node_modules'), { recursive: true })
+        const manifest = await readManifest(staged.stageDir)
+        if (manifest.dependencies) delete manifest.dependencies[name]
+        const profile = manifest.dsh?.profile ?? {}
+        manifest.dsh = {
+          ...(manifest.dsh ?? {}),
+          profile: {
+            ...profile,
+            bundles: (profile.bundles ?? []).filter((bundle) => bundle !== name),
+          },
+        }
+        await writeManifest(staged.stageDir, manifest)
+        await staged.markDependenciesResolved()
+        await this.#validateRuntimeGraph(staged.stageDir)
+        await staged.markGraphValidated()
+        return Object.freeze({
+          name,
+          previousVersion: previous.version,
+          staging: staged,
+        })
+      } catch (error) {
+        try {
+          await staged.cancel()
+        } catch (cancelError) {
+          throw new Error('staged plugin removal failed and cleanup was incomplete', {
+            cause: new AggregateError([error, cancelError]),
+          })
+        }
+        throw error
+      }
+    })
+  }
+
+  applyPreparedRemoval(prepared) {
+    if (
+      prepared === null
+      || typeof prepared !== 'object'
+      || typeof prepared.name !== 'string'
+      || prepared.staging === undefined
+    ) {
+      throw new TypeError('prepared plugin removal is required')
+    }
+    const { name } = validatePluginSpec(prepared.name)
+    if (name !== prepared.name || PROTECTED_PACKAGES.has(name)) {
+      throw new TypeError('prepared plugin removal identity is invalid')
+    }
+    return this.#enqueue(async () => {
+      await this.beforeMutation({ type: 'remove', name })
+      this.updateStates.delete(name)
+      return prepared.staging.activate({
+        profileArchive: this.profileArchive,
+        validateActivated: (profileDir) => this.#validateRuntimeGraph(profileDir),
+        result: Object.freeze({
+          name,
+          previousVersion: prepared.previousVersion,
+          restartRequired: true,
+        }),
+      })
+    })
+  }
+
   /**
    * Disable incompatible community bundles unless Electron main explicitly
    * supplies their already-approved full-access package names. The manager
@@ -1237,6 +1316,108 @@ export class PluginManager {
         await writeFile(join(this.profileDir, 'package.json'), previous)
         throw error
       }
+    })
+  }
+
+  prepareFullAccessExternal(descriptor) {
+    const external = assertExternalPluginDescriptor(descriptor)
+    if (external.package.identity !== 'opaque' && PROTECTED_PACKAGES.has(external.package.name)) {
+      throw new Error(`${external.package.name} is a built-in desktop plugin and cannot be replaced by an external source`)
+    }
+    if (this.stagingManager === undefined) {
+      return Promise.resolve(Object.freeze({ descriptor: external }))
+    }
+    return this.#enqueue(async () => {
+      const staged = await this.stagingManager.begin({
+        operation: 'full-access-external-plugin-install',
+        pluginIds: [external.package.name],
+      })
+      try {
+        const beforeManifest = await readManifest(staged.stageDir)
+        const addArgs = ['add', external.installSpec, '--save-exact']
+        try {
+          await this.#runPnpm(addArgs, staged.stageDir)
+        } catch (error) {
+          const allowedBuild = gitPrepareAllowBuildFromError(error, external.installSpec)
+          if (allowedBuild === undefined) throw error
+          await this.#runPnpm([...addArgs, `--allow-build=${allowedBuild}`], staged.stageDir)
+        }
+        const manifest = await readManifest(staged.stageDir)
+        const name = installedExternalPackageName(beforeManifest, manifest, external)
+        if (PROTECTED_PACKAGES.has(name)) {
+          throw new Error(`${name} is a built-in desktop plugin and cannot be replaced by an external source`)
+        }
+        const installed = await readInstalledManifest(staged.stageDir, name)
+        if (installed === undefined) {
+          throw new Error(`full-access external install did not materialize ${name}`)
+        }
+        if (typeof installed.dsh?.bundle?.patch !== 'string') {
+          throw new Error(`${name} is not a DSH bundle package`)
+        }
+        const profile = manifest.dsh?.profile ?? {}
+        const bundles = new Set(profile.bundles ?? [])
+        bundles.add(name)
+        manifest.dsh = {
+          ...(manifest.dsh ?? {}),
+          profile: { ...profile, bundles: [...bundles] },
+        }
+        await writeManifest(staged.stageDir, manifest)
+        await staged.markDependenciesResolved()
+        await this.#validateRuntimeGraph(staged.stageDir)
+        await staged.markGraphValidated()
+        const previous = await readInstalledManifest(this.profileDir, name)
+        return Object.freeze({
+          descriptor: external,
+          name,
+          version: typeof installed.version === 'string' ? installed.version : external.package.version,
+          previousVersion: typeof previous?.version === 'string' ? previous.version : undefined,
+          staging: staged,
+        })
+      } catch (error) {
+        try {
+          await staged.cancel()
+        } catch (cancelError) {
+          throw new Error('full-access plugin staging failed and cleanup was incomplete', {
+            cause: new AggregateError([error, cancelError]),
+          })
+        }
+        throw error
+      }
+    })
+  }
+
+  applyPreparedFullAccessExternal(prepared) {
+    if (
+      prepared === null
+      || typeof prepared !== 'object'
+      || typeof prepared.name !== 'string'
+      || prepared.staging === undefined
+    ) {
+      throw new TypeError('prepared full-access plugin is required')
+    }
+    const name = validatePluginSpec(prepared.name).name
+    if (name !== prepared.name || PROTECTED_PACKAGES.has(name)) {
+      throw new TypeError('prepared full-access plugin identity is invalid')
+    }
+    return this.#enqueue(async () => {
+      await this.beforeMutation({
+        type: 'full-access-external-install',
+        name,
+        sourceId: prepared.descriptor?.sourceId,
+        candidateId: prepared.descriptor?.candidateId,
+      })
+      this.updateStates.delete(name)
+      return prepared.staging.activate({
+        profileArchive: this.profileArchive,
+        validateActivated: (profileDir) => this.#validateRuntimeGraph(profileDir),
+        result: Object.freeze({
+          name,
+          ...(typeof prepared.version === 'string' ? { version: prepared.version } : {}),
+          previousVersion: prepared.previousVersion,
+          fullAccess: true,
+          restartRequired: true,
+        }),
+      })
     })
   }
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { resolveExternalPluginSource } from '../src/external-plugin-source.mjs'
 import { createHostCompatibility } from '../src/extensions/plugin-compatibility.mjs'
 import { PluginStagingManager } from '../src/extensions/plugin-staging.mjs'
 import { PluginManager } from '../src/extensions/plugins.mjs'
@@ -16,7 +17,7 @@ const hostCompatibility = createHostCompatibility({
   packages: { '@deepseek-ai/cordis': '4.0.1' },
 })
 
-async function fixture({ runner, registry } = {}) {
+async function fixture({ runner, registry, runtimeGraphValidator } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-manager-staging-'))
   const profileDir = join(root, 'profiles', 'desktop')
   await mkdir(join(profileDir, 'node_modules'), { recursive: true })
@@ -38,7 +39,7 @@ async function fixture({ runner, registry } = {}) {
     hostCompatibility,
     profileArchive,
     stagingManager,
-    runtimeGraphValidator: async (directory) => { graphChecks.push(directory) },
+    runtimeGraphValidator: runtimeGraphValidator ?? (async (directory) => { graphChecks.push(directory) }),
     registry,
     runner,
   })
@@ -120,6 +121,117 @@ test('a failed staged batch leaves the live profile byte-for-byte unchanged', as
     await assert.rejects(
       value.manager.prepareMany([`${first.name}@1.0.0`, `${second.name}@1.0.0`]),
       /simulated staged pnpm failure/u,
+    )
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), original)
+    assert.equal((await value.stagingManager.list()).length, 0)
+  } finally {
+    if (value) await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('plugin removal is fully resolved in staging before activation', async () => {
+  const installed = candidate('@community/removable', '1.0.0')
+  let value
+  try {
+    value = await fixture({
+      runner: async ({ args, profileDir }) => {
+        if (args[0] !== 'remove') return
+        const manifestPath = join(profileDir, 'package.json')
+        const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+        delete manifest.dependencies[installed.name]
+        await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        await rm(join(profileDir, 'node_modules', ...installed.name.split('/')), {
+          recursive: true,
+          force: true,
+        })
+        await writeFile(join(profileDir, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n")
+      },
+    })
+    await materializePackage(value.profileDir, installed)
+    const liveManifestPath = join(value.profileDir, 'package.json')
+    const liveManifest = JSON.parse(await readFile(liveManifestPath, 'utf8'))
+    liveManifest.dsh.profile.bundles.push(installed.name)
+    await writeFile(liveManifestPath, `${JSON.stringify(liveManifest, null, 2)}\n`)
+
+    const prepared = await value.manager.prepareRemoval(installed.name)
+    assert.equal(JSON.parse(await readFile(liveManifestPath, 'utf8')).dependencies[installed.name], '1.0.0')
+    assert.equal(await readFile(join(value.profileDir, 'node_modules', ...installed.name.split('/'), 'package.json'), 'utf8') !== '', true)
+
+    const transaction = await value.manager.applyPreparedRemoval(prepared)
+    const activated = JSON.parse(await readFile(liveManifestPath, 'utf8'))
+    assert.equal(activated.dependencies[installed.name], undefined)
+    assert.equal(activated.dsh.profile.bundles.includes(installed.name), false)
+    await transaction.validateActivated()
+    await transaction.markRuntimeStarting()
+    await transaction.markRuntimeHealthy()
+    await transaction.commit()
+  } finally {
+    if (value) await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('full-access local plugins materialize and validate in staging before Runtime downtime', async () => {
+  const name = '@external/local-plugin'
+  const packageManifest = candidate(name, '1.0.0')
+  let value
+  try {
+    value = await fixture({
+      runner: async ({ args, profileDir }) => {
+        if (args[0] === 'add') await materializePackage(profileDir, packageManifest)
+      },
+    })
+    const sourceDir = join(value.root, 'external-source')
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({
+      name,
+      version: '1.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }))
+    await writeFile(join(sourceDir, 'cordis.patch.yml'), 'patch: []\n')
+    const descriptor = await resolveExternalPluginSource(sourceDir)
+    const original = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+
+    const prepared = await value.manager.prepareFullAccessExternal(descriptor)
+    assert.equal(prepared.name, name)
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), original)
+    const transaction = await value.manager.applyPreparedFullAccessExternal(prepared)
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'package.json'), 'utf8')).dependencies[name], '1.0.0')
+    assert.equal(await transaction.rollback(), true)
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), original)
+  } finally {
+    if (value) await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('full-access protected graph conflict is rejected while Live Profile stays unchanged', async () => {
+  const name = '@external/conflicting-plugin'
+  const packageManifest = candidate(name, '1.0.0')
+  let value
+  try {
+    value = await fixture({
+      runtimeGraphValidator: async () => {
+        const error = new Error('protected Runtime conflict')
+        error.code = 'PROTECTED_TRANSITIVE_VERSION_CONFLICT'
+        throw error
+      },
+      runner: async ({ args, profileDir }) => {
+        if (args[0] === 'add') await materializePackage(profileDir, packageManifest)
+      },
+    })
+    const sourceDir = join(value.root, 'conflicting-source')
+    await mkdir(sourceDir, { recursive: true })
+    await writeFile(join(sourceDir, 'package.json'), JSON.stringify({
+      name,
+      version: '1.0.0',
+      dsh: { bundle: { patch: './cordis.patch.yml' } },
+    }))
+    await writeFile(join(sourceDir, 'cordis.patch.yml'), 'patch: []\n')
+    const descriptor = await resolveExternalPluginSource(sourceDir)
+    const original = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+
+    await assert.rejects(
+      value.manager.prepareFullAccessExternal(descriptor),
+      { code: 'PROTECTED_TRANSITIVE_VERSION_CONFLICT' },
     )
     assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), original)
     assert.equal((await value.stagingManager.list()).length, 0)

@@ -372,11 +372,20 @@ export function registerExtensionIpc({
             // Local content can change after selection. Electron main
             // re-resolves and stages the private descriptor immediately
             // before stopping Runtime or writing the persistent Desktop profile.
-            prepare: async () => assertExternalPluginDescriptor(
-              await revalidateFullAccessPlugin(descriptor),
-            ),
-            apply: async (installationDescriptor) => {
-              const transaction = await pluginManager.installFullAccessExternal(installationDescriptor)
+            prepare: async () => {
+              const installationDescriptor = assertExternalPluginDescriptor(
+                await revalidateFullAccessPlugin(descriptor),
+              )
+              if (typeof pluginManager.prepareFullAccessExternal === 'function') {
+                return pluginManager.prepareFullAccessExternal(installationDescriptor)
+              }
+              return installationDescriptor
+            },
+            apply: async (prepared) => {
+              const transaction = typeof pluginManager.applyPreparedFullAccessExternal === 'function'
+                && prepared?.staging !== undefined
+                ? await pluginManager.applyPreparedFullAccessExternal(prepared)
+                : await pluginManager.installFullAccessExternal(prepared?.descriptor ?? prepared)
               return { transactions: [transaction], result: transaction.result }
             },
             finalize: (plan) => Object.freeze({ ...plan.result, isolated: false }),
@@ -427,6 +436,23 @@ export function registerExtensionIpc({
       finalize: (plan) => {
         emitProgress('plugin-batch', 'committed')
         return plan?.result
+      },
+    }))
+  }
+
+  const removePlugin = (name) => {
+    if (
+      typeof pluginManager.prepareRemoval !== 'function'
+      || typeof pluginManager.applyPreparedRemoval !== 'function'
+    ) {
+      return mutatePlugin(() => pluginManager.remove(name))
+    }
+    return enqueuePluginMutation(() => mutation().run({
+      label: 'plugin removal',
+      prepare: () => pluginManager.prepareRemoval(name),
+      apply: async (prepared) => {
+        const transaction = await pluginManager.applyPreparedRemoval(prepared)
+        return { transactions: [transaction], result: transaction.result }
       },
     }))
   }
@@ -562,7 +588,7 @@ export function registerExtensionIpc({
     }))
   })
   handleExtension('extensions:plugin-remove', (_event, name) => {
-    return trackProductOperation('remove', () => mutatePlugin(() => pluginManager.remove(name)))
+    return trackProductOperation('remove', () => removePlugin(name))
   })
   handleExtension('extensions:plugin-enable', (_event, request) => {
     if (

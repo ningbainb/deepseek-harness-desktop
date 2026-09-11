@@ -1131,6 +1131,56 @@ test('plugin removal rolls back when the updated runtime cannot start', async ()
   unregister()
 })
 
+test('production plugin removal prepares staging before runtime downtime', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  qqBotBinding.start = () => ({})
+  qqBotBinding.cancel = () => ({})
+  qqBotBinding.unbind = async () => ({})
+  const events = []
+  const transaction = {
+    result: { name: '@community/example', restartRequired: true },
+    commit: async () => { events.push('commit') },
+    rollback: async () => { events.push('rollback') },
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: {},
+    shell: {},
+    getWindow: () => undefined,
+    pluginManager: {
+      prepareRemoval: async (name) => {
+        events.push(`prepare:${name}`)
+        return { name, staging: {} }
+      },
+      applyPreparedRemoval: async () => {
+        events.push('activate')
+        return transaction
+      },
+    },
+    controller: {
+      stop: async () => { events.push('stop') },
+      start: async () => { events.push('start') },
+    },
+    ensureProfile: async () => { events.push('ensure') },
+    projectRoot: 'C:\\project',
+    dshHome: 'C:\\dsh',
+    qqBotBinding,
+  })
+
+  await ipcMain.handlers.get('extensions:plugin-remove')(undefined, '@community/example')
+  assert.deepEqual(events, [
+    'prepare:@community/example',
+    'stop',
+    'activate',
+    'ensure',
+    'start',
+    'commit',
+  ])
+  unregister()
+})
+
 test('extension shutdown quiesces active mutations and rejects queued work', async () => {
   const ipcMain = new FakeIpcMain()
   const qqBotBinding = new EventEmitter()
