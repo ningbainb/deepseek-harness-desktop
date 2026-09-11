@@ -51,7 +51,8 @@ test('explicit Desktop background opt-in exposes the durable Task Board Host sch
     throw new Error(`${message}\nRecent runtime log:\n${await logs.tail(80)}`, { cause: error })
   } finally {
     await controller?.stop()
-    await rm(root, { recursive: true, force: true })
+    await logs.queue
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })
 
@@ -83,6 +84,7 @@ test('Desktop defaults to the browser scheduler when background automation was n
     throw new Error(`${message}\nRecent runtime log:\n${await logs.tail(80)}`, { cause: error })
   } finally {
     await controller?.stop()
-    await rm(root, { recursive: true, force: true })
+    await logs.queue
+    await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })

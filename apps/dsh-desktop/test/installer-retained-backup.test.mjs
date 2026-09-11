@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -14,7 +14,9 @@ const main = 'DeepSeek Harness Desktop.exe'
 const windows = { skip: process.platform !== 'win32', timeout: 60_000 }
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-retained-backup-'))
+  // Windows PowerShell expands existing 8.3 path segments before hashing the
+  // transaction identity. Use that same physical root for the seeded journal.
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-retained-backup-')))
   const temporary = join(root, 'temporary')
   const install = join(root, "用户's Desktop")
   await mkdir(temporary)

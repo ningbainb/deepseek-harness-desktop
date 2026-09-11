@@ -4,6 +4,7 @@ import { cp, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
@@ -35,14 +36,41 @@ import {
   resolveDshCliPath,
 } from '../src/profile.mjs'
 
-test('Desktop aggregate ships the current conversation navigator build', () => {
+test('Desktop aggregate ships the current conversation navigator build', async () => {
   const root = resolveRuntimePackages(['@linxin666/dsh-web-ui-all']).get('@linxin666/dsh-web-ui-all')
   const shipped = readFileSync(join(root, 'lib/client.js'), 'utf8').replaceAll('\r\n', '\n')
-  const workspace = readFileSync(new URL('../../../packages/dsh-web-ui-all/lib/client.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
-  const region = /\t*\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\t*\/\/#endregion/u
-  const expected = workspace.match(region)?.[0]
-  assert.ok(expected?.includes('positionNavigator'), 'workspace build contains composer avoidance')
-  assert.equal(shipped.match(region)?.[0], expected, 'update the pinned aggregate patch when changing the navigator')
+  const workspaceRoot = resolve(import.meta.dirname, '../../../packages/dsh-web-ui-all')
+  const workspace = readFileSync(join(workspaceRoot, 'lib/client.js'), 'utf8')
+  assert.ok(workspace.includes('function positionNavigator('), 'workspace build contains composer avoidance')
+  // Production minification removes region comments. Build a readable
+  // comparison from current source with the same shared preset, in isolation;
+  // keep the exact whole-navigator equality against the pinned shipped patch.
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-navigator-build-'))
+  try {
+    const require = createRequire(import.meta.url)
+    const compiler = join(dirname(require.resolve('tsdown/package.json')), 'dist/run.mjs')
+    const built = spawnSync(process.execPath, [compiler, '--no-minify', '--out-dir', temporary], {
+      cwd: workspaceRoot, encoding: 'utf8', windowsHide: true, timeout: 30_000,
+    })
+    assert.equal(built.status, 0, built.stderr || String(built.error ?? 'navigator comparison build failed'))
+    const readable = (await readFile(join(temporary, 'client.js'), 'utf8')).replaceAll('\r\n', '\n')
+    const region = /\t*\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\t*\/\/#endregion/u
+    const expected = readable.match(region)?.[0]
+    assert.ok(expected?.includes('positionNavigator'), 'fresh source build contains composer avoidance')
+    const actual = shipped.match(region)?.[0]
+    assert.ok(actual?.includes('positionNavigator'), 'shipped build contains composer avoidance')
+    // Wrapper indentation is not executable code. Canonically print both
+    // complete syntax trees, retaining all identifiers, operators and literals.
+    const ts = createRequire(compiler)('typescript')
+    const canonical = source => {
+      const tree = ts.createSourceFile('navigator.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+      assert.equal(tree.parseDiagnostics.length, 0, 'navigator comparison must parse as valid JavaScript')
+      return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, removeComments: true }).printFile(tree)
+    }
+    assert.equal(canonical(actual), canonical(expected), 'update the pinned aggregate patch when changing the navigator')
+  } finally {
+    await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  }
 })
 
 function aggregateLoaderPackageNames(source) {
