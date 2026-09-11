@@ -280,6 +280,7 @@
         "structured-pnpm-v9-lock-graph-validation",
         "protected-runtime-link-source-validation",
         "protected-transitive-version-conflict-rejection",
+        "protected-virtual-store-singleton-source-validation",
         "post-activation-graph-validation-before-runtime-health-commit",
         "sdk-composed-runtime-launcher",
         "bounded-runtime-startup-phase-timings",

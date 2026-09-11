@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { lstat, readFile, realpath } from 'node:fs/promises'
+import { lstat, readFile, readdir, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import semver from 'semver'
@@ -27,6 +27,64 @@ function communityDependencyNames(manifest, policy) {
   return Object.keys(manifest.dependencies ?? {}).filter(name => !policy.owns(name))
 }
 
+async function readDirectoryIfPresent(path, listDirectory) {
+  try {
+    return await listDirectory(path, { withFileTypes: true })
+  } catch (error) {
+    if (error?.code === 'ENOENT') return []
+    throw error
+  }
+}
+
+function virtualStorePrefix(name) {
+  return `${name.replace('/', '+')}@`
+}
+
+async function inspectProtectedVirtualStore({
+  profileDir,
+  baseline,
+  policy,
+  read,
+  resolveRealPath,
+  listDirectory,
+}) {
+  const virtualStore = join(profileDir, 'node_modules', '.pnpm')
+  const entries = await readDirectoryIfPresent(virtualStore, listDirectory)
+  const protectedNodes = []
+  for (const name of policy.names) {
+    const prefix = virtualStorePrefix(name)
+    const expected = baseline.packages[name]
+    for (const entry of entries.filter((item) => item.isDirectory() && item.name.startsWith(prefix))) {
+      const root = join(virtualStore, entry.name, 'node_modules', ...packagePathSegments(name))
+      let installed
+      try {
+        installed = JSON.parse(await read(join(root, 'package.json'), 'utf8'))
+      } catch (error) {
+        if (error?.code === 'ENOENT') continue
+        throw graphError('PROTECTED_PACKAGE_IDENTITY_INVALID', 'a protected package in the dependency store is unreadable', { name })
+      }
+      if (installed?.name !== name || semver.valid(installed?.version) === null) {
+        throw graphError('PROTECTED_PACKAGE_IDENTITY_INVALID', 'a protected package in the dependency store has an invalid identity', { name })
+      }
+      if (expected === undefined || installed.version !== expected.version) {
+        throw graphError('PROTECTED_PHYSICAL_VERSION_CONFLICT', 'the plugin dependency store contains a different protected Runtime version', {
+          name,
+          expected: expected?.version,
+          actual: installed.version,
+        })
+      }
+      const actualRealPath = await resolveRealPath(root)
+      if (policy.get(name)?.singleton === true && actualRealPath !== expected.realPath) {
+        throw graphError('PROTECTED_SINGLETON_SOURCE_CONFLICT', 'the plugin dependency store contains another protected Runtime source', {
+          name,
+        })
+      }
+      protectedNodes.push({ name, version: installed.version, realPath: actualRealPath })
+    }
+  }
+  return protectedNodes.toSorted((left, right) => left.name.localeCompare(right.name) || left.realPath.localeCompare(right.realPath))
+}
+
 /** Validate only manifests, lock nodes, and protected top-level links. */
 export async function validateProtectedRuntimeGraph({
   profileDir,
@@ -35,6 +93,7 @@ export async function validateProtectedRuntimeGraph({
   read = readFile,
   resolveRealPath = realpath,
   inspectPath = lstat,
+  listDirectory = readdir,
 } = {}) {
   if (typeof profileDir !== 'string' || profileDir.length === 0) throw new TypeError('profileDir is required')
   if (!baseline?.packages || typeof baseline.packageVersion !== 'function') throw new TypeError('RuntimeBaseline is required')
@@ -95,14 +154,25 @@ export async function validateProtectedRuntimeGraph({
     }
   }
 
+  const protectedStoreNodes = await inspectProtectedVirtualStore({
+    profileDir,
+    baseline,
+    policy,
+    read,
+    resolveRealPath,
+    listDirectory,
+  })
+
   const projection = {
     links: checkedLinks,
     lock: protectedLockPackages.map(({ name, version }) => ({ name, version })),
+    store: protectedStoreNodes,
   }
   return Object.freeze({
     valid: true,
     protectedLinks: Object.freeze(checkedLinks.map(Object.freeze)),
     protectedLockPackages,
+    protectedStoreNodes: Object.freeze(protectedStoreNodes.map(Object.freeze)),
     fingerprint: createHash('sha256').update(JSON.stringify(projection)).digest('hex'),
   })
 }
