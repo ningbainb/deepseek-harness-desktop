@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
 import {
   assessPluginCompatibility,
   createHostCompatibility,
   createHostCompatibilityProvider,
+  resolveHostPackageVersion,
+  resolvePluginPackageVersion,
+  resolveProfilePackageVersion,
 } from '../src/extensions/plugin-compatibility.mjs'
 import { COMMUNITY_PLUGIN_KNOWN_ISSUES } from '../src/extensions/plugin-known-issues.mjs'
 
@@ -27,6 +33,29 @@ function bundle(extra = {}) {
     ...extra,
   }
 }
+
+test('Host, Profile, and plugin package version resolvers have separate authorities', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-package-authority-'))
+  try {
+    const appRoot = join(root, 'application')
+    const profileDir = join(root, 'profile')
+    const hostRoot = join(appRoot, 'node_modules', 'authority-test')
+    const profileRoot = join(profileDir, 'node_modules', 'authority-test')
+    const pluginRoot = join(root, 'candidate')
+    await Promise.all([hostRoot, profileRoot, pluginRoot].map(path => mkdir(path, { recursive: true })))
+    await Promise.all([
+      writeFile(join(appRoot, 'package.json'), JSON.stringify({ name: 'app', version: '1.0.0' })),
+      writeFile(join(hostRoot, 'package.json'), JSON.stringify({ name: 'authority-test', version: '1.0.0' })),
+      writeFile(join(profileRoot, 'package.json'), JSON.stringify({ name: 'authority-test', version: '9.0.0' })),
+      writeFile(join(pluginRoot, 'package.json'), JSON.stringify({ name: 'authority-test', version: '2.0.0' })),
+    ])
+    assert.equal(resolveHostPackageVersion('authority-test', { anchors: [join(appRoot, 'package.json')] }), '1.0.0')
+    assert.equal(resolveProfilePackageVersion('authority-test', { profileDir }), '9.0.0')
+    assert.equal(resolvePluginPackageVersion('authority-test', { pluginRoot }), '2.0.0')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
 test('compatibility rejects packages that are not DSH bundles', () => {
   const result = assessPluginCompatibility({ name: 'plain', version: '1.0.0' }, host)

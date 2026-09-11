@@ -265,6 +265,9 @@
       "e2eScript": "scripts/verify-runtime-provider.mjs",
       "features": [
         "official-dsh-0.1.5-exact-pin",
+        "immutable-application-runtime-baseline",
+        "host-package-authority-excludes-profile",
+        "unified-protected-package-ownership",
         "sdk-composed-runtime-launcher",
         "bounded-runtime-startup-phase-timings",
         "production-client-compression-preserves-names-and-source-maps",

@@ -94,17 +94,14 @@ function manifestVersionAt(path, expectedName) {
   }
 }
 
-export function resolvePackageVersion(name, { profileDir, anchors = [import.meta.url] } = {}) {
+function assertPackageName(name) {
   if (typeof name !== 'string' || !PACKAGE_NAME_PATTERN.test(name)) throw new TypeError('invalid host package name')
-  if (typeof profileDir === 'string' && profileDir.length > 0) {
-    const direct = manifestVersionAt(join(profileDir, 'node_modules', ...name.split('/'), 'package.json'), name)
-    if (direct !== undefined) return direct
-  }
-  const resolutionAnchors = [
-    ...(typeof profileDir === 'string' && profileDir.length > 0 ? [join(profileDir, 'package.json')] : []),
-    ...anchors,
-  ]
-  for (const anchor of resolutionAnchors) {
+}
+
+/** Resolve a Host package only through application-controlled anchors. */
+export function resolveHostPackageVersion(name, { anchors = [import.meta.url] } = {}) {
+  assertPackageName(name)
+  for (const anchor of anchors) {
     const require = createRequire(anchor)
     try {
       const version = manifestVersionAt(require.resolve(`${name}/package.json`), name)
@@ -127,6 +124,24 @@ export function resolvePackageVersion(name, { profileDir, anchors = [import.meta
   }
   return undefined
 }
+
+/** Read a package materialized in the mutable Desktop Profile. */
+export function resolveProfilePackageVersion(name, { profileDir } = {}) {
+  assertPackageName(name)
+  if (typeof profileDir !== 'string' || profileDir.length === 0) throw new TypeError('profile directory is required')
+  return manifestVersionAt(join(profileDir, 'node_modules', ...name.split('/'), 'package.json'), name)
+}
+
+/** Read the final identity of one already materialized plugin root. */
+export function resolvePluginPackageVersion(name, { pluginRoot } = {}) {
+  assertPackageName(name)
+  if (typeof pluginRoot !== 'string' || pluginRoot.length === 0) throw new TypeError('plugin root is required')
+  return manifestVersionAt(join(pluginRoot, 'package.json'), name)
+}
+
+// Compatibility alias for callers outside Desktop. It intentionally has no
+// Profile option: mutable Profile state can never become Host truth again.
+export const resolvePackageVersion = resolveHostPackageVersion
 
 export function createHostCompatibilityProvider({
   desktopVersion,

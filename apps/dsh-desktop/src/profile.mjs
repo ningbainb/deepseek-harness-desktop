@@ -1207,7 +1207,7 @@ export async function ensureDesktopProfile({
   return { changed, manifest, profileDir }
 }
 
-function resolvePackageRoot(packageName, anchors) {
+export function resolvePackageRoot(packageName, anchors) {
   for (const anchor of anchors) {
     const require = createRequire(anchor)
     try {

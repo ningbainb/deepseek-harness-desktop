@@ -42,7 +42,6 @@ import { DESKTOP_SURFACES, desktopContractForSurface, DESKTOP_API_VERSION } from
 import { DesktopSurfaceRegistry } from './desktop-surfaces.mjs'
 import {
   createHostCompatibilityProvider,
-  resolvePackageVersion,
 } from './extensions/plugin-compatibility.mjs'
 import { PluginManager, resolvePnpmCliPath } from './extensions/plugins.mjs'
 import { PluginRegistry } from './extensions/plugin-registry.mjs'
@@ -93,8 +92,11 @@ import {
   DESKTOP_PROFILE_FAILURE_CATEGORIES,
   ensureDesktopProfile,
   resolveDshCliPath,
+  resolvePackageRoot,
   resolveRuntimePackages,
 } from './profile.mjs'
+import { createRuntimeBaseline, resolveHostPackageVersion } from './runtime-baseline.mjs'
+import { DESKTOP_RUNTIME_PACKAGE_POLICY } from './runtime-package-policy.mjs'
 import { WebProfileMigrationService } from './profile-migration.mjs'
 import { PresetService } from './presets/preset-service.mjs'
 import { persistRuntimePort, selectPreferredRuntimePort } from './runtime-port.mjs'
@@ -1260,6 +1262,22 @@ export async function startElectronApp(metadata) {
     await showDirectStartupState('installation-repair-required')
     return
   }
+  const runtimeBaselineRoots = new Map(runtimePackages)
+  for (const name of DESKTOP_RUNTIME_PACKAGE_POLICY.names) {
+    if (runtimeBaselineRoots.has(name)) continue
+    const root = resolvePackageRoot(name, [import.meta.url])
+    if (root === undefined) throw new Error(`application Runtime package is missing: ${name}`)
+    runtimeBaselineRoots.set(name, root)
+  }
+  const runtimeBaseline = await createRuntimeBaseline({
+    desktopVersion,
+    runtimeVersion,
+    packageRoots: runtimeBaselineRoots,
+    policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
+  })
+  await logStore.append(
+    `[runtime] immutable baseline ready packages=${Object.keys(runtimeBaseline.packages).length} fingerprint=${runtimeBaseline.fingerprint.slice(0, 12)}`,
+  )
   let primaryFullUserPermission
   try {
     primaryFullUserPermission = await ensurePrimaryRuntimeFullUserPermission({
@@ -1300,10 +1318,7 @@ export async function startElectronApp(metadata) {
       integrity: knownGoodRuntimeEvidence?.integrity,
       lockfileSha256: knownGoodRuntimeEvidence?.lockfile.sha256,
     },
-    resolvePackageVersion: (name) => resolvePackageVersion(name, {
-      profileDir: desktopProfileDir,
-      anchors: [import.meta.url],
-    }),
+    resolvePackageVersion: (name) => resolveHostPackageVersion(name, runtimeBaseline),
   })
   const pluginRecoveryStore = new PluginRecoveryStore({
     profileDir: desktopProfileDir,
