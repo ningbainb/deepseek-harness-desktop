@@ -286,8 +286,38 @@ function requestedVersion(parsed) {
 function compatibilityError(message, code, compatibility) {
   const error = new Error(message)
   error.code = code
+  error.userMessage = code === 'PLUGIN_INCOMPATIBLE'
+    ? '这个插件与当前版本不兼容，因此没有安装。'
+    : '无法确认这个插件与当前版本的兼容性。'
   error.compatibility = compatibility
   return error
+}
+
+/**
+ * Compatibility is a main-process admission policy, not renderer advice.
+ * Unknown candidates require an explicit user decision; incompatible
+ * candidates are never admitted, even when allowUnknown is true.
+ */
+export function enforceCompatibilityAdmission(compatibility, { allowUnknown = false } = {}) {
+  if (typeof allowUnknown !== 'boolean') throw new TypeError('allowUnknown must be a boolean')
+  if (!['compatible', 'unknown', 'incompatible'].includes(compatibility?.status)) {
+    throw new TypeError('plugin compatibility result is invalid')
+  }
+  if (compatibility.status === 'incompatible') {
+    throw compatibilityError(
+      'plugin is incompatible with the current Desktop Runtime',
+      'PLUGIN_INCOMPATIBLE',
+      compatibility,
+    )
+  }
+  if (compatibility.status === 'unknown' && !allowUnknown) {
+    throw compatibilityError(
+      'plugin compatibility requires explicit confirmation',
+      'PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED',
+      compatibility,
+    )
+  }
+  return compatibility
 }
 
 function normalizePreserveEnabledNames(value) {
@@ -739,6 +769,7 @@ export class PluginManager {
       if (PROTECTED_PACKAGES.has(parsed.name)) throw new Error(`${parsed.name} is a built-in desktop plugin`)
       const candidate = await this.registry.fetchManifest(parsed.name, requestedVersion(parsed))
       const compatibility = await this.#assess(candidate)
+      enforceCompatibilityAdmission(compatibility, { allowUnknown })
       const spec = `${parsed.name}@${candidate.version}`
       await this.#runPnpm(['store', 'add', spec])
       return Object.freeze({
@@ -789,6 +820,7 @@ export class PluginManager {
           throw new Error(`registry candidate identity does not match ${parsed.spec}`)
         }
         const compatibility = await this.#assess(candidate)
+        enforceCompatibilityAdmission(compatibility, { allowUnknown })
         const integrity = candidate.dist?.integrity
         if (typeof integrity !== 'string' || !SHA512_INTEGRITY_PATTERN.test(integrity)) {
           throw new Error(`${parsed.name}@${candidate.version} does not publish a valid sha512 integrity`)

@@ -292,7 +292,7 @@ test('plugin manager lazily checks only community updates and assesses candidate
   }
 })
 
-test('candidate preparation preloads exact versions and reports compatibility without admission gating', async () => {
+test('candidate preparation enforces compatible, unknown, and incompatible admission', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-prepare-'))
   const calls = []
   let candidate = {
@@ -325,7 +325,12 @@ test('candidate preparation preloads exact versions and reports compatibility wi
       version: '2.1.0',
       peerDependencies: undefined,
     }
-    const unknown = await manager.prepare('@community/example@latest')
+    await assert.rejects(
+      manager.prepare('@community/example@latest'),
+      (error) => error.code === 'PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED'
+        && error.userMessage === '无法确认这个插件与当前版本的兼容性。',
+    )
+    const unknown = await manager.prepare('@community/example@latest', { allowUnknown: true })
     assert.equal(unknown.compatibility.status, 'unknown')
 
     candidate = {
@@ -333,9 +338,12 @@ test('candidate preparation preloads exact versions and reports compatibility wi
       version: '3.0.0',
       engines: { node: '>=25' },
     }
-    const incompatible = await manager.prepare('@community/example@latest')
-    assert.equal(incompatible.compatibility.status, 'incompatible')
-    assert.equal(calls.length, 3)
+    await assert.rejects(
+      manager.prepare('@community/example@latest', { allowUnknown: true }),
+      (error) => error.code === 'PLUGIN_INCOMPATIBLE'
+        && error.userMessage === '这个插件与当前版本不兼容，因此没有安装。',
+    )
+    assert.equal(calls.length, 2)
     await assert.rejects(manager.prepare('@linxin666/dsh-web-ui-all@latest'), /built-in/u)
   } finally {
     await rm(profileDir, { recursive: true, force: true })
@@ -508,7 +516,7 @@ test('prepareMany deduplicates names, resolves every exact candidate, and prefet
   }
 })
 
-test('prepareMany treats compatibility as diagnostic while prefetch failures remain technical errors', async () => {
+test('prepareMany rejects the whole incompatible batch before prefetch and preserves technical errors', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-prepare-many-fail-'))
   let runnerCalls = 0
   try {
@@ -541,13 +549,18 @@ test('prepareMany treats compatibility as diagnostic while prefetch failures rem
         if (runnerError) throw runnerError
       },
     })
-    const prepared = await manager.prepareMany(['@community/failure@2.0.0'])
-    assert.equal(prepared.items[0].compatibility.status, 'incompatible')
-    assert.equal(runnerCalls, 1)
+    await assert.rejects(
+      manager.prepareMany(['@community/failure@2.0.0'], { allowUnknown: true }),
+      { code: 'PLUGIN_INCOMPATIBLE' },
+    )
+    assert.equal(runnerCalls, 0)
     incompatible = false
     runnerError = new Error('store unavailable')
-    await assert.rejects(manager.prepareMany(['@community/failure@2.0.0']), /store unavailable/u)
-    assert.equal(runnerCalls, 2)
+    await assert.rejects(
+      manager.prepareMany(['@community/failure@2.0.0'], { allowUnknown: true }),
+      /store unavailable/u,
+    )
+    assert.equal(runnerCalls, 1)
   } finally {
     await rm(profileDir, { recursive: true, force: true })
   }
