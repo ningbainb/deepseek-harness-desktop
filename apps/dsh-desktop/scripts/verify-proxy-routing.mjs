@@ -27,7 +27,10 @@ async function listen(server) {
 }
 
 async function close(server) {
-  await new Promise((resolveClose) => server.close(() => resolveClose()))
+  await new Promise((resolveClose) => {
+    server.close(() => resolveClose())
+    server.closeAllConnections()
+  })
 }
 
 const targetRequests = []
@@ -180,7 +183,7 @@ try {
       pacScript: `http://127.0.0.1:${input.pacPort}/invalid.pac`,
     })
     const startedAt = Date.now()
-    const request = networkSession.fetch('http://dsh-pac-route.invalid/fail')
+    const request = networkSession.fetch('http://dsh-pac-route.invalid/fail', { signal: AbortSignal.timeout(2_000) })
       .then(() => 'response', () => 'failed')
     const outcome = await Promise.race([
       request,
@@ -204,7 +207,7 @@ try {
     const networkSession = session.fromPartition('dsh-proxy-dns-e2e', { cache: false })
     await networkSession.setProxy({ mode: 'direct' })
     const startedAt = Date.now()
-    const request = networkSession.fetch('http://dsh-dns-route.invalid/fail')
+    const request = networkSession.fetch('http://dsh-dns-route.invalid/fail', { signal: AbortSignal.timeout(2_000) })
       .then(() => 'response', () => 'failed')
     const outcome = await Promise.race([
       request,
@@ -224,7 +227,31 @@ try {
 
   console.log('Desktop Electron proxy routing verified: fixed, bypass, authenticated, PAC recovery, DNS recovery')
 } finally {
-  await electronApp?.close().catch(() => {})
-  await Promise.all([close(target), close(proxy), close(authProxy), close(pac)])
-  await rm(temporary, { recursive: true, force: true })
+  let phase = 'network sessions'
+  let deadline
+  try {
+    await Promise.race([
+      (async () => {
+        console.log(`Closing proxy fixture ${phase}`)
+        if (electronApp) {
+          await electronApp.evaluate(async ({ session }) => {
+            await Promise.all(['routing', 'bypass', 'auth', 'pac', 'dns'].map(kind =>
+              session.fromPartition(`dsh-proxy-${kind}-e2e`, { cache: false }).closeAllConnections()))
+          })
+          phase = 'Electron application'
+          console.log(`Closing proxy fixture ${phase}`)
+          await electronApp.close()
+        }
+        phase = 'HTTP servers'
+        console.log(`Closing proxy fixture ${phase}`)
+        await Promise.all([close(target), close(proxy), close(authProxy), close(pac)])
+        phase = 'temporary data'
+        await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+        console.log('Proxy fixture exited and cleaned up')
+      })(),
+      new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error(
+        `proxy fixture teardown exceeded 30s at ${phase}; fixture retained at ${temporary}`,
+      )), 30_000) }),
+    ])
+  } finally { clearTimeout(deadline) }
 }
