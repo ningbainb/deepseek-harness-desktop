@@ -186,6 +186,20 @@ async function readComposerSelector(page) {
   await menu.waitFor({ state: 'visible', timeout: 30_000 })
   await menu.getByRole('menuitem', { name: /^模型/u }).click()
   await menu.locator('section').first().waitFor({ state: 'visible', timeout: 30_000 })
+  const compact = await menu.evaluate(element => ({
+    width: element.getBoundingClientRect().width,
+    overflowing: [...element.querySelectorAll('section, [role="menuitemradio"]')].some(row => row.scrollWidth > row.clientWidth + 1),
+    descriptions: [...element.querySelectorAll('[class*="description"]')].map(row => row.textContent),
+    floatingPagers: document.querySelectorAll('[data-dsh-turn-navigator]').length,
+  }))
+  assert.ok(compact.width <= 301, JSON.stringify(compact))
+  assert.equal(compact.overflowing, false, JSON.stringify(compact))
+  assert.ok(compact.descriptions.every(text => text === '当前供应商已禁用，请选择其他模型。'), JSON.stringify(compact))
+  assert.equal(compact.floatingPagers, 0)
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    await mkdir(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS, { recursive: true })
+    await page.screenshot({ path: join(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS, 'compact-model-menu.png') })
+  }
   const sections = await menu.locator('section').evaluateAll((items) => items.map((section) => ({
     label: section.getAttribute('aria-label')
       || section.querySelector('[class*="providerTitle"] span')?.textContent?.trim()
@@ -316,5 +330,5 @@ try {
   throw error
 } finally {
   await app?.close()
-  await rm(temporary, { recursive: true, force: true })
+  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
 }

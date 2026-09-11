@@ -366,28 +366,6 @@ async function conversationGeometry(page) {
   })
 }
 
-async function navigatorState(page) {
-  return page.evaluate(() => {
-    const scroll = document.querySelector('[data-conversation-scroll]')
-    const turns = [...document.querySelectorAll('[data-chat-flow-kind="user"]')]
-    const nav = document.querySelector('[data-dsh-turn-navigator]')
-    const counter = nav?.querySelector('[data-role="counter"]')
-    if (!(scroll instanceof HTMLElement) || !(nav instanceof HTMLElement) || !(counter instanceof HTMLElement)) {
-      throw new Error('conversation navigator is unavailable')
-    }
-    const scrollRect = scroll.getBoundingClientRect()
-    return {
-      counter: counter.textContent,
-      scrollTop: scroll.scrollTop,
-      scrollHeight: scroll.scrollHeight,
-      clientHeight: scroll.clientHeight,
-      turnOffsets: turns.map(turn => turn.getBoundingClientRect().top - scrollRect.top - scroll.clientTop),
-      nextDisabled: nav.querySelector('[data-role="next"]')?.disabled,
-      bottomDisabled: nav.querySelector('[data-role="bottom"]')?.disabled,
-    }
-  })
-}
-
 async function assertDarkReadability(page) {
   await page.evaluate(() => {
     document.body.setAttribute('data-ds-dark-theme', '')
@@ -410,15 +388,14 @@ async function assertDarkReadability(page) {
       const b = luminance(parseRgb(background))
       return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
     }
-    const counter = document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')
-    const navigator = document.querySelector('[data-dsh-turn-navigator]')
-    const button = navigator?.querySelector('button')
-    if (!(counter instanceof HTMLElement) || !(navigator instanceof HTMLElement) || !(button instanceof HTMLElement)) {
-      throw new Error('navigator counter or button is unavailable')
+    const label = document.querySelector('[role="treeitem"]')
+    if (!(label instanceof HTMLElement)) throw new Error('sidebar label unavailable')
+    const style = getComputedStyle(label)
+    let background = 'rgb(24, 24, 24)'
+    for (let node = label; node; node = node.parentElement) {
+      const color = getComputedStyle(node).backgroundColor
+      if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') { background = color; break }
     }
-    const style = getComputedStyle(counter)
-    const navigatorStyle = getComputedStyle(navigator)
-    const buttonStyle = getComputedStyle(button)
     const rows = [...document.querySelectorAll('[role="treeitem"]')]
       .filter(row => row instanceof HTMLElement && row.getClientRects().length > 0)
       .map(row => {
@@ -435,19 +412,15 @@ async function assertDarkReadability(page) {
         && current.top < previous.bottom - 1) overlaps.push({ previous, current })
     }
     return {
-      contrast: contrast(style.color, style.backgroundColor),
+      contrast: contrast(style.color, background),
       color: style.color,
-      background: style.backgroundColor,
-      navigatorPosition: navigatorStyle.position,
-      buttonWidth: buttonStyle.width,
-      buttonHeight: buttonStyle.height,
+      background,
+      fallbackCount: document.querySelectorAll('[data-dsh-turn-navigator]').length,
       overlaps,
     }
   })
-  assert.ok(state.contrast >= 3, `dark navigator counter contrast is too low: ${JSON.stringify(state)}`)
-  assert.equal(state.navigatorPosition, 'absolute', JSON.stringify(state))
-  assert.equal(state.buttonWidth, '28px', JSON.stringify(state))
-  assert.equal(state.buttonHeight, '28px', JSON.stringify(state))
+  assert.ok(state.contrast >= 3, `dark sidebar label contrast is too low: ${JSON.stringify(state)}`)
+  assert.equal(state.fallbackCount, 0, 'Desktop never overlays the removed floating pager')
   assert.deepEqual(state.overlaps, [], `visible sidebar rows overlap: ${JSON.stringify(state.overlaps)}`)
   return state
 }
@@ -540,20 +513,12 @@ try {
     }
     await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
   }
-  const navigationBox = nativeTurns ? null : await second.page.locator('[data-dsh-turn-navigator]').boundingBox()
+  assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'legacy and native histories have no floating pager')
   if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
     const screenshots = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS)
     await mkdir(screenshots, { recursive: true })
     await second.page.screenshot({ path: join(screenshots, nativeTurns ? 'conversation-native-navigation.png' : 'conversation-navigation.png') })
   }
-  if (!nativeTurns) {
-    const navigationLayout = await second.page.locator('[data-dsh-turn-navigator]').evaluate(nav => {
-      const style = getComputedStyle(nav)
-      return { pane: nav.parentElement.getBoundingClientRect().toJSON(), offsetParent: nav.offsetParent?.getBoundingClientRect().toJSON(), bottom: style.bottom, inline: nav.style.bottom, position: style.position, direction: style.flexDirection }
-    })
-    assert.ok(navigationBox && navigationBox.y + navigationBox.height <= beforeWheel.composer.top, `turn navigation stays above the composer: ${JSON.stringify({ navigationBox, beforeWheel, navigationLayout })}`)
-  }
-
   const inputScroll = second.page.locator('[data-input-scroll]')
   await inputScroll.hover()
   await second.page.mouse.wheel(0, 900)
@@ -595,54 +560,32 @@ try {
     // Narrow the actual conversation, not a window size that used to imply it.
     await nativeWindow.evaluate(window => window.setSize(1000, 820))
     await second.page.waitForFunction(() => document.querySelector('[data-pane="conversation"]')?.getBoundingClientRect().width < 800)
-    await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'visible' })
     assert.equal(await rail.isVisible(), false, 'DSH hides its native rail in a narrow container')
-    assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 1, 'narrow layout retains one functional fallback')
+    assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'narrow Desktop stays free of the removed pager')
+    await second.page.evaluate(() => { document.querySelector('[data-conversation-scroll]').scrollTop = 0 })
+    await nativeBottom.waitFor({ state: 'visible' })
+    await nativeBottom.click()
+    await second.page.waitForFunction(() => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      return scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
+    })
+
     await nativeWindow.evaluate(window => window.setSize(1700, 820))
     await rail.waitFor({ state: 'visible' })
     await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
   } else {
-    assert.equal((await navigatorState(second.page)).counter, `1/${messageCount}`)
-
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
-    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
-    await second.page.waitForTimeout(450)
-    let navigation = await navigatorState(second.page)
-    assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
-
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="next"]').click()
-    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `3/${messageCount}`)
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="prev"]').click()
-    await second.page.waitForFunction(expected => document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')?.textContent === expected, `2/${messageCount}`)
-    await second.page.waitForTimeout(450)
-    navigation = await navigatorState(second.page)
-    assert.ok(Math.abs(navigation.turnOffsets[1] - 60) <= 5, JSON.stringify(navigation))
-
+    // User-requested removal: the legacy floating pager is not a Desktop
+    // navigation owner. Its standalone-web behavior remains in Vitest.
+    // Check the actual replacement contract: scroll, native bottom, and no
+    // overlay even when opening menus or switching color schemes.
     await nativeBottom.click()
     await second.page.waitForFunction(() => {
       const scroll = document.querySelector('[data-conversation-scroll]')
       return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
     })
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').waitFor({ state: 'hidden' })
-    // Exercise the compatibility path too, without changing any SDK file.
-    await second.page.evaluate(() => { document.querySelector('[data-conversation-scroll]').scrollTop = 0 })
-    await nativeBottom.waitFor({ state: 'visible' })
-    await nativeBottom.evaluate(button => { button.parentElement.style.display = 'none' })
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').waitFor({ state: 'visible' })
-    await second.page.locator('[data-dsh-turn-navigator] [data-role="bottom"]').click()
-    await second.page.waitForFunction(expected => {
-      const scroll = document.querySelector('[data-conversation-scroll]')
-      const counter = document.querySelector('[data-dsh-turn-navigator] [data-role="counter"]')
-      const bottom = document.querySelector('[data-dsh-turn-navigator] [data-role="bottom"]')
-      // The scroll position can settle one renderer frame before the navigator.
-      // Await both observable results, then keep the exact assertions below.
-      return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
-        && counter?.textContent === expected && bottom instanceof HTMLButtonElement && bottom.disabled
-    }, `${messageCount}/${messageCount}`)
-    navigation = await navigatorState(second.page)
-    assert.equal(navigation.counter, `${messageCount}/${messageCount}`)
-    assert.equal(navigation.bottomDisabled, true)
-
+    await second.page.getByRole('button', { name: /工具|Tools/u }).click()
+    assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0)
+    await second.page.keyboard.press('Escape')
     dark = await assertDarkReadability(second.page)
   }
   // The brand logo also has this accessible name; choose the explicit action.
@@ -700,12 +643,14 @@ try {
     emptyConversationHasNoCompatibilityNavigation: true,
     wheelForwardedFromInput: true,
     composerStayedFixed: true,
-    navigatorPreviousNextAndBottom: true,
+    nativeTurnNavigation: nativeTurns,
+    nativeBackToBottom: true,
+    desktopFloatingPagerRemoved: true,
     nativeBottomActionDeduplicated: true,
     emptySessionRoundTrip: true,
     nativeStatsSupplement: nativeTurns,
-    navigationOwner: nativeTurns ? 'native-dsh' : 'desktop-compatibility',
-    darkCounterContrast: dark ? Number(dark.contrast.toFixed(2)) : undefined,
+    navigationOwner: 'native-dsh',
+    darkSidebarContrast: dark ? Number(dark.contrast.toFixed(2)) : undefined,
     sidebarRowsOverlap: dark ? false : undefined,
   }, null, 2))
 } catch (error) {

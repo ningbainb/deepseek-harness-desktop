@@ -882,8 +882,12 @@ export async function startElectronApp(metadata) {
     confirm: confirmManagedGitInstall,
     fetchImpl: marketFetch,
   })
-  const toggleDesktopTerminal = async () => {
+  const toggleDesktopTerminal = async ({ openOnly = false } = {}) => {
     if (terminalSurface && !terminalSurface.disposed) {
+      if (openOnly) {
+        terminalSurface.webContents.focus()
+        return true
+      }
       terminalSurface.dispose()
       return false
     }
@@ -1659,6 +1663,7 @@ export async function startElectronApp(metadata) {
     },
     handleToolAction: (action) => {
       if (action === 'terminal') return toggleDesktopTerminal()
+      if (action === 'terminal-open') return toggleDesktopTerminal({ openOnly: true })
       if (action === 'conversation-import') return createHandoffWindow()
       return createExtensionWindow()
     },

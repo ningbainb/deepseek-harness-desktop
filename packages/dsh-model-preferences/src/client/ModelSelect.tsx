@@ -201,7 +201,6 @@ export function ModelSelect(props: ModelSelectProps) {
     >
       <span className={styles.optionCopy}>
         <span className={styles.modelName}>{option.model.name || option.model.id}</span>
-        {option.model.description !== undefined && <span className={styles.description}>{option.model.description}</span>}
         {option.providerDisabled && <span className={styles.description}>{t('status.providerDisabled')}</span>}
       </span>
       <span className={styles.check} aria-hidden="true">{option.current && <span className={styles.checkmark} />}</span>

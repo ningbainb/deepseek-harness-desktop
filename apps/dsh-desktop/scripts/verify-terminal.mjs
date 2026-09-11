@@ -142,6 +142,11 @@ try {
   assert.ok(browserWindowIdsBefore.includes(embedding.ownerWindowId), 'terminal must stay attached to the existing Desktop window')
   terminal.on('pageerror', (error) => console.error(`terminal renderer error: ${error.message}`))
   await terminal.locator('#terminal-status[data-state="ready"]').waitFor({ state: 'visible', timeout: 20_000 })
+  await startup.evaluate(async () => {
+    await Promise.all([window.dshDesktop.toolAction('terminal-open'), window.dshDesktop.toolAction('terminal-open')])
+  })
+  assert.equal(terminal.isClosed(), false, 'open-only entry must focus, never toggle the existing terminal closed')
+  assert.equal(electronApp.windows().filter(page => page.url().includes('/ui/terminal.html')).length, 1)
   await assertNoVisibleConsoleDescendants(electronApp.process().pid)
   await terminal.locator('.xterm-helper-textarea').focus()
   await terminal.keyboard.type('Write-Output "__DSH_TERMINAL_OK__"')

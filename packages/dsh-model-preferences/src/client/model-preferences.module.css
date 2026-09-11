@@ -59,9 +59,8 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: max-content;
-  min-width: min(240px, calc(100vw - 32px));
-  max-width: min(420px, calc(100vw - 32px));
+  width: min(300px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   max-height: min(360px, calc(100vh - 96px));
   padding: 4px;
   overflow: hidden;
@@ -112,6 +111,8 @@
 }
 .groups {
   min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 .group + .group { margin-top: 4px; }
@@ -131,8 +132,8 @@
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
-  width: auto;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   min-height: 38px;
   padding: 6px 8px;
   border: 0;
@@ -170,8 +171,8 @@
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
-  width: auto;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   height: 40px;
   padding: 0 10px;
   border: 0;

@@ -1,4 +1,5 @@
 import { createExtensionOperationQueue } from './extension-operation-queue.mjs'
+import { presetExportFailureMessage } from './preset-export-view.mjs'
 import {
   communityMarketInstallPresentation,
   selectCommunityMarketPlugins,
@@ -1404,11 +1405,33 @@ restartRuntimeButton.addEventListener('click', () => {
 })
 document.querySelector('#export-preset').addEventListener('click', () => {
   void extensionOperations.run(async () => {
+    const button = document.querySelector('#export-preset')
+    const status = document.querySelector('#preset-export-status')
+    const details = document.querySelector('#preset-export-details')
+    const errorText = document.querySelector('#preset-export-error')
+    const label = button.textContent
+    button.textContent = '正在导出…'
+    status.hidden = false
+    status.dataset.state = 'pending'
+    status.textContent = '请选择保存位置；确认后将校验并导出，请稍候。'
+    details.hidden = true
+    details.open = false
+    errorText.textContent = ''
     try {
       const result = await window.dshDesktop.exportPreset()
-      if (!result.canceled) notify(`Preset 已导出（${result.packages} 个插件，${result.skills} 个技能，跳过 ${result.skipped?.length ?? 0} 项本机或敏感设置）`)
+      status.dataset.state = result.canceled ? 'canceled' : 'success'
+      status.textContent = result.canceled
+        ? '已取消导出，未保存文件。'
+        : `Preset 已保存到所选位置（${result.packages} 个社区插件，${result.skills} 个技能，跳过 ${result.skipped?.length ?? 0} 项本机或敏感设置）。桌面版内置组件由软件提供，无需放入预设。`
+      if (!result.canceled) notify('Preset 已导出，校验通过。')
     } catch (error) {
-      notify(error.message, true)
+      status.dataset.state = 'error'
+      status.textContent = presetExportFailureMessage(error)
+      errorText.textContent = String(error?.message ?? error).slice(0, 2_000)
+      details.hidden = false
+      notify(status.textContent, true)
+    } finally {
+      button.textContent = label
     }
   })
 })

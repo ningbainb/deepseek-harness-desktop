@@ -32,11 +32,27 @@ function rect(top: number, height: number): DOMRect {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   vi.useRealTimers()
   document.body.replaceChildren()
 })
 
 describe('conversation turn navigator', () => {
+  it('never overlays a Desktop conversation, model menu or narrow native rail', async () => {
+    vi.stubGlobal('dshDesktop', { shellContext: { mode: 'advanced' } })
+    document.body.innerHTML = '<main data-pane="conversation"><section data-conversation-scroll><div data-chat-flow-kind="user"></div></section><nav aria-label="轮次导航" hidden><button>1</button><button>2</button></nav></main>'
+    const pane = document.querySelector<HTMLElement>('main')!
+    const dispose = installTurnNavigator()
+    try {
+      expect(pane.querySelector('[data-dsh-turn-navigator]')).toBeNull()
+      pane.insertAdjacentHTML('beforeend', '<div role="menu">Models</div>')
+      window.dispatchEvent(new Event('resize'))
+      await Promise.resolve()
+      expect(pane.querySelector('[data-dsh-turn-navigator]')).toBeNull()
+      expect(pane.querySelector('nav')!.querySelectorAll('button')).toHaveLength(2)
+    } finally { dispose() }
+  })
+
   it('yields only the bottom control to a visible enabled native action and restores it when unavailable', async () => {
     document.body.innerHTML = '<main data-pane="conversation"><section data-conversation-scroll><div data-chat-flow-kind="user"></div></section><aside><button aria-label="回到底部"></button></aside></main>'
     const pane = document.querySelector<HTMLElement>('main')!

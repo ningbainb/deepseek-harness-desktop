@@ -154,7 +154,7 @@ try {
     })(),
     shellContext: window.dshDesktop?.shellContext,
     locationSearch: location.search,
-    sidebarToggles: [...document.querySelectorAll('[data-dsh-panel-host] button')].map((button) => {
+    sidebarToggles: [...document.querySelectorAll('[data-dsh-panel-host] button')].filter(button => !button.closest('[data-dsh-desktop-layout-relocated="true"]')).map((button) => {
       const rect = button.getBoundingClientRect()
       const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
       return {

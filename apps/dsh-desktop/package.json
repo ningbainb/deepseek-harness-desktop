@@ -42,6 +42,7 @@
     "test:task-board-worktree:e2e": "node scripts/verify-task-board-worktree.mjs",
     "test:update-shutdown:e2e": "node scripts/verify-update-shutdown.mjs",
     "test:installer-lifecycle:e2e": "node scripts/verify-installer-lifecycle.mjs",
+    "test:installer-progress:e2e": "node scripts/verify-installer-progress.mjs",
     "test:star-prompt:e2e": "node scripts/verify-star-prompt.mjs",
     "test:regression:e2e": "node scripts/run-regression-e2e.mjs",
     "test:regression:e2e:full": "node scripts/run-regression-e2e.mjs --full",

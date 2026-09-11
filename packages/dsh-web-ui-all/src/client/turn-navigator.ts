@@ -350,12 +350,17 @@ export function hasNativeTurnNavigator(pane: HTMLElement): boolean {
     .some(nav => {
       if (nav.querySelectorAll('button').length < 2) return false
       // DSH hides its rail in narrow conversation containers. A registered
-      // but CSS-hidden rail must not suppress the usable Desktop fallback.
+      // but CSS-hidden rail must not suppress the standalone web fallback.
       return isVisibleControl(nav, pane)
     })
 }
 
 export function installTurnNavigator(): () => void {
+  // Desktop uses the SDK's own navigation. Do not reintroduce a floating
+  // pager in narrow panes, over menus, or when a session has only one turn.
+  // Standalone web deployments retain their legacy compatibility navigator.
+  if ((window as Window & { dshDesktop?: { shellContext?: { mode?: string } } })
+    .dshDesktop?.shellContext?.mode === 'advanced') return () => {}
   ensureStyle()
   let disposeNavigator: (() => void) | undefined
   let currentPane: HTMLElement | undefined

@@ -24,8 +24,8 @@ patchedDependencies:
   '@linxin666/dsh-desktop-launcher@0.2.5': ac7eeea5303d5fd90e338bc19ee9d34bc6bebafb19bd10b0d098708cbf911f63
   '@linxin666/dsh-liangshen@0.2.5': 1aead417e1872c887dbfff48bc1638f2f84e248f1689b73397c2aafb30f106f5
   '@linxin666/dsh-pet@0.2.5': a26b9f8340b17eed227d37b3c2f2bee24e05ac72f77af842b8193cee895d125b
-  '@linxin666/dsh-web-ui-all@0.2.5': af2e78c4fe111d492301543dc10c434520d131e210b22bb20f1cf40b074891d2
-  dsh-better-sidebar@0.14.0: ecc34ebba92c6a7bcfe56d3b45ac931c11960cc1753a074b4169c6651f8ac53a
+  '@linxin666/dsh-web-ui-all@0.2.5': 3b5b2f033a6f4ffd26246c6a1dfb6d2467cb47edd7c6b1546d2b3d094a02a75a
+  dsh-better-sidebar@0.14.0: fac9d89323dc7e7b8947f3d9844c0c1dbf78ef483912fea1153d2d98122c679d
 
 importers:
 
@@ -330,7 +330,7 @@ importers:
         version: link:../../packages/dsh-value-mode
       '@linxin666/dsh-web-ui-all':
         specifier: 0.2.5
-        version: 0.2.5(patch_hash=af2e78c4fe111d492301543dc10c434520d131e210b22bb20f1cf40b074891d2)(d3466ef8c4c11d6bc461bd23997e6a2b)
+        version: 0.2.5(patch_hash=3b5b2f033a6f4ffd26246c6a1dfb6d2467cb47edd7c6b1546d2b3d094a02a75a)(d3466ef8c4c11d6bc461bd23997e6a2b)
       '@ningbainb/dsh-chat-artifacts':
         specifier: workspace:*
         version: link:../../packages/dsh-chat-artifacts
@@ -12648,7 +12648,7 @@ snapshots:
     transitivePeerDependencies:
       - react
 
-  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=af2e78c4fe111d492301543dc10c434520d131e210b22bb20f1cf40b074891d2)(d3466ef8c4c11d6bc461bd23997e6a2b)':
+  '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=3b5b2f033a6f4ffd26246c6a1dfb6d2467cb47edd7c6b1546d2b3d094a02a75a)(d3466ef8c4c11d6bc461bd23997e6a2b)':
     dependencies:
       '@linxin666/dsh-chat-recovery': 0.2.5(patch_hash=21d4309825eeee6710c22af349c746b9bff607046b05cd508813ccd858a2b9fe)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-client-ui-aionui-panel': link:packages/dsh-aionui-panel
@@ -12666,7 +12666,7 @@ snapshots:
       '@linxin666/dsh-skins': 0.2.5(react@18.3.1)
       '@linxin666/dsh-ssh': link:packages/dsh-ssh
       '@linxin666/dsh-tool-describe-image': link:packages/dsh-tool-describe-image
-      dsh-better-sidebar: 0.14.0(patch_hash=ecc34ebba92c6a7bcfe56d3b45ac931c11960cc1753a074b4169c6651f8ac53a)(d3466ef8c4c11d6bc461bd23997e6a2b)
+      dsh-better-sidebar: 0.14.0(patch_hash=fac9d89323dc7e7b8947f3d9844c0c1dbf78ef483912fea1153d2d98122c679d)(d3466ef8c4c11d6bc461bd23997e6a2b)
     transitivePeerDependencies:
       - '@deepseek-ai/cordis'
       - '@deepseek-ai/dsh-agent'
@@ -14289,7 +14289,7 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  dsh-better-sidebar@0.14.0(patch_hash=ecc34ebba92c6a7bcfe56d3b45ac931c11960cc1753a074b4169c6651f8ac53a)(d3466ef8c4c11d6bc461bd23997e6a2b):
+  dsh-better-sidebar@0.14.0(patch_hash=fac9d89323dc7e7b8947f3d9844c0c1dbf78ef483912fea1153d2d98122c679d)(d3466ef8c4c11d6bc461bd23997e6a2b):
     dependencies:
       '@codemirror/commands': 6.11.0
       '@codemirror/lang-cpp': 6.0.3

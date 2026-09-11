@@ -707,9 +707,10 @@ export function registerExtensionIpc({
   handleExtension('extensions:preset-export', async () => {
     if (presetService === undefined) throw new Error('preset service is unavailable')
     const result = await dialog.showSaveDialog(getWindow(), {
-      title: '导出 Desktop Preset',
+      title: '导出当前环境预设',
+      buttonLabel: '保存预设',
       defaultPath: `deepseek-harness-${new Date().toISOString().slice(0, 10)}.dshpreset`,
-      filters: [{ name: 'DeepSeek Harness Preset', extensions: ['dshpreset'] }],
+      filters: [{ name: 'DeepSeek Harness 环境预设', extensions: ['dshpreset'] }],
     })
     if (result.canceled || !result.filePath) return Object.freeze({ canceled: true })
     const exported = await presetService.exportFile(result.filePath)

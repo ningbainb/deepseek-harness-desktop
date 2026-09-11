@@ -62,7 +62,7 @@ diff --git a/lib/client.js b/lib/client.js
 index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb162d4c01 100644
 --- a/lib/client.js
 +++ b/lib/client.js
-@@ -4,6 +4,375 @@ window.__ModuleLoader__.load({
+@@ -4,6 +4,376 @@ window.__ModuleLoader__.load({
  		var module = { exports: {} };
  		var exports = module.exports;
  		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
@@ -388,6 +388,7 @@ index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb
 +			});
 +		}
 +		function installTurnNavigator() {
++			if (window.dshDesktop?.shellContext?.mode === "advanced") return () => {};
 +			ensureStyle();
 +			let disposeNavigator;
 +			let currentPane;
@@ -438,7 +439,7 @@ index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb
  		//#region src/client/index.ts
  		/** Column shims: element selector → attribute to stamp. */
  		const COLUMN_SHIMS = [
-@@ -11,6 +380,28 @@ window.__ModuleLoader__.load({
+@@ -11,6 +381,28 @@ window.__ModuleLoader__.load({
  			["[class*=\"centerCol\"]", "data-pane=\"conversation\""],
  			["[class*=\"detailsCol\"]", "data-pane=\"details\""]
  		];
@@ -467,7 +468,7 @@ index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb
  		/** One pass over the current DOM. Returns false once every stamp is already in place. */
  		function applyShims() {
  			let changed = false;
-@@ -24,11 +415,40 @@ window.__ModuleLoader__.load({
+@@ -24,11 +416,40 @@ window.__ModuleLoader__.load({
  					changed = true;
  				}
  			}
@@ -509,7 +510,7 @@ index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb
  			return changed;
  		}
  		/**
-@@ -60,13 +480,28 @@ window.__ModuleLoader__.load({
+@@ -60,13 +481,28 @@ window.__ModuleLoader__.load({
  				const observer = new MutationObserver(schedulePass);
  				observer.observe(document.body, {
  					childList: true,

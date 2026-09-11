@@ -55,7 +55,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "c759b8a40cb0f9a2a4c006f7f30af49932ada7eb7b9c56b65fa004cf87663e32"
+          "sha256": "cfd4fa53f047eb84fdd818b762d12b643db70f0591c218b90045561f9edfce6b"
         },
         "slots": [
           "conversation.composer.dock",

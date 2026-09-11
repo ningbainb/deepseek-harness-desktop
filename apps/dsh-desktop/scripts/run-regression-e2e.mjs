@@ -117,6 +117,11 @@ const CORE_SUITES = [
     args: [],
   },
   {
+    name: 'Real Preset Export, Visible Feedback & Retry',
+    script: 'scripts/verify-preset-export.mjs',
+    args: [],
+  },
+  {
     name: 'Direct-Start Matrix & Repair Unit Integration',
     script: '--test',
     args: [
@@ -126,6 +131,7 @@ const CORE_SUITES = [
       'test/legacy-session-backend.test.mjs',
       'test/pet-client-polling.test.mjs',
       'test/dock-settings-fixture.test.mjs',
+      'test/panel-layout-menu.test.mjs',
       'test/desktop-ingress.test.mjs',
       'test/runtime-presentation.test.mjs',
       'test/runtime-startup-timing.test.mjs',

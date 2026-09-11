@@ -162,7 +162,33 @@ function Assert-InstallBackup([object] $install) {
 
 function Remove-RegistryEntries([object[]] $entries) {
   foreach ($entry in $entries) {
-    Remove-Item -LiteralPath ([string] $entry.providerPath) -Recurse -Force -ErrorAction SilentlyContinue
+    $path = [string] $entry.providerPath
+    if (Test-Path -LiteralPath $path) {
+      # Do not fall through to the legacy uninstaller with stale registration.
+      Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
+      if (Test-Path -LiteralPath $path) { throw 'previous install registration is still present' }
+    }
+  }
+}
+
+function Move-InstallToBackup([object] $install) {
+  $wait = [Diagnostics.Stopwatch]::StartNew()
+  while ($true) {
+    try {
+      [System.IO.Directory]::Move($install.Root, $install.Backup)
+      return
+    } catch {
+      $failure = $_.Exception
+      while ($null -ne $failure.InnerException) { $failure = $failure.InnerException }
+      $win32Code = $failure.HResult -band 0xffff
+      # File probes miss directory handles and nested DLLs. Only sharing/lock
+      # violations are transient; permissions and other failures stop promptly.
+      if ($win32Code -notin @(32, 33) -or $wait.ElapsedMilliseconds -ge 5000) {
+        throw "upgrade-directory-stage-failed code=$win32Code root=$($install.Root): $($failure.Message)"
+      }
+      Write-Output "upgrade-directory-stage-retry code=$win32Code"
+      Start-Sleep -Milliseconds 200
+    }
   }
 }
 
@@ -415,7 +441,7 @@ function Begin-Transaction {
   try {
     foreach ($rawInstall in $installPlans) {
       $install = Assert-InstallBackup $rawInstall
-      [System.IO.Directory]::Move($install.Root, $install.Backup)
+      Move-InstallToBackup $install
       Write-Output "upgrade-install-staged root=$($install.Root)"
     }
     Remove-RegistryEntries @($registryJournal)

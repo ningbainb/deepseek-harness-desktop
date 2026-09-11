@@ -31,7 +31,7 @@ const HELP_ACTIONS = new Set([
   'privacy',
   'updates',
 ])
-const TOOL_ACTIONS = new Set(['extensions', 'terminal', 'conversation-import'])
+const TOOL_ACTIONS = new Set(['extensions', 'terminal', 'terminal-open', 'conversation-import'])
 const DOCK_DISMISS_REASONS = new Set(['close', 'escape', 'clicked'])
 const WINDOW_CHROME_THEMES = new Set(['light', 'dark'])
 const UPDATE_PHASES = new Set(['idle', 'checking', 'downloading', 'installing', 'current', 'ready', 'unavailable', 'error'])

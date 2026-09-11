@@ -7,6 +7,8 @@ import YAML from 'yaml'
 
 import { createPresetBuffer, readPresetFile } from '../src/presets/preset-archive.mjs'
 import { PresetService } from '../src/presets/preset-service.mjs'
+import { PluginManager } from '../src/extensions/plugins.mjs'
+import { DESKTOP_REPAIR_BUNDLE, ensureDesktopProfile } from '../src/profile.mjs'
 
 const packageLock = Object.freeze({
   name: '@community/review',
@@ -153,6 +155,80 @@ test('preset export creates a validated archive without secret values', async ()
     assert.deepEqual(parsed.manifest.requiredSecrets, [])
     assert.deepEqual(parsed.packages, [packageLock])
     assert.deepEqual(parsed.settings, { language: 'zh-CN' })
+  } finally {
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+test('real managed Desktop profile exports offline without a pnpm lockfile, including the repair component', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-preset-managed-'))
+  try {
+    const { profileDir, manifest } = await ensureDesktopProfile({ dshHome })
+    assert.ok(manifest.dependencies[DESKTOP_REPAIR_BUNDLE], 'exercise the bundled repair component')
+    await assert.rejects(readFile(join(profileDir, 'pnpm-lock.yaml')), { code: 'ENOENT' })
+    const originalManifest = await readFile(join(profileDir, 'package.json'))
+    await writeFile(join(dshHome, 'settings.yaml'), 'language: zh-CN\nui:\n  apiToken: must-not-export\n')
+    const manager = new PluginManager({
+      profileDir,
+      runner: assert.fail,
+      registry: { fetchManifest: assert.fail },
+    })
+    const service = new PresetService({
+      dshHome, desktopVersion: '3.5.0', runtimeVersion: '0.1.5-rc.1',
+      pluginManager: manager, runtimeProvider: runtimeProvider(),
+    })
+    const output = join(dshHome, '导出目录', '当前环境.dshpreset')
+    const result = await service.exportFile(output)
+    const parsed = await readPresetFile(output)
+    assert.equal(result.packages, 0, 'bundled components are supplied by Desktop, not community packages')
+    assert.deepEqual(parsed.packages, [])
+    assert.deepEqual(parsed.settings, { language: 'zh-CN' })
+    assert.deepEqual(await readFile(join(profileDir, 'package.json')), originalManifest)
+    await assert.rejects(readFile(join(profileDir, 'pnpm-lock.yaml')), { code: 'ENOENT' })
+    await assert.rejects(readFile(join(profileDir, 'desktop-plugins.lock.json')), { code: 'ENOENT' })
+    const preview = await service.previewFile(output)
+    assert.equal(preview.trust.integrityVerified, true)
+    assert.deepEqual(preview.packages, [])
+    assert.deepEqual(preview.settings, ['language'])
+  } finally {
+    await rm(dshHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  }
+})
+
+test('real community plugin export retains exact lock integrity and preserves the old output on failure', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-preset-community-'))
+  try {
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    const packageDir = join(profileDir, 'node_modules', '@community', 'review')
+    await mkdir(packageDir, { recursive: true })
+    await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dependencies: { [packageLock.name]: '^2.0.0' } }))
+    await writeFile(join(packageDir, 'package.json'), JSON.stringify({ name: packageLock.name, version: packageLock.version }))
+    const manager = new PluginManager({ profileDir, runner: assert.fail, registry: { fetchManifest: assert.fail } })
+    const service = new PresetService({
+      dshHome, desktopVersion: '3.5.0', runtimeVersion: '0.1.5-rc.1',
+      pluginManager: manager, runtimeProvider: runtimeProvider(),
+    })
+    const output = join(dshHome, 'existing.dshpreset')
+    await writeFile(output, 'previous export')
+    await assert.rejects(service.exportFile(output), /lockfile is required/u)
+    assert.equal(await readFile(output, 'utf8'), 'previous export')
+    const lockPath = join(profileDir, 'pnpm-lock.yaml')
+    await writeFile(lockPath, YAML.stringify({ packages: {
+      [`${packageLock.name}@1.0.0`]: { resolution: { integrity: packageLock.integrity } },
+    } }))
+    await assert.rejects(service.exportFile(output), /integrity is unavailable/u)
+    assert.equal(await readFile(output, 'utf8'), 'previous export')
+    await writeFile(lockPath, 'packages: [invalid')
+    await assert.rejects(service.exportFile(output), /lockfile is invalid/u)
+    assert.equal(await readFile(output, 'utf8'), 'previous export')
+    const lock = YAML.stringify({ packages: {
+      [`${packageLock.name}@${packageLock.version}(peer@1.0.0)`]: { resolution: { integrity: packageLock.integrity } },
+    } })
+    await writeFile(lockPath, lock)
+    const exported = await service.exportFile(output)
+    assert.equal(exported.packages, 1)
+    assert.deepEqual((await readPresetFile(output)).packages, [packageLock])
+    assert.equal(await readFile(lockPath, 'utf8'), lock, 'export never repairs or regenerates package locks')
   } finally {
     await rm(dshHome, { recursive: true, force: true })
   }

@@ -8,6 +8,7 @@
       "package": "@linxin666/dsh-web-ui-all",
       "path": "packages/dsh-web-ui-all",
       "description": "聚合包自身的桌面布局兼容与会话导航插件",
+      "features": ["desktop-native-navigation-without-floating-fallback", "standalone-web-navigation-preserved"],
       "patchId": "ui-web-ui-compat",
       "requiredInAggregate": false,
       "requiredInCordisPatch": true,
@@ -51,7 +52,8 @@
       "features": [
         "menu-open-does-not-reload",
         "recovery-event-refresh-throttle",
-        "same-session-broadcast-refresh"
+        "same-session-broadcast-refresh",
+        "compact-name-only-model-menu"
       ]
     },
     {
@@ -232,7 +234,11 @@
         "native-browser-split-float-dock-retain-independent-drafts",
         "native-browser-cross-session-close-and-history-isolation",
         "native-browser-close-owner-with-legacy-and-keyboard-fallback",
-        "incremental-modal-layer-tracking-with-document-lifecycle"
+        "incremental-modal-layer-tracking-with-document-lifecycle",
+        "native-panel-control-with-tools-layout-menu",
+        "compatibility-panels-retain-handlers-tabs-and-terminal-lifetime",
+        "bottom-panel-measures-current-frame-in-empty-conversations",
+        "layout-menu-restores-original-controls-on-contract-loss"
       ]
     },
     {
@@ -246,7 +252,7 @@
       "name": "长对话固定输入区、滚轮转发与轮次导航",
       "uiSelector": "nav[aria-label=\"轮次导航\"], nav[aria-label=\"Turn navigation\"], [data-dsh-turn-navigator]",
       "e2eScript": "scripts/verify-conversation-scroll.mjs",
-      "features": ["native-turn-navigation-first", "legacy-navigation-fallback", "compact-navigation-above-composer", "shipped-aggregate-navigation-parity", "empty-conversation-no-idle-navigation", "navigation-disposal-clears-pending-scroll", "native-bottom-action-deduplication", "navigation-remount-and-empty-session-roundtrip", "offscreen-message-layout-with-native-content-retained", "bounded-native-jump-settling-yields-to-reader"]
+      "features": ["native-turn-navigation-first", "desktop-floating-pager-removed-by-user-request", "standalone-web-legacy-navigation-preserved", "shipped-aggregate-navigation-parity", "empty-conversation-no-idle-navigation", "navigation-disposal-clears-pending-scroll", "native-bottom-action-deduplication", "navigation-remount-and-empty-session-roundtrip", "offscreen-message-layout-with-native-content-retained", "bounded-native-jump-settling-yields-to-reader"]
     },
     {
       "id": "directory-picker",
@@ -283,6 +289,20 @@
       ]
     },
     {
+      "id": "preset-export",
+      "name": "真实环境预设导出与结果反馈",
+      "e2eScript": "scripts/verify-preset-export.mjs",
+      "features": [
+        "offline-managed-profile-export-without-pnpm-lock",
+        "bundled-repair-component-excluded-from-community-lock",
+        "community-plugin-exact-integrity-preserved",
+        "persistent-localized-export-result",
+        "visible-toast-within-viewport",
+        "cancel-preserves-existing-file",
+        "export-failure-and-retry-through-real-ipc"
+      ]
+    },
+    {
       "id": "upgrade-and-session-recovery",
       "name": "安装事务提速与历史会话格式恢复",
       "e2eScript": "scripts/verify-package.mjs",
@@ -294,6 +314,13 @@
         "stable-installer-transaction-helper",
         "compiled-nsis-commit-and-failure-callback-regression",
         "bounded-post-exit-replacement-file-release",
+        "bounded-directory-backup-sharing-lock-retry",
+        "old-uninstaller-failure-invokes-rollback",
+        "installer-stage-log-survives-abort",
+        "installer-honest-stage-progress-and-elapsed-time",
+        "installer-progress-observer-cannot-change-install-result",
+        "installer-diagnostic-write-failure-does-not-block-install",
+        "stale-registration-with-missing-uninstaller-recovery",
         "verified-rollback-result-messaging",
         "noncommitted-upgrade-rollback",
         "plaintext-zstd-session-recovery",
@@ -323,7 +350,7 @@
       "id": "terminal",
       "name": "内置 ConPTY / xterm 终端侧边栏",
       "e2eScript": "scripts/verify-terminal.mjs",
-      "features": ["panel-visible-before-git-inspection", "cancel-pending-terminal-without-late-shell", "terminal-restart-generation-isolation", "terminal-renderer-loss-reclaims-panel", "terminal-initialization-rollback", "terminal-single-ipc-owner"]
+      "features": ["panel-visible-before-git-inspection", "cancel-pending-terminal-without-late-shell", "terminal-restart-generation-isolation", "terminal-renderer-loss-reclaims-panel", "terminal-initialization-rollback", "terminal-single-ipc-owner", "sidebar-terminal-entry-prefers-desktop", "terminal-open-is-idempotent", "web-and-agent-terminal-pty-preserved"]
     },
     {
       "id": "personal-prompt-card",

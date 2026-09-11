@@ -330,8 +330,12 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 
 .plugin-tools p { margin: 0; color: var(--harness-text-secondary); font-size: 11px; }
 .empty { padding: 28px; color: var(--harness-text-tertiary); text-align: center; font-size: 12px; }
 
-.toast { position: fixed; right: 24px; bottom: 24px; z-index: 8; max-width: 460px; padding: 11px 14px; border: 1px solid var(--harness-border-strong); border-radius: 12px; color: var(--harness-text); background: var(--harness-bg); box-shadow: 0 12px 32px rgb(0 0 0 / 12%); }
+.toast { position: fixed; right: 24px; bottom: 24px; z-index: 8; max-width: min(460px, calc(100vw - 48px)); max-height: calc(100vh - 80px); overflow: auto; overflow-wrap: anywhere; padding: 11px 14px; border: 1px solid var(--harness-border-strong); border-radius: 12px; color: var(--harness-text); background: var(--harness-bg); box-shadow: 0 12px 32px rgb(0 0 0 / 12%); }
 .toast.error { border-color: color-mix(in srgb, var(--harness-danger) 42%, transparent); }
+.preset-export-status { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--harness-border); border-radius: 10px; background: var(--harness-bg-subtle); overflow-wrap: anywhere; }
+.preset-export-status[data-state="error"] { border-color: color-mix(in srgb, var(--harness-danger) 42%, transparent); }
+.preset-export-details { margin-top: 8px; color: var(--harness-text-secondary); font-size: 12px; }
+.preset-export-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }
 
 /* --- Desktop Native Plugins & Elevation --- */
 .native-shortcut-banner {

@@ -11,6 +11,7 @@ import { _electron as electron } from 'playwright'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { verifyPanelLayoutMenu } from './panel-layout-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -208,6 +209,7 @@ try {
   await initialNativePanel.waitFor({ state: 'hidden' })
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'collapsing the default native surface keeps compatibility tools inactive')
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-default.png') })
+  await verifyPanelLayoutMenu(page, resolve(appDir, '../../.tmp/interaction-qa'))
   // Explicitly enter the preserved tools before testing their existing controls.
   await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
   await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })

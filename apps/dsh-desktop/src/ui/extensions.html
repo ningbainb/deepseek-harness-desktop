@@ -196,6 +196,11 @@
           <button type="button" class="primary" id="export-preset">导出当前环境为 Preset</button>
           <button type="button" class="secondary" id="select-preset">选择并导入 Preset…</button>
         </div>
+        <div id="preset-export-status" class="preset-export-status" role="status" aria-live="polite" hidden></div>
+        <details id="preset-export-details" class="preset-export-details" hidden>
+          <summary>技术详情（反馈时请先检查是否包含隐私信息）</summary>
+          <pre id="preset-export-error"></pre>
+        </details>
         <div id="preset-plan" class="preset-plan" hidden>
           <div class="preset-summary">
             <div>
@@ -280,7 +285,7 @@
       </section>
       </main>
     </div>
-    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="./extensions.mjs"></script>
   </body>
 </html>

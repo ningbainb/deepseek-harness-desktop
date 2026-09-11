@@ -9,8 +9,26 @@ InstallDir "${TEST_INSTALL}"
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
 !insertmacro customHeader
 
+Function CheckOldUninstallerFixture
+  !insertmacro customUnInstallCheck
+FunctionEnd
+
 Section
+  !ifdef TEST_UNWRITABLE_LOG
+    ; An existing directory cannot be opened as a log file.
+    StrCpy $DshInstallerLogPath "$TEMP"
+  !endif
   !insertmacro customCheckAppRunning
+  !ifdef TEST_UNINSTALL_FAILURE
+    ClearErrors
+    StrCpy $R0 41
+    Call CheckOldUninstallerFixture
+  !endif
+  !ifdef TEST_UNINSTALL_LAUNCH_FAILURE
+    StrCpy $R0 0
+    SetErrors
+    Call CheckOldUninstallerFixture
+  !endif
   ; Fault injection: neither the early plugin helper nor the stable helper
   ; survives until the next phase. Production macros must re-stage it.
   Delete "$PLUGINSDIR\installer-upgrade-transaction.ps1"

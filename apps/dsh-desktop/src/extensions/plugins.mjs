@@ -10,6 +10,7 @@ import {
   BUILTIN_BUNDLES,
   BUILTIN_RUNTIME_PACKAGES,
   DESKTOP_PLUGIN_COMPAT_PACKAGES,
+  DESKTOP_REPAIR_BUNDLE,
   DESKTOP_SUPPORT_PACKAGES,
   materializeFilesystemPath,
   packagePathSegments,
@@ -627,23 +628,27 @@ export class PluginManager {
   }
 
   async portablePackages() {
-    await this.queue
-    const manifest = await readManifest(this.profileDir)
-    const lock = await readOptionalFile(join(this.profileDir, 'pnpm-lock.yaml'))
-    if (lock === undefined) throw new Error('desktop profile lockfile is required for preset export')
-    const names = Object.keys(manifest.dependencies ?? {})
-      .filter((name) => !PROTECTED_PACKAGES.has(name))
-      .toSorted()
-    const installed = await readInstalledManifests(this.profileDir, names)
-    return Object.freeze(names.map((name) => {
-      const version = installed.get(name)?.version
-      if (typeof version !== 'string' || semver.valid(version) === null) {
-        throw new Error(`installed version is unavailable for ${name}`)
-      }
-      const integrity = lockfileIntegrity(lock, name, version)
-      if (integrity === undefined) throw new Error(`lockfile integrity is unavailable for ${name}@${version}`)
-      return Object.freeze({ name, version, integrity })
-    }))
+    return this.#enqueue(async () => {
+      const manifest = await readManifest(this.profileDir)
+      const names = Object.keys(manifest.dependencies ?? {})
+        .filter((name) => !PROTECTED_PACKAGES.has(name) && name !== DESKTOP_REPAIR_BUNDLE)
+        .toSorted()
+      // Managed Desktop packages (including repair) are linked from the app.
+      // A normal built-in-only profile has no pnpm lock and needs no registry I/O.
+      if (names.length === 0) return Object.freeze([])
+      const lock = await readOptionalFile(join(this.profileDir, 'pnpm-lock.yaml'))
+      if (lock === undefined) throw new Error('desktop profile lockfile is required for preset export')
+      const installed = await readInstalledManifests(this.profileDir, names)
+      return Object.freeze(names.map((name) => {
+        const version = installed.get(name)?.version
+        if (typeof version !== 'string' || semver.valid(version) === null) {
+          throw new Error(`installed version is unavailable for ${name}`)
+        }
+        const integrity = lockfileIntegrity(lock, name, version)
+        if (integrity === undefined) throw new Error(`lockfile integrity is unavailable for ${name}@${version}`)
+        return Object.freeze({ name, version, integrity })
+      }))
+    })
   }
 
   captureSnapshot() {

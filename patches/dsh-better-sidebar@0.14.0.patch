@@ -1,5 +1,5 @@
 diff --git a/lib/client-editor.js b/lib/client-editor.js
-index 11cb963d54054e847a5b83d8b8222da13fc9630a..da7911ea4afbadf282704d3593b4015e388c267f 100644
+index 11cb963d54054e847a5b83d8b8222da13fc9630a..4dcb860e45c8b101146de143c022127cec7d3ec5 100644
 --- a/lib/client-editor.js
 +++ b/lib/client-editor.js
 @@ -33599,11 +33599,10 @@ globalThis.__dshChunks__["editor"] = (require) => {
@@ -29,10 +29,27 @@ index 11cb963d54054e847a5b83d8b8222da13fc9630a..da7911ea4afbadf282704d3593b4015e
  	/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  	const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
 diff --git a/lib/client-registry.js b/lib/client-registry.js
-index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca414b6870 100644
+index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..19773f23d9bc435ec8654e63cf8a994837370fc1 100644
 --- a/lib/client-registry.js
 +++ b/lib/client-registry.js
-@@ -1335,11 +1335,10 @@ window.__ModuleLoader__.load({
+@@ -1162,6 +1162,16 @@ window.__ModuleLoader__.load({
+ 			const openTab = (seed, scope) => {
+ 				if (!isTabEnabled(seed.type)) {
+ 					console.warn(`[dsh-better-sidebar] tab type "${seed.type}" is disabled in the side card settings`);
+ 					return;
+ 				}
++				// UI terminal entries belong to Desktop; web and agent PTYs stay independent.
++				const desktop = window.dshDesktop;
++				if (seed.type === "terminal" && !seed.id?.startsWith("agent:") &&
++					desktop?.shellContext?.mode === "advanced" && typeof desktop.toolAction === "function" &&
++					(scope === void 0 || scope.sessionId === store.getSnapshot().sessionId)) {
++					void Promise.resolve().then(() => desktop.toolAction("terminal-open")).catch(() => {
++						window.alert("无法打开桌面终端，请通过“工具 > 内置终端”重试。");
++					});
++					return;
++				}
+ 				const descriptor = tabs.get(seed.type);
+@@ -1335,11 +1345,10 @@ window.__ModuleLoader__.load({
  		* CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
  		* external and the loader resolves them here). A superset is safe: the
  		* require only answers what the chunk actually asks for. The shell's static
@@ -48,7 +65,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca
  		*/
  		const CHUNK_EXTERNALS = [
  			"react",
-@@ -1348,8 +1347,7 @@ window.__ModuleLoader__.load({
+@@ -1348,8 +1357,7 @@ window.__ModuleLoader__.load({
  			"react-dom/client",
  			"cordis",
  			"@deepseek-ai/dsh-client-ui-slots",
@@ -58,7 +75,10 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca
  		];
  		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
-@@ -7384,11 +7382,12 @@ window.__ModuleLoader__.load({
+@@ -6586,1 +6594,1 @@ window.__ModuleLoader__.load({
+-					available: (_ctx, _scope, state) => uiTerminalCount(state) < 3,
++					available: (_ctx, _scope, state) => (window.dshDesktop?.shellContext?.mode === "advanced" && typeof window.dshDesktop.toolAction === "function") || uiTerminalCount(state) < 3,
+@@ -7384,11 +7392,12 @@ window.__ModuleLoader__.load({
  		function parseDesktopEnv() {
  			if (cached !== void 0) return cached;
  			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
@@ -75,7 +95,16 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca
  			cached = {
  				desktop,
  				mode,
-@@ -9921,6 +9920,35 @@ window.__ModuleLoader__.load({
+@@ -7796,7 +7805,7 @@ window.__ModuleLoader__.load({
+ 				let observer;
+ 				const locate = () => {
+ 					if (disposed) return;
+-					const col = document.querySelector("#root [data-slot=\"conversation\"]")?.parentElement;
++					const col = document.querySelector("#root [data-dsh-frame] > [data-pane=\"conversation\"]") ?? document.querySelector("#root [data-slot=\"conversation\"]")?.parentElement;
+ 					if (col === void 0) {
+ 						if (centerColRef.current !== null) {
+ 							centerColRef.current = null;
+@@ -9921,6 +9930,35 @@ window.__ModuleLoader__.load({
  			"locale",
  			"modules"
  		];
@@ -111,7 +140,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca
  		/**
  		* Error boundary over the sidebar tree (root scope): a render error in the
  		* sidebar SHELL itself must never blank the page silently — the shared
-@@ -9933,6 +9961,7 @@ window.__ModuleLoader__.load({
+@@ -9933,6 +9971,7 @@ window.__ModuleLoader__.load({
  		* @param ctx - the client cordis context (slots, sessions).
  		*/
  		function apply(ctx) {
@@ -120,10 +149,27 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..422074896db3d5c67ca4118d20e302ca
  			ctx.effect(() => {
  				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
 diff --git a/lib/client.js b/lib/client.js
-index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32656a8e5e 100644
+index 70226f68ea5fcb478844c8366afe621665eeb907..de837f108a01cb061dfe57d16e2701712880b19e 100644
 --- a/lib/client.js
 +++ b/lib/client.js
-@@ -1335,11 +1335,10 @@ window.__ModuleLoader__.load({
+@@ -1162,6 +1162,16 @@ window.__ModuleLoader__.load({
+ 			const openTab = (seed, scope) => {
+ 				if (!isTabEnabled(seed.type)) {
+ 					console.warn(`[dsh-better-sidebar] tab type "${seed.type}" is disabled in the side card settings`);
+ 					return;
+ 				}
++				// UI terminal entries belong to Desktop; web and agent PTYs stay independent.
++				const desktop = window.dshDesktop;
++				if (seed.type === "terminal" && !seed.id?.startsWith("agent:") &&
++					desktop?.shellContext?.mode === "advanced" && typeof desktop.toolAction === "function" &&
++					(scope === void 0 || scope.sessionId === store.getSnapshot().sessionId)) {
++					void Promise.resolve().then(() => desktop.toolAction("terminal-open")).catch(() => {
++						window.alert("无法打开桌面终端，请通过“工具 > 内置终端”重试。");
++					});
++					return;
++				}
+ 				const descriptor = tabs.get(seed.type);
+@@ -1335,11 +1345,10 @@ window.__ModuleLoader__.load({
  		* CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
  		* external and the loader resolves them here). A superset is safe: the
  		* require only answers what the chunk actually asks for. The shell's static
@@ -139,7 +185,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32
  		*/
  		const CHUNK_EXTERNALS = [
  			"react",
-@@ -1348,8 +1347,7 @@ window.__ModuleLoader__.load({
+@@ -1348,8 +1357,7 @@ window.__ModuleLoader__.load({
  			"react-dom/client",
  			"cordis",
  			"@deepseek-ai/dsh-client-ui-slots",
@@ -149,7 +195,10 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32
  		];
  		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
-@@ -7384,11 +7382,12 @@ window.__ModuleLoader__.load({
+@@ -6586,1 +6594,1 @@ window.__ModuleLoader__.load({
+-					available: (_ctx, _scope, state) => uiTerminalCount(state) < 3,
++					available: (_ctx, _scope, state) => (window.dshDesktop?.shellContext?.mode === "advanced" && typeof window.dshDesktop.toolAction === "function") || uiTerminalCount(state) < 3,
+@@ -7384,11 +7392,12 @@ window.__ModuleLoader__.load({
  		function parseDesktopEnv() {
  			if (cached !== void 0) return cached;
  			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
@@ -166,7 +215,16 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32
  			cached = {
  				desktop,
  				mode,
-@@ -9921,6 +9920,35 @@ window.__ModuleLoader__.load({
+@@ -7796,7 +7805,7 @@ window.__ModuleLoader__.load({
+ 				let observer;
+ 				const locate = () => {
+ 					if (disposed) return;
+-					const col = document.querySelector("#root [data-slot=\"conversation\"]")?.parentElement;
++					const col = document.querySelector("#root [data-dsh-frame] > [data-pane=\"conversation\"]") ?? document.querySelector("#root [data-slot=\"conversation\"]")?.parentElement;
+ 					if (col === void 0) {
+ 						if (centerColRef.current !== null) {
+ 							centerColRef.current = null;
+@@ -9921,6 +9930,35 @@ window.__ModuleLoader__.load({
  			"locale",
  			"modules"
  		];
@@ -202,7 +260,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..0ca2bd9499860b1c4e6fa9a15ab55a32
  		/**
  		* Error boundary over the sidebar tree (root scope): a render error in the
  		* sidebar SHELL itself must never blank the page silently — the shared
-@@ -9933,6 +9961,7 @@ window.__ModuleLoader__.load({
+@@ -9933,6 +9971,7 @@ window.__ModuleLoader__.load({
  		* @param ctx - the client cordis context (slots, sessions).
  		*/
  		function apply(ctx) {
@@ -275,7 +333,7 @@ index eebd7c2fffe354690443b595238492e4c70b9a6c..9a2eccdcf13aaddff93ed2a994a6047f
   * Geometry facts the sidebar adapts to (from the Electron runtime):
   * - win32 `advanced` mode draws the window controls in a 32px overlay strip
 diff --git a/package.json b/package.json
-index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..3015363b47e04bc0785f793bf58d03d9a6d5346e 100644
+index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..183da1be563d0d3e05be53f9a4f3260873b9595a 100644
 --- a/package.json
 +++ b/package.json
 @@ -45,9 +45,10 @@
@@ -307,6 +365,23 @@ index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..3015363b47e04bc0785f793bf58d03d9
      "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.8",
      "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.8",
      "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.8",
+diff --git a/src/client/Sidebar.tsx b/src/client/Sidebar.tsx
+index 887e3a34c0e38168faae55fdda33014841667e49..537318740bdc6732ecbbdcc4e660bbe1c85b840d 100644
+--- a/src/client/Sidebar.tsx
++++ b/src/client/Sidebar.tsx
+@@ -435,8 +435,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
+     // a 1px sliver at the viewport's left edge).
+     const locate = (): void => {
+       if (disposed) return
+-      const col = document.querySelector('#root [data-slot="conversation"]')
+-        ?.parentElement as HTMLElement | undefined
++      // DSH 0.1.5 no longer renders the legacy conversation slot wrapper.
++      // Reuse the same frame anchor as layout.css, including empty sessions.
++      const col = document.querySelector<HTMLElement>('#root [data-dsh-frame] > [data-pane="conversation"]')
++        ?? document.querySelector('#root [data-slot="conversation"]')?.parentElement
+       if (col === undefined) {
+         if (centerColRef.current !== null) {
+           centerColRef.current = null
 diff --git a/src/client/chunk-loader.ts b/src/client/chunk-loader.ts
 index 30f0a9afa1297470ae7ed106137f1ee2a03e6152..b33f97065a9bbf2c82b663b91837e4caf0973f63 100644
 --- a/src/client/chunk-loader.ts
@@ -467,3 +542,38 @@ index baeb387e4e68d4e879ebf49f2c105d8c4b112f30..d1beeb168a3dd8bd4e1bda1aee4b4093
      // The structural settings mirror types `schema` as unknown, so the
      // generic is not inferred here; the real service resolves it from the
      // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
+diff --git a/src/client/service.ts b/src/client/service.ts
+--- a/src/client/service.ts
++++ b/src/client/service.ts
+@@ -603,6 +603,20 @@
+       console.warn(`[dsh-better-sidebar] tab type "${seed.type}" is disabled in the side card settings`)
+       return
+     }
++    // UI terminal entries use Desktop's one native surface. Agent terminals
++    // and requests targeting an inactive session keep the plugin's PTY.
++    const desktop = (window as Window & { dshDesktop?: {
++      shellContext?: { mode?: string }
++      toolAction?: (action: string) => Promise<unknown>
++    } }).dshDesktop
++    if (seed.type === 'terminal' && !seed.id?.startsWith('agent:') &&
++      desktop?.shellContext?.mode === 'advanced' && typeof desktop.toolAction === 'function' &&
++      (scope === undefined || scope.sessionId === store.getSnapshot().sessionId)) {
++      void Promise.resolve().then(() => desktop.toolAction!('terminal-open')).catch(() => {
++        window.alert('无法打开桌面终端，请通过“工具 > 内置终端”重试。')
++      })
++      return
++    }
+     const descriptor = tabs.get(seed.type)
+     if (descriptor === undefined) return
+     // A scope targets another session: the open lands in THAT session's
+diff --git a/src/client/builtins/tabs.tsx b/src/client/builtins/tabs.tsx
+--- a/src/client/builtins/tabs.tsx
++++ b/src/client/builtins/tabs.tsx
+@@ -173,1 +173,6 @@
+-      available: (_ctx, _scope, state) => uiTerminalCount(state) < TERMINAL_LIMIT,
++      available: (_ctx, _scope, state) => {
++        const desktop = (window as Window & { dshDesktop?: {
++          shellContext?: { mode?: string }; toolAction?: unknown
++        } }).dshDesktop
++        return (desktop?.shellContext?.mode === 'advanced' && typeof desktop.toolAction === 'function') || uiTerminalCount(state) < TERMINAL_LIMIT
++      },
