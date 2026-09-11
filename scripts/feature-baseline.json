@@ -348,7 +348,9 @@
         "empty-query-guard",
         "tag-and-phrase-ranking",
         "settings-only-memory-entry",
-        "on-demand-memory-advanced-fields"
+        "on-demand-memory-advanced-fields",
+        "bounded-windows-lock-acquisition-retry",
+        "no-replay-after-memory-transaction-start"
       ]
     },
     {

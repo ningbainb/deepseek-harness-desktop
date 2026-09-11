@@ -76,6 +76,13 @@ try {
     throw error
   }
   const rendererEvents = []
+  if (process.argv.includes('--native-layout')) {
+    await electronApp.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.webContents.getURL()))
+      if (!window) throw new Error('native-layout fixture runtime window is missing')
+      window.setSize(1024, 768)
+    })
+  }
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
       rendererEvents.push(`[console:${message.type()}] ${message.text()}`)

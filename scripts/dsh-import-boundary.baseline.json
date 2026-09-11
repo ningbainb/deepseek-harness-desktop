@@ -149,6 +149,7 @@
     "packages/dsh-memory/src/tools.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 1,
     "packages/dsh-memory/src/tools.ts\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
     "packages/dsh-memory/src/tools.ts\u0000static-import\u0000@deepseek-ai/dsh-tools": 1,
+    "packages/dsh-memory/tests/lock-acquisition.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-atomic-write": 1,
     "packages/dsh-mode-switcher/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-locale/client": 1,
     "packages/dsh-mode-switcher/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-conversation/client": 1,
     "packages/dsh-mode-switcher/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-renderer/client": 1,

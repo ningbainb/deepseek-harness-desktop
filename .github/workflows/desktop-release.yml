@@ -127,6 +127,11 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           CSC_NAME: ${{ vars.CSC_NAME }}
+      - name: Select packaged executable for release verification
+        shell: pwsh
+        run: |
+          $packagedExecutable = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          "DSH_DESKTOP_E2E_EXECUTABLE=$packagedExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Verify packaged directory picker
         run: pnpm --filter @deepseek-ai/dsh-desktop test:directory-picker:e2e
       - name: Verify packaged embedded terminal

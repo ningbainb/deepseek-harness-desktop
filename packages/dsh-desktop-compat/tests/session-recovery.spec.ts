@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { constants as zlibConstants, zstdCompress, zstdDecompress } from 'node:zlib'
 
@@ -26,7 +26,7 @@ const legacyHeader = {
   version: 0,
   id: 'legacy-session',
   createdAt: 1,
-  cwd: 'C:\\project',
+  cwd: resolve('project'),
   delegationDepth: 0,
   agentPreset: 'standard',
 }

@@ -254,6 +254,14 @@ test('official Desktop tag releases require signing only when certificate materi
   const directStartGate = workflow.indexOf('- name: Verify direct-start matrix before signing')
   const signedPackage = workflow.indexOf('- name: Package the selected release channel')
   assert.ok(unsignedCandidate >= 0 && unsignedCandidate < directStartGate && directStartGate < signedPackage)
+  const packagedEnvironment = workflow.indexOf('- name: Select packaged executable for release verification')
+  const packagedGate = workflow.indexOf('- name: Verify packaged directory picker')
+  assert.ok(signedPackage < packagedEnvironment && packagedEnvironment < packagedGate,
+    'every post-package gate must receive the freshly built executable')
+  const environmentStep = workflow.slice(packagedEnvironment, packagedGate)
+  assert.match(environmentStep, /Resolve-Path 'apps\/dsh-desktop\/dist\/win-unpacked\/DeepSeek Harness Desktop\.exe'/u)
+  assert.match(environmentStep, /"DSH_DESKTOP_E2E_EXECUTABLE=\$packagedExecutable" \| Out-File -FilePath \$env:GITHUB_ENV/u,
+    'a step-local PowerShell variable does not reach the shutdown verification step')
   assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY: 'false'/u)
   assert.equal(
     desktopPackage.scripts['test:fresh-relaunch:e2e'],

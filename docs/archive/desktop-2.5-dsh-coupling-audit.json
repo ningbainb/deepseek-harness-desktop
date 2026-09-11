@@ -1749,6 +1749,15 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-memory/tests/lock-acquisition.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-atomic-write",
+      "line": 1,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-mode-switcher/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",

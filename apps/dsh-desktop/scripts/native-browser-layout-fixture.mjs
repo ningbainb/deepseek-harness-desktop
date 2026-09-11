@@ -60,8 +60,16 @@ export async function verifyNativeBrowserLayout({ page }) {
   await page.locator('[data-sidebar-right-panel="push"]').waitFor({ state: 'visible' })
   assert.equal(await first.locator('input').inputValue(), 'first layout draft')
   const browserTab = page.locator('[data-sidebar-right-panel="push"]').getByRole('tab').filter({ hasText: /^网页预览$/u })
+  // A narrow native strip scrolls its tabs. boundingBox includes clipped
+  // portions, so raw pointer coordinates alone can start outside the strip.
+  await browserTab.scrollIntoViewIfNeeded()
+  await browserTab.click({ trial: true })
   const tabBox = await browserTab.boundingBox()
   assert.ok(tabBox)
+  assert.equal(await browserTab.evaluate(tab => {
+    const box = tab.getBoundingClientRect()
+    return tab.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+  }), true, 'the drag must start on the visible native tab, not a clipped coordinate')
   await page.mouse.move(tabBox.x + tabBox.width / 2, tabBox.y + tabBox.height / 2)
   await page.mouse.down()
   await page.mouse.move(400, 250, { steps: 18 })

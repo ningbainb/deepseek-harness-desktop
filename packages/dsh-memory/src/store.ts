@@ -74,9 +74,7 @@ export class MemoryStore {
     const filename = this.filenameForPrincipal(principalId)
     await this.ensureRoot()
     await this.ensureOwnerDirectory(principalId)
-    return withFileLock(filename, async () => this.loadUnlocked(filename, principalId), {
-      waitMs: this.lockWaitMs,
-    })
+    return this.withLock(filename, async () => this.loadUnlocked(filename, principalId))
   }
 
   private async loadUnlocked(filename: string, principalId: PrincipalId): Promise<MemorySnapshot> {
@@ -104,14 +102,14 @@ export class MemoryStore {
     assertMemorySnapshot(snapshot, principalId)
     await this.ensureRoot()
     await this.ensureOwnerDirectory(principalId)
-    return withFileLock(filename, async () => {
+    return this.withLock(filename, async () => {
       // Never overwrite an existing document before validating its version.
       // This preserves forward-version data for a newer compatible build and
       // keeps malformed files recoverable through the .corrupt backup.
       await this.loadUnlocked(filename, principalId)
       await this.writeJson(filename, snapshot)
       return normalizeMemorySnapshot(snapshot, principalId)
-    }, { waitMs: this.lockWaitMs })
+    })
   }
 
   async update(
@@ -121,13 +119,39 @@ export class MemoryStore {
     const filename = this.filenameForPrincipal(principalId)
     await this.ensureRoot()
     await this.ensureOwnerDirectory(principalId)
-    return withFileLock(filename, async () => {
+    return this.withLock(filename, async () => {
       const current = await this.loadUnlocked(filename, principalId)
       const next = await update(current)
       assertMemorySnapshot(next, principalId)
       await this.writeJson(filename, next)
       return normalizeMemorySnapshot(next, principalId)
-    }, { waitMs: this.lockWaitMs })
+    })
+  }
+
+  private async withLock<T>(filename: string, operation: () => Promise<T>): Promise<T> {
+    const deadline = performance.now() + this.lockWaitMs
+    let remainingMs = this.lockWaitMs
+    for (let attempt = 0; ; attempt += 1) {
+      let operationStarted = false
+      try {
+        return await withFileLock(filename, () => {
+          operationStarted = true
+          return operation()
+        }, { waitMs: remainingMs })
+      } catch (error) {
+        // On Windows the owner can release a lock between the SDK's failed
+        // exclusive create and its lstat. Retry acquisition through the SDK,
+        // never remove somebody else's lock or replay a started transaction.
+        const io = error as NodeJS.ErrnoException | undefined
+        if (operationStarted || process.platform !== 'win32' || attempt >= 3
+          || io?.code !== 'EPERM' || io.syscall !== 'open' || io.path !== `${filename}.lock`) throw error
+        remainingMs = deadline - performance.now()
+        if (remainingMs <= 0) throw error
+        await new Promise(resolve => setTimeout(resolve, Math.min(20 * 2 ** attempt, remainingMs)))
+        remainingMs = deadline - performance.now()
+        if (remainingMs <= 0) throw error
+      }
+    }
   }
 
   private async ensureRoot(): Promise<void> {

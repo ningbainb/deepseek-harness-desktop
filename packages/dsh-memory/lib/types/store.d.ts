@@ -21,6 +21,7 @@ export declare class MemoryStore {
     private loadUnlocked;
     save(principalId: PrincipalId, snapshot: MemorySnapshot): Promise<MemorySnapshot>;
     update(principalId: PrincipalId, update: (current: MemorySnapshot) => MemorySnapshot | Promise<MemorySnapshot>): Promise<MemorySnapshot>;
+    private withLock;
     private ensureRoot;
     private ensureOwnerDirectory;
     private readRaw;

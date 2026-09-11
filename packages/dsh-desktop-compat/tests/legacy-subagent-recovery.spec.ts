@@ -2,14 +2,14 @@ import { expect, it } from 'vitest'
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { appendFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { installSessionPersistenceRecovery } from '../src/session-recovery.ts'
 
 // Published @deepseek-ai/dsh-subagent 0.1.1-rc.1 snapshots these generation-2
 // fields. The candidate still passes the installed official strict catalog.
-const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, cwd: 'C:/project', delegationDepth: 1 }
+const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, cwd: resolve('project'), delegationDepth: 1 }
 const backupSuffix = '.desktop-v0-subagent-descriptor-backup-v3.4.0'
 const descriptor = (data: Record<string, unknown>, seq = 0) => ({ type: 'subagent/descriptor', seq, time: 1, data })
 const minimal = { version: 2, mode: 'one-shot', provider: 'in-process' }
