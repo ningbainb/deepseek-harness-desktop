@@ -140,10 +140,15 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
     setOpen(true)
   }
 
-  const persistGlobalPatch = (patch: Partial<ValueModeConfig>, fallback: string): void => {
-    void Promise.resolve()
-      .then(() => onChange(patch))
-      .catch((reason) => reportSetupError(reason, fallback))
+  const persistGlobalPatch = async (patch: Partial<ValueModeConfig>, fallback: string): Promise<boolean> => {
+    setSetupError(null)
+    try {
+      await onChange(patch)
+      return true
+    } catch (reason) {
+      reportSetupError(reason, fallback)
+      return false
+    }
   }
 
   const enableCurrentScope = async (source: 'auto' | 'manual' = 'manual') => {
@@ -233,7 +238,7 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
     dialog?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus()
   }, [open, onboarding, pickingTarget])
 
-  const handleStrategyChange = (nextStrategy: ValueModeStrategy) => {
+  const handleStrategyChange = async (nextStrategy: ValueModeStrategy) => {
     if (onboarding) {
       setSetupDraft((draft) => ({ ...draft, strategy: nextStrategy }))
       reportValueModeTelemetry({ kind: 'strategy', strategy: nextStrategy })
@@ -242,7 +247,7 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
     if (scope === 'session' && onSessionOverrideChange) {
       onSessionOverrideChange({ ...sessionOverride, strategy: nextStrategy })
     } else {
-      persistGlobalPatch({ strategy: nextStrategy }, '策略保存失败，请重试。')
+      if (!await persistGlobalPatch({ strategy: nextStrategy }, '策略保存失败，请重试。')) return
     }
     reportValueModeTelemetry({ kind: 'strategy', strategy: nextStrategy })
   }

@@ -11,8 +11,8 @@
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { PluginSettingsCard, ChoiceField, ValueField } from './PluginSettingsCard.tsx'
-import { CardForm, choiceField, numberField, textField, type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts'
+import { PluginSettingsCard, BooleanField, ChoiceField, ValueField } from './PluginSettingsCard.tsx'
+import { CardForm, booleanField, choiceField, numberField, textField, type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts'
 import { t } from './locales.ts'
 
 /** The describe-image fields this card edits (the namespace's full schema). */
@@ -26,6 +26,7 @@ export interface DescribeImageSettings {
   maxOutputTokens?: number
   timeoutMs?: number
   apiStyle?: 'chat-completions' | 'responses'
+  interceptImageSend?: boolean
 }
 
 /** What the describe-image card renders. */
@@ -39,6 +40,7 @@ export interface DescribeImageSettingsCardState extends CardShell {
   maxOutputTokens: CardFieldState
   timeoutMs: CardFieldState
   apiStyle: CardFieldState
+  interceptImageSend: CardFieldState
 }
 
 /** The registration-side face the card's slot entry injects. */
@@ -66,6 +68,7 @@ export class DescribeImageSettingsCardController {
       numberField('maxBytes'),
       numberField('maxOutputTokens'),
       numberField('timeoutMs'),
+      booleanField('interceptImageSend'),
     ])
     this.store = this.form.bind(() => this.projection())
   }
@@ -82,6 +85,7 @@ export class DescribeImageSettingsCardController {
       maxBytes: this.form.field('maxBytes'),
       maxOutputTokens: this.form.field('maxOutputTokens'),
       timeoutMs: this.form.field('timeoutMs'),
+      interceptImageSend: this.form.field('interceptImageSend'),
     }
   }
 
@@ -122,6 +126,18 @@ export function DescribeImageSettingsCard(props: DescribeImageSettingsCardProps)
       onSave={props.save}
       onDiscard={props.discard}
     >
+      <BooleanField
+        id="settings-describe-image-intercept"
+        label={t('field.interceptImageSend')}
+        hint={t('field.interceptImageSend.hint')}
+        inheritLabel={t('settings.inherit')}
+        onLabel={t('settings.on')}
+        offLabel={t('settings.off')}
+        {...fieldProps}
+        {...state.interceptImageSend}
+        onEdit={(text) => { props.edit('interceptImageSend', text) }}
+        onReset={() => { props.resetField('interceptImageSend') }}
+      />
       <ValueField
         id="settings-describe-image-baseurl"
         label={t('field.baseURL')}

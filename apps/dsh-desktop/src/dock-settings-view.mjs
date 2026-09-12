@@ -1,11 +1,61 @@
 import { installNavigationPolicy } from './navigation-policy.mjs'
-import { getWindowChromeTheme, WINDOW_CHROME_HEIGHT } from './window-chrome.mjs'
+import { getWindowChromeTheme, getWindowPalette, WINDOW_CHROME_HEIGHT } from './window-chrome.mjs'
 import { publishWindowMotion } from './window-motion.mjs'
+import { assertDockSetting } from './dock-pages.mjs'
 
-export const DOCK_SETTING_IDS = Object.freeze(['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'])
+export { DOCK_SETTING_IDS, assertDockSetting } from './dock-pages.mjs'
 
-export function assertDockSetting(id) {
-  if (id !== null && !DOCK_SETTING_IDS.includes(id)) throw new TypeError('unknown Dock settings page')
+/** Runs in the settings renderer; each draft is submitted at most once. */
+export async function saveDockSettingsDrafts({
+  document = globalThis.document,
+  wait = () => new Promise(resolve => setTimeout(resolve, 100)),
+  maxPolls = 300,
+} = {}) {
+  const states = new Map()
+  const alerts = form => [...form.querySelectorAll('[role="alert"]')].map(item => item.textContent).join('\n')
+  const stateFor = form => {
+    if (!states.has(form)) states.set(form, { revision: 0, initialAlerts: alerts(form), attempted: false, lastDraft: undefined })
+    return states.get(form)
+  }
+  const edited = event => {
+    const form = event.target?.closest?.('[data-dock-dirty]')
+    if (form) stateFor(form).revision++
+  }
+  const draftKey = (form, state) => JSON.stringify([
+    state.revision,
+    [...form.querySelectorAll('input, textarea, select')].map(control => [
+      control.value, control.checked,
+      control.selectedOptions ? [...control.selectedOptions].map(option => option.value) : undefined,
+    ]),
+  ])
+  document.addEventListener('input', edited, true)
+  document.addEventListener('change', edited, true)
+  try {
+    for (let poll = 0; poll < maxPolls; poll++) {
+      const forms = [...document.querySelectorAll('[data-dock-dirty="true"]')]
+      if (forms.length === 0) return true
+      for (const form of forms) {
+        const state = stateFor(form)
+        const failure = alerts(form)
+        // A previous failure may be retried once by choosing Save and close.
+        // New failures, including an already-running save failing, stop here.
+        if (failure && (state.attempted || failure !== state.initialAlerts)) return false
+        const button = form.querySelector('[data-dock-save]')
+        if (!button) return false
+        if (button.disabled) continue
+        const draft = draftKey(form, state)
+        if (draft === state.lastDraft) continue
+        state.lastDraft = draft
+        state.attempted = true
+        button.click()
+      }
+      await wait()
+    }
+    return !document.querySelector('[data-dock-dirty="true"]')
+  } finally {
+    document.removeEventListener('input', edited, true)
+    document.removeEventListener('change', edited, true)
+  }
 }
 
 /** Lazy, unprivileged runtime view. It shares the local user's browser session,
@@ -20,6 +70,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   let allowClose = false
   let checkingClose = false
   let theme = getWindowChromeTheme(window)
+  let palette = getWindowPalette(mainWindow)
   let lastBounds
   const bounded = (operation, timeoutMs, message) => {
     let timer
@@ -38,21 +89,12 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
       const dirty = await inspect('Boolean(document.querySelector(\'[data-dock-dirty="true"]\'))')
       if (dirty) {
         const { response } = await dialog.showMessageBox(window, {
-          type: 'question', title: '保存未完成的编辑', message: '个人偏好中有尚未保存的修改。',
+          type: 'question', title: '保存未完成的编辑', message: '设置中有尚未保存的修改。',
           buttons: ['保存并关闭', '返回编辑', '放弃并关闭'], defaultId: 1, cancelId: 1, noLink: true,
         })
         if (response === 1) return
         if (response === 0) {
-          const saved = await inspect(`(async () => {
-            const forms = [...document.querySelectorAll('[data-dock-dirty="true"]')];
-            for (const form of forms) form.querySelector('[data-dock-save]')?.click();
-            for (let attempt = 0; attempt < 300; attempt++) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-              if (!document.querySelector('[data-dock-dirty="true"]')) return true;
-              if (forms.some(form => form.querySelector('[role="alert"]'))) return false;
-            }
-            return false;
-          })()`, 32000)
+          const saved = await inspect(`(${saveDockSettingsDrafts.toString()})()`, 32000)
           if (!saved) {
             await dialog.showMessageBox(window, { type: 'warning', message: '修改未能全部保存，请返回对应设置检查后重试。' })
             return
@@ -135,6 +177,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
             dispatched = true;
             window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: ${JSON.stringify(id)} }));
             window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: ${JSON.stringify(theme)} }));
+            window.dispatchEvent(new CustomEvent('dsh:dock-palette', { detail: ${JSON.stringify(palette)} }));
           }
           if (document.querySelector('[data-dsh-dock-settings]').getAttribute('data-dsh-dock-settings') === ${JSON.stringify(id)}) { resolve(true); return; }
         }
@@ -169,6 +212,10 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
         if (view && !view.webContents.isDestroyed()) view.setVisible(false)
         throw error
       }
+    },
+    syncPalette: value => {
+      palette = value
+      if (view && !view.webContents.isDestroyed()) void view.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('dsh:dock-palette', { detail: ${JSON.stringify(palette)} }))`).catch(() => {})
     },
     syncTheme: nextTheme => {
       theme = nextTheme

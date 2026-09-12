@@ -240,6 +240,7 @@ describe('registerAttachRoute', () => {
     let body = ''
     const res = {
       writeHead: (code: number) => { status = code },
+      setHeader: () => {},
       end: (chunk?: unknown) => {
         if (chunk !== undefined && chunk !== null) body += String(chunk)
       },
@@ -273,6 +274,20 @@ describe('registerAttachRoute', () => {
 
   it('is a no-op when no webserver is mounted', () => {
     expect(capture(undefined, false)).toHaveLength(0)
+  })
+
+  it('answers a capability request with the live verdict without serving raw image bytes', async () => {
+    let route: { handler(req: IncomingMessage, res: ServerResponse): Promise<void> } | undefined
+    const requested: string[] = []
+    registerAttachRoute({ get: () => ({ register: (row: typeof route) => { route = row } }) } as unknown as Context, undefined, async id => {
+      requested.push(id)
+      return { acceptsImages: true, known: true }
+    })
+    const { res, status, body } = makeRes()
+    await route!.handler(makeReq('GET', undefined, '/describe-image/capability?session=one%2Ftwo'), res)
+    expect(requested).toEqual(['one/two'])
+    expect(status()).toBe(200)
+    expect(JSON.parse(body())).toEqual({ ok: true, value: { acceptsImages: true, known: true } })
   })
 
   it('answers non-GET/non-POST requests with 405', async () => {

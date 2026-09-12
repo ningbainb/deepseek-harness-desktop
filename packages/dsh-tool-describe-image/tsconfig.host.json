@@ -29,6 +29,7 @@
     "src/media.ts",
     "src/attach-routes.ts",
     "src/config-resolve.ts",
+    "src/model-capability.ts",
     "src/vision-client.ts"
   ]
 }

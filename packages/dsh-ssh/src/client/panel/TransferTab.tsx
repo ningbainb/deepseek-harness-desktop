@@ -73,8 +73,23 @@ export function TransferTab({ api }: TransferTabProps) {
         if (!disposed) setListError(errorMessage(cause))
       }
     })()
-    return () => { disposed = true }
+    return () => { disposed = true; seqRef.current++ }
   }, [api])
+
+  const changeHost = (next: string): void => {
+    if (next === alias || transfer !== null) return
+    // A directory response belongs to the host that started it. Invalidate
+    // it before rendering a different host, including an A -> B -> A switch.
+    seqRef.current++
+    setAlias(next)
+    setRemotePath('')
+    setEntries([])
+    setBrowseDir('/')
+    setBrowseOpen(false)
+    setBrowsing(false)
+    setListError(null)
+    setStatus(null)
+  }
 
   const loadDir = async (path: string): Promise<void> => {
     if (alias === '') return
@@ -168,12 +183,12 @@ export function TransferTab({ api }: TransferTabProps) {
   return (
     <div className={css.tabBody}>
       <div className={css.controls}>
-        <select className={css.input} value={alias} onChange={event => { setAlias(event.target.value) }}>
+        <select className={css.input} aria-label={tt('transfer.selectHost')} value={alias} disabled={transfer !== null} onChange={event => { changeHost(event.target.value) }}>
           <option value="">{tt('transfer.selectHost')}</option>
           {hosts.map(host => <option key={host.alias} value={host.alias}>{host.alias} ({host.host})</option>)}
         </select>
-        <input className={css.input} placeholder={tt('transfer.remotePathHint')} value={remotePath} onChange={event => { setRemotePath(event.target.value) }} />
-        <button type="button" className={css.ghostButton} disabled={alias === ''} onClick={openBrowse}>{tt('transfer.browseRemote')}</button>
+        <input className={css.input} placeholder={tt('transfer.remotePathHint')} value={remotePath} disabled={transfer !== null} onChange={event => { setRemotePath(event.target.value) }} />
+        <button type="button" className={css.ghostButton} disabled={alias === '' || transfer !== null} onClick={openBrowse}>{tt('transfer.browseRemote')}</button>
         <div className={css.toolbarSpacer} />
         <button type="button" className={css.primaryButton} disabled={!ready} onClick={() => { fileRef.current?.click() }}>{tt('transfer.upload')}</button>
         <button type="button" className={css.ghostButton} disabled={!ready} onClick={() => { void handleDownload() }}>{tt('transfer.download')}</button>
@@ -184,18 +199,18 @@ export function TransferTab({ api }: TransferTabProps) {
         <div className={css.browsePanel}>
           <div className={css.browseHeader}>
             <span className={css.browsePath}>{browseDir}</span>
-            <button type="button" className={css.linkButton} disabled={browsing} onClick={() => { void loadDir(browseDir) }}>{tt('transfer.refresh')}</button>
+            <button type="button" className={css.linkButton} disabled={browsing || transfer !== null} onClick={() => { void loadDir(browseDir) }}>{tt('transfer.refresh')}</button>
           </div>
           <div className={css.browseList}>
             {browseDir !== '/' && (
-              <button type="button" className={css.dirRow} data-up onClick={() => { void loadDir(parentOf(browseDir)) }}>
+              <button type="button" className={css.dirRow} data-up disabled={transfer !== null} onClick={() => { void loadDir(parentOf(browseDir)) }}>
                 <span className={css.dirName}>{tt('transfer.upLevel')}</span>
                 <span className={css.dirType} />
                 <span className={css.dirSize} />
               </button>
             )}
             {entries.map(entry => (
-              <button key={entry.name} type="button" className={css.dirRow} data-type={entry.type} onClick={() => {
+              <button key={entry.name} type="button" className={css.dirRow} data-type={entry.type} disabled={transfer !== null} onClick={() => {
                 if (entry.type === 'dir') {
                   void loadDir(joinRemotePath(browseDir, entry.name))
                 } else {

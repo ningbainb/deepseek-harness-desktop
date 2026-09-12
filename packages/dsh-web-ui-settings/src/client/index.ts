@@ -25,6 +25,7 @@ import { DockSettingsPage, dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { projectCopy } from './ProjectDialog.tsx'
 import { installBrowserClose, installProjectDialog } from './desktop-interactions.tsx'
 import { protectDirectoryEditorFocus } from './directory-editor-focus.ts'
+import { installDesktopAppearance } from './desktop-appearance.ts'
 import {
   chatGptAuthEn,
   chatGptAuthZh,
@@ -80,6 +81,7 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  ctx.effect(() => installDesktopAppearance(window), 'web-ui-settings: desktop appearance')
   if (!dockSettingFromUrl()) {
     ctx.effect(() => protectDirectoryEditorFocus(document), 'web-ui-settings: native directory editor focus')
     ctx.effect(() => installBrowserClose(document), 'web-ui-settings: browser close action')
@@ -148,7 +150,7 @@ export function apply(ctx: ClientContext): void {
       name: 'root',
       priority: -100,
       locale: 'web-ui-plugins',
-      children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
+      children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' }, 'settings.section': { kind: 'list', scope: 'root' } },
     }, DockSettingsPage))
   }
 }

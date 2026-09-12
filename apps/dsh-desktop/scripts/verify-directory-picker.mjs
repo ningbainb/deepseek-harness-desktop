@@ -205,7 +205,19 @@ try {
   const initialNativePanel = page.locator('[data-sidebar-right-panel]')
   await initialNativePanel.waitFor({ state: 'visible' })
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false)
-  await initialNativePanel.locator('[data-sidebar-right-toggle]').click()
+  try {
+    await initialNativePanel.locator('[data-sidebar-right-toggle]').click()
+  } catch (error) {
+    console.error('native sidebar click geometry:', JSON.stringify(await page.evaluate(() => ({
+      scroll: { body: document.body.scrollTop, documentElement: document.documentElement.scrollTop, window: window.scrollY },
+      elements: ['#root', '[data-dsh-frame]', '[data-rightbar-col]', '[data-sidebar-right-panel]', '[data-sidebar-right-toggle]', '[data-sidebar-right-expand]', '#dsh-desktop-window-chrome']
+        .map(selector => ({ selector, nodes: [...document.querySelectorAll(selector)].map(element => {
+          const style = getComputedStyle(element)
+          return { rect: element.getBoundingClientRect().toJSON(), className: element.className, position: style.position, top: style.top, height: style.height, paddingTop: style.paddingTop, marginTop: style.marginTop }
+        }) })),
+    }))))
+    throw error
+  }
   await initialNativePanel.waitFor({ state: 'hidden' })
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'collapsing the default native surface keeps compatibility tools inactive')
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-default.png') })

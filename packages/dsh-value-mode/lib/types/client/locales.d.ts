@@ -1,4 +1,6 @@
 export declare const zh: {
+    settingsNotWritable: string;
+    settingsSaveFailed: string;
     catalogUnavailable: string;
     catalogTimeout: string;
     catalogChanged: string;

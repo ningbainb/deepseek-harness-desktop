@@ -118,6 +118,10 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
   const [error, setError] = useState<string | undefined>(undefined)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const draftRevision = useRef(0)
+  const sendGeneration = useRef(0)
+  const sendInFlight = useRef(false)
+  const composing = useRef(false)
   const scrollRef = useRef<HTMLDivElement | undefined>(undefined)
   const pendingRef = useRef(false)
   /**
@@ -144,6 +148,15 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
    * the legacy Enter-to-send behavior until the preference loads).
    */
   const [mobileEnterToSend, setMobileEnterToSend] = useState(true)
+
+  useEffect(() => {
+    // A completed request must not alter another session's composer.
+    sendGeneration.current++
+    sendInFlight.current = false
+    composing.current = false
+    setSending(false)
+    return () => { sendGeneration.current++ }
+  }, [session.sessionId])
 
   // Read-only mobile display preferences ride the plugin's local
   // `/m/api` method; a failure keeps the default (Enter sends).
@@ -352,19 +365,27 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
   /** Send the drafted prompt (the echoed user/message arrives over mux). */
   const send = useCallback(() => {
     const text = input.trim()
-    if (text === '' || sending) return
+    if (text === '' || sendInFlight.current || composing.current) return
+    const revision = draftRevision.current
+    const generation = ++sendGeneration.current
+    sendInFlight.current = true
     setSending(true)
+    setError(undefined)
     void prompt(session.sessionId, text).then(
       () => {
+        if (generation !== sendGeneration.current) return
+        sendInFlight.current = false
         setSending(false)
-        setInput('')
+        if (revision === draftRevision.current) setInput('')
       },
       (reason: unknown) => {
+        if (generation !== sendGeneration.current) return
+        sendInFlight.current = false
         setSending(false)
         setError(errorText(reason))
       },
     )
-  }, [input, sending, session.sessionId])
+  }, [input, session.sessionId])
 
   const modelLabel = currentModel?.model ?? '模型'
   const permissionLabel = permissions === undefined
@@ -411,8 +432,11 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
           value={input}
           placeholder={mobileEnterToSend ? '输入消息，Enter 发送…' : '输入消息，Enter 换行，点按钮发送…'}
           enterKeyHint={mobileEnterToSend ? 'send' : 'enter'}
-          onChange={(event) => { setInput(event.target.value) }}
+          onChange={(event) => { draftRevision.current++; setInput(event.target.value) }}
+          onCompositionStart={() => { composing.current = true }}
+          onCompositionEnd={() => { composing.current = false }}
           onKeyDown={(event) => {
+            if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return
             if (mobileEnterToSend && event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
               void send()

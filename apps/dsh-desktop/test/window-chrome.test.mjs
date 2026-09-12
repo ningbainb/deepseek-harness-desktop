@@ -7,6 +7,7 @@ import {
   decorateDesktopRuntimeUrl,
   getWindowChromeTheme,
   installWindowChrome,
+  markWindowChromeViewportRoot,
   WINDOW_CHROME_CSS,
   WINDOW_CHROME_HEIGHT,
   normalizeWindowChromeTheme,
@@ -14,6 +15,56 @@ import {
   setWindowChromeTheme,
   windowChromeBrowserOptions,
 } from '../src/window-chrome.mjs'
+
+function viewportRootFixture(position, authoredTop = 0) {
+  const classes = new Set()
+  let mutations = 0
+  const document = { body: {}, getElementById: () => root }
+  const root = {
+    parentElement: document.body,
+    position,
+    classList: {
+      contains: name => classes.has(name),
+      toggle(name, enabled) {
+        if (classes.has(name) !== enabled) mutations++
+        if (enabled) classes.add(name)
+        else classes.delete(name)
+      },
+    },
+    getBoundingClientRect: () => ({ top: classes.has('dsh-desktop-viewport-root') ? WINDOW_CHROME_HEIGHT : authoredTop }),
+  }
+  // Run the same self-contained function embedded in the renderer script.
+  const mark = new Function(`return (${markWindowChromeViewportRoot.toString()})`)()
+  return { root, document, classes, mutations: () => mutations,
+    sync: () => mark({ document, getComputedStyle: element => ({ position: element.position }), chromeHeight: WINDOW_CHROME_HEIGHT }) }
+}
+
+test('positioned roots retain their caption inset through consecutive document mutations', () => {
+  for (const position of ['fixed', 'absolute']) {
+    const f = viewportRootFixture(position)
+    for (let i = 0; i < 20; i++) {
+      f.sync()
+      assert.equal(f.root.getBoundingClientRect().top, WINDOW_CHROME_HEIGHT)
+    }
+    assert.equal(f.mutations(), 1, 'the correction settles after one mutation instead of toggling between 0 and 32')
+  }
+})
+
+test('caption inset ownership ends in normal flow and preserves existing positioned offsets', () => {
+  const f = viewportRootFixture('absolute')
+  f.sync()
+  f.root.position = 'static'
+  f.sync()
+  assert.equal(f.classes.size, 0, 'body padding supplies the normal-flow inset')
+  f.sync()
+  assert.equal(f.mutations(), 2)
+  for (const position of ['static', 'relative', 'fixed', 'absolute']) {
+    const alreadyBelow = viewportRootFixture(position, 48)
+    alreadyBelow.sync()
+    assert.equal(alreadyBelow.root.getBoundingClientRect().top, 48)
+    assert.equal(alreadyBelow.mutations(), 0, 'an existing caption margin is preserved')
+  }
+})
 
 function chromeObserverFixture() {
   let callback, queries = 0, disconnected = false

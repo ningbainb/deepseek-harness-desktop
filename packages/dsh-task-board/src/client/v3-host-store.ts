@@ -31,6 +31,7 @@ export class RemoteTaskStoreV3 implements TaskStore, EvidenceStore {
   private document: TaskLedgerDocumentV3 | undefined
   private readonly externalListeners = new Set<() => void>()
   private reloadRequired = false
+  private readGeneration = 0
 
   constructor(
     private readonly fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
@@ -40,16 +41,26 @@ export class RemoteTaskStoreV3 implements TaskStore, EvidenceStore {
   ) {}
 
   async load(): Promise<TaskRecord[]> {
-    await this.queue
-    const document = await this.fetchDocument()
-    return document.tasks
+    const next = this.queue.then(() => this.fetchDocument())
+    this.queue = next.then(() => {}, () => {})
+    return (await next).tasks
   }
 
   async save(tasks: readonly TaskRecord[]): Promise<void> {
+    const readGeneration = this.readGeneration
+    const hadDocument = this.document !== undefined
+    const snapshot = structuredClone(tasks) as TaskRecord[]
     const operation = async (): Promise<void> => {
       if (this.reloadRequired) throw new TaskLedgerV3ConflictError(this.document)
+      // A queued GET can change the task ancestor, not just the revision. An
+      // older caller must rebase instead of silently borrowing that revision.
+      if (hadDocument && readGeneration !== this.readGeneration) {
+        this.reloadRequired = true
+        this.notifyExternal()
+        throw new TaskLedgerV3ConflictError(this.document)
+      }
       const current = this.document ?? await this.fetchDocument()
-      this.document = await this.putDocument({ ...current, tasks: structuredClone(tasks) as TaskRecord[] })
+      this.document = await this.putDocument({ ...current, tasks: snapshot })
     }
     const next = this.queue.then(operation, operation)
     this.queue = next.catch(() => {})
@@ -143,6 +154,7 @@ export class RemoteTaskStoreV3 implements TaskStore, EvidenceStore {
     const parsed = parseLedgerDocumentV3(await response.text())
     if (parsed === undefined) throw new Error('task-board v3 returned an invalid document')
     this.document = parsed
+    this.readGeneration++
     this.reloadRequired = false
     return parsed
   }

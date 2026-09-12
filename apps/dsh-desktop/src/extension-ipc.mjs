@@ -7,6 +7,7 @@ import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/ski
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
+import { assertDockSetting } from './dock-pages.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
 const PROFILE_RESET_BACKUP_LIMIT = 3
@@ -571,7 +572,7 @@ export function registerExtensionIpc({
 
   handleExtension('extensions:list', scan)
   handleExtension('extensions:settings-select', async (_event, id) => {
-    if (id !== null && !['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(id)) throw new TypeError('unknown Dock settings page')
+    assertDockSetting(id)
     const record = (outcome) => {
       if (id !== null) try { recordFeatureEvent({ feature: 'dock-setting', detail: id, outcome }) } catch {}
     }

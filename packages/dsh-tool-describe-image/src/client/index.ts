@@ -16,12 +16,14 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ConversationController } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import { installSendHook } from './send-hook.ts'
+import { installSendHook, sessionAcceptsImages } from './send-hook.ts'
 import { DescribeImageSettingsCard, DescribeImageSettingsCardController, type DescribeImageSettings } from './DescribeImageSettingsCard.tsx'
 import { dictionaries, setLanguage, type DescribeImageClientKey } from './locales.ts'
+
+export type { ConversationController }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -80,16 +82,18 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['slots', 'conversation'], (scope: ClientContext) => {
     const conversation = scope.conversation
     const slots = scope.slots
+    let liveSettings: SettingsScope<DescribeImageSettings> | undefined
 
     // Text-only models reject image blocks at submit: rewrite image-bearing
     // sends into describe-image references before they reach the model.
-    installSendHook(conversation)
+    installSendHook(conversation, () => liveSettings?.getSnapshot().value?.interceptImageSend !== false, sessionAcceptsImages)
 
     // The settings card: bound to the describe-image namespace through the
     // family bridge when the official scope does not expose it.
     ctx.inject(['settingsScope'], (settingsCtx: ClientContext) => {
       const binder = settingsCtx.get('webUiSettings') ?? settingsCtx.settingsScope
       const settingsScope = binder.bind<DescribeImageSettings>({ namespace: NS })
+      liveSettings = settingsScope
       const settingsCard = new DescribeImageSettingsCardController(settingsScope)
       slots.inject('web-ui.plugin.item', () =>
         slots.register({

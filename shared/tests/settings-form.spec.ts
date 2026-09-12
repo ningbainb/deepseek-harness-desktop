@@ -167,6 +167,46 @@ describe('CardForm', () => {
     expect(form.shell()).toMatchObject({ failed: true, dirty: true })
   })
 
+  it.each(['edit', 'reset'] as const)('keeps a later same-field %s after the original save finishes', async (action) => {
+    const scope = new FakeScope<Record<string, unknown>>({ size: 32 })
+    scope.autoReflect()
+    const originalSet = scope.set.getMockImplementation()!
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    scope.set.mockImplementationOnce(async (field, value) => {
+      await gate
+      await originalSet(field, value)
+    })
+    const form = new CardForm(scope, fields())
+    form.actions().edit('size', '64')
+    const saving = form.save()
+    if (action === 'edit') form.actions().edit('size', '99')
+    else form.actions().resetField('size')
+    release()
+    await saving
+
+    expect(scope.value.size).toBe(64)
+    expect(form.field('size').text).toBe(action === 'edit' ? '99' : '32')
+    expect(form.shell()).toMatchObject({ dirty: true, saving: false, failed: false })
+    await form.save()
+    expect(scope.value.size).toBe(action === 'edit' ? 99 : 32)
+    expect(form.shell().dirty).toBe(false)
+  })
+
+  it('keeps drafts and allows retry after a rejected write', async () => {
+    const scope = new FakeScope<Record<string, unknown>>({ name: 'old' })
+    scope.autoReflect()
+    scope.set.mockRejectedValueOnce(new Error('transport interrupted'))
+    const form = new CardForm(scope, fields())
+    form.actions().edit('name', 'new')
+    await form.save()
+    expect(form.shell()).toMatchObject({ dirty: true, saving: false, failed: true })
+    expect(form.field('name').text).toBe('new')
+    await form.save()
+    expect(scope.value.name).toBe('new')
+    expect(form.shell()).toMatchObject({ dirty: false, saving: false, failed: false })
+  })
+
   it('resets a field back to its base value', () => {
     const scope = new FakeScope<Record<string, unknown>>({ enabled: true })
     const form = new CardForm(scope, fields())

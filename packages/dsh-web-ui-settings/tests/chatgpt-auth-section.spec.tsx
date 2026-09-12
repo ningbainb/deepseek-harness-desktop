@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ChatGptAuthState } from '../src/chatgpt-auth-protocol.ts'
 import { chatGptAuthZh, type ChatGptAuthKey } from '../src/client/locales.ts'
 
@@ -33,6 +33,13 @@ const signedOut: ChatGptAuthState = {
   phase: 'idle',
 }
 
+const awaitingBrowser: ChatGptAuthState = {
+  ...signedOut,
+  inFlight: true,
+  phase: 'awaiting-user',
+  notice: { message: 'Continue in your browser', url: 'https://auth.openai.com/oauth/authorize?state=opaque' },
+}
+
 function t(key: ChatGptAuthKey): string {
   return chatGptAuthZh[key]
 }
@@ -52,11 +59,89 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
 describe('ChatGPT authorization settings section', () => {
+  it('keeps polling unchanged waiting states until browser authorization completes', async () => {
+    vi.useFakeTimers()
+    api.state.mockResolvedValue({ ...awaitingBrowser })
+    await act(async () => { renderSection() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2700) })
+    expect(api.state).toHaveBeenCalledTimes(4)
+    api.state.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(api.state).toHaveBeenCalledTimes(5)
+  })
+
+  it('recovers polling after an initial transport failure', async () => {
+    vi.useFakeTimers()
+    api.state.mockRejectedValueOnce(new Error('temporary transport failure'))
+      .mockResolvedValueOnce({ ...awaitingBrowser })
+      .mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
+    await act(async () => { renderSection() })
+    expect(screen.getByRole('alert')).toBeTruthy()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
+  })
+
+  it('does not overlap slow polls or let a stale response revive a cancelled login', async () => {
+    vi.useFakeTimers()
+    let finishPoll!: (state: ChatGptAuthState) => void
+    api.state.mockResolvedValueOnce({ ...awaitingBrowser })
+      .mockImplementationOnce(() => new Promise(resolve => { finishPoll = resolve }))
+    api.cancel.mockResolvedValue({ ...signedOut, phase: 'cancelled' })
+    await act(async () => { renderSection() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(5900) })
+    expect(api.state).toHaveBeenCalledTimes(2)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: t('cancel') })) })
+    await act(async () => { finishPoll({ ...awaitingBrowser }) })
+    expect(screen.queryByRole('button', { name: t('cancel') })).toBeNull()
+    expect(screen.queryByRole('button', { name: t('openBrowser') })).toBeNull()
+    expect((screen.getByRole('button', { name: t('login') }) as HTMLButtonElement).disabled).toBe(false)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(api.state).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not schedule another poll after unmounting with a request in flight', async () => {
+    vi.useFakeTimers()
+    let finishPoll!: (state: ChatGptAuthState) => void
+    api.state.mockImplementation(() => new Promise(resolve => { finishPoll = resolve }))
+    await act(async () => { renderSection() })
+    cleanup()
+    await act(async () => { finishPoll({ ...awaitingBrowser }); await vi.advanceTimersByTimeAsync(5000) })
+    expect(api.state).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('resumes polling after a fast answer invalidates an older in-flight read', async () => {
+    vi.useFakeTimers()
+    const promptState: ChatGptAuthState = {
+      ...awaitingBrowser,
+      prompt: { id: 'choose-method', kind: 'select', message: 'Choose', options: [{ id: 'browser', label: 'Browser' }] },
+    }
+    let finishOldPoll!: (state: ChatGptAuthState) => void
+    api.state.mockResolvedValueOnce(promptState)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOldPoll = resolve }))
+      .mockResolvedValue({ ...awaitingBrowser })
+    api.answer.mockResolvedValue({ ...awaitingBrowser })
+    await act(async () => { renderSection() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Browser' })) })
+    expect(api.answer).toHaveBeenCalledWith('choose-method', 'browser')
+    await act(async () => { finishOldPoll(promptState) })
+    expect(screen.queryByRole('button', { name: 'Browser' })).toBeNull()
+    api.state.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
+  })
+
   it('starts the official flow with one visible sign-in click', async () => {
     renderSection()
     const button = await screen.findByRole('button', { name: '使用 ChatGPT 登录' })

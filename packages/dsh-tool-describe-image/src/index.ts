@@ -22,6 +22,7 @@ import { registerAttachRoute } from './attach-routes.ts'
 import { DEFAULT_MAX_BYTES } from './media.ts'
 import { Config, DESCRIBE_IMAGE_SETTINGS_NAMESPACE, resolveApiKey, resolveConfig, type ResolvedConfig } from './config-resolve.ts'
 import { callVision, createVisionCache, loadImage } from './vision-client.ts'
+import { createImageCapabilityProbe } from './model-capability.ts'
 
 export const name = 'describe-image'
 export const inject = ['tools', 'webServer']
@@ -131,7 +132,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   const visionCache = createVisionCache()
   // The webserver is optional (the loader-composition tests boot without one):
   // the attach route registers only when the service is actually mounted.
-  registerAttachRoute(ctx, () => current().maxBytes ?? DEFAULT_MAX_BYTES)
+  registerAttachRoute(ctx, () => current().maxBytes ?? DEFAULT_MAX_BYTES, createImageCapabilityProbe(ctx))
   ctx.tools.register(defineTool({
     name: 'describe_image',
     description: DESCRIPTION_HEAD

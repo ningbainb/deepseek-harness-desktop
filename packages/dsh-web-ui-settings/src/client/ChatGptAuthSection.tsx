@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { ChatGptAuthState } from '../chatgpt-auth-protocol.ts'
 import { chatGptAuthClient, ChatGptAuthClientError } from './chatgpt-auth-client.ts'
 import type { ChatGptAuthKey } from './locales.ts'
@@ -26,42 +26,80 @@ function errorKind(error: unknown): SurfaceError {
   return 'authorization'
 }
 
+function needsRefresh(state: ChatGptAuthState): boolean {
+  return state.inFlight || state.phase === 'starting' || state.phase === 'awaiting-user'
+}
+
 /** First-level settings surface for the official DSH 0.1.5 OpenAI Codex flow. */
 export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
   const [state, setState] = useState<ChatGptAuthState>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<SurfaceError>()
   const [answer, setAnswer] = useState('')
+  const [refreshEpoch, setRefreshEpoch] = useState(0)
+  const mounted = useRef(false)
+  const generation = useRef(0)
+  const operationPending = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; generation.current++ }
+  }, [])
 
   const refresh = useCallback(async () => {
+    const requestGeneration = generation.current
     try {
-      setState(await chatGptAuthClient.state())
+      const next = await chatGptAuthClient.state()
+      if (!mounted.current || requestGeneration !== generation.current) return
+      setState(next)
       setError(undefined)
+      return next
     } catch (cause) {
-      setError(errorKind(cause))
+      if (mounted.current && requestGeneration === generation.current) setError(errorKind(cause))
     }
   }, [])
 
-  useEffect(() => { void refresh() }, [refresh])
-
+  const pollingRequired = state === undefined || needsRefresh(state)
   useEffect(() => {
-    if (state?.inFlight !== true && state?.phase !== 'starting' && state?.phase !== 'awaiting-user') return
-    const timer = window.setTimeout(() => { void refresh() }, 900)
-    return () => window.clearTimeout(timer)
-  }, [refresh, state?.inFlight, state?.phase, state?.notice?.url, state?.prompt?.id])
+    if (!pollingRequired || pending) return
+    let disposed = false
+    let timer: number | undefined
+    const poll = async () => {
+      if (disposed || operationPending.current) return
+      const requestGeneration = generation.current
+      const next = await refresh()
+      if (disposed || operationPending.current || requestGeneration !== generation.current) return
+      if (next !== undefined && !needsRefresh(next)) return
+      // Re-arm after unchanged waiting states and retry transient failures.
+      // Schedule only after settlement so state requests never overlap.
+      timer = window.setTimeout(() => { void poll() }, next === undefined ? 2000 : 900)
+    }
+    void poll()
+    return () => { disposed = true; window.clearTimeout(timer) }
+  }, [refresh, pollingRequired, pending, refreshEpoch])
 
   const run = useCallback(async (operation: () => Promise<ChatGptAuthState>) => {
-    if (pending) return
+    if (operationPending.current) return
+    operationPending.current = true
+    // Reads started before a user operation cannot overwrite its result.
+    const requestGeneration = ++generation.current
     setPending(true)
     setError(undefined)
     try {
-      setState(await operation())
+      const next = await operation()
+      if (mounted.current && requestGeneration === generation.current) setState(next)
     } catch (cause) {
-      setError(errorKind(cause))
+      if (mounted.current && requestGeneration === generation.current) setError(errorKind(cause))
     } finally {
-      setPending(false)
+      if (mounted.current && requestGeneration === generation.current) {
+        operationPending.current = false
+        setPending(false)
+        // Fast operations can batch pending=true/false into one render. Still
+        // replace the invalidated poll loop after answering the current prompt.
+        setRefreshEpoch(epoch => epoch + 1)
+      }
     }
-  }, [pending])
+  }, [])
 
   const openBrowser = useCallback(() => {
     const href = state?.notice?.url

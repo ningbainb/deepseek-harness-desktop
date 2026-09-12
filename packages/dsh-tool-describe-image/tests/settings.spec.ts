@@ -79,6 +79,13 @@ afterEach(async () => {
 })
 
 describe('describe-image settings section', () => {
+  it('persists the image interception switch through the official settings service', async () => {
+    const { ctx } = await boot()
+    await ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { interceptImageSend: false })
+    expect((ctx.settings as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: false })
+    await ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { interceptImageSend: true })
+    expect((ctx.settings as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: true })
+  })
   it('overlays the composition entry from the stored section', async () => {
     const { ctx, server } = await boot({ 'describe-image': { model: 'settings-model', maxOutputTokens: 7 } })
     const path = await tempPng()

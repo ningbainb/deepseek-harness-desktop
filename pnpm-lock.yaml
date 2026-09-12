@@ -5,6 +5,10 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-plugin-manager': 0.3.20
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-skill-explorer': 0.3.20
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-desktop-launcher': 0.3.13
+  '@linxin666/dsh-web-ui-all>dsh-better-sidebar': 0.14.0
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-aionui-panel': link:./packages/dsh-aionui-panel
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-ssh': link:./packages/dsh-ssh
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-task-board': link:./packages/dsh-task-board
@@ -20,8 +24,8 @@ patchedDependencies:
   '@deepseek-ai/dsh-llm-pi-ai@0.1.5-rc.1': 54d6a658f670e01b18a27e5793bb596bbe8a6b1b55b67c70eb72cd5e1b8d3c3f
   '@deepseek-ai/dsh-subprocess-local@0.1.5-rc.1': 57c068bc9033203c1ec5278593c43696de40275b18958440ad3d433ea3fb8b51
   '@linxin666/dsh-chat-recovery@0.2.5': 21d4309825eeee6710c22af349c746b9bff607046b05cd508813ccd858a2b9fe
-  '@linxin666/dsh-client-ui-skin-center@0.2.5': 8f289d659e48e5faac033fb9ec0558a48fcb3678f44bfec16c19b9d683cd797e
-  '@linxin666/dsh-desktop-launcher@0.2.5': ac7eeea5303d5fd90e338bc19ee9d34bc6bebafb19bd10b0d098708cbf911f63
+  '@linxin666/dsh-client-ui-model-capabilities@0.3.20': 81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4
+  '@linxin666/dsh-client-ui-skin-center@0.2.5': 12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae
   '@linxin666/dsh-liangshen@0.2.5': 1aead417e1872c887dbfff48bc1638f2f84e248f1689b73397c2aafb30f106f5
   '@linxin666/dsh-pet@0.2.5': a26b9f8340b17eed227d37b3c2f2bee24e05ac72f77af842b8193cee895d125b
   '@linxin666/dsh-web-ui-all@0.2.5': 3b5b2f033a6f4ffd26246c6a1dfb6d2467cb47edd7c6b1546d2b3d094a02a75a
@@ -295,9 +299,18 @@ importers:
       '@linxin666/dsh-client-ui-mode-switcher':
         specifier: workspace:*
         version: link:../../packages/dsh-mode-switcher
+      '@linxin666/dsh-client-ui-model-capabilities':
+        specifier: 0.3.20
+        version: 0.3.20(patch_hash=81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4)(react@18.3.1)
+      '@linxin666/dsh-client-ui-plugin-manager':
+        specifier: 0.3.20
+        version: 0.3.20(react@18.3.1)
+      '@linxin666/dsh-client-ui-skill-explorer':
+        specifier: 0.3.20
+        version: 0.3.20(react@18.3.1)
       '@linxin666/dsh-client-ui-skin-center':
         specifier: 0.2.5
-        version: 0.2.5(patch_hash=8f289d659e48e5faac033fb9ec0558a48fcb3678f44bfec16c19b9d683cd797e)(react@18.3.1)
+        version: 0.2.5(patch_hash=12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae)(react@18.3.1)
       '@linxin666/dsh-client-ui-web-ui-settings':
         specifier: workspace:*
         version: link:../../packages/dsh-web-ui-settings
@@ -307,6 +320,9 @@ importers:
       '@linxin666/dsh-desktop-compat':
         specifier: workspace:*
         version: link:../../packages/dsh-desktop-compat
+      '@linxin666/dsh-desktop-launcher':
+        specifier: 0.3.13
+        version: 0.3.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-desktop-repair':
         specifier: workspace:*
         version: link:../../packages/dsh-desktop-repair
@@ -322,9 +338,15 @@ importers:
       '@linxin666/dsh-remote-web-ui':
         specifier: workspace:*
         version: link:../../packages/dsh-remote-web-ui
+      '@linxin666/dsh-session-archive':
+        specifier: 0.3.20
+        version: 0.3.20(react@18.3.1)
       '@linxin666/dsh-tool-describe-image':
         specifier: workspace:*
         version: link:../../packages/dsh-tool-describe-image
+      '@linxin666/dsh-usage':
+        specifier: 0.3.20
+        version: 0.3.20(react@18.3.1)
       '@linxin666/dsh-value-mode':
         specifier: workspace:*
         version: link:../../packages/dsh-value-mode
@@ -355,6 +377,9 @@ importers:
       '@xterm/xterm':
         specifier: 6.0.0
         version: 6.0.0
+      dsh-better-sidebar:
+        specifier: 0.14.0
+        version: 0.14.0(patch_hash=fac9d89323dc7e7b8947f3d9844c0c1dbf78ef483912fea1153d2d98122c679d)(d3466ef8c4c11d6bc461bd23997e6a2b)
       electron-updater:
         specifier: 6.8.9
         version: 6.8.9(supports-color@7.2.0)
@@ -5048,13 +5073,18 @@ packages:
     peerDependencies:
       react: ^18.2.0
 
-  '@linxin666/dsh-client-ui-plugin-manager@0.2.5':
-    resolution: {integrity: sha512-RAt/bT1oJWaQOWdHwM1xdf+yV4Pf+I7mPdkDAtJXAFe5GPruezSqwEDS5aAYmmkNQdTk5uPa/cnzIP9021Zy9g==}
+  '@linxin666/dsh-client-ui-model-capabilities@0.3.20':
+    resolution: {integrity: sha512-dUL6xJy+H4GK/k00OwXFpfmuEOBG2Ai9MV6xqm7aXi3IRtWxuKgOQX+jb2c+A1OXbpwCRv4OejuKlU93QT5NRg==}
     peerDependencies:
       react: ^18.2.0
 
-  '@linxin666/dsh-client-ui-skill-explorer@0.2.5':
-    resolution: {integrity: sha512-TiEOPleSCMO1EI0V7yZfjPKGxnDl7xT5SvqY2eN3+M/0bDtv/N7khgsTf28wXUnfHG9Ti1lNHL5wX3DUKD7C+A==}
+  '@linxin666/dsh-client-ui-plugin-manager@0.3.20':
+    resolution: {integrity: sha512-ymybTl6Eiu2bPaYNfxwFha9A6R8yr3tR8L0uGc5aL0T0v5pNeILK66TdRhB71kHPpJ5tb7NKldcZbdLdM+/Hsw==}
+    peerDependencies:
+      react: ^18.2.0
+
+  '@linxin666/dsh-client-ui-skill-explorer@0.3.20':
+    resolution: {integrity: sha512-dNn55ACSI263s56Ol9xOM0GfLS8BlGpIjtORPxAxdJFhhTZTiP6Mf96PU/YoqJrJyiUj+OOGi3jGWMWzYe/lBg==}
     peerDependencies:
       react: ^18.2.0
 
@@ -5068,8 +5098,8 @@ packages:
     peerDependencies:
       react: ^18.2.0
 
-  '@linxin666/dsh-desktop-launcher@0.2.5':
-    resolution: {integrity: sha512-IeFFaaALymjS2DZBHjOQl/NjEDQFM9oynlog6gvQpPPOfTY7fV8q8Yczfj9+edAPEXG3gx1fm61r87hFiO0mxw==}
+  '@linxin666/dsh-desktop-launcher@0.3.13':
+    resolution: {integrity: sha512-gjoXEYiGAK8+WF+RxD0UU3VJypamT4ZrHr3MUzJU8Yj1Ivzx329ONTPKdcZwkbiXgQoJc7q6wEYGXX24A94c1A==}
     engines: {node: ^22.19.0 || >=24.0.0}
     peerDependencies:
       react: ^18.2.0
@@ -5086,8 +5116,20 @@ packages:
       react: ^18.2.0
       react-dom: ^18.2.0
 
+  '@linxin666/dsh-session-archive@0.3.20':
+    resolution: {integrity: sha512-wfgzHLeEiqBObLMiL3ymmOuis+laZj+NSioWZ8dDYdD0zVZ5Fl2P26Sef2V1Yn8xt9yFPrMWccFmki5Q7rb9OQ==}
+    engines: {node: ^22.19.0 || >=24.0.0}
+    peerDependencies:
+      react: ^18.2.0
+
   '@linxin666/dsh-skins@0.2.5':
     resolution: {integrity: sha512-yB8Vw9y6+oMopktPbWvCFgEt6HRO6Zt+lwlUZei0dSNNdHeoi5pCZDqX9pTmNbMzwh8ioTbGLaXDYF7l/+LAkw==}
+
+  '@linxin666/dsh-usage@0.3.20':
+    resolution: {integrity: sha512-7l7x9E0ydQ9kA3rFeW8TEu5pr6vCF98zp5Kpgi9OkcncQKec84dO5m1NiTK/JAZ8CYA6vlvgIcG86Y9N6pZBOA==}
+    engines: {node: ^22.19.0 || >=24.0.0}
+    peerDependencies:
+      react: ^18.2.0
 
   '@linxin666/dsh-web-ui-all@0.2.5':
     resolution: {integrity: sha512-v8wggRtXF5mvxqZSpajMNujYLYfy5XvFMoo2ofI7IID8EBPx9D17aVt9asarr45Sj4gb3WNANFfTb89VAfRzJw==}
@@ -12605,16 +12647,21 @@ snapshots:
       react: 18.3.1
       schemastery: 3.18.0
 
-  '@linxin666/dsh-client-ui-plugin-manager@0.2.5(react@18.3.1)':
+  '@linxin666/dsh-client-ui-model-capabilities@0.3.20(patch_hash=81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4)(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      schemastery: 3.18.0
+
+  '@linxin666/dsh-client-ui-plugin-manager@0.3.20(react@18.3.1)':
     dependencies:
       react: 18.3.1
       yaml: 2.9.0
 
-  '@linxin666/dsh-client-ui-skill-explorer@0.2.5(react@18.3.1)':
+  '@linxin666/dsh-client-ui-skill-explorer@0.3.20(react@18.3.1)':
     dependencies:
       react: 18.3.1
 
-  '@linxin666/dsh-client-ui-skin-center@0.2.5(patch_hash=8f289d659e48e5faac033fb9ec0558a48fcb3678f44bfec16c19b9d683cd797e)(react@18.3.1)':
+  '@linxin666/dsh-client-ui-skin-center@0.2.5(patch_hash=12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae)(react@18.3.1)':
     dependencies:
       lightningcss: 1.32.0
       react: 18.3.1
@@ -12625,7 +12672,7 @@ snapshots:
       react: 18.3.1
       schemastery: 3.18.0
 
-  '@linxin666/dsh-desktop-launcher@0.2.5(patch_hash=ac7eeea5303d5fd90e338bc19ee9d34bc6bebafb19bd10b0d098708cbf911f63)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@linxin666/dsh-desktop-launcher@0.3.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -12642,11 +12689,21 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       schemastery: 3.18.0
 
+  '@linxin666/dsh-session-archive@0.3.20(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      schemastery: 3.18.0
+
   '@linxin666/dsh-skins@0.2.5(react@18.3.1)':
     dependencies:
-      '@linxin666/dsh-client-ui-skin-center': 0.2.5(patch_hash=8f289d659e48e5faac033fb9ec0558a48fcb3678f44bfec16c19b9d683cd797e)(react@18.3.1)
+      '@linxin666/dsh-client-ui-skin-center': 0.2.5(patch_hash=12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae)(react@18.3.1)
     transitivePeerDependencies:
       - react
+
+  '@linxin666/dsh-usage@0.3.20(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      schemastery: 3.18.0
 
   '@linxin666/dsh-web-ui-all@0.2.5(patch_hash=3b5b2f033a6f4ffd26246c6a1dfb6d2467cb47edd7c6b1546d2b3d094a02a75a)(d3466ef8c4c11d6bc461bd23997e6a2b)':
     dependencies:
@@ -12654,12 +12711,12 @@ snapshots:
       '@linxin666/dsh-client-ui-aionui-panel': link:packages/dsh-aionui-panel
       '@linxin666/dsh-client-ui-community-plugins': 0.2.5(react@18.3.1)
       '@linxin666/dsh-client-ui-git-graph': link:packages/dsh-git-graph
-      '@linxin666/dsh-client-ui-plugin-manager': 0.2.5(react@18.3.1)
-      '@linxin666/dsh-client-ui-skill-explorer': 0.2.5(react@18.3.1)
-      '@linxin666/dsh-client-ui-skin-center': 0.2.5(patch_hash=8f289d659e48e5faac033fb9ec0558a48fcb3678f44bfec16c19b9d683cd797e)(react@18.3.1)
+      '@linxin666/dsh-client-ui-plugin-manager': 0.3.20(react@18.3.1)
+      '@linxin666/dsh-client-ui-skill-explorer': 0.3.20(react@18.3.1)
+      '@linxin666/dsh-client-ui-skin-center': 0.2.5(patch_hash=12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae)(react@18.3.1)
       '@linxin666/dsh-client-ui-task-board': link:packages/dsh-task-board
       '@linxin666/dsh-client-ui-web-ui-settings': 0.2.5(react@18.3.1)
-      '@linxin666/dsh-desktop-launcher': 0.2.5(patch_hash=ac7eeea5303d5fd90e338bc19ee9d34bc6bebafb19bd10b0d098708cbf911f63)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@linxin666/dsh-desktop-launcher': 0.3.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-liangshen': 0.2.5(patch_hash=1aead417e1872c887dbfff48bc1638f2f84e248f1689b73397c2aafb30f106f5)
       '@linxin666/dsh-pet': 0.2.5(patch_hash=a26b9f8340b17eed227d37b3c2f2bee24e05ac72f77af842b8193cee895d125b)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-remote-web-ui': link:packages/dsh-remote-web-ui

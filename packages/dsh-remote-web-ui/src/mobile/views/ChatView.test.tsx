@@ -423,6 +423,82 @@ describe('ChatView composer', () => {
   })
 })
 
+describe('ChatView composer request boundaries', () => {
+  function deferred() {
+    let resolve!: () => void
+    let reject!: (reason: Error) => void
+    const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no })
+    return { promise, resolve, reject }
+  }
+
+  async function openChat() {
+    loadHistoryMock.mockResolvedValue(historyPage(turnEvents()))
+    const view = render(<ChatView session={session} onBack={() => {}} />)
+    await screen.findByText('已完成修改')
+    return { ...view, input: screen.getByRole('textbox') as HTMLTextAreaElement }
+  }
+
+  it('keeps a later draft when the earlier send completes, including edits back to the same text', async () => {
+    const pending = deferred()
+    promptMock.mockReturnValueOnce(pending.promise)
+    const { input } = await openChat()
+    fireEvent.change(input, { target: { value: 'first' } })
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    fireEvent.change(input, { target: { value: 'second' } })
+    fireEvent.change(input, { target: { value: 'first' } })
+    await act(async () => { pending.resolve() })
+    expect(input.value).toBe('first')
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(promptMock).toHaveBeenCalledWith(session.sessionId, 'first')
+  })
+
+  it('clears an unchanged successful draft and preserves a failed draft for retry', async () => {
+    const { input } = await openChat()
+    fireEvent.change(input, { target: { value: 'accepted' } })
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    await waitFor(() => expect(input.value).toBe(''))
+    promptMock.mockRejectedValueOnce(new Error('request unavailable'))
+    fireEvent.change(input, { target: { value: 'retry me' } })
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    await screen.findByText('request unavailable')
+    expect(input.value).toBe('retry me')
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    await waitFor(() => expect(input.value).toBe(''))
+    expect(promptMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not send the Enter used to confirm an IME composition', async () => {
+    const { input } = await openChat()
+    fireEvent.change(input, { target: { value: '中文内容' } })
+    fireEvent.compositionStart(input)
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true, keyCode: 229 })
+    expect(promptMock).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(input)
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(promptMock).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 })
+    await waitFor(() => expect(promptMock).toHaveBeenCalledWith(session.sessionId, '中文内容'))
+  })
+
+  it('ignores a send result from the previous session while the current send is pending', async () => {
+    const oldSend = deferred()
+    const newSend = deferred()
+    promptMock.mockReturnValueOnce(oldSend.promise).mockReturnValueOnce(newSend.promise)
+    const { input, rerender } = await openChat()
+    fireEvent.change(input, { target: { value: 'old session' } })
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    rerender(<ChatView session={{ ...session, sessionId: 's-2' }} onBack={() => {}} />)
+    fireEvent.change(input, { target: { value: 'current session' } })
+    fireEvent.click(screen.getByRole('button', { name: /^发送$/ }))
+    await act(async () => { oldSend.resolve() })
+    expect(input.value).toBe('current session')
+    expect(screen.getByRole('button', { name: /^发送中…$/ }).hasAttribute('disabled')).toBe(true)
+    await act(async () => { newSend.resolve() })
+    expect(input.value).toBe('')
+    expect(promptMock).toHaveBeenLastCalledWith('s-2', 'current session')
+  })
+})
+
 describe('ChatView scrolling', () => {
   // Controllable scrollHeight + a write log for the chat-scroll element. The
   // accessors live on Element.prototype, so patching them here lets every

@@ -48,7 +48,7 @@ const baseApi = {
   getStatus: () => ipcRenderer.invoke('desktop:status'),
   getRepairStatus: () => ipcRenderer.invoke('desktop:repair-status'),
   retryRepair: () => ipcRenderer.invoke('desktop:repair-retry'),
-  setWindowChromeTheme: (theme) => ipcRenderer.invoke('desktop:window-chrome-theme', theme),
+  setWindowChromeTheme: (theme, palette) => ipcRenderer.invoke('desktop:window-chrome-theme', theme, palette),
   showNotification: (notification) => ipcRenderer.invoke('desktop:notification-show', notification),
   openWorkspaceFile: (request) => ipcRenderer.invoke('desktop:workspace-file-open', request),
   onStatus: createSubscription('desktop:status', 'status'),

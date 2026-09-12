@@ -1,5 +1,7 @@
 import { createCommunityQrImage } from './community.mjs'
 import { createDockSettingsView } from './dock-settings-view.mjs'
+import { applyWindowPalette } from './window-palette.mjs'
+import { getWindowPalette } from './window-chrome.mjs'
 import { DESKTOP_SURFACES } from './desktop-contract.mjs'
 import { applyWindowIcon } from './app-icon.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
@@ -238,7 +240,11 @@ export function createDesktopWindowFactory({
       removeWindowChrome()
       if (windows.get(key) === browserWindow) windows.delete(key)
     })
-    return browserWindow.loadFile(filePath, { query: { ...query, theme: chromeTheme } })
+    return browserWindow.loadFile(filePath, { query: { ...query, theme: chromeTheme } }).then(() => {
+      const palette = getWindowPalette(getMainWindow())
+      setWindowChromeTheme(browserWindow, chromeTheme, palette)
+      return browserWindow.webContents.executeJavaScript(`(${applyWindowPalette.toString()})(document, ${JSON.stringify(palette)})`)
+    })
   }
 
   const getAuxiliaryWindow = (key) => {
@@ -384,12 +390,13 @@ export function createDesktopWindowFactory({
     return operation
   }
 
-  const syncTheme = (theme) => {
+  const syncTheme = (theme, palette) => {
     dockSettings?.syncTheme(theme)
+    if (palette !== undefined) dockSettings?.syncPalette(palette)
     for (const browserWindow of windows.values()) {
       if (!browserWindow || browserWindow.isDestroyed()) continue
-      setWindowChromeTheme(browserWindow, theme)
-      const script = `document.documentElement.dataset.dshDesktopTheme = ${JSON.stringify(theme)}; document.documentElement.dataset.dshDesktopChromeTheme = ${JSON.stringify(theme)}`
+      setWindowChromeTheme(browserWindow, theme, palette)
+      const script = `document.documentElement.dataset.dshDesktopTheme = ${JSON.stringify(theme)}; document.documentElement.dataset.dshDesktopChromeTheme = ${JSON.stringify(theme)}; (${applyWindowPalette.toString()})(document, ${JSON.stringify(getWindowPalette(browserWindow))})`
       void browserWindow.webContents.executeJavaScript(script).catch(() => {})
     }
   }

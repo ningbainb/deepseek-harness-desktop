@@ -11,6 +11,7 @@ import css from '../board.module.css'
 import { NewTaskModal } from './NewTaskModal.tsx'
 import { TaskCard } from './TaskCard.tsx'
 import { TaskDetail } from './TaskDetail.tsx'
+import { PersistenceNotice } from './PersistenceNotice.tsx'
 
 /** Column status → locale key. */
 const STATUS_KEY: Record<TaskStatus, TaskBoardKey> = {
@@ -81,6 +82,8 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
         </button>
       </header>
 
+      <PersistenceNotice controller={controller} status={snapshot.persistence} />
+
       <div className={css.columns}>
         {COLUMNS.map(column => {
           const tasks = visible.filter(task => task.status === column.status)
@@ -103,7 +106,7 @@ export function TaskBoard({ controller }: { controller: BoardController }) {
       </div>
 
       {selected !== undefined && (
-        <TaskDetail controller={controller} task={selected} evidence={controller.getLatestEvidence(selected.id)} />
+        <TaskDetail controller={controller} task={selected} evidence={controller.getLatestEvidence(selected.id)} persistence={snapshot.persistence} />
       )}
       {showNew && (
         <NewTaskModal

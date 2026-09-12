@@ -14,6 +14,7 @@ import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
 import { normalizeFeatureEvent } from './feature-telemetry.mjs'
+import { normalizeWindowPalette } from './window-palette.mjs'
 
 // 'launch-builtins' was accepted here through 3.0.x. It had no implementation
 // and no caller, so it fell through to the exit branch below - sending it quit
@@ -292,9 +293,11 @@ export function registerDesktopStartupIpc({
     const status = typeof getStatus === 'function' ? await getStatus() : { state: 'starting' }
     return publicRuntimeStatus(status)
   })
-  ipcMain.handle('desktop:window-chrome-theme', (event, rawTheme) => {
+  ipcMain.handle('desktop:window-chrome-theme', (event, rawTheme, rawPalette) => {
     assertMain(event)
-    return setWindowChromeTheme(event.sender, normalizeWindowChromeTheme(rawTheme))
+    const theme = normalizeWindowChromeTheme(rawTheme)
+    const palette = normalizeWindowPalette(rawPalette)
+    return palette === undefined ? setWindowChromeTheme(event.sender, theme) : setWindowChromeTheme(event.sender, theme, palette)
   })
   ipcMain.handle('desktop:update-status', (event) => {
     assertMain(event)
@@ -568,9 +571,10 @@ export function registerDesktopIpc({
     if (action === 'exit') exitApp()
     return undefined
   })
-  handle('desktop:window-chrome-theme', [main, extensions], (event, _surface, rawTheme) => {
+  handle('desktop:window-chrome-theme', [main, extensions], (event, _surface, rawTheme, rawPalette) => {
     const theme = normalizeWindowChromeTheme(rawTheme)
-    return setWindowChromeTheme?.(event.sender, theme)
+    const palette = normalizeWindowPalette(rawPalette)
+    return palette === undefined ? setWindowChromeTheme?.(event.sender, theme) : setWindowChromeTheme?.(event.sender, theme, palette)
   })
   handle('desktop:help-action', main, async (_event, _surface, rawAction) => {
     const action = normalizeHelpAction(rawAction)

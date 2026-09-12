@@ -15,6 +15,7 @@ const dshHome = join(temporary, 'dsh-home')
 const userData = join(temporary, 'user-data')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
 const timings = {}
+const errors = []
 let app
 let settings
 let blocked = false
@@ -39,7 +40,6 @@ try {
   const dock = opened.dock
   settings = opened.settings
   timings.coldDockMs = Math.round(performance.now() - start)
-  const errors = []
   settings.on('pageerror', error => errors.push(error.message))
   const requests = []
   settings.on('request', request => { if (isCatalog(request)) requests.push(new URL(request.url()).pathname) })
@@ -112,7 +112,17 @@ try {
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
 } catch (error) {
-  console.error('Dock catalog fixture', await settings?.evaluate(() => ({ dialog: document.querySelector('[data-value-mode-model-picker]')?.textContent, pane: document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-dsh-dock-settings') })).catch(() => undefined))
+  console.error('Dock catalog fixture', { errors, page: await settings?.evaluate(() => ({
+    url: location.href,
+    readyState: document.readyState,
+    dialog: document.querySelector('[data-value-mode-model-picker]')?.textContent,
+    pane: document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-dsh-dock-settings'),
+    alerts: [...document.querySelectorAll('[role="alert"]')].map(item => item.textContent),
+    body: document.body?.innerText.slice(0, 1800),
+  })).catch(() => undefined) })
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    await settings?.screenshot({ path: join(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS, 'model-catalog-failure.png') }).catch(() => {})
+  }
   throw error
 } finally {
   blocked = false

@@ -144,6 +144,28 @@ test('window chrome IPC accepts only supported themes', () => {
   }
 })
 
+test('startup and full IPC validate the same native palette contract', async () => {
+  const palette = { background: '#112233', foreground: '#ddeeff', accent: '#3366ff', border: '#445566' }
+  for (const register of [registerDesktopStartupIpc, registerDesktopIpc]) {
+    const handlers = new Map(), sender = {}, calls = []
+    const surfaceRegistry = new DesktopSurfaceRegistry()
+    surfaceRegistry.register(sender, 'main')
+    const unregister = register({
+      ipcMain: { handle: (channel, handler) => handlers.set(channel, handler), removeHandler: channel => handlers.delete(channel) },
+      surfaceRegistry,
+      controller: new EventEmitter(),
+      setWindowChromeTheme: (...args) => calls.push(args),
+    })
+    try {
+      const handler = handlers.get('desktop:window-chrome-theme')
+      await handler({ sender }, 'light', palette)
+      assert.deepEqual(calls, [[sender, 'light', palette]])
+      await assert.rejects(async () => handler({ sender }, 'dark', { ...palette, background: 'url(https://invalid.test)' }))
+      assert.equal(calls.length, 1, 'invalid colors never reach the native window')
+    } finally { unregister() }
+  }
+})
+
 test('window chrome Help IPC accepts only fixed application actions', () => {
   for (const action of ['community', 'downloads', 'feedback', 'project', 'sponsor', 'privacy', 'updates']) {
     assert.equal(normalizeHelpAction(action), action)

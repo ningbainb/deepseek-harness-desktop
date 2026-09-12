@@ -205,6 +205,38 @@ try {
   }
   assert.ok(state.rootBounds && state.rootBounds.top >= 31, `root overlaps title bar: ${JSON.stringify(state.rootBounds)}`)
   assert.ok(state.rootBounds.bottom <= viewportHeight + 1, `root exceeds safe viewport: ${JSON.stringify(state.rootBounds)}`)
+  const positionedRootFrames = await page.evaluate(async () => {
+    const root = document.querySelector('body > #root')
+    const originalStyle = root.getAttribute('style')
+    const ownedInset = root.classList.contains('dsh-desktop-viewport-root')
+    const frames = []
+    const paint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    try {
+      for (const position of ['absolute', 'fixed']) {
+        root.style.setProperty('position', position)
+        root.style.setProperty('top', '0px')
+        root.style.setProperty('left', '0px')
+        root.style.setProperty('width', '100%')
+        for (let i = 0; i < 12; i++) {
+          const mutation = document.createElement('span')
+          mutation.hidden = true
+          root.append(mutation)
+          await paint()
+          frames.push({ position, top: root.getBoundingClientRect().top })
+          mutation.remove()
+        }
+      }
+    } finally {
+      if (originalStyle === null) root.removeAttribute('style')
+      else root.setAttribute('style', originalStyle)
+      if (!ownedInset) root.classList.remove('dsh-desktop-viewport-root')
+      await paint()
+    }
+    return frames
+  })
+  assert.equal(positionedRootFrames.length, 24)
+  assert.ok(positionedRootFrames.every(frame => frame.top >= 31 && frame.top <= 33),
+    `positioned root caption inset must remain stable across mutations: ${JSON.stringify(positionedRootFrames)}`)
   assert.ok(state.frameBounds && state.frameBounds.top >= 31, `frame overlaps title bar: ${JSON.stringify(state.frameBounds)}`)
   assert.ok(state.frameBounds.bottom <= viewportHeight + 1, `frame exceeds safe viewport: ${JSON.stringify(state.frameBounds)}`)
   assert.equal(state.chromeCount, 1)

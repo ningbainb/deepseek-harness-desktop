@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import type { DesktopPalette } from './desktop-appearance.ts'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import css from './dock-settings.module.css'
 
-export const DOCK_SETTINGS = ['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'] as const
+export const DOCK_SETTINGS = ['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
+
+export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'dsh-session-archive' } as const
+function sectionFor(id: DockSetting): string | undefined { return DOCK_SECTIONS[id as keyof typeof DOCK_SECTIONS] }
 
 export function isDockSetting(value: unknown): value is DockSetting {
   return typeof value === 'string' && DOCK_SETTINGS.includes(value as DockSetting)
@@ -17,10 +21,11 @@ export function dockSettingFromUrl(): DockSetting | undefined {
 }
 
 /** Dedicated runtime document in the Dock; all forms keep their official slot bindings. */
-export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plugin.item'> & PropsLocale<'web-ui-plugins'>) {
+export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plugin.item' | 'settings.section'> & PropsLocale<'web-ui-plugins'>) {
   const [selected, setSelected] = useState<DockSetting>(() => dockSettingFromUrl() ?? 'value-mode')
   const [theme, setTheme] = useState(() => new URLSearchParams(window.location.search).get('desktop-dock-theme') === 'dark' ? 'dark' : 'light')
   const [visited, setVisited] = useState<DockSetting[]>([selected])
+  const [palette, setPalette] = useState<DesktopPalette | null>(null)
   const navigateTo = (next: DockSetting) => {
     setSelected(next)
     setVisited(previous => previous.includes(next) ? previous : [...previous, next])
@@ -34,14 +39,24 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
     window.addEventListener('dsh:dock-setting', navigate)
     const syncTheme = (event: Event) => setTheme((event as CustomEvent).detail === 'dark' ? 'dark' : 'light')
     window.addEventListener('dsh:dock-theme', syncTheme)
+    const syncPalette = (event: Event) => setPalette((event as CustomEvent<DesktopPalette | null>).detail)
+    window.addEventListener('dsh:dock-palette', syncPalette)
     return () => {
       window.removeEventListener('dsh:dock-setting', navigate)
       window.removeEventListener('dsh:dock-theme', syncTheme)
+      window.removeEventListener('dsh:dock-palette', syncPalette)
     }
   }, [])
   const personal = selected === 'personal-prompt' || selected === 'memory'
-  return <main className={css.page} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{t(selected === 'particle-theme' ? 'dockDesktopGroup' : 'dockAiGroup')} / {t(personal ? 'dockPersonal' : selected === 'relay' ? 'dockModels' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision')}</p>
+  const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions' } as const
+  const sectionTitle = sectionTitles[selected as keyof typeof sectionTitles]
+  const paletteStyle = palette ? {
+    '--dsw-alias-bg-layer-1': palette.background, '--dsw-alias-bg-layer-2': palette.background, '--dsw-alias-bg-layer-3': palette.background,
+    '--dsw-alias-label-primary': palette.foreground, '--dsw-alias-label-secondary': palette.foreground,
+    '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
+  } as CSSProperties : undefined
+  return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
+    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'relay' ? 'dockModels' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -56,7 +71,9 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
     </>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
-        {renderSlot('web-ui.plugin.item', {}, { only: id, fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
+        {sectionFor(id)
+          ? renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })
+          : renderSlot('web-ui.plugin.item', {}, { only: id, fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
       </SafePluginBoundary>
     </section>)}
   </main>

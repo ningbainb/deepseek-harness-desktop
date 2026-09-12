@@ -10,6 +10,8 @@ A hot-pluggable DeepSeek Harness (DSH) client GUI plugin: it adds a **task board
 
 ## Features
 
+- **Save recovery**: the board and task details distinguish pending saves, unsaved drafts, and concurrent-edit conflicts. Failed changes remain in this window for retry; closing or refreshing loses them. Retry reads the latest ledger and merges only compatible changes, preserving Host execution state. Explicit reload asks before discarding a draft and replaces it only after a successful read. Scheduled tasks continue using their last saved settings; new executions require a successful save.
+
 - **Sidebar entry**: injects a "任务看板" (task board) entry row inside the sidebar column (`[data-pane="sidebar"]` on older shells, `[class*="sidebarCol"]` on the DSH 0.1.0-rc.6 AppFrame layout) below the new-session button (wide rail shows icon + text, collapsed rail shows a bare icon, adapting to DSH skin tokens).
 - **Multi-column board**: five columns — 待规划 (to plan) / 待办 (to do) / 进行中 (in progress) / 已完成 (done) / 已失败 (failed); cards show title, description, status, update time, and execution count; the top supports search filter, new task, and back to chat.
 - **Task details**: click a card to open details (title/description/execution prompt/execution log) — it does **not** execute on a single click; the details offer "执行 / 重新执行" (Run / Re-run), "删除" (Delete, with confirm), "查看会话" (View session, jumps to the execution transcript), and a manual move to 待规划/待办.

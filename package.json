@@ -39,8 +39,10 @@
     "docs:write-pair": "node scripts/verify-docs.mjs --write",
     "sync-shared": "node scripts/sync-shared.mjs",
     "sync-shared:check": "node scripts/sync-shared.mjs --check",
-    "feature-baseline:check": "node scripts/verify-feature-baseline.mjs --check",
+    "builtin-plugin-adaptation:check": "node scripts/verify-builtin-plugin-adaptation.mjs",
+    "feature-baseline:check": "node scripts/verify-feature-baseline.mjs --check && node scripts/verify-builtin-plugin-adaptation.mjs",
     "desktop:regression:e2e": "pnpm --filter @deepseek-ai/dsh-desktop test:regression:e2e",
+    "desktop:plugin-adaptation:e2e": "pnpm --filter @deepseek-ai/dsh-desktop test:plugin-adaptation:e2e",
     "desktop:regression:e2e:full": "pnpm --filter @deepseek-ai/dsh-desktop test:regression:e2e:full"
   },
   "engines": {

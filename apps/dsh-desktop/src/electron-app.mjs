@@ -149,7 +149,7 @@ import { UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
-import { attachWindowStatePersistence, loadWindowState } from './window-state.mjs'
+import { attachWindowStatePersistence, loadWindowStateForRestore } from './window-state.mjs'
 import { ConversationImportService } from './conversation-import/service.mjs'
 import { createUpdateShutdownCoordinator } from './update-shutdown-coordinator.mjs'
 import {
@@ -694,7 +694,7 @@ export async function startElectronApp(metadata) {
   }
   const statePath = desktopWindowStatePath
   const settingsWindowStateStore = new SettingsWindowStateStore(settingsWindowStatePath)
-  const state = await loadWindowState(statePath, screen.getAllDisplays())
+  const { state, restoredBounds } = await loadWindowStateForRestore(statePath, screen.getAllDisplays())
   const surfaceRegistry = new DesktopSurfaceRegistry()
   mainWindow = createMainWindow({
     BrowserWindow,
@@ -804,15 +804,15 @@ export async function startElectronApp(metadata) {
     getStatus: () => runtimeProvider?.status ?? { state: 'starting' },
     ipcMain,
     surfaceRegistry,
-    setWindowChromeTheme: (sender, theme) => {
+    setWindowChromeTheme: (sender, theme, palette) => {
       const target = BrowserWindow.fromWebContents(sender)
       if (!target || target.isDestroyed()) return undefined
-      return setWindowChromeTheme(target, theme)
+      return setWindowChromeTheme(target, theme, palette)
     },
   })
   if (state.maximized) mainWindow.maximize()
   const saveWindowState = attachWindowStatePersistence(mainWindow, statePath, {
-    restoredBounds: process.platform === 'win32' ? state : undefined,
+    restoredBounds: process.platform === 'win32' ? restoredBounds : undefined,
   })
   let activeOrigin
   let updateController
@@ -1769,12 +1769,12 @@ export async function startElectronApp(metadata) {
       window.webContents.send('extensions:plugin-install-prefill', { spec })
       await logStore.append(`[extensions] plugin install request received for a ${spec.split(':')[0] === 'git' ? 'git' : 'registry'} source`).catch(() => {})
     },
-    setWindowChromeTheme: (sender, theme) => {
+    setWindowChromeTheme: (sender, theme, palette) => {
       const target = BrowserWindow.fromWebContents(sender)
       if (!target || target.isDestroyed()) return undefined
-      const applied = setWindowChromeTheme(target, theme)
+      const applied = setWindowChromeTheme(target, theme, palette)
       if (target === mainWindow) {
-        desktopWindowFactory.syncTheme(applied)
+        desktopWindowFactory.syncTheme(applied, palette)
         syncTerminalPanelTheme(applied)
       }
       return applied

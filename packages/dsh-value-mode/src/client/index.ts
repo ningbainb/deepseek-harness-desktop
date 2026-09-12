@@ -22,6 +22,7 @@ import { ValueModeHeroOnboarding } from './ValueModeHeroOnboarding.tsx'
 import type { ValueModeModelCatalog } from './ModelPicker.tsx'
 import { reportValueModeTelemetry } from './telemetry.ts'
 import { createModelCatalogLoader } from './model-catalog.ts'
+import { createValueModeSettingsWriter } from './settings-write.ts'
 
 export { ValueModeSettingsCard } from './ValueModeSettingsCard.tsx'
 export { ValueModeHeaderStatus } from './ValueModeHeaderStatus.tsx'
@@ -222,11 +223,7 @@ export function apply(ctx: ClientContext): void {
 
   const fetchModels = createModelCatalogLoader(ctx, ctx.locale.bind('value-mode'))
 
-  const onChange = async (patch: Partial<ValueModeConfig>): Promise<void> => {
-    for (const [key, value] of Object.entries(patch)) {
-      await scope.set(key, value)
-    }
-  }
+  const onChange = createValueModeSettingsWriter(scope, ctx.locale.bind('value-mode'))
 
   ctx.effect(
     () => mountHeroOnboarding({

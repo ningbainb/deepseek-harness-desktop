@@ -17,6 +17,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { decodeBase64, isImageMimeType, sniffMimeType, DEFAULT_MAX_BYTES, type ImageMimeType } from './media.ts'
+import type { ImageCapability } from './model-capability.ts'
 
 /** Request-body byte cap: base64 of a {@link DEFAULT_MAX_BYTES} image plus envelope slack. */
 export const MAX_ATTACH_BODY_BYTES = 16 * 1024 * 1024
@@ -231,7 +232,11 @@ async function serveRawImage(ctx: Context, req: IncomingMessage, res: ServerResp
  * @param ctx - registrant context; webServer is required.
  * @param readMaxBytes - per-request byte-bound reader (defaults to the constant).
  */
-export function registerAttachRoute(ctx: Context, readMaxBytes: () => number = () => DEFAULT_MAX_BYTES): void {
+export function registerAttachRoute(
+  ctx: Context,
+  readMaxBytes: () => number = () => DEFAULT_MAX_BYTES,
+  probe?: (sessionId: string) => Promise<ImageCapability>,
+): void {
   const webserver = ctx.get('webServer')
   if (webserver === undefined) return
   webserver.register({
@@ -243,6 +248,15 @@ export function registerAttachRoute(ctx: Context, readMaxBytes: () => number = (
       // content-addressed and loopback-only, so a bare read carries no
       // secrets; the store's digest verification still runs.
       if (req.method === 'GET') {
+        const url = new URL(req.url ?? '/', 'http://x')
+        if (url.pathname === '/describe-image/capability') {
+          const sessionId = url.searchParams.get('session') ?? ''
+          const value = probe === undefined || sessionId === ''
+            ? { acceptsImages: false, known: false } : await probe(sessionId)
+          res.setHeader('cache-control', 'no-store')
+          json(res, { ok: true, value })
+          return
+        }
         await serveRawImage(ctx, req, res)
         return
       }

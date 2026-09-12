@@ -11,6 +11,7 @@ import { ValueModeHeaderStatus } from "./ValueModeHeaderStatus.js";
 import { ValueModeHeroOnboarding } from "./ValueModeHeroOnboarding.js";
 import { reportValueModeTelemetry } from "./telemetry.js";
 import { createModelCatalogLoader } from "./model-catalog.js";
+import { createValueModeSettingsWriter } from "./settings-write.js";
 export { ValueModeSettingsCard } from "./ValueModeSettingsCard.js";
 export { ValueModeHeaderStatus } from "./ValueModeHeaderStatus.js";
 export { ValueModeHeroOnboarding } from "./ValueModeHeroOnboarding.js";
@@ -173,11 +174,7 @@ export function apply(ctx) {
     const scope = binder.bind({ namespace: VALUE_MODE_SETTINGS_NAMESPACE });
     const defaultModelScope = binder.bind({ namespace: 'agent-default-model' });
     const fetchModels = createModelCatalogLoader(ctx, ctx.locale.bind('value-mode'));
-    const onChange = async (patch) => {
-        for (const [key, value] of Object.entries(patch)) {
-            await scope.set(key, value);
-        }
-    };
+    const onChange = createValueModeSettingsWriter(scope, ctx.locale.bind('value-mode'));
     ctx.effect(() => mountHeroOnboarding({
         scope,
         defaultModelScope: defaultModelScope,

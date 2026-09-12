@@ -1141,7 +1141,7 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'relay-tab': 'sliders', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'models-tab': 'cpu', 'relay-tab': 'sliders', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
@@ -1213,6 +1213,10 @@ for (const tab of tabs) {
   })
 }
 const searchEntries = [
+  ['皮肤与壁纸', '外观 试穿 配色 背景 Wallpaper 主题', 'appearance-tab'],
+  ['模型与能力', '模型目录 图片输入 推理档位 供应商 启用 停用', 'models-tab'],
+  ['用量与余额', '统计 token 额度 套餐 费用 供应商', 'usage-tab'],
+  ['会话管理', '聊天历史 搜索 归档 恢复 清理', 'sessions-tab'],
   ['模型接入', '供应商 bai 中转站 登录 账号 充值 API Key', 'relay-tab'],
   ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
   ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
@@ -1425,7 +1429,7 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
   }
   const copyDiagnosticsButton = event.target.closest('[data-copy-plugin-diagnostics]')
   if (copyDiagnosticsButton) {
-    const plugin = pluginInventory.find((item) => item.name === copyDiagnosticsButton.dataset.copyPluginDiagnostics)
+    const plugin = cachedPlugins.find((item) => item.name === copyDiagnosticsButton.dataset.copyPluginDiagnostics)
     if (plugin) {
       const diagnostics = {
         plugin: plugin.name,
@@ -1448,17 +1452,21 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
   if (updateButton) {
     const allowUnknown = updateButton.dataset.updateCompatibility === 'unknown'
     if (allowUnknown && !await confirmUnknownCompatibility('更新失败时，当前版本会继续保留。')) return
-    await extensionOperations.run(async () => {
+    const updated = await extensionOperations.run(async () => {
       try {
         const result = await window.dshDesktop.updatePlugin(updateButton.dataset.updatePlugin, allowUnknown)
         notify(`${result.name} 已更新`)
         await refresh()
-        await checkPluginUpdates({ silent: true, skipAutoUpdate: true })
+        return true
       } catch (error) {
         await showPluginFailure(error, '插件更新失败')
         await refresh()
+        return false
       }
     })
+    // An existing check can be waiting for automatic updates on this queue.
+    // Release the manual operation before joining that check.
+    if (updated) await checkPluginUpdates({ silent: true, skipAutoUpdate: true })
     return
   }
   const button = event.target.closest('[data-remove-plugin]')
@@ -1691,30 +1699,34 @@ document.querySelector('#open-conversation-import')?.addEventListener('click', (
 })
 document.querySelector('#reset-profile-env')?.addEventListener('click', async () => {
   await extensionOperations.run(async () => {
-    try {
-      const preview = await window.dshDesktop.previewProfileReset()
-      const confirmed = await showPluginDialog({
-        title: '修复插件环境？',
-        description: '修复只会重建插件运行环境，不会删除聊天、设置、模型服务商、API 配置或个人数据。',
-        details: `当前环境约 ${formatFileSize(preview.currentProfileBytes)}，所需可用空间 ${formatFileSize(preview.requiredFreeBytes)}。原环境会先安全备份。`,
-        confirmLabel: '修复',
-      })
-      if (!confirmed) return
-      const result = await window.dshDesktop.resetProfile({ timestamp: preview.timestamp })
-      void result
-      notify('插件环境已修复')
-      await refresh()
-    } catch (error) {
-      const action = await showPluginDialog({
-        title: '插件环境修复失败',
-        description: '原有聊天、设置和个人数据没有改变。你可以重试，或导出诊断信息用于反馈。',
-        details: normalizedErrorMessage(error),
-        confirmLabel: '重试',
-        cancelLabel: '导出诊断信息',
-        returnValue: true,
-      })
-      if (action === 'confirm') document.querySelector('#reset-profile-env').click()
-      if (action === 'cancel') document.querySelector('#export-diagnostics').click()
+    for (;;) {
+      try {
+        const preview = await window.dshDesktop.previewProfileReset()
+        const confirmed = await showPluginDialog({
+          title: '修复插件环境？',
+          description: '修复只会重建插件运行环境，不会删除聊天、设置、模型服务商、API 配置或个人数据。',
+          details: `当前环境约 ${formatFileSize(preview.currentProfileBytes)}，所需可用空间 ${formatFileSize(preview.requiredFreeBytes)}。原环境会先安全备份。`,
+          confirmLabel: '修复',
+        })
+        if (!confirmed) return
+        await window.dshDesktop.resetProfile({ timestamp: preview.timestamp })
+        notify('插件环境已修复')
+        await refresh()
+        return
+      } catch (error) {
+        const action = await showPluginDialog({
+          title: '插件环境修复失败',
+          description: '原有聊天、设置和个人数据没有改变。你可以重试，或导出诊断信息用于反馈。',
+          details: normalizedErrorMessage(error),
+          confirmLabel: '重试',
+          cancelLabel: '导出诊断信息',
+          returnValue: true,
+        })
+        // Retry the operation directly; its mutation button is still disabled.
+        if (action === 'confirm') continue
+        if (action === 'cancel') document.querySelector('#export-diagnostics').click()
+        return
+      }
     }
   })
 })

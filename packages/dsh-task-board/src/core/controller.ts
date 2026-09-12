@@ -27,6 +27,7 @@ import { applyCreateTask } from './use-cases/task-create.ts'
 import { applyDeleteTask } from './use-cases/task-delete.ts'
 import { applyScheduleNextRun as applyScheduleRollForward, applySetSchedule } from './use-cases/task-schedule.ts'
 import { applyUpdateTask } from './use-cases/task-update.ts'
+import { rebaseTaskDraft, TaskDraftConflictError, type PersistenceStatus } from './persistence.ts'
 
 /** The sessions face the controller needs for navigation awareness. */
 export interface SessionsControllerFace {
@@ -80,6 +81,8 @@ export interface ControllerSnapshot {
   tasks: readonly TaskRecord[]
   boardOpen: boolean
   selectedTaskId: string | undefined
+  /** Local changes are authoritative only after this returns to saved. */
+  persistence: PersistenceStatus
 }
 
 /** The selected task (resolved from the ledger), or undefined. */
@@ -106,7 +109,7 @@ function currentOf(sessions: SessionsControllerFace): string | undefined {
 }
 
 function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
-  return typeof (value as { then?: unknown })?.then === 'function'
+  return value !== null && value !== undefined && typeof (value as { then?: unknown }).then === 'function'
 }
 
 type SettledExecutionEvent = Extract<ExecutionEvent, { kind: 'settled' }>
@@ -191,6 +194,19 @@ export class BoardController {
   private readonly now: () => number
   private readonly uuid: () => string
   private evidences: Evidence[] = []
+  private savedTasks: TaskRecord[] = []
+  /** Last acknowledged local candidate, excluding Host fields merged into it. */
+  private draftBase: TaskRecord[] | undefined
+  private persistence: PersistenceStatus = 'saved'
+  private writeVersion = 0
+  private writeQueue: Promise<void> | undefined
+  private writesInFlight = 0
+  private externalRequested = false
+  private externalReadVersion = 0
+  private externalRead: Promise<void> | undefined
+  private externalReadFailed = false
+  private disposed = false
+  private rejectedAdmissions = new Map<string, TaskStatus>()
   /**
    * SSE may replay an old running/terminal pair after reconnecting. This is
    * intentionally process-local: notification delivery is never ledger state.
@@ -217,24 +233,14 @@ export class BoardController {
   /** Complete startup synchronously for local stores and after await for Host stores. */
   private finishStart(tasks: TaskRecord[]): void {
     this.tasks = tasks
+    this.savedTasks = tasks
     void this.loadEvidence()
     void this.reconcileRunningTasks()
     // A sibling tab may have edited or deleted the ledger (same origin,
     // storage events). Reload on external change so a task deleted in
     // another tab stops firing here — and is never written back by this
     // tab's stale copy (scheduler roll-forward, execution settlement).
-    const unsubscribeExternal = this.deps.store.subscribeExternal?.(() => {
-      const loaded = this.deps.store.load()
-      if (!isPromise(loaded)) {
-        this.applyExternalSnapshot(loaded)
-        return
-      }
-      void loaded.then((next) => {
-        this.applyExternalSnapshot(next)
-      }).catch((error) => {
-        console.error('[dsh-task-board] external task reload failed', error)
-      })
-    })
+    const unsubscribeExternal = this.deps.store.subscribeExternal?.(() => { this.requestExternalReload() })
     if (unsubscribeExternal !== undefined) this.disposers.push(unsubscribeExternal)
     this.disposers.push(this.deps.sessions.list.subscribe(() => {
       this.onSessionsChanged()
@@ -244,6 +250,8 @@ export class BoardController {
 
   /** Stop all subscriptions and drop retained state (idempotent). */
   dispose(): void {
+    this.disposed = true
+    this.externalReadVersion++
     for (const dispose of this.disposers.splice(0)) dispose()
     this.listeners.clear()
     if (this.reconcileTimer !== undefined) clearTimeout(this.reconcileTimer)
@@ -257,6 +265,7 @@ export class BoardController {
       tasks: this.tasks,
       boardOpen: this.boardOpen,
       selectedTaskId: this.selectedTaskId,
+      persistence: this.persistence,
     }
   }
 
@@ -437,6 +446,8 @@ export class BoardController {
    * already running is ignored.
    */
   async runTask(id: string): Promise<boolean> {
+    if (this.writeQueue !== undefined) await this.waitForPersistence()
+    if (this.persistence !== 'saved') return false
     const task = this.tasks.find(candidate => candidate.id === id)
     if (task === undefined || task.status === 'running') return false
     const beforeStart = this.tasks
@@ -621,11 +632,154 @@ export class BoardController {
     }
   }
 
-  private persistAndNotify(): void {
-    void Promise.resolve(this.deps.store.save(this.tasks)).catch((error) => {
-      console.error('[dsh-task-board] task ledger write failed', error)
-    })
+  private persistAndNotify(): void { void this.enqueueWrite(this.tasks) }
+
+  /** Wait for queued mutations; never launch an agent from an unsaved draft. */
+  async waitForPersistence(): Promise<boolean> {
+    while (this.writeQueue !== undefined) await this.writeQueue
+    return this.persistence === 'saved'
+  }
+
+  /** Retry only the local differences, preserving unrelated Host/SSE updates. */
+  async retryPersistence(): Promise<boolean> {
+    if (this.persistence === 'saving') return false
+    return this.enqueueWrite(this.tasks, true)
+  }
+
+  /** Explicitly discard a draft, only after a fresh authoritative read succeeds. */
+  reloadSavedTasks(): Promise<boolean> {
+    if (this.persistence === 'saving') return Promise.resolve(false)
+    const version = ++this.writeVersion
+    this.persistence = 'saving'
+    this.writesInFlight++
     this.notify()
+    const result = Promise.resolve(this.externalRead).then(() => this.loadSavedTasks()).then(tasks => {
+      this.savedTasks = tasks
+      this.externalReadFailed = false
+      if (version !== this.writeVersion || this.disposed) return false
+      this.persistence = 'saved'
+      this.draftBase = undefined
+      this.applyExternalSnapshot(tasks)
+      return true
+    }, () => {
+      if (version === this.writeVersion) { this.persistence = 'error'; this.notify() }
+      return false
+    }).finally(() => { this.writesInFlight-- })
+    this.trackWrite(result)
+    return result
+  }
+
+  private enqueueWrite(candidate: TaskRecord[], reload = false, onFailure?: () => void): Promise<boolean> {
+    const version = ++this.writeVersion
+    const base = this.draftBase ?? this.savedTasks
+    this.draftBase ??= this.savedTasks
+    this.persistence = 'saving'
+    this.writesInFlight++
+    const settle = (ok: boolean, tasks?: TaskRecord[], error?: unknown): boolean => {
+      this.writesInFlight--
+      if (ok && tasks !== undefined) {
+        this.savedTasks = tasks
+        // Later queued candidates were edited from this local view, before
+        // unseen Host fields were merged. Do not misread those absent Host
+        // fields in the next candidate as intentional local deletions.
+        this.draftBase = version === this.writeVersion ? undefined : this.removeRejectedAdmissions(candidate)
+      }
+      if (!ok) onFailure?.()
+      if (version === this.writeVersion && !this.disposed) {
+        this.persistence = ok ? 'saved' : error instanceof TaskDraftConflictError || (error instanceof Error && error.name === 'TaskLedgerV3ConflictError') ? 'conflict' : 'error'
+        if (ok && tasks !== undefined) this.tasks = tasks
+        this.notify()
+      }
+      return ok
+    }
+    const save = (): boolean | Promise<boolean> => {
+      try {
+        if (this.externalReadFailed) throw new Error('task ledger reload failed')
+        // A prior local write may have been acknowledged while this edit was
+        // queued. Advance its ancestor too, including an intentional undo.
+        const tasks = rebaseTaskDraft(this.draftBase ?? base, this.removeRejectedAdmissions(candidate), this.savedTasks)
+        const result = this.deps.store.saveChecked !== undefined
+          ? this.deps.store.saveChecked(tasks)
+          : this.deps.store.save(tasks)
+        return isPromise(result) ? result.then(() => settle(true, tasks), error => settle(false, undefined, error)) : settle(true, tasks)
+      } catch (error) { return settle(false, undefined, error) }
+    }
+    const operation = (): boolean | Promise<boolean> => reload
+      ? Promise.resolve().then(() => this.loadSavedTasks()).then(tasks => { this.savedTasks = tasks; this.externalReadFailed = false; return save() }, error => settle(false, undefined, error))
+      : save()
+    // A Host read advances both its tasks and the transport revision. Compute
+    // the merge only after that pair has reached the controller.
+    const predecessor = this.writeQueue ?? this.externalRead
+    const result = predecessor === undefined ? operation() : predecessor.then(operation)
+    if (isPromise(result)) {
+      this.trackWrite(result)
+      this.notify()
+      return result
+    }
+    if (this.externalRequested) this.requestExternalReload()
+    return Promise.resolve(result)
+  }
+
+  private trackWrite(result: Promise<boolean>): void {
+    const queued = result.then(() => {})
+    this.writeQueue = queued
+    void queued.then(() => {
+      if (this.writeQueue === queued) this.writeQueue = undefined
+      if (this.writesInFlight === 0) {
+        this.rejectedAdmissions.clear()
+        if (this.externalRequested) this.requestExternalReload()
+      }
+    })
+  }
+
+  /** Later queued edits must never re-create an execution whose admission failed. */
+  private removeRejectedAdmissions(tasks: TaskRecord[]): TaskRecord[] {
+    if (this.rejectedAdmissions.size === 0) return tasks
+    return tasks.map(task => {
+      const rejected = task.executions.find(execution => this.rejectedAdmissions.has(execution.id))
+      if (rejected === undefined) return task
+      const executions = task.executions.filter(execution => !this.rejectedAdmissions.has(execution.id))
+      const runs = task.runs?.filter(run => !this.rejectedAdmissions.has(run.runId))
+      const status = task.status === 'running' ? this.rejectedAdmissions.get(rejected.id)! : task.status
+      return { ...task, executions, ...(runs === undefined ? {} : { runs }), status }
+    })
+  }
+
+  private requestExternalReload(): void {
+    this.externalRequested = true
+    if (this.disposed || this.writesInFlight > 0 || this.persistence !== 'saved' || this.externalRead !== undefined) return
+    this.externalRequested = false
+    const readVersion = ++this.externalReadVersion
+    const writeVersion = this.writeVersion
+    const apply = (tasks: TaskRecord[]): void => {
+      if (this.disposed || readVersion !== this.externalReadVersion) return
+      this.savedTasks = tasks
+      this.externalReadFailed = false
+      if (writeVersion !== this.writeVersion || this.writesInFlight > 0 || this.persistence !== 'saved') {
+        // Keep the local draft visible. The queued write rebases it on this
+        // exact saved snapshot before the store can use the new revision.
+        return
+      }
+      this.applyExternalSnapshot(tasks)
+    }
+    try {
+      const result = this.loadSavedTasks()
+      if (isPromise(result)) {
+        let loaded = false
+        const read = result.then(tasks => { loaded = true; apply(tasks) }, () => { this.externalRequested = true; this.externalReadFailed = true })
+        this.externalRead = read
+        void read.then(() => {
+          if (this.externalRead === read) this.externalRead = undefined
+          // A failed GET waits for another SSE or an explicit retry; it must
+          // never create an unbounded retry loop while the Host is offline.
+          if (loaded && this.externalRequested) this.requestExternalReload()
+        })
+      } else apply(result)
+    } catch { this.externalRequested = true; this.externalReadFailed = true }
+  }
+
+  private loadSavedTasks(): TaskRecord[] | Promise<TaskRecord[]> {
+    return this.deps.store.loadChecked !== undefined ? this.deps.store.loadChecked() : this.deps.store.load()
   }
 
   /** Apply a Host/SSE reload without writing it back to the authoritative store. */
@@ -647,19 +801,30 @@ export class BoardController {
    * unlaunched so the caller can retry through the current scheduler owner.
    */
   private async persistExecutionStart(previousTasks: TaskRecord[]): Promise<boolean> {
-    const candidate = this.tasks
+    const previousIds = new Set(previousTasks.flatMap(task => task.executions.map(execution => execution.id)))
+    const newExecutions = this.tasks.flatMap(task => task.executions.filter(execution => !previousIds.has(execution.id)).map(execution => ({ id: execution.id, status: previousTasks.find(previous => previous.id === task.id)?.status ?? 'todo' as TaskStatus })))
+    const attempt = this.enqueueWrite(this.tasks, false, () => {
+      for (const execution of newExecutions) this.rejectedAdmissions.set(execution.id, execution.status)
+      this.tasks = this.removeRejectedAdmissions(this.tasks)
+    })
+    const version = this.writeVersion
     try {
-      await this.deps.store.save(candidate)
-      this.notify()
+      if (!await attempt) throw new Error('task execution admission was not saved')
       return true
     } catch (error) {
       console.error('[dsh-task-board] execution admission write failed', error)
+      if (version !== this.writeVersion) return false
       try {
-        const loaded = this.deps.store.load()
-        this.tasks = isPromise(loaded) ? await loaded : loaded
+        const loaded = this.loadSavedTasks()
+        const tasks = isPromise(loaded) ? await loaded : loaded
+        if (version !== this.writeVersion) return false
+        this.tasks = tasks
+        this.savedTasks = tasks
+        this.externalReadFailed = false
+        this.draftBase = undefined
       } catch (reloadError) {
         console.error('[dsh-task-board] execution admission reload failed', reloadError)
-        this.tasks = previousTasks
+        if (version === this.writeVersion) this.tasks = previousTasks
       }
       this.notify()
       return false

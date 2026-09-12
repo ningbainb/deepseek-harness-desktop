@@ -153,6 +153,62 @@ test('window chrome installs the serializable adapter only for the main Tools me
   assert.doesNotThrow(() => new Function(script))
 })
 
+test('current header bottom toggle and preserved AionUI explorer remain available through Tools', async t => {
+  const f = fixture(t)
+  f.cluster.remove()
+  const bottom = f.document.createElement('button')
+  bottom.setAttribute('data-dsh-bottom-toggle', 'true')
+  bottom.setAttribute('aria-label', '展开底部面板')
+  bottom.setAttribute('aria-pressed', 'false')
+  let bottomClicks = 0
+  bottom.addEventListener('click', () => {
+    bottomClicks++
+    bottom.setAttribute('aria-label', bottomClicks % 2 ? '折叠底部面板' : '展开底部面板')
+    bottom.setAttribute('aria-pressed', String(bottomClicks % 2 === 1))
+  })
+  const explorer = f.document.createElement('button')
+  explorer.className = 'aionui-floating-expand'
+  const column = f.document.createElement('aside')
+  column.setAttribute('data-aionui-explorer-col', '')
+  column.setAttribute('data-aionui-visible', 'false')
+  let explorerClicks = 0
+  explorer.addEventListener('click', () => {
+    explorerClicks++
+    column.setAttribute('data-aionui-visible', String(explorerClicks % 2 === 1))
+  })
+  f.document.body.append(bottom, explorer, column)
+  await flush()
+  assert.equal(f.group.hidden, false)
+  assert.equal(f.entry('bottom').hidden, false)
+  assert.equal(f.entry('right').hidden, false)
+  assert.equal(f.window.getComputedStyle(bottom).display, 'none')
+  f.entry('bottom').click()
+  f.entry('right').click()
+  await flush()
+  assert.equal(bottomClicks, 1)
+  assert.equal(explorerClicks, 1)
+  assert.equal(f.entry('bottom').getAttribute('aria-checked'), 'true')
+  assert.equal(f.entry('right').getAttribute('aria-checked'), 'true')
+  bottom.disabled = true
+  await flush()
+  assert.equal(f.entry('bottom').disabled, true)
+  f.entry('bottom').click()
+  assert.equal(bottomClicks, 1)
+  column.setAttribute('data-aionui-visible', 'false')
+  await flush()
+  assert.equal(f.entry('right').getAttribute('aria-checked'), 'false', 'external close updates the menu')
+  const duplicate = bottom.cloneNode(true)
+  f.document.body.append(duplicate)
+  await flush()
+  assert.equal(f.group.hidden, true, 'ambiguous header seats keep their original buttons')
+  assert.equal(bottom.hasAttribute('data-dsh-desktop-layout-relocated'), false)
+  duplicate.remove()
+  await flush()
+  assert.equal(f.group.hidden, false)
+  f.dispose()
+  assert.equal(bottom.hasAttribute('data-dsh-desktop-layout-relocated'), false)
+})
+
 test('both shipped sidebar bundles measure the current frame and retain the legacy fallback', async () => {
   const appRequire = createRequire(new URL('../package.json', import.meta.url))
   const aggregateRequire = createRequire(appRequire.resolve('@linxin666/dsh-web-ui-all/package.json'))

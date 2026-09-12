@@ -121,6 +121,8 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const contentRef = useRef<HTMLTextAreaElement>(null)
+  const [editorFocusRequest, requestEditorFocus] = useState(0)
   const lastRevision = useRef(settingsSnapshot.revision)
   const useWorkspaces = (props as unknown as {
     useWorkspaces?: (selector: (state: WorkspaceState) => WorkspaceState) => WorkspaceState
@@ -133,6 +135,12 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
     : useWorkspaces(state => state)
   const workspaceItems = workspaceState.items
   const visibleProfiles = useMemo(() => editableProfiles(draftConfig), [draftConfig])
+
+  useEffect(() => {
+    if (editorFocusRequest === 0) return
+    contentRef.current?.focus({ preventScroll: true })
+    contentRef.current?.scrollIntoView?.({ block: 'center', behavior: 'instant' })
+  }, [editorFocusRequest])
 
   useEffect(() => {
     if (lastRevision.current !== settingsSnapshot.revision) {
@@ -166,6 +174,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
     setEditor(toDraft(profile))
     setEditorDirty(false)
     setError(null)
+    requestEditorFocus(current => current + 1)
   }
 
   const editEditor = (patch: Partial<PromptProfileDraft>): void => {
@@ -219,6 +228,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
     setEditorDirty(true)
     setError(null)
     setSaved(false)
+    requestEditorFocus(current => current + 1)
   }
 
   const remove = (): void => {
@@ -303,7 +313,7 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
           {editor.scope === 'workspace' && <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.workspaceId')}</span><input list="personal-prompt-workspaces" value={editor.workspaceId} maxLength={128} disabled={readOnlySession} placeholder={t('settings.workspaceIdPlaceholder')} onChange={event => editEditor({ workspaceId: event.target.value })} /><datalist id="personal-prompt-workspaces">{workspaceItems.map(item => { const id = workspaceIdOf(item); return id === undefined ? null : <option key={id} value={id}>{item.title ?? item.path ?? id}</option> })}</datalist></label>}
           {readOnlySession && <p className={styles.notice}>{t('settings.sessionReadonly')}</p>}
           <label className={styles.toggle}><input type="checkbox" checked={editor.enabled} disabled={readOnlySession} onChange={event => editEditor({ enabled: event.target.checked })} />{editor.enabled ? t('settings.enable') : t('settings.disable')}</label>
-          <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.content')}</span><textarea value={editor.content} maxLength={MAX_PROMPT_CONTENT_LENGTH} disabled={readOnlySession} placeholder={t('settings.contentPlaceholder')} onChange={event => editEditor({ content: event.target.value })} /><span className={styles.counter}>{editor.content.length} / {MAX_PROMPT_CONTENT_LENGTH}</span></label>
+          <label className={styles.field}><span className={styles.fieldLabel}>{t('settings.content')}</span><textarea ref={contentRef} value={editor.content} maxLength={MAX_PROMPT_CONTENT_LENGTH} disabled={readOnlySession} placeholder={t('settings.contentPlaceholder')} onChange={event => editEditor({ content: event.target.value })} /><span className={styles.counter}>{editor.content.length} / {MAX_PROMPT_CONTENT_LENGTH}</span></label>
           <details className={styles.details} data-preference-preview="true"><summary>{t('settings.preview')}</summary>{preview ? <pre className={styles.preview}>{preview}</pre> : <p className={styles.muted}>{t('settings.previewEmpty')}</p>}</details>
         </section>
       )}

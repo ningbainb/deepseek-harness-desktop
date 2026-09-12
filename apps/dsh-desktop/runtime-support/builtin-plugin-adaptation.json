@@ -1,0 +1,1122 @@
+{
+  "schemaVersion": 1,
+  "policy": "desktop-first",
+  "runtimeVersion": "0.1.5-rc.1",
+  "notes": [
+    "The selection is the reviewed Desktop source and version, independent of the dated public latest snapshot.",
+    "A 404 snapshot does not establish package privacy.",
+    "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts. It does not run the listed acceptance scenarios.",
+    "Empty validation.results means no execution evidence has been recorded here. Metadata compatible is not a test result.",
+    "Update an npm selection only after carrying Desktop fixes and running its relevant automated and interactive checks."
+  ],
+  "mounts": {
+    "topLevel": [
+      "@deepseek-ai/dsh-base",
+      "@linxin666/dsh-desktop-compat",
+      "@deepseek-ai/dsh-web-app",
+      "@linxin666/dsh-value-mode",
+      "dsh-better-sidebar",
+      "@linxin666/dsh-web-ui-all",
+      "@linxin666/dsh-client-ui-model-capabilities",
+      "@linxin666/dsh-usage",
+      "@linxin666/dsh-session-archive",
+      "@tencent-connect/dsh-qqbot",
+      "reasoning-slider"
+    ],
+    "dependencyOnly": [
+      "@linxin666/dsh-client-ui-mode-switcher",
+      "@linxin666/dsh-particle-theme"
+    ],
+    "repairBundle": "@linxin666/dsh-desktop-repair",
+    "aggregateEntries": [
+      {
+        "id": "web-ui-compat",
+        "name": "@linxin666/dsh-web-ui-all"
+      },
+      {
+        "id": "web-ui-settings",
+        "name": "@linxin666/dsh-client-ui-web-ui-settings"
+      },
+      {
+        "id": "user-scope",
+        "name": "@ningbainb/dsh-user-scope"
+      },
+      {
+        "id": "ui-model-preferences",
+        "name": "@linxin666/dsh-client-ui-model-preferences"
+      },
+      {
+        "id": "personal-prompt",
+        "name": "@ningbainb/dsh-personal-prompt"
+      },
+      {
+        "id": "memory",
+        "name": "@ningbainb/dsh-memory"
+      },
+      {
+        "id": "web-ui-mode-switcher",
+        "name": "@linxin666/dsh-client-ui-mode-switcher"
+      },
+      {
+        "id": "live-stats",
+        "name": "@linxin666/dsh-live-stats"
+      },
+      {
+        "id": "web-ui-plugin-manager",
+        "name": "@linxin666/dsh-client-ui-plugin-manager"
+      },
+      {
+        "id": "web-ui-dsh-aionui-panel",
+        "name": "@linxin666/dsh-client-ui-aionui-panel"
+      },
+      {
+        "id": "web-ui-task-board",
+        "name": "@linxin666/dsh-client-ui-task-board"
+      },
+      {
+        "id": "web-ui-git-graph",
+        "name": "@linxin666/dsh-client-ui-git-graph"
+      },
+      {
+        "id": "web-ui-remote-web-ui",
+        "name": "@linxin666/dsh-remote-web-ui"
+      },
+      {
+        "id": "web-ui-pet",
+        "name": "@linxin666/dsh-pet"
+      },
+      {
+        "id": "web-ui-ssh",
+        "name": "@linxin666/dsh-ssh"
+      },
+      {
+        "id": "web-ui-describe-image",
+        "name": "@linxin666/dsh-tool-describe-image"
+      },
+      {
+        "id": "web-ui-chat-recovery",
+        "name": "@linxin666/dsh-chat-recovery"
+      },
+      {
+        "id": "web-ui-liangshen",
+        "name": "@linxin666/dsh-liangshen"
+      },
+      {
+        "id": "web-ui-skill-explorer",
+        "name": "@linxin666/dsh-client-ui-skill-explorer"
+      },
+      {
+        "id": "web-ui-desktop-launcher",
+        "name": "@linxin666/dsh-desktop-launcher"
+      },
+      {
+        "id": "web-ui-skin-center",
+        "name": "@linxin666/dsh-client-ui-skin-center"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "name": "@linxin666/dsh-chat-recovery",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-chat-recovery@0.2.5.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.5",
+        "checkedAt": "2026-09-12T06:50:35.608Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-chat-recovery"
+      },
+      "reason": "公开最新版仍调用已删除的 workspaces.connectWorkspace，并假设旧 SessionSnapshot 结构；保留当前已修复这两个接口的 Desktop 0.2.5 补丁。",
+      "desktopContracts": [
+        "Current session-content snapshot",
+        "Split workspace controller API"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Restore a saved conversation and verify its messages and workspace."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-aionui-panel",
+      "selection": {
+        "version": "0.1.15",
+        "source": "workspace",
+        "path": "packages/dsh-aionui-panel"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.6",
+        "checkedAt": "2026-09-12T06:50:35.699Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-aionui-panel"
+      },
+      "reason": "公开最新版仍 require 当前运行时不存在的 @deepseek-ai/dsh-client-runtime/client；保留已迁至官方拆分 SDK、保有桌面文件打开能力的 workspace 版。",
+      "desktopContracts": [
+        "Split SDK imports",
+        "Desktop workspace open and attachment handling"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-aionui-panel/tests/host-fixes.spec.ts",
+          "packages/dsh-aionui-panel/tests/attachment-send-guard.spec.tsx"
+        ],
+        "desktopAcceptance": [
+          "Open a project and upload an attachment through the Desktop file explorer."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-community-plugins",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:35.532Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-community-plugins"
+      },
+      "reason": "新版已变为无界面的社区索引数据源，cordis 行为 no-op；其原设置卡/界面移除。不能把它当作保留原功能的等价替换。",
+      "desktopContracts": [
+        "Existing community settings card",
+        "Desktop community discovery remains reachable"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing community card and Desktop discovery surface."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-git-graph",
+      "selection": {
+        "version": "0.1.18",
+        "source": "workspace",
+        "path": "packages/dsh-git-graph"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:35.537Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-git-graph"
+      },
+      "reason": "保留 workspace 版本。公开 0.3.20 的 lib/index.js 未导出 Desktop 打包校验与任务执行所依赖的 WorktreeHostService 和 WorktreeWorkspaceRegistry，不能直接替换。",
+      "desktopContracts": [
+        "Windows git.exe discovery and spawn fallback",
+        "Workspace allowlist and worktree conflict protection",
+        "WorktreeHostService and WorktreeWorkspaceRegistry exports"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Read a Git graph on Windows, inspect a worktree, and reject an unregistered workspace."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-mode-switcher",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-mode-switcher"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:35.682Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-mode-switcher"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-model-capabilities",
+      "selection": {
+        "version": "0.3.20",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-client-ui-model-capabilities@0.3.20.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T07:04:27.856Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-model-capabilities/latest"
+      },
+      "reason": "保留公开 0.3.20 与 Desktop 请求边界补丁；解析和挂载不代表已完成真实模型能力探测。",
+      "desktopContracts": [
+        "Model capability settings",
+        "Desktop request boundary"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Probe an explicitly configured model and verify displayed capability results."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-model-preferences",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-model-preferences"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:35.648Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-model-preferences"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-plugin-manager",
+      "selection": {
+        "version": "0.3.20",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:35.811Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-plugin-manager"
+      },
+      "reason": "选用公开 0.3.20 的新 workspace/session 控制器和 Desktop profile 识别。保留内置包保护与 Desktop 管理入口；执行证据记录在 validation.results。",
+      "desktopContracts": [
+        "Selected Desktop profile",
+        "Builtin package protection and shared management entry"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Inspect builtins and install/disable a disposable community plugin through the Desktop flow."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-skill-explorer",
+      "selection": {
+        "version": "0.3.20",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:35.937Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-skill-explorer"
+      },
+      "reason": "选用公开 0.3.20，声明支持 DSH >=0.1.5-rc.1。保留工作区技能列表与会话选择流程；执行证据记录在 validation.results。",
+      "desktopContracts": [
+        "Workspace-scoped skill listing",
+        "Skill viewing and conversation selection"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "List and inspect workspace skills and use one in a conversation."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-skin-center",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-client-ui-skin-center@0.2.5.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:37.000Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-skin-center"
+      },
+      "reason": "桌面优先保留 0.2.5 的完整 15 款离线皮肤。公开 0.3.20 仅打包 1 款，不能直接替换。保留已有 Host SDK 与跨窗口同步补丁，并回填关闭后异步请求不得写回、应用事件监听正确清理等修复；执行证据记录在 validation.results。",
+      "desktopContracts": [
+        "Built-in skin catalog assets",
+        "Settings scope and Desktop profile persistence",
+        "Cross-window skin synchronization",
+        "No asynchronous reactivation or persistence after shutdown"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/skin-desktop-adaptation.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Switch skins and background, restart Desktop, and verify persistence."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-task-board",
+      "selection": {
+        "version": "0.1.18",
+        "source": "workspace",
+        "path": "packages/dsh-task-board"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:35.938Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-task-board"
+      },
+      "reason": "新版使用 DSH_HOME/task-board/ledger-v2.json 与 /api/task-board；当前 Desktop 使用 profile/state/task-board/tasks-v3.json 与 /api/dsh-task-board/v3，并有独立 Worktree/Run/Evidence 接线。需要数据迁移和执行流程整合，不能覆盖。",
+      "desktopContracts": [
+        "profile/state/task-board/tasks-v3.json",
+        "/api/dsh-task-board/v3",
+        "Worktree, Run and Evidence integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-task-board/tests/host-migration.spec.ts",
+          "packages/dsh-task-board/tests/worktree-execution.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Reopen an existing task, run it in a worktree, and inspect retained evidence."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-web-ui-settings",
+      "selection": {
+        "version": "0.2.3-desktop.1",
+        "source": "workspace",
+        "path": "packages/dsh-web-ui-settings"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:36.329Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-web-ui-settings"
+      },
+      "reason": "新版通用设置 bridge 可以工作，但 apply 中未包含当前 Desktop Dock 专页/入口、项目对话框、授权/中转页与粒子补挂；替换会丢桌面设置功能。",
+      "desktopContracts": [
+        "Dock settings page and project dialog",
+        "Authorization and relay settings",
+        "Particle-theme mounting"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-web-ui-settings/tests/dock-settings-page.spec.tsx",
+          "packages/dsh-web-ui-settings/tests/desktop-native-pages.spec.tsx"
+        ],
+        "desktopAcceptance": [
+          "Open Dock, project, authorization, and relay pages and verify saved settings after restart."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-desktop-client",
+      "selection": {
+        "version": "1.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-desktop-client"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:36.102Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-client"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-desktop-compat",
+      "selection": {
+        "version": "2.0.0",
+        "source": "workspace",
+        "path": "packages/dsh-desktop-compat"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:36.138Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-compat"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-desktop-launcher",
+      "selection": {
+        "version": "0.3.13",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.13",
+        "checkedAt": "2026-09-12T06:50:36.252Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-launcher"
+      },
+      "reason": "选用公开 0.3.13，已纳入 settings.installSection、新 store 和 appExit。保留快捷方式功能，实际 Desktop 启动流程另行验收。",
+      "desktopContracts": [
+        "Current settings/store API",
+        "Desktop profile and app exit integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Create and open a shortcut without losing the selected Desktop profile."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-desktop-repair",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-desktop-repair"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:36.270Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-repair"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-liangshen",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-liangshen@0.2.5.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:36.661Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-liangshen"
+      },
+      "reason": "公开预设仍用 persona.config.text。只将 YAML 数据交给当前官方 persona Config 校验即失败：$.prefix missing required value；当前本地 prefix 预设通过。",
+      "desktopContracts": [
+        "persona.config.prefix accepted by the official SDK"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Activate the preset and start a conversation."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-live-stats",
+      "selection": {
+        "version": "0.1.15",
+        "source": "workspace",
+        "path": "packages/dsh-live-stats"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.20",
+        "checkedAt": "2026-09-12T06:50:36.611Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-live-stats"
+      },
+      "reason": "公开最新版仍依赖已移除的 client-runtime、installSettingsSection/settingsNamespace；保留已适配当前官方 SDK 的 Desktop workspace 版。",
+      "desktopContracts": [
+        "Split client SDK",
+        "Current settings API",
+        "Usage ledger and balance routing"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-live-stats/tests/client-apply.spec.tsx",
+          "packages/dsh-live-stats/tests/ledger-store.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Record a conversation and verify usage and balance views with configured providers."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-particle-theme",
+      "selection": {
+        "version": "0.1.15",
+        "source": "workspace",
+        "path": "packages/dsh-particle-theme"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:36.609Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-particle-theme"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-pet",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-pet@0.2.5.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:36.816Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-pet"
+      },
+      "reason": "公开最新版迁入了新 SDK，但缺少当前 Desktop 的单请求合并、超时、Abort 及隐藏/卸载取消修复；保留现有完整补丁。",
+      "desktopContracts": [
+        "One coalesced state poll",
+        "Timeout and Abort support",
+        "Cancel when hidden or unmounted"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Show and hide the pet repeatedly with delayed requests and verify cleanup."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-remote-web-ui",
+      "selection": {
+        "version": "0.1.15",
+        "source": "workspace",
+        "path": "packages/dsh-remote-web-ui"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:36.612Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-remote-web-ui"
+      },
+      "reason": "新版更新入口直接调用自身更新服务，缺 Desktop.checkForUpdates 接管；其全量 /api gate 允许配对远端，未保留当前 mobile-only /m/api 隔离方案。",
+      "desktopContracts": [
+        "Mobile-only /m/api isolation",
+        "Desktop.checkForUpdates ownership"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-remote-web-ui/tests/mobile-isolation.spec.ts",
+          "packages/dsh-remote-web-ui/tests/update-entry.spec.tsx"
+        ],
+        "desktopAcceptance": [
+          "Pair a phone, verify mobile access boundaries, and route update actions to Desktop."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-session-archive",
+      "selection": {
+        "version": "0.3.20",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T07:04:27.856Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-session-archive/latest"
+      },
+      "reason": "本轮工作区新增，0.3.20 已解析及挂载；包的 host/client 文件与公开包字节一致，接口引用静态通过。未执行真实归档、还原或删除。",
+      "desktopContracts": [
+        "Archive settings and current SDK mounts"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Archive and restore a disposable conversation and verify its messages."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-skins",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.2.9",
+        "checkedAt": "2026-09-12T06:50:37.029Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-skins"
+      },
+      "reason": "新版仍是聚合/资产载体，固定依赖 skin-center@0.2.9。Desktop 实际皮肤由 Skin Center v2 提供；应按当前挂载/资产方案处理，不能据它单独升级皮肤中心。",
+      "desktopContracts": [
+        "Skin Center asset ownership",
+        "No duplicate legacy skin mounts"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Verify the existing skin catalog remains complete."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-ssh",
+      "selection": {
+        "version": "0.1.18",
+        "source": "workspace",
+        "path": "packages/dsh-ssh"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:36.888Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-ssh"
+      },
+      "reason": "保留已包含 SFTP 主机切换竞态修复的 Desktop workspace 版，以及现有 PTY/SFTP/隧道与回环同源保护；公开最新版尚未包含清旧目录与旧请求失效处理。",
+      "desktopContracts": [
+        "PTY, SFTP, and tunnels",
+        "Loopback same-origin guard",
+        "Invalidate old host requests and clear old directory state"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-ssh/tests/panel-transfer.test.tsx",
+          "packages/dsh-ssh/tests/routes.test.ts"
+        ],
+        "desktopAcceptance": [
+          "Switch between two SSH hosts while a directory request is pending and verify the new host view."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-tool-describe-image",
+      "selection": {
+        "version": "0.1.15",
+        "source": "workspace",
+        "path": "packages/dsh-tool-describe-image"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T06:50:37.002Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-tool-describe-image"
+      },
+      "reason": "保留 Desktop workspace 的附件保存与引用读取，迁入禁用及原生视觉透传，并修复当前官方 SDK 的草稿附件、提交结果和取消接口；按待生效模型选择查询真实输入能力。",
+      "desktopContracts": [
+        "Official attachment storage and reference readback",
+        "Image send conversion",
+        "Dock image settings",
+        "Preserve generic files, cancellation, and rejected-send drafts",
+        "Pending model selection precedes the last request"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-tool-describe-image/tests/send-hook.spec.ts",
+          "packages/dsh-tool-describe-image/tests/attach-routes.spec.ts",
+          "packages/dsh-tool-describe-image/tests/send-hook-sdk.spec.ts",
+          "packages/dsh-tool-describe-image/tests/model-capability.spec.ts",
+          "packages/dsh-tool-describe-image/tests/settings-card.spec.ts",
+          "apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs"
+        ],
+        "desktopAcceptance": [
+          "Drag an image into a conversation and verify description or native-vision dispatch for the chosen model."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-usage",
+      "selection": {
+        "version": "0.3.20",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.20",
+        "checkedAt": "2026-09-12T07:04:27.856Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-usage/latest"
+      },
+      "reason": "本轮工作区新增，0.3.20 已解析及挂载；包的 host/client 文件与公开包字节一致，接口引用静态通过。未校验真实供应商账单与余额。",
+      "desktopContracts": [
+        "Usage view and current SDK mounts"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Compare displayed usage with one configured provider response."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-value-mode",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-value-mode"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:37.003Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-value-mode"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-web-ui-all",
+      "selection": {
+        "version": "0.2.5",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-web-ui-all@0.2.5.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.6",
+        "checkedAt": "2026-09-12T06:50:37.165Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-web-ui-all"
+      },
+      "reason": "旧包 0.3.6 已弃用并要求迁移至 dsh-web-all；没有当前 Desktop 的全部自有挂载与修复。升级旧包不能代表完成全套插件升级。",
+      "desktopContracts": [
+        "Current aggregate mount ids and order",
+        "All Desktop-owned plugin rows",
+        "No duplicate registration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Start fresh and existing Desktop profiles and inspect all preserved plugin surfaces."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-chat-artifacts",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-chat-artifacts"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:37.207Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-chat-artifacts"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-memory",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-memory"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:37.328Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-memory"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-personal-prompt",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-personal-prompt"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:37.348Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-personal-prompt"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-user-scope",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-user-scope"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-09-12T06:50:37.380Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-user-scope"
+      },
+      "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
+      "desktopContracts": [
+        "Desktop-owned plugin behavior and configuration",
+        "Existing aggregate/profile integration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@tencent-connect/dsh-qqbot",
+      "selection": {
+        "version": "0.5.0",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.5.0",
+        "checkedAt": "2026-09-12T06:50:37.496Z",
+        "url": "https://registry.npmjs.org/%40tencent-connect%2Fdsh-qqbot"
+      },
+      "reason": "当前 0.5.0 与公开最新一致；profile/SDK 契约检查通过。未在本次执行真实 QQ 收发。",
+      "desktopContracts": [
+        "QQ Bot extension and profile configuration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Pair a configured bot and verify real incoming and outgoing messages."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "dsh-better-sidebar",
+      "selection": {
+        "version": "0.14.0",
+        "source": "npm",
+        "patch": "patches/dsh-better-sidebar@0.14.0.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.19.1",
+        "checkedAt": "2026-09-12T06:50:37.575Z",
+        "url": "https://registry.npmjs.org/dsh-better-sidebar"
+      },
+      "reason": "保留当前Desktop 0.14补丁版本及旧标签、宽度、默认开合与路径接管配置。公开0.19.1改用原生右栏，而当前官方SDK缺少保存宽度读写和已配置布局标识，无法完整保留旧配置语义；候选迁移单独留存，暂不进入Desktop。",
+      "desktopContracts": [
+        "Desktop user terminal routing and separate agent PTYs",
+        "Legacy tabs, widths, open defaults and path interception remain effective",
+        "Current frame geometry and Tools menu retain original controls"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/sidebar-terminal-routing.test.mjs",
+          "apps/dsh-desktop/test/panel-layout-menu.test.mjs",
+          "apps/dsh-desktop/scripts/verify-terminal.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open a user terminal and an agent terminal and verify their distinct routing."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "reasoning-slider",
+      "selection": {
+        "version": "0.0.3",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.0.6",
+        "checkedAt": "2026-09-12T06:50:37.620Z",
+        "url": "https://registry.npmjs.org/reasoning-slider"
+      },
+      "reason": "modelDirectories.directoryFor 接口仍存在，但它在 conversation.input.model 注册 priority=-1；当前 model-preferences 为 -10，同槽最低值优先，独立滑块会被覆盖。先整合模型选择 UI。",
+      "desktopContracts": [
+        "Existing reasoning control through model preferences",
+        "No competing model-slot UI"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Change model reasoning through Desktop model preferences and verify the next request."
+        ],
+        "results": []
+      }
+    }
+  ]
+}

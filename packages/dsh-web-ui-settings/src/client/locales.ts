@@ -4,6 +4,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  dockSkins: '皮肤与壁纸', dockModelCapabilities: '模型与能力', dockUsage: '用量与余额', dockSessions: '会话管理',
   dockAiGroup: 'AI 设置', dockDesktopGroup: '桌面体验', dockPersonal: '个人偏好',
   dockModels: '模型接入',
   dockResponsePreferences: '回复偏好',
@@ -57,6 +58,7 @@ export type WebUIPluginsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  dockSkins: 'Skins and wallpapers', dockModelCapabilities: 'Models and capabilities', dockUsage: 'Usage and balance', dockSessions: 'Session manager',
   dockAiGroup: 'AI settings', dockDesktopGroup: 'Desktop', dockPersonal: 'Personal preferences',
   dockModels: 'Model connection',
   dockResponsePreferences: 'Response preferences',

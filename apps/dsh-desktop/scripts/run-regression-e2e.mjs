@@ -42,6 +42,11 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 const CORE_SUITES = [
   {
+    name: 'Native Plugin Pages, Preserved Skins and Window Palette',
+    script: 'scripts/verify-native-plugin-pages.mjs',
+    args: [],
+  },
+  {
     name: 'Settings Availability Before Slow Resources Complete',
     script: 'scripts/verify-settings-readiness.mjs',
     args: [],
@@ -131,6 +136,9 @@ const CORE_SUITES = [
       'test/legacy-session-backend.test.mjs',
       'test/pet-client-polling.test.mjs',
       'test/dock-settings-fixture.test.mjs',
+      'test/dock-settings-close.test.mjs',
+      'test/dock-settings-save.test.mjs',
+      'test/extensions-renderer-actions.test.mjs',
       'test/panel-layout-menu.test.mjs',
       'test/desktop-ingress.test.mjs',
       'test/runtime-presentation.test.mjs',

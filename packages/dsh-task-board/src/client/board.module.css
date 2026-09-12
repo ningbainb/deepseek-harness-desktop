@@ -48,6 +48,24 @@ html[data-dsh-taskboard-active]:not([data-dsh-ssh-active]) [class*='centerCol'] 
 
 /* --- sidebar entry row ------------------------------------------------------- */
 
+.persistenceNotice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex: none;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--dsw-alias-border-main, currentColor);
+  border-radius: 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.persistenceNotice > span { flex: 1 1 240px; }
+.persistenceNotice[data-persistence='error'],
+.persistenceNotice[data-persistence='conflict'] { color: var(--dsw-alias-label-primary); }
+
 .entry {
   display: flex;
   align-items: center;

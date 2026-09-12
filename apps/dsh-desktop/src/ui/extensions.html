@@ -16,15 +16,19 @@
         <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
           <p class="nav-group-label">AI 设置</p>
+          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="model-catalog"><span class="tab-title">模型与能力</span></button>
           <button type="button" class="tab" id="relay-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="relay" data-group="models"><span class="tab-title">模型接入</span></button>
           <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="ai"><span class="tab-title">模型协作</span></button>
           <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="personal"><span class="tab-title">个人偏好</span></button>
           <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="vision"><span class="tab-title">图像理解</span></button>
           <p class="nav-group-label">扩展能力</p>
+          <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
+          <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
           <p class="nav-group-label">桌面体验</p>
+          <button type="button" class="tab" id="appearance-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="appearance" data-group="skins"><span class="tab-title">皮肤与壁纸</span></button>
           <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
           <p class="nav-group-label">维护与迁移</p>
           <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="backup"><span class="tab-title">备份与迁移</span></button>
@@ -163,7 +167,7 @@
           <p>能自动恢复的问题会静默处理；这里只保留需要你主动操作的情况。</p>
         </div>
         <section class="recovery-primary">
-          <div><strong>插件运行环境出现异常</strong><p>聊天记录、设置和个人数据不会受到影响。</p></div>
+          <div><strong>插件运行环境维护</strong><p>仅在插件无法正常运行时使用修复；聊天记录、设置和个人数据会保留。</p></div>
           <button type="button" class="primary" id="reset-profile-env" data-mutation-control>修复插件环境</button>
         </section>
         <details class="recovery-advanced">

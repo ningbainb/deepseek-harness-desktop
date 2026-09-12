@@ -1,4 +1,6 @@
 export const zh = {
+    settingsNotWritable: '当前配置不可写，请等待运行时连接恢复后重试。',
+    settingsSaveFailed: '配置未保存成功，请重试。',
     catalogUnavailable: '模型目录尚未连接，请稍后重试。',
     catalogTimeout: '模型目录查询超时，请检查运行时连接后重试。',
     catalogChanged: '模型配置或运行时已变化，请重试以读取最新目录。',
@@ -67,6 +69,8 @@ export const zh = {
     tokens: 'Token',
 };
 export const en = {
+    settingsNotWritable: 'Settings are not writable. Wait for the runtime connection and try again.',
+    settingsSaveFailed: 'Settings were not saved. Please try again.',
     catalogUnavailable: 'The model catalog is not connected yet. Please retry shortly.',
     catalogTimeout: 'The model catalog request timed out. Check the runtime connection and retry.',
     catalogChanged: 'The model configuration or runtime changed. Retry to load the current catalog.',

@@ -53,6 +53,8 @@ export interface Config {
   timeoutMs?: number
   /** Protocol style of the endpoint; defaults to {@link DEFAULT_API_STYLE} (`chat-completions`). */
   apiStyle?: ApiStyle
+  /** Rewrite image sends for text-only models; disable to let another plugin handle them. */
+  interceptImageSend?: boolean
 }
 
 /** Schemastery configuration for the describe-image tool; doubles as the `describe-image` settings-section schema. */
@@ -66,6 +68,7 @@ export const Config: z<Config> = z.object({
   maxOutputTokens: z.number().step(1).min(1).default(DEFAULT_MAX_OUTPUT_TOKENS),
   timeoutMs: z.number().min(1).default(DEFAULT_TIMEOUT_MS),
   apiStyle: z.union(API_STYLES).default(DEFAULT_API_STYLE),
+  interceptImageSend: z.boolean().default(true),
 })
 
 /** Settings namespace carrying the endpoint, model, and key reference the Plugins card edits. */

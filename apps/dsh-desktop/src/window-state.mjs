@@ -45,20 +45,34 @@ export function normalizeWindowState(input = {}, displays = []) {
 }
 
 export async function loadWindowState(path, displays) {
+  return (await loadWindowStateForRestore(path, displays)).state
+}
+
+/** Keep the visible launch rectangle separate from the saved logical preference. */
+export async function loadWindowStateForRestore(path, displays) {
+  let stored = {}
   try {
-    return normalizeWindowState(JSON.parse(await readFile(path, 'utf8')), displays)
+    const input = JSON.parse(await readFile(path, 'utf8'))
+    if (input && typeof input === 'object' && !Array.isArray(input)) stored = input
   } catch {
-    return normalizeWindowState({}, displays)
+    // Missing or invalid state uses the same visible defaults as a first launch.
   }
+  const state = normalizeWindowState(stored, displays)
+  const restoredBounds = { ...state }
+  for (const [key, minimum] of [['x', -Infinity], ['y', -Infinity], ['width', MIN_WIDTH], ['height', MIN_HEIGHT]]) {
+    if (Number.isFinite(stored[key]) && stored[key] >= minimum) restoredBounds[key] = Math.round(stored[key])
+  }
+  return { state, restoredBounds }
 }
 
 export function attachWindowStatePersistence(window, path, { restoredBounds } = {}) {
   let timer
   let writeQueue = Promise.resolve()
   let latestWrite = writeQueue
-  // A restored Windows frame can round outward at fractional DPI. Until a
-  // coordinate changes, preserve the requested logical value rather than
-  // feeding that construction error into the next launch's requested size.
+  // A restored Windows frame can round outward at fractional DPI, and the
+  // current work area may temporarily clamp the saved rectangle. Until a
+  // coordinate changes, preserve its logical preference rather than feeding
+  // either automatic adjustment into the next launch's requested geometry.
   const initialBounds = restoredBounds && window.isDestroyed?.() !== true
     ? window.getNormalBounds() : undefined
   const unchanged = new Map(['x', 'y', 'width', 'height']

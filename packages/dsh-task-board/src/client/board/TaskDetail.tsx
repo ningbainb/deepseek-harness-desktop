@@ -14,6 +14,8 @@ import css from '../board.module.css'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { formatTime } from './TaskCard.tsx'
 import { EvidencePanel } from './EvidencePanel.tsx'
+import { PersistenceNotice } from './PersistenceNotice.tsx'
+import type { PersistenceStatus } from '../../core/persistence.ts'
 
 /** Execution outcome → locale key. */
 const RESULT_KEY: Record<NonNullable<ExecutionRecord['result']>, TaskBoardKey> = {
@@ -175,7 +177,7 @@ function ScheduleSection({ controller, task }: { controller: BoardController; ta
 }
 
 /** Task detail overlay. */
-export function TaskDetail({ controller, task, evidence }: { controller: BoardController; task: TaskRecord; evidence?: Evidence }) {
+export function TaskDetail({ controller, task, evidence, persistence = 'saved' }: { controller: BoardController; task: TaskRecord; evidence?: Evidence; persistence?: PersistenceStatus }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const running = task.status === 'running'
 
@@ -202,6 +204,7 @@ export function TaskDetail({ controller, task, evidence }: { controller: BoardCo
         </header>
 
         <div className={css.detailBody}>
+          <PersistenceNotice controller={controller} status={persistence} />
           <section className={css.detailSection}>
             <h4>{t('detail.description')}</h4>
             <p className={css.detailText}>{current.description !== '' ? current.description : '—'}</p>
@@ -275,7 +278,7 @@ export function TaskDetail({ controller, task, evidence }: { controller: BoardCo
           <button
             type="button"
             className={css.primaryButton}
-            disabled={running}
+            disabled={running || persistence !== 'saved'}
             onClick={() => {
               // Running kicks off a real agent session; close the detail so
               // the whole board stays visible while the task executes.

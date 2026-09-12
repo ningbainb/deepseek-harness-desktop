@@ -1,4 +1,5 @@
 import { installPanelLayoutMenu } from './panel-layout-menu.mjs'
+import { normalizeWindowPalette } from './window-palette.mjs'
 
 export const WINDOW_CHROME_HEIGHT = 32
 
@@ -17,16 +18,22 @@ export function normalizeWindowChromeTheme(value) {
 }
 
 const windowChromeThemes = new WeakMap()
+const windowPalettes = new WeakMap()
+export function getWindowPalette(browserWindow) { return windowPalettes.get(browserWindow) ?? null }
 
 export function getWindowChromeTheme(browserWindow) {
   return windowChromeThemes.get(browserWindow) ?? 'dark'
 }
 
-export function setWindowChromeTheme(browserWindow, rawTheme) {
+export function setWindowChromeTheme(browserWindow, rawTheme, rawPalette) {
   const theme = normalizeWindowChromeTheme(rawTheme)
+  const palette = normalizeWindowPalette(rawPalette)
+  if (browserWindow && palette !== undefined) windowPalettes.set(browserWindow, palette)
+  const activePalette = getWindowPalette(browserWindow)
   if (browserWindow) windowChromeThemes.set(browserWindow, theme)
   browserWindow?.setTitleBarOverlay?.({
     ...WINDOW_CHROME_THEMES[theme],
+    ...(activePalette ? { color: activePalette.background, symbolColor: activePalette.foreground } : {}),
     height: WINDOW_CHROME_HEIGHT,
   })
   return theme
@@ -273,6 +280,19 @@ export function decorateDesktopRuntimeUrl(rawUrl, { platform = process.platform 
   return url.toString()
 }
 
+/** Keep an owned viewport inset stable across the mutations it triggers. */
+export function markWindowChromeViewportRoot({ document, getComputedStyle, chromeHeight }) {
+  const root = document.getElementById('root')
+  if (!root || root.parentElement !== document.body) return
+  const marker = 'dsh-desktop-viewport-root'
+  const position = getComputedStyle(root).position
+  // Once the rule moves the root below the caption, its corrected rectangle
+  // must not make the next observer pass remove that same rule.
+  const needsInset = (position === 'fixed' || position === 'absolute')
+    && (root.classList.contains(marker) || root.getBoundingClientRect().top < chromeHeight)
+  root.classList.toggle(marker, needsInset)
+}
+
 /** Serialized into the renderer. Index dialogs without rescanning all history. */
 export function observeWindowChromeDocument({ document, window, chrome, syncTheme, markViewportRoot, markModalLayer }) {
   const selector = '[role="dialog"], [aria-modal="true"], dialog[open]'
@@ -466,14 +486,9 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         layer.classList.add('dsh-desktop-modal-layer');
       }
     };
-    const markViewportRoot = () => {
-      const root = document.getElementById('root');
-      if (!root || root.parentElement !== document.body) return;
-      const position = getComputedStyle(root).position;
-      const overlapsChrome = (position === 'fixed' || position === 'absolute')
-        && root.getBoundingClientRect().top < data.chromeHeight;
-      root.classList.toggle('dsh-desktop-viewport-root', overlapsChrome);
-    };
+    const markViewportRoot = () => (${markWindowChromeViewportRoot.toString()})({
+      document, getComputedStyle, chromeHeight: data.chromeHeight,
+    });
     (${observeWindowChromeDocument.toString()})({ document, window, chrome, syncTheme, markViewportRoot, markModalLayer });
     return true;
   })()`

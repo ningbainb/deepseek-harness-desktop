@@ -209,6 +209,10 @@ try {
   await particleSettingsTitle.waitFor({ state: 'visible' })
   await particleSettingsTitle.scrollIntoViewIfNeeded()
   const particleSettingsCard = particleSettingsTitle.locator('xpath=ancestor::li[1]')
+  const settingsToggle = particleSettingsCard.getByRole('button', { name: /(?:收起设置|Hide settings)/iu })
+  assert.equal(await settingsToggle.getAttribute('aria-expanded'), 'true', 'the dedicated Dock form opens expanded')
+  await settingsToggle.click()
+  await particleSettingsCard.locator('#settings-particle-theme-enabled').waitFor({ state: 'hidden' })
   await particleSettingsCard.getByRole('button', { name: /(?:展开设置|Show settings)/iu }).click()
   if (screenshot) await page.screenshot({ path: screenshot.replace(/\.png$/iu, '-settings.png') })
 

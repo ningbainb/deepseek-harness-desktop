@@ -1,5 +1,170 @@
+diff --git a/lib/client.js b/lib/client.js
+index b0bb430..94a30fc 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -2333,6 +2333,7 @@ window.__ModuleLoader__.load({
+ 				doc.head.appendChild(link);
+ 			}));
+ 			let latestRequest = 0;
++			let disposed = false;
+ 			let currentActivation = null;
+ 			const initialSkinId = doc.documentElement?.getAttribute("data-dsh-skin") || null;
+ 			let active = initialSkinId;
+@@ -2480,7 +2481,8 @@ window.__ModuleLoader__.load({
+ 					body: JSON.stringify({ active: id })
+ 				});
+ 			}
+-			async function switchInternal(id, entry, shouldPersist) {
++			async function switchInternal(id, entry, shouldCommit, shouldPersist = shouldCommit) {
++				if (disposed) return active;
+ 				const seq = ++latestRequest;
+ 				const activation = ledger.beginActivation();
+ 				try {
+@@ -2504,7 +2506,7 @@ window.__ModuleLoader__.load({
+ 					currentActivation = activation;
+ 					active = id;
+ 					if (entry !== null) lastEntry = entry;
+-					if (shouldPersist) {
++					if (shouldCommit) {
+ 						committed = {
+ 							id,
+ 							entry
+@@ -2545,6 +2547,9 @@ window.__ModuleLoader__.load({
+ 				async switchTo(id, entry) {
+ 					return await switchInternal(id, entry, true);
+ 				},
++				async adopt(id, entry) {
++					return await switchInternal(id, entry, true, false);
++				},
+ 				async tryOn(id, entry) {
+ 					return await switchInternal(id, entry, false);
+ 				},
+@@ -2567,6 +2572,7 @@ window.__ModuleLoader__.load({
+ 					return await switchInternal(id, id === null ? null : lastEntry, false);
+ 				},
+ 				shutdown() {
++					disposed = true;
+ 					latestRequest += 1;
+ 					if (currentActivation !== null) {
+ 						ledger.disposeActivation(currentActivation);
+@@ -2608,11 +2614,25 @@ window.__ModuleLoader__.load({
+ 			const doc = options.doc ?? document;
+ 			const apiBase = options.apiBase ?? "/api/skin-center/v2";
+ 			const fetchImpl = options.fetchImpl ?? fetch.bind(doc.defaultView);
++			const Channel = doc.defaultView?.BroadcastChannel;
++			const selectionChannel = Channel ? new Channel("dsh-skin-selection-v1") : null;
++			let stopped = false;
++			let removeAppliedListener = () => {};
+ 			const controller = createSkinController({
+ 				doc,
+ 				ledger: createEffectLedger(),
+ 				apiBase,
+ 				fetchImpl,
++				async persist(id) {
++					if (stopped) return;
++					const response = await fetchImpl(`${apiBase}/active`, {
++						method: "POST",
++						headers: { "content-type": "application/json" },
++						body: JSON.stringify({ active: id })
++					});
++					if (!response.ok || (await response.json()).ok !== true) throw new Error("skin selection was not saved");
++					if (!stopped) selectionChannel?.postMessage({ active: id });
++				},
+ 				suppressBackgroundMedia: options.suppressBackgroundMedia,
+ 				onError: (message, error) => {
+ 					console.error(`[skin-center] ${message}`, error);
+@@ -2627,9 +2647,11 @@ window.__ModuleLoader__.load({
+ 				for (const listener of listeners) listener();
+ 			};
+ 			async function refreshCatalog() {
++				if (stopped) return;
+ 				const res = await fetchImpl(`${apiBase}/catalog`);
+ 				if (!res.ok) throw new Error(`catalog fetch -> ${res.status}`);
+ 				const payload = await res.json();
++				if (stopped) return;
+ 				catalog = payload.skins ?? [];
+ 				diagnostics = payload.diagnostics ?? [];
+ 				emit();
+@@ -2652,10 +2674,27 @@ window.__ModuleLoader__.load({
+ 					};
+ 				},
+ 				shutdown() {
++					if (stopped) return;
++					stopped = true;
++					if (selectionChannel) selectionChannel.onmessage = null;
++					selectionChannel?.close();
++					removeAppliedListener();
++					listeners.clear();
++					if (doc.defaultView?.__skinRuntime === store) delete doc.defaultView.__skinRuntime;
+ 					adapter.stop();
+ 					controller.shutdown();
+ 				}
+ 			};
++			if (selectionChannel) selectionChannel.onmessage = async ({ data }) => {
++				if (stopped || !data || !(data.active === null || typeof data.active === "string")) return;
++				try {
++					if (catalog === null) await refreshCatalog();
++					if (stopped) return;
++					const entry = data.active === null ? null : store.find(data.active);
++					if (data.active !== null && entry === null) return;
++					await controller.adopt(data.active, entry);
++				} catch (error) { console.error("[skin-center] cross-window selection failed", error); }
++			};
+ 			{
+ 				const root = doc.defaultView;
+ 				root.__skinRuntime = store;
+@@ -2663,22 +2702,39 @@ window.__ModuleLoader__.load({
+ 			(async () => {
+ 				try {
+ 					await refreshCatalog();
++					if (stopped) return;
+ 					let active = doc.documentElement?.getAttribute("data-dsh-skin") || null;
+ 					if (!active) {
+ 						const payload = await (await fetchImpl(`${apiBase}/active`)).json();
+ 						active = payload.ok && typeof payload.active === "string" ? payload.active : null;
+ 					}
+-					if (active === null) return;
++					if (stopped || active === null) return;
+ 					const entry = store.find(active);
+ 					if (entry === null) {
+ 						await controller.switchTo(null, null);
+ 						return;
+ 					}
+-					await controller.switchTo(active, entry);
++					if (!stopped) await controller.adopt(active, entry);
+ 				} catch {
+-					await controller.switchTo(null, null).catch(() => {});
++					if (!stopped) await controller.switchTo(null, null).catch(() => {});
+ 				}
+ 			})();
++			if (doc.defaultView) {
++				const win = doc.defaultView;
++				const onSkinApplied = (event) => {
++					if (stopped) return;
++					const detail = event.detail;
++					if (detail && typeof detail.id === "string") refreshCatalog().then(async () => {
++						if (stopped) return;
++						const entry = store.find(detail.id);
++						if (entry !== null) await controller.switchTo(detail.id, entry);
++					}).catch((error) => {
++						if (!stopped) console.error("[skin-center] applied selection failed", error);
++					});
++				};
++				win.addEventListener("dsh-skin-applied", onSkinApplied);
++				removeAppliedListener = () => win.removeEventListener("dsh-skin-applied", onSkinApplied);
++			}
+ 			return store;
+ 		}
+ 		//#endregion
+@@ -2791,4 +2847,4 @@ window.__ModuleLoader__.load({
+ 	}
+ });
+ 
+-//# sourceMappingURL=client.js.map
+\ No newline at end of file
++//# sourceMappingURL=client.js.map
 diff --git a/lib/index.js b/lib/index.js
-index 959216d1d7d13e6b87c1b010271f55577fe3b119..bbce336ad329c3bd0e9bfccd7a9849b992399206 100644
+index 959216d..bbce336 100644
 --- a/lib/index.js
 +++ b/lib/index.js
 @@ -1,4 +1,3 @@
@@ -54,7 +219,7 @@ index 959216d1d7d13e6b87c1b010271f55577fe3b119..bbce336ad329c3bd0e9bfccd7a9849b9
  	const routes = [...makeSkinCenterV2Routes(), ...makeWeRoutes({
  		getConfig: () => wallpaperSource(),
 diff --git a/package.json b/package.json
-index bcd10443944eebb4146c75b2d216296b2377ac8f..1d842bd169b47662d546f8948399a2669fdd01c9 100644
+index bcd1044..d9cb8e0 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,7 +16,9 @@

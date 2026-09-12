@@ -11,6 +11,8 @@
   transition: border-color 0.16s, background 0.16s;
 }
 
+.body[hidden] { display: none; }
+
 .card:hover {
   border-color: var(--dsw-alias-label-dimmed);
 }

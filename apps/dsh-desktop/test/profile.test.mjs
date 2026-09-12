@@ -22,6 +22,7 @@ import {
   DEPENDENCY_ONLY_BUNDLES,
   DESKTOP_PLUGIN_COMPAT_PACKAGES,
   DESKTOP_RUNTIME_OVERRIDE_PACKAGES,
+  DESKTOP_PUBLISHED_OVERRIDE_PACKAGES,
   DESKTOP_SUPPORT_PACKAGES,
   DSH_BOOT_RUNTIME_PACKAGES,
   MANAGED_RUNTIME_PACKAGES,
@@ -1067,11 +1068,22 @@ test('runtime resolver finds every bundled and desktop support package', async (
   for (const packageName of AGGREGATED_BUNDLES) {
     if (
       DESKTOP_RUNTIME_OVERRIDE_PACKAGES.includes(packageName)
+      || DESKTOP_PUBLISHED_OVERRIDE_PACKAGES.includes(packageName)
       || DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES.includes(packageName)
       || packageName === 'dsh-better-sidebar'
     ) continue
     const manifest = JSON.parse(readFileSync(join(resolved.get(packageName), 'package.json'), 'utf8'))
     assert.equal(manifest.version, aggregate.version, `${packageName} did not resolve from the aggregate release`)
+  }
+  const reviewedPublicVersions = {
+    '@linxin666/dsh-client-ui-plugin-manager': '0.3.20',
+    '@linxin666/dsh-client-ui-skill-explorer': '0.3.20',
+    '@linxin666/dsh-desktop-launcher': '0.3.13',
+  }
+  assert.deepEqual(DESKTOP_PUBLISHED_OVERRIDE_PACKAGES, Object.keys(reviewedPublicVersions).toSorted())
+  for (const [name, version] of Object.entries(reviewedPublicVersions)) {
+    const manifest = JSON.parse(readFileSync(join(resolved.get(name), 'package.json'), 'utf8'))
+    assert.equal(manifest.version, version, `${name} must use its reviewed public release`)
   }
   for (const packageName of DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES) {
     assert.match(resolved.get(packageName), /packages[\\/](?:dsh-aionui-panel|dsh-chat-artifacts|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-pet|dsh-ssh|dsh-tool-describe-image|dsh-user-scope|skins[\\/]skin-center)$/u)

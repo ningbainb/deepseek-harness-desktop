@@ -61,6 +61,11 @@ try {
     const horizontalOverflow = await settings.evaluate(() => document.documentElement.scrollWidth > innerWidth)
     assert.equal(horizontalOverflow, false, `${id} fits its pane`)
     assert.equal(await settings.evaluate(() => typeof window.dshDesktop), 'undefined', 'settings have no extension IPC bridge')
+    if (id === 'particle-theme' || id === 'describe-image') {
+      const form = settings.locator(`[data-dsh-dock-settings] > section:not([hidden])`)
+      assert.equal(await form.locator('button[aria-expanded="true"]').first().isVisible(), true, `${id} opens its primary form directly`)
+      assert.ok(await form.locator('input:visible, select:visible, textarea:visible').count() > 0, `${id} exposes configuration without a second click`)
+    }
     if (id === 'memory') {
       const card = settings.locator('[data-memory-card="true"]')
       assert.equal(await card.locator('textarea').isVisible(), false, 'memory editor opens on demand')
@@ -98,6 +103,7 @@ try {
   await settings.locator('[data-dsh-dock-settings="personal-prompt"]').waitFor()
   const prompt = settings.locator('[data-personal-prompt-card="true"]')
   await prompt.getByRole('button', { name: '新建偏好', exact: true }).click()
+  assert.equal(await prompt.locator('textarea').first().evaluate(element => element === document.activeElement), true, 'new preference focuses its body')
   await prompt.locator('input[placeholder="例如：简洁代码审查"]').fill('Dock draft')
   await prompt.locator('textarea').first().fill('Preserve this draft across Dock tabs.')
   assert.equal(await prompt.locator('[data-preference-preview]').getAttribute('open'), null, 'preference preview starts collapsed')
@@ -198,7 +204,11 @@ try {
   await dock.locator('#plugins-hub-tab').click()
   await dock.locator('#install-plugin > summary').click()
   await dock.locator('#plugin-form').waitFor({ state: 'visible' })
-  assert.equal(await dock.locator('.settings-sidebar [role="tab"]').count(), 10, 'ten direct destinations including model connection')
+  assert.deepEqual(await dock.locator('.settings-sidebar [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
+    'models-tab', 'relay-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
+    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'skills-tab', 'qqbot-tab',
+    'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
+  ], 'all ten existing destinations and four native plugin destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('.native-catalog-disclosure > summary').click()
   await dock.locator('#native-plugin-grid').waitFor()

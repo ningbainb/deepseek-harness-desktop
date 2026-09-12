@@ -7,6 +7,12 @@
 
 /** zh dictionary (key-set source of truth). */
 export const zh = {
+  'save.pending': '正在保存更改。定时任务仍按已保存的设置运行。',
+  'save.failed': '保存未成功，当前更改仅保留在此窗口，关闭或刷新会丢失。定时任务仍按已保存的设置运行。',
+  'save.conflict': '其他窗口或运行中的任务已修改相同内容，当前草稿尚未保存。重试不会覆盖这些修改。定时任务仍按已保存的设置运行。',
+  'save.retry': '重试保存',
+  'save.reload': '重新载入已保存内容',
+  'save.discardConfirm': '放弃此窗口未保存的更改并重新载入？仅在载入成功后才会替换当前草稿。',
   'entry.label': '任务看板',
   'board.title': '任务看板',
   'board.close': '返回对话',
@@ -120,6 +126,12 @@ export const zh = {
 
 /** en dictionary, complete against the zh key set. */
 export const en: Record<keyof typeof zh, string> = {
+  'save.pending': 'Saving changes. Scheduled tasks still use the last saved settings.',
+  'save.failed': 'Changes were not saved and are kept only in this window. Closing or refreshing will lose them. Scheduled tasks still use the last saved settings.',
+  'save.conflict': 'Another window or running task changed the same content. Your draft is not saved; retrying will not overwrite those changes. Scheduled tasks still use the last saved settings.',
+  'save.retry': 'Retry saving',
+  'save.reload': 'Reload saved content',
+  'save.discardConfirm': 'Discard unsaved changes in this window and reload? Your draft will only be replaced after loading succeeds.',
   'entry.label': 'Task Board',
   'board.title': 'Task Board',
   'board.close': 'Back to chat',

@@ -241,22 +241,29 @@ export class CardForm<T> {
     const plan = this.plan()
     const writes = plan.flatMap(item => item.run === undefined ? [] : [item.run])
     if (plan.length === 0 || this.saving || writes.length !== plan.length) return
-    // Snapshot the fields this save writes, so edits staged while it is in
-    // flight survive: only the staged keys this save actually wrote are cleared.
-    const fields = new Set(plan.map(item => item.field))
+    // Match the exact draft this save writes: a later edit or reset of the
+    // same field must survive the older write finishing.
+    const drafts = new Map(plan.map(item => [item.field, this.staged.get(item.field)]))
     this.saving = true
     this.failed = false
     this.publish()
     let landed = true
-    for (const write of writes) {
-      landed = await write() && landed
+    try {
+      for (const write of writes) {
+        landed = await write() && landed
+      }
+      if (landed) {
+        for (const [field, draft] of drafts) {
+          if (this.staged.get(field) === draft) this.staged.delete(field)
+        }
+      }
+    } catch {
+      landed = false
+    } finally {
+      this.saving = false
+      this.failed = !landed
+      this.publish()
     }
-    if (landed) {
-      for (const field of fields) this.staged.delete(field)
-    }
-    this.saving = false
-    this.failed = !landed
-    this.publish()
   }
 
   /**

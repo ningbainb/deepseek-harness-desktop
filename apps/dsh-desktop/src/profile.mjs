@@ -25,6 +25,9 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@linxin666/dsh-value-mode',
   'dsh-better-sidebar',
   '@linxin666/dsh-web-ui-all',
+  '@linxin666/dsh-client-ui-model-capabilities',
+  '@linxin666/dsh-usage',
+  '@linxin666/dsh-session-archive',
   '@tencent-connect/dsh-qqbot',
   'reasoning-slider',
 ])
@@ -135,6 +138,9 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
+  '@linxin666/dsh-client-ui-model-capabilities',
+  '@linxin666/dsh-usage',
+  '@linxin666/dsh-session-archive',
   '@linxin666/dsh-desktop-compat',
   '@linxin666/dsh-desktop-client',
   '@linxin666/dsh-client-ui-aionui-panel',
@@ -219,6 +225,14 @@ export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-web-ui-settings',
   '@linxin666/dsh-live-stats',
   '@linxin666/dsh-remote-web-ui',
+].toSorted())
+
+// Reviewed public releases override the older aggregate carrier. Keep these
+// direct so development and packaged profiles resolve the same patched builds.
+export const DESKTOP_PUBLISHED_OVERRIDE_PACKAGES = Object.freeze([
+  '@linxin666/dsh-client-ui-plugin-manager',
+  '@linxin666/dsh-client-ui-skill-explorer',
+  '@linxin666/dsh-desktop-launcher',
 ].toSorted())
 
 // These bundles deliberately resolve through the workspace overrides in
@@ -1277,7 +1291,7 @@ export function resolveRuntimePackages(
     }
   }
 
-  for (const packageName of DESKTOP_RUNTIME_OVERRIDE_PACKAGES) {
+  for (const packageName of [...DESKTOP_RUNTIME_OVERRIDE_PACKAGES, ...DESKTOP_PUBLISHED_OVERRIDE_PACKAGES]) {
     if (!pending.has(packageName)) continue
     const overrideRoot = resolvePackageRoot(packageName, [initialAnchor])
     if (overrideRoot === undefined) continue

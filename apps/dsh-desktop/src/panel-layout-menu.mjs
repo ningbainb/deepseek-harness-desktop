@@ -11,7 +11,9 @@ export function installPanelLayoutMenu({ document, window, chrome, closeMenus })
   const marker = 'data-dsh-desktop-layout-relocated'
   const nativeSelector = '[data-sidebar-right-expand], [data-sidebar-right-toggle], [data-aionui-sidebar-return-button]'
   const clusterSelector = '[data-dsh-panel-host] > [class*="toggleCluster"]'
-  const watchedSelector = `${nativeSelector}, [data-dsh-panel-host]`
+  const bottomSelector = '[data-dsh-bottom-toggle]'
+  const explorerSelector = '.aionui-floating-expand'
+  const watchedSelector = `${nativeSelector}, [data-dsh-panel-host], ${bottomSelector}, ${explorerSelector}, [data-aionui-explorer-col]`
   const labels = {
     bottom: ['展开底部面板', '折叠底部面板', 'Expand bottom panel', 'Collapse bottom panel'],
     right: ['展开侧边栏', '折叠侧边栏', 'Expand sidebar', 'Collapse sidebar'],
@@ -90,6 +92,17 @@ export function installPanelLayoutMenu({ document, window, chrome, closeMenus })
       }
       if (found.has('right') && found.size === buttons.length) match = { cluster, found }
     }
+    // Sidebar 0.19 registers its bottom toggle in the session header. The
+    // preserved AionUI explorer still owns the compatibility-side toggle.
+    if (!match && clusters.length === 0 && document.querySelector(nativeSelector)) {
+      const bottoms = [...document.querySelectorAll(bottomSelector)]
+      if (bottoms.length === 1 && labels.bottom.includes(bottoms[0].getAttribute('aria-label'))) {
+        const found = new Map([['bottom', bottoms[0]]])
+        const explorers = [...document.querySelectorAll(explorerSelector)]
+        if (explorers.length === 1) found.set('right', explorers[0])
+        match = { cluster: bottoms[0], found }
+      }
+    }
     for (const cluster of owned) {
       if (cluster !== match?.cluster) { cluster.removeAttribute(marker); owned.delete(cluster) }
     }
@@ -100,7 +113,9 @@ export function installPanelLayoutMenu({ document, window, chrome, closeMenus })
       entry.item.hidden = !original
       entry.item.disabled = !original || original.disabled
       const index = labels[kind].indexOf(original?.getAttribute('aria-label'))
-      const open = index === 1 || index === 3
+      const open = kind === 'right' && original?.matches(explorerSelector)
+        ? document.querySelector('[data-aionui-explorer-col]')?.getAttribute('data-aionui-visible') === 'true'
+        : index === 1 || index === 3
       setAttribute(entry.item, 'aria-checked', String(open))
       setText(entry.status, open ? '已展开 / Open' : '已收起 / Closed')
     }
@@ -118,10 +133,10 @@ export function installPanelLayoutMenu({ document, window, chrome, closeMenus })
   const observer = new window.MutationObserver(records => {
     if (!chrome.isConnected || !group.isConnected || !style.isConnected) { dispose(); return }
     // Ignore conversation text/streaming mutations and our own menu updates.
-    if (records.some(record => record.target.nodeType === 1 && record.target.closest(clusterSelector) ||
+    if (records.some(record => record.target.nodeType === 1 && record.target.closest(`${clusterSelector}, ${bottomSelector}, ${explorerSelector}, [data-aionui-explorer-col]`) ||
       [...record.addedNodes, ...record.removedNodes].some(relevant))) schedule()
   })
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'disabled'] })
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'disabled', 'aria-pressed', 'data-aionui-visible'] })
   const onKey = event => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
     const items = [...menu.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')]

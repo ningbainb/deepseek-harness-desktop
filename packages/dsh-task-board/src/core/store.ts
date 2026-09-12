@@ -17,8 +17,12 @@ import { isTaskStatus } from './tasks.ts'
 export interface TaskStore {
   /** Read the persisted ledger (empty when nothing is stored yet). */
   load(): TaskRecord[] | Promise<TaskRecord[]>
+  /** Optional checked read for recovery without an empty-on-error fallback. */
+  loadChecked?(): TaskRecord[] | Promise<TaskRecord[]>
   /** Persist the whole ledger (replaces the stored document). */
   save(tasks: readonly TaskRecord[]): void | Promise<void>
+  /** Optional checked write for legacy backends whose save contract cannot throw. */
+  saveChecked?(tasks: readonly TaskRecord[]): void | Promise<void>
   /** Drop the persisted ledger (leaves the in-memory state alone). */
   clear(): void | Promise<void>
   /**
@@ -287,6 +291,7 @@ export function createLedgerDocumentV2(
 
 /** localStorage-backed store (the browser backend). */
 export class LocalStorageTaskStore implements TaskStore {
+  private writeError: unknown
   /**
    * @param key - storage key for the ledger document.
    * @param storage - storage backend (defaults to the global localStorage; tests inject fakes).
@@ -315,13 +320,27 @@ export class LocalStorageTaskStore implements TaskStore {
   }
 
   save(tasks: readonly TaskRecord[]): void {
-    if (this.storage === undefined) return
+    this.writeError = undefined
+    if (this.storage === undefined) { this.writeError = new Error('task storage unavailable'); return }
     try {
       this.storage.setItem(this.key, JSON.stringify(tasks))
     } catch (error) {
+      this.writeError = error
       // Write failures only skip persistence; in-memory state stays live.
       console.error('[dsh-task-board] task ledger write failed (persistence skipped)', error)
     }
+  }
+
+  loadChecked(): TaskRecord[] {
+    if (this.storage === undefined) throw new Error('task storage unavailable')
+    const raw = this.storage.getItem(this.key)
+    if (raw !== null && !Array.isArray(JSON.parse(raw))) throw new Error('task ledger is invalid')
+    return parseLedger(raw)
+  }
+
+  saveChecked(tasks: readonly TaskRecord[]): void {
+    this.save(tasks)
+    if (this.writeError !== undefined) throw this.writeError
   }
 
   clear(): void {

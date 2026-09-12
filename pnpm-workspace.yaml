@@ -9,11 +9,9 @@ packages:
 # turtle-ui convention used by the bundled plugins.
 autoInstallPeers: false
 
-# dsh-better-sidebar@0.14.0 is patched below to remove its only runtime use of
-# the retired monolith, declare the split Session/Workspace controllers, and
-# replace the settingsNamespace helper removed by DSH 0.1.5.
-# pnpm resolves peer requirements before applying dependency patches, so ignore
-# the stale pre-patch peer entry while still checking every other missing peer.
+# Some retained aggregate peers still name the retired client runtime.
+# Desktop-owned builds use the official split controllers. Ignore this stale
+# peer declaration while still checking every other missing peer.
 peerDependencyRules:
   ignoreMissing:
     - '@deepseek-ai/dsh-client-runtime'
@@ -44,12 +42,16 @@ peerDependencyRules:
 # It compares resolved versions rather than specifiers, so cases B and C stay
 # clean even when two importers declare different ranges.
 
-patchedDependencies: { '@deepseek-ai/dsh-client-store@0.1.5-rc.1': patches/@deepseek-ai__dsh-client-store@0.1.5-rc.1.patch, '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.1': patches/@deepseek-ai__dsh-client-ui-primitives@0.1.5-rc.1.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.5-rc.1': patches/@deepseek-ai__dsh-llm-pi-ai@0.1.5-rc.1.patch, '@deepseek-ai/dsh-subprocess-local@0.1.5-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.5-rc.1.patch, '@linxin666/dsh-chat-recovery@0.2.5': patches/@linxin666__dsh-chat-recovery@0.2.5.patch, '@linxin666/dsh-client-ui-skin-center@0.2.5': patches/@linxin666__dsh-client-ui-skin-center@0.2.5.patch, '@linxin666/dsh-desktop-launcher@0.2.5': patches/@linxin666__dsh-desktop-launcher@0.2.5.patch, '@linxin666/dsh-liangshen@0.2.5': patches/@linxin666__dsh-liangshen@0.2.5.patch, '@linxin666/dsh-pet@0.2.5': patches/@linxin666__dsh-pet@0.2.5.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch, 'dsh-better-sidebar@0.14.0': patches/dsh-better-sidebar@0.14.0.patch }
+patchedDependencies: { '@deepseek-ai/dsh-client-store@0.1.5-rc.1': patches/@deepseek-ai__dsh-client-store@0.1.5-rc.1.patch, '@deepseek-ai/dsh-client-ui-primitives@0.1.5-rc.1': patches/@deepseek-ai__dsh-client-ui-primitives@0.1.5-rc.1.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.5-rc.1': patches/@deepseek-ai__dsh-llm-pi-ai@0.1.5-rc.1.patch, '@deepseek-ai/dsh-subprocess-local@0.1.5-rc.1': patches/@deepseek-ai__dsh-subprocess-local@0.1.5-rc.1.patch, '@linxin666/dsh-chat-recovery@0.2.5': patches/@linxin666__dsh-chat-recovery@0.2.5.patch, '@linxin666/dsh-client-ui-model-capabilities@0.3.20': patches/@linxin666__dsh-client-ui-model-capabilities@0.3.20.patch, '@linxin666/dsh-client-ui-skin-center@0.2.5': patches/@linxin666__dsh-client-ui-skin-center@0.2.5.patch, '@linxin666/dsh-liangshen@0.2.5': patches/@linxin666__dsh-liangshen@0.2.5.patch, '@linxin666/dsh-pet@0.2.5': patches/@linxin666__dsh-pet@0.2.5.patch, '@linxin666/dsh-web-ui-all@0.2.5': patches/@linxin666__dsh-web-ui-all@0.2.5.patch, 'dsh-better-sidebar@0.14.0': patches/dsh-better-sidebar@0.14.0.patch }
 
 # Desktop pins the published aggregate at 0.2.5, while selected dependencies
 # use reviewed workspace builds for Desktop-owned fixes and security
 # boundaries.
 overrides:
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-plugin-manager': '0.3.20'
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-skill-explorer': '0.3.20'
+  '@linxin666/dsh-web-ui-all>@linxin666/dsh-desktop-launcher': '0.3.13'
+  '@linxin666/dsh-web-ui-all>dsh-better-sidebar': '0.14.0'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-aionui-panel': 'link:./packages/dsh-aionui-panel'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-ssh': 'link:./packages/dsh-ssh'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-task-board': 'link:./packages/dsh-task-board'

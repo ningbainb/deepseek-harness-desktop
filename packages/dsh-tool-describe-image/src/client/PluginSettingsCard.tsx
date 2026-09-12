@@ -55,7 +55,8 @@ export interface PluginSettingsCardProps<TKey extends string = string> {
  * @returns the card, or nothing while the namespace is still loading.
  */
 export function PluginSettingsCard<TKey extends string = string>(props: PluginSettingsCardProps<TKey>) {
-  const [open, setOpen] = useState(false)
+  const dock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('desktop-dock-setting')
+  const [open, setOpen] = useState(dock)
   const { state } = props
   if (!state.available) return null
   const title = props.t(props.titleKey)
@@ -105,7 +106,7 @@ export function PluginSettingsCard<TKey extends string = string>(props: PluginSe
     )
   }
   return (
-    <li className={cardClass}>
+    <li className={cardClass} data-dock-dirty={dock ? state.dirty : undefined}>
       <button
         type="button"
         className={css.header}
@@ -117,7 +118,7 @@ export function PluginSettingsCard<TKey extends string = string>(props: PluginSe
           <span className={css.name} title={title}>{title}</span>
           <span className={css.description} title={description}>{description}</span>
         </span>
-        {state.dirty ? <span className={css.pending} title={props.t('settings.unsaved')}>{props.t('settings.unsaved')}</span> : null}
+        {state.saving || state.failed || state.dirty ? <span className={css.pending} role="status">{props.t(state.saving ? 'settings.saving' : state.failed ? 'settings.saveFailed' : 'settings.unsaved')}</span> : null}
         <svg
           width="14"
           height="14"
@@ -132,13 +133,13 @@ export function PluginSettingsCard<TKey extends string = string>(props: PluginSe
           />
         </svg>
       </button>
-      {open
+      {open || dock
         ? (
-          <div className={css.body}>
+          <div className={css.body} hidden={!open}>
             {!state.writable ? <p className={css.readOnly} role="status">{props.t('settings.readOnly')}</p> : null}
             {props.children}
-            <div className={css.footer}>
-              {state.failed ? <p className={css.failed} role="status">{props.t('settings.saveFailed')}</p> : null}
+            <div className={css.footer} data-dock-save-bar={dock || undefined}>
+              {state.failed ? <p className={css.failed} role="alert">{props.t('settings.saveFailed')}</p> : null}
               <button
                 type="button"
                 className={css.discard}
@@ -150,6 +151,7 @@ export function PluginSettingsCard<TKey extends string = string>(props: PluginSe
               <button
                 type="button"
                 className={css.save}
+                data-dock-save={dock || undefined}
                 disabled={blocked}
                 onClick={props.onSave}
               >
