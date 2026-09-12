@@ -30,22 +30,32 @@ async function diagnosticFiles(root) {
     const metadata = await stat(path).catch(() => undefined)
     if (!metadata?.isFile() || metadata.size > 256_000) continue
     if (!/\.(?:json|jsonl|log|txt)$/iu.test(relative)) continue
-    diagnostics.push({ relative, content: await readFile(path, 'utf8').catch(() => '') })
+    const content = await readFile(path, 'utf8').catch(() => '')
+    diagnostics.push({ relative, content: content.slice(-8_000) })
   }
   return diagnostics
 }
 
 async function dismissFirstRunSurfaces(page) {
   const starPrompt = page.locator('#dsh-desktop-star-prompt')
-  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
-  await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
-  await starPrompt.waitFor({ state: 'hidden' })
   const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
   const introDialog = page.getByRole('dialog').filter({ has: continueButton })
-  if (await introDialog.isVisible().catch(() => false)) {
-    await introDialog.getByRole('button', { name: /^(?:继续|Continue)$/u }).click()
-    await introDialog.waitFor({ state: 'hidden' })
+
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    await page.waitForTimeout(250)
+    if (await introDialog.isVisible().catch(() => false)) {
+      await continueButton.last().click({ force: true })
+      continue
+    }
+    if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
+      await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click({ force: true })
+      continue
+    }
+    if (attempt >= 7) break
   }
+
+  assert.equal(await introDialog.isVisible().catch(() => false), false, 'intro dialog remained visible')
+  assert.notEqual(await starPrompt.getAttribute('data-open').catch(() => null), 'true', 'Star prompt remained open')
 }
 
 try {
