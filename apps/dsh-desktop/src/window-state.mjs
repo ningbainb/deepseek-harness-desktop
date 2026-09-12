@@ -87,7 +87,10 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     const bounds = { ...window.getNormalBounds() }
     const maximized = window.isMaximized()
     for (const [key, { automatic, requested }] of unchanged) {
-      if (maximized || automatic.has(bounds[key])) bounds[key] = requested
+      if (maximized) {
+        automatic.add(bounds[key])
+        bounds[key] = requested
+      } else if (automatic.has(bounds[key])) bounds[key] = requested
       else unchanged.delete(key)
     }
     return `${JSON.stringify({ ...bounds, maximized }, null, 2)}\n`
