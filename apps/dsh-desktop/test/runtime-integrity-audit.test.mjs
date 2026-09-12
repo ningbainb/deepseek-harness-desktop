@@ -58,6 +58,22 @@ test('migration preserves a blocked result for the repair UI', async () => {
   assert.match(error.userMessage, /不会删除聊天、设置或个人数据/u)
 })
 
+test('repair failure stays bounded and leaves recovery to the repair UI', async () => {
+  const before = { status: 'repairable', reasonCode: 'PROTECTED_PACKAGE_SOURCE_CONFLICT' }
+  const failure = new Error('C:\\Users\\private\\profile contains secret material')
+  let audits = 0
+  const error = await migrateLegacyRuntimeIntegrity({
+    audit: async () => { audits += 1; return before },
+    repair: async () => { throw failure },
+  }).then(() => undefined, (thrown) => thrown)
+  assert.equal(audits, 1)
+  assert.equal(error.code, 'PLUGIN_ENVIRONMENT_REPAIR_REQUIRED')
+  assert.equal(error.cause, failure)
+  assert.equal(error.audit, before)
+  assert.doesNotMatch(error.userMessage, /Users|secret|node_modules|pnpm/u)
+  assert.match(error.userMessage, /不会删除聊天、设置或个人数据/u)
+})
+
 test('a fresh profile is initialized without being reported as damaged', async () => {
   const states = [
     { status: 'uninitialized', reasonCode: 'PROFILE_NOT_INITIALIZED' },

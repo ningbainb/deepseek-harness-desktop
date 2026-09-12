@@ -116,6 +116,23 @@ test('activation rollback restores the exact manifest, lockfile, and dependency 
   }
 })
 
+test('commit is rejected until Runtime health is durable and rollback remains available', async () => {
+  const value = await fixture()
+  try {
+    const staged = await prepareChangedStage(value)
+    const transaction = await staged.activate({ profileArchive: value.profileArchive })
+    await assert.rejects(transaction.commit(), /cannot commit from NEW_ENV_ACTIVATED/u)
+    assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), true)
+    assert.equal(await transaction.rollback(), true)
+    assert.equal(
+      JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version,
+      '1.0.0',
+    )
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
 test('one persistent writer lock rejects concurrent mutations and stale staging is recoverable', async () => {
   const value = await fixture()
   try {

@@ -516,6 +516,10 @@ export class PluginStagingManager {
       },
       async commit() {
         if (!active) return false
+        const journal = await manager.#readJournal(transactionId)
+        if (journal.phase !== 'RUNTIME_HEALTHY') {
+          throw new Error(`plugin transaction cannot commit from ${journal.phase}`)
+        }
         await archiveTransaction.commit()
         await manager.advance(transactionId, 'COMMITTED')
         await manager.#clearActive(transactionId)

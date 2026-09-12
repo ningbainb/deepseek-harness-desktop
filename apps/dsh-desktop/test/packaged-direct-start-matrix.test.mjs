@@ -26,6 +26,7 @@ test('direct-start fixtures have release-commit provenance and complete text has
   assert.ok(verified.files.includes('2.3/home.json'))
   assert.ok(verified.files.includes('3.0.1/home.json'))
   assert.ok(verified.files.includes('3.3.0/home.json'))
+  assert.ok(verified.files.includes('3.4.0/home.json'))
   assert.ok(verified.files.includes('probe-package/index.mjs'))
 })
 
@@ -99,6 +100,14 @@ test('3.3.0 verification rejects silently dropping its existing enabled bundles'
   await writeFile(manifestPath, JSON.stringify(manifest))
   await assert.rejects(verifyPackagedDirectStart(layout, { runtimeLog: '[startup] direct-state=ready-full\n' }),
     /dropped an enabled legacy bundle/u)
+})
+
+test('3.4.0 verification retains its complete enabled bundle set', async context => {
+  const root = await mkdtemp(join(tmpdir(), 'direct-start-340-bundles-'))
+  context.after(() => rm(root, { recursive: true, force: true }))
+  const layout = await materializeDirectStartFixture({ root, version: '3.4.0' })
+  assert.equal(layout.expectedLegacyBundles.length, 8)
+  assert.ok(layout.expectedLegacyBundles.includes('dsh-better-sidebar'))
 })
 
 test('packaged direct-start matrix covers every historical Home plus a truly fresh Home', async () => {

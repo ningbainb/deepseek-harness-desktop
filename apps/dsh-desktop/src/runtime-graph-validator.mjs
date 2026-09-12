@@ -105,10 +105,17 @@ export async function validateProtectedRuntimeGraph({
   }
 
   const checkedLinks = []
-  for (const name of Object.keys(dependencies).filter(policy.owns).toSorted()) {
+  for (const name of policy.names) {
     const expected = baseline.packages[name]
     if (expected === undefined) {
       throw graphError('PROTECTED_PACKAGE_BASELINE_MISSING', 'a protected package is missing from the Desktop baseline', { name })
+    }
+    if (!Object.hasOwn(dependencies, name)) {
+      throw graphError('PROTECTED_PACKAGE_MISSING', 'a protected Desktop package is missing from the profile manifest', { name })
+    }
+    const expectedSpec = `link:${expected.resolvedPath.replaceAll('\\', '/')}`
+    if (dependencies[name] !== expectedSpec) {
+      throw graphError('PROTECTED_PACKAGE_SOURCE_CONFLICT', 'a protected Desktop package no longer points to the application Runtime', { name })
     }
     const root = join(profileDir, 'node_modules', ...packagePathSegments(name))
     let installed

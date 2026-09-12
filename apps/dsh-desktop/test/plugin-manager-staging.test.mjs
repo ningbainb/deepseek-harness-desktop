@@ -152,6 +152,8 @@ test('plugin removal is fully resolved in staging before activation', async () =
     const liveManifest = JSON.parse(await readFile(liveManifestPath, 'utf8'))
     liveManifest.dsh.profile.bundles.push(installed.name)
     await writeFile(liveManifestPath, `${JSON.stringify(liveManifest, null, 2)}\n`)
+    const pluginData = '- id: community-removable-settings\n  config:\n    retained: true\n'
+    await writeFile(join(value.profileDir, 'cordis.patch.yml'), pluginData)
 
     const prepared = await value.manager.prepareRemoval(installed.name)
     assert.equal(JSON.parse(await readFile(liveManifestPath, 'utf8')).dependencies[installed.name], '1.0.0')
@@ -161,6 +163,7 @@ test('plugin removal is fully resolved in staging before activation', async () =
     const activated = JSON.parse(await readFile(liveManifestPath, 'utf8'))
     assert.equal(activated.dependencies[installed.name], undefined)
     assert.equal(activated.dsh.profile.bundles.includes(installed.name), false)
+    assert.equal(await readFile(join(value.profileDir, 'cordis.patch.yml'), 'utf8'), pluginData)
     await transaction.validateActivated()
     await transaction.markRuntimeStarting()
     await transaction.markRuntimeHealthy()

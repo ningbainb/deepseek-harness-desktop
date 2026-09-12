@@ -7,7 +7,8 @@
     "2.6": { "release": "2.6.0", "tag": null, "commit": "69a6d558c15f7b0897ebae7acdc0ac305b3afb85" },
     "2.7": { "release": "2.7.0", "tag": null, "commit": "5e0900a15eb211478832ff459aaaff567bf2209d" },
     "3.0.1": { "release": "3.0.1", "tag": null, "commit": "cc46560cc86a348cbb9b46c84defe479cd8b3ae1" },
-    "3.3.0": { "release": "3.3.0", "tag": null, "commit": "95886c89d888da01874b448cbc9f06de4ad9f879" }
+    "3.3.0": { "release": "3.3.0", "tag": null, "commit": "95886c89d888da01874b448cbc9f06de4ad9f879" },
+    "3.4.0": { "release": "3.4.0", "tag": "desktop-v3.4.0", "commit": "713eda02f078d02bda97f1e6493b0ac52da0fd0e" }
   },
   "files": {
     "2.3/home.json": "7c234c2eef12cfb6c70d20ed3fdaafbed6528e9618a33481958e43c2afa76a3d",
@@ -17,7 +18,8 @@
     "2.7/home.json": "5363ac635182240d6fc6289eb0e318f772a0d40dc30945e5834204be10cd86d6",
     "3.0.1/home.json": "36cbbd4782690e8f207301e5be226930b0e9d42f513af8eda5bc2feb5d9b3e25",
     "3.3.0/home.json": "fea7dbc9be2e6d36e00ca3664049cb7fc137c6e9efdf383a576060356ff6345a",
-    "README.md": "bfb3f4abc003e1506358f05c54786e02e5f909f6b773369c09e4d5fcd4015a18",
+    "3.4.0/home.json": "b5344e3660d7597c062fd9d7a731334a6e0f77986773dbfb0ef434fbc89ae403",
+    "README.md": "61d175b0b853b9190a66ac46df5ffa7028615d947688917f7061aa2f6bd5c625",
     "faults/bad-patch/cordis.patch.yml": "65c9ea8f901f1f218e2f7e2e07e22e88ba95f1fccded461d7e971591bb9ac6e1",
     "faults/bad-patch/index.mjs": "5f3d5554abc8ecce5defdfdfe1ce7872e4474a80c8fe24290bd007a4064122b2",
     "faults/bad-patch/package.json": "0a26f763949ffc6a1d6cbc7fd6bd5e13b8caed917d55d8397b1a6fd0205d1b2a",

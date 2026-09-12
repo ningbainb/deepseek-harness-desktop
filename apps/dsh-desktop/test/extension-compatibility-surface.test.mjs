@@ -22,7 +22,7 @@ test('Extension Dock exposes only installed discover and settings as plugin top-
   const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
   const group = /<nav class="page-tabs" data-tab-group="plugins"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? ''
   assert.match(group, />已安装 /u)
-  assert.match(group, />发现插件 /u)
+  assert.match(group, />发现 /u)
   assert.match(group, />设置</u)
   assert.doesNotMatch(group, />内置能力 /u)
 })

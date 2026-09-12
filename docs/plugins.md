@@ -95,6 +95,13 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 
 社区 bundle 可用 `package.json#dsh.compatibility` 声明 Desktop 契约，详见 [Desktop 插件兼容性声明](desktop-plugin-compatibility.md)。未声明项视为“未知”，安装前必须确认。
 
+### 插件代码与数据边界
+
+- 插件安装代码只存在于 Desktop Profile 的依赖环境，例如 `profiles/desktop/node_modules`、`package.json` 和 `pnpm-lock.yaml`。安装、更新和卸载只允许通过 Desktop 的 staging 事务修改这些内容。
+- 插件的持久设置和用户内容不得写入插件包目录或依赖缓存。插件应使用官方 SDK 提供的配置、存储或 Workspace 接口；Desktop 会在依赖事务中原样保留已有 `cordis.patch.yml` 配置。
+- 默认卸载只移除插件代码和加载入口，不删除插件设置或用户内容。未来如果提供“同时删除插件数据”，必须作为单独的二次确认操作实现。
+- 插件不得直接读取或写入其他插件的安装目录，也不得把 `node_modules` 当成持久存储。
+
 ## 插件规范要点
 
 - **package.json 的 `dsh.bundle.patch` 声明**：指向包内 `cordis.patch.yml`，这是官方 bundle 清单，`dsh plugin` 依赖它识别与挂载插件。

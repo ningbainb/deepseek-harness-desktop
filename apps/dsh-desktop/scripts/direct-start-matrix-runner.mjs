@@ -13,7 +13,7 @@ const LEGACY_CREDENTIAL_VALUE = 'fixture-old-api-key-do-not-log'
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
 
-export const DIRECT_START_FIXTURE_VERSIONS = Object.freeze(['2.3', '2.4', '2.5', '2.6', '2.7', '3.0.1', '3.3.0'])
+export const DIRECT_START_FIXTURE_VERSIONS = Object.freeze(['2.3', '2.4', '2.5', '2.6', '2.7', '3.0.1', '3.3.0', '3.4.0'])
 export const DIRECT_START_FIXTURE_ROOT = resolve(SCRIPT_DIRECTORY, '..', 'test', 'fixtures', 'direct-start')
 
 function isRecord(value) {
@@ -79,7 +79,12 @@ export async function verifyDirectStartFixtureProvenance({ fixtureRoot = DIRECT_
   }
   for (const version of DIRECT_START_FIXTURE_VERSIONS) {
     const source = provenance.sources[version]
-    if (!isRecord(source) || typeof source.release !== 'string' || source.tag !== null || !COMMIT_PATTERN.test(source.commit)) {
+    if (
+      !isRecord(source)
+      || typeof source.release !== 'string'
+      || !(source.tag === null || /^desktop-v\d+\.\d+\.\d+$/u.test(source.tag))
+      || !COMMIT_PATTERN.test(source.commit)
+    ) {
       throw new TypeError(`direct-start ${version} provenance source is invalid`)
     }
   }

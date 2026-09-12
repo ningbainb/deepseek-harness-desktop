@@ -23,7 +23,7 @@ async function fixture({
   await writeFile(join(installedRoot, 'package.json'), JSON.stringify({ name: installedName, version: installedVersion }))
   await writeFile(join(profileDir, 'package.json'), JSON.stringify({
     name: 'profile',
-    dependencies: { 'protected-runtime': `link:${applicationRoot}`, 'community-plugin': '1.0.0' },
+    dependencies: { 'protected-runtime': `link:${applicationRoot.replaceAll('\\', '/')}`, 'community-plugin': '1.0.0' },
   }))
   await writeFile(join(profileDir, 'pnpm-lock.yaml'), `
 lockfileVersion: '9.0'
@@ -63,6 +63,25 @@ test('direct physical version and source conflicts fail closed', async () => {
     await assert.rejects(() => validateProtectedRuntimeGraph(sourceConflict), { code: 'PROTECTED_PACKAGE_SOURCE_CONFLICT' })
   } finally {
     await Promise.all([versionConflict.root, sourceConflict.root].map(path => rm(path, { recursive: true, force: true })))
+  }
+})
+
+test('manifest removal or replacement of a protected dependency fails closed', async () => {
+  const missing = await fixture()
+  const replaced = await fixture()
+  try {
+    await writeFile(join(missing.profileDir, 'package.json'), JSON.stringify({
+      name: 'profile',
+      dependencies: { 'community-plugin': '1.0.0' },
+    }))
+    await writeFile(join(replaced.profileDir, 'package.json'), JSON.stringify({
+      name: 'profile',
+      dependencies: { 'protected-runtime': '1.0.0', 'community-plugin': '1.0.0' },
+    }))
+    await assert.rejects(() => validateProtectedRuntimeGraph(missing), { code: 'PROTECTED_PACKAGE_MISSING' })
+    await assert.rejects(() => validateProtectedRuntimeGraph(replaced), { code: 'PROTECTED_PACKAGE_SOURCE_CONFLICT' })
+  } finally {
+    await Promise.all([missing.root, replaced.root].map(path => rm(path, { recursive: true, force: true })))
   }
 })
 
