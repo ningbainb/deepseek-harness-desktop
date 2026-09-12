@@ -373,7 +373,11 @@ const PACKAGED_PATCH_CONTRACTS = Object.freeze([
   Object.freeze({
     packageName: '@linxin666/dsh-desktop-launcher',
     file: Object.freeze(['lib', 'client.js']),
-    required: Object.freeze(['@deepseek-ai/dsh-client-store']),
+    required: Object.freeze([
+      'const platform = ["@deepseek-ai/dsh-client", "-store"].join("");',
+      'engine = require(platform);',
+      'const createSnapshotStore = engine.createSnapshotStore;',
+    ]),
     forbidden: Object.freeze(['@deepseek-ai/dsh-client-runtime/client']),
   }),
   Object.freeze({
