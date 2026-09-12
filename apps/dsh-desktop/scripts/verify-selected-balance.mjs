@@ -8,6 +8,7 @@ import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = fileURLToPath(new URL('..', import.meta.url))
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
@@ -36,7 +37,7 @@ try {
     'llm-deepseek': { baseURL: baseURL + '/official', apiKeyEnv: 'BALANCE_OFFICIAL_TEST_KEY' },
     'llm-pi-ai': { providers: { 'balance-relay': { baseURL: baseURL + '/relay/v1', apiKeyEnv: 'BALANCE_RELAY_TEST_KEY', api: 'openai-completions', displayName: 'Balance Test Relay', models: [{ id: 'balance-test-model', name: 'Balance Test Model' }] } } },
   }))
-  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['3.4.0'] }))
+  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
   app = await electron.launch({ executablePath: packagedExecutable || electronPath, args: packagedExecutable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData, DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', BALANCE_OFFICIAL_TEST_KEY: 'official-fixture-key', BALANCE_RELAY_TEST_KEY: 'relay-fixture-key' } })

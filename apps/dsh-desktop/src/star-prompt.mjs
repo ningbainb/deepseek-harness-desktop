@@ -10,8 +10,8 @@ export function renderSponsorQr() {
 }
 
 // Bump the once-per-release claim key so the community prompt is shown again
-// after upgrading to the 3.4.0 release, while remaining idempotent thereafter.
-export const STAR_PROMPT_VERSION = '3.4.0'
+// after upgrading to the 3.5.0 release, while remaining idempotent thereafter.
+export const STAR_PROMPT_VERSION = '3.5.0'
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {
@@ -491,7 +491,7 @@ export function createStarPromptSurfaceScript({ forceVisible = false, showDelayM
     content.className = 'dsh-star-content';
     const kicker = document.createElement('p');
     kicker.className = 'dsh-star-kicker';
-    kicker.textContent = '3.4.0 · 社区支持';
+    kicker.textContent = '${STAR_PROMPT_VERSION} · 社区支持';
     const title = document.createElement('h2');
     title.id = 'dsh-star-title';
     title.className = 'dsh-star-title';

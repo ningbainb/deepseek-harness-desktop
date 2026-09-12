@@ -18,8 +18,8 @@ import QRCode from 'qrcode'
 
 test('star prompt is accessible, animated, dependency-free, and honest about its action', () => {
   const script = createStarPromptSurfaceScript()
-  assert.equal(STAR_PROMPT_VERSION, '3.4.0')
-  assert.match(script, /3\.4\.0 · 社区支持/u)
+  assert.equal(STAR_PROMPT_VERSION, '3.5.0')
+  assert.match(script, /3\.5\.0 · 社区支持/u)
   assert.match(STAR_PROMPT_CSS, /dsh-star-prompt-burst/u)
   assert.match(STAR_PROMPT_CSS, /dsh-star-prompt-orbit/u)
   assert.match(STAR_PROMPT_CSS, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/u)
@@ -48,33 +48,33 @@ test('sponsor QR encodes the exact author URL offline and rejects remote QR inpu
   assert.doesNotMatch(createStarPromptSurfaceScript({ sponsorQrDataUrl: 'https://untrusted.invalid/qr.png' }), /untrusted\.invalid/u)
 })
 
-test('star prompt claims only version 3.4.0 once, including concurrent calls', async () => {
+test('star prompt claims only version 3.5.0 once, including concurrent calls', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-star-prompt-'))
   const path = join(directory, 'state.json')
   try {
     const store = new StarPromptStore({ path })
     assert.equal(await store.claim('3.1.0'), false)
     assert.equal(await store.claim('3.2.0'), false)
-    assert.equal(await store.claim('3.5.0'), false)
-    assert.deepEqual(await Promise.all([store.claim('3.4.0'), store.claim('3.4.0')]), [true, false])
     assert.equal(await store.claim('3.4.0'), false)
+    assert.deepEqual(await Promise.all([store.claim('3.5.0'), store.claim('3.5.0')]), [true, false])
+    assert.equal(await store.claim('3.5.0'), false)
     assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
       schemaVersion: 1,
-      shownVersions: ['3.4.0'],
+      shownVersions: ['3.5.0'],
     })
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
 })
 
-test('star prompt shows once after upgrading a profile that already saw 3.3.0', async () => {
+test('star prompt shows once after upgrading a profile that already saw 3.4.0', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-star-prompt-upgrade-'))
   const path = join(directory, 'state.json')
   try {
-    await writeFile(path, JSON.stringify({ schemaVersion: 1, shownVersions: ['3.3.0'] }), 'utf8')
-    assert.equal(await new StarPromptStore({ path }).claim('3.4.0'), true)
-    assert.equal(await new StarPromptStore({ path }).claim('3.4.0'), false)
-    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).shownVersions, ['3.3.0', '3.4.0'])
+    await writeFile(path, JSON.stringify({ schemaVersion: 1, shownVersions: ['3.4.0'] }), 'utf8')
+    assert.equal(await new StarPromptStore({ path }).claim('3.5.0'), true)
+    assert.equal(await new StarPromptStore({ path }).claim('3.5.0'), false)
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).shownVersions, ['3.4.0', '3.5.0'])
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -86,9 +86,9 @@ test('star prompt recovers a corrupt state file without showing future versions'
   try {
     await writeFile(path, '{broken', 'utf8')
     const store = new StarPromptStore({ path })
+    assert.equal(await store.claim('3.6.0'), false)
+    assert.equal(await store.claim('3.5.0'), true)
     assert.equal(await store.claim('3.5.0'), false)
-    assert.equal(await store.claim('3.4.0'), true)
-    assert.equal(await store.claim('3.4.0'), false)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

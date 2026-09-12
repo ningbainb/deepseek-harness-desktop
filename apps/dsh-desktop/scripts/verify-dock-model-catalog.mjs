@@ -7,6 +7,7 @@ import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = fileURLToPath(new URL('..', import.meta.url))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-dock-catalog-'))
@@ -26,7 +27,7 @@ try {
     'llm-deepseek': { baseURL: 'http://127.0.0.1:9/official', apiKeyEnv: 'DOCK_CATALOG_TEST_KEY' },
     'llm-pi-ai': { providers: { 'dock-test': { baseURL: 'http://127.0.0.1:9/v1', apiKeyEnv: 'DOCK_CATALOG_TEST_KEY', api: 'openai-completions', displayName: 'Dock Test', models: [{ id: 'dock-test-model', name: 'Dock Test Model' }] } } },
   }))
-  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['3.4.0'] }))
+  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
   app = await electron.launch({ executablePath: executable || electronPath, args: executable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData, DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DOCK_CATALOG_TEST_KEY: 'synthetic-dock-key' } })

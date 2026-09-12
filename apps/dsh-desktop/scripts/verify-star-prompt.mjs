@@ -59,14 +59,14 @@ async function waitForHarnessPage(electronApp) {
 let electronApp
 try {
   await mkdir(userData, { recursive: true })
-  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['3.3.0'] }), 'utf8')
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['3.4.0'] }), 'utf8')
   electronApp = await launchDesktop({ blocker: true })
   const firstPage = await waitForHarnessPage(electronApp)
   const firstPrompt = firstPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
   await firstPage.locator('#star-ordering-fixture').waitFor()
   await firstPage.waitForTimeout(1500)
   assert.equal(await firstPrompt.count(), 0, 'existing dialog must not be interrupted by the Star prompt')
-  assert.deepEqual(JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8')).shownVersions, ['3.3.0'],
+  assert.deepEqual(JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8')).shownVersions, ['3.4.0'],
     'a blocked prompt must not consume its version claim')
   await firstPage.getByRole('button', { name: 'Close ordering fixture', exact: true }).click()
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -79,7 +79,7 @@ try {
     await firstPage.waitForTimeout(250)
   }
   await firstPrompt.waitFor({ state: 'visible', timeout: 10_000 })
-  await firstPrompt.getByText('3.4.0 · 社区支持', { exact: true }).waitFor({ state: 'visible' })
+  await firstPrompt.getByText('3.5.0 · 社区支持', { exact: true }).waitFor({ state: 'visible' })
   await firstPage.getByRole('button', { name: '去 GitHub 点个 Star' }).waitFor({ state: 'visible' })
   await firstPrompt.getByRole('button', { name: '在爱发电支持我' }).waitFor({ state: 'visible' })
   assert.equal(await firstPrompt.locator('.dsh-star-sponsor-link').getAttribute('href'), 'https://afdian.com/a/ningbai')
@@ -97,10 +97,10 @@ try {
   await firstPrompt.waitFor({ state: 'hidden' })
 
   const claimedState = JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8'))
-  if (!claimedState.shownVersions?.includes('3.4.0')) {
-    throw new Error(`3.4.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
+  if (!claimedState.shownVersions?.includes('3.5.0')) {
+    throw new Error(`3.5.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
   }
-  if (!claimedState.shownVersions?.includes('3.3.0')) throw new Error('upgrade discarded the previous release claim')
+  if (!claimedState.shownVersions?.includes('3.4.0')) throw new Error('upgrade discarded the previous release claim')
 
   await electronApp.close()
   electronApp = undefined
@@ -108,7 +108,7 @@ try {
   const thirdPage = await waitForHarnessPage(electronApp)
   await thirdPage.waitForTimeout(1_600)
   if (await thirdPage.locator('#dsh-desktop-star-prompt[data-open="true"]').isVisible()) {
-    throw new Error('the 3.4.0 Star prompt appeared more than once for the same user profile')
+    throw new Error('the 3.5.0 Star prompt appeared more than once for the same user profile')
   }
 
   await electronApp.close()
