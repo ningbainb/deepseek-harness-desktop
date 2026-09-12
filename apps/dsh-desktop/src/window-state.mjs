@@ -113,9 +113,16 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     clearTimeout(timer)
     timer = setTimeout(saveFromEvent, 250)
   }
+  const scheduleMaximize = () => {
+    if (window.isDestroyed?.() !== true) {
+      const bounds = window.getNormalBounds()
+      for (const [key, { automatic }] of unchanged) automatic.add(bounds[key])
+    }
+    schedule()
+  }
   window.on('resize', schedule)
   window.on('move', schedule)
-  window.on('maximize', schedule)
+  window.on('maximize', scheduleMaximize)
   window.on('unmaximize', schedule)
   window.on('close', () => {
     clearTimeout(timer)

@@ -101,6 +101,16 @@ test('restored logical bounds do not accumulate native constructor DPI rounding 
     window.emit('unmaximize')
     await save()
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
+    // Windows can restore before the debounced maximize write runs. The
+    // maximize event must still remember the native normal bounds that the OS
+    // temporarily substituted during that transition.
+    maximized = true
+    bounds = { x: 9, y: 0, width: 722, height: 542 }
+    window.emit('maximize')
+    maximized = false
+    window.emit('unmaximize')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
     // A real resize adopts the user's new dimensions, including a later
     // deliberate return to the native dimensions seen at construction.
     window.emit('will-resize')
