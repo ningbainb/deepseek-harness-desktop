@@ -849,6 +849,8 @@ input[role="switch"] { width: 34px; height: 18px; flex: 0 0 34px; margin: 0; acc
 .plugin-advanced-information dd { margin: 0; font-size: 11px; overflow-wrap: anywhere; }
 .plugin-detail-facts ul { margin: 0; padding-left: var(--space-4); }
 .plugin-detail-warning { color: var(--warning); }
+.plugin-attention-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.plugin-attention-actions button { min-height: 32px; }
 .plugin-uninstall { padding-inline: 0; border: 0; color: var(--danger); background: transparent; }
 .plugin-advanced-information { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 11px; }
 .plugin-advanced-information > summary { cursor: pointer; color: var(--text-secondary); font-weight: 600; }

@@ -1294,7 +1294,12 @@ export async function startElectronApp(metadata) {
   await logStore.append(
     `[runtime] immutable baseline ready packages=${Object.keys(runtimeBaseline.packages).length} fingerprint=${runtimeBaseline.fingerprint.slice(0, 12)}`,
   )
-  const pluginStagingManager = new PluginStagingManager({ profileDir: desktopProfileDir })
+  const pluginStagingManager = new PluginStagingManager({
+    profileDir: desktopProfileDir,
+    onPhase: ({ transactionId, operation, phase }) => logStore.append(
+      `[plugin-tx:${transactionId.slice(3)}] operation=${operation} phase=${phase}`,
+    ),
+  })
   const stagedRecovery = await pluginStagingManager.recover({ profileArchive: userPluginArchive })
   if (stagedRecovery.recovered) {
     await logStore.append(

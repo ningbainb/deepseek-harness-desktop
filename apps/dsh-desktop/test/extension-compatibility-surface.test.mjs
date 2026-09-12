@@ -37,6 +37,16 @@ test('Extension Dock keeps healthy plugin state quiet and technical fields insid
   }
 })
 
+test('Extension Dock gives a failed plugin scoped recovery and safe diagnostic actions', async () => {
+  const script = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
+  assert.match(script, /data-restart-plugin/u)
+  assert.match(script, /data-disable-plugin/u)
+  assert.match(script, /data-copy-plugin-diagnostics/u)
+  assert.match(script, /await window\.dshDesktop\.restartRuntime\(\)/u)
+  assert.match(script, /setPluginEnabled\(disablePluginButton\.dataset\.disablePlugin, false\)/u)
+  assert.match(script, /诊断信息已复制/u)
+})
+
 test('Extension Dock plugin dialogs and icon-only controls have accessible contracts', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),

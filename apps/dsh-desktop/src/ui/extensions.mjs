@@ -340,7 +340,7 @@ function pluginDetailMarkup(plugin) {
       ? `<button type="button" class="primary" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}" data-mutation-control>更新到 v${escapeHtml(plugin.latestVersion ?? '')}</button>`
       : '<span class="meta">已是当前可用版本</span>'
   const attention = plugin.attention
-    ? `<section class="plugin-attention"><strong>${escapeHtml(plugin.statusLabel || '需要处理')}</strong><p>${escapeHtml(plugin.attention)}</p></section>`
+    ? `<section class="plugin-attention"><strong>${escapeHtml(plugin.statusLabel || '需要处理')}</strong><p>${escapeHtml(plugin.attention)}</p><div class="plugin-attention-actions"><button type="button" class="primary" data-restart-plugin="${escapeHtml(plugin.name)}" data-mutation-control>重新启动</button>${plugin.enabled ? `<button type="button" data-disable-plugin="${escapeHtml(plugin.name)}" data-mutation-control>停用</button>` : ''}${plugin.updateAvailable && !plugin.updateBlocked ? `<button type="button" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}" data-mutation-control>检查更新</button>` : ''}<button type="button" data-copy-plugin-diagnostics="${escapeHtml(plugin.name)}">复制诊断信息</button></div></section>`
     : ''
   const permissions = plugin.permissions?.length
     ? plugin.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
@@ -1395,6 +1395,53 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
   }
   if (event.target.closest('[data-open-discover]')) {
     activateTab(document.querySelector('#market-tab'), true)
+    return
+  }
+  const restartPluginButton = event.target.closest('[data-restart-plugin]')
+  if (restartPluginButton) {
+    await extensionOperations.run(async () => {
+      try {
+        await window.dshDesktop.restartRuntime()
+        notify('插件已重新启动')
+        await refresh()
+      } catch (error) {
+        await showPluginFailure(error, '插件重新启动失败')
+      }
+    })
+    return
+  }
+  const disablePluginButton = event.target.closest('[data-disable-plugin]')
+  if (disablePluginButton) {
+    await extensionOperations.run(async () => {
+      try {
+        await window.dshDesktop.setPluginEnabled(disablePluginButton.dataset.disablePlugin, false)
+        notify('插件已停用')
+        await refresh()
+      } catch (error) {
+        await showPluginFailure(error, '插件停用失败')
+      }
+    })
+    return
+  }
+  const copyDiagnosticsButton = event.target.closest('[data-copy-plugin-diagnostics]')
+  if (copyDiagnosticsButton) {
+    const plugin = pluginInventory.find((item) => item.name === copyDiagnosticsButton.dataset.copyPluginDiagnostics)
+    if (plugin) {
+      const diagnostics = {
+        plugin: plugin.name,
+        version: plugin.version,
+        status: plugin.status,
+        compatibility: plugin.compatibility?.status,
+        runtimeRange: plugin.advanced?.runtimeRange,
+        attention: plugin.attention,
+      }
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2))
+        notify('诊断信息已复制')
+      } catch (error) {
+        await showPluginFailure(error, '复制诊断信息失败')
+      }
+    }
     return
   }
   const updateButton = event.target.closest('[data-update-plugin]')

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -7,7 +7,7 @@ import test from 'node:test'
 import { PluginStagingManager } from '../src/extensions/plugin-staging.mjs'
 import { UserPluginArchive } from '../src/user-plugin-archive.mjs'
 
-async function fixture() {
+async function fixture({ onPhase } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-staging-'))
   const profileDir = join(root, 'profiles', 'desktop')
   const transactionRoot = join(root, 'profiles', '.plugin-transactions')
@@ -24,8 +24,18 @@ async function fixture() {
     version: '1.0.0',
   }))
   const profileArchive = new UserPluginArchive({ profileDir, archiveDir })
-  const manager = new PluginStagingManager({ profileDir, transactionRoot })
+  const manager = new PluginStagingManager({ profileDir, transactionRoot, onPhase })
   return { root, profileDir, transactionRoot, archiveDir, profileArchive, manager }
+}
+
+async function exists(path) {
+  try {
+    await lstat(path)
+    return true
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false
+    throw error
+  }
 }
 
 async function prepareChangedStage(value, { version = '2.0.0' } = {}) {
@@ -78,8 +88,10 @@ test('staged activation commits only after post-activation validation and health
     await transaction.markRuntimeHealthy()
     assert.deepEqual(validations, [value.profileDir])
     assert.equal((await value.manager.list())[0].phase, 'RUNTIME_HEALTHY')
+    assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), true)
     assert.equal(await transaction.commit(), true)
     assert.deepEqual(await value.manager.list(), [])
+    assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), false)
     assert.equal((await value.profileArchive.getState()).active, undefined)
   } finally {
     await rm(value.root, { recursive: true, force: true })
@@ -97,6 +109,7 @@ test('activation rollback restores the exact manifest, lockfile, and dependency 
     assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
     assert.equal(await readFile(join(value.profileDir, 'pnpm-lock.yaml'), 'utf8'), originalLock)
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+    assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), false)
     assert.equal((await value.profileArchive.getState()).active, undefined)
   } finally {
     await rm(value.root, { recursive: true, force: true })
@@ -130,20 +143,20 @@ test('restart recovery restores a profile interrupted immediately after archive'
   try {
     const originalManifest = await readFile(join(value.profileDir, 'package.json'), 'utf8')
     const staged = await prepareChangedStage(value)
-    await value.profileArchive.begin({ operation: 'plugin-install', nodeModulesTransfer: 'move' })
-    await value.manager.advance(staged.transactionId, 'OLD_ENV_ARCHIVED')
-    const recoveredArchive = new UserPluginArchive({
+    const transactionArchive = new UserPluginArchive({
       profileDir: value.profileDir,
-      archiveDir: value.archiveDir,
+      archiveDir: value.manager.backupDirectory(staged.transactionId),
     })
-    const archiveResult = await recoveredArchive.recover()
-    assert.equal(archiveResult.recovered, true)
+    await transactionArchive.begin({ operation: 'plugin-install', nodeModulesTransfer: 'move' })
+    await value.manager.advance(staged.transactionId, 'RUNTIME_STOPPING')
+    await value.manager.advance(staged.transactionId, 'OLD_ENV_ARCHIVED')
     const recoveredManager = new PluginStagingManager({
       profileDir: value.profileDir,
       transactionRoot: value.transactionRoot,
     })
-    const stagingResult = await recoveredManager.recover({ profileArchive: recoveredArchive })
+    const stagingResult = await recoveredManager.recover({ profileArchive: value.profileArchive })
     assert.equal(stagingResult.previousPhase, 'OLD_ENV_ARCHIVED')
+    assert.equal(stagingResult.outcome, 'rolled-back')
     assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
   } finally {
@@ -159,20 +172,71 @@ test('restart recovery rolls back an activated environment that was never health
     await staged.activate({ profileArchive: value.profileArchive })
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '2.0.0')
 
-    const recoveredArchive = new UserPluginArchive({
-      profileDir: value.profileDir,
-      archiveDir: value.archiveDir,
-    })
-    const archiveResult = await recoveredArchive.recover()
-    assert.equal(archiveResult.recovered, true)
     const recoveredManager = new PluginStagingManager({
       profileDir: value.profileDir,
       transactionRoot: value.transactionRoot,
     })
-    const stagingResult = await recoveredManager.recover({ profileArchive: recoveredArchive })
+    const stagingResult = await recoveredManager.recover({ profileArchive: value.profileArchive })
     assert.equal(stagingResult.previousPhase, 'NEW_ENV_ACTIVATED')
+    assert.equal(stagingResult.outcome, 'rolled-back')
     assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('restart recovery commits an environment already proven Runtime healthy', async () => {
+  const value = await fixture()
+  try {
+    const staged = await prepareChangedStage(value)
+    const transaction = await staged.activate({ profileArchive: value.profileArchive })
+    await transaction.validateActivated()
+    await transaction.markRuntimeStarting()
+    await transaction.markRuntimeHealthy()
+
+    const recoveredManager = new PluginStagingManager({
+      profileDir: value.profileDir,
+      transactionRoot: value.transactionRoot,
+    })
+    const result = await recoveredManager.recover({ profileArchive: value.profileArchive })
+    assert.equal(result.previousPhase, 'RUNTIME_HEALTHY')
+    assert.equal(result.outcome, 'committed')
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '2.0.0')
+    assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), false)
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('transaction journal phases are ordered and share one diagnostic transaction id', async () => {
+  const events = []
+  const value = await fixture({ onPhase: (event) => events.push(event) })
+  try {
+    const staged = await prepareChangedStage(value)
+    const transaction = await staged.activate({ profileArchive: value.profileArchive })
+    await transaction.validateActivated()
+    await transaction.markRuntimeStarting()
+    await transaction.markRuntimeHealthy()
+    await transaction.commit()
+    assert.deepEqual(events.map((event) => event.phase), [
+      'CREATED',
+      'METADATA_READY',
+      'COMPATIBILITY_APPROVED',
+      'PACKAGE_PREFETCHED',
+      'STAGING_READY',
+      'DEPENDENCIES_RESOLVED',
+      'GRAPH_VALIDATED',
+      'RUNTIME_STOPPING',
+      'OLD_ENV_ARCHIVED',
+      'NEW_ENV_ACTIVATED',
+      'MANAGED_LINKS_REPAIRED',
+      'RUNTIME_STARTING',
+      'RUNTIME_HEALTHY',
+      'COMMITTED',
+    ])
+    assert.equal(new Set(events.map((event) => event.transactionId)).size, 1)
+    assert.equal(events[0].transactionId, staged.transactionId)
   } finally {
     await rm(value.root, { recursive: true, force: true })
   }

@@ -35,6 +35,34 @@ class FakeIpcMain {
   }
 }
 
+function stagedFullAccessManager(apply) {
+  return {
+    prepareFullAccessExternal: async (descriptor) => ({
+      descriptor,
+      staging: { cancel: async () => true },
+    }),
+    applyPreparedFullAccessExternal: async (prepared) => apply(prepared.descriptor),
+  }
+}
+
+function stagedRemovalManager(apply) {
+  return {
+    prepareRemoval: async (name) => ({
+      name,
+      staging: { cancel: async () => true },
+    }),
+    applyPreparedRemoval: async (prepared) => {
+      const value = await apply(prepared.name)
+      if (typeof value?.commit === 'function' && typeof value?.rollback === 'function') return value
+      return {
+        result: value,
+        commit: async () => true,
+        rollback: async () => true,
+      }
+    },
+  }
+}
+
 test('extension IPC rejects a registered main renderer before sensitive work', async () => {
   const handlers = new Map()
   const ipcMain = {
@@ -343,12 +371,10 @@ test('user-selected plugin installation skips trust approval and commits the per
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      installFullAccessExternal: async (value) => {
+    pluginManager: stagedFullAccessManager(async (value) => {
         events.push(['install-persistent', value])
         return transaction
-      },
-    },
+    }),
     controller: {
       stop: async () => events.push('stop'),
       start: async () => events.push('start'),
@@ -406,14 +432,14 @@ test('community market resolves an opaque catalog ID and installs it without an 
     getWindow: () => undefined,
     pluginManager: {
       prepare: async () => assert.fail('market install must not use the registry-only compatibility path'),
-      installFullAccessExternal: async (value) => {
+      ...stagedFullAccessManager(async (value) => {
         events.push(['install', value])
         return {
           result: { name: '@community/plugin', fullAccess: true },
           commit: async () => events.push('commit'),
           rollback: async () => events.push('rollback'),
         }
-      },
+      }),
     },
     controller: {
       stop: async () => events.push('stop'),
@@ -484,7 +510,7 @@ test('a failed full-access source revalidation leaves Runtime and the profile un
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: { installFullAccessExternal: async () => events.push('install') },
+    pluginManager: stagedFullAccessManager(async () => assert.fail('changed source must not reach staging')),
     controller: { stop: async () => events.push('stop'), start: async () => events.push('start') },
     ensureProfile: async () => events.push('ensure'),
     projectRoot: 'C:\\project',
@@ -541,9 +567,7 @@ test('a failed persistent full-access activation rolls back the profile before r
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      installFullAccessExternal: async () => { events.push('install'); return transaction },
-    },
+    pluginManager: stagedFullAccessManager(async () => { events.push('install'); return transaction }),
     controller: {
       stop: async () => events.push('stop'),
       start: async () => {
@@ -598,16 +622,14 @@ test('legacy confirmation callbacks cannot block a user-selected plugin install'
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      installFullAccessExternal: async () => {
+    pluginManager: stagedFullAccessManager(async () => {
         events.push('install')
         return {
           result: { name: '@external/free-plugin', fullAccess: true },
           commit: async () => events.push('commit'),
           rollback: async () => events.push('rollback'),
         }
-      },
-    },
+    }),
     controller: {
       stop: async () => events.push('stop'),
       start: async () => events.push('start'),
@@ -940,8 +962,8 @@ test('web profile migration applies selected packages and attributable config in
     'config-apply',
     'ensure',
     'start',
-    'packages-commit',
     'config-commit',
+    'packages-commit',
     'forget',
   ])
   assert.deepEqual(sent.map(([, payload]) => payload.phase), [
@@ -1003,12 +1025,10 @@ test('plugin mutations serialize the complete runtime downtime transaction', asy
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async (name) => {
+    pluginManager: stagedRemovalManager(async (name) => {
         events.push(`remove:${name}`)
         return { name, restartRequired: true }
-      },
-    },
+    }),
     controller: {
       stop: async () => { events.push('stop') },
       start: async () => {
@@ -1064,12 +1084,10 @@ test('failed plugin removal reports a runtime recovery failure', async () => {
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async () => {
+    pluginManager: stagedRemovalManager(async () => {
         events.push('remove')
         throw new Error('profile removal failed')
-      },
-    },
+    }),
     controller: {
       stop: async () => { events.push('stop') },
       start: async () => {
@@ -1110,12 +1128,10 @@ test('plugin removal rolls back when the updated runtime cannot start', async ()
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async () => {
+    pluginManager: stagedRemovalManager(async () => {
         events.push('remove')
         return transaction
-      },
-    },
+    }),
     controller: {
       stop: async () => { events.push('stop') },
       start: async () => {
@@ -1253,14 +1269,12 @@ test('extension shutdown quiesces active mutations and rejects queued work', asy
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async (name) => {
+    pluginManager: stagedRemovalManager(async (name) => {
         events.push(`remove:${name}`)
         removalEntered()
         await removalBarrier
         return { name, restartRequired: true }
-      },
-    },
+    }),
     controller: {
       stop: async () => { events.push('stop') },
       start: async () => { events.push('start') },
@@ -1306,7 +1320,7 @@ test('plugin mutations are rejected while QQ Bot binding can still change the pr
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: { remove: async () => { removals += 1 } },
+    pluginManager: stagedRemovalManager(async () => { removals += 1 }),
     controller: {
       stop: async () => { stops += 1 },
       start: async () => {},
@@ -1343,13 +1357,11 @@ test('QQ Bot bind and unbind wait for plugin mutations while cancellation stays 
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async (name) => {
+    pluginManager: stagedRemovalManager(async (name) => {
         removalEntered()
         await removalBarrier
         return { name, restartRequired: true }
-      },
-    },
+    }),
     controller: { stop: async () => {}, start: async () => {} },
     ensureProfile: async () => {},
     projectRoot: 'C:\\project',
@@ -1387,13 +1399,11 @@ test('extension shutdown quiesce times out instead of waiting forever for a plug
     dialog: {},
     shell: {},
     getWindow: () => undefined,
-    pluginManager: {
-      remove: async () => {
+    pluginManager: stagedRemovalManager(async () => {
         removalEntered()
         await removalBarrier
         return { name: '@community/active', restartRequired: true }
-      },
-    },
+    }),
     controller: { stop: async () => {}, start: async () => {} },
     ensureProfile: async () => {},
     projectRoot: 'C:\\project',

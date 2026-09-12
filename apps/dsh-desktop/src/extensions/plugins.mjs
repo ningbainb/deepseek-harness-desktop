@@ -7,24 +7,15 @@ import { parse as parseYaml } from 'yaml'
 
 import {
   AGGREGATED_BUNDLES,
-  BUILTIN_BUNDLES,
-  BUILTIN_RUNTIME_PACKAGES,
-  DESKTOP_PLUGIN_COMPAT_PACKAGES,
-  DESKTOP_REPAIR_BUNDLE,
-  DESKTOP_SUPPORT_PACKAGES,
   materializeFilesystemPath,
   packagePathSegments,
 } from '../profile.mjs'
+import { DESKTOP_RUNTIME_PACKAGE_POLICY, PACKAGE_OWNERSHIP } from '../runtime-package-policy.mjs'
 import { assertExternalPluginDescriptor } from '../external-plugin-source.mjs'
 import { assessPluginCompatibility } from './plugin-compatibility.mjs'
 import { PluginRegistry } from './plugin-registry.mjs'
 
-const PROTECTED_PACKAGES = new Set([
-  ...BUILTIN_BUNDLES,
-  ...BUILTIN_RUNTIME_PACKAGES,
-  ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
-  ...DESKTOP_SUPPORT_PACKAGES,
-])
+const PROTECTED_PACKAGES = new Set(DESKTOP_RUNTIME_PACKAGE_POLICY.names)
 const MAX_PNPM_PATH_ENTRIES = 64
 const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i
@@ -36,6 +27,12 @@ const UNKNOWN_COMPATIBILITY = Object.freeze({
 const MANAGED_COMPATIBILITY = Object.freeze({ status: 'compatible', reasons: Object.freeze([]) })
 export const DESKTOP_PLUGINS_LOCK_SCHEMA_VERSION = 1
 export const PLUGIN_PACKAGE_MANIFEST_READ_ERROR = 'plugin-package-manifest-read-failed'
+
+function unsafeDirectMutationError() {
+  const error = new Error('direct Live Profile plugin mutation is disabled; use a staged transaction')
+  error.code = 'PLUGIN_STAGING_REQUIRED'
+  return error
+}
 
 function publicDiagnosticString(value, limit = 256) {
   return typeof value === 'string' ? value.slice(0, limit) : undefined
@@ -246,7 +243,7 @@ export function createPluginInventory(manifest, {
         managedByDesktop: builtIn,
         enabled: bundles.has(name)
           || AGGREGATED_BUNDLES.includes(name)
-          || DESKTOP_SUPPORT_PACKAGES.includes(name),
+          || DESKTOP_RUNTIME_PACKAGE_POLICY.get(name)?.ownership === PACKAGE_OWNERSHIP.DESKTOP_SUPPORT,
         compatibility,
         ...(updateStates.get(name) ?? {}),
       }
@@ -754,7 +751,7 @@ export class PluginManager {
     return this.#enqueue(async () => {
       const manifest = await readManifest(this.profileDir)
       const names = Object.keys(manifest.dependencies ?? {})
-        .filter((name) => !PROTECTED_PACKAGES.has(name) && name !== DESKTOP_REPAIR_BUNDLE)
+        .filter((name) => !PROTECTED_PACKAGES.has(name))
         .toSorted()
       // Managed Desktop packages (including repair) are linked from the app.
       // A normal built-in-only profile has no pnpm lock and needs no registry I/O.
@@ -1009,6 +1006,7 @@ export class PluginManager {
     }
     return this.#enqueue(async () => {
       if (PROTECTED_PACKAGES.has(prepared.name)) throw new Error(`${prepared.name} is a built-in desktop plugin`)
+      if (this.stagingManager !== undefined && prepared.staging === undefined) throw unsafeDirectMutationError()
       await this.beforeMutation({ type: 'install', name: prepared.name, version: prepared.version })
       if (prepared.staging !== undefined) {
         const result = Object.freeze({
@@ -1093,6 +1091,7 @@ export class PluginManager {
       for (const item of items) {
         if (PROTECTED_PACKAGES.has(item.name)) throw new Error(`${item.name} is a built-in desktop plugin`)
       }
+      if (this.stagingManager !== undefined && prepared.staging === undefined) throw unsafeDirectMutationError()
       const names = items.map((item) => item.name)
       const versions = items.map((item) => item.version)
       await this.beforeMutation({ type: 'install-batch', names, versions })
@@ -1318,6 +1317,7 @@ export class PluginManager {
     const parsed = validatePluginSpec(rawSpec)
     if (PROTECTED_PACKAGES.has(parsed.name)) throw new Error(`${parsed.name} is a built-in desktop plugin`)
     return this.#enqueue(async () => {
+      if (this.stagingManager !== undefined) throw unsafeDirectMutationError()
       await this.beforeMutation({ type: 'install', name: parsed.name })
       const previous = await readFile(join(this.profileDir, 'package.json'), 'utf8')
       let added = false
@@ -1468,6 +1468,7 @@ export class PluginManager {
     const sourceId = external.sourceId
     const candidateId = external.candidateId
     return this.#enqueue(async () => {
+      if (this.stagingManager !== undefined) throw unsafeDirectMutationError()
       await this.beforeMutation({
         type: 'full-access-external-install',
         name: external.package.name,
@@ -1564,6 +1565,7 @@ export class PluginManager {
 
   remove(rawName) {
     return this.#enqueue(async () => {
+      if (this.stagingManager !== undefined) throw unsafeDirectMutationError()
       const { name } = validatePluginSpec(rawName)
       if (name !== rawName) throw new TypeError('plugin removal requires a package name without a version')
       if (PROTECTED_PACKAGES.has(name)) throw new Error(`${name} is a built-in desktop plugin and cannot be removed`)

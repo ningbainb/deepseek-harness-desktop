@@ -330,23 +330,6 @@ export function registerExtensionIpc({
     return mutationCoordinator
   }
 
-  const mutatePlugin = (operation) => enqueuePluginMutation(() => mutation().run({
-    label: 'plugin change',
-    apply: async () => {
-      const changed = await operation()
-      const transaction = changed
-        && typeof changed === 'object'
-        && typeof changed.commit === 'function'
-        && typeof changed.rollback === 'function'
-        ? changed
-        : undefined
-      return {
-        transactions: transaction === undefined ? [] : [transaction],
-        result: transaction ? transaction.result : changed,
-      }
-    },
-  }))
-
   const installPlugin = (payload, { confirmationMode } = {}) => {
     if (confirmationMode !== undefined && confirmationMode !== 'market') {
       throw new TypeError('invalid plugin confirmation mode')
@@ -382,17 +365,17 @@ export function registerExtensionIpc({
               const installationDescriptor = assertExternalPluginDescriptor(
                 await revalidateFullAccessPlugin(descriptor),
               )
-              if (typeof pluginManager.prepareFullAccessExternal === 'function') {
-                return pluginManager.prepareFullAccessExternal(installationDescriptor)
+              if (typeof pluginManager.prepareFullAccessExternal !== 'function') {
+                throw new Error('staged full-access plugin preparation is unavailable')
               }
-              return installationDescriptor
+              return pluginManager.prepareFullAccessExternal(installationDescriptor)
             },
             abandon: async (prepared) => prepared?.staging?.cancel?.(),
             apply: async (prepared) => {
-              const transaction = typeof pluginManager.applyPreparedFullAccessExternal === 'function'
-                && prepared?.staging !== undefined
-                ? await pluginManager.applyPreparedFullAccessExternal(prepared)
-                : await pluginManager.installFullAccessExternal(prepared?.descriptor ?? prepared)
+              if (typeof pluginManager.applyPreparedFullAccessExternal !== 'function' || prepared?.staging === undefined) {
+                throw new Error('staged full-access plugin activation is unavailable')
+              }
+              const transaction = await pluginManager.applyPreparedFullAccessExternal(prepared)
               return { transactions: [transaction], result: transaction.result }
             },
             finalize: (plan) => Object.freeze({ ...plan.result, isolated: false }),
@@ -454,7 +437,7 @@ export function registerExtensionIpc({
       typeof pluginManager.prepareRemoval !== 'function'
       || typeof pluginManager.applyPreparedRemoval !== 'function'
     ) {
-      return mutatePlugin(() => pluginManager.remove(name))
+      throw new Error('staged plugin removal is unavailable')
     }
     return enqueuePluginMutation(() => mutation().run({
       label: 'plugin removal',
@@ -805,59 +788,47 @@ export function registerExtensionIpc({
       throw new TypeError('invalid web profile migration request')
     }
     if (migrationService === undefined) throw new Error('web profile migration service is unavailable')
-    return enqueuePluginMutation(async () => {
-      const selection = migrationService.resolveSelection(request.id, request.names, { allowUnknown: request.allowUnknown })
-      emitProgress('profile-migration', 'preparing', { total: selection.specs.length })
-      const prepared = selection.specs.length === 0
-        ? undefined
-        : await pluginManager.prepareMany(selection.specs, { allowUnknown: request.allowUnknown })
-      emitProgress('profile-migration', 'prefetched', { total: prepared?.items.length ?? 0 })
-      const configTransaction = await migrationService.stageConfig(selection.record, selection.names)
-      let packageTransaction
-      let stopped = false
-      try {
-        emitProgress('profile-migration', 'stopping')
-        await controller.stop()
-        stopped = true
+    return enqueuePluginMutation(() => mutation().run({
+      label: 'web profile migration',
+      onRuntimeEvent: (event) => emitProgress('profile-migration', event),
+      prepare: async () => {
+        const selection = migrationService.resolveSelection(request.id, request.names, { allowUnknown: request.allowUnknown })
+        emitProgress('profile-migration', 'preparing', { total: selection.specs.length })
+        const prepared = selection.specs.length === 0
+          ? undefined
+          : await pluginManager.prepareMany(selection.specs, { allowUnknown: request.allowUnknown })
+        emitProgress('profile-migration', 'prefetched', { total: prepared?.items.length ?? 0 })
+        const configTransaction = await migrationService.stageConfig(selection.record, selection.names)
+        return { prepared, configTransaction }
+      },
+      abandon: async ({ prepared, configTransaction }) => {
+        const errors = []
+        try { await configTransaction.rollback() } catch (error) { errors.push(error) }
+        try { await prepared?.staging?.cancel?.() } catch (error) { errors.push(error) }
+        if (errors.length > 0) throw new AggregateError(errors, 'profile migration staging cleanup failed')
+      },
+      apply: async ({ prepared, configTransaction }) => {
         emitProgress('profile-migration', 'applying')
-        if (prepared) packageTransaction = await pluginManager.applyPreparedBatch(prepared)
+        const packageTransaction = prepared
+          ? await pluginManager.applyPreparedBatch(prepared)
+          : undefined
         await configTransaction.apply()
-        await ensureProfile()
-        emitProgress('profile-migration', 'starting')
-        await controller.start()
-        packageTransaction?.commit()
-        configTransaction.commit()
+        return {
+          transactions: [configTransaction, packageTransaction].filter(Boolean),
+          result: { packageTransaction, configTransaction },
+        }
+      },
+      finalize: (plan) => {
         migrationService.forget(request.id)
         emitProgress('profile-migration', 'committed')
         return Object.freeze({
-          plugins: packageTransaction?.result.plugins ?? Object.freeze([]),
-          configurationFragments: configTransaction.fragments,
+          plugins: plan?.result?.packageTransaction?.result.plugins ?? Object.freeze([]),
+          configurationFragments: plan?.result?.configTransaction?.fragments ?? Object.freeze([]),
           activation: Object.freeze({ mode: 'restart', reason: 'web-profile-migrated' }),
           restartRequired: true,
         })
-      } catch (error) {
-        emitProgress('profile-migration', 'rolling-back')
-        const recoveryErrors = []
-        try { await configTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        if (packageTransaction) {
-          try { await packageTransaction.rollback() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        } else {
-          try { await prepared?.staging?.cancel?.() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        }
-        if (stopped) {
-          try { await ensureProfile() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-          try { await controller.start() } catch (recoveryError) { recoveryErrors.push(recoveryError) }
-        }
-        if (recoveryErrors.length > 0) {
-          throw new Error(
-            `web profile migration failed and rollback was incomplete: ${String(error?.message ?? error).slice(0, 1_000)}; ${recoveryErrors.map((item) => String(item?.message ?? item).slice(0, 500)).join('; ')}`,
-            { cause: new AggregateError([error, ...recoveryErrors]) },
-          )
-        }
-        emitProgress('profile-migration', 'restored')
-        throw error
-      }
-    })
+      },
+    }))
   })
 
   const forwardQqBotEvent = (payload) => {

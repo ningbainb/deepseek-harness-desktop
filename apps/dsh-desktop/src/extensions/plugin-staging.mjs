@@ -11,6 +11,8 @@ import {
 } from 'node:fs/promises'
 import { dirname, join, parse, resolve } from 'node:path'
 
+import { UserPluginArchive } from '../user-plugin-archive.mjs'
+
 export const PLUGIN_TRANSACTION_SCHEMA_VERSION = 1
 
 export const PLUGIN_TRANSACTION_PHASES = Object.freeze([
@@ -34,10 +36,28 @@ export const PLUGIN_TRANSACTION_PHASES = Object.freeze([
 ])
 
 const PHASES = new Set(PLUGIN_TRANSACTION_PHASES)
+const LINEAR_PHASES = Object.freeze([
+  'CREATED',
+  'METADATA_READY',
+  'COMPATIBILITY_APPROVED',
+  'PACKAGE_PREFETCHED',
+  'STAGING_READY',
+  'DEPENDENCIES_RESOLVED',
+  'GRAPH_VALIDATED',
+  'RUNTIME_STOPPING',
+  'OLD_ENV_ARCHIVED',
+  'NEW_ENV_ACTIVATED',
+  'MANAGED_LINKS_REPAIRED',
+  'RUNTIME_STARTING',
+  'RUNTIME_HEALTHY',
+  'COMMITTED',
+])
+const LINEAR_NEXT = new Map(LINEAR_PHASES.slice(0, -1).map((phase, index) => [phase, LINEAR_PHASES[index + 1]]))
 const ID_PATTERN = /^tx-[a-f0-9-]{36}$/u
 const ACTIVE_FILE = 'active.json'
 const JOURNAL_FILE = 'plugin-transaction.json'
 const STAGE_DIRECTORY = 'stage'
+const BACKUP_DIRECTORY = 'backup'
 const PROFILE_INPUTS = Object.freeze([
   'package.json',
   'pnpm-lock.yaml',
@@ -197,18 +217,6 @@ export class StagedPluginTransaction {
     Object.freeze(this)
   }
 
-  markMetadataReady() {
-    return this.#manager.advance(this.transactionId, 'METADATA_READY')
-  }
-
-  markCompatibilityApproved() {
-    return this.#manager.advance(this.transactionId, 'COMPATIBILITY_APPROVED')
-  }
-
-  markPackagePrefetched() {
-    return this.#manager.advance(this.transactionId, 'PACKAGE_PREFETCHED')
-  }
-
   markDependenciesResolved() {
     return this.#manager.advance(this.transactionId, 'DEPENDENCIES_RESOLVED')
   }
@@ -231,7 +239,7 @@ export class StagedPluginTransaction {
 }
 
 export class PluginStagingManager {
-  constructor({ profileDir, transactionRoot } = {}) {
+  constructor({ profileDir, transactionRoot, onPhase = () => {} } = {}) {
     if (typeof profileDir !== 'string' || profileDir.length === 0) throw new TypeError('profileDir is required')
     this.profileDir = resolve(profileDir)
     this.transactionRoot = resolve(transactionRoot ?? join(dirname(this.profileDir), '.plugin-transactions'))
@@ -241,7 +249,9 @@ export class PluginStagingManager {
     if (this.transactionRoot === this.profileDir) {
       throw new TypeError('plugin transaction root must be outside the profile')
     }
+    if (typeof onPhase !== 'function') throw new TypeError('onPhase must be a function')
     this.activePath = join(this.transactionRoot, ACTIVE_FILE)
+    this.onPhase = onPhase
     this.queue = Promise.resolve()
   }
 
@@ -257,6 +267,10 @@ export class PluginStagingManager {
 
   stageDirectory(transactionId) {
     return join(this.transactionDirectory(transactionId), STAGE_DIRECTORY)
+  }
+
+  backupDirectory(transactionId) {
+    return join(this.transactionDirectory(transactionId), BACKUP_DIRECTORY)
   }
 
   journalPath(transactionId) {
@@ -280,7 +294,21 @@ export class PluginStagingManager {
   async #writeJournal(journal) {
     const validated = assertJournal(journal)
     await replaceJson(this.journalPath(validated.transactionId), validated)
+    this.#notify(validated)
     return validated
+  }
+
+  #notify(journal) {
+    try {
+      void Promise.resolve(this.onPhase(Object.freeze({
+        transactionId: journal.transactionId,
+        operation: journal.operation,
+        pluginIds: journal.pluginIds,
+        phase: journal.phase,
+      }))).catch(() => {})
+    } catch {
+      // Transaction logging is diagnostic only and never changes safety.
+    }
   }
 
   async #readActive() {
@@ -307,6 +335,15 @@ export class PluginStagingManager {
   async #advance(transactionId, phase) {
     if (!PHASES.has(phase)) throw new TypeError('plugin transaction phase is invalid')
     const journal = await this.#readJournal(transactionId)
+    const expected = LINEAR_NEXT.get(journal.phase)
+    const rollback = phase === 'ROLLING_BACK'
+      && !['COMMITTED', 'ROLLED_BACK', 'FAILED'].includes(journal.phase)
+    const rolledBack = phase === 'ROLLED_BACK' && journal.phase === 'ROLLING_BACK'
+    const failedBeforeActivation = phase === 'FAILED'
+      && LINEAR_PHASES.indexOf(journal.phase) <= LINEAR_PHASES.indexOf('RUNTIME_STOPPING')
+    if (phase !== expected && !rollback && !rolledBack && !failedBeforeActivation) {
+      throw new Error(`plugin transaction cannot advance from ${journal.phase} to ${phase}`)
+    }
     return this.#writeJournal({
       ...journal,
       phase,
@@ -340,6 +377,7 @@ export class PluginStagingManager {
       updatedAt: now,
     })
     await writeExclusiveJson(this.journalPath(transactionId), journal)
+    this.#notify(journal)
     try {
       await writeExclusiveJson(this.activePath, {
         schemaVersion: PLUGIN_TRANSACTION_SCHEMA_VERSION,
@@ -355,6 +393,9 @@ export class PluginStagingManager {
       throw error
     }
     try {
+      await this.#advance(transactionId, 'METADATA_READY')
+      await this.#advance(transactionId, 'COMPATIBILITY_APPROVED')
+      await this.#advance(transactionId, 'PACKAGE_PREFETCHED')
       for (const name of PROFILE_INPUTS) {
         await copyLeafIfPresent(join(this.profileDir, name), join(stageDir, name))
       }
@@ -394,8 +435,7 @@ export class PluginStagingManager {
     return this.#enqueue(() => this.#cancel(transactionId))
   }
 
-  async #activate(transactionId, { profileArchive, validateActivated, result } = {}) {
-    if (typeof profileArchive?.begin !== 'function') throw new TypeError('profileArchive is required')
+  async #activate(transactionId, { validateActivated, result } = {}) {
     if (validateActivated !== undefined && typeof validateActivated !== 'function') {
       throw new TypeError('validateActivated must be a function')
     }
@@ -410,7 +450,11 @@ export class PluginStagingManager {
     await this.#advance(transactionId, 'RUNTIME_STOPPING')
     let archiveTransaction
     try {
-      archiveTransaction = await profileArchive.begin({
+      const transactionArchive = new UserPluginArchive({
+        profileDir: this.profileDir,
+        archiveDir: this.backupDirectory(transactionId),
+      })
+      archiveTransaction = await transactionArchive.begin({
         operation: journal.operation,
         nodeModulesTransfer: 'move',
       })
@@ -501,14 +545,32 @@ export class PluginStagingManager {
       await mkdir(this.transactionRoot, { recursive: true })
       const active = await this.#readActive()
       if (active === undefined) return Object.freeze({ recovered: false })
-      const archiveState = typeof profileArchive?.getState === 'function'
+      const transactionArchive = new UserPluginArchive({
+        profileDir: this.profileDir,
+        archiveDir: this.backupDirectory(active.transactionId),
+      })
+      const transactionArchiveState = await transactionArchive.getState()
+      const completedHealthy = ['RUNTIME_HEALTHY', 'COMMITTED'].includes(active.phase)
+      if (transactionArchiveState.active !== undefined) {
+        if (completedHealthy && transactionArchiveState.active.phase === 'applied') {
+          await transactionArchive._commit(transactionArchiveState.active.transactionId)
+        } else {
+          await transactionArchive.recover()
+        }
+      }
+      const legacyArchiveState = typeof profileArchive?.getState === 'function'
         ? await profileArchive.getState()
         : { active: undefined }
-      if (archiveState.active !== undefined) {
+      if (legacyArchiveState.active !== undefined) {
         throw new Error('profile archive recovery must finish before plugin staging recovery')
       }
       if (!['COMMITTED', 'ROLLED_BACK', 'FAILED'].includes(active.phase)) {
-        await this.#advance(active.transactionId, 'ROLLED_BACK')
+        if (completedHealthy) {
+          await this.#advance(active.transactionId, 'COMMITTED')
+        } else {
+          if (active.phase !== 'ROLLING_BACK') await this.#advance(active.transactionId, 'ROLLING_BACK')
+          await this.#advance(active.transactionId, 'ROLLED_BACK')
+        }
       }
       await this.#clearActive(active.transactionId)
       await rm(this.transactionDirectory(active.transactionId), { recursive: true, force: true })
@@ -516,6 +578,7 @@ export class PluginStagingManager {
         recovered: true,
         transactionId: active.transactionId,
         previousPhase: active.phase,
+        outcome: completedHealthy ? 'committed' : 'rolled-back',
       })
     })
   }

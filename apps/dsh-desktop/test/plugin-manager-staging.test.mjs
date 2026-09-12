@@ -239,3 +239,36 @@ test('full-access protected graph conflict is rejected while Live Profile stays 
     if (value) await rm(value.root, { recursive: true, force: true })
   }
 })
+
+test('a production manager cannot fall back to direct Live Profile mutation', async () => {
+  let value
+  let runnerCalls = 0
+  try {
+    value = await fixture({
+      runner: async () => { runnerCalls += 1 },
+    })
+    for (const operation of [
+      () => value.manager.install('@community/unsafe@1.0.0'),
+      () => value.manager.remove('@community/unsafe'),
+      () => value.manager.applyPrepared({
+        name: '@community/unsafe',
+        version: '1.0.0',
+        spec: '@community/unsafe@1.0.0',
+      }),
+      () => value.manager.applyPreparedBatch({
+        items: [{
+          name: '@community/unsafe',
+          version: '1.0.0',
+          spec: '@community/unsafe@1.0.0',
+          integrity: 'sha512-dW5zYWZl',
+        }],
+      }),
+    ]) {
+      await assert.rejects(operation(), { code: 'PLUGIN_STAGING_REQUIRED' })
+    }
+    assert.equal(runnerCalls, 0)
+    assert.deepEqual(JSON.parse(await readFile(join(value.profileDir, 'package.json'), 'utf8')).dependencies, {})
+  } finally {
+    if (value) await rm(value.root, { recursive: true, force: true })
+  }
+})
