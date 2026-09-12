@@ -93,10 +93,12 @@ test('restored logical bounds do not accumulate native constructor DPI rounding 
     await save()
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
     maximized = true
+    bounds = { x: 7, y: 0, width: 720, height: 540 }
     window.emit('maximize')
     await save()
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: true })
     maximized = false
+    bounds = { x: 82, y: 60, width: 1286, height: 824 }
     window.emit('unmaximize')
     await save()
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })

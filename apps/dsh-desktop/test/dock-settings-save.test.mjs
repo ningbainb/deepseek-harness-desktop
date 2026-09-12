@@ -128,6 +128,25 @@ test('a save that makes no progress is bounded and does not submit duplicate wri
   assert.equal(f.form.dataset.dockDirty, 'true')
 })
 
+test('save and close waits while a loading form temporarily removes its save control', async t => {
+  const f = fixture(t)
+  const container = f.button.parentElement
+  let writes = 0, polls = 0
+  f.button.addEventListener('click', () => { writes++ })
+  f.button.remove()
+  const saved = await saveDockSettingsDrafts({
+    document: f.document,
+    wait: async () => {
+      if (++polls === 1) container.append(f.button)
+      if (polls === 2) f.form.dataset.dockDirty = 'false'
+    },
+    maxPolls: 4,
+  })
+  assert.equal(saved, true)
+  assert.equal(writes, 1)
+  assert.equal(polls, 2)
+})
+
 test('the serialized renderer helper can save a collapsed form and releases its edit listeners', async t => {
   const f = fixture(t)
   f.button.parentElement.hidden = true

@@ -41,7 +41,7 @@ export async function saveDockSettingsDrafts({
         // New failures, including an already-running save failing, stop here.
         if (failure && (state.attempted || failure !== state.initialAlerts)) return false
         const button = form.querySelector('[data-dock-save]')
-        if (!button) return false
+        if (!button) continue
         if (button.disabled) continue
         const draft = draftKey(form, state)
         if (draft === state.lastDraft) continue
