@@ -11,10 +11,14 @@ export function dataPoint(event, day, country) {
   const dimensions = event.params ? costDimensions(event) : event
   const p = event.params ?? {}
   return {
-    indexes: [event.dailyActor ?? country],
+    // AE is the aggregate counter plane, not an installation-observation store.
+    // Country is the coarsest dimension used by rollup queries and gives
+    // equitable sampling a bounded, query-aligned index without copying any
+    // daily or stable actor into Analytics Engine.
+    indexes: [country],
     blobs: [day, event.name, event.appVersion, event.channel, event.os, event.language,
       dimensions.outcome, dimensions.detail, dimensions.bucket, p.model ?? '', p.error_type ?? '', country,
-      p.source ?? '', p.position ?? '', p.strategy ?? '', event.installationActor ?? '', event.update ? JSON.stringify(event.update) : ''],
+      p.source ?? '', p.position ?? '', p.strategy ?? '', '', event.update ? JSON.stringify(event.update) : ''],
     doubles: [1],
   }
 }

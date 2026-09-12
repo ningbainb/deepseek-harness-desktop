@@ -14,10 +14,15 @@ export function isDockSetting(value: unknown): value is DockSetting {
   return typeof value === 'string' && DOCK_SETTINGS.includes(value as DockSetting)
 }
 
+/** Preserve old Dock links while presenting one combined model destination. */
+export function canonicalDockSetting(value: DockSetting): DockSetting {
+  return value === 'relay' ? 'models' : value
+}
+
 export function dockSettingFromUrl(): DockSetting | undefined {
   if (typeof window === 'undefined') return undefined
   const value = new URLSearchParams(window.location.search).get('desktop-dock-setting')
-  return isDockSetting(value) ? value : undefined
+  return isDockSetting(value) ? canonicalDockSetting(value) : undefined
 }
 
 /** Dedicated runtime document in the Dock; all forms keep their official slot bindings. */
@@ -27,8 +32,9 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
   const [visited, setVisited] = useState<DockSetting[]>([selected])
   const [palette, setPalette] = useState<DesktopPalette | null>(null)
   const navigateTo = (next: DockSetting) => {
-    setSelected(next)
-    setVisited(previous => previous.includes(next) ? previous : [...previous, next])
+    const canonical = canonicalDockSetting(next)
+    setSelected(canonical)
+    setVisited(previous => previous.includes(canonical) ? previous : [...previous, canonical])
   }
   useEffect(() => {
     const navigate = (event: Event) => {
@@ -56,7 +62,7 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
     '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
   } as CSSProperties : undefined
   return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'relay' ? 'dockModels' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
+    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -72,7 +78,8 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
         {sectionFor(id)
-          ? renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })
+          ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
+            {renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}</>
           : renderSlot('web-ui.plugin.item', {}, { only: id, fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
       </SafePluginBoundary>
     </section>)}

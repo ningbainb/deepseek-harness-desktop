@@ -4,9 +4,9 @@
 
 The Worker accepts bounded Desktop event batches and the legacy official-site download-click endpoint. AnalyticsService owns all telemetry storage. Workers Analytics Engine (AE) receives event counters, model routing signals and interface activity. D1 stores hourly snapshots, unsampled failure diagnostics, launch presence/cohorts, and monthly launch/update observations. User configuration and core desktop state remain in their existing stores.
 
-Desktop schemas 2/3/4 remain accepted. Value Mode names are normalized into five schema 5 logical events: cost_mode_enter, cost_mode_toggle, cost_mode_strategy, cost_mode_route and cost_mode_guide. Model role, result, strategy and position are parameters. Existing successful events never fall back to per-event D1 counters if AE is unavailable.
+Desktop schemas 2 through 6 remain accepted. Value Mode names are normalized into five schema 5 logical events: cost_mode_enter, cost_mode_toggle, cost_mode_strategy, cost_mode_route and cost_mode_guide. Schema 6 adds bounded update-failure diagnostics. Model role, result, strategy and position are parameters. Existing successful events never fall back to per-event D1 counters if AE is unavailable.
 
-The protected administration surface retains historical data, DAU/WAU/MAU, 400-day installation counts, D1/D7/D30 retention, country/version observations, update conversion, Dock conversion, feature counts, release filtering and CSV export. Daily counts combine legacy D1 observations with new AE snapshots. Only launch instances and monthly launch/update observations continue to be persisted individually; aggregate-only event instance counts are displayed as --. Dock and guide conversion use event counts. Update conversion uses monthly anonymous observations.
+The protected administration surface retains historical data, exact UTC DAU, rolling 7-day WAU, rolling 30-day MAU, 400-day installation counts, D1/D7/D30 retention, country/version observations, update conversion, Dock conversion, feature counts, release filtering and CSV export. It shows non-overlapping prior-window comparisons, DAU/MAU and WAU/MAU stickiness, coverage age, and separate DAU and rolling-MAU trends. Daily event counts combine legacy D1 observations with new AE snapshots. Only launch presence/cohorts and monthly launch/update observations continue to be persisted with anonymous actors; aggregate-only event instance counts are displayed as --. Dock and guide conversion use event counts. Update conversion uses monthly anonymous observations.
 
 ## Install
 
@@ -16,7 +16,7 @@ Use the existing authenticated Cloudflare CLI or Wrangler account for this Worke
 2. Create an account-scoped token with Account Analytics: Read and store it as the Worker secret ANALYTICS_READ_TOKEN. Do not use an expiring CLI OAuth token as a deployed secret or put credentials in files committed to Git.
 3. Apply D1 migration 0006 with Wrangler: pnpm exec wrangler d1 migrations apply dsh-desktop-telemetry --remote. This creates the summary/failure tables and compatibility views and removes five redundant indexes. It does not drop historical event data.
 4. Inspect the intended deployment with node scripts/deploy-with-cf.mjs --inspect. Then explicitly deploy with node scripts/deploy-with-cf.mjs --apply. The script requires the correct D1 database, the new tables/views and the analytics read secret. It preserves administrator secrets, adds the AE dataset binding and sets both cron schedules.
-5. Run node scripts/deploy-with-cf.mjs --verify. Verify a real hourly rollup and the protected dashboard before distributing the schema 5 Desktop build. The verification command sends no synthetic product events.
+5. Run node scripts/deploy-with-cf.mjs --verify. Verify a real hourly rollup and the protected dashboard before distributing the schema 6 Desktop build. The verification command sends no synthetic product events.
 
 Wrangler is an alternative deployment path: wrangler.toml declares the D1/AE bindings and schedules; supply INGEST_ENABLED=1 explicitly and preserve administrator secrets. The repository's Desktop telemetry config remains disabled for local/development/Fork builds. Official release builds obtain their endpoint through the existing DSH_TELEMETRY_ENDPOINT variable.
 
@@ -33,7 +33,7 @@ Wrangler is an alternative deployment path: wrangler.toml declares the D1/AE bin
 
 Schema 5 cost events contain the fixed product context, anonymous actor hashes, eventId, timestamp and params. The exact contract is in ../dsh-desktop/src/cost-mode-events.mjs and is bundled into the Worker deployment. Entry source is hero/header/settings or unknown for old clients; strategies are saving/balanced/stronger or unknown; roles are main/subagent; route results are started/success/failure/cancelled.
 
-The AE blob layout is: 1 server UTC day, 2 event, 3 version, 4 channel, 5 OS, 6 language, 7 outcome, 8 detail, 9 bucket, 10 model, 11 error type, 12 country, 13 source, 14 position, 15 strategy, 16 anonymous installation actor. double1 is the event count, initially 1; index1 is the rotating daily actor (country for download clicks). Use SUM(_sample_interval * double1) for counts. Independent actor counts can use COUNT(DISTINCT blob16), but are observed lower bounds under sampling, not counts to multiply by the sampling interval.
+The AE blob layout is: 1 server UTC day, 2 event, 3 version, 4 channel, 5 OS, 6 language, 7 outcome, 8 detail, 9 bucket, 10 model, 11 error type, 12 country, 13 source, 14 position, 15 strategy, and 16 reserved empty. double1 is the event count, initially 1; index1 is the server-derived country code. Aggregate points contain no daily, monthly, or stable actor hash. Use SUM(_sample_interval * double1) for counts. Exact active-instance and retention metrics come only from the bounded D1 app_launch presence/cohort tables, not from sampled AE data.
 
 ## Operations and validation
 

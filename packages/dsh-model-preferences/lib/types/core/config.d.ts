@@ -2,6 +2,8 @@ import type { ModelCatalogFailure, ModelProviderGroup, ModelSelection } from '@d
 import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types';
 /** Settings namespace registered by the Host half. */
 export declare const MODEL_PREFERENCES_SETTINGS_NAMESPACE = "model-preferences";
+/** The built-in bai route stays first on every projected model surface. */
+export declare const PRIMARY_PROVIDER_ID = "project-relay";
 /** Structured provider/model identity. Never collapse this into a display label. */
 export interface ModelKey {
     provider: string;

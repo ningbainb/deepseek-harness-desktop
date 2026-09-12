@@ -114,6 +114,35 @@ test('healthy full startup never creates a fallback provider or calls repair', a
   assert.deepEqual(states, ['starting-full', 'ready-full'])
 })
 
+test('a blocked profile recovery starts builtins without touching the full profile or repair path', async () => {
+  const calls = []
+  const states = []
+  const outcomes = []
+  const full = fakeProvider({ profileName: 'desktop', calls })
+  const builtins = fakeProvider({ profileName: 'desktop-builtins', calls })
+  let repairCalls = 0
+  const coordinator = new StartupRepairCoordinator({
+    createProvider: ({ profileName }) => profileName === 'desktop' ? full : builtins,
+    canRepair: async () => { repairCalls += 1; return true },
+    runRepair: async () => { repairCalls += 1; return { status: 'applied' } },
+    publishState: (state) => states.push(state),
+    onOutcome: async (outcome) => { outcomes.push(outcome) },
+  })
+
+  const result = await coordinator.start({ builtinsOnly: true })
+
+  assert.equal(result.state, 'ready-builtins')
+  assert.equal(result.recoveryBlocked, true)
+  assert.equal(result.fullAttempts, 0)
+  assert.deepEqual(calls, [
+    ['ensure', 'desktop-builtins'],
+    ['start', 'desktop-builtins'],
+  ])
+  assert.equal(repairCalls, 0)
+  assert.deepEqual(states, ['starting-builtins', 'ready-builtins'])
+  assert.deepEqual(outcomes, [result])
+})
+
 test('fallback rejects a different Home instead of creating an isolated session', async () => {
   const calls = []
   const full = fakeProvider({ profileName: 'desktop', failures: 2, calls })

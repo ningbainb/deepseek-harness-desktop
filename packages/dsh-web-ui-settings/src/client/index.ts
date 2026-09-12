@@ -81,8 +81,9 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  const dockSetting = dockSettingFromUrl()
   ctx.effect(() => installDesktopAppearance(window), 'web-ui-settings: desktop appearance')
-  if (!dockSettingFromUrl()) {
+  if (!dockSetting) {
     ctx.effect(() => protectDirectoryEditorFocus(document), 'web-ui-settings: native directory editor focus')
     ctx.effect(() => installBrowserClose(document), 'web-ui-settings: browser close action')
     ctx.inject?.(['workspaces', 'sessions', 'uiWorkspace'], scope => {
@@ -107,7 +108,7 @@ export function apply(ctx: ClientContext): void {
     locale: 'chatgpt-auth',
   }, ChatGptAuthSection))
 
-  if (!dockSettingFromUrl()) ctx.slots.inject('settings.section', () => ctx.slots.register({
+  if (!dockSetting) ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'web-ui-plugins',
     order: 110,
@@ -117,16 +118,18 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ getPluginIds: () => ctx.slots.entriesOfSlot('web-ui.plugin.item').flatMap(entry => entry.options.id ? [entry.options.id] : []) }),
   }, WebUIPluginsSection))
 
-  ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
-    name: 'model-preferences.onboarding',
-    id: 'bai',
-    order: 5,
-    locale: 'relay-onboarding',
-  }, RelayOnboardingCard))
-
-  ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
-    name: 'web-ui.plugin.item', id: 'relay', order: 1, locale: 'relay-onboarding',
-  }, RelayOnboardingCard))
+  if (dockSetting) {
+    ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
+      name: 'web-ui.plugin.item', id: 'relay', order: 1, locale: 'relay-onboarding',
+    }, RelayOnboardingCard))
+  } else {
+    ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
+      name: 'model-preferences.onboarding',
+      id: 'bai',
+      order: 5,
+      locale: 'relay-onboarding',
+    }, RelayOnboardingCard))
+  }
 
   // The highest ordered footer action sits immediately before Settings.
   // Ordinary Web hosts receive no button because the component requires the
@@ -145,7 +148,7 @@ export function apply(ctx: ClientContext): void {
 
   // Only the isolated Dock settings document replaces the root. The main
   // conversation document continues to use the official application frame.
-  if (dockSettingFromUrl()) {
+  if (dockSetting) {
     ctx.slots.inject('root', () => ctx.slots.register({
       name: 'root',
       priority: -100,

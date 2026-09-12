@@ -10,11 +10,15 @@ const script = 'dsh-desktop-telemetry'
 const database = 'ae704c84-608e-4b60-a16c-703ebf2c1961'
 const mode = process.argv[2] ?? '--inspect'
 assert.ok(['--inspect', '--apply', '--verify'].includes(mode))
-const credentials = JSON.parse(await readFile(join(process.env.APPDATA, 'xdg.config', 'cloudflare', 'config', 'default.json'), 'utf8'))
-assert.equal(typeof credentials.oauth_token, 'string')
+let oauthToken = process.env.CLOUDFLARE_API_TOKEN?.trim()
+if (!oauthToken) {
+  const credentials = JSON.parse(await readFile(join(process.env.APPDATA, 'xdg.config', 'cloudflare', 'config', 'default.json'), 'utf8'))
+  assert.equal(typeof credentials.oauth_token, 'string')
+  oauthToken = credentials.oauth_token
+}
 const base = `https://api.cloudflare.com/client/v4/accounts/${account}`
 async function api(path, init = {}) {
-  const result = await fetch(base + path, { ...init, headers: { ...init.headers, authorization: 'Bearer ' + credentials.oauth_token }, signal: AbortSignal.timeout(30_000) })
+  const result = await fetch(base + path, { ...init, headers: { ...init.headers, authorization: 'Bearer ' + oauthToken }, signal: AbortSignal.timeout(30_000) })
   const data = await result.json()
   if (!result.ok || data.success !== true) throw new Error(`Cloudflare API failed: HTTP ${result.status}, codes ${(data.errors ?? []).map(error => error.code).join(',')}`)
   return data.result
@@ -56,8 +60,10 @@ if (mode === '--verify') {
   assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS_ACCOUNT_ID')?.text, account)
   assert.equal(settings.bindings.find(binding => binding.name === 'ANALYTICS_READ_TOKEN')?.type, 'secret_text')
   const schedules = await api(`/workers/scripts/${script}/schedules`)
-  assert.deepEqual(schedules.map(item => item.cron).sort(), ['17 3 * * *', '7 * * * *'])
-  const result = await fetch(base + `/workers/scripts/${script}`, { headers: { authorization: 'Bearer ' + credentials.oauth_token }, signal: AbortSignal.timeout(30_000) })
+  const scheduleEntries = Array.isArray(schedules) ? schedules : schedules.schedules
+  assert.ok(Array.isArray(scheduleEntries), 'Cloudflare schedules response is not an array')
+  assert.deepEqual(scheduleEntries.map(item => item.cron).sort(), ['17 3 * * *', '7 * * * *'])
+  const result = await fetch(base + `/workers/scripts/${script}`, { headers: { authorization: 'Bearer ' + oauthToken }, signal: AbortSignal.timeout(30_000) })
   assert.equal(result.ok, true)
   const body = await result.formData()
   for (const module of modules) {

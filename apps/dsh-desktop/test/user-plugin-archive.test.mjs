@@ -5,6 +5,7 @@ import {
   mkdtemp,
   mkdir,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -15,6 +16,7 @@ import test from 'node:test'
 
 import {
   USER_PLUGIN_ARCHIVE_PROFILE_ARTIFACTS,
+  USER_PLUGIN_ARCHIVE_RECOVERY_CODES,
   UserPluginArchive,
   inventoryUserPluginTree,
 } from '../src/user-plugin-archive.mjs'
@@ -326,6 +328,49 @@ test('an integrity failure leaves the archived bytes and active rollback journal
     const active = (await archive.getState()).active
     assert.equal(active?.transactionId, transaction.transactionId)
     assert.equal(active?.phase, 'archived')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('startup recovery reports a blocked node_modules archive without mutating either tree', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-user-plugin-archive-blocked-'))
+  try {
+    const fixture = await createProfileFixture(root)
+    const archive = new UserPluginArchive({ profileDir: fixture.profileDir })
+    const transaction = await archive.begin({ operation: 'interrupted-plugin-update' })
+    const archivedPlugin = join(
+      archive.archiveDir,
+      'snapshots',
+      transaction.snapshotId,
+      'node_modules',
+      '@community',
+      'hand-edited-plugin',
+      'index.mjs',
+    )
+    const damaged = Buffer.from('export const handEdited = "archive changed"\n')
+    await writeFile(archivedPlugin, damaged)
+
+    const recovery = await archive.recover()
+
+    assert.deepEqual(recovery, {
+      recovered: false,
+      blocked: true,
+      code: USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_MISMATCH,
+      transactionId: transaction.transactionId,
+      snapshotId: transaction.snapshotId,
+      phase: 'archived',
+    })
+    assert.equal(await exists(fixture.nodeModules), false)
+    assert.deepEqual(await readFile(archivedPlugin), damaged)
+    assert.equal((await archive.getState()).active?.transactionId, transaction.transactionId)
+
+    assert.deepEqual(await archive.quarantineBlockedRecovery(), { quarantined: true })
+    assert.equal((await archive.getState()).active, undefined)
+    assert.deepEqual(await readFile(archivedPlugin), damaged)
+    const journalEntries = await readdir(join(archive.archiveDir, 'journal'))
+    assert.equal(journalEntries.some((name) => name.startsWith('blocked-active-')), true)
+    assert.deepEqual(await archive.recover(), { recovered: false })
   } finally {
     await rm(root, { recursive: true, force: true })
   }

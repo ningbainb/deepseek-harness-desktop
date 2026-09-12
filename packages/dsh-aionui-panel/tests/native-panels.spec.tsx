@@ -80,6 +80,7 @@ it('registers both page definitions and bodies under matching official seat keys
   expect(definitions.every(item => item.kind !== 'files')).toBe(true)
   expect(bodies).toEqual(definitions.map(item => ({ name: 'sidebar.right.pane.tab', key: item.id, locale: 'aionui-panel' })))
   expect(nativePanelDefinitions.every(item => !item.patterns && item.guide?.length === 1)).toBe(true)
+  expect(nativePanelDefinitions.flatMap(item => item.guide?.map(entry => entry.order) ?? [])).toEqual([20, 30])
   expect(dispose).toHaveBeenCalledOnce()
   expect(release).toHaveBeenCalledTimes(4)
 })

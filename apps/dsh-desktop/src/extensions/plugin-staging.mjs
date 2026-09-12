@@ -568,7 +568,16 @@ export class PluginStagingManager {
         if (completedHealthy && transactionArchiveState.active.phase === 'applied') {
           await transactionArchive._commit(transactionArchiveState.active.transactionId)
         } else {
-          await transactionArchive.recover()
+          const archiveRecovery = await transactionArchive.recover()
+          if (archiveRecovery.blocked === true) {
+            return Object.freeze({
+              recovered: false,
+              blocked: true,
+              code: archiveRecovery.code,
+              phase: archiveRecovery.phase,
+              source: 'staged-plugin-transaction',
+            })
+          }
         }
       }
       const legacyArchiveState = typeof profileArchive?.getState === 'function'
@@ -593,6 +602,45 @@ export class PluginStagingManager {
         previousPhase: active.phase,
         outcome: completedHealthy ? 'committed' : 'rolled-back',
       })
+    })
+  }
+
+  /**
+   * Release a blocked staging lock after an explicit profile reset succeeds.
+   * Both markers are retained under quarantine names; transaction contents
+   * and the nested byte-preserving archive are left untouched.
+   */
+  quarantineBlockedRecovery() {
+    return this.#enqueue(async () => {
+      await mkdir(this.transactionRoot, { recursive: true })
+      const status = await lstatIfPresent(this.activePath)
+      if (status === undefined) return Object.freeze({ quarantined: false, nestedQuarantined: false })
+
+      let transactionId
+      try {
+        const marker = JSON.parse(await readFile(this.activePath, 'utf8'))
+        transactionId = assertTransactionId(marker?.transactionId)
+      } catch {
+        // An unreadable marker must still be movable out of the active slot.
+      }
+
+      const quarantinePath = join(
+        this.transactionRoot,
+        `blocked-active-${Date.now()}-${randomUUID()}.json`,
+      )
+      await rename(this.activePath, quarantinePath)
+      await syncDirectory(this.transactionRoot)
+
+      let nestedQuarantined = false
+      if (transactionId !== undefined) {
+        const transactionArchive = new UserPluginArchive({
+          profileDir: this.profileDir,
+          archiveDir: this.backupDirectory(transactionId),
+        })
+        const nested = await transactionArchive.quarantineBlockedRecovery().catch(() => ({ quarantined: false }))
+        nestedQuarantined = nested.quarantined === true
+      }
+      return Object.freeze({ quarantined: true, nestedQuarantined })
     })
   }
 

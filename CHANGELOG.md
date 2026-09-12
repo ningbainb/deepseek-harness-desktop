@@ -9,7 +9,9 @@
 - 对 manifest、pnpm lockfile、顶层链接、物理 `.pnpm` 节点与传递依赖进行一致性检查；直接冲突、隐藏冲突、同版本不同来源和伪造包身份均在 Live Profile 变化前被拒绝。
 - 增加持久事务状态机、单 writer 锁和启动恢复，覆盖归档后中断、激活后中断、过期事务与健康确认后的收尾恢复。
 - 旧 Profile 启动时执行本地完整性审计，可证明安全的受管依赖漂移会静默修复；无法确认时进入简洁的插件环境修复界面，个人数据保持不变。
+- 用户插件归档的 `node_modules` 完整性检查失败时，启动会保留用户数据并回退到同一 Home 的可用内置插件，不再同时阻断普通模式与安全模式；诊断会记录具体阶段和恢复结果。
 - Extension Dock 插件管理收敛为“已安装”“发现”“设置”，健康状态保持安静；兼容、权限、来源和完整性细节按需展开，故障只影响对应插件。
+- 匿名数据看板明确展示 UTC 当日 DAU、滚动 7 日 WAU、滚动 30 日 MAU、非重叠前期对比、粘性、覆盖范围和双趋势；高频聚合层不再携带每日、每月或稳定实例标识。
 - 正式验证 pnpm isolated linker、本地 tarball fixture、30 项隔离矩阵、官方 Runtime 集成、完整 Desktop 回归、Windows 打包与 3.4.0 覆盖升级。
 
 English:
@@ -19,7 +21,9 @@ English:
 - Validate manifests, the pnpm lock graph, top-level links, physical `.pnpm` nodes, and transitive dependencies before the Live Profile changes.
 - Add a persistent transaction state machine, one writer lock, and startup recovery for crashes around archive, activation, stale work, and post-health cleanup.
 - Audit legacy Profiles locally and repair provably safe managed drift without deleting personal data; unresolved cases use a focused plugin-environment repair surface.
+- Preserve user data and fall back to usable built-ins in the same Home when a user-plugin archive fails its `node_modules` integrity check, instead of blocking both normal and safe startup; diagnostics retain the bounded stage and recovery result.
 - Reduce Extension Dock plugin management to Installed, Discover, and Settings; healthy state stays quiet and advanced compatibility or integrity evidence remains on demand.
+- Clarify current UTC-day DAU, rolling 7-day WAU, rolling 30-day MAU, non-overlapping comparisons, stickiness, coverage, and both trends; high-frequency aggregates no longer carry daily, monthly, or stable actor hashes.
 - Verify isolated pnpm fixtures, the 30-case isolation matrix, official Runtime integration, full Desktop regressions, Windows packaging, and the 3.4.0 overlay upgrade.
 
 ## 3.4.0 - 2026-09-09

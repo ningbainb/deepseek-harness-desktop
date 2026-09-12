@@ -145,7 +145,7 @@ import {
   restoreDesktopWindow,
   shouldQuitWhenAllWindowsClosed,
 } from './tray-lifecycle.mjs'
-import { UserPluginArchive } from './user-plugin-archive.mjs'
+import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
@@ -1105,15 +1105,30 @@ export async function startElectronApp(metadata) {
     profileDir: desktopProfileDir,
     archiveDir: join(userData, 'plugin-archives', 'desktop'),
   })
+  let blockedPluginArchiveRecovery
   const repairIncidentStore = new RepairIncidentStore({ userDataDir: userData })
   try {
     const recoveredPluginMutation = await userPluginArchive.recover()
-    if (recoveredPluginMutation.recovered) {
+    if (recoveredPluginMutation.blocked === true) {
+      blockedPluginArchiveRecovery = Object.freeze({
+        ...recoveredPluginMutation,
+        source: 'legacy-profile-archive',
+      })
+      await logStore.append(
+        `[plugins] persistent plugin transaction recovery blocked code=${recoveredPluginMutation.code} phase=${recoveredPluginMutation.phase}`,
+      )
+    } else if (recoveredPluginMutation.recovered) {
       await logStore.append('[plugins] restored an interrupted persistent plugin transaction before direct startup')
     }
   } catch (error) {
     await logStore.append(`[plugins] persistent plugin transaction recovery failed: ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
-    throw error
+    blockedPluginArchiveRecovery = Object.freeze({
+      recovered: false,
+      blocked: true,
+      code: USER_PLUGIN_ARCHIVE_RECOVERY_CODES.RECOVERY_FAILED,
+      phase: 'unknown',
+      source: 'legacy-profile-archive',
+    })
   }
   const packageResolutionStartedAt = performance.now()
   const runtimePackages = resolveRuntimePackages()
@@ -1300,12 +1315,36 @@ export async function startElectronApp(metadata) {
       `[plugin-tx:${transactionId.slice(3)}] operation=${operation} phase=${phase}`,
     ),
   })
-  const stagedRecovery = await pluginStagingManager.recover({ profileArchive: userPluginArchive })
-  if (stagedRecovery.recovered) {
+  let stagedRecovery = Object.freeze({ recovered: false })
+  if (blockedPluginArchiveRecovery === undefined) {
+    try {
+      stagedRecovery = await pluginStagingManager.recover({ profileArchive: userPluginArchive })
+    } catch (error) {
+      await logStore.append(
+        `[plugins] staged plugin transaction recovery failed: ${error instanceof Error ? error.name : 'unknown'}`,
+      ).catch(() => {})
+      stagedRecovery = Object.freeze({
+        recovered: false,
+        blocked: true,
+        code: USER_PLUGIN_ARCHIVE_RECOVERY_CODES.RECOVERY_FAILED,
+        phase: 'unknown',
+        source: 'staged-plugin-transaction',
+      })
+    }
+  }
+  if (stagedRecovery.blocked === true) {
+    blockedPluginArchiveRecovery = stagedRecovery
+    await logStore.append(
+      `[plugins] staged plugin transaction recovery blocked code=${stagedRecovery.code} phase=${stagedRecovery.phase}`,
+    )
+  } else if (stagedRecovery.recovered) {
     await logStore.append(
       `[plugins] cleared interrupted staging transaction phase=${stagedRecovery.previousPhase}`,
     )
   }
+  let builtinsFallbackDetail = blockedPluginArchiveRecovery === undefined
+    ? 'full-retry-failed'
+    : 'plugin-archive-blocked'
   const validateDesktopPluginGraph = (profileDir) => validateProtectedRuntimeGraph({
     profileDir,
     baseline: runtimeBaseline,
@@ -1621,6 +1660,7 @@ export async function startElectronApp(metadata) {
     controller: runtimeProvider,
     pluginRecovery,
     pluginManager,
+    pluginArchiveRecovery: blockedPluginArchiveRecovery,
     logStore,
     updateChannel: updateController?.getChannel?.() ?? 'stable',
     installation: {
@@ -1903,6 +1943,27 @@ export async function startElectronApp(metadata) {
   const communityMarket = createCommunityMarketService({
     fetch: marketFetch,
   })
+  const completeBlockedPluginRecovery = async () => {
+    if (blockedPluginArchiveRecovery === undefined) {
+      return Object.freeze({ resolved: false })
+    }
+    try {
+      const quarantine = blockedPluginArchiveRecovery.source === 'staged-plugin-transaction'
+        ? await pluginStagingManager.quarantineBlockedRecovery()
+        : await userPluginArchive.quarantineBlockedRecovery()
+      blockedPluginArchiveRecovery = undefined
+      builtinsFallbackDetail = 'full-retry-failed'
+      await logStore.append(
+        `[plugins] blocked plugin recovery resolved after successful profile reset quarantined=${quarantine.quarantined === true}`,
+      ).catch(() => {})
+      return Object.freeze({ resolved: true })
+    } catch (error) {
+      await logStore.append(
+        `[plugins] blocked plugin recovery quarantine failed: ${error instanceof Error ? error.name : 'unknown'}`,
+      ).catch(() => {})
+      return Object.freeze({ resolved: false })
+    }
+  }
   let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
     selectDockSetting: (id) => desktopWindowFactory.selectDockSetting(id),
@@ -1933,6 +1994,7 @@ export async function startElectronApp(metadata) {
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
     recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
+    completeBlockedPluginRecovery,
   })
   const dispatchDeepLink = async (link) => {
     if (link.kind === 'extensions' || link.kind === 'preset-preview') {
@@ -2198,7 +2260,6 @@ export async function startElectronApp(metadata) {
       createProbe: () => createCandidateProbe({ fingerprint, staged }),
     }),
   })
-  let builtinsFallbackDetail = 'full-retry-failed'
   let builtinsRollbackFailed = false
   let repairToolsCapabilityForJob = 'auto'
   let repairFallbackModelsForJob
@@ -2432,7 +2493,9 @@ export async function startElectronApp(metadata) {
   })
   const startup = beginDesktopStartup({
     loadShell: loadStartup,
-    startRuntime: () => startupCoordinator.start(),
+    startRuntime: () => startupCoordinator.start({
+      builtinsOnly: blockedPluginArchiveRecovery !== undefined,
+    }),
     holdRuntime,
   })
   startupRuntimePromise = startup.runtimePromise

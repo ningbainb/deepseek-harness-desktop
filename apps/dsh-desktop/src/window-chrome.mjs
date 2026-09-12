@@ -1,4 +1,3 @@
-import { installPanelLayoutMenu } from './panel-layout-menu.mjs'
 import { normalizeWindowPalette } from './window-palette.mjs'
 
 export const WINDOW_CHROME_HEIGHT = 32
@@ -350,11 +349,9 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
   })
   return `(() => {
     const data = ${data};
-    document.getElementById(data.id)?.disposePanelLayout?.();
     document.getElementById(data.id)?.remove();
     const chrome = document.createElement('div');
     chrome.id = data.id;
-    let installLayout;
     const canShowTools = data.showToolsMenu && typeof window.dshDesktop?.toolAction === 'function';
     const canShowHelp = data.showHelpMenu && typeof window.dshDesktop?.helpAction === 'function';
     if (canShowTools || canShowHelp) {
@@ -447,13 +444,9 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         if (event.key === 'Escape') closeMenus({ restoreFocus: true });
       });
       chrome.append(menus);
-      if (canShowTools) installLayout = () => {
-        chrome.disposePanelLayout = (${installPanelLayoutMenu.toString()})({ document, window, chrome, closeMenus });
-      };
     }
     document.documentElement.dataset.dshDesktopWindowChrome = 'true';
     document.body.prepend(chrome);
-    installLayout?.();
 
     const isDark = () => {
       const pageTheme = document.documentElement.dataset.dshDesktopTheme;

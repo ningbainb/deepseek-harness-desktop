@@ -24,7 +24,7 @@ patchedDependencies:
   '@deepseek-ai/dsh-llm-pi-ai@0.1.5-rc.1': 54d6a658f670e01b18a27e5793bb596bbe8a6b1b55b67c70eb72cd5e1b8d3c3f
   '@deepseek-ai/dsh-subprocess-local@0.1.5-rc.1': 57c068bc9033203c1ec5278593c43696de40275b18958440ad3d433ea3fb8b51
   '@linxin666/dsh-chat-recovery@0.2.5': 21d4309825eeee6710c22af349c746b9bff607046b05cd508813ccd858a2b9fe
-  '@linxin666/dsh-client-ui-model-capabilities@0.3.20': 81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4
+  '@linxin666/dsh-client-ui-model-capabilities@0.3.20': 91f1b1deacb1c35078e1610a1e7aaa3b18aeedb484ed6813611ec6b0ec874564
   '@linxin666/dsh-client-ui-skin-center@0.2.5': 12c9427a9e962ae5a9dbe035ea9a05d28e1f5e55ef690bed943bb22a1354d5ae
   '@linxin666/dsh-liangshen@0.2.5': 1aead417e1872c887dbfff48bc1638f2f84e248f1689b73397c2aafb30f106f5
   '@linxin666/dsh-pet@0.2.5': a26b9f8340b17eed227d37b3c2f2bee24e05ac72f77af842b8193cee895d125b
@@ -301,7 +301,7 @@ importers:
         version: link:../../packages/dsh-mode-switcher
       '@linxin666/dsh-client-ui-model-capabilities':
         specifier: 0.3.20
-        version: 0.3.20(patch_hash=81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4)(react@18.3.1)
+        version: 0.3.20(patch_hash=91f1b1deacb1c35078e1610a1e7aaa3b18aeedb484ed6813611ec6b0ec874564)(react@18.3.1)
       '@linxin666/dsh-client-ui-plugin-manager':
         specifier: 0.3.20
         version: 0.3.20(react@18.3.1)
@@ -12647,7 +12647,7 @@ snapshots:
       react: 18.3.1
       schemastery: 3.18.0
 
-  '@linxin666/dsh-client-ui-model-capabilities@0.3.20(patch_hash=81e39b5e6070868e168e452b768de693b44e77a37c8e4c7e6dcd04690a2c00b4)(react@18.3.1)':
+  '@linxin666/dsh-client-ui-model-capabilities@0.3.20(patch_hash=91f1b1deacb1c35078e1610a1e7aaa3b18aeedb484ed6813611ec6b0ec874564)(react@18.3.1)':
     dependencies:
       react: 18.3.1
       schemastery: 3.18.0

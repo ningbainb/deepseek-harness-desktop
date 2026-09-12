@@ -63,9 +63,10 @@ export class StartupRepairCoordinator {
     this.directAttempt = 0
   }
 
-  start() {
+  start({ builtinsOnly = false } = {}) {
+    if (typeof builtinsOnly !== 'boolean') throw new TypeError('builtinsOnly must be a boolean')
     if (this.operation !== undefined) return this.operation
-    this.operation = this.#run()
+    this.operation = this.#run({ builtinsOnly })
     return this.operation
   }
 
@@ -170,8 +171,45 @@ export class StartupRepairCoordinator {
     }
   }
 
-  async #run() {
+  async #startBuiltins(full, { fullAttempts, rollbackFailed = false, recoveryBlocked = false }) {
+    const builtins = await this.#provider('desktop-builtins')
+    if (builtins.dshHome !== full.dshHome) {
+      throw new Error('fallback Runtime must use the same DSH Home')
+    }
+    await this.#publish('starting-builtins')
+    try {
+      await this.#startProvider(builtins, {
+        phase: 'builtins',
+        attempt: 1,
+        failureDetails: [],
+      })
+    } catch (error) {
+      // A failed builtins start must stay observable instead of surfacing as an
+      // anonymous crash page; consumers log and record it before rethrowing.
+      await this.#outcome({
+        state: 'builtins-start-failed',
+        profileName: builtins.profileName,
+        ...(recoveryBlocked ? { recoveryBlocked: true } : {}),
+      })
+      throw error
+    }
+    const outcome = Object.freeze({
+      state: 'ready-builtins',
+      provider: builtins,
+      fullAttempts,
+      ...(rollbackFailed ? { rollbackFailed: true } : {}),
+      ...(recoveryBlocked ? { recoveryBlocked: true } : {}),
+    })
+    await this.#outcome(outcome)
+    await this.#publish('ready-builtins')
+    return outcome
+  }
+
+  async #run({ builtinsOnly }) {
     const full = await this.#provider('desktop')
+    if (builtinsOnly) {
+      return this.#startBuiltins(full, { fullAttempts: 0, recoveryBlocked: true })
+    }
     const failures = []
     const failureDetails = []
     await this.#publish('starting-full')
@@ -227,31 +265,6 @@ export class StartupRepairCoordinator {
       }
     }
 
-    const builtins = await this.#provider('desktop-builtins')
-    if (builtins.dshHome !== full.dshHome) {
-      throw new Error('fallback Runtime must use the same DSH Home')
-    }
-    await this.#publish('starting-builtins')
-    try {
-      await this.#startProvider(builtins, {
-        phase: 'builtins',
-        attempt: 1,
-        failureDetails: [],
-      })
-    } catch (error) {
-      // A failed builtins start must stay observable instead of surfacing as an
-      // anonymous crash page; consumers log and record it before rethrowing.
-      await this.#outcome({ state: 'builtins-start-failed', profileName: builtins.profileName })
-      throw error
-    }
-    const outcome = Object.freeze({
-      state: 'ready-builtins',
-      provider: builtins,
-      fullAttempts: 2,
-      ...(rollbackFailed ? { rollbackFailed: true } : {}),
-    })
-    await this.#outcome(outcome)
-    await this.#publish('ready-builtins')
-    return outcome
+    return this.#startBuiltins(full, { fullAttempts: 2, rollbackFailed })
   }
 }

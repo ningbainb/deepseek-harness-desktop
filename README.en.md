@@ -42,16 +42,16 @@ The installer includes the main runtime components, so you do not need to separa
 
 [Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
-### Latest Release: 3.3.0
+### Latest Release: 3.5.0
 
-- **Organized Dock settings**: Model connection, Value Mode, Personal Prompt, Memory, particle theme, and image understanding are grouped in the sidebar. Settings follow the same light/dark theme, open centered by default, and coalesce drag updates to reduce stutter.
-- **Projects and file handoff**: Creating a project and choosing a workspace use a shared dialog with a native folder picker. Ordinary dropped files appear as attachment cards; sending supplies real file references for the model to investigate with tools, without preprocessing or automatic Markdown conversion.
-- **Visible memory activity**: Inspect saved memories, pending suggestions, and recently prepared memory context in the Dock. Suggestions require confirmation before saving, and memories are isolated by local user and scope. When references are enabled, matching content is sent to the selected model provider; the panel does not prove that the model used it.
-- **Upgrade and feedback**: Each local user upgrading to 3.3.0 sees the Star prompt once; closing it and restarting does not repeat it. Official builds add anonymous project, ordinary-file, and settings-page outcome counts, excluding conversations, file contents, paths, and credentials. See the [privacy policy](PRIVACY.md).
+- **Safer plugin updates**: Installs, updates, removals, and Preset imports validate compatibility, source, and dependency graphs in isolation before atomic activation. Failures roll back automatically, and a damaged user-plugin archive no longer blocks both normal and safe startup.
+- **A more compact Dock**: Plugin management is organized as Installed, Discover, and Settings. Model connection, Value Mode, Personal Prompt, Memory, particle theme, and image understanding remain available, with one active sidebar form at a time.
+- **Clearer anonymous metrics**: The admin dashboard distinguishes current UTC-day DAU, rolling 7-day WAU, and rolling 30-day MAU, with prior-period comparisons, stickiness, coverage, and trends. High-frequency aggregates carry no installation actor.
+- **Upgrade and feedback**: Each local user upgrading to 3.5.0 sees the Star prompt once; closing it and restarting does not repeat it. Official builds send only fixed-vocabulary anonymous outcomes and exclude conversations, file contents, paths, and credentials. See the [privacy policy](PRIVACY.md).
 
-![DeepSeek Harness Desktop 3.3.0 project creation and source-folder selection](docs/screenshots/3.3.0-create-project.webp)
+![DeepSeek Harness Desktop 3.5.0 Extension Dock plugin management](docs/screenshots/desktop-3.5.0-extension-dock.png)
 
-![DeepSeek Harness Desktop 3.3.0 Dock memory settings](docs/screenshots/3.3.0-memory.webp)
+![DeepSeek Harness Desktop 3.5.0 compact Dock settings](docs/screenshots/desktop-3.5.0-extension-dock-compact.png)
 
 ### Continuing core capabilities
 
@@ -66,7 +66,7 @@ The installer includes the main runtime components, so you do not need to separa
 
 ## Model collaboration, usage, and project import
 
-The following three screenshots are historical 3.2.0 captures. These capabilities remain available; use the Dock for the current 3.3.0 settings navigation and layout.
+The following three screenshots are historical 3.2.0 captures. These capabilities remain available; use the Dock for the current 3.5.0 settings navigation and layout.
 
 ### Value Mode: let the expert decide, let the worker execute
 

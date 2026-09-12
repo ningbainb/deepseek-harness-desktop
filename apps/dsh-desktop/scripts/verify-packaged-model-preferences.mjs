@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -65,6 +65,7 @@ async function launch() {
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_HOME: dshHome,
       DSH_AGENTS_HOME: join(userData, 'agents'),
+      PROJECT_RELAY_API_KEY: 'model-preferences-test-key',
     },
   })
   await useChineseFixtureLocale(instance)
@@ -95,6 +96,17 @@ async function openSettings(page) {
   assert.equal(await modelNav.count(), 1)
   assert.equal(await settings.getByRole('button', { name: '模型选项', exact: true }).count(), 0)
   await modelNav.click()
+  const baiProvider = page.locator('[data-dsh-provider-id="project-relay"]').first()
+  await baiProvider.waitFor({ state: 'visible', timeout: 30_000 })
+  const baiPosition = await baiProvider.evaluate((element) => {
+    const row = element.closest('li')
+    const list = row?.parentElement
+    if (!row || !list) return undefined
+    const visibleRows = [...list.children].filter((candidate) => candidate instanceof HTMLElement && candidate.offsetParent !== null)
+    const visualRows = visibleRows.toSorted((left, right) => left.getBoundingClientRect().top - right.getBoundingClientRect().top)
+    return { order: getComputedStyle(row).order, isFirst: visualRows[0] === row }
+  })
+  assert.deepEqual(baiPosition, { order: '-1', isFirst: true }, 'bai is the first provider in Settings')
   const card = page.locator('[data-model-preferences-card="true"]')
   await card.waitFor({ state: 'visible', timeout: 30_000 })
   try {
@@ -237,7 +249,7 @@ function assertComposerProjection(sections, expectedPins) {
   assert.ok(pinned, JSON.stringify(sections))
   assert.ok(pinned.buttons[0]?.text.startsWith(expectedPins[0]), JSON.stringify(pinned))
   assert.ok(pinned.buttons[1]?.text.startsWith(expectedPins[1]), JSON.stringify(pinned))
-  assert.deepEqual(sections.map((section) => section.label).slice(0, 3), ['置顶模型', 'openai-codex', 'DeepSeek'])
+  assert.deepEqual(sections.map((section) => section.label).slice(0, 4), ['置顶模型', 'bai供应商', 'openai-codex', 'DeepSeek'])
   const deepseek = sections.find((section) => section.label === 'DeepSeek')
   assert.ok(deepseek, JSON.stringify(sections))
   assert.equal(deepseek.buttons.length, 1, JSON.stringify(deepseek))
@@ -253,6 +265,20 @@ function assertOfficialModelCommand(rows) {
 
 try {
   await mkdir(workspace, { recursive: true })
+  await mkdir(dshHome, { recursive: true })
+  await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify({
+    'llm-pi-ai': {
+      providers: {
+        'project-relay': {
+          baseURL: 'https://api.1521003.xyz/v1',
+          apiKeyEnv: 'PROJECT_RELAY_API_KEY',
+          api: 'openai-completions',
+          displayName: 'bai供应商',
+          models: [{ id: 'model-preferences-test', name: 'bai 测试模型' }],
+        },
+      },
+    },
+  }))
   const first = await launch()
   app = first.instance
   const firstPage = first.page
@@ -260,7 +286,7 @@ try {
   const expectedPins = await configurePreferences(firstSettings.card)
   const firstSettingsState = await readPersistedSettings(firstSettings.card)
   assert.deepEqual(firstSettingsState.pinnedLabels, expectedPins.modelIds.map((value) => `openai-codex / ${value}`))
-  assert.deepEqual(firstSettingsState.providerIds.slice(0, 2), ['openai-codex', 'deepseek-official'])
+  assert.deepEqual(firstSettingsState.providerIds.slice(0, 3), ['project-relay', 'openai-codex', 'deepseek-official'])
   assert.equal(firstSettingsState.deepseekEnabledButtonCount, 1)
   await closeSettings(firstSettings.settings)
   await chooseWorkspace(firstPage)
@@ -278,7 +304,7 @@ try {
   const secondSettings = await openSettings(second.page)
   const restartedSettingsState = await readPersistedSettings(secondSettings.card)
   assert.deepEqual(restartedSettingsState.pinnedLabels, expectedPins.modelIds.map((value) => `openai-codex / ${value}`))
-  assert.deepEqual(restartedSettingsState.providerIds.slice(0, 2), ['openai-codex', 'deepseek-official'])
+  assert.deepEqual(restartedSettingsState.providerIds.slice(0, 3), ['project-relay', 'openai-codex', 'deepseek-official'])
   assert.equal(restartedSettingsState.deepseekEnabledButtonCount, 1)
   await closeSettings(secondSettings.settings)
   await ensureWorkspace(second.page)

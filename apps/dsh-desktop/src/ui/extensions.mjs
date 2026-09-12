@@ -1141,7 +1141,7 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'models-tab': 'cpu', 'relay-tab': 'sliders', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
@@ -1153,7 +1153,8 @@ const groupTitles = {
 function activateTab(tab, focus = false, settingOverride) {
   try { localStorage.setItem('dsh-dock-tab', tab.id) } catch { /* storage may be unavailable */ }
   const request = ++settingsRequest
-  const setting = settingOverride ?? tab.dataset.setting
+  const requestedSetting = settingOverride ?? tab.dataset.setting
+  const setting = requestedSetting === 'relay' ? 'models' : requestedSetting
   activeSettingsTab = setting ? tab : undefined
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting)
@@ -1214,10 +1215,9 @@ for (const tab of tabs) {
 }
 const searchEntries = [
   ['皮肤与壁纸', '外观 试穿 配色 背景 Wallpaper 主题', 'appearance-tab'],
-  ['模型与能力', '模型目录 图片输入 推理档位 供应商 启用 停用', 'models-tab'],
+  ['模型与能力', '模型目录 图片输入 推理档位 供应商 bai 中转站 登录 账号 充值 API Key 启用 停用 模型接入', 'models-tab'],
   ['用量与余额', '统计 token 额度 套餐 费用 供应商', 'usage-tab'],
   ['会话管理', '聊天历史 搜索 归档 恢复 清理', 'sessions-tab'],
-  ['模型接入', '供应商 bai 中转站 登录 账号 充值 API Key', 'relay-tab'],
   ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
   ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
@@ -1269,7 +1269,8 @@ nativePluginGrid?.addEventListener('click', event => {
   const button = event.target.closest('[data-open-dock-setting]')
   if (!button) return
   const id = button.dataset.openDockSetting
-  const tab = document.getElementById(`${id === 'memory' ? 'personal-prompt' : id}-tab`)
+  const tabId = id === 'memory' ? 'personal-prompt' : id === 'relay' ? 'models' : id
+  const tab = document.getElementById(`${tabId}-tab`)
   if (tab) activateTab(tab, true, id)
 })
 
@@ -1877,7 +1878,8 @@ let initialTab = document.querySelector('#value-mode-tab')
 let initialSetting
 try {
   const previousId = localStorage.getItem('dsh-dock-tab')
-  initialTab = tabs.find(tab => tab.id === previousId) ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : initialTab)
+  initialTab = tabs.find(tab => tab.id === previousId)
+    ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : previousId === 'relay-tab' ? document.querySelector('#models-tab') : initialTab)
   const previousSetting = previousId === 'memory-tab' ? 'memory' : localStorage.getItem('dsh-dock-setting')
   if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
 } catch { /* first visit opens model collaboration */ }

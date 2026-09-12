@@ -8,6 +8,9 @@ import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/
 /** Settings namespace registered by the Host half. */
 export const MODEL_PREFERENCES_SETTINGS_NAMESPACE = 'model-preferences'
 
+/** The built-in bai route stays first on every projected model surface. */
+export const PRIMARY_PROVIDER_ID = 'project-relay'
+
 /** Structured provider/model identity. Never collapse this into a display label. */
 export interface ModelKey {
   provider: string
@@ -224,6 +227,8 @@ export function sortModelCatalog(
   const groups = currentFallbackGroup(snapshot.groups, snapshot.current)
     .map((group, index) => ({ group, index }))
     .sort((left, right) => {
+      if (left.group.id === PRIMARY_PROVIDER_ID && right.group.id !== PRIMARY_PROVIDER_ID) return -1
+      if (right.group.id === PRIMARY_PROVIDER_ID && left.group.id !== PRIMARY_PROVIDER_ID) return 1
       const leftRank = providerOrder.get(left.group.id)
       const rightRank = providerOrder.get(right.group.id)
       if (leftRank !== undefined && rightRank !== undefined) return leftRank - rightRank
@@ -307,8 +312,10 @@ export function providerIdsInOrder(
   const normalized = normalizeModelPreferences(config)
   const known: string[] = []
   for (const group of groups) if (!known.includes(group.id)) known.push(group.id)
-  const result = normalized.providerOrder.filter(provider => known.includes(provider))
+  const result = normalized.providerOrder.filter(provider => provider !== PRIMARY_PROVIDER_ID && known.includes(provider))
   for (const provider of known) if (!result.includes(provider)) result.push(provider)
+  const primary = result.indexOf(PRIMARY_PROVIDER_ID)
+  if (primary > 0) result.unshift(...result.splice(primary, 1))
   return result
 }
 
@@ -325,7 +332,10 @@ export function moveProvider(
   )
   const index = order.indexOf(provider)
   const target = index + direction
-  if (index < 0 || target < 0 || target >= order.length) return normalizeModelPreferences(config)
+  const firstMovable = order[0] === PRIMARY_PROVIDER_ID ? 1 : 0
+  if (provider === PRIMARY_PROVIDER_ID || index < firstMovable || target < firstMovable || target >= order.length) {
+    return normalizeModelPreferences(config)
+  }
   const next = [...order]
   const [item] = next.splice(index, 1)
   next.splice(target, 0, item)

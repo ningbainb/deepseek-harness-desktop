@@ -73,6 +73,15 @@ describe('model preference client projection', () => {
     expect(set).toHaveBeenCalledWith('recentModels', [{ provider: 'beta', model: 'b:two' }])
   })
 
+  it('projects bai ahead of an explicit provider order', () => {
+    const withBai = {
+      ...state,
+      groups: [...state.groups, { id: 'project-relay', name: 'bai供应商', models: [{ id: 'relay', name: 'Relay' }] }],
+    }
+    const options = commandOptions(withBai, config, key => key)
+    expect(options.map(option => option.label)).toEqual(['Alpha One', 'Relay', 'Beta Two', 'Gamma'])
+  })
+
   it('does not hold model selection busy while recent history is slow, and serializes rapid choices', async () => {
     let finish!: () => void
     const firstWrite = new Promise<void>(resolve => { finish = resolve })

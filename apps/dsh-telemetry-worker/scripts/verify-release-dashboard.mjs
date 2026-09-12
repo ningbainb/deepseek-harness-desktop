@@ -9,9 +9,16 @@ import { createSession, sessionCookie } from '../src/admin-auth.mjs'
 const db = new DatabaseSync(':memory:')
 for (const file of (await readdir(new URL('../migrations/', import.meta.url))).filter(file => file.endsWith('.sql')).sort()) db.exec(await readFile(new URL('../migrations/' + file, import.meta.url), 'utf8'))
 const today = new Date().toISOString().slice(0, 10)
+const day = (offset) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10)
 db.prepare("INSERT INTO product_measurement_coverage VALUES ('release-observations', ?)").run(today)
 db.prepare("INSERT INTO product_release_daily VALUES (?, ?, '3.3.0', 'feature_attachment', 'succeeded', 'file', 3)").run(today, 'a'.repeat(64))
 db.prepare("INSERT INTO product_release_daily VALUES (?, ?, '3.3.0', 'app_launch', 'started', 'normal', 1)").run(today, 'a'.repeat(64))
+for (const [offset, actor] of [[-31, 'b'], [-8, 'c'], [-1, 'd'], [0, 'd'], [0, 'e']]) {
+  db.prepare('INSERT INTO product_installation_daily (day, installation_actor) VALUES (?, ?)').run(day(offset), actor.repeat(64))
+}
+for (const [offset, actor] of [[-31, 'b'], [-8, 'c'], [-1, 'd'], [0, 'e']]) {
+  db.prepare('INSERT INTO product_installation_first_seen (installation_actor, first_seen_day, first_version) VALUES (?, ?, ?)').run(actor.repeat(64), day(offset), '3.5.0')
+}
 const env = { ADMIN_PASSWORD_SHA256: 'a'.repeat(43), ADMIN_SESSION_SECRET: 'b'.repeat(43), METRICS: {
   prepare(sql) { let values = []; const s = { bind(...args) { values = args; return s }, async all() { return { results: db.prepare(sql).all(...values) } } }; return s },
 } }
@@ -33,6 +40,11 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message))
   await page.goto('http://127.0.0.1:' + server.address().port + '/admin')
   await page.waitForFunction(() => document.querySelector('#release-export')?.disabled === false)
+  await page.waitForFunction(() => document.querySelector('#metric-dau')?.textContent === '2')
+  assert.match(await page.locator('#metric-mau-context').innerText(), /此前 30 日/)
+  assert.match(await page.locator('#metric-active-coverage').innerText(), /共 32 天/)
+  assert.ok(await page.locator('#active-dau-chart .trend-line').count() > 0)
+  assert.ok(await page.locator('#active-mau-chart .trend-line').count() > 0)
   assert.match(await page.locator('#release-rows').innerText(), /普通文件添加/)
   await page.selectOption('#release-version', '3.3.0')
   await page.waitForFunction(() => document.querySelector('#release-export')?.disabled === false)
@@ -48,5 +60,5 @@ try {
   assert.equal(await page.locator('#release-active').innerText(), '--')
   assert.equal(await page.locator('#release-export').isDisabled(), true)
   assert.deepEqual(errors, [])
-  console.log('PASS release dashboard: authenticated SQL, version filter, CSV, narrow layout, failure state; local fixtures only')
+  console.log('PASS release dashboard: exact DAU/WAU/MAU, rolling trends, authenticated SQL, version filter, CSV, narrow layout, failure state; local fixtures only')
 } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); db.close() }

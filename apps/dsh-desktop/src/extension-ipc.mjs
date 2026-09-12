@@ -213,6 +213,7 @@ export function registerExtensionIpc({
   trackProductOperation = (_detail, operation) => operation(),
   recordFeatureEvent = () => false,
   onRuntimeMaintenanceChange = () => {},
+  completeBlockedPluginRecovery = async () => Object.freeze({ resolved: false }),
   quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
   getProfileResetAvailableBytes = profileResetAvailableBytes,
 }) {
@@ -230,6 +231,9 @@ export function registerExtensionIpc({
   }
   if (typeof onRuntimeMaintenanceChange !== 'function') {
     throw new TypeError('runtime maintenance callback must be a function')
+  }
+  if (typeof completeBlockedPluginRecovery !== 'function') {
+    throw new TypeError('blocked plugin recovery completion callback must be a function')
   }
   for (const channel of CHANNELS) ipcMain.removeHandler(channel)
   let skillPaths = new Map()
@@ -706,6 +710,7 @@ export function registerExtensionIpc({
     await controller.stop()
     const backupDir = `${profileDir}.backup-${timestamp}`
     let moved = false
+    let archiveRecoveryResolved = false
     try {
       try {
         await rename(profileDir, backupDir)
@@ -716,6 +721,7 @@ export function registerExtensionIpc({
       if (moved) await assertRealProfileDirectory(backupDir)
       await ensureProfile()
       await controller.start()
+      archiveRecoveryResolved = (await completeBlockedPluginRecovery())?.resolved === true
     } catch (error) {
       if (!moved) throw error
       const rollbackErrors = []
@@ -737,7 +743,12 @@ export function registerExtensionIpc({
       throw error
     }
     await pruneProfileResetBackups(profileDir).catch(() => {})
-    return Object.freeze({ reset: true, timestamp, backupDirectory: moved ? backupDir : undefined })
+    return Object.freeze({
+      reset: true,
+      timestamp,
+      backupDirectory: moved ? backupDir : undefined,
+      archiveRecoveryResolved,
+    })
   }))
   handleExtension('extensions:qqbot-status', () => qqBotBinding.status())
   handleExtension('extensions:qqbot-bind', () => {

@@ -28,6 +28,8 @@ Extension Dock 的插件页面收敛为“已安装”“发现”“设置”�
 
 从 3.4.0 升级时，Desktop 会在本地检查旧 Profile。能够确认安全的依赖漂移会自动修复；无法自动确认时只提示“插件环境需要修复”。聊天、设置、API Provider、API Key、Memory、Personal Prompt、Workspace、插件配置和用户文件均保持原位。
 
+如果用户插件归档的 `node_modules` 完整性检查失败，3.5.0 会保留用户数据，记录明确的启动阶段与恢复结果，并回退到同一 DSH Home 中可用的内置插件。归档损坏不再同时阻断普通模式和安全模式。
+
 ### Runtime 与日常体验
 
 Desktop 继续使用官方 DSH `0.1.5-rc.1` Runtime，并保留 3.4.0 对 DeepSeek V4.1 Flash、原生文件上传、侧栏预览、历史会话、模型目录、终端、余额、拓展坞和 Windows 覆盖升级的适配。插件架构升级不会改变正常的会话、Agent、设置和内置功能入口。
@@ -38,7 +40,9 @@ Desktop 继续使用官方 DSH `0.1.5-rc.1` Runtime，并保留 3.4.0 对 DeepSe
 
 ### 验证
 
-3.5.0 源码检查覆盖 Runtime 基线、插件兼容准入、依赖图保护、事务提交与回滚、崩溃恢复、3.4.0 迁移和发布资料。当前自动化测试为 1114 项，其中 1112 项通过、2 项按环境条件跳过、0 项失败；Windows 安装包仍以同一提交的本地打包和覆盖升级验收结果为准。
+3.5.0 源码检查覆盖 Runtime 基线、插件兼容准入、依赖图保护、事务提交与回滚、崩溃恢复、3.4.0 迁移、匿名统计边界和发布资料。本次正式候选的 Desktop 主套件为 1157 项，其中 1155 项通过、2 项因 Windows 未开启符号链接权限跳过、0 项失败；仓库脚本套件 194/194 通过。安装包大小与 SHA-256 以本次正式发布同一提交的验证记录和 GitHub Release 资产为准。
+
+产品数据看板现在明确区分 UTC 当日 DAU、滚动 7 日 WAU 和滚动 30 日 MAU，展示此前非重叠窗口对比、DAU/MAU 与 WAU/MAU 粘性、数据覆盖天数、DAU 趋势和滚动 MAU 趋势。高频事件只进入无实例标识的聚合层；精确活跃与留存仍由有界的启动集合计算。
 
 ### 下载与校验
 
@@ -80,6 +84,8 @@ Plugin details collect enablement, version, update, permissions, and removal in 
 
 When upgrading from 3.4.0, Desktop audits the existing Profile locally. Safe dependency drift is repaired silently. If automatic repair cannot be proven safe, Desktop offers a focused plugin-environment repair action. Conversations, settings, providers, API keys, Memory, Personal Prompt, Workspaces, plugin configuration, and user files remain in place.
 
+If the user-plugin archive fails its `node_modules` integrity check, 3.5.0 preserves user data, records the bounded startup stage and recovery result, and falls back to usable built-ins in the same DSH Home. A damaged archive no longer blocks both normal and safe startup.
+
 ### Runtime and existing workflows
 
 Desktop continues to use the official DSH `0.1.5-rc.1` Runtime and retains the 3.4.0 adaptations for DeepSeek V4.1 Flash, native uploads, sidebar previews, historical sessions, model catalog loading, terminals, provider balances, the Extension Dock, and Windows overlay upgrades. The plugin-platform change does not replace normal conversation, Agent, Settings, or built-in feature workflows.
@@ -90,7 +96,9 @@ Anonymous metrics keep high-frequency behavior aggregated and low-frequency crit
 
 ### Verification
 
-The 3.5.0 source gates cover the immutable Runtime baseline, compatibility admission, protected dependency graphs, transactional commit and rollback, crash recovery, migration from 3.4.0, and release documentation. The current automated Desktop suite contains 1,114 tests: 1,112 passed, two were conditionally skipped, and none failed. The Windows installer remains subject to local packaging and real overlay-upgrade acceptance from the same commit.
+The 3.5.0 source gates cover the immutable Runtime baseline, compatibility admission, protected dependency graphs, transactional commit and rollback, crash recovery, migration from 3.4.0, anonymous measurement boundaries, and release documentation. The formal candidate Desktop suite contains 1,157 tests: 1,155 passed, two were skipped because Windows symbolic-link privileges were unavailable, and none failed; the repository script suite passed 194 of 194. Installer size and SHA-256 are reported from the same commit used by this formal release and its GitHub Release assets.
+
+The product dashboard now distinguishes current UTC-day DAU, rolling 7-day WAU, and rolling 30-day MAU. It shows non-overlapping prior-window comparisons, DAU/MAU and WAU/MAU stickiness, coverage age, DAU trend, and rolling-MAU trend. High-frequency events enter an actor-free aggregate plane; exact activity and retention still come from bounded launch-presence tables.
 
 ### Download and verification
 

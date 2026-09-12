@@ -199,6 +199,7 @@ it('registers the browser definition and content with matching native keys and r
   expect(register).toHaveBeenNthCalledWith(1, nativeBrowserDefinition)
   expect(register.mock.calls[1]![0]).toEqual({ name: 'sidebar.right.pane.tab', key: nativeBrowserDefinition.id, locale: 'aionui-panel' })
   expect(release).toHaveBeenCalledTimes(2)
+  expect(nativeBrowserDefinition.guide?.map(entry => entry.order)).toEqual([40])
   expect(nativeBrowserDefinition.canOpen!('dsh-resource://desktop-browser/tab-1')).toBe(true)
   for (const address of ['https://example.com', 'dsh-resource://file/session/x/a', 'dsh-resource://desktop-browser/../x']) {
     expect(nativeBrowserDefinition.canOpen!(address)).toBe(false)

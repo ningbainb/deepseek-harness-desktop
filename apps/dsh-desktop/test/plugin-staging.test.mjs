@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 
 import { PluginStagingManager } from '../src/extensions/plugin-staging.mjs'
-import { UserPluginArchive } from '../src/user-plugin-archive.mjs'
+import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from '../src/user-plugin-archive.mjs'
 
 async function fixture({ onPhase } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-plugin-staging-'))
@@ -176,6 +176,51 @@ test('restart recovery restores a profile interrupted immediately after archive'
     assert.equal(stagingResult.outcome, 'rolled-back')
     assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('restart recovery reports a damaged staged archive without clearing either transaction', async () => {
+  const value = await fixture()
+  try {
+    const staged = await prepareChangedStage(value)
+    const backupDirectory = value.manager.backupDirectory(staged.transactionId)
+    const transactionArchive = new UserPluginArchive({
+      profileDir: value.profileDir,
+      archiveDir: backupDirectory,
+    })
+    await transactionArchive.begin({ operation: 'plugin-install', nodeModulesTransfer: 'move' })
+    await value.manager.advance(staged.transactionId, 'RUNTIME_STOPPING')
+    await value.manager.advance(staged.transactionId, 'OLD_ENV_ARCHIVED')
+    const archivedManifest = join(backupDirectory, 'snapshots', (await transactionArchive.getState()).active.snapshotId, 'node_modules', 'community-plugin', 'package.json')
+    await writeFile(archivedManifest, JSON.stringify({ name: 'community-plugin', version: 'damaged' }))
+
+    const recoveredManager = new PluginStagingManager({
+      profileDir: value.profileDir,
+      transactionRoot: value.transactionRoot,
+    })
+    const recovery = await recoveredManager.recover({ profileArchive: value.profileArchive })
+
+    assert.deepEqual(recovery, {
+      recovered: false,
+      blocked: true,
+      code: USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_MISMATCH,
+      phase: 'archived',
+      source: 'staged-plugin-transaction',
+    })
+    assert.equal(await exists(join(value.profileDir, 'node_modules')), false)
+    assert.equal((await transactionArchive.getState()).active?.phase, 'archived')
+    assert.equal((await recoveredManager.list())[0]?.phase, 'OLD_ENV_ARCHIVED')
+
+    assert.deepEqual(await recoveredManager.quarantineBlockedRecovery(), {
+      quarantined: true,
+      nestedQuarantined: true,
+    })
+    assert.equal((await transactionArchive.getState()).active, undefined)
+    assert.equal((await readdir(value.transactionRoot)).some((name) => name.startsWith('blocked-active-')), true)
+    assert.deepEqual(await recoveredManager.recover({ profileArchive: value.profileArchive }), { recovered: false })
+    assert.equal((await recoveredManager.list())[0]?.phase, 'OLD_ENV_ARCHIVED')
   } finally {
     await rm(value.root, { recursive: true, force: true })
   }

@@ -88,9 +88,13 @@ const ACTIVE_HEADLINE_SQL = [
   'WITH bounds AS (SELECT date(?) AS asOfDay)',
   'SELECT',
   '  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day = bounds.asOfDay) AS dau,',
+  "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day = date(bounds.asOfDay, '-1 day')) AS previousDau,",
   "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-6 days') AND bounds.asOfDay) AS wau,",
+  "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-13 days') AND date(bounds.asOfDay, '-7 days')) AS previousWau,",
   "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-29 days') AND bounds.asOfDay) AS mau,",
-  "  (SELECT COUNT(*) FROM product_installation_first_seen WHERE first_seen_day BETWEEN date(bounds.asOfDay, '-399 days') AND bounds.asOfDay) AS totalInstallations",
+  "  (SELECT COUNT(DISTINCT installation_actor) FROM product_installation_daily WHERE day BETWEEN date(bounds.asOfDay, '-59 days') AND date(bounds.asOfDay, '-30 days')) AS previousMau,",
+  "  (SELECT COUNT(*) FROM product_installation_first_seen WHERE first_seen_day BETWEEN date(bounds.asOfDay, '-399 days') AND bounds.asOfDay) AS totalInstallations,",
+  '  (SELECT MIN(day) FROM product_installation_daily) AS activityStartedDay',
   'FROM bounds',
 ].join(' ')
 
@@ -509,12 +513,44 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       letter-spacing: .09em;
       text-transform: uppercase;
     }
+    .metric small em {
+      display: block;
+      margin-top: 4px;
+      font-style: normal;
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+    }
     .metric strong {
       display: block;
       margin-top: 15px;
       font: 800 clamp(34px, 5vw, 58px)/.9 "Bahnschrift Condensed", sans-serif;
       letter-spacing: -.035em;
     }
+    .metric-context {
+      display: block;
+      margin-top: 14px;
+      color: inherit;
+      opacity: .66;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .activity-ratios {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: -1px 0 18px;
+      border: 1px solid var(--ink);
+      background: rgba(251, 249, 242, .9);
+    }
+    .activity-ratios span {
+      padding: 13px 16px;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .activity-ratios span:last-child { border-right: 0; }
+    .activity-ratios strong { color: var(--ink); }
     .grid {
       display: grid;
       grid-template-columns: minmax(0, 1.6fr) minmax(300px, .8fr);
@@ -544,7 +580,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     .panel-head span { color: var(--muted); font-size: 11px; }
     .panel-body { padding: 18px; }
     .chart-wrap { min-height: 260px; }
-    #trend-chart { display: block; width: 100%; min-height: 238px; overflow: visible; }
+    .trend-chart { display: block; width: 100%; min-height: 238px; overflow: visible; }
     .axis-line { stroke: rgba(20, 24, 23, .16); stroke-width: 1; }
     .trend-area { fill: rgba(185, 242, 39, .28); }
     .trend-line { fill: none; stroke: var(--ink); stroke-width: 3; vector-effect: non-scaling-stroke; }
@@ -613,6 +649,9 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
       .header-actions { justify-content: space-between; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .grid, .grid.equal { grid-template-columns: 1fr; }
+      .activity-ratios { grid-template-columns: 1fr; }
+      .activity-ratios span { border-right: 0; border-bottom: 1px solid var(--line); }
+      .activity-ratios span:last-child { border-bottom: 0; }
     }
     @media (max-width: 580px) {
       .topline { padding: 0 14px; }
@@ -650,21 +689,38 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
 
     <section class="notice">
       <b>统计口径</b>
-      <span>DAU、WAU、MAU 使用稳定匿名安装实例哈希去重：DAU 为服务端 UTC 当日，WAU 为最近 7 个 UTC 日，MAU 为最近 30 个 UTC 日；累计安装实例统计近 400 个 UTC 日内首次见到的实例。国家、版本和更新漏斗沿用月度匿名观察口径；拓展坞和引导转化采用事件次数；多台设备分别计数。系统不保存 IP、账号、机器码、硬件信息。仅失败保留受限诊断字段；事件计数为按小时汇总的采样加权观察值。</span>
+      <span>DAU、WAU、MAU 只对启动事件使用稳定匿名安装实例哈希去重：DAU 为服务端 UTC 当日，WAU 为滚动 7 个 UTC 日，MAU 为滚动 30 个 UTC 日；累计安装实例统计最近 400 个 UTC 日内首次见到的实例。高频事件进入无实例标识的按小时聚合层，国家、版本和更新漏斗沿用月度匿名观察口径；拓展坞和引导转化采用事件次数。多台设备分别计数。系统不保存 IP、账号、机器码、硬件信息。仅失败保留受限诊断字段；事件计数为采样加权观察值。</span>
     </section>
 
     <section class="metrics" aria-label="核心指标">
-      <article class="metric"><small>下载按钮点击</small><strong id="metric-downloads">--</strong></article>
-      <article class="metric"><small>日活跃实例</small><strong id="metric-dau">--</strong></article>
-      <article class="metric"><small>周活跃实例</small><strong id="metric-wau">--</strong></article>
-      <article class="metric"><small>月活跃实例</small><strong id="metric-mau">--</strong></article>
-      <article class="metric"><small>近 400 天累计安装实例</small><strong id="metric-total-installations">--</strong></article>
-      <article class="metric"><small>活跃国家或地区</small><strong id="metric-countries">--</strong></article>
+      <article class="metric"><small>日活跃实例 DAU<em>UTC 今日，截至当前</em></small><strong id="metric-dau">--</strong><span class="metric-context" id="metric-dau-context">对比完整昨日</span></article>
+      <article class="metric"><small>周活跃实例 WAU<em>滚动 7 个 UTC 日</em></small><strong id="metric-wau">--</strong><span class="metric-context" id="metric-wau-context">对比此前 7 日</span></article>
+      <article class="metric"><small>月活跃实例 MAU<em>滚动 30 个 UTC 日</em></small><strong id="metric-mau">--</strong><span class="metric-context" id="metric-mau-context">对比此前 30 日</span></article>
+      <article class="metric"><small>下载按钮点击<em>所选看板周期</em></small><strong id="metric-downloads">--</strong><span class="metric-context">次数，不等于安装人数</span></article>
+      <article class="metric"><small>累计安装实例<em>最近 400 个 UTC 日</em></small><strong id="metric-total-installations">--</strong><span class="metric-context">首次启动实例去重</span></article>
+      <article class="metric"><small>活跃国家或地区<em>月度匿名观察</em></small><strong id="metric-countries">--</strong><span class="metric-context">未知地区单独归类</span></article>
+    </section>
+
+    <section class="activity-ratios" aria-label="活跃质量与覆盖范围">
+      <span>DAU / MAU 粘性 <strong id="metric-dau-mau">--</strong></span>
+      <span>WAU / MAU 粘性 <strong id="metric-wau-mau">--</strong></span>
+      <span>活跃数据覆盖 <strong id="metric-active-coverage">--</strong></span>
+    </section>
+
+    <section class="grid equal" aria-label="活跃趋势">
+      <article class="panel">
+        <div class="panel-head"><h2>日活跃实例趋势</h2><span>每天独立去重，UTC 日</span></div>
+        <div class="panel-body chart-wrap"><svg id="active-dau-chart" class="trend-chart" viewBox="0 0 760 238" role="img" aria-label="日活跃实例趋势"></svg></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head"><h2>滚动 30 日 MAU 趋势</h2><span>每天向前回看 30 个 UTC 日</span></div>
+        <div class="panel-body chart-wrap"><svg id="active-mau-chart" class="trend-chart" viewBox="0 0 760 238" role="img" aria-label="滚动 30 日月活跃实例趋势"></svg></div>
+      </article>
     </section>
 
     <section class="panel" aria-label="发布分析" style="margin-bottom:20px">
       <div class="panel-head"><h2>发布分析</h2><div>
-        <label>版本 <select id="release-version"><option value="">全部版本</option><option value="3.3.0">v3.3.0</option></select></label>
+        <label>版本 <select id="release-version"><option value="">全部版本</option><option value="3.5.0">v3.5.0</option><option value="3.4.0">v3.4.0</option><option value="3.3.0">v3.3.0</option></select></label>
         <label>周期 <select id="release-days"><option value="7">7 天</option><option value="30" selected>30 天</option><option value="90">90 天</option></select></label>
         <button id="release-export" type="button" disabled>导出 CSV</button>
       </div></div>
@@ -679,7 +735,7 @@ const DASHBOARD_PAGE = String.raw`<!doctype html>
     <section class="grid">
       <article class="panel">
         <div class="panel-head"><h2>下载点击趋势</h2><span>UTC 日聚合</span></div>
-        <div class="panel-body chart-wrap"><svg id="trend-chart" viewBox="0 0 760 238" role="img" aria-label="下载按钮点击趋势"></svg></div>
+        <div class="panel-body chart-wrap"><svg id="trend-chart" class="trend-chart" viewBox="0 0 760 238" role="img" aria-label="下载按钮点击趋势"></svg></div>
       </article>
       <article class="panel">
         <div class="panel-head"><h2>下载入口</h2><span>固定官网位置</span></div>
@@ -996,12 +1052,12 @@ function svgNode(name, attributes) {
   return node
 }
 
-function renderTrend(rows) {
-  const svg = element('trend-chart')
+function renderTrend(id, rows, emptyText, seriesName) {
+  const svg = element(id)
   clear(svg)
   if (!rows.length) {
     const label = svgNode('text', { x: 380, y: 119, 'text-anchor': 'middle', class: 'chart-label' })
-    label.textContent = '当前周期暂无下载点击数据'
+    label.textContent = emptyText
     svg.appendChild(label)
     return
   }
@@ -1039,7 +1095,7 @@ function renderTrend(rows) {
       class: 'trend-point',
     })
     const title = svgNode('title', {})
-    title.textContent = point.row.day + ': ' + formatCount(point.row.count)
+    title.textContent = point.row.day + ' ' + seriesName + ': ' + formatCount(point.row.count)
     circle.appendChild(title)
     svg.appendChild(circle)
   }
@@ -1050,6 +1106,17 @@ function renderTrend(rows) {
   const peak = svgNode('text', { x: 4, y: padding.top + 4, class: 'chart-label' })
   peak.textContent = formatCount(maximum)
   svg.append(start, end, peak)
+}
+
+function comparisonText(current, previous, period) {
+  const value = Number(current) || 0
+  const baseline = Number(previous) || 0
+  const difference = value - baseline
+  if (baseline === 0) return difference === 0 ? period + '也是 0' : period + '为 0，本期新增 ' + formatCount(difference)
+  if (difference === 0) return '较' + period + '持平'
+  const sign = difference > 0 ? '+' : '-'
+  const percent = Math.abs(difference / baseline * 100)
+  return '较' + period + ' ' + (difference > 0 ? '+' : '') + formatCount(difference) + '（' + sign + percent.toFixed(1) + '%）'
 }
 
 function countryLabel(code) {
@@ -1129,10 +1196,18 @@ function render(data) {
   setText('metric-mau', formatCount(data.active.mau))
   setText('metric-total-installations', formatCount(data.active.totalInstallations))
   setText('metric-countries', formatCount(data.active.countries.length))
+  setText('metric-dau-context', comparisonText(data.active.dau, data.active.previous.dau, '昨日'))
+  setText('metric-wau-context', comparisonText(data.active.wau, data.active.previous.wau, '此前 7 日'))
+  setText('metric-mau-context', comparisonText(data.active.mau, data.active.previous.mau, '此前 30 日'))
+  setText('metric-dau-mau', formatPercent(data.active.stickiness.dauToMau))
+  setText('metric-wau-mau', formatPercent(data.active.stickiness.wauToMau))
+  setText('metric-active-coverage', data.active.coverage.from ? data.active.coverage.from + ' 起，共 ' + formatCount(data.active.coverage.days) + ' 天' : '尚无启动数据')
   setText('metric-retention-d1', formatPercent(data.retention.d1.rate))
   setText('metric-retention-d7', formatPercent(data.retention.d7.rate))
   setText('metric-retention-d30', formatPercent(data.retention.d30.rate))
-  renderTrend(data.downloads.trend)
+  renderTrend('active-dau-chart', data.active.dailyTrend, '当前周期暂无日活跃数据', 'DAU')
+  renderTrend('active-mau-chart', data.active.mauTrend, '当前周期暂无滚动 MAU 数据', 'MAU')
+  renderTrend('trend-chart', data.downloads.trend, '当前周期暂无下载点击数据', '下载点击')
   renderCountries(data.active.countries)
   renderBars('source-bars', data.downloads.sources, (row) => sourceLabels[row.source] || row.source)
   renderBars('version-bars', data.active.versions, (row) => 'v' + row.version)
@@ -1293,9 +1368,17 @@ async function executeSummary(env, days, seams) {
   const normalizedDailyTrend = normalizeRows(activeDailyTrend, ['day', 'count'])
   const normalizedMauTrend = normalizeRows(activeMauTrend, ['day', 'count'])
   const normalizedRetentionCohorts = normalizeRetentionRows(retentionCohorts)
+  const headline = activeHeadline?.results?.[0] ?? {}
+  const dau = normalizedCount(headline.dau)
+  const wau = normalizedCount(headline.wau)
+  const mau = normalizedCount(headline.mau)
+  const activityStartedDay = typeof headline.activityStartedDay === 'string' ? headline.activityStartedDay : null
+  const coverageDays = activityStartedDay
+    ? Math.max(0, Math.round((Date.parse(asOfDay + 'T00:00:00Z') - Date.parse(activityStartedDay + 'T00:00:00Z')) / 86_400_000) + 1)
+    : 0
 
   return {
-    schema: 5,
+    schema: 6,
     rangeDays: days,
     generatedAt: generatedAt.toISOString(),
     analytics: { snapshotAt: analyticsStatus?.results?.[0]?.snapshotAt ?? null, sampleInterval: Number(analyticsStatus?.results?.[0]?.sampleInterval ?? 1), mode: 'hourly-weighted-aggregate' },
@@ -1318,10 +1401,21 @@ async function executeSummary(env, days, seams) {
     active: {
       asOfDay,
       definition: 'app_launch',
-      dau: normalizedCount(activeHeadline?.results?.[0]?.dau),
-      wau: normalizedCount(activeHeadline?.results?.[0]?.wau),
-      mau: normalizedCount(activeHeadline?.results?.[0]?.mau),
-      totalInstallations: normalizedCount(activeHeadline?.results?.[0]?.totalInstallations),
+      windows: { dauDays: 1, wauDays: 7, mauDays: 30, timezone: 'UTC', currentDayPartial: true },
+      dau,
+      wau,
+      mau,
+      previous: {
+        dau: normalizedCount(headline.previousDau),
+        wau: normalizedCount(headline.previousWau),
+        mau: normalizedCount(headline.previousMau),
+      },
+      stickiness: {
+        dauToMau: mau === 0 ? null : Math.round(dau / mau * 10_000) / 100,
+        wauToMau: mau === 0 ? null : Math.round(wau / mau * 10_000) / 100,
+      },
+      coverage: { from: activityStartedDay, to: asOfDay, days: coverageDays },
+      totalInstallations: normalizedCount(headline.totalInstallations),
       totalInstallationsWindowDays: 400,
       dailyTrend: normalizedDailyTrend,
       mauTrend: normalizedMauTrend,

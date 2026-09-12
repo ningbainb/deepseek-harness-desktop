@@ -56,6 +56,7 @@ const directReasonCopy = Object.freeze({
   'profile-installation': { heading: '正在修复应用安装', message: '应用安装文件阻止了完整启动，应用已使用内置插件启动。', guidance: '请修复或重新安装应用后再尝试。' },
   'profile-failed': { heading: '已使用内置插件启动', message: '应用数据目录未能完成启动，应用已使用内置插件启动；原有对话和设置仍在。', guidance: '可检查本地日志了解安装问题，再尝试启动。' },
   'rollback-failed': { heading: '插件修复已回滚', message: '自动修复启动失败后已恢复原插件文件，但部分文件未能完全复原；应用已使用内置插件启动。', guidance: '可在设置页导出脱敏诊断了解详情，必要时手动恢复插件目录。' },
+  'plugin-archive-blocked': { heading: '插件恢复需要处理', message: '无法验证上次插件变更的恢复副本，应用已使用内置插件启动；原有插件文件保持不变。', guidance: '请在拓展坞的恢复页先导出脱敏诊断，再使用“修复插件环境”；处理前不要继续安装、更新或移除插件。' },
 })
 function safeDirectReason(value) {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(directReasonCopy, value)

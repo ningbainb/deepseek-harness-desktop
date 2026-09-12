@@ -24,6 +24,30 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
  */
 export const USER_PLUGIN_ARCHIVE_SCHEMA_VERSION = 1
 
+export const USER_PLUGIN_ARCHIVE_RECOVERY_CODES = Object.freeze({
+  INVENTORY_INVALID: 'PLUGIN_ARCHIVE_INVENTORY_INVALID',
+  INVENTORY_MISMATCH: 'PLUGIN_ARCHIVE_INVENTORY_MISMATCH',
+  NODE_MODULES_MISSING: 'PLUGIN_ARCHIVE_NODE_MODULES_MISSING',
+  NODE_MODULES_UNEXPECTED: 'PLUGIN_ARCHIVE_NODE_MODULES_UNEXPECTED',
+  PROFILE_ARTIFACT_MISMATCH: 'PLUGIN_ARCHIVE_PROFILE_ARTIFACT_MISMATCH',
+  RECOVERY_FAILED: 'PLUGIN_ARCHIVE_RECOVERY_FAILED',
+  SNAPSHOT_INCOMPLETE: 'PLUGIN_ARCHIVE_SNAPSHOT_INCOMPLETE',
+  SNAPSHOT_METADATA_INVALID: 'PLUGIN_ARCHIVE_SNAPSHOT_METADATA_INVALID',
+})
+
+const USER_PLUGIN_ARCHIVE_RECOVERY_CODE_SET = new Set(Object.values(USER_PLUGIN_ARCHIVE_RECOVERY_CODES))
+
+export class UserPluginArchiveRecoveryBlockedError extends Error {
+  constructor(code, message, options = {}) {
+    if (!USER_PLUGIN_ARCHIVE_RECOVERY_CODE_SET.has(code)) {
+      throw new TypeError('user plugin archive recovery code is invalid')
+    }
+    super(message, options)
+    this.name = 'UserPluginArchiveRecoveryBlockedError'
+    this.code = code
+  }
+}
+
 export const USER_PLUGIN_ARCHIVE_PHASES = Object.freeze([
   'intent',
   'archived',
@@ -788,23 +812,44 @@ export class UserPluginArchive {
   async #readSnapshot(snapshotId) {
     const directory = this.#snapshotDir(snapshotId)
     const source = await readTextIfPresent(join(directory, METADATA_FILE))
-    if (source === undefined) throw new Error('user plugin archive snapshot is incomplete')
+    if (source === undefined) {
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.SNAPSHOT_INCOMPLETE,
+        'user plugin archive snapshot is incomplete',
+      )
+    }
     let metadata
     try {
       metadata = assertSnapshotMetadata(JSON.parse(source), snapshotId)
     } catch (error) {
-      throw new Error('user plugin archive snapshot metadata is unreadable', { cause: error })
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.SNAPSHOT_METADATA_INVALID,
+        'user plugin archive snapshot metadata is unreadable',
+        { cause: error },
+      )
     }
     const inventorySource = await readTextIfPresent(join(directory, INVENTORY_FILE))
-    if (inventorySource === undefined) throw new Error('user plugin archive inventory is missing')
+    if (inventorySource === undefined) {
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_INVALID,
+        'user plugin archive inventory is missing',
+      )
+    }
     let inventory
     try {
       inventory = assertInventory(JSON.parse(inventorySource))
     } catch (error) {
-      throw new Error('user plugin archive inventory is unreadable', { cause: error })
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_INVALID,
+        'user plugin archive inventory is unreadable',
+        { cause: error },
+      )
     }
     if (inventory.present !== metadata.nodeModules.present) {
-      throw new Error('user plugin archive snapshot node_modules state disagrees with inventory')
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_INVALID,
+        'user plugin archive snapshot node_modules state disagrees with inventory',
+      )
     }
     return immutable({ directory, metadata, inventory })
   }
@@ -812,22 +857,43 @@ export class UserPluginArchive {
   async #verifySnapshot(snapshot) {
     for (const entry of snapshot.metadata.profileArtifacts) {
       if (entry.kind !== 'file') continue
-      const bytes = await readFile(profileArtifactArchivePath(snapshot.directory, entry.id))
+      let bytes
+      try {
+        bytes = await readFile(profileArtifactArchivePath(snapshot.directory, entry.id))
+      } catch (error) {
+        throw new UserPluginArchiveRecoveryBlockedError(
+          USER_PLUGIN_ARCHIVE_RECOVERY_CODES.PROFILE_ARTIFACT_MISMATCH,
+          `user plugin archive profile artifact integrity check failed: ${entry.relativePath}`,
+          { cause: error },
+        )
+      }
       if (bytes.length !== entry.size || sha256(bytes) !== entry.sha256) {
-        throw new Error(`user plugin archive profile artifact integrity check failed: ${entry.relativePath}`)
+        throw new UserPluginArchiveRecoveryBlockedError(
+          USER_PLUGIN_ARCHIVE_RECOVERY_CODES.PROFILE_ARTIFACT_MISMATCH,
+          `user plugin archive profile artifact integrity check failed: ${entry.relativePath}`,
+        )
       }
     }
     const archivedNodeModules = join(snapshot.directory, NODE_MODULES_DIRECTORY)
     if (snapshot.inventory.present) {
       if (!await pathPresent(archivedNodeModules)) {
-        throw new Error('user plugin archive node_modules tree is missing')
+        throw new UserPluginArchiveRecoveryBlockedError(
+          USER_PLUGIN_ARCHIVE_RECOVERY_CODES.NODE_MODULES_MISSING,
+          'user plugin archive node_modules tree is missing',
+        )
       }
       const actual = await inventoryUserPluginTree(archivedNodeModules)
       if (!inventoriesEqual(actual, snapshot.inventory)) {
-        throw new Error('user plugin archive node_modules integrity check failed')
+        throw new UserPluginArchiveRecoveryBlockedError(
+          USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_MISMATCH,
+          'user plugin archive node_modules integrity check failed',
+        )
       }
     } else if (await pathPresent(archivedNodeModules)) {
-      throw new Error('user plugin archive has an unexpected node_modules tree')
+      throw new UserPluginArchiveRecoveryBlockedError(
+        USER_PLUGIN_ARCHIVE_RECOVERY_CODES.NODE_MODULES_UNEXPECTED,
+        'user plugin archive has an unexpected node_modules tree',
+      )
     }
   }
 
@@ -964,7 +1030,10 @@ export class UserPluginArchive {
         await copyTreeWithoutFollowingLinks(archived, staged)
         const stagedInventory = await inventoryUserPluginTree(staged)
         if (!inventoriesEqual(stagedInventory, snapshot.inventory)) {
-          throw new Error('staged user plugin archive restore integrity check failed')
+          throw new UserPluginArchiveRecoveryBlockedError(
+            USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_MISMATCH,
+            'staged user plugin archive restore integrity check failed',
+          )
         }
       }
       if (await pathPresent(target)) {
@@ -1018,7 +1087,10 @@ export class UserPluginArchive {
       }
       const bytes = await readFile(profileArtifactArchivePath(snapshot.directory, entry.id))
       if (bytes.length !== entry.size || sha256(bytes) !== entry.sha256) {
-        throw new Error(`user plugin archive profile artifact integrity check failed: ${entry.relativePath}`)
+        throw new UserPluginArchiveRecoveryBlockedError(
+          USER_PLUGIN_ARCHIVE_RECOVERY_CODES.PROFILE_ARTIFACT_MISMATCH,
+          `user plugin archive profile artifact integrity check failed: ${entry.relativePath}`,
+        )
       }
       await writeLeafAtomically(target, bytes, entry.mode)
     }
@@ -1080,7 +1152,19 @@ export class UserPluginArchive {
       await this.#clearActiveJournal(journal.transactionId)
       return immutable({ recovered: false, transactionId: journal.transactionId, phase: journal.phase })
     }
-    await this.#rollback(journal.transactionId)
+    try {
+      await this.#rollback(journal.transactionId)
+    } catch (error) {
+      if (!(error instanceof UserPluginArchiveRecoveryBlockedError)) throw error
+      return immutable({
+        recovered: false,
+        blocked: true,
+        code: error.code,
+        transactionId: journal.transactionId,
+        snapshotId: journal.snapshotId,
+        phase: journal.phase,
+      })
+    }
     return immutable({ recovered: true, transactionId: journal.transactionId, snapshotId: journal.snapshotId })
   }
 
@@ -1115,6 +1199,26 @@ export class UserPluginArchive {
   /** Recover an interrupted intent/archived/applied transaction to its snapshot. */
   recover() {
     return this.#enqueue(() => this.#recover())
+  }
+
+  /**
+   * Stop retrying a recovery which the user explicitly replaced with a fresh
+   * profile. The marker is renamed, not deleted, so the journal and snapshot
+   * remain available for diagnosis or manual recovery.
+   */
+  quarantineBlockedRecovery() {
+    return this.#enqueue(async () => {
+      await this.#ensureArchiveLayout()
+      const status = await lstatIfPresent(this.activeJournalPath)
+      if (status === undefined) return immutable({ quarantined: false })
+      const quarantinePath = join(
+        this.journalDir,
+        `blocked-active-${Date.now()}-${randomUUID()}.json`,
+      )
+      await rename(this.activeJournalPath, quarantinePath)
+      await syncDirectory(this.journalDir)
+      return immutable({ quarantined: true })
+    })
   }
 
   /**

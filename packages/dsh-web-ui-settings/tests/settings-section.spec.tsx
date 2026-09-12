@@ -28,6 +28,7 @@ import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.
 
 afterEach(() => {
   cleanup()
+  window.history.replaceState({}, '', '/')
   vi.clearAllMocks()
   vi.restoreAllMocks()
 })
@@ -66,8 +67,8 @@ describe('Web UI settings section', () => {
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'web-ui.plugin.item', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(5)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(4)
     const [authOptions, AuthComponent] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
       name: 'settings.section',
@@ -94,10 +95,7 @@ describe('Web UI settings section', () => {
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)
-    const [relayDockOptions, RelayDockComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
-    expect(relayDockOptions).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', locale: 'relay-onboarding' })
-    expect(RelayDockComponent).toBe(RelayOnboardingCard)
-    const [dockOptions, DockComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [dockOptions, DockComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',
@@ -106,6 +104,23 @@ describe('Web UI settings section', () => {
     })
     expect(DockComponent).toBe(DesktopExtensionDockEntry)
     expect(particleClient).toHaveBeenCalledTimes(1)
+  })
+
+  it('registers one bai card above the official Models section in the Dock', () => {
+    window.history.replaceState({}, '', '/?desktop-dock-setting=models')
+    const register = vi.fn((_entry: unknown, _component?: unknown) => () => {})
+    const inject = vi.fn((_name: string, callback: () => unknown) => callback())
+    const ctx = {
+      effect: (callback: () => unknown) => callback(),
+      inject: vi.fn(),
+      locale: { register: vi.fn(() => () => {}), bind: vi.fn(() => (key: string) => key) },
+      slots: { inject, register },
+    }
+    apply(ctx as never)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'web-ui.plugin.item', 'sidebar.footer.action', 'root'])
+    expect(register).toHaveBeenCalledTimes(4)
+    expect(register.mock.calls[1]![0]).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', order: 1 })
+    expect(register.mock.calls[1]![1]).toBe(RelayOnboardingCard)
   })
 
   it('renders the declared web-ui.plugin.item child slot under the static section heading', () => {

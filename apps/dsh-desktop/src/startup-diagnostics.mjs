@@ -40,6 +40,18 @@ const STARTUP_FAILURE_CATEGORIES = new Set([
   'PERMISSION_FAILURE',
   'UNKNOWN_FATAL',
 ])
+const PLUGIN_ARCHIVE_RECOVERY_CODES = new Set([
+  'PLUGIN_ARCHIVE_INVENTORY_INVALID',
+  'PLUGIN_ARCHIVE_INVENTORY_MISMATCH',
+  'PLUGIN_ARCHIVE_NODE_MODULES_MISSING',
+  'PLUGIN_ARCHIVE_NODE_MODULES_UNEXPECTED',
+  'PLUGIN_ARCHIVE_PROFILE_ARTIFACT_MISMATCH',
+  'PLUGIN_ARCHIVE_RECOVERY_FAILED',
+  'PLUGIN_ARCHIVE_SNAPSHOT_INCOMPLETE',
+  'PLUGIN_ARCHIVE_SNAPSHOT_METADATA_INVALID',
+])
+const PLUGIN_ARCHIVE_RECOVERY_PHASES = new Set(['intent', 'archived', 'applied'])
+const PLUGIN_ARCHIVE_RECOVERY_SOURCES = new Set(['legacy-profile-archive', 'staged-plugin-transaction'])
 const DIAGNOSTIC_EXCLUSIONS = Object.freeze([
   'API keys, tokens, cookies, passwords, private keys, and authorization values',
   'project files, complete prompts, complete sessions, answers, and tool results',
@@ -362,6 +374,24 @@ function projectStartupAttempt(value) {
   })
 }
 
+function projectPluginArchiveRecovery(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value) || value.blocked !== true) {
+    return undefined
+  }
+  const code = PLUGIN_ARCHIVE_RECOVERY_CODES.has(value.code) ? value.code : undefined
+  if (code === undefined) return undefined
+  const transactionPhase = PLUGIN_ARCHIVE_RECOVERY_PHASES.has(value.phase) ? value.phase : 'unknown'
+  const source = PLUGIN_ARCHIVE_RECOVERY_SOURCES.has(value.source) ? value.source : 'unknown'
+  return Object.freeze({
+    status: 'blocked',
+    stage: 'plugin-archive-recovery',
+    code,
+    transactionPhase,
+    source,
+    userDataPreserved: true,
+  })
+}
+
 function boundedTimeout(operation, source, {
   timeoutMs,
   schedule,
@@ -401,6 +431,7 @@ export async function collectStartupDiagnostics({
   controller,
   pluginRecovery,
   pluginManager,
+  pluginArchiveRecovery,
   logStore,
   now = () => new Date(),
   redactionRoots = [],
@@ -449,6 +480,7 @@ export async function collectStartupDiagnostics({
     ),
   ])
   const startupAttemptSummary = projectStartupAttempt(startupAttempt)
+  const pluginArchiveRecoverySummary = projectPluginArchiveRecovery(pluginArchiveRecovery)
   // The real phase history: what ran, in what order, how long each phase took
   // and how it ended. It lives in memory, so this is synchronous, and a
   // failure here must never turn a completed export into an error.
@@ -487,6 +519,9 @@ export async function collectStartupDiagnostics({
         : undefined,
     },
     recovery: projectRecoveryDiagnostics(recovery),
+    ...(pluginArchiveRecoverySummary === undefined
+      ? {}
+      : { pluginArchiveRecovery: pluginArchiveRecoverySummary }),
     sessionRecovery: projectSessionRecovery(sessionRecovery),
     plugins: projectPluginInventory(inventory),
     taskScheduler: {

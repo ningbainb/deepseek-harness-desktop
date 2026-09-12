@@ -2,11 +2,12 @@ diff --git a/lib/client.js b/lib/client.js
 index 2673ddf8a92dbd16f033f040e79d6f1c3d0a7a47..c73550b5836c4d9dcb403662b5fb55e97d6bb1b5 100644
 --- a/lib/client.js
 +++ b/lib/client.js
-@@ -727,6 +727,7 @@ window.__ModuleLoader__.load({
+@@ -727,6 +727,8 @@ window.__ModuleLoader__.load({
  				className: capabilities_module_css_default.panel,
  				"data-dsh-plugin": "model-capabilities",
  				"data-dsh-part": "panel",
 +				"data-dock-dirty": dirty ? "true" : "false",
++				"data-dsh-provider-id": provider.provider,
  				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
  					type: "button",
  					className: capabilities_module_css_default.header,

@@ -24,6 +24,7 @@ export const DIRECT_STARTUP_REASONS = Object.freeze([
   'profile-installation',
   'profile-failed',
   'rollback-failed',
+  'plugin-archive-blocked',
 ])
 
 const DIRECT_STARTUP_REASON_SET = new Set(DIRECT_STARTUP_REASONS)

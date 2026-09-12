@@ -11,7 +11,7 @@ import { _electron as electron } from 'playwright'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
-import { verifyPanelLayoutMenu } from './panel-layout-fixture.mjs'
+import { verifyLocalPanelControls } from './panel-layout-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -221,28 +221,7 @@ try {
   await initialNativePanel.waitFor({ state: 'hidden' })
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'collapsing the default native surface keeps compatibility tools inactive')
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-default.png') })
-  await verifyPanelLayoutMenu(page, resolve(appDir, '../../.tmp/interaction-qa'))
-  // Explicitly enter the preserved tools before testing their existing controls.
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-  await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
-  const panelControls = await page.evaluate(() => {
-    const close = document.querySelector('[data-aionui-explorer-toolbar] button[aria-label="关闭文件面板"]')
-    const toggles = [...document.querySelectorAll('[data-dsh-panel-host] > div:first-child button')]
-    const a = close?.getBoundingClientRect()
-    return { close: a?.toJSON(), toggles: toggles.map(b => ({ label:b.getAttribute('aria-label'), box:b.getBoundingClientRect().toJSON() })), padding: close && getComputedStyle(close.parentElement).paddingRight, count: toggles.length, overlap: a && toggles.some(button => {
-      const b = button.getBoundingClientRect()
-      return b.width > 0 && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
-    }) }
-  })
-  console.log('panel controls', JSON.stringify(panelControls))
-  assert.ok(panelControls.count > 0, 'sibling panel controls are mounted')
-  assert.equal(panelControls.overlap, false, 'explorer close must not overlap sibling panel controls')
-  await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/panel-controls-fixed.png'), clip: { x: Math.max(0, panelControls.close.x - 120), y: Math.max(0, panelControls.close.y - 4), width: 230, height: 50 } })
-  for (let repeat = 0; repeat < 3; repeat++) {
-    await page.getByRole('button', { name: '关闭文件面板', exact: true }).click()
-    await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-    await page.getByRole('button', { name: '关闭文件面板', exact: true }).waitFor({ state: 'visible' })
-  }
+  await verifyLocalPanelControls(page, resolve(appDir, '../../.tmp/interaction-qa'))
   const composer = page.locator('[data-composer-card] textarea, [data-composer-input][contenteditable="true"]').first()
   const draftText = () => composer.evaluate(element => element instanceof HTMLTextAreaElement ? element.value : element.innerText)
   const nativeUploadNames = []
@@ -293,8 +272,18 @@ try {
   await page.getByRole('button', { name: '移除文件 retry.txt', exact: true }).click()
   assert.equal(await page.locator('[aria-label="待发送文件"]').count(), 1)
   await page.locator('[data-composer-seat]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/file-attachments.png') })
-  // Open the actual preview surface through its file tree and new URL control.
-  const previewFile = page.locator('[data-aionui-explorer-col]').getByRole('button', { name: 'preview-fixture.txt', exact: true })
+  // The native sidebar is the single normal tool entry surface.
+  await nativeReturn.click()
+  const nativeDock = page.locator('[data-sidebar-right-panel]')
+  const nativeStart = nativeDock.getByRole('tab').filter({ hasText: /^开始$/u })
+  if (await nativeStart.count()) await nativeStart.click()
+  else await page.getByRole('button', { name: '新标签页', exact: true }).click()
+  const nativeFileEntry = nativeDock.getByRole('button', { name: /^文件工具/u })
+  if (!await nativeFileEntry.count()) console.error('native file entry diagnostic', JSON.stringify(await nativeDock.locator('[role="tab"], button').evaluateAll(elements => elements.map(element => ({ role: element.getAttribute('role'), label: element.getAttribute('aria-label'), text: element.textContent?.trim() })))))
+  await nativeFileEntry.click()
+  const nativeFiles = page.locator('[data-aionui-native-panel="files"]')
+  const previewFile = nativeFiles.getByRole('button', { name: 'preview-fixture.txt', exact: true })
+  await previewFile.waitFor({ state: 'visible' })
   await previewFile.dblclick()
   const nativePreview = page.locator('[data-sidebar-right-panel]').filter({ hasText: 'Browser close fixture' })
   await nativePreview.waitFor({ state: 'visible', timeout: 30_000 })
@@ -324,11 +313,11 @@ try {
   await nativePreview.locator('[data-sidebar-right-toggle]').click()
   await nativePreview.waitFor({ state: 'hidden' })
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'native collapse must not automatically restore compatibility columns')
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  await page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible').click()
+  await nativeDock.getByRole('tab').filter({ hasText: /^文件工具$/u }).click()
   await previewFile.dblclick()
   await nativePreview.waitFor({ state: 'visible' })
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-  await nativePreview.waitFor({ state: 'hidden' })
+  await nativeDock.getByRole('tab').filter({ hasText: /^文件工具$/u }).click()
   await previewFile.click({ button: 'right' })
   await page.getByRole('menuitem', { name: '编辑 / 兼容预览', exact: true }).click()
   await nativePreview.waitFor({ state: 'hidden' })
@@ -344,10 +333,14 @@ try {
   })
   assert.equal(previewControls.visible, true)
   assert.equal(previewControls.overlap, false, 'preview close must avoid sibling controls when explorer is collapsed')
-  await page.locator('[data-aionui-preview-toolbar]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/preview-controls-fixed.png') })
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  const returnAfterCompatibility = page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible')
+  await returnAfterCompatibility.waitFor({ state: 'visible' })
+  await returnAfterCompatibility.click()
+  await nativeDock.waitFor({ state: 'visible' })
+  if (await nativeDock.getByRole('tab').filter({ hasText: /^开始$/u }).count()) await nativeDock.getByRole('tab').filter({ hasText: /^开始$/u }).click()
+  else await page.getByRole('button', { name: '新标签页', exact: true }).click()
   await page.route('https://desktop-browser-fixture.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Browser fixture</title><p>Isolated browser preview</p>' }))
-  await page.getByTitle(/新建 URL 预览|New URL preview/iu, { exact: true }).click()
+  await nativeDock.getByRole('button', { name: /^网页预览/u }).click()
   const nativeBrowser = page.locator('[data-aionui-native-panel="browser"]')
   await nativeBrowser.waitFor({ state: 'visible' })
   assert.equal(rendererEvents.some(line => /slot .*already declared/u.test(line)), false, 'native adaptation must not redeclare an SDK-owned child slot')
@@ -405,9 +398,9 @@ try {
   await browserClose.click()
   await browserClose.waitFor({ state: 'hidden' })
   await nativeBrowser.waitFor({ state: 'detached' })
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-  const legacyExplorer = page.locator('[data-aionui-explorer-toolbar]')
-  await legacyExplorer.getByRole('button', { name: '变更', exact: true }).click()
+  if (await nativeDock.getByRole('tab').filter({ hasText: /^开始$/u }).count()) await nativeDock.getByRole('tab').filter({ hasText: /^开始$/u }).click()
+  else await page.getByRole('button', { name: '新标签页', exact: true }).click()
+  await nativeDock.getByRole('button', { name: /^Git 变更/u }).click()
   const nativeGit = page.locator('[data-aionui-native-panel="changes"]')
   await nativeGit.waitFor({ state: 'visible', timeout: 15_000 })
   assert.equal(await nativeGit.locator('[data-aionui-explorer-toolbar]').count(), 0, 'native Git must not nest a second tab strip')
@@ -421,14 +414,12 @@ try {
   await gitRow.getByTitle('暂存', { exact: true }).waitFor({ state: 'visible' })
   assert.doesNotMatch(fixtureGit(['diff', '--cached', '--name-only']), /git-fixture\.txt/u)
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-git-tab.png') })
-  const nativeDock = page.locator('[data-sidebar-right-panel]')
   // A closable guide chip includes its nested Close button in its accessible
   // name. Match the exact visible title, not an assumed accessible-name shape.
   const startTab = nativeDock.getByRole('tab').filter({ hasText: /^开始$/u })
   if (await startTab.count()) await startTab.click()
-  else await nativeDock.getByRole('button', { name: '新标签页', exact: true }).click()
+  else await page.getByRole('button', { name: '新标签页', exact: true }).click()
   await nativeDock.getByRole('button', { name: /文件工具/u }).click()
-  const nativeFiles = page.locator('[data-aionui-native-panel="files"]')
   await nativeFiles.getByRole('textbox', { name: '按文件名搜索', exact: true }).fill('preview-fixture')
   const searchResult = nativeFiles.locator('[data-aionui-search-results][data-search-status="done"]').getByRole('button', { name: 'preview-fixture.txt', exact: true })
   await searchResult.waitFor({ state: 'visible' })
@@ -436,21 +427,8 @@ try {
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-file-tools.png') })
   await searchResult.click()
   assert.equal(await nativeFiles.getByRole('textbox', { name: '按文件名搜索', exact: true }).inputValue(), '', 'native file search reveals the selected result in the tree')
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
-  await legacyExplorer.getByRole('button', { name: '文件', exact: true }).click()
-  try {
-    await nativeDock.locator('[data-files-reload]').waitFor({ state: 'visible', timeout: 10_000 })
-    await nativeDock.getByRole('button', { name: 'preview-fixture.txt', exact: true }).waitFor({ state: 'visible' })
-  } catch (error) {
-    console.error('native files route failure', JSON.stringify({ events: rendererEvents.slice(-15),
-      body: (await page.locator('body').innerText()).slice(-3000),
-      tabs: await nativeDock.locator('[role="tab"], button').evaluateAll(elements => elements.map(element => ({ role: element.getAttribute('role'), label: element.getAttribute('aria-label'), text: element.textContent?.slice(0, 100) }))),
-    }))
-    await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-files-route-failure.png') })
-    throw error
-  }
-  assert.equal(await nativeFiles.count(), 0, 'native file browser does not render an extra desktop file tool body')
-  await page.getByRole('button', { name: 'Expand explorer', exact: true }).click()
+  assert.equal(await nativeFiles.count(), 1, 'one native file tool body owns the active tab')
+  assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'compatibility file tools stay hidden during normal native navigation')
   assert.match(await draftText(), /保留我的草稿/u)
   await addWorkspace.dispatchEvent('click')
   await dialog.waitFor()

@@ -308,6 +308,13 @@ export class PanelLayoutController {
   /** Toggle explorer collapse (width 0, kept mounted; no transition). */
   toggleExplorer(): void {
     const state = this.layout.getSnapshot()
+    // With the native sidebar service present, closing an explicit compatibility
+    // editor returns ownership to that sidebar. Its edge button must never open
+    // a second tool surface beside the native one.
+    if (this.nativeAvailable) {
+      if (!this.nativeOwner) this.instant(() => { this.nativeOwner = true; this.applyGrid() })
+      return
+    }
     // The native dock is absolutely positioned at the right edge. Appending
     // an explorer while it is open both covers the tree and squeezes chat.
     // Restore the tree on demand without rewriting its persisted preference.
@@ -407,9 +414,10 @@ export class PanelLayoutController {
       this.previewHandle.style.display = preview > 0 && state.root !== '' ? 'block' : 'none'
     }
 
-    // Floating expand button: visible only when the explorer is collapsed.
+    // The compatibility button is a fallback for hosts without the native
+    // sidebar service. Desktop exposes one native sidebar control.
     if (this.floatingButton !== null) {
-      const show = state.root !== '' && (state.explorerCollapsed || yieldToNative)
+      const show = !this.nativeAvailable && state.root !== '' && state.explorerCollapsed
       this.floatingButton.style.display = show ? 'flex' : 'none'
     }
   }

@@ -5,9 +5,9 @@ import { DockSettingsPage, dockSettingFromUrl } from '../src/client/DockSettings
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
-it('accepts only the six setting ids in dedicated document URLs', () => {
+it('accepts known setting ids and maps the retired relay URL to Models', () => {
   window.history.replaceState({}, '', '/?desktop-dock-setting=relay')
-  expect(dockSettingFromUrl()).toBe('relay')
+  expect(dockSettingFromUrl()).toBe('models')
   window.history.replaceState({}, '', '/?desktop-dock-setting=memory')
   expect(dockSettingFromUrl()).toBe('memory')
   window.history.replaceState({}, '', '/?desktop-dock-setting=https://example.com')
@@ -30,7 +30,9 @@ it('loads one form at a time and preserves drafts when returning to an opened fo
 
 it('uses the opening theme and updates it without losing the active form', () => {
   window.history.replaceState({}, '', '/?desktop-dock-setting=relay&desktop-dock-theme=light')
-  render(<DockSettingsPage renderSlot={(() => <input aria-label="draft" />) as never} t={key => key} />)
+  render(<DockSettingsPage renderSlot={((_slot: string, _owner: unknown, options: { only: string }) => options.only === 'relay'
+    ? <div data-testid="bai-provider" />
+    : <input aria-label="draft" />) as never} t={key => key} />)
   fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'keep' } })
   expect(screen.getByRole('main').dataset.theme).toBe('light')
   act(() => window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: 'dark' })))

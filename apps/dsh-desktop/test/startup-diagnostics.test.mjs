@@ -202,6 +202,34 @@ test('startup diagnostics preserve safe boot and direct-attempt correlation sepa
   })
 })
 
+test('blocked plugin archive recovery exports only a fixed stage and reason code', async () => {
+  const diagnostics = await collectStartupDiagnostics({
+    pluginArchiveRecovery: {
+      blocked: true,
+      code: 'PLUGIN_ARCHIVE_INVENTORY_MISMATCH',
+      phase: 'applied',
+      source: 'legacy-profile-archive',
+      transactionId: 'tx-private-identifier',
+      snapshotId: 'snapshot-private-identifier',
+      path: `${aliceDshHome}\\plugin-archives\\desktop`,
+      error: 'ARCHIVE_PRIVATE_ERROR',
+    },
+  })
+
+  assert.deepEqual(diagnostics.pluginArchiveRecovery, {
+    status: 'blocked',
+    stage: 'plugin-archive-recovery',
+    code: 'PLUGIN_ARCHIVE_INVENTORY_MISMATCH',
+    transactionPhase: 'applied',
+    source: 'legacy-profile-archive',
+    userDataPreserved: true,
+  })
+  assert.doesNotMatch(
+    JSON.stringify(diagnostics.pluginArchiveRecovery),
+    /private|transactionId|snapshotId|Alice|ARCHIVE_PRIVATE_ERROR/u,
+  )
+})
+
 test('diagnostic projections never serialize plugin-recovery raw error, prompt, session, or tool data', async () => {
   const diagnostics = await collectStartupDiagnostics({
     controller: { status: { state: 'crashed', error: 'session: RUNTIME_PRIVATE_SESSION' } },

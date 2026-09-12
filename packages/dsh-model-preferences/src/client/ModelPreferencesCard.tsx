@@ -5,6 +5,7 @@ import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/d
 import {
   DEFAULT_MODEL_PREFERENCES,
   MAX_PINNED_MODELS,
+  PRIMARY_PROVIDER_ID,
   moveProvider,
   normalizeModelPreferences,
   providerIdsInOrder,
@@ -226,8 +227,8 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
                   <code>{provider}</code>
                 </div>
                 <div className={styles.providerActions}>
-                  <button type="button" className={styles.smallButton} disabled={index === 0} onClick={() => edit(moveProvider(draft, provider, -1, knownProviders))} aria-label={t('settings.swapUp')}>{t('settings.swapUp')}</button>
-                  <button type="button" className={styles.smallButton} disabled={index === orderedProviders.length - 1} onClick={() => edit(moveProvider(draft, provider, 1, knownProviders))} aria-label={t('settings.swapDown')}>{t('settings.swapDown')}</button>
+                  <button type="button" className={styles.smallButton} disabled={index === 0 || (orderedProviders[0] === PRIMARY_PROVIDER_ID && index === 1)} onClick={() => edit(moveProvider(draft, provider, -1, knownProviders))} aria-label={t('settings.swapUp')}>{t('settings.swapUp')}</button>
+                  <button type="button" className={styles.smallButton} disabled={provider === PRIMARY_PROVIDER_ID || index === orderedProviders.length - 1} onClick={() => edit(moveProvider(draft, provider, 1, knownProviders))} aria-label={t('settings.swapDown')}>{t('settings.swapDown')}</button>
                   <button type="button" className={styles.toggleButton} aria-pressed={!disabled.has(provider)} onClick={() => edit({ ...draft, disabledProviders: disabled.has(provider) ? draft.disabledProviders.filter(id => id !== provider) : [...draft.disabledProviders, provider] })}>
                     {disabled.has(provider) ? t('settings.enable') : t('settings.disable')}
                   </button>

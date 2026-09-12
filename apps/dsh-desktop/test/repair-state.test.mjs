@@ -39,6 +39,7 @@ test('direct startup projection carries only safe fallback reasons', () => {
   assert.equal(state.reason, 'missing-credentials')
   assert.ok(DIRECT_STARTUP_REASONS.includes('missing-credentials'))
   assert.ok(DIRECT_STARTUP_REASONS.includes('rollback-failed'))
+  assert.ok(DIRECT_STARTUP_REASONS.includes('plugin-archive-blocked'))
   assert.throws(
     () => projectDirectStartupState({ state: 'ready-builtins', reason: 'raw-error' }),
     /startup reason/u,

@@ -8,16 +8,33 @@ describe('native Dock sections', () => {
   for (const [id, section] of [['appearance', 'skin-center'], ['models', 'models'], ['usage', 'dsh-usage'], ['sessions', 'dsh-session-archive']]) {
     it(`renders ${id} through the official section contract`, () => {
       window.history.replaceState({}, '', `/?desktop-dock-setting=${id}`)
-      const renderSlot = vi.fn(() => <input aria-label="draft" defaultValue="retained" />)
+      const renderSlot = vi.fn((slot: string, _owner: unknown, _options: { only: string }) => slot === 'settings.section'
+        ? <input aria-label="draft" defaultValue="retained" />
+        : <div data-testid="bai-provider">bai</div>)
       render(<DockSettingsPage renderSlot={renderSlot as never} t={((key: string) => key) as never} />)
       expect(DOCK_SETTINGS).toContain(id)
       expect(renderSlot).toHaveBeenCalledWith('settings.section', { close: expect.any(Function) }, expect.objectContaining({ only: section }))
+      if (id === 'models') {
+        expect(renderSlot.mock.calls.slice(0, 2).map(([slot, , options]) => [slot, options.only]))
+          .toEqual([['web-ui.plugin.item', 'relay'], ['settings.section', 'models']])
+      }
       fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'edited' } })
       fireEvent(window, new CustomEvent('dsh:dock-setting', { detail: 'particle-theme' }))
       fireEvent(window, new CustomEvent('dsh:dock-setting', { detail: id }))
       expect((screen.getAllByLabelText('draft')[0] as HTMLInputElement).value).toBe('edited')
     })
   }
+})
+
+it('maps the retired relay URL and navigation event to the combined Models page', () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=relay')
+  const renderSlot = vi.fn((slot: string, _owner: unknown, _options: { only: string }) => <div>{slot}</div>)
+  const { container } = render(<DockSettingsPage renderSlot={renderSlot as never} t={((key: string) => key) as never} />)
+  expect(container.querySelector('[data-dsh-dock-settings="models"]')).toBeTruthy()
+  expect(renderSlot.mock.calls.slice(0, 2).map(([slot, , options]) => [slot, options.only]))
+    .toEqual([['web-ui.plugin.item', 'relay'], ['settings.section', 'models']])
+  fireEvent(window, new CustomEvent('dsh:dock-setting', { detail: 'relay' }))
+  expect(container.querySelector('[data-dsh-dock-settings="models"]')).toBeTruthy()
 })
 it('only converts opaque resolved color values into native colors', () => {
   expect(opaqueColor('#abc')).toBe('#aabbcc')

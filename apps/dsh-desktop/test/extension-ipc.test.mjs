@@ -1468,6 +1468,10 @@ test('extensions:profile-reset stops runtime, ensures profile, and restarts runt
     start: async () => { steps.push('start') },
   }
   const ensureProfile = async () => { steps.push('ensureProfile') }
+  const completeBlockedPluginRecovery = async () => {
+    steps.push('completeBlockedPluginRecovery')
+    return { resolved: true }
+  }
   const unregister = registerExtensionIpc({
     ipcMain,
     dialog: {},
@@ -1479,11 +1483,13 @@ test('extensions:profile-reset stops runtime, ensures profile, and restarts runt
     projectRoot: 'C:\\project',
     dshHome: 'C:\\dsh',
     qqBotBinding,
+    completeBlockedPluginRecovery,
   })
 
   const result = await ipcMain.handlers.get('extensions:profile-reset')()
   assert.equal(result.reset, true)
-  assert.deepEqual(steps, ['stop', 'ensureProfile', 'start'])
+  assert.equal(result.archiveRecoveryResolved, true)
+  assert.deepEqual(steps, ['stop', 'ensureProfile', 'start', 'completeBlockedPluginRecovery'])
   await unregister()
 })
 
@@ -1668,6 +1674,7 @@ test('extensions:profile-reset restores the old profile when startup fails', asy
     const ipcMain = new FakeIpcMain()
     const qqBotBinding = new EventEmitter()
     qqBotBinding.status = () => ({ bound: false })
+    let completionCalls = 0
     unregister = registerExtensionIpc({
       ipcMain,
       dialog: {},
@@ -1685,6 +1692,10 @@ test('extensions:profile-reset restores the old profile when startup fails', asy
       projectRoot: 'C:\\project',
       dshHome,
       qqBotBinding,
+      completeBlockedPluginRecovery: async () => {
+        completionCalls += 1
+        return { resolved: true }
+      },
     })
 
     await assert.rejects(
@@ -1693,6 +1704,7 @@ test('extensions:profile-reset restores the old profile when startup fails', asy
     )
     assert.equal(await readFile(join(profileDir, 'original.txt'), 'utf8'), 'original\n')
     await assert.rejects(readFile(join(profileDir, 'replacement.txt'), 'utf8'), { code: 'ENOENT' })
+    assert.equal(completionCalls, 0)
     const entries = await readdir(join(dshHome, 'profiles'))
     assert.equal(entries.some((name) => name.startsWith('desktop.backup-')), false)
   } finally {

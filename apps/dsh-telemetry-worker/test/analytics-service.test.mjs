@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync, readdirSync } from 'node:fs'
 import worker from '../src/index.mjs'
-import { AnalyticsService, CLEANUP_WRITE_BUDGET } from '../src/analytics-service.mjs'
+import { AnalyticsService, CLEANUP_WRITE_BUDGET, dataPoint } from '../src/analytics-service.mjs'
 import { rollupAnalytics, rollupQuery } from '../src/analytics-rollup.mjs'
 import { summarizeCostMode } from '../src/cost-mode-summary.mjs'
 import { database } from './analytics-fixture.mjs'
@@ -71,6 +71,14 @@ test('legacy cost names normalize to five parameterized events and never fall ba
     assert.equal(mutations.length,0)
     assert.equal(legacyCostEvent(events.at(-1),now).params.result,'started')
   } finally {db.close()}
+})
+
+test('aggregate points use a coarse server dimension and exclude every actor hash', () => {
+  const event = route()
+  const aggregate = dataPoint(event, '2026-09-09', 'CN')
+  assert.deepEqual(aggregate.indexes, ['CN'])
+  assert.equal(aggregate.blobs[15], '')
+  assert.doesNotMatch(JSON.stringify(aggregate), new RegExp([event.dailyActor, event.monthlyActor, event.installationActor].join('|'), 'u'))
 })
 
 test('every failed route is stored with diagnosis even when Analytics Engine throws, rejects or stalls', async () => {

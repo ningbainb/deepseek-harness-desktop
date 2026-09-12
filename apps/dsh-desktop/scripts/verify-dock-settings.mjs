@@ -45,7 +45,7 @@ try {
   await dock.screenshot({ path: resolve(output, 'dock.png') })
   await app.evaluate(({ shell }) => { shell.openExternal = async url => { globalThis.dockExternalUrl = url } })
   for (const [id, selector] of [
-    ['relay', '[data-relay-onboarding-card="true"]'],
+    ['models', '[data-relay-onboarding-card="true"]'],
     ['value-mode', '[data-value-mode-card="true"]'],
     ['personal-prompt', '[data-personal-prompt-card="true"]'],
     ['memory', '[data-memory-card="true"]'],
@@ -77,8 +77,14 @@ try {
       await settings.keyboard.press('Home')
       await card.getByRole('button', { name: '新建', exact: true }).waitFor()
     }
-    if (id === 'relay') {
+    if (id === 'models') {
       const relay = settings.locator('[data-relay-onboarding-card]')
+      assert.equal(await relay.count(), 1, 'combined model page renders one bai onboarding card')
+      const preferences = settings.locator('[data-model-preferences-card]')
+      await preferences.waitFor()
+      const relayBounds = await relay.boundingBox()
+      const preferencesBounds = await preferences.boundingBox()
+      assert.ok(relayBounds && preferencesBounds && relayBounds.y < preferencesBounds.y, 'bai onboarding appears before model preferences')
       const relayWindow = await app.browserWindow(dock)
       const beforeCollapse = await relayWindow.evaluate(window => window.getBounds())
       await relay.getByRole('button', { name: '收起中转设置', exact: true }).click()
@@ -95,7 +101,7 @@ try {
       assert.ok(new URLSearchParams(new URL(externalUrl).hash.slice(1)).has('state'))
       await relay.getByRole('button', { name: '取消连接', exact: true }).click()
       await relay.getByRole('button', { name: '在浏览器继续', exact: true }).waitFor({ state: 'hidden' })
-      await settings.screenshot({ path: resolve(output, 'relay.png') })
+      await settings.screenshot({ path: resolve(output, 'models-combined.png') })
     }
     await settings.screenshot({ path: resolve(output, `${id}.png`) })
   }
@@ -205,10 +211,10 @@ try {
   await dock.locator('#install-plugin > summary').click()
   await dock.locator('#plugin-form').waitFor({ state: 'visible' })
   assert.deepEqual(await dock.locator('.settings-sidebar [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
-    'models-tab', 'relay-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
+    'models-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
     'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'skills-tab', 'qqbot-tab',
     'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
-  ], 'all ten existing destinations and four native plugin destinations remain available in order')
+  ], 'the combined model destination and all other destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('.native-catalog-disclosure > summary').click()
   await dock.locator('#native-plugin-grid').waitFor()

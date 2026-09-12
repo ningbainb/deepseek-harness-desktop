@@ -53,6 +53,10 @@ const BUILTINS_FALLBACK_COPY = Object.freeze({
     title: '插件修复已回滚',
     body: '自动修复启动失败后已恢复原插件文件，但部分文件未能完全复原；应用已使用内置插件启动。可在设置页导出脱敏诊断了解详情。',
   },
+  'plugin-archive-blocked': {
+    title: '插件恢复需要处理',
+    body: '无法验证上次插件变更的恢复副本，应用已使用内置插件启动；原有插件文件未被删除。请在拓展坞的恢复页先导出诊断，再使用“修复插件环境”。',
+  },
 })
 
 const BUILTINS_FALLBACK_REASON_SET = new Set(Object.keys(BUILTINS_FALLBACK_COPY))

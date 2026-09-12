@@ -148,4 +148,24 @@ describe('model preference projection', () => {
     expect(moveProvider(normalized, 'gamma', -1, ['alpha', 'gamma']).providerOrder).toEqual(['gamma', 'alpha'])
     expect(() => assertModelPreferences({ ...normalized, providerOrder: ['alpha', 'alpha'] })).toThrow()
   })
+
+  it('keeps the bai provider first in model catalogs and settings order', () => {
+    const withBai = {
+      ...config,
+      pinnedModels: [],
+      providerOrder: ['beta', 'project-relay', 'alpha'],
+    }
+    const groups = [
+      { id: 'alpha', name: 'Alpha', models: [{ id: 'a1', name: 'Alpha One' }] },
+      { id: 'beta', name: 'Beta', models: [{ id: 'b1', name: 'Beta One' }] },
+      { id: 'project-relay', name: 'bai供应商', models: [{ id: 'r1', name: 'Relay One' }] },
+    ]
+    expect(sortModelCatalog({ current: null, groups, failures: [] }, withBai).groups.map(group => group.id))
+      .toEqual(['project-relay', 'beta', 'alpha'])
+    expect(providerIdsInOrder(groups, withBai)).toEqual(['project-relay', 'beta', 'alpha'])
+    expect(moveProvider(withBai, 'project-relay', 1, groups.map(group => group.id)).providerOrder)
+      .toEqual(withBai.providerOrder)
+    expect(moveProvider(withBai, 'beta', -1, groups.map(group => group.id)).providerOrder)
+      .toEqual(withBai.providerOrder)
+  })
 })

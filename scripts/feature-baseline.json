@@ -287,7 +287,7 @@
         "agent-and-background-session-pty-isolation",
         "current-frame-and-legacy-layout",
         "preserve-sidebar-tabs-width-and-default-open-settings",
-        "tools-menu-preserves-panel-controls"
+        "panel-controls-remain-on-owning-surfaces"
       ]
     },
     {
@@ -306,10 +306,10 @@
         "native-browser-cross-session-close-and-history-isolation",
         "native-browser-close-owner-with-legacy-and-keyboard-fallback",
         "incremental-modal-layer-tracking-with-document-lifecycle",
-        "native-panel-control-with-tools-layout-menu",
+        "native-panel-control-remains-on-sidebar-surface",
         "compatibility-panels-retain-handlers-tabs-and-terminal-lifetime",
         "bottom-panel-measures-current-frame-in-empty-conversations",
-        "layout-menu-restores-original-controls-on-contract-loss"
+        "tools-menu-has-no-panel-layout-duplicates"
       ]
     },
     {
@@ -367,6 +367,9 @@
         "durable-plugin-transaction-journal",
         "crash-recovery-after-profile-archive",
         "crash-recovery-after-unhealthy-activation",
+        "corrupt-plugin-archive-forces-builtins-without-data-mutation",
+        "structured-plugin-archive-recovery-diagnostics",
+        "successful-profile-reset-quarantines-blocked-recovery-marker",
         "atomic-node-modules-activation-with-archive-rollback",
         "staged-atomic-plugin-removal",
         "full-access-git-local-staging-with-protected-graph-policy",
@@ -527,7 +530,7 @@
     },
     {
       "id": "dock-settings-navigation",
-      "name": "拓展坞四组导航、六个设置页面与供应商登录接入",
+      "name": "拓展坞四组导航、统一模型页面与供应商登录接入",
       "navigationGroups": [
         "AI 设置",
         "扩展能力",
@@ -544,6 +547,8 @@
         "centered-on-open",
         "synchronized-theme",
         "relay-browser-connect",
+        "combined-model-capabilities-and-onboarding",
+        "legacy-relay-route-alias",
         "skip-redundant-view-layout",
         "frame-coalesced-settings-drag",
         "read-only-refresh-outside-mutation-lock",
@@ -557,7 +562,7 @@
         "relay-top-left-up-down-toggle",
         "search-results-replace-navigation",
         "dedicated-settings-form-default-expanded",
-        "fourteen-sidebar-destinations-fit-default-window",
+        "thirteen-sidebar-destinations-fit-default-window",
         "collapsed-settings-draft-close-save",
         "close-save-waits-for-new-draft",
         "plugin-update-refresh-outside-mutation-lock",
@@ -565,7 +570,6 @@
         "plugin-diagnostics-use-loaded-inventory"
       ],
       "settings": [
-        "relay",
         "value-mode",
         "personal-prompt",
         "memory",
@@ -586,7 +590,8 @@
         "menu-open-does-not-reload",
         "recovery-event-refresh-throttle",
         "same-session-broadcast-refresh",
-        "nonblocking-bounded-recent-model-persistence"
+        "nonblocking-bounded-recent-model-persistence",
+        "bai-provider-fixed-first"
       ]
     },
     {
@@ -632,6 +637,7 @@
         "native-dock-space-handoff-preserves-preferences",
         "native-toolbar-workbench-clearance",
         "native-git-and-file-tools-tabs",
+        "native-guide-is-single-tool-entry-owner",
         "native-files-toolbar-route",
         "shared-workspace-store-no-duplicate-tab-strip",
         "git-action-root-epoch-guard",
@@ -639,6 +645,7 @@
         "sandboxed-browser-no-popup-authority",
         "legacy-browser-address-restore-without-filesystem-read",
         "native-collapse-does-not-reactivate-legacy-columns",
+        "native-available-hides-compatibility-edge-control",
         "empty-conversation-native-sidebar-return",
         "frame-coalesced-native-sidebar-return-with-disposal",
         "native-default-surface-without-forced-session-navigation",
@@ -702,11 +709,11 @@
     },
     {
       "id": "star-prompt",
-      "name": "3.4.0 升级后每个本机用户显示一次 Star 提示",
+      "name": "3.5.0 升级后每个本机用户显示一次 Star 提示",
       "uiSelector": "#dsh-desktop-star-prompt",
       "e2eScript": "scripts/verify-star-prompt.mjs",
       "features": [
-        "version-3.4.0-once",
+        "version-3.5.0-once",
         "previous-version-claim-preserved",
         "restart-does-not-repeat",
         "defer-behind-existing-dialogs",

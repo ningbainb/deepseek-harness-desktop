@@ -116,3 +116,11 @@ test('rollback-failed fallback notification reports the incomplete restore hones
   assert.match(notification.body, /内置插件启动/u)
   assert.doesNotMatch(JSON.stringify(notification), /secret|api.?key=|C:\\Users/u)
 })
+
+test('blocked archive fallback explains preservation without exposing private recovery details', () => {
+  const notification = builtinsFallbackNotification('d'.repeat(64), 'plugin-archive-blocked')
+  assert.equal(notification.title, '插件恢复需要处理')
+  assert.match(notification.body, /内置插件启动/u)
+  assert.match(notification.body, /未被删除/u)
+  assert.doesNotMatch(JSON.stringify(notification), /transaction|snapshot|node_modules|C:\\Users/iu)
+})

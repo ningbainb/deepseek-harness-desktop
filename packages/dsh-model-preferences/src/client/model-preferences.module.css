@@ -292,3 +292,4 @@
   .modelRow { align-items: flex-start; flex-wrap: wrap; }
   .modelRow code { flex-basis: 100%; text-align: left; }
 }
+:global(li:has([data-dsh-provider-id='project-relay'])) { order: -1; }

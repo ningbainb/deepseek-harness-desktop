@@ -506,7 +506,10 @@ test('authenticated admin page is dependency-free and protected by strict browse
   assert.match(body, /日活跃实例/u)
   assert.match(body, /周活跃实例/u)
   assert.match(body, /月活跃实例/u)
-  assert.match(body, /近 400 天累计安装实例/u)
+  assert.match(body, /累计安装实例/u)
+  assert.match(body, /最近 400 个 UTC 日/u)
+  assert.match(body, /滚动 30 日 MAU 趋势/u)
+  assert.match(body, /DAU \/ MAU 粘性/u)
   assert.match(body, /应用内更新漏斗/u)
   assert.match(body, /拓展坞漏斗/u)
   assert.match(body, /D1 留存率/u)
@@ -531,7 +534,7 @@ test('admin summary returns only bounded aggregate queries for a signed session'
       { results: [{ surface: 'settings', count: 7 }] },
        { results: [{ event: 'app_launch', count: 16 }] },
        { results: [{ event: 'value_mode_call', outcome: 'started', detail: 'controller', count: 4 }] },
-       { results: [{ dau: 0, wau: 17, mau: 31, totalInstallations: 45 }] },
+       { results: [{ dau: 8, previousDau: 4, wau: 17, previousWau: 10, mau: 31, previousMau: 25, totalInstallations: 45, activityStartedDay: '2026-08-01' }] },
       { results: [
         { day: '2026-08-18', count: 9 },
         { day: '2026-08-19', count: 0 },
@@ -561,7 +564,7 @@ test('admin summary returns only bounded aggregate queries for a signed session'
   assert.equal(response.status, 200)
   assert.match(response.headers.get('content-type'), /^application\/json/iu)
   assert.deepEqual(await response.json(), {
-     schema: 5,
+     schema: 6,
     rangeDays: 30,
     generatedAt: '2026-08-19T08:02:00.000Z',
     analytics: { snapshotAt: null, sampleInterval: 1, mode: 'hourly-weighted-aggregate' },
@@ -589,9 +592,13 @@ test('admin summary returns only bounded aggregate queries for a signed session'
     active: {
       asOfDay: '2026-08-19',
       definition: 'app_launch',
-      dau: 0,
+      windows: { dauDays: 1, wauDays: 7, mauDays: 30, timezone: 'UTC', currentDayPartial: true },
+      dau: 8,
       wau: 17,
       mau: 31,
+      previous: { dau: 4, wau: 10, mau: 25 },
+      stickiness: { dauToMau: 25.81, wauToMau: 54.84 },
+      coverage: { from: '2026-08-01', to: '2026-08-19', days: 19 },
       totalInstallations: 45,
       totalInstallationsWindowDays: 400,
       dailyTrend: [
@@ -665,6 +672,10 @@ test('activity SQL uses stable installation actors and exact rolling windows', (
       mau: Number(headline.mau),
       totalInstallations: Number(headline.totalInstallations),
     }, { dau: 2, wau: 4, mau: 5, totalInstallations: 5 })
+    assert.equal(Number(headline.previousDau), 0)
+    assert.equal(Number(headline.previousWau), 1)
+    assert.equal(Number(headline.previousMau), 0)
+    assert.equal(headline.activityStartedDay, '2026-08-12')
 
     const bindings = ['2026-08-19', '-6 days', '2026-08-19']
     const dailyTrend = database.prepare(dashboardTest.ACTIVE_DAILY_TREND_SQL).all(...bindings)
