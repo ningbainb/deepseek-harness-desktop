@@ -813,6 +813,7 @@ export async function startElectronApp(metadata) {
   if (state.maximized) mainWindow.maximize()
   const saveWindowState = attachWindowStatePersistence(mainWindow, statePath, {
     restoredBounds: process.platform === 'win32' ? restoredBounds : undefined,
+    visibleBounds: process.platform === 'win32' ? state : undefined,
   })
   let activeOrigin
   let updateController

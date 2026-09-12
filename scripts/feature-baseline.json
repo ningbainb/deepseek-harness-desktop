@@ -299,6 +299,7 @@
         "dsh-1.1.5-query-sanitization-safe",
         "dsh-1.1.5-layout-anchor-bridge",
         "restored-window-geometry-does-not-accumulate-native-dpi-rounding",
+        "restored-window-geometry-survives-native-launch-clamp-settling",
         "positioned-root-caption-inset-stays-stable-across-document-mutations",
         "native-sidebar-fullscreen-reserves-desktop-caption",
         "native-fullscreen-controls-clear-desktop-workbench",

@@ -140,6 +140,35 @@ test('programmatic geometry changes replace only changed restored coordinates', 
   }
 })
 
+test('native launch clamp settling does not replace restored logical geometry', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-clamp-settling-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  const restoredBounds = { x: 100, y: 90, width: 1102, height: 742 }
+  const visibleBounds = { x: 0, y: 0, width: 1024, height: 720 }
+  let bounds = { x: 0, y: 0, width: 1026, height: 722 }
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  try {
+    const save = attachWindowStatePersistence(window, statePath, { restoredBounds, visibleBounds })
+    bounds = { ...visibleBounds }
+    window.emit('move')
+    window.emit('resize')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...restoredBounds, maximized: false })
+
+    bounds = { x: 120, y: 95, width: 900, height: 650 }
+    window.emit('move')
+    window.emit('resize')
+    await save()
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...bounds, maximized: false })
+  } finally {
+    window.emit('closed')
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('DPI viewport clamping preserves logical bounds through maximize, restore, and an explicit move or resize', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-dpi-clamp-'))
   const statePath = join(root, 'window-state.json')

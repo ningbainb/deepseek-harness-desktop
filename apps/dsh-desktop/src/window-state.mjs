@@ -65,7 +65,7 @@ export async function loadWindowStateForRestore(path, displays) {
   return { state, restoredBounds }
 }
 
-export function attachWindowStatePersistence(window, path, { restoredBounds } = {}) {
+export function attachWindowStatePersistence(window, path, { restoredBounds, visibleBounds } = {}) {
   let timer
   let writeQueue = Promise.resolve()
   let latestWrite = writeQueue
@@ -77,13 +77,16 @@ export function attachWindowStatePersistence(window, path, { restoredBounds } = 
     ? window.getNormalBounds() : undefined
   const unchanged = new Map(['x', 'y', 'width', 'height']
     .filter(key => Number.isFinite(restoredBounds?.[key]) && Number.isFinite(initialBounds?.[key]))
-    .map(key => [key, { observed: initialBounds[key], requested: restoredBounds[key] }]))
+    .map(key => [key, {
+      automatic: new Set([initialBounds[key], visibleBounds?.[key]].filter(Number.isFinite)),
+      requested: restoredBounds[key],
+    }]))
 
   const capture = () => {
     if (window.isDestroyed?.() === true) return undefined
     const bounds = { ...window.getNormalBounds() }
-    for (const [key, { observed, requested }] of unchanged) {
-      if (bounds[key] === observed) bounds[key] = requested
+    for (const [key, { automatic, requested }] of unchanged) {
+      if (automatic.has(bounds[key])) bounds[key] = requested
       else unchanged.delete(key)
     }
     return `${JSON.stringify({ ...bounds, maximized: window.isMaximized() }, null, 2)}\n`

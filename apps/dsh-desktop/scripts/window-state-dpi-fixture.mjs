@@ -24,7 +24,7 @@ async function main() {
     : { state: await loadWindowState(statePath, displays) }
   const window = createMainWindow({ BrowserWindow, productName: 'DSH window geometry regression', state: input })
   if (input.maximized) window.maximize()
-  const save = attachWindowStatePersistence(window, statePath, { restoredBounds })
+  const save = attachWindowStatePersistence(window, statePath, { restoredBounds, visibleBounds: input })
   await window.loadURL('data:text/html,<title>DSH geometry regression</title>Window geometry check')
   window.show()
   await new Promise(resolve => setTimeout(resolve, 150))
