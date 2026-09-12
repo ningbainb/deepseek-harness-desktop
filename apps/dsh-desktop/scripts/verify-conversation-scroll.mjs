@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -13,7 +13,7 @@ import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
-import { waitForSessionLog } from './session-log-fixture.mjs'
+import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -164,29 +164,11 @@ async function rpc(page, method, payload) {
   return response.body.result.value
 }
 
-async function collectFiles(root, suffix) {
-  const found = []
-  const pending = [root]
-  while (pending.length > 0) {
-    const current = pending.pop()
-    const entries = await readdir(current, { withFileTypes: true }).catch(error => {
-      if (error?.code === 'ENOENT') return []
-      throw error
-    })
-    for (const entry of entries) {
-      const path = join(current, entry.name)
-      if (entry.isDirectory()) pending.push(path)
-      else if (entry.isFile() && entry.name.endsWith(suffix)) found.push(path)
-    }
-  }
-  return found
-}
-
 async function seedConversationLog(sessionId) {
-  const logs = await collectFiles(join(dshHome, 'sessions'), '.jsonl')
-  assert.equal(logs.length, 1, `expected one uncompressed session log, found ${JSON.stringify(logs)}`)
+  const logs = await findSessionLogs(join(dshHome, 'sessions'))
+  assert.equal(logs.length, 1, `expected one session log, found ${JSON.stringify(logs)}`)
   const logPath = logs[0]
-  const original = await readFile(logPath, 'utf8')
+  const original = await readSessionLogText(logPath)
   const lines = original.trimEnd().split(/\r?\n/u)
   assert.ok(lines.length >= 1, 'session log is missing its header')
   const header = JSON.parse(lines[0])
@@ -238,7 +220,7 @@ async function seedConversationLog(sessionId) {
   if (!nativeTurns) session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   const appended = session.snapshotEvents().slice(existingEvents.length)
   assert.equal(appended.length, nativeTurns ? messageCount * 3 + 4 : messageCount + 3)
-  await appendFile(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
+  await appendSessionLogText(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
   return { logPath, asOfSeq: session.snapshotEvents().at(-1).seq }
 }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -12,7 +12,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { waitForSessionLog } from './session-log-fixture.mjs'
+import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -113,29 +113,11 @@ async function rpc(page, method, payload) {
   return result.value
 }
 
-async function collectFiles(root, suffix) {
-  const found = []
-  const pending = [root]
-  while (pending.length > 0) {
-    const current = pending.pop()
-    const entries = await readdir(current, { withFileTypes: true }).catch(error => {
-      if (error?.code === 'ENOENT') return []
-      throw error
-    })
-    for (const entry of entries) {
-      const path = join(current, entry.name)
-      if (entry.isDirectory()) pending.push(path)
-      else if (entry.isFile() && entry.name.endsWith(suffix)) found.push(path)
-    }
-  }
-  return found
-}
-
 async function seedHistory(sessionId) {
-  const logs = await collectFiles(join(dshHome, 'sessions'), '.jsonl')
+  const logs = await findSessionLogs(join(dshHome, 'sessions'))
   assert.equal(logs.length, 1, `expected one session log, found ${JSON.stringify(logs)}`)
   const logPath = logs[0]
-  const lines = (await readFile(logPath, 'utf8')).trimEnd().split(/\r?\n/u)
+  const lines = (await readSessionLogText(logPath)).trimEnd().split(/\r?\n/u)
   const header = JSON.parse(lines[0])
   assert.equal(header.id, sessionId)
   assert.equal(header.cwd, oldPath)
@@ -148,7 +130,7 @@ async function seedHistory(sessionId) {
   }), { surfaceOp: 'append' })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   const appended = session.snapshotEvents().slice(existingEvents.length)
-  await appendFile(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
+  await appendSessionLogText(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
 }
 
 async function renameWhenReleased(source, destination, timeoutMs = 30_000) {
