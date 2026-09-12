@@ -22,10 +22,11 @@ export async function auditRuntimeIntegrity({
   profileDir,
   baseline,
   policy,
+  managedPackageNames,
   validate = validateProtectedRuntimeGraph,
 } = {}) {
   try {
-    const result = await validate({ profileDir, baseline, policy })
+    const result = await validate({ profileDir, baseline, policy, managedPackageNames })
     return publicAudit('healthy', undefined, result.fingerprint)
   } catch (error) {
     if (error?.code === 'ENOENT') return publicAudit('uninitialized', 'PROFILE_NOT_INITIALIZED')

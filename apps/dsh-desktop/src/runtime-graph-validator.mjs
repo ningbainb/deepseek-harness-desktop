@@ -191,6 +191,7 @@ export async function validateProtectedRuntimeGraph({
   profileDir,
   baseline,
   policy,
+  managedPackageNames = policy?.names,
   read = readFile,
   resolveRealPath = realpath,
   inspectPath = lstat,
@@ -199,6 +200,9 @@ export async function validateProtectedRuntimeGraph({
   if (typeof profileDir !== 'string' || profileDir.length === 0) throw new TypeError('profileDir is required')
   if (!baseline?.packages || typeof baseline.packageVersion !== 'function') throw new TypeError('RuntimeBaseline is required')
   if (!policy || typeof policy.owns !== 'function') throw new TypeError('package policy is required')
+  if (!Array.isArray(managedPackageNames) || managedPackageNames.some(name => !policy.owns(name))) {
+    throw new TypeError('managed profile package names must belong to the Runtime package policy')
+  }
   const manifest = JSON.parse(await read(join(profileDir, 'package.json'), 'utf8'))
   const dependencies = manifest?.dependencies
   if (dependencies === null || typeof dependencies !== 'object' || Array.isArray(dependencies)) {
@@ -206,7 +210,7 @@ export async function validateProtectedRuntimeGraph({
   }
 
   const checkedLinks = []
-  for (const name of policy.names) {
+  for (const name of [...new Set(managedPackageNames)].toSorted()) {
     const expected = baseline.packages[name]
     if (expected === undefined) {
       throw graphError('PROTECTED_PACKAGE_BASELINE_MISSING', 'a protected package is missing from the Desktop baseline', { name })

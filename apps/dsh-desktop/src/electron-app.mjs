@@ -1310,11 +1310,13 @@ export async function startElectronApp(metadata) {
     profileDir,
     baseline: runtimeBaseline,
     policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
+    managedPackageNames: [...runtimePackages.keys()],
   })
   auditFullProfileIntegrity = () => auditRuntimeIntegrity({
     profileDir: desktopProfileDir,
     baseline: runtimeBaseline,
     policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
+    managedPackageNames: [...runtimePackages.keys()],
   })
   let primaryFullUserPermission
   try {

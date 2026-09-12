@@ -107,6 +107,40 @@ test('a transitive protected version hidden in the lockfile is rejected', async 
   }
 })
 
+test('a protected transitive package is audited without becoming a required profile root', async () => {
+  const value = await fixture()
+  const transitiveRoot = join(value.root, 'application', 'protected-transitive')
+  try {
+    await mkdir(transitiveRoot, { recursive: true })
+    await writeFile(join(transitiveRoot, 'package.json'), JSON.stringify({
+      name: 'protected-transitive',
+      version: '1.0.0',
+    }))
+    const policy = createRuntimePackagePolicy({
+      desktopRuntime: ['protected-runtime', 'protected-transitive'],
+    })
+    const baseline = await createRuntimeBaseline({
+      desktopVersion: '3.5.0',
+      runtimeVersion: '1.0.0',
+      packageRoots: new Map([
+        ['protected-runtime', value.baseline.packages['protected-runtime'].resolvedPath],
+        ['protected-transitive', transitiveRoot],
+      ]),
+      policy,
+    })
+    const result = await validateProtectedRuntimeGraph({
+      ...value,
+      baseline,
+      policy,
+      managedPackageNames: ['protected-runtime'],
+    })
+    assert.equal(result.valid, true)
+    assert.deepEqual(result.protectedLinks.map(entry => entry.name), ['protected-runtime'])
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
 test('an undeclared protected physical copy in the pnpm virtual store is rejected', async () => {
   const value = await fixture()
   const virtualRoot = join(
