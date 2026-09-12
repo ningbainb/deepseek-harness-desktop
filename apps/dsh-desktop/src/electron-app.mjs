@@ -810,11 +810,11 @@ export async function startElectronApp(metadata) {
       return setWindowChromeTheme(target, theme, palette)
     },
   })
-  if (state.maximized) mainWindow.maximize()
   const saveWindowState = attachWindowStatePersistence(mainWindow, statePath, {
     restoredBounds: process.platform === 'win32' ? restoredBounds : undefined,
     visibleBounds: process.platform === 'win32' ? state : undefined,
   })
+  if (state.maximized) mainWindow.maximize()
   let activeOrigin
   let updateController
   let updateChannelWriteQueue = Promise.resolve()
