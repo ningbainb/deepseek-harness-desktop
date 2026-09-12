@@ -503,6 +503,10 @@ export function registerExtensionIpc({
           // packages and must therefore unwind before them. This preserves the
           // pre-3.1.0 recovery behaviour exactly.
           transactions: [configTransaction, packageTransaction].filter(Boolean),
+          // Package commit owns the durable dependency decision and can still
+          // fail before that point. Configuration commit runs only after that
+          // decision succeeds.
+          commitTransactions: [packageTransaction, configTransaction].filter(Boolean),
           result: { packageTransaction },
         }
       },
@@ -815,6 +819,7 @@ export function registerExtensionIpc({
         await configTransaction.apply()
         return {
           transactions: [configTransaction, packageTransaction].filter(Boolean),
+          commitTransactions: [packageTransaction, configTransaction].filter(Boolean),
           result: { packageTransaction, configTransaction },
         }
       },

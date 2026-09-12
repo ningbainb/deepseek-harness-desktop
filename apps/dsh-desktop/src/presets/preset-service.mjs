@@ -430,8 +430,11 @@ export class PresetService {
       },
       async commit() {
         if (!active) return false
-        await rm(stageRoot, { recursive: true, force: true })
         active = false
+        // Configuration is already active and Runtime health has passed. A
+        // temporary-directory cleanup problem must not turn a committed
+        // Preset into an impossible partial rollback.
+        await rm(stageRoot, { recursive: true, force: true }).catch(() => {})
         return true
       },
       rollback,

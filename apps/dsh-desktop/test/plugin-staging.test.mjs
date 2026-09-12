@@ -226,6 +226,26 @@ test('restart recovery commits an environment already proven Runtime healthy', a
   }
 })
 
+test('restart recovery finishes archive cleanup after a durable commit decision', async () => {
+  const value = await fixture()
+  try {
+    const staged = await prepareChangedStage(value)
+    const transaction = await staged.activate({ profileArchive: value.profileArchive })
+    await transaction.validateActivated()
+    await transaction.markRuntimeStarting()
+    await transaction.markRuntimeHealthy()
+    await value.manager.advance(staged.transactionId, 'COMMITTED')
+
+    const recovered = await value.manager.recover({ profileArchive: value.profileArchive })
+    assert.equal(recovered.recovered, true)
+    assert.equal(recovered.previousPhase, 'COMMITTED')
+    assert.equal(recovered.outcome, 'committed')
+    assert.equal((await value.profileArchive.getState()).active, undefined)
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
 test('transaction journal phases are ordered and share one diagnostic transaction id', async () => {
   const events = []
   const value = await fixture({ onPhase: (event) => events.push(event) })

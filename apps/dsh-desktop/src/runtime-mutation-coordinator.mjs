@@ -76,7 +76,18 @@ export function normalizeMutationPlan(value) {
       throw new TypeError('runtime mutation plan transactions must be rollback-capable')
     }
   }
-  return { transactions, result: value.result }
+  const commitTransactions = value.commitTransactions === undefined
+    ? transactions
+    : value.commitTransactions
+  if (
+    !Array.isArray(commitTransactions)
+    || commitTransactions.length !== transactions.length
+    || new Set(commitTransactions).size !== transactions.length
+    || commitTransactions.some((transaction) => !transactions.includes(transaction))
+  ) {
+    throw new TypeError('runtime mutation commitTransactions must contain every transaction exactly once')
+  }
+  return { transactions, commitTransactions, result: value.result }
 }
 
 /**
@@ -224,10 +235,9 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
       for (const transaction of plan?.transactions ?? []) {
         await transaction.markRuntimeHealthy?.()
       }
-      for (const transaction of plan?.transactions ?? []) {
+      for (const transaction of plan?.commitTransactions ?? []) {
         await transaction.commit?.()
       }
-      return typeof finalize === 'function' ? await finalize(plan) : plan?.result
     } catch (error) {
       const { recovered, error: thrown } = await restore({ plan, error, label, onRuntimeEvent })
       if (recovered && typeof onRecovered === 'function') {
@@ -239,6 +249,10 @@ export function createRuntimeMutationCoordinator({ controller, ensureProfile, lo
       }
       throw thrown
     }
+    // A successful commit is the transaction boundary. Finalization updates
+    // presentation state and notifications only; it must never try to roll a
+    // committed dependency environment back if that best-effort work fails.
+    return typeof finalize === 'function' ? await finalize(plan) : plan?.result
   }
 
   return Object.freeze({ run, restore })

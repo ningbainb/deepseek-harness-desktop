@@ -962,8 +962,8 @@ test('web profile migration applies selected packages and attributable config in
     'config-apply',
     'ensure',
     'start',
-    'config-commit',
     'packages-commit',
+    'config-commit',
     'forget',
   ])
   assert.deepEqual(sent.map(([, payload]) => payload.phase), [

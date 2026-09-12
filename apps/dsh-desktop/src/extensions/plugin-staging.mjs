@@ -520,11 +520,20 @@ export class PluginStagingManager {
         if (journal.phase !== 'RUNTIME_HEALTHY') {
           throw new Error(`plugin transaction cannot commit from ${journal.phase}`)
         }
-        await archiveTransaction.commit()
+        // Persist the outer commit decision before cleaning up the nested
+        // archive. Once this write succeeds rollback is no longer valid, so
+        // cleanup failures are retained for startup recovery instead of being
+        // misreported as a failed mutation.
         await manager.advance(transactionId, 'COMMITTED')
-        await manager.#clearActive(transactionId)
-        await rm(manager.transactionDirectory(transactionId), { recursive: true, force: true })
         active = false
+        try {
+          await archiveTransaction.commit()
+          await manager.#clearActive(transactionId)
+          await rm(manager.transactionDirectory(transactionId), { recursive: true, force: true })
+        } catch {
+          // The durable COMMITTED journal and active marker intentionally stay
+          // behind. recover() will finish this idempotent cleanup next boot.
+        }
         return true
       },
       async rollback() {

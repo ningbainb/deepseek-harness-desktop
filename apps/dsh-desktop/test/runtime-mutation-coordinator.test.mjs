@@ -96,7 +96,21 @@ describe('normalizeMutationPlan', () => {
       result: 1,
     })
     assert.equal(plan.transactions.length, 2)
+    assert.equal(plan.commitTransactions.length, 2)
     assert.equal(plan.result, 1)
+  })
+
+  test('requires an explicit commit order to contain every transaction once', () => {
+    const first = transaction('first')
+    const second = transaction('second')
+    assert.throws(
+      () => normalizeMutationPlan({ transactions: [first, second], commitTransactions: [first] }),
+      /every transaction exactly once/u,
+    )
+    assert.throws(
+      () => normalizeMutationPlan({ transactions: [first, second], commitTransactions: [first, first] }),
+      /every transaction exactly once/u,
+    )
   })
 })
 
@@ -357,7 +371,7 @@ describe('recovery', () => {
 })
 
 describe('transaction ordering', () => {
-  test('commits and rolls back in the caller declared order', async () => {
+  test('supports a safe commit order while preserving the declared rollback order', async () => {
     const order = []
     const make = (name, failApply = false) => ({
       commit: async () => order.push(`commit:${name}`),
@@ -371,24 +385,30 @@ describe('transaction ordering', () => {
 
     // Success path order.
     await coordinator.run({
-      apply: async () => ({ transactions: [config, packages], result: {} }),
+      apply: async () => ({
+        transactions: [config, packages],
+        commitTransactions: [packages, config],
+        result: {},
+      }),
     })
-    assert.deepEqual(order, ['commit:config', 'commit:packages'])
+    assert.deepEqual(order, ['commit:packages', 'commit:config'])
 
-    // Failure path must unwind in the same declared order - the preset path
-    // stages config before packages and relies on that for a clean revert.
+    // Finalization happens after the durable commit point. A presentation-side
+    // failure must not attempt an impossible rollback of committed resources.
     order.length = 0
     await coordinator.run({
-      apply: async () => ({ transactions: [config, packages], result: {} }),
+      apply: async () => ({
+        transactions: [config, packages],
+        commitTransactions: [packages, config],
+        result: {},
+      }),
       finalize: async () => {
         throw new Error('late failure')
       },
     }).catch(() => {})
     assert.deepEqual(order, [
-      'commit:config',
       'commit:packages',
-      'rollback:config',
-      'rollback:packages',
+      'commit:config',
     ])
   })
 
