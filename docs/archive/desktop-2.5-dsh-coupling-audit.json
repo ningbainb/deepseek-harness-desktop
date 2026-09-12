@@ -4534,7 +4534,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/capture-startup.mjs",
-      "line": 39,
+      "line": 41,
       "operation": "DSH_HOME"
     },
     {
@@ -4732,13 +4732,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-scroll.mjs",
-      "line": 429,
+      "line": 411,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-scroll.mjs",
-      "line": 432,
+      "line": 414,
       "operation": "profileDir"
     },
     {
@@ -4762,7 +4762,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-dock-model-catalog.mjs",
-      "line": 32,
+      "line": 33,
       "operation": "DSH_HOME"
     },
     {
@@ -5050,7 +5050,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-selected-balance.mjs",
-      "line": 42,
+      "line": 43,
       "operation": "DSH_HOME"
     },
     {
@@ -5110,13 +5110,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 168,
+      "line": 150,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 172,
+      "line": 154,
       "operation": "profileDir"
     },
     {
@@ -5266,49 +5266,49 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1315,
+      "line": 1316,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1362,
+      "line": 1364,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1367,
+      "line": 1369,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1519,
+      "line": 1521,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2077,
+      "line": 2079,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2109,
+      "line": 2111,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2173,
+      "line": 2175,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2179,
+      "line": 2181,
       "operation": "profileDir"
     },
     {
@@ -6556,49 +6556,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 44,
+      "line": 79,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 51,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 90,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 98,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 98,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 98,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 101,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 120,
+      "line": 130,
       "operation": "profileDir"
     },
     {
@@ -6610,7 +6574,61 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 165,
+      "line": 152,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 191,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 200,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 200,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 200,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 206,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 225,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 250,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 254,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
+      "line": 279,
       "operation": "profileDir"
     },
     {
@@ -6622,7 +6640,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-integrity-audit.mjs",
-      "line": 28,
+      "line": 29,
       "operation": "profileDir"
     },
     {
@@ -10336,13 +10354,55 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
-      "line": 113,
+      "line": 147,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
-      "line": 137,
+      "line": 171,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 194,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 196,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 214,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 225,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 228,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 249,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-graph-validator.test.mjs",
+      "line": 252,
       "operation": "profileDir"
     },
     {
@@ -11644,31 +11704,31 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1521,
+      "line": 1523,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2025,
+      "line": 2027,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2027,
+      "line": 2029,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2456,
+      "line": 2458,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2458,
+      "line": 2460,
       "operation": "start"
     },
     {
