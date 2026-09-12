@@ -91,7 +91,7 @@ async function dismissStartup(page) {
 
 async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
-  const args = packagedExecutable === undefined ? [mainEntry] : []
+  const args = ['--lang=zh-CN', ...(packagedExecutable === undefined ? [mainEntry] : [])]
   const instance = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args,
