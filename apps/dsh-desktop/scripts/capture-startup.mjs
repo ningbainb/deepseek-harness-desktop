@@ -29,7 +29,9 @@ try {
     cwd: appDir,
     env: {
       ...process.env,
-      DSH_DESKTOP_HOLD_STARTUP: updateMode ? '0' : '1',
+      // Extension inventory is served by the Runtime. Keep startup held for
+      // static shell captures only; Dock captures need the isolated Runtime.
+      DSH_DESKTOP_HOLD_STARTUP: updateMode || extensionMode ? '0' : '1',
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_STARTUP_PREVIEW_STATE: extensionMode ? '' : 'starting',
       DSH_DESKTOP_OPEN_EXTENSIONS: extensionMode ? '1' : '0',
@@ -53,6 +55,13 @@ try {
     }
     if (!page.url().includes(communityMode ? 'community.html' : 'extensions.html')) {
       throw new Error(`${communityMode ? 'community' : 'extension'} window did not open`)
+    }
+    if (extensionMode) {
+      // The Dock window is intentionally created as soon as the shell is ready.
+      // Reload its isolated capture page after the Runtime has published the
+      // inventory service so this screenshot cannot freeze the early empty state.
+      await firstWindow.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: 120_000 })
+      await page.reload({ waitUntil: 'domcontentloaded' })
     }
   }
   await page.waitForLoadState('domcontentloaded')
@@ -87,12 +96,17 @@ try {
     await page.locator('#dsh-desktop-update-surface:not([hidden])').waitFor({ state: 'visible' })
   }
   if (extensionMode) {
-    await page.waitForFunction(() => document.body.dataset.busy !== 'true' && document.querySelector('#plugin-count')?.textContent !== '0')
-    const pluginTab = page.getByRole('tab', { name: /插件/u }).first()
-    const skillTab = page.getByRole('tab', { name: /技能/u })
+    await page.waitForFunction(
+      () => document.body.dataset.busy !== 'true' && (document.querySelector('#plugin-list')?.children.length ?? 0) > 0,
+      undefined,
+      { timeout: 90_000 },
+    )
+    await page.locator('#plugins-hub-tab').click()
+    const pluginTab = page.locator('#plugins-tab')
+    const settingsTab = page.locator('#plugin-settings-tab')
     await pluginTab.focus()
     await page.keyboard.press('End')
-    if (await skillTab.getAttribute('aria-selected') !== 'true' || !(await page.getByRole('tabpanel', { name: /技能/u }).isVisible())) {
+    if (await settingsTab.getAttribute('aria-selected') !== 'true' || !(await page.locator('#plugin-settings').isVisible())) {
       throw new Error('extension tabs do not support keyboard selection')
     }
     await page.keyboard.press('Home')

@@ -90,6 +90,7 @@ try {
     }
   }, { catalogValue: catalog, inventoryValue: inventory, pluginsValue: plugins, recoveryValue: recovery })
   await page.goto(`http://127.0.0.1:${address.port}/extensions.html`, { waitUntil: 'domcontentloaded' })
+  await page.locator('#plugins-hub-tab').click()
   await page.locator('#market-tab').click()
   await page.locator('.market-card').first().waitFor({ state: 'visible' })
   await page.waitForFunction(() => document.body.dataset.busy !== 'true')
