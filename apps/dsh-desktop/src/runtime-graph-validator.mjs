@@ -40,6 +40,107 @@ function virtualStorePrefix(name) {
   return `${name.replace('/', '+')}@`
 }
 
+async function readInstalledPackage(root, read) {
+  try {
+    return JSON.parse(await read(join(root, 'package.json'), 'utf8'))
+  } catch (error) {
+    throw graphError('COMMUNITY_PACKAGE_INVALID', 'an installed community package is unreadable', {
+      cause: error?.code,
+    })
+  }
+}
+
+async function installedPackageEntries(nodeModulesRoot, listDirectory) {
+  const entries = await readDirectoryIfPresent(nodeModulesRoot, listDirectory)
+  const packages = []
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue
+    const entryRoot = join(nodeModulesRoot, entry.name)
+    if (entry.name.startsWith('@')) {
+      for (const scoped of await readDirectoryIfPresent(entryRoot, listDirectory)) {
+        if (scoped.name.startsWith('.')) continue
+        packages.push({ name: `${entry.name}/${scoped.name}`, root: join(entryRoot, scoped.name) })
+      }
+      continue
+    }
+    packages.push({ name: entry.name, root: entryRoot })
+  }
+  return packages
+}
+
+/**
+ * Old Desktop profiles can predate pnpm-lock.yaml while still containing a
+ * complete installed plugin tree. Audit that physical tree locally instead of
+ * deleting the plugin or inventing lockfile evidence. Protected packages must
+ * still match the immutable application baseline by version and, for
+ * singletons, by real path.
+ */
+async function inspectLocklessCommunityGraph({
+  profileDir,
+  names,
+  baseline,
+  policy,
+  read,
+  resolveRealPath,
+  inspectPath,
+  listDirectory,
+}) {
+  const visited = new Set()
+  const protectedNodes = []
+  const MAX_PACKAGES = 10_000
+
+  const inspectPackage = async (root, expectedName) => {
+    const actualRoot = await resolveRealPath(root)
+    if (visited.has(actualRoot)) return
+    visited.add(actualRoot)
+    if (visited.size > MAX_PACKAGES) {
+      throw graphError('COMMUNITY_GRAPH_TOO_LARGE', 'the installed community dependency graph is too large to audit')
+    }
+
+    const installed = await readInstalledPackage(root, read)
+    if (installed?.name !== expectedName || semver.valid(installed?.version) === null) {
+      throw graphError('COMMUNITY_PACKAGE_INVALID', 'an installed community package has an invalid identity', {
+        name: expectedName,
+      })
+    }
+    if (policy.owns(expectedName)) {
+      const expected = baseline.packages[expectedName]
+      if (expected === undefined || installed.version !== expected.version) {
+        throw graphError('PROTECTED_PHYSICAL_VERSION_CONFLICT', 'a legacy plugin contains a different protected Runtime version', {
+          name: expectedName,
+          expected: expected?.version,
+          actual: installed.version,
+        })
+      }
+      if (policy.get(expectedName)?.singleton === true && actualRoot !== expected.realPath) {
+        throw graphError('PROTECTED_SINGLETON_SOURCE_CONFLICT', 'a legacy plugin contains another protected Runtime source', {
+          name: expectedName,
+        })
+      }
+      protectedNodes.push({ name: expectedName, version: installed.version, realPath: actualRoot })
+      return
+    }
+
+    for (const dependency of await installedPackageEntries(join(root, 'node_modules'), listDirectory)) {
+      await inspectPackage(dependency.root, dependency.name)
+    }
+  }
+
+  for (const name of [...names].toSorted()) {
+    const root = join(profileDir, 'node_modules', ...packagePathSegments(name))
+    try {
+      await inspectPath(root)
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        throw graphError('COMMUNITY_PACKAGE_MISSING', 'an installed community package is missing', { name })
+      }
+      throw error
+    }
+    await inspectPackage(root, name)
+  }
+  return protectedNodes.toSorted((left, right) => left.name.localeCompare(right.name) || left.realPath.localeCompare(right.realPath))
+}
+
 async function inspectProtectedVirtualStore({
   profileDir,
   baseline,
@@ -144,9 +245,18 @@ export async function validateProtectedRuntimeGraph({
 
   const lockSource = await readOptional(join(profileDir, 'pnpm-lock.yaml'), read)
   const communityNames = communityDependencyNames(manifest, policy)
-  if (lockSource === undefined && communityNames.length > 0) {
-    throw graphError('PLUGIN_LOCKFILE_MISSING', 'the plugin dependency lockfile is missing')
-  }
+  const legacyProtectedNodes = lockSource === undefined && communityNames.length > 0
+    ? await inspectLocklessCommunityGraph({
+      profileDir,
+      names: communityNames,
+      baseline,
+      policy,
+      read,
+      resolveRealPath,
+      inspectPath,
+      listDirectory,
+    })
+    : []
   const protectedLockPackages = lockSource === undefined
     ? []
     : PnpmLockGraph.parse(lockSource).protectedPackages(policy)
@@ -174,12 +284,14 @@ export async function validateProtectedRuntimeGraph({
     links: checkedLinks,
     lock: protectedLockPackages.map(({ name, version }) => ({ name, version })),
     store: protectedStoreNodes,
+    legacy: legacyProtectedNodes,
   }
   return Object.freeze({
     valid: true,
     protectedLinks: Object.freeze(checkedLinks.map(Object.freeze)),
     protectedLockPackages,
     protectedStoreNodes: Object.freeze(protectedStoreNodes.map(Object.freeze)),
+    legacyProtectedNodes: Object.freeze(legacyProtectedNodes.map(Object.freeze)),
     fingerprint: createHash('sha256').update(JSON.stringify(projection)).digest('hex'),
   })
 }

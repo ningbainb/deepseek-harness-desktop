@@ -154,3 +154,82 @@ test('a singleton same-version copy from another physical source is rejected', a
     await rm(value.root, { recursive: true, force: true })
   }
 })
+
+test('a lockless legacy plugin with a complete local graph remains usable', async () => {
+  const value = await fixture()
+  const pluginRoot = join(value.profileDir, 'node_modules', 'community-plugin')
+  try {
+    await rm(join(value.profileDir, 'pnpm-lock.yaml'))
+    await mkdir(pluginRoot, { recursive: true })
+    await writeFile(join(pluginRoot, 'package.json'), JSON.stringify({
+      name: 'community-plugin',
+      version: '1.0.0',
+      dependencies: {},
+    }))
+    const result = await validateProtectedRuntimeGraph(value)
+    assert.equal(result.valid, true)
+    assert.deepEqual(result.legacyProtectedNodes, [])
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('a lockless legacy plugin with no installed package fails closed', async () => {
+  const value = await fixture()
+  try {
+    await rm(join(value.profileDir, 'pnpm-lock.yaml'))
+    await assert.rejects(() => validateProtectedRuntimeGraph(value), {
+      code: 'COMMUNITY_PACKAGE_MISSING',
+    })
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('a lockless legacy plugin cannot hide another protected Runtime version', async () => {
+  const value = await fixture()
+  const pluginRoot = join(value.profileDir, 'node_modules', 'community-plugin')
+  const nestedProtected = join(pluginRoot, 'node_modules', 'protected-runtime')
+  try {
+    await rm(join(value.profileDir, 'pnpm-lock.yaml'))
+    await mkdir(nestedProtected, { recursive: true })
+    await writeFile(join(pluginRoot, 'package.json'), JSON.stringify({
+      name: 'community-plugin',
+      version: '1.0.0',
+      dependencies: { 'protected-runtime': '2.0.0' },
+    }))
+    await writeFile(join(nestedProtected, 'package.json'), JSON.stringify({
+      name: 'protected-runtime',
+      version: '2.0.0',
+    }))
+    await assert.rejects(() => validateProtectedRuntimeGraph(value), {
+      code: 'PROTECTED_PHYSICAL_VERSION_CONFLICT',
+    })
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('a lockless legacy plugin cannot hide a second singleton source', async () => {
+  const value = await fixture()
+  const pluginRoot = join(value.profileDir, 'node_modules', 'community-plugin')
+  const nestedProtected = join(pluginRoot, 'node_modules', 'protected-runtime')
+  try {
+    await rm(join(value.profileDir, 'pnpm-lock.yaml'))
+    await mkdir(nestedProtected, { recursive: true })
+    await writeFile(join(pluginRoot, 'package.json'), JSON.stringify({
+      name: 'community-plugin',
+      version: '1.0.0',
+      dependencies: { 'protected-runtime': '1.0.0' },
+    }))
+    await writeFile(join(nestedProtected, 'package.json'), JSON.stringify({
+      name: 'protected-runtime',
+      version: '1.0.0',
+    }))
+    await assert.rejects(() => validateProtectedRuntimeGraph(value), {
+      code: 'PROTECTED_SINGLETON_SOURCE_CONFLICT',
+    })
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
