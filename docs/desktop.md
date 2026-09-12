@@ -2,13 +2,13 @@
 
 ## Architecture
 
-The desktop application is a thin lifecycle and security layer around the official DSH host. Desktop 3.4.0 validates the packaged `@deepseek-ai/dsh` CLI as its installation anchor, then composes the `desktop` Profile through the official DSH 1.1.5 app-boot, command-line, HTTP-proxy, and launch-environment SDKs on a random loopback port. It probes HTTP readiness and loads that URL into the main window. The Web application, protocols, data paths, tools, and plugin system remain DSH implementations.
+The desktop application is a thin lifecycle and security layer around the official DSH host. Desktop 3.5.0 validates the packaged `@deepseek-ai/dsh` CLI as its installation anchor, then composes the `desktop` Profile through the official DSH 1.1.5 app-boot, command-line, HTTP-proxy, and launch-environment SDKs on a random loopback port. It probes HTTP readiness and loads that URL into the main window. The Web application, protocols, data paths, and tools remain DSH implementations; Desktop owns the immutable Runtime baseline and the transactional boundary around community plugin dependencies.
 
 The DSH home remains `DSH_HOME` or `~/.dsh`. The desktop app runs the managed `~/.dsh/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-ui-all`, `@tencent-connect/dsh-qqbot`, and `reasoning-slider` while preserving community bundles already added to that profile. DSH 1.1.5 provides the native Codex model adapter through `@deepseek-ai/dsh-base`; the retired standalone Codex providers are removed from Desktop-managed profiles to prevent duplicate provider registration. The native Extension Dock market fetches the public awesome-dsh-plugin index and sends confirmed installs through Desktop's transactional plugin manager; it is not a Runtime bundle. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. Existing default profiles are not changed.
 
-## Desktop 3.4 platform policy
+## Desktop 3.5 platform policy
 
-Desktop 3.4.0 retains grouped Dock settings, shared project/workspace dialogs, model-driven file handoff, and visible local memory activity while moving the bundled Runtime and plugins to DSH 1.1.5. New public integrations must use the 3.0 contracts and official split SDK services rather than infer behavior from the internal Electron implementation.
+Desktop 3.5.0 retains grouped Dock settings, shared project/workspace dialogs, model-driven file handoff, and visible local memory activity on DSH 1.1.5. It adds an application-owned Runtime baseline, a unified package ownership policy, compatibility admission, isolated pnpm staging, protected dependency-graph validation, atomic activation, post-start health confirmation, and crash-safe recovery. New public integrations must use the 3.0 contracts and official split SDK services rather than infer behavior from the internal Electron implementation.
 
 The Desktop Client SDK and Desktop Contract remain 1.x. Runtime Provider, Preset, Project/Task/Run/Evidence, Deep Link, plugin compatibility, Runtime matrix, and compat-patch inputs have machine-readable definitions. The applicable additive-change, deprecation, and major-version rules are in the [compatibility policy](compatibility-policy.md) and [schema versioning guide](schema-versioning.md).
 
@@ -28,7 +28,7 @@ Official packaged Desktop releases enable first-party anonymous product analysis
 | Conversation continuity | FIFO next-turn queue, automatic continuation after cancellation, normalized user-cancellation feedback |
 | Model recovery | Bounded backoff for rate limits, timeouts, network loss, and retryable server errors; immediate manual cancellation |
 | Recovery | Status-only startup, one unchanged full-profile retry, bounded transactional model repair, verified apply/rollback, then same-Home built-ins fallback |
-| Plugins | Actual version inventory, Desktop-managed built-ins, lazy community update checks, atomic exact-version batches, compatibility declarations, profile lock diagnostics, progress, rollback |
+| Plugins | Immutable Desktop-owned Runtime baseline, compatible/unknown/incompatible admission, isolated staging, protected direct and transitive graph validation, one persistent writer, atomic install/update/remove/batch/Preset activation, health-gated commit, crash recovery, and quiet PluginUIState projection |
 | Presets | Review-only file ingress, bounded archive validation, integrity and trust summary, staged multi-surface rollback |
 | Skills | Project/DSH/Agents root discovery, safe folder import, searchable conversation menu, recent-use ordering, full keyboard control |
 | Reasoning | Sticky disclosure control keeps long reasoning collapsible without scrolling back to its start |
@@ -57,7 +57,7 @@ After a one-time native confirmation, the single primary Runtime runs with `dang
 
 Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. The primary invocation contains exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
-## Using Desktop 3.4.0
+## Using Desktop 3.5.0
 
 1. Open the Extension Dock to connect a model or configure Value Mode. Its sidebar also groups Personal Prompt, Memory, the particle theme, and image understanding. Existing plugin, import, backup, and repair entries remain available.
 2. Use Add workspace to open Create project, enter a name, and click the source-folder area to open the system folder picker. Choose workspace uses the shared dialog to connect a directory; an already connected directory opens its existing workspace.
@@ -77,7 +77,7 @@ The built-in QQ Bot integration is pinned to `@tencent-connect/dsh-qqbot@0.5.0`.
 
 ## Model collaboration, usage, and import
 
-These capabilities remain available in 3.4.0. The screenshots below are historical 3.2.0 captures; the current settings navigation and layout are represented by the preserved 3.3.0 captures above.
+These capabilities remain available in 3.5.0. The screenshots below are historical 3.2.0 captures; the current settings navigation and layout are represented by the preserved 3.3.0 captures above.
 
 ![DeepSeek Harness Desktop 3.2.0 main workspace and AI coding entry points](screenshots/3.2.0-workspace.webp)
 

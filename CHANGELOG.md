@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.5.0 - 2026-09-12
+
+中文：
+
+- 建立由 Desktop 安装目录生成并冻结的 Runtime Baseline，以及统一 Package Ownership Registry；Profile 污染不再改变 Host 版本事实。
+- 插件安装、更新、卸载、批量安装与 Preset 导入统一经过兼容性准入、同卷 staging、离线依赖解析、受保护依赖图验证、原子激活、Runtime 健康检查和提交或回滚。
+- 对 manifest、pnpm lockfile、顶层链接、物理 `.pnpm` 节点与传递依赖进行一致性检查；直接冲突、隐藏冲突、同版本不同来源和伪造包身份均在 Live Profile 变化前被拒绝。
+- 增加持久事务状态机、单 writer 锁和启动恢复，覆盖归档后中断、激活后中断、过期事务与健康确认后的收尾恢复。
+- 旧 Profile 启动时执行本地完整性审计，可证明安全的受管依赖漂移会静默修复；无法确认时进入简洁的插件环境修复界面，个人数据保持不变。
+- Extension Dock 插件管理收敛为“已安装”“发现”“设置”，健康状态保持安静；兼容、权限、来源和完整性细节按需展开，故障只影响对应插件。
+- 正式验证 pnpm isolated linker、本地 tarball fixture、30 项隔离矩阵、官方 Runtime 集成、完整 Desktop 回归、Windows 打包与 3.4.0 覆盖升级。
+
+English:
+
+- Build and freeze the Host Runtime baseline from the Desktop installation and centralize protected package ownership so Profile pollution cannot redefine Host versions.
+- Route install, update, remove, batch, and Preset mutations through compatibility admission, same-volume staging, offline resolution, protected-graph validation, atomic activation, Runtime health, and commit or rollback.
+- Validate manifests, the pnpm lock graph, top-level links, physical `.pnpm` nodes, and transitive dependencies before the Live Profile changes.
+- Add a persistent transaction state machine, one writer lock, and startup recovery for crashes around archive, activation, stale work, and post-health cleanup.
+- Audit legacy Profiles locally and repair provably safe managed drift without deleting personal data; unresolved cases use a focused plugin-environment repair surface.
+- Reduce Extension Dock plugin management to Installed, Discover, and Settings; healthy state stays quiet and advanced compatibility or integrity evidence remains on demand.
+- Verify isolated pnpm fixtures, the 30-case isolation matrix, official Runtime integration, full Desktop regressions, Windows packaging, and the 3.4.0 overlay upgrade.
+
 ## 3.4.0 - 2026-09-09
 
 中文：

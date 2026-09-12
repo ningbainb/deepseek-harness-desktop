@@ -1,6 +1,10 @@
-# Desktop 3.4.0 upgrade and rollback
+# Desktop 3.5.0 upgrade and rollback
 
-Desktop 3.4.0 starts the DSH 1.1.5 Runtime directly from the user's existing `DSH_HOME` and `profiles/desktop`. It does not scan for a source version, create a startup migration plan, open a recovery choice page, or copy the profile into an isolated Home. A fresh install uses the same direct path with the built-in plugin set.
+Desktop 3.5.0 starts the DSH 1.1.5 Runtime from the user's existing `DSH_HOME` and `profiles/desktop`. Before community plugins load, Desktop builds an immutable Runtime baseline from its own installation and audits the existing Profile locally. A safe 3.4-era managed-link drift is repaired silently; an unprovable dependency environment is left intact and routed to the focused plugin repair surface. A fresh install uses the same Home with the built-in plugin set.
+
+Plugin dependency changes are prepared under `.plugin-transactions` on the same volume. Registry and package work happens while the Runtime remains available. Only a validated staged graph can enter the short stop, atomic activation, managed-link repair, restart, health, and commit sequence. Any failure before the durable commit restores the prior manifest, lockfile, and physical dependency tree. An interrupted transaction is completed or rolled back from its journal at the next launch.
+
+This audit and repair boundary never deletes conversations, Workspace content, providers, API keys, Memory, Personal Prompt, user settings, plugin settings, or user files. Users are never instructed to delete their Profile or `node_modules`.
 
 ## Star prompt after upgrading
 
