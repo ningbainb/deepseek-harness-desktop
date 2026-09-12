@@ -199,7 +199,7 @@
           <p>导出或恢复允许的插件、设置、技能与任务模板。Preset 不包含 Secret，也不会静默安装。</p>
         </div>
         <div class="preset-actions">
-          <button type="button" class="primary" id="export-preset">导出当前环境为 Preset</button>
+          <button type="button" class="primary" id="export-preset" data-mutation-control>导出当前环境为 Preset</button>
           <button type="button" class="secondary" id="select-preset">选择并导入 Preset…</button>
         </div>
         <div id="preset-export-status" class="preset-export-status" role="status" aria-live="polite" hidden></div>
@@ -228,7 +228,7 @@
           </div>
           <div class="preset-footer">
             <label class="risk-check"><input type="checkbox" id="preset-confirm">我已确认导入内容，并允许桌面版应用精确插件版本与配置（失败将自动回滚）</label>
-            <button type="button" class="primary" id="import-preset">应用 Preset 并重启</button>
+            <button type="button" class="primary" id="import-preset" data-mutation-control>应用 Preset 并重启</button>
           </div>
           <div id="preset-progress" class="preset-progress" hidden>
             <h4>导入进度</h4>

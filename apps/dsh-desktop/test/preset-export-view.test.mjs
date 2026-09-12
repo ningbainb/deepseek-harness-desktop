@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { presetExportFailureMessage } from '../src/ui/preset-export-view.mjs'
 
@@ -24,4 +25,10 @@ test('export errors survive Electron wrapping and have actionable Chinese explan
     assert.ok(presetExportFailureMessage(error).includes(expected), reason)
   }
   assert.match(presetExportFailureMessage(null), /导出失败/u)
+})
+
+test('preset export and import participate in the shared operation lock', async () => {
+  const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
+  assert.match(html, /id="export-preset" data-mutation-control/u)
+  assert.match(html, /id="import-preset" data-mutation-control/u)
 })
