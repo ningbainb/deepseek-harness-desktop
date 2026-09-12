@@ -49,10 +49,15 @@ try {
   const resized = await launch(1.25, 'resize')
   assert.notEqual(resized.saved.width, first.width)
   assert.deepEqual(resized.saved, { ...resized.normal, maximized: false }, 'explicit resize must persist actual new geometry')
-  const reloaded = await launch(1)
-  assert.deepEqual(reloaded.input, resized.saved)
-  assert.deepEqual(reloaded.saved, resized.saved)
-  assert.deepEqual(reloaded.bounds, resized.normal, 'returning to 100% must restore the actual user-selected rectangle')
+  const smallDisplay = [{
+    bounds: { x: 0, y: 0, width: 1024, height: 768 },
+    workArea: { x: 0, y: 0, width: 1024, height: 720 },
+  }]
+  const reloaded = await launch(1, undefined, smallDisplay)
+  const visibleReload = { x: 0, y: 0, width: 1024, height: 720, maximized: false }
+  assert.deepEqual(reloaded.input, visibleReload, 'launch bounds must fit the current work area')
+  assert.deepEqual(reloaded.saved, resized.saved, 'visible launch clamping must retain the user-selected logical rectangle')
+  assert.deepEqual(reloaded.bounds, { x: 0, y: 0, width: 1024, height: 720 }, 'native 100% bounds must match the visible launch rectangle')
 
   // DSH-350-DPI-01: the saved rectangle fits at 100% but its x coordinate
   // must be clamped from 1920 to 1706 in the smaller logical work area.
