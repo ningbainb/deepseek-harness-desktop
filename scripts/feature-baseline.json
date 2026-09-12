@@ -563,6 +563,13 @@
       "features": ["software-canvas-encoding", "decoder-and-canvas-release", "twenty-drop-memory-budget", "cancel-and-retry"]
     },
     {
+      "id": "session-agent-tool-work",
+      "name": "主界面会话发消息、Agent 工具执行与最终回复",
+      "uiSelector": "[data-composer-card]",
+      "e2eScript": "scripts/verify-packaged-agent-work.mjs",
+      "features": ["workspace-and-session-create", "model-select", "real-composer-submit", "pwsh-tool-round-trip", "assistant-completion", "synthetic-provider-no-paid-inference"]
+    },
+    {
       "id": "embedded-browser-close",
       "name": "内置浏览器常驻关闭按钮",
       "uiSelector": "[data-dsh-browser-close]",

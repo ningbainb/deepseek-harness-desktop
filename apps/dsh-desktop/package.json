@@ -28,6 +28,7 @@
     "test:skin-center:e2e": "node scripts/verify-skin-center.mjs",
     "test:conversation-scroll:e2e": "node scripts/verify-conversation-scroll.mjs",
     "test:image-drop:e2e": "node scripts/verify-packaged-image-drop.mjs",
+    "test:agent-work:e2e": "node scripts/verify-packaged-agent-work.mjs",
     "test:conversation-skills:e2e": "node scripts/verify-conversation-skills.mjs",
     "test:directory-picker:e2e": "node scripts/verify-directory-picker.mjs",
     "test:workspace-relocation:e2e": "node scripts/verify-workspace-relocation.mjs",

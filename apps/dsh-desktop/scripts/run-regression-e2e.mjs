@@ -194,6 +194,11 @@ const PACKAGED_SUITES = [
     args: [],
   },
   {
+    name: 'Packaged Session Message & Agent Tool Work',
+    script: 'scripts/verify-packaged-agent-work.mjs',
+    args: [],
+  },
+  {
     name: 'Workspace Relocation Compatibility & Rollback',
     script: 'scripts/verify-workspace-relocation.mjs',
     args: [],
