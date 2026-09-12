@@ -1170,13 +1170,28 @@ function activateTab(tab, focus = false, settingOverride) {
   settingState.textContent = '正在加载设置…'
   settingState.hidden = !setting
   settingRetry.hidden = true
-  void Promise.resolve(window.dshDesktop.selectDockSetting?.(setting ?? null)).then(() => {
-    if (request === settingsRequest) settingState.hidden = true
+  const applyPanels = () => {
+    for (const panel of document.querySelectorAll('.panel')) {
+      const active = panel.id === tab.dataset.tab
+      panel.hidden = !active
+      panel.classList.toggle('active', active)
+    }
+  }
+  if (setting) applyPanels()
+  else for (const panel of document.querySelectorAll('.panel')) {
+    panel.hidden = true
+    panel.classList.remove('active')
+  }
+  void Promise.resolve().then(() => window.dshDesktop.selectDockSetting?.(setting ?? null)).then(() => {
+    if (request !== settingsRequest) return
+    settingState.hidden = true
+    if (!setting) applyPanels()
   }).catch(error => {
     if (request === settingsRequest) {
       settingState.hidden = false
       settingState.textContent = error.message || '设置加载失败，请重试。'
       settingRetry.hidden = false
+      if (!setting) applyPanels()
     }
   })
   for (const item of tabs) {
@@ -1186,11 +1201,6 @@ function activateTab(tab, focus = false, settingOverride) {
     item.classList.toggle('active', active)
     item.setAttribute('aria-selected', String(active))
     item.tabIndex = active ? 0 : -1
-  }
-  for (const panel of document.querySelectorAll('.panel')) {
-    const active = panel.id === tab.dataset.tab
-    panel.hidden = !active
-    panel.classList.toggle('active', active)
   }
   if (focus) tab.focus()
 }

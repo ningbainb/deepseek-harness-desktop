@@ -216,6 +216,10 @@ try {
     'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
   ], 'the combined model destination and all other destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
+  await dock.locator('#plugin-settings').waitFor({ state: 'visible' })
+  assert.equal(await (await app.browserWindow(dock)).evaluate(window => window.contentView.children
+    .find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getVisible()), false,
+  'local Dock panels become interactive only after the settings child view is hidden')
   await dock.locator('.native-catalog-disclosure > summary').click()
   await dock.locator('#native-plugin-grid').waitFor()
   await dock.locator('#qqbot-tab').click()
