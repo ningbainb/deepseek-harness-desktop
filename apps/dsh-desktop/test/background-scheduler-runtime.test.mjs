@@ -7,9 +7,11 @@ import electronPath from 'electron'
 
 import { BoundedLogStore } from '../src/log-store.mjs'
 import { ensureDesktopProfile, resolveDshCliPath } from '../src/profile.mjs'
-import { DshRuntimeController } from '../src/runtime-controller.mjs'
+import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from '../src/runtime-controller.mjs'
 
-test('explicit Desktop background opt-in exposes the durable Task Board Host scheduler', { timeout: 90_000 }, async () => {
+const RUNTIME_TEST_TIMEOUT_MS = DEFAULT_STARTUP_TIMEOUT_MS + 60_000
+
+test('explicit Desktop background opt-in exposes the durable Task Board Host scheduler', { timeout: RUNTIME_TEST_TIMEOUT_MS }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-background-scheduler-'))
   const logs = new BoundedLogStore({ directory: join(root, 'logs') })
   let controller
@@ -21,7 +23,6 @@ test('explicit Desktop background opt-in exposes the durable Task Board Host sch
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,
-      startupTimeoutMs: 45_000,
       environmentProvider: () => ({ DSH_DESKTOP_BACKGROUND_AUTOMATION: '1' }),
     })
     const url = await controller.start()
@@ -56,7 +57,7 @@ test('explicit Desktop background opt-in exposes the durable Task Board Host sch
   }
 })
 
-test('Desktop defaults to the browser scheduler when background automation was not enabled', { timeout: 90_000 }, async () => {
+test('Desktop defaults to the browser scheduler when background automation was not enabled', { timeout: RUNTIME_TEST_TIMEOUT_MS }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-background-default-'))
   const logs = new BoundedLogStore({ directory: join(root, 'logs') })
   let controller
@@ -68,7 +69,6 @@ test('Desktop defaults to the browser scheduler when background automation was n
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,
-      startupTimeoutMs: 45_000,
     })
     const url = await controller.start()
     const response = await fetch(new URL('/api/dsh-task-board/scheduler', url), {

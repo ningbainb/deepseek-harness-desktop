@@ -4756,7 +4756,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs",
-      "line": 59,
+      "line": 69,
       "operation": "DSH_HOME"
     },
     {
@@ -4823,6 +4823,12 @@
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-large-legacy-history.mjs",
       "line": 221,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs",
+      "line": 227,
       "operation": "DSH_HOME"
     },
     {
@@ -6910,25 +6916,25 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/background-scheduler-runtime.test.mjs",
-      "line": 17,
+      "line": 19,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/background-scheduler-runtime.test.mjs",
-      "line": 19,
+      "line": 21,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/background-scheduler-runtime.test.mjs",
-      "line": 64,
+      "line": 65,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/background-scheduler-runtime.test.mjs",
-      "line": 66,
+      "line": 67,
       "operation": "resolveDshCliPath"
     },
     {
@@ -11932,7 +11938,7 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/background-scheduler-runtime.test.mjs",
-      "line": 27,
+      "line": 28,
       "operation": "start"
     },
     {
