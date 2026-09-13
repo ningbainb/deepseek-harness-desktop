@@ -90,7 +90,14 @@ try {
   const topologyReloaded = await launch(1, undefined, topology(1))
   assert.deepEqual(topologyReloaded.input, clampedResized.saved)
   assert.deepEqual(topologyReloaded.saved, clampedResized.saved)
-  assert.deepEqual(topologyReloaded.bounds, clampedResized.normal)
+  // The injected topology exercises loader clamping, but Electron still
+  // constrains the native window to the CI host's physical work area.
+  assert.deepEqual(topologyReloaded.bounds, topologyReloaded.normal)
+  assert.deepEqual(topologyReloaded.bounds, {
+    ...clampedResized.normal,
+    width: Math.min(clampedResized.normal.width, topologyReloaded.nativeWorkArea.width),
+    height: Math.min(clampedResized.normal.height, topologyReloaded.nativeWorkArea.height),
+  }, 'native relaunch bounds must exactly match the physical work-area size limit')
   console.log(JSON.stringify({ factoryGeometryRegression: true, results }, null, 2))
 } catch (error) {
   console.error('DPI geometry regression evidence', JSON.stringify(results))

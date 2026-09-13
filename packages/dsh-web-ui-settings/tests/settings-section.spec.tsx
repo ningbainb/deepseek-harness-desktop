@@ -11,6 +11,13 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import * as desktop from '@linxin666/dsh-desktop-client'
 
 const particleClient = vi.hoisted(() => vi.fn())
+const effectDisposers: Array<() => void> = []
+
+function effect(callback: () => unknown) {
+  const disposer = callback()
+  if (typeof disposer === 'function') effectDisposers.push(disposer as () => void)
+  return disposer
+}
 
 vi.mock('@linxin666/dsh-particle-theme/src/client/index.ts', () => ({
   installParticleThemeClient: particleClient,
@@ -27,6 +34,7 @@ import { RelayOnboardingCard } from '../src/client/RelayOnboardingCard.tsx'
 import { DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
 
 afterEach(() => {
+  for (const dispose of effectDisposers.splice(0).reverse()) dispose()
   cleanup()
   window.history.replaceState({}, '', '/')
   vi.clearAllMocks()
@@ -54,7 +62,7 @@ describe('Web UI settings section', () => {
     const localeRegister = vi.fn(() => () => {})
     const bind = vi.fn(() => (key: string) => key === 'title' ? 'Web UI Plugins' : key)
     const ctx = {
-      effect: (callback: () => unknown) => callback(),
+      effect,
       inject: vi.fn(),
       locale: { register: localeRegister, bind },
       slots: { inject, register },
@@ -111,7 +119,7 @@ describe('Web UI settings section', () => {
     const register = vi.fn((_entry: unknown, _component?: unknown) => () => {})
     const inject = vi.fn((_name: string, callback: () => unknown) => callback())
     const ctx = {
-      effect: (callback: () => unknown) => callback(),
+      effect,
       inject: vi.fn(),
       locale: { register: vi.fn(() => () => {}), bind: vi.fn(() => (key: string) => key) },
       slots: { inject, register },

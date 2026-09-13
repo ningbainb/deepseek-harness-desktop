@@ -36,6 +36,7 @@ async function main() {
   await save()
   const result = { source, displays: displays.map(({ bounds, workArea, scaleFactor }) => ({ bounds, workArea, scaleFactor })),
     input, restoredBounds, action, bounds: window.getBounds(), normal: window.getNormalBounds(),
+    nativeWorkArea: screen.getDisplayMatching(window.getBounds()).workArea,
     content: window.getContentBounds(), maximized: window.isMaximized(),
     scale: await window.webContents.executeJavaScript('devicePixelRatio'),
     saved: JSON.parse(await readFile(statePath, 'utf8')) }
