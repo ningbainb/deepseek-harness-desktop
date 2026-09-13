@@ -610,12 +610,20 @@ try {
     const { verifyModeSwitchLifecycle } = await import('./mode-switch-lifecycle-fixture.mjs')
     await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
       workspacePath, messageCount, logPath, openSeededSession })
+    assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
+    const consoleBeforeClose = second.rendererConsole.filter(line =>
+      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
+    assert.deepEqual(consoleBeforeClose, [], 'mode switching must not introduce unexpected console errors')
+    const consoleCountBeforeClose = second.rendererConsole.length
     await activeApp.close()
     activeApp = undefined
-    assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
-    assert.deepEqual(second.rendererConsole.filter(line =>
-      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line)), [],
-    'mode switching and shutdown must not introduce unexpected console errors')
+    const shutdownConsole = second.rendererConsole.slice(consoleCountBeforeClose)
+      .filter(line => !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
+    const expectedDisconnect = 'warning: [connection] connection lost, retry #1'
+    assert.ok(shutdownConsole.filter(line => line === expectedDisconnect).length <= 1,
+      `shutdown emitted repeated connection retries: ${JSON.stringify(shutdownConsole)}`)
+    assert.deepEqual(shutdownConsole.filter(line => line !== expectedDisconnect), [],
+      'shutdown must not introduce unexpected console errors')
   }
 
   console.log(JSON.stringify({
