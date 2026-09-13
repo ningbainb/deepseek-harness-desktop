@@ -230,6 +230,38 @@ test('DPI viewport clamping preserves logical bounds through maximize, restore, 
   assert.deepEqual(await loadWindowState(statePath, expandedDisplays), changed)
 })
 
+test('native restore transition events cannot replace offscreen logical coordinates', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-native-restore-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  t.after(async () => {
+    window.emit('closed')
+    await rm(root, { recursive: true, force: true })
+  })
+  const restoredBounds = { x: 1920, y: 145, width: 1280, height: 820 }
+  let bounds = { x: 7, y: 0, width: 724, height: 543 }
+  let maximized = true
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => maximized
+  const save = attachWindowStatePersistence(window, statePath, {
+    restoredBounds,
+    visibleBounds: { ...restoredBounds, x: 1706 },
+  })
+
+  maximized = false
+  bounds = { ...bounds, x: 0 }
+  window.emit('move')
+  bounds = { ...bounds, x: 7 }
+  window.emit('unmaximize')
+  await save()
+
+  assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), {
+    ...restoredBounds,
+    maximized: false,
+  })
+})
+
 test('temporary size clamping and a missing display do not replace the saved normal rectangle', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-display-clamp-'))
   const statePath = join(root, 'window-state.json')

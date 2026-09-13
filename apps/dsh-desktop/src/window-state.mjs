@@ -67,6 +67,8 @@ export async function loadWindowStateForRestore(path, displays) {
 
 export function attachWindowStatePersistence(window, path, { restoredBounds, visibleBounds } = {}) {
   let timer
+  let settlingRestore = false
+  let lastMaximized = window.isDestroyed?.() !== true && window.isMaximized()
   let writeQueue = Promise.resolve()
   let latestWrite = writeQueue
   // A restored Windows frame can round outward at fractional DPI, and the
@@ -87,7 +89,7 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     const bounds = { ...window.getNormalBounds() }
     const maximized = window.isMaximized()
     for (const [key, { automatic, requested }] of unchanged) {
-      if (maximized) {
+      if (maximized || settlingRestore) {
         automatic.add(bounds[key])
         bounds[key] = requested
       } else if (automatic.has(bounds[key])) bounds[key] = requested
@@ -102,28 +104,44 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     latestWrite = operation
     return operation
   }
-  const save = () => persist(capture())
+  const save = () => {
+    const content = capture()
+    settlingRestore = false
+    return persist(content)
+  }
   const saveFromEvent = () => {
-    void save().catch(() => {
+    const content = capture()
+    settlingRestore = false
+    void persist(content).catch(() => {
       // Explicit lifecycle saves report failures; event-driven saves must not
       // create an unhandled rejection while the window is moving or closing.
     })
   }
   const schedule = () => {
+    const maximized = window.isMaximized()
+    if (lastMaximized && !maximized) settlingRestore = true
+    lastMaximized = maximized
     clearTimeout(timer)
     timer = setTimeout(saveFromEvent, 250)
   }
   const scheduleMaximize = () => {
     if (window.isDestroyed?.() !== true) {
+      lastMaximized = true
+      settlingRestore = false
       const bounds = window.getNormalBounds()
       for (const [key, { automatic }] of unchanged) automatic.add(bounds[key])
     }
     schedule()
   }
+  const scheduleUnmaximize = () => {
+    settlingRestore = true
+    lastMaximized = false
+    schedule()
+  }
   window.on('resize', schedule)
   window.on('move', schedule)
   window.on('maximize', scheduleMaximize)
-  window.on('unmaximize', schedule)
+  window.on('unmaximize', scheduleUnmaximize)
   window.on('close', () => {
     clearTimeout(timer)
     saveFromEvent()
