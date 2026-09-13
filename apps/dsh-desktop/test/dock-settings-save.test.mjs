@@ -86,6 +86,35 @@ test('a failed close save stops promptly without automatically retrying the same
   assert.equal(f.form.dataset.dockDirty, 'true')
 })
 
+for (const alreadySaving of [false, true]) {
+  test(`save and close waits for transient revision alerts during ${alreadySaving ? 'an existing' : 'its own'} save`, async t => {
+    const f = fixture(t)
+    let writes = 0, polls = 0, alert
+    f.button.disabled = alreadySaving
+    f.button.addEventListener('click', () => { writes++; f.button.disabled = true })
+    const saved = await saveDockSettingsDrafts({
+      document: f.document,
+      wait: async () => {
+        polls++
+        if (polls === 1) {
+          alert = f.fail()
+          alert.textContent = 'Settings revision changed while saving'
+        }
+        if (polls === 3) {
+          alert.remove()
+          f.form.dataset.dockDirty = 'false'
+          f.button.disabled = false
+        }
+      },
+      maxPolls: 5,
+    })
+    assert.equal(saved, true, 'a pending save must settle before an intermediate alert is classified as failure')
+    assert.equal(writes, alreadySaving ? 0 : 1)
+    assert.equal(polls, 3)
+    assert.equal(f.form.dataset.dockDirty, 'false')
+  })
+}
+
 test('choosing save and close permits one explicit retry of a previous failed save', async t => {
   const f = fixture(t)
   const previousFailure = f.fail()

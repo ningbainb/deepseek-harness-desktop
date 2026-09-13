@@ -571,6 +571,7 @@
         "macos-command-option-shortcut-labels",
         "macos-sidebar-controls-clear-native-titlebar",
         "close-save-waits-for-new-draft",
+        "close-save-awaits-pending-save-before-evaluating-alerts",
         "plugin-update-refresh-outside-mutation-lock",
         "plugin-repair-retry-within-active-operation",
         "plugin-diagnostics-use-loaded-inventory"

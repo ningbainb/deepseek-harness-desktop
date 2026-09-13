@@ -36,13 +36,15 @@ export async function saveDockSettingsDrafts({
       if (forms.length === 0) return true
       for (const form of forms) {
         const state = stateFor(form)
+        const button = form.querySelector('[data-dock-save]')
+        // Multi-field saves can briefly report a revision conflict while
+        // their remaining writes are pending. Let that save settle first.
+        if (button?.disabled) continue
         const failure = alerts(form)
         // A previous failure may be retried once by choosing Save and close.
         // New failures, including an already-running save failing, stop here.
         if (failure && (state.attempted || failure !== state.initialAlerts)) return false
-        const button = form.querySelector('[data-dock-save]')
         if (!button) continue
-        if (button.disabled) continue
         const draft = draftKey(form, state)
         if (draft === state.lastDraft) continue
         state.lastDraft = draft
