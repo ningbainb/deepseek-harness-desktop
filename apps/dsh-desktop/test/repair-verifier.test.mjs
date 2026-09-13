@@ -122,8 +122,8 @@ test('repair command children receive only allowlisted environment variables', a
   }
 
   const outcome = await runRegisteredRepairCommand(
-    { executable: 'C:/node.exe', args: ['cli.mjs'], cwd: 'packages/example' },
-    'C:/incident/staging',
+    { executable: process.execPath, args: ['cli.mjs'], cwd: 'packages/example' },
+    process.cwd(),
     { spawnProcess: fakeSpawn, timeoutMs: 1000 },
   )
 

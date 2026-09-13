@@ -209,10 +209,10 @@ test('rapid direct-start states serialize local startup-page navigations', async
 })
 
 test('desktop local surfaces use canonical file URLs with encoded query values', () => {
-  const url = desktopLocalSurfaceUrl('D:\\DeepSeek Harness\\startup.html', {
+  const url = desktopLocalSurfaceUrl(process.platform === 'win32' ? 'D:\\DeepSeek Harness\\startup.html' : '/DeepSeek Harness/startup.html', {
     query: { directState: 'starting full', omitted: undefined },
   })
-  assert.equal(url, 'file:///D:/DeepSeek%20Harness/startup.html?directState=starting+full')
+  assert.equal(url, process.platform === 'win32' ? 'file:///D:/DeepSeek%20Harness/startup.html?directState=starting+full' : 'file:///DeepSeek%20Harness/startup.html?directState=starting+full')
   assert.equal(url.includes('\\'), false)
 })
 

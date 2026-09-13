@@ -4,7 +4,7 @@ This page covers installing the unsigned contributor preview of **DeepSeek Harne
 
 ## Scope and limits
 
-- Apple Silicon (arm64) only. Intel Macs are not supported; Rosetta cannot run an arm64 build.
+- macOS 12 or later on Apple Silicon (arm64) only. Intel Macs are not supported; Rosetta cannot run an arm64 build.
 - This is an unsigned preview, not a stable distribution, and it is not on the Mac App Store.
 - macOS uses the system Git. MinGit is not bundled. If `git --version` fails, install Xcode Command Line Tools with `xcode-select --install`.
 - Preview builds have no in-app auto-update. **Help > Check for Updates** explains this. Download new builds from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases). Do not use `/releases/latest`; pre-releases are omitted from Latest.
@@ -29,6 +29,21 @@ xattr -dr com.apple.quarantine "/Applications/DeepSeek Harness Desktop.app"
 - The built-in terminal works (it must not exit because `pty.node` or `spawn-helper` is missing).
 - System Git is detected; a missing CLT should prompt installation instead of reporting that Git is absent.
 - Exercise plugin install, SSH, Task Board, and deep links the way you normally would.
+
+## Contributor builds
+
+Run from the repository root on an Apple Silicon Mac:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm verify
+pnpm --filter @deepseek-ai/dsh-desktop pack:mac
+pnpm --filter @deepseek-ai/dsh-desktop pack:verify:mac
+pnpm desktop:regression:e2e:full --keep-going
+pnpm --filter @deepseek-ai/dsh-desktop test:macos-lifecycle:e2e
+```
+
+The full gate detects the packaged `.app` automatically. `--keep-going` runs the remaining suites after a failure and still exits with a nonzero status. Tests use isolated profiles. CI also runs on the `macos-15` ARM runner; local success does not replace that platform check.
 
 ## Feedback
 

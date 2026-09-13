@@ -136,6 +136,7 @@ export function secondaryWindowWebPreferences({ preload } = {}) {
     spellcheck: false,
   }
 }
+
 /**
  * Keep the primary BrowserWindow security contract in one mechanically
  * testable constructor. Wiring (IPC, renderer surfaces, and lifecycle
@@ -403,6 +404,8 @@ export function createDesktopWindowFactory({
 
   return Object.freeze({
     createExtensionWindow,
+    prepareQuit: () => dockSettings?.prepareClose() ?? Promise.resolve(true),
+    cancelQuit: () => dockSettings?.cancelClose(),
     selectDockSetting: (id) => {
       if (!dockSettings) throw new Error('拓展坞设置尚未就绪，请重新打开拓展坞。')
       return dockSettings.select(id)

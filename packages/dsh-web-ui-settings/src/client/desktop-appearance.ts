@@ -34,7 +34,7 @@ export function surfaceColor(value: string, background: string): string {
 export function installDesktopAppearance(window: Window): () => void {
   const { document } = window
   const desktop = (window as Window & { dshDesktop?: { setWindowChromeTheme?: (theme: string, palette: DesktopPalette | null) => Promise<unknown> } }).dshDesktop
-  let previous = '', timer: ReturnType<typeof setTimeout> | undefined
+  let previous = '', timer: ReturnType<typeof setTimeout> | undefined, disposed = false
   const apply = (value: Appearance) => {
     if (!value || !['dark', 'light'].includes(value.theme)) return
     if (value.palette && !['background', 'foreground', 'accent', 'border'].every(key => /^#[\da-f]{6}$/i.test(value.palette![key as keyof DesktopPalette]))) return
@@ -46,6 +46,7 @@ export function installDesktopAppearance(window: Window): () => void {
   }
   const sample = () => {
     timer = undefined
+    if (disposed) return
     const root = document.documentElement
     const style = window.getComputedStyle(document.body)
     const token = (name: string, fallback: string) => surfaceColor(style.getPropertyValue(name), fallback)
@@ -64,11 +65,17 @@ export function installDesktopAppearance(window: Window): () => void {
     previous = key
     apply(value)
   }
-  const schedule = () => { if (!timer) timer = setTimeout(sample, 80) }
+  const schedule = () => { if (!disposed && !timer) timer = setTimeout(sample, 80) }
   const observer = new MutationObserver(schedule)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-dsh-skin', 'style', 'class'] })
   observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
   document.addEventListener('load', schedule, true)
   schedule()
-  return () => { clearTimeout(timer); observer.disconnect(); document.removeEventListener('load', schedule, true) }
+  return () => {
+    disposed = true
+    clearTimeout(timer)
+    timer = undefined
+    observer.disconnect()
+    document.removeEventListener('load', schedule, true)
+  }
 }

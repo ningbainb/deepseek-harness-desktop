@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   REPOSITORY_ROOT,
   isControlledImportPath,
+  isIgnoredSourcePath,
   listRepositoryFiles,
   scanRepositoryImports,
 } from './dsh-import-boundary.mjs'
@@ -74,6 +75,7 @@ export async function scanRuntimeSeams(root = REPOSITORY_ROOT) {
   const paths = (await listRepositoryFiles(root))
     .map((path) => path.split('\\').join('/'))
     .filter((path) => SCANNED_SOURCE_EXTENSIONS.has(sourceExtension(path)))
+    .filter((path) => !isIgnoredSourcePath(path))
     .filter((path) => !path.includes('/lib/') && !path.includes('/dist/') && !path.includes('/build/'))
     .filter((path) => !path.endsWith('.d.ts'))
     .toSorted()

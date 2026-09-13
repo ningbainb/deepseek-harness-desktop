@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -57,7 +58,7 @@ test('deep link routing queues until ready, deduplicates, and dispatches each ro
 })
 
 test('preset file arguments accept only absolute .dshpreset files', () => {
-  assert.equal(presetFileFrom(['desktop.exe', 'C:\\Users\\person\\portable.dshpreset']), 'C:\\Users\\person\\portable.dshpreset')
+  assert.equal(presetFileFrom(['desktop.exe', resolve('/C/Users/person/portable.dshpreset')]), resolve('/C/Users/person/portable.dshpreset'))
   assert.equal(presetFileFrom(['desktop.exe', '.\\portable.dshpreset']), undefined)
-  assert.equal(presetFileFrom(['desktop.exe', 'C:\\Users\\person\\portable.txt']), undefined)
+  assert.equal(presetFileFrom(['desktop.exe', resolve('/C/Users/person/portable.txt')]), undefined)
 })

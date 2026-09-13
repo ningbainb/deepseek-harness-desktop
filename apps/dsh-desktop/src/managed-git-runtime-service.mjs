@@ -1,7 +1,7 @@
 import { createHash as nodeCreateHash } from 'node:crypto'
 import * as nodeFs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, win32 } from 'node:path'
 
 import {
   MANAGED_GIT_ALLOWED_HOSTS,
@@ -309,9 +309,13 @@ export async function downloadManagedGitArchive({
  * writes process.env, the registry, or a user/system PATH setting.
  */
 export function prependManagedGitPathEntry(executablePath, pathEntries = []) {
-  const executable = assertAbsolutePath(executablePath, 'managed Git executable')
+  if (typeof executablePath !== 'string' || executablePath.length === 0 || executablePath.length > 4_096 || executablePath.includes('\0') || !win32.isAbsolute(executablePath)) {
+    throw new TypeError('managed Git executable must be an absolute path')
+  }
+  const pathApi = isAbsolute(executablePath) ? { resolve, dirname } : win32
+  const executable = pathApi.resolve(executablePath)
   const existing = normalizeExistingPathEntries(pathEntries)
-  const commandDirectory = dirname(executable)
+  const commandDirectory = pathApi.dirname(executable)
   const seen = new Set([windowsPathIdentity(commandDirectory)])
   const entries = [commandDirectory]
   for (const entry of existing) {

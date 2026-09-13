@@ -11,8 +11,10 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { quotePosixArgument } from './terminal-e2e-probe.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
+const shellTool = process.platform === 'win32' ? 'pwsh' : 'bash'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
 const configuredExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -68,7 +70,7 @@ function toolCallChunk({ argumentsJson, finishReason }) {
           index: 0,
           id: 'call-dsh-agent-fixture',
           type: 'function',
-          function: { name: 'pwsh', arguments: argumentsJson },
+          function: { name: shellTool, arguments: argumentsJson },
         }],
       },
       finish_reason: finishReason ?? null,
@@ -93,12 +95,14 @@ const server = createServer(async (request, response) => {
     sendChunk(response, completionChunk({ content: 'Agent workspace verification' }))
     sendChunk(response, completionChunk({ finishReason: 'stop' }))
   } else {
-    assert.ok(tools.some(tool => tool.function?.name === 'pwsh'), 'Agent request did not expose the pwsh tool')
+    assert.ok(tools.some(tool => tool.function?.name === shellTool), `Agent request did not expose the ${shellTool} tool`)
     const hasToolResult = body.messages?.some(message => message.role === 'tool') === true
     if (!hasToolResult) {
       const escapedMarkerPath = markerPath.replaceAll("'", "''")
       const argumentsJson = JSON.stringify({
-        command: `Set-Content -LiteralPath '${escapedMarkerPath}' -Value 'agent-work-complete' -Encoding utf8`,
+        command: shellTool === 'pwsh'
+          ? `Set-Content -LiteralPath '${escapedMarkerPath}' -Value 'agent-work-complete' -Encoding utf8`
+          : `printf '%s\\n' agent-work-complete > ${quotePosixArgument(markerPath)}`,
         description: 'Create deterministic agent verification marker',
       })
       sendChunk(response, toolCallChunk({ argumentsJson }))
@@ -268,7 +272,7 @@ try {
   assert.equal(agentRequests.length, 2, `expected one tool-call round, got ${agentRequests.length} agent requests`)
   assert.ok(titleRequests.length >= 1, 'automatic title generation request was not observed')
   assert.ok(agentRequests.every(request => request.model === 'agent-fixture-model'))
-  assert.ok(agentRequests[0].tools.some(tool => tool.function?.name === 'pwsh'), 'Agent request did not expose pwsh')
+  assert.ok(agentRequests[0].tools.some(tool => tool.function?.name === shellTool), `Agent request did not expose ${shellTool}`)
   const toolResult = agentRequests[1].messages?.find(message => message.role === 'tool')
   assert.equal(toolResult?.tool_call_id, 'call-dsh-agent-fixture')
   assert.equal((await readFile(markerPath, 'utf8')).trim(), 'agent-work-complete')

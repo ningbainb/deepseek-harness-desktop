@@ -76,13 +76,16 @@ test('repository file listing omits tracked files deleted from the working tree'
   }
 })
 
-test('repository import scan excludes patch construction scratch trees', async () => {
+test('repository import scan excludes patch construction and local spike scratch trees', async () => {
   const root = await mkdtemp(resolve(tmpdir(), 'dsh-import-scratch-'))
   try {
     await execFileAsync('git', ['init'], { cwd: root, windowsHide: true })
     await mkdir(resolve(root, '.patch-work'), { recursive: true })
+    await mkdir(resolve(root, '_spikes'), { recursive: true })
+    const ignoredImport = "import '@deepseek-ai/" + "dsh-settings'\n"
     await writeFile(resolve(root, 'kept.mjs'), "import '@deepseek-ai/dsh-session'\n")
-    await writeFile(resolve(root, '.patch-work', 'scratch.mjs'), "import '@deepseek-ai/dsh-settings'\n")
+    await writeFile(resolve(root, '.patch-work', 'scratch.mjs'), ignoredImport)
+    await writeFile(resolve(root, '_spikes', 'scratch.mjs'), ignoredImport)
 
     assert.deepEqual(await scanRepositoryImports(root), [{
       path: 'kept.mjs',

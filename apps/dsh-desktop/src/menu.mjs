@@ -100,6 +100,7 @@ export function createApplicationMenuTemplate({
         { role: 'selectAll', label: '全选 / Select All' },
       ],
     },
+    ...(platform === 'darwin' ? [{ role: 'windowMenu' }] : []),
     {
       label: '帮助 / Help',
       submenu: [

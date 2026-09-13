@@ -570,6 +570,7 @@ test('identical runtime crashes stop automatic restart after one retry', async (
     cliPath: 'dsh-bin.js',
     cwd: process.cwd(),
     dshHome: 'C:\\isolated-home',
+    platform: 'win32',
     autoRestart: true,
     spawnProcess: () => children[spawns++],
     logStore: { append: async () => {} },

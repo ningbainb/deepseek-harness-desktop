@@ -565,7 +565,13 @@
         "dedicated-settings-form-default-expanded",
         "thirteen-sidebar-destinations-fit-default-window",
         "collapsed-settings-draft-close-save",
+        "quit-resolves-settings-drafts-before-runtime-stop",
+        "macos-native-quit-after-settings-close",
+        "macos-native-window-menu",
+        "macos-command-option-shortcut-labels",
+        "macos-sidebar-controls-clear-native-titlebar",
         "close-save-waits-for-new-draft",
+        "close-save-awaits-pending-save-before-evaluating-alerts",
         "plugin-update-refresh-outside-mutation-lock",
         "plugin-repair-retry-within-active-operation",
         "plugin-diagnostics-use-loaded-inventory"

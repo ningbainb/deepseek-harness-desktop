@@ -334,7 +334,7 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
     sync()
   })
   observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
-    attributeFilter: ['class', 'style', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
+    attributeFilter: ['class', 'style', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'data-dsh-title-bar-compat', 'role', 'aria-modal', 'open'] })
   window.addEventListener('pagehide', pagehide)
   sync()
   return dispose
@@ -349,6 +349,8 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
   })
   return `(() => {
     const data = ${data};
+    const platform = window.dshDesktop?.shellContext?.platform;
+    if (platform) document.documentElement.dataset.dshDesktopPlatform = platform;
     document.getElementById(data.id)?.remove();
     const chrome = document.createElement('div');
     chrome.id = data.id;
@@ -418,8 +420,8 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         kind: 'tools',
         label: '工具 / Tools',
         entries: [
-          { label: '内置终端 / Built-in Terminal', action: 'terminal', shortcut: 'Ctrl+Alt+T' },
-          { label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: 'Ctrl+Shift+X' },
+          { label: '内置终端 / Built-in Terminal', action: 'terminal', shortcut: platform === 'darwin' ? 'Cmd+Option+T' : 'Ctrl+Alt+T' },
+          { label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: platform === 'darwin' ? 'Cmd+Shift+X' : 'Ctrl+Shift+X' },
           { label: '从其他 AI 工具导入 / Migrate from Other AI Tools', action: 'conversation-import' },
         ],
         invoke: (action) => window.dshDesktop.toolAction(action),
@@ -460,6 +462,12 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
     };
     let activeTheme;
     const syncTheme = () => {
+      // Use the sidebar's existing caption adapter without moving its viewport
+      // host. Explicit sidebar preferences keep their configured strip height.
+      if (platform === 'darwin' && !document.body.hasAttribute('data-dsh-title-bar-compat')) {
+        document.body.setAttribute('data-dsh-title-bar-compat', '');
+        document.documentElement.style.setProperty('--dsh-title-bar-strip', data.chromeHeight + 'px');
+      }
       const theme = isDark() ? 'dark' : 'light';
       if (document.documentElement.dataset.dshDesktopChromeTheme !== theme) {
         document.documentElement.dataset.dshDesktopChromeTheme = theme;

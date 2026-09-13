@@ -539,8 +539,9 @@ try {
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0)
     const nativeWindow = await activeApp.browserWindow(second.page)
     // Native-default layout no longer spends 260px on a legacy Explorer.
-    // Narrow the actual conversation, not a window size that used to imply it.
-    await nativeWindow.evaluate(window => window.setSize(1000, 820))
+    // Use a viewport below the 800px conversation breakpoint even when the
+    // native sidebar is collapsed (the default can differ by platform).
+    await nativeWindow.evaluate(window => window.setSize(780, 820))
     await second.page.waitForFunction(() => document.querySelector('[data-pane="conversation"]')?.getBoundingClientRect().width < 800)
     assert.equal(await rail.isVisible(), false, 'DSH hides its native rail in a narrow container')
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'narrow Desktop stays free of the removed pager')
@@ -609,12 +610,20 @@ try {
     const { verifyModeSwitchLifecycle } = await import('./mode-switch-lifecycle-fixture.mjs')
     await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
       workspacePath, messageCount, logPath, openSeededSession })
+    assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
+    const consoleBeforeClose = second.rendererConsole.filter(line =>
+      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
+    assert.deepEqual(consoleBeforeClose, [], 'mode switching must not introduce unexpected console errors')
+    const consoleCountBeforeClose = second.rendererConsole.length
     await activeApp.close()
     activeApp = undefined
-    assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
-    assert.deepEqual(second.rendererConsole.filter(line =>
-      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line)), [],
-    'mode switching and shutdown must not introduce unexpected console errors')
+    const shutdownConsole = second.rendererConsole.slice(consoleCountBeforeClose)
+      .filter(line => !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
+    const expectedDisconnect = 'warning: [connection] connection lost, retry #1'
+    assert.ok(shutdownConsole.filter(line => line === expectedDisconnect).length <= 1,
+      `shutdown emitted repeated connection retries: ${JSON.stringify(shutdownConsole)}`)
+    assert.deepEqual(shutdownConsole.filter(line => line !== expectedDisconnect), [],
+      'shutdown must not introduce unexpected console errors')
   }
 
   console.log(JSON.stringify({

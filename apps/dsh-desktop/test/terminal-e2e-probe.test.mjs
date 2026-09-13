@@ -25,3 +25,29 @@ test('PowerShell cwd probe rejects invalid expected paths', () => {
     assert.throws(() => createPowerShellCwdProbe(value), /absolute path/u)
   }
 })
+
+// Execute the POSIX probe, including shell-sensitive characters and a symlink,
+// so a command echoed by xterm cannot be mistaken for successful execution.
+test('POSIX cwd probe verifies physical cwd and safely quotes paths', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const { mkdtemp, mkdir, rm, symlink } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { createPosixCwdProbe } = await import('../scripts/terminal-e2e-probe.mjs')
+  if (process.platform === 'win32') {
+    assert.throws(() => createPosixCwdProbe('C:\\work'), /absolute path/)
+    return
+  }
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cwd-probe-'))
+  try {
+    const path = join(root, "space ' quote $ variable")
+    await mkdir(path)
+    const alias = join(root, 'alias')
+    await symlink(path, alias)
+    const command = createPosixCwdProbe(alias)
+    assert.equal(command.includes(CWD_PROBE_SUCCESS), false)
+    assert.equal(command.includes(CWD_PROBE_MISMATCH), false)
+    assert.equal(execFileSync('/bin/sh', ['-c', command], { cwd: path, encoding: 'utf8' }).trim(), CWD_PROBE_SUCCESS)
+    assert.equal(execFileSync('/bin/sh', ['-c', command], { cwd: root, encoding: 'utf8' }).trim(), CWD_PROBE_MISMATCH)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

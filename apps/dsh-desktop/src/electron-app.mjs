@@ -2798,13 +2798,25 @@ export async function startElectronApp(metadata) {
     event.preventDefault()
     if (wasQuitting) return
     setQuitInProgress(true)
-    void shutdownLifecycle.shutdown()
-      .then(() => app.quit())
+    // Resolve drafts while the Runtime can still persist them. An asynchronous
+    // window close after app.quit cancels the native macOS quit sequence.
+    void desktopWindowFactory.prepareQuit()
+      .then(async approved => {
+        if (!approved) {
+          appQuitStarted = false
+          setQuitInProgress(false)
+          closeBehaviorController?.cancelExplicitQuit()
+          return
+        }
+        await shutdownLifecycle.shutdown()
+        app.quit()
+      })
       .catch((error) => {
         appQuitStarted = false
         setQuitInProgress(false)
         closeBehaviorController?.cancelExplicitQuit()
         const message = error instanceof Error ? error.message : String(error)
+        desktopWindowFactory.cancelQuit()
         void logStore.append(`[shutdown] quit deferred because runtime stop failed: ${message}`).catch(() => {})
       })
   })

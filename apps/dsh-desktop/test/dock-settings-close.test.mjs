@@ -31,7 +31,7 @@ async function fixture({ dirty = true, response = 1, saved = true, unavailable =
   }
   const control = createDockSettingsView({ WebContentsView: View, window, mainWindow: { webContents: { session: {} } }, getRuntimeOrigin: () => 'http://127.0.0.1:1234', closeCheckTimeoutMs: 10, dialog: { showMessageBox: async () => { prompts++; return { response } } } })
   await control.select('personal-prompt')
-  return { window, state: () => ({ closed, prompts, saves }) }
+  return { window, control, state: () => ({ closed, prompts, saves }) }
 }
 
 test('return to editing keeps the window and drafts alive', async () => {
@@ -180,4 +180,19 @@ test('a current warm renderer failure exposes the shell retry action instead of 
   state.inspect = async () => true
   await control.select('personal-prompt')
   assert.equal(state.visible.at(-1), true)
+})
+
+
+test('application quit resolves drafts before the native close sequence', async () => {
+  for (const response of [0, 1, 2]) {
+    const f = await fixture({ response })
+    const approved = await f.control.prepareClose()
+    assert.equal(approved, response !== 1)
+    assert.deepEqual(f.state(), { closed: false, prompts: 1, saves: response === 0 ? 1 : 0 })
+    if (approved) {
+      f.window.close()
+      assert.equal(f.state().closed, true, 'approved quit closes synchronously without cancelling macOS app.quit')
+      assert.equal(f.state().prompts, 1)
+    }
+  }
 })

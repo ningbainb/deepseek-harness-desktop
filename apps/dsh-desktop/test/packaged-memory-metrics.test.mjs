@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   createMemorySample,
   normalizeProcessSnapshot,
+  normalizePosixProcessSnapshot,
   selectProcessTree,
   summarizeMemorySamples,
 } from '../scripts/packaged-memory-metrics.mjs'
@@ -53,4 +54,14 @@ test('memory summaries use only the final idle window and compute even medians',
   assert.equal(summary.sampleCount, 4)
   assert.equal(summary.finalWindowSampleCount, 3)
   assert.deepEqual(summary.totalWorkingSetBytes, { minimum: 10, median: 20, maximum: 30 })
+})
+
+test('macOS ps snapshots retain spaced executable paths and count only the app tree RSS', () => {
+  const rows = normalizePosixProcessSnapshot(' 10 1 100 /Applications/DeepSeek Harness Desktop.app/Contents/MacOS/DeepSeek Harness Desktop\n 11 10 50 /app/node_modules/@deepseek-ai/dsh/lib/bin.js --profile desktop\n 20 1 900 /other/app\n')
+  assert.equal(rows[0].commandLine, '/Applications/DeepSeek Harness Desktop.app/Contents/MacOS/DeepSeek Harness Desktop')
+  const sample = createMemorySample(rows, 10, 100)
+  assert.equal(sample.totalWorkingSetBytes, 150 * 1024)
+  assert.equal(sample.runtimeWorkingSetBytes, 50 * 1024)
+  assert.equal(sample.processCount, 2)
+  assert.throws(() => normalizePosixProcessSnapshot('invalid'), /snapshot row/)
 })

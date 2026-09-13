@@ -95,3 +95,20 @@ export function createMemorySample(rows, rootProcessId, elapsedMs) {
     processCount: tree.length,
   })
 }
+
+/** ps RSS is in KiB. Private committed bytes are unavailable from macOS ps. */
+export function normalizePosixProcessSnapshot(text) {
+  if (typeof text !== 'string') throw new TypeError('process snapshot must be text')
+  return text.split('\n').filter(line => line.trim()).map(line => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/.exec(line)
+    if (!match) throw new TypeError('invalid POSIX process snapshot row')
+    return Object.freeze({
+      processId: numericField(match[1], 'pid'),
+      parentProcessId: numericField(match[2], 'ppid'),
+      workingSetBytes: numericField(Number(match[3]) * 1024, 'rss'),
+      privateBytes: 0,
+      name: '',
+      commandLine: match[4],
+    })
+  })
+}

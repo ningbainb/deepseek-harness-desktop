@@ -70,8 +70,9 @@ it('observes skin changes, clears native colors on reset, and stops on disposal'
     await vi.advanceTimersByTimeAsync(200)
     expect(setWindowChromeTheme).toHaveBeenLastCalledWith('light', null)
     expect(document.documentElement.style.getPropertyValue('--dsh-desktop-chrome-bg')).toBe('')
-    dispose()
     document.documentElement.setAttribute('data-dsh-skin', 'fixture')
+    fireEvent.load(document)
+    dispose()
     await vi.advanceTimersByTimeAsync(200)
     expect(setWindowChromeTheme).toHaveBeenCalledTimes(2)
   } finally {

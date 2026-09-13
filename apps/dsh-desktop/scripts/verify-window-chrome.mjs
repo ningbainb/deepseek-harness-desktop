@@ -169,8 +169,8 @@ try {
   }))
   const requiredChromeEntries = [
     '工具 / Tools',
-    '内置终端 / Built-in TerminalCtrl+Alt+T',
-    '扩展坞 / Extension DockCtrl+Shift+X',
+    `内置终端 / Built-in Terminal${process.platform === 'darwin' ? 'Cmd+Option+T' : 'Ctrl+Alt+T'}`,
+    `扩展坞 / Extension Dock${process.platform === 'darwin' ? 'Cmd+Shift+X' : 'Ctrl+Shift+X'}`,
     '从其他 AI 工具导入 / Migrate from Other AI Tools',
     '帮助 / Help',
     '加入社群',
@@ -280,8 +280,8 @@ try {
   const toolsMenu = page.getByRole('menu', { name: '工具 / Tools' })
   await toolsMenu.waitFor({ state: 'visible' })
   assert.deepEqual(await toolsMenu.getByRole('menuitem').allTextContents(), [
-    '内置终端 / Built-in TerminalCtrl+Alt+T',
-    '扩展坞 / Extension DockCtrl+Shift+X',
+    `内置终端 / Built-in Terminal${process.platform === 'darwin' ? 'Cmd+Option+T' : 'Ctrl+Alt+T'}`,
+    `扩展坞 / Extension Dock${process.platform === 'darwin' ? 'Cmd+Shift+X' : 'Ctrl+Shift+X'}`,
     '从其他 AI 工具导入 / Migrate from Other AI Tools',
   ])
   if (screenshot) await page.screenshot({ path: screenshot })
@@ -470,7 +470,7 @@ try {
     const extensionDockMenu = toolsMenu?.submenu?.items.find((item) => item.label.includes('Extension Dock'))
     const updateMenu = helpMenu?.submenu?.items.find((item) => item.label.includes('Check for Updates'))
     const packagedIcon = app.isPackaged
-      ? nativeImage.createFromPath(`${process.resourcesPath}\\app-icon.png`)
+      ? nativeImage.createFromPath(process.getBuiltinModule('path').join(process.resourcesPath, 'app-icon.png'))
       : undefined
     return {
       appName: app.getName(),
@@ -490,10 +490,10 @@ try {
     hasExtensionDockMenu: true,
     packagedIconValid: true,
     maximizable: true,
-    menuBarVisible: false,
+    menuBarVisible: process.platform === 'darwin',
     minimizable: true,
   })
-  const pnpmShim = await readFile(resolve(temporary, 'user-data', 'runtime-bin', 'pnpm.cmd'), 'utf8')
+  const pnpmShim = await readFile(resolve(temporary, 'user-data', 'runtime-bin', process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'), 'utf8')
   assert.match(pnpmShim, /ELECTRON_RUN_AS_NODE=1/u)
   assert.match(pnpmShim, /pnpm\.(?:mjs|cjs)/u)
   const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8')
