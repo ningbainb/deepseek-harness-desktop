@@ -256,7 +256,92 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
   }
 })
 
-test('release recovery restores Windows native optional bindings omitted by electron-builder', async () => {
+test('release recovery restores Windows native optional bindings from resolved package sources', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-native-bindings-'))
+  const sources = await mkdtemp(join(tmpdir(), 'dsh-native-sources-'))
+  const files = [
+    '@img/sharp-win32-x64/lib/sharp-win32-x64-0.35.3.node',
+    '@koromix/koffi-win32-x64/win32_x64/koffi.node',
+    '@vscode/ripgrep-win32-x64/bin/rg.exe',
+    'lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node',
+    'node-addon-require-builtin-win32-x64-msvc/prebuilt/win32-x64-msvc-napi-v9.node',
+  ]
+  const resolveModule = name => name.endsWith('/package.json')
+    ? join(sources, name) : join(sources, name, 'lib', 'index.js')
+  try {
+    for (const file of files) {
+      const name = file.startsWith('@') ? file.split('/').slice(0, 2).join('/') : file.split('/')[0]
+      await mkdir(dirname(join(sources, file)), { recursive: true })
+      await writeFile(join(sources, name, 'package.json'), JSON.stringify({ name }))
+      await writeFile(join(sources, file), `native fixture: ${name}`)
+    }
+    const restored = await restoreRequiredNativeBindings(root, {
+      platform: 'win32',
+      arch: 'x64',
+    }, { resolveModule })
+    assert.deepEqual(restored, [
+      '@img/sharp-win32-x64',
+      '@koromix/koffi-win32-x64',
+      '@vscode/ripgrep-win32-x64',
+      'lightningcss-win32-x64-msvc',
+      'node-addon-require-builtin-win32-x64-msvc',
+    ])
+    await access(join(
+      root,
+      '@img',
+      'sharp-win32-x64',
+      'lib',
+      'sharp-win32-x64-0.35.3.node',
+    ))
+    await access(join(root, '@koromix', 'koffi-win32-x64', 'win32_x64', 'koffi.node'))
+    await access(join(root, '@vscode', 'ripgrep-win32-x64', 'bin', 'rg.exe'))
+    await access(join(
+      root,
+      'lightningcss-win32-x64-msvc',
+      'lightningcss.win32-x64-msvc.node',
+    ))
+    await access(join(
+      root,
+      'node-addon-require-builtin-win32-x64-msvc',
+      'prebuilt',
+      'win32-x64-msvc-napi-v9.node',
+    ))
+    assert.deepEqual(await restoreRequiredNativeBindings(root, {
+      platform: 'win32',
+      arch: 'x64',
+    }, { resolveModule }), [])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+    await rm(sources, { recursive: true, force: true })
+  }
+})
+
+test('Windows packaging favors install speed and retains only supported Electron locales', async () => {
+  const config = YAML.parse(await readFile(
+    resolve(import.meta.dirname, '..', 'electron-builder.yml'),
+    'utf8',
+  ))
+  assert.equal(config.npmRebuild, false)
+  assert.equal(config.compression, 'normal')
+  assert.deepEqual(config.electronLanguages, ['en-US', 'zh-CN', 'zh-TW'])
+})
+
+// The fixture above exercises Windows recovery on every host; this probe also
+// checks the actual installed macOS native packages rather than fixture bytes.
+test('release recovery restores installed macOS arm64 native bindings', { skip: process.platform !== 'darwin' || process.arch !== 'arm64' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-native-mac-'))
+  try {
+    const restored = await restoreRequiredNativeBindings(root, { platform: 'darwin', arch: 'arm64' })
+    assert.deepEqual(restored, ['@img/sharp-darwin-arm64', '@img/sharp-libvips-darwin-arm64', '@koromix/koffi-darwin-arm64', '@vscode/ripgrep-darwin-arm64', 'lightningcss-darwin-arm64', 'node-addon-require-builtin-darwin-arm64'])
+    await access(join(root, '@vscode/ripgrep-darwin-arm64/bin/rg'))
+    await access(join(root, 'lightningcss-darwin-arm64/lightningcss.darwin-arm64.node'))
+    assert.deepEqual(await restoreRequiredNativeBindings(root, { platform: 'darwin', arch: 'arm64' }), [])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('installed Windows native optional bindings are recoverable', { skip: process.platform !== 'win32' || process.arch !== 'x64' }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-native-bindings-'))
   try {
     const restored = await restoreRequiredNativeBindings(root, {
@@ -297,14 +382,4 @@ test('release recovery restores Windows native optional bindings omitted by elec
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-})
-
-test('Windows packaging favors install speed and retains only supported Electron locales', async () => {
-  const config = YAML.parse(await readFile(
-    resolve(import.meta.dirname, '..', 'electron-builder.yml'),
-    'utf8',
-  ))
-  assert.equal(config.npmRebuild, false)
-  assert.equal(config.compression, 'normal')
-  assert.deepEqual(config.electronLanguages, ['en-US', 'zh-CN', 'zh-TW'])
 })

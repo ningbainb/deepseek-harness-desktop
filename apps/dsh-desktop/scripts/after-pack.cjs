@@ -434,7 +434,7 @@ async function restoreRequiredPackagedPeers(nodeModulesRoot) {
   return restored
 }
 
-async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_PACKING_TARGET) {
+async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_PACKING_TARGET, { resolveModule = require.resolve } = {}) {
   const normalizedTarget = normalizePackingTarget(target)
   const bindings = REQUIRED_PACKAGED_NATIVE_BINDINGS[
     `${normalizedTarget.platform}-${normalizedTarget.arch}`
@@ -450,14 +450,14 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
     }
     let resolutionAnchor
     try {
-      resolutionAnchor = require.resolve(resolveFrom)
+      resolutionAnchor = resolveModule(resolveFrom)
     } catch (error) {
       if (error?.code !== 'MODULE_NOT_FOUND') throw error
-      resolutionAnchor = require.resolve(`${resolveFrom}/package.json`)
+      resolutionAnchor = resolveModule(`${resolveFrom}/package.json`)
     }
     const source = Array.isArray(sourceFromEntry)
       ? resolve(dirname(resolutionAnchor), ...sourceFromEntry)
-      : dirname(require.resolve(`${packageName}/package.json`, {
+      : dirname(resolveModule(`${packageName}/package.json`, {
           paths: [dirname(resolutionAnchor)],
         }))
     const physicalSource = await realpath(source)

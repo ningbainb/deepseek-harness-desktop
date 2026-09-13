@@ -19,7 +19,7 @@ test('mac packaging is unsigned arm64 dmg+zip without Intel or universal targets
   assert.equal(config.mac.forceCodeSigning, false)
   assert.equal(config.mac.icon, 'build/icon.icns')
   assert.equal(config.mac.category, 'public.app-category.developer-tools')
-  assert.equal(config.mac.minimumSystemVersion, '11.0')
+  assert.equal(config.mac.minimumSystemVersion, '12.0')
   assert.equal(config.mac.entitlements, 'build/entitlements.mac.plist')
   assert.equal(config.mac.entitlementsInherit, 'build/entitlements.mac.inherit.plist')
   assert.equal(config.mac.artifactName, 'DeepSeek-Harness-Desktop-${version}-${arch}.${ext}')

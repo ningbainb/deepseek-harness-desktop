@@ -10,6 +10,7 @@ import { _electron as electron } from 'playwright'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-settings-window-e2e-'))
 const runtimeReadyTimeoutMs = process.env.CI ? 120_000 : 90_000
+const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
 let electronApp
 let page
 
@@ -49,8 +50,8 @@ const assertContained = (state) => {
 
 try {
   electronApp = await electron.launch({
-    executablePath: electronPath,
-    args: [resolve(appDir, 'src', 'main.mjs')],
+    executablePath: packagedExecutable || electronPath,
+    args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
     cwd: appDir,
     env: {
       ...process.env,

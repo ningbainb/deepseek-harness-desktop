@@ -1,15 +1,15 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { delimiter, posix, win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 const DEFAULT_TERMINAL_SIZE = Object.freeze({ cols: 80, rows: 24 })
 const MAX_TERMINAL_INPUT_LENGTH = 65_536
 const MAX_TERMINAL_OUTPUT_LENGTH = 65_536
 const MAX_PATH_ENTRIES = 64
 
-function terminalPath(environment) {
+function terminalPath(environment, platform) {
   const key = Object.keys(environment).find((name) => name.toLowerCase() === 'path')
-  return { key: key ?? (process.platform === 'win32' ? 'Path' : 'PATH'), value: key === undefined ? '' : environment[key] }
+  return { key: key ?? (platform === 'win32' ? 'Path' : 'PATH'), value: key === undefined ? '' : environment[key] }
 }
 
 function normalizedPathEntries(pathEntries) {
@@ -98,7 +98,8 @@ export function createTerminalEnvironment({
   }
   delete result.ELECTRON_RUN_AS_NODE
   const entries = normalizedPathEntries(pathEntries)
-  const path = terminalPath(result)
+  const path = terminalPath(result, platform)
+  const delimiter = platform === 'win32' ? win32.delimiter : posix.delimiter
   if (entries.length > 0) {
     const identity = (value) => platform === 'win32'
       ? value.replaceAll('/', '\\').replace(/\\+$/u, '').toLowerCase()

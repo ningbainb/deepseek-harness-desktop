@@ -163,8 +163,8 @@ describe('IPC best-effort failures are recorded, not swallowed', () => {
 })
 
 describe('repair verifier failures are recorded', () => {
-  const command = { executable: 'C:\\Windows\\System32\\cmd.exe', args: ['/c', 'exit 0'], cwd: '.' }
-  const workspace = 'C:\\repair-workspace'
+  const command = { executable: process.execPath, args: ['/c', 'exit 0'], cwd: '.' }
+  const workspace = process.cwd()
 
   test('a spawn failure is logged instead of vanishing into ok:false', async () => {
     const logLines = []

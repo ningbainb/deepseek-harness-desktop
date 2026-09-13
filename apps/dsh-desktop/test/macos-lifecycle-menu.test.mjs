@@ -28,9 +28,11 @@ function menuOptions(platform) {
 test('macOS uses the native application menu while Windows keeps the existing App menu', () => {
   const darwin = createApplicationMenuTemplate(menuOptions('darwin'))
   assert.deepEqual(darwin[0], { role: 'appMenu' })
+  assert.ok(darwin.some(item => item.role === 'windowMenu'))
 
   const win32 = createApplicationMenuTemplate(menuOptions('win32'))
   assert.equal(win32[0].role, undefined)
+  assert.equal(win32.some(item => item.role === 'windowMenu'), false)
   assert.equal(win32[0].label, '应用 / App')
   assert.equal(win32[0].submenu.at(-1).role, 'quit')
   assert.ok(win32[0].submenu.some((entry) => entry.label === '关闭行为 / Close behavior'))

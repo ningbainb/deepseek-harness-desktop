@@ -12,6 +12,7 @@ import { _electron as electron } from 'playwright'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-proxy-routing-e2e-'))
+const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
 
 async function listen(server) {
   await new Promise((resolveListen, reject) => {
@@ -77,8 +78,8 @@ try {
   ])
   console.log('Proxy routing fixture servers ready')
   electronApp = await electron.launch({
-    executablePath: electronPath,
-    args: [resolve(APP_DIR, 'src', 'main.mjs')],
+    executablePath: packagedExecutable || electronPath,
+    args: packagedExecutable ? [] : [resolve(APP_DIR, 'src', 'main.mjs')],
     cwd: APP_DIR,
     env: {
       ...process.env,

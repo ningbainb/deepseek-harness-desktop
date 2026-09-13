@@ -29,7 +29,6 @@ const storeFile = join(osHome, '.dsh', 'dsh-ssh.json')
 let activeApplication
 let sshServer
 
-if (process.platform !== 'win32') throw new Error('packaged SSH verification currently requires Windows')
 if (!existsSync(appPath)) throw new Error(`packaged executable does not exist: ${appPath}`)
 
 async function dismissStartup(page) {

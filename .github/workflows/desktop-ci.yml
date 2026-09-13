@@ -10,8 +10,13 @@ permissions:
 
 jobs:
   test:
-    runs-on: windows-latest
-    timeout-minutes: 40
+    name: Desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
@@ -52,3 +57,16 @@ jobs:
       - run: pnpm community:check
       - run: pnpm docs:check
       - run: git diff --check
+
+      - name: Build unsigned Apple Silicon app
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:mac:dir
+      - name: Verify macOS package integrity and native bindings
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify:mac:dir
+      - name: Verify isolated macOS packaged startup
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke:mac
+      - name: Verify native macOS lifecycle and unsigned update policy
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:macos-lifecycle:e2e

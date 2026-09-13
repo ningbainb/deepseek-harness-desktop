@@ -113,6 +113,34 @@ async function rpc(page, method, payload) {
   return result.value
 }
 
+async function waitForSessionTitle(page, sessionId, title, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs
+  let summary
+  while (Date.now() < deadline) {
+    const listed = await rpc(page, 'session.list', {})
+    summary = listed.items.find(item => item.sessionId === sessionId)
+    const observed = summary?.displayTitle ?? summary?.title ?? summary?.projections?.values?.title
+    if (observed === title) return summary
+    await new Promise(resolveWait => setTimeout(resolveWait, 100))
+  }
+  assert.fail(`session rename was not observable before relaunch: ${JSON.stringify(summary)}`)
+}
+
+async function waitForPersistedSessionText(sessionId, text, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs
+  let contents = ''
+  while (Date.now() < deadline) {
+    const logs = await findSessionLogs(join(dshHome, 'sessions'))
+    const logPath = logs.find(candidate => basename(dirname(candidate)) === sessionId)
+    if (logPath) {
+      contents = await readSessionLogText(logPath)
+      if (contents.includes(text)) return
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 100))
+  }
+  assert.fail(`session text was not persisted before relaunch: ${text}; recent log: ${contents.slice(-2_000)}`)
+}
+
 async function seedHistory(sessionId) {
   const logs = await findSessionLogs(join(dshHome, 'sessions'))
   assert.equal(logs.length, 1, `expected one session log, found ${JSON.stringify(logs)}`)
@@ -174,7 +202,6 @@ try {
   const oldSession = await rpc(first.page, 'session.create', { workspaceId: oldWorkspaceId })
   const oldSessionId = oldSession.sessionId
   assert.equal(typeof oldSessionId, 'string')
-  await rpc(first.page, 'session.rename', { sessionId: oldSessionId, title: originalTitle })
   assert.deepEqual(first.rendererErrors, [])
   await waitForSessionLog(join(dshHome, 'sessions'), oldSessionId)
   await activeApp.close()
@@ -193,10 +220,9 @@ try {
   if (await oldGroup.getAttribute('aria-expanded') !== 'true') await oldGroup.click({ force: true })
   const history = selection.page.getByText(historyMarker, { exact: true })
   if (!await history.isVisible().catch(() => false)) {
-    const originalSession = selection.page.locator('[role="treeitem"]')
-      .filter({ hasText: originalTitle })
-      .first()
+    const originalSession = selection.page.locator('[role="treeitem"][aria-selected="false"]')
     try {
+      assert.equal(await originalSession.count(), 1, 'expected one non-selected historical Session row')
       await originalSession.waitFor({ state: 'visible', timeout: 15_000 })
       await originalSession.click({ force: true })
     } catch (error) {
@@ -209,6 +235,11 @@ try {
     }
   }
   await history.waitFor({ state: 'visible', timeout: 15_000 })
+  await rpc(selection.page, 'session.rename', { sessionId: oldSessionId, title: originalTitle })
+  await waitForSessionTitle(selection.page, oldSessionId, originalTitle)
+  await waitForPersistedSessionText(oldSessionId, originalTitle)
+  await selection.page.getByRole('treeitem').filter({ hasText: originalTitle }).first()
+    .waitFor({ state: 'visible', timeout: 15_000 })
   assert.deepEqual(selection.rendererErrors, [])
   await activeApp.close()
   activeApp = undefined

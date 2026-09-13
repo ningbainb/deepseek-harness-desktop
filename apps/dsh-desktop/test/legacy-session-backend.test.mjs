@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 import test from 'node:test'
@@ -12,7 +12,7 @@ const appRequire = createRequire(new URL('../package.json', import.meta.url))
 const baseRequire = createRequire(appRequire.resolve('@deepseek-ai/dsh-base/package.json'))
 const { default: JsonlSessionPersistence } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-session-persistence-jsonl')))
 const { Context } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/cordis')))
-const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, cwd: 'C:/project', delegationDepth: 1 }
+const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, cwd: resolve('/project'), delegationDepth: 1 }
 const child = { type: 'subagent/descriptor', seq: 0, time: 1, data: { version: 2, mode: 'continuable', provider: 'in-process', label: 'worker' } }
 const permission = { type: 'permission/preset', seq: 0, time: 1, data: { preset: 'standard', origin: 'default' } }
 

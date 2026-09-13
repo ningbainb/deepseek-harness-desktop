@@ -13,8 +13,7 @@ const { values } = parseArgs({
 
 const supplied = values['desktop-exe'] ?? process.env.DSH_DESKTOP_E2E_EXECUTABLE
 if (typeof supplied !== 'string' || supplied.trim().length === 0) {
-  console.log('SKIP packaged direct-start matrix: provide --desktop-exe or DSH_DESKTOP_E2E_EXECUTABLE')
-  process.exit(0)
+  throw new Error('packaged direct-start matrix requires --desktop-exe or DSH_DESKTOP_E2E_EXECUTABLE')
 }
 const appPath = resolve(supplied)
 if (!isAbsolute(appPath)) throw new Error('packaged Desktop executable must be absolute')

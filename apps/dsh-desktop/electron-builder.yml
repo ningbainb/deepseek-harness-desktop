@@ -78,7 +78,8 @@ mac:
   forceCodeSigning: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
-  minimumSystemVersion: '11.0'
+  # Match the minimum declared by the bundled Electron runtime.
+  minimumSystemVersion: '12.0'
   darkModeSupport: true
   artifactName: DeepSeek-Harness-Desktop-${version}-${arch}.${ext}
   target:

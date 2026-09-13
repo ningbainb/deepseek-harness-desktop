@@ -4,7 +4,7 @@
 
 ## 适用与限制
 
-- 只支持 Apple Silicon（arm64）。Intel Mac 不能用，Rosetta 也无法反向兼容。
+- 只支持运行 macOS 12 或更新系统的 Apple Silicon（arm64）。Intel Mac 不能用，Rosetta 也无法反向兼容。
 - 这是未签名预览包，不是正式发行版。不上 Mac App Store。
 - mac 端使用系统 Git，不内置 MinGit。若 `git --version` 不可用，请安装 Xcode Command Line Tools：`xcode-select --install`。
 - 预览版没有自动更新。应用内「检查更新」会说明原因；新版本请到 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 手动下载。不要用 `/releases/latest`，预发布不会出现在 Latest 里。
@@ -29,6 +29,21 @@ xattr -dr com.apple.quarantine "/Applications/DeepSeek Harness Desktop.app"
 - 内置终端可用（不因缺少 `pty.node` / `spawn-helper` 退出）。
 - 系统 Git 可探测；未装 CLT 时应能看到安装引导，而不是误报「没有 Git」。
 - 插件安装、SSH、任务看板、深链接按你平时的用法点一遍。
+
+## 贡献者构建
+
+在 Apple Silicon Mac 上从仓库根目录执行：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm verify
+pnpm --filter @deepseek-ai/dsh-desktop pack:mac
+pnpm --filter @deepseek-ai/dsh-desktop pack:verify:mac
+pnpm desktop:regression:e2e:full --keep-going
+pnpm --filter @deepseek-ai/dsh-desktop test:macos-lifecycle:e2e
+```
+
+完整门禁会自动识别打包后的 `.app`。`--keep-going` 会在失败后继续执行剩余套件，存在失败时仍以非零状态退出。测试使用隔离配置。CI 同时在 `macos-15` ARM runner 上运行，本地成功不能代替该平台验证。
 
 ## 反馈
 

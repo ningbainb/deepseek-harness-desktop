@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,13 +14,16 @@ import {
   CWD_PROBE_MISMATCH,
   CWD_PROBE_SUCCESS,
   createPowerShellCwdProbe,
+  createPosixCwdProbe,
 } from './terminal-e2e-probe.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const isWindows = process.platform === 'win32'
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-terminal-e2e-'))
 const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
+const isolatedShellConfig = resolve(temporary, 'shell-config')
 const executeFile = promisify(execFile)
 let electronApp
 
@@ -91,6 +94,7 @@ $processes = @(Get-CimInstance Win32_Process | ForEach-Object {
 }
 
 try {
+  await mkdir(isolatedShellConfig, { recursive: true })
   await seedPrimaryRuntimePermissionForTest({ userData })
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,
@@ -103,6 +107,7 @@ try {
       DSH_DESKTOP_STARTUP_PREVIEW_STATE: 'starting',
       DSH_DESKTOP_USER_DATA: userData,
       DSH_HOME: dshHome,
+      ...(isWindows ? {} : { ZDOTDIR: isolatedShellConfig }),
     },
   })
   await electronApp.firstWindow()
@@ -148,11 +153,15 @@ try {
   assert.equal(terminal.isClosed(), false, 'open-only entry must focus, never toggle the existing terminal closed')
   assert.equal(electronApp.windows().filter(page => page.url().includes('/ui/terminal.html')).length, 1)
   await assertNoVisibleConsoleDescendants(electronApp.process().pid)
+  if (!isWindows) await terminal.waitForFunction(() => (document.querySelector('.xterm-rows')?.textContent ?? '').trim().length > 0, undefined, { timeout: 15000 })
   await terminal.locator('.xterm-helper-textarea').focus()
-  await terminal.keyboard.type('Write-Output "__DSH_TERMINAL_OK__"')
+  await terminal.keyboard.type(isWindows ? 'Write-Output ("__DSH_" + "TERMINAL_OK__")' : `printf '__DSH_%s\\n' 'TERMINAL_OK__'`)
   await terminal.keyboard.press('Enter')
   await terminal.waitForFunction(() => document.querySelector('.xterm-rows')?.textContent?.includes('__DSH_TERMINAL_OK__'), undefined, {
     timeout: 15_000,
+  }).catch(async error => {
+    console.error('Terminal probe output:', await terminal.locator('.xterm-rows').textContent())
+    throw error
   })
 
   await terminal.keyboard.type('git --version')
@@ -168,15 +177,18 @@ try {
     console.error(`isolated terminal pnpm probe output: ${(await terminal.locator('.xterm-rows').textContent() ?? '').slice(-5_000)}`)
     throw error
   })
-  const expectedPnpmShim = resolve(userData, 'runtime-bin', 'pnpm.cmd')
-  await terminal.keyboard.type('Write-Output ("__DSH_PNPM__" + (Get-Command pnpm).Source)')
+  const expectedPnpmShim = resolve(userData, 'runtime-bin', isWindows ? 'pnpm.cmd' : 'pnpm')
+  await terminal.keyboard.type(isWindows ? 'Write-Output ("__DSH_PNPM__" + (Get-Command pnpm).Source)' : `printf '__DSH_PNPM__%s\\n' "$(command -v pnpm)"`)
   await terminal.keyboard.press('Enter')
   await terminal.waitForFunction((expected) => {
     const output = document.querySelector('.xterm-rows')?.textContent ?? ''
     return output.toLowerCase().includes(`__dsh_pnpm__${expected}`.toLowerCase())
-  }, expectedPnpmShim, { timeout: 15_000 })
+  }, expectedPnpmShim, { timeout: 15_000 }).catch(async error => {
+    console.error(`isolated terminal pnpm path probe expected ${expectedPnpmShim}; output: ${(await terminal.locator('.xterm-rows').textContent() ?? '').slice(-5_000)}`)
+    throw error
+  })
   const expectedProfileCwd = resolve(dshHome, 'profiles', 'desktop')
-  await terminal.keyboard.type(createPowerShellCwdProbe(expectedProfileCwd))
+  await terminal.keyboard.type((isWindows ? createPowerShellCwdProbe : createPosixCwdProbe)(expectedProfileCwd))
   await terminal.keyboard.press('Enter')
   await terminal.waitForFunction(({ success, mismatch }) => {
     const output = document.querySelector('.xterm-rows')?.textContent ?? ''
@@ -188,7 +200,8 @@ try {
     `terminal shell cwd does not match the Desktop Profile: ${terminalOutput.slice(-2_000)}`,
   )
   const context = await terminal.locator('#terminal-context').textContent()
-  assert.match(context ?? '', /PowerShell/u)
+  assert.equal(await terminal.locator('#terminal-shortcut').textContent(), process.platform === 'darwin' ? 'Cmd+Option+T' : 'Ctrl+Alt+T')
+  assert.match(context ?? '', isWindows ? /PowerShell/u : /zsh|bash|Shell/u)
   assert.ok(
     (context ?? '').toLowerCase().includes(expectedProfileCwd.toLowerCase()),
     `terminal context does not identify the Desktop Profile cwd: ${context}`,
@@ -276,7 +289,7 @@ try {
     assert.equal(startup.isClosed(), false)
     console.log('verified real terminal restart ignores stale PATH failure and renderer crash reclaims its isolated panel')
   }
-  console.log('verified embedded PowerShell PTY, no popup BrowserWindow, no visible console subprocess, packaged Git and pnpm PATH, persistent Desktop Profile cwd, terminal output, and close cleanup')
+  console.log('verified embedded native shell PTY, no popup BrowserWindow, no visible console subprocess, packaged Git and pnpm PATH, persistent Desktop Profile cwd, terminal output, and close cleanup')
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })

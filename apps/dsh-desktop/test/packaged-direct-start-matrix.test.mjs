@@ -127,12 +127,15 @@ test('packaged direct-start matrix covers every historical Home plus a truly fre
   assert.equal((await Promise.all(roots.map(assertFixtureRemoved))).every(Boolean), true)
 })
 
-test('direct-start verifier skips clearly without an executable and never automates recovery UI', async () => {
-  const result = await execFileAsync(process.execPath, [verifyScript], {
+test('direct-start verifier fails clearly without an executable and never automates recovery UI', async () => {
+  let error
+  await assert.rejects(execFileAsync(process.execPath, [verifyScript], {
     env: { ...process.env, DSH_DESKTOP_E2E_EXECUTABLE: '' },
+  }), candidate => {
+    error = candidate
+    return true
   })
-  assert.match(result.stdout, /SKIP packaged direct-start matrix/u)
-  assert.equal(result.stderr, '')
+  assert.match(error.stderr, /packaged direct-start matrix requires/u)
 
   const source = await readFile(runnerScript, 'utf8')
   assert.doesNotMatch(source, /click|dialog|recovery button|forceRendererAccessibility|onSpawn/iu)

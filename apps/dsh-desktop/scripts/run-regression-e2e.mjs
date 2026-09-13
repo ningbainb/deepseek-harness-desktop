@@ -2,316 +2,205 @@
 /**
  * Unified Desktop E2E Regression Gate.
  *
- * Runs critical desktop E2E suites sequentially:
- * - Default / --core: Runs core desktop E2E suites (window chrome, settings window,
- *   directory picker, runtime provider, preset deep-link, direct-start/repair unit integration).
- *   Fast, deterministic, and runnable in PR CI.
- * - --full: Runs complete regression (core + packaged suites: terminal, direct-start matrix,
- *   fresh relaunch, personalization cards, model preferences, profile reset, update shutdown,
- *   remote isolation). Required for full release verification.
- *
  * Usage:
- *   node scripts/run-regression-e2e.mjs          # Core regression
- *   node scripts/run-regression-e2e.mjs --source # Verify current source and rebuilt plugins
- *   node scripts/run-regression-e2e.mjs --core   # Core regression
- *   node scripts/run-regression-e2e.mjs --full   # Full regression
+ *   node scripts/run-regression-e2e.mjs --source
+ *   node scripts/run-regression-e2e.mjs --full --artifact /path/to/executable
+ *   node scripts/run-regression-e2e.mjs --full --artifact /path/to/executable --keep-going
+ *   node scripts/run-regression-e2e.mjs --full --artifact /path/to/executable --suite desktop.workspace-relocation-packaged
+ *   node scripts/run-regression-e2e.mjs --list
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { acceptedReleaseIssue } from './release-known-issues.mjs'
+import { createRegressionReport, updatePlannedStatus, writeRegressionReport } from './regression-report.mjs'
+import { runRegressionSuite } from './regression-runner.mjs'
+import { getRegressionSuites, resolveSuiteTarget, validateRegressionSuites } from './regression-suites.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const IS_FULL = process.argv.includes('--full')
-const SOURCE_ONLY = process.argv.includes('--source')
-const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
+const argv = process.argv.slice(2)
+const IS_FULL = argv.includes('--full')
+const KEEP_GOING = argv.includes('--keep-going')
+const SOURCE_ONLY = argv.includes('--source')
+const LIST_ONLY = argv.includes('--list')
+const ACCEPT_KNOWN_DPI = argv.includes('--accept-known-dpi-position-3.4.0')
 const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
-const acceptedIssues = []
-// QA uses isolated data and must also leave the host's link association intact.
-process.env.DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION = '1'
-if (SOURCE_ONLY) delete process.env.DSH_DESKTOP_E2E_EXECUTABLE
+const allowedFlags = new Set(['--core', '--full', '--keep-going', '--source', '--list', '--accept-known-dpi-position-3.4.0'])
 
-const defaultPackagedExe = resolve(APP_DIR, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe')
-if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaultPackagedExe)) {
-  process.env.DSH_DESKTOP_E2E_EXECUTABLE = defaultPackagedExe
-  console.log(`Auto-detected packaged desktop executable: ${defaultPackagedExe}`)
+function optionValue(name) {
+  const equals = argv.find(argument => argument.startsWith(`${name}=`))
+  if (equals) return equals.slice(name.length + 1)
+  const index = argv.indexOf(name)
+  return index >= 0 ? argv[index + 1] : undefined
 }
 
-
-const CORE_SUITES = [
-  {
-    name: 'Native Plugin Pages, Preserved Skins and Window Palette',
-    script: 'scripts/verify-native-plugin-pages.mjs',
-    args: [],
-  },
-  {
-    name: 'Settings Availability Before Slow Resources Complete',
-    script: 'scripts/verify-settings-readiness.mjs',
-    args: [],
-  },
-  {
-    name: 'Optional Prompt Ordering & Once-per-release Lifecycle',
-    script: 'scripts/verify-star-prompt.mjs',
-    args: [],
-  },
-  {
-    name: 'Extension Dock Settings & Compact Layout',
-    script: 'scripts/verify-dock-settings.mjs',
-    args: [],
-  },
-  {
-    name: 'Selected Model Balance & Provider Credential Isolation',
-    script: 'scripts/verify-selected-balance.mjs',
-    args: [],
-  },
-  {
-    name: 'Dock Model Catalog, Selection & Timeout Recovery',
-    script: 'scripts/verify-dock-model-catalog.mjs',
-    args: [],
-  },
-  {
-    name: 'Network Proxy Routing & Recovery',
-    script: 'scripts/verify-proxy-routing.mjs',
-    args: [],
-  },
-  {
-    name: 'Window Chrome & Geometry',
-    script: 'scripts/verify-window-chrome.mjs',
-    args: [],
-  },
-  {
-    name: 'Settings Window Multi-tab & Resizing',
-    script: 'scripts/verify-settings-window.mjs',
-    args: [],
-  },
-  {
-    name: 'Long Conversation Scroll & Turn Navigation',
-    script: 'scripts/verify-conversation-scroll.mjs',
-    args: [],
-  },
-  {
-    name: 'Native DSH Turn Navigation Without Duplicate Controls',
-    script: 'scripts/verify-conversation-scroll.mjs',
-    args: ['--native-turns', '--native-tabs', '--mode-switch'],
-  },
-  {
-    name: 'Directory Picker & Workspace Import',
-    script: 'scripts/verify-directory-picker.mjs',
-    args: ['--native-layout'],
-  },
-  {
-    name: 'Runtime Provider & IPC Services',
-    script: 'scripts/verify-runtime-provider.mjs',
-    args: [],
-  },
-  ...(process.platform === 'win32' ? [{
-    name: 'Windows DPI Persistence, Maximize and Explicit Resize',
-    script: 'scripts/verify-window-state-dpi.mjs',
-    args: [],
-  }] : []),
-  {
-    name: 'Particle Composer Clearance & Multi-window Settings Delivery',
-    script: 'scripts/verify-particle-theme.mjs',
-    args: [],
-  },
-  {
-    name: 'Preset Deep-Link Protocol Handler',
-    script: 'scripts/verify-preset-deep-link.mjs',
-    args: [],
-  },
-  {
-    name: 'Real Preset Export, Visible Feedback & Retry',
-    script: 'scripts/verify-preset-export.mjs',
-    args: [],
-  },
-  {
-    name: 'Direct-Start Matrix & Repair Unit Integration',
-    script: '--test',
-    args: [
-      'test/packaged-direct-start-matrix.test.mjs',
-      'test/repair-agent-integration.test.mjs',
-      'test/session-preservation.test.mjs',
-      'test/legacy-session-backend.test.mjs',
-      'test/pet-client-polling.test.mjs',
-      'test/dock-settings-fixture.test.mjs',
-      'test/dock-settings-close.test.mjs',
-      'test/dock-settings-save.test.mjs',
-      'test/extensions-renderer-actions.test.mjs',
-      'test/panel-layout-menu.test.mjs',
-      'test/desktop-ingress.test.mjs',
-      'test/runtime-presentation.test.mjs',
-      'test/runtime-startup-timing.test.mjs',
-      'test/runtime-shutdown-control.test.mjs',
-      'test/runtime-stream-drain.test.mjs',
-      'test/window-state.test.mjs',
-      'test/window-chrome.test.mjs',
-      'test/settings-window.test.mjs',
-      'test/modal-reveal.test.mjs',
-      'test/star-prompt.test.mjs',
-      'test/install-recovery.test.mjs',
-      'test/terminal-session.test.mjs',
-      'test/terminal-window.test.mjs',
-      'test/terminal-renderer.test.mjs',
-      'test/windows-background-runner.test.mjs',
-      'test/windows-runner-console.test.mjs',
-    ],
-  },
-]
-
-const PACKAGED_SUITES = [
-  ...(process.platform === 'win32' ? [{
-    name: 'Compiled NSIS Upgrade & Rollback Lifecycle',
-    script: 'scripts/verify-installer-lifecycle.mjs',
-    args: [],
-  }] : []),
-  {
-    name: 'Embedded Terminal (ConPTY / xterm)',
-    script: 'scripts/verify-terminal.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged SSH Terminal & Relaunch Persistence',
-    script: 'scripts/verify-packaged-ssh.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Direct-Start Matrix',
-    script: 'scripts/verify-packaged-direct-start-matrix.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Clean Profile Relaunch',
-    script: 'scripts/verify-packaged-fresh-second-launch.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Personalization (Prompt & Memory Cards)',
-    script: 'scripts/verify-packaged-personalization.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Model Preferences Card',
-    script: 'scripts/verify-packaged-model-preferences.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Image Drop Reliability & Memory',
-    script: 'scripts/verify-packaged-image-drop.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Session Message & Agent Tool Work',
-    script: 'scripts/verify-packaged-agent-work.mjs',
-    args: [],
-  },
-  {
-    name: 'Workspace Relocation Compatibility & Rollback',
-    script: 'scripts/verify-workspace-relocation.mjs',
-    args: [],
-  },
-  {
-    name: 'Skin Center Live Apply & Relaunch Persistence',
-    script: 'scripts/verify-skin-center.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Cleared Profile Rebuild',
-    script: 'scripts/verify-packaged-profile-reset.mjs',
-    args: [],
-  },
-  {
-    name: 'Packaged Update Shutdown Receipt',
-    script: 'scripts/verify-update-shutdown.mjs',
-    args: [],
-  },
-]
-
-function runSuite(suite) {
-  return new Promise((resolveRun, reject) => {
-    let output = ''
-    const startTime = Date.now()
-    console.log(`\n============================================================`)
-    console.log(` [RUNNING E2E] ${suite.name}`)
-    console.log(` Command: node ${suite.script} ${suite.args.join(' ')}`)
-    console.log(`============================================================`)
-
-    const nodeArgs = suite.script === '--test'
-      ? ['--test', ...suite.args]
-      : [suite.script, ...suite.args]
-
-    const child = spawn(process.execPath, nodeArgs, {
-      cwd: APP_DIR,
-      env: {
-        ...process.env,
-        // Ensure child processes inherit packaged executable if defined
-        DSH_DESKTOP_E2E_EXECUTABLE: process.env.DSH_DESKTOP_E2E_EXECUTABLE,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    for (const [stream, destination] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
-      stream.on('data', chunk => {
-        output = (output + chunk.toString()).slice(-128_000)
-        destination.write(chunk)
-      })
+function validateArguments() {
+  for (let index = 0; index < argv.length; index++) {
+    const argument = argv[index]
+    if (argument === '--artifact' || argument === '--report-dir' || argument === '--suite') {
+      if (!argv[index + 1] || argv[index + 1].startsWith('--')) throw new Error(`${argument} requires a value`)
+      index++
+      continue
     }
+    if (argument.startsWith('--artifact=') || argument.startsWith('--report-dir=') || argument.startsWith('--suite=')) continue
+    if (!allowedFlags.has(argument)) throw new Error(`Unknown regression option: ${argument}`)
+  }
+  if (IS_FULL && SOURCE_ONLY) throw new Error('--full and --source are mutually exclusive')
+  if (argv.includes('--core') && IS_FULL) throw new Error('--core and --full are mutually exclusive')
+}
 
-    child.on('error', (err) => reject(err))
-    child.on('exit', (code, signal) => {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-      if (code === 0) {
-        console.log(`[PASS] ${suite.name} (${elapsed}s)`)
-        resolveRun()
-      } else {
-        const issue = acceptedReleaseIssue({ version: VERSION, enabled: ACCEPT_KNOWN_DPI,
-          script: suite.script, code, signal, output })
-        if (issue) {
-          acceptedIssues.push(issue)
-          console.warn(`[ACCEPTED KNOWN ISSUE] ${issue}: test failed; maintainer explicitly deferred it for 3.4.0. No test was skipped.`)
-          resolveRun()
-          return
-        }
-        const reason = signal ? `signal ${signal}` : `exit code ${code}`
-        reject(new Error(`[FAIL] ${suite.name} failed with ${reason} (${elapsed}s)`))
-      }
-    })
-  })
+function configuredExecutable() {
+  const fromArgument = optionValue('--artifact')
+  const fromEnvironment = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
+  if (fromArgument && fromEnvironment && resolve(fromArgument) !== resolve(fromEnvironment)) {
+    throw new Error('--artifact and DSH_DESKTOP_E2E_EXECUTABLE select different executables')
+  }
+  const selected = fromArgument || fromEnvironment
+  if (SOURCE_ONLY && selected) throw new Error('--source cannot be combined with a packaged executable')
+  if (!selected) return null
+  const absolute = resolve(selected)
+  if (!existsSync(absolute)) throw new Error(`Packaged Desktop executable does not exist: ${absolute}`)
+  return absolute
+}
+
+function elapsedSeconds(durationMs) {
+  return (durationMs / 1000).toFixed(1)
 }
 
 async function main() {
-  const suitesToRun = IS_FULL
-    ? [...CORE_SUITES, ...PACKAGED_SUITES]
-    : CORE_SUITES
-
-  console.log(`Starting Desktop Regression E2E Gate (${IS_FULL ? 'FULL RELEASE' : 'CORE PR'} mode, ${suitesToRun.length} suites)...`)
-  const totalStart = Date.now()
-
-  for (let i = 0; i < suitesToRun.length; i++) {
-    const suite = suitesToRun[i]
-    console.log(`\nProgress: [${i + 1}/${suitesToRun.length}] ${suite.name}`)
-    try {
-      await runSuite(suite)
-      if (i + 1 < suitesToRun.length) {
-        await new Promise((r) => setTimeout(r, 1200))
-      }
-    } catch (err) {
-      console.error(`\n------------------------------------------------------------`)
-      console.error(` [REGRESSION E2E FAILURE] Regression gate blocked release/merge!`)
-      console.error(` ${err.message}`)
-      console.error(`------------------------------------------------------------`)
-      process.exit(1)
-    }
+  validateArguments()
+  const packagedExecutable = configuredExecutable()
+  if (IS_FULL && !packagedExecutable && !LIST_ONLY) {
+    throw new Error('Full regression requires an explicit --artifact path or DSH_DESKTOP_E2E_EXECUTABLE; automatic dist discovery is disabled')
   }
 
-  const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1)
-  console.log(`\n============================================================`)
-  console.log(` [${acceptedIssues.length ? 'COMPLETED WITH ACCEPTED KNOWN ISSUE' : 'ALL PASSED'}] Unified Desktop Regression Gate (${suitesToRun.length} suites, ${totalElapsed}s)`)
+  let suites = validateRegressionSuites(getRegressionSuites({ full: IS_FULL }), { appDir: APP_DIR })
+    .map(suite => ({ ...suite, target: resolveSuiteTarget(suite, {
+      packagedExecutable: packagedExecutable || (IS_FULL && LIST_ONLY ? '<required-artifact>' : null),
+    }) }))
+  const selectedSuiteId = optionValue('--suite')
+  if (selectedSuiteId) {
+    const selectedSuite = suites.find(suite => suite.id === selectedSuiteId)
+    if (!selectedSuite) throw new Error(`Unknown or unavailable regression suite: ${selectedSuiteId}`)
+    suites = [selectedSuite]
+  }
+
+  if (LIST_ONLY) {
+    console.log(JSON.stringify({ mode: IS_FULL ? 'full' : 'core', platform: process.platform, suites }, null, 2))
+    return
+  }
+
+  const { directory, report } = createRegressionReport({
+    appDir: APP_DIR,
+    suites,
+    mode: IS_FULL ? 'full' : 'core',
+    packagedExecutable,
+    reportRoot: optionValue('--report-dir'),
+  })
+  const failures = []
+  const acceptedIssues = []
+  process.env.DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION = '1'
+  if (packagedExecutable) process.env.DSH_DESKTOP_E2E_EXECUTABLE = packagedExecutable
+  else delete process.env.DSH_DESKTOP_E2E_EXECUTABLE
+
+  console.log(`Starting Desktop Regression E2E Gate (${IS_FULL ? 'FULL RELEASE' : 'CORE PR'} mode, ${suites.length} suites)...`)
+  console.log(`Structured report: ${resolve(directory, 'report.json')}`)
+  const totalStart = Date.now()
+
+  for (let index = 0; index < suites.length; index++) {
+    const suite = suites[index]
+    console.log(`\nProgress: [${index + 1}/${suites.length}] ${suite.name}`)
+    console.log('\n============================================================')
+    console.log(` [RUNNING E2E] ${suite.name}`)
+    console.log(` Suite: ${suite.id}`)
+    console.log(` Target: ${suite.target}`)
+    console.log(` Command: node ${suite.script} ${suite.args.join(' ')}`)
+    console.log(` Timeout: ${suite.timeoutMs}ms`)
+    console.log('============================================================')
+    updatePlannedStatus(report, suite.id, 'running')
+    writeRegressionReport(directory, report)
+
+    const attempt = await runRegressionSuite({
+      suite,
+      appDir: APP_DIR,
+      env: {
+        ...process.env,
+        DSH_DESKTOP_E2E_EXECUTABLE: packagedExecutable || undefined,
+      },
+      logDirectory: directory,
+    })
+    const issue = attempt.status === 'failed' ? acceptedReleaseIssue({
+      version: VERSION,
+      enabled: ACCEPT_KNOWN_DPI,
+      script: suite.script,
+      code: attempt.exitCode,
+      signal: attempt.signal,
+      output: attempt.output,
+    }) : null
+    const result = {
+      suiteId: suite.id,
+      name: suite.name,
+      target: suite.target,
+      status: attempt.status,
+      acceptedIssue: issue,
+      attempts: [{ ...attempt, output: undefined }],
+    }
+    report.results.push(result)
+    updatePlannedStatus(report, suite.id, attempt.status)
+    writeRegressionReport(directory, report)
+
+    if (attempt.status === 'passed') {
+      console.log(`[PASS] ${suite.name} (${elapsedSeconds(attempt.durationMs)}s)`)
+    } else if (issue) {
+      acceptedIssues.push(issue)
+      console.warn(`[ACCEPTED KNOWN ISSUE] ${issue}: test failed; maintainer explicitly deferred it for 3.4.0. No test was skipped.`)
+    } else {
+      const reason = attempt.status === 'timed-out'
+        ? `timeout after ${suite.timeoutMs}ms`
+        : attempt.signal ? `signal ${attempt.signal}` : attempt.error || `exit code ${attempt.exitCode}`
+      const message = `[FAIL] ${suite.name} failed with ${reason} (${elapsedSeconds(attempt.durationMs)}s)`
+      failures.push(message)
+      report.gate.reasons.push(message)
+      console.error('\n------------------------------------------------------------')
+      console.error(' [REGRESSION E2E FAILURE] Regression gate blocked release/merge!')
+      console.error(` ${message}`)
+      console.error('------------------------------------------------------------')
+      if (!KEEP_GOING) break
+    }
+
+    if (attempt.cleanup.status === 'failed') {
+      const message = `[FAIL] ${suite.name} left an unconfirmed process after cleanup timeout`
+      failures.push(message)
+      report.gate.reasons.push(message)
+      writeRegressionReport(directory, report)
+      console.error(message)
+      break
+    }
+
+    if (index + 1 < suites.length) await new Promise(resolveWait => setTimeout(resolveWait, 1200))
+  }
+
+  report.completedAt = new Date().toISOString()
+  report.gate.status = failures.length ? 'failed' : acceptedIssues.length ? 'passed-with-accepted-issues' : 'passed'
+  report.gate.acceptedIssues = acceptedIssues
+  writeRegressionReport(directory, report)
+
+  if (failures.length) {
+    console.error(`Failed ${failures.length}/${suites.length} suites:\n${failures.join('\n')}`)
+    process.exitCode = 1
+    return
+  }
+
+  const totalElapsed = elapsedSeconds(Date.now() - totalStart)
+  console.log('\n============================================================')
+  console.log(` [${acceptedIssues.length ? 'COMPLETED WITH ACCEPTED KNOWN ISSUE' : 'ALL PASSED'}] Unified Desktop Regression Gate (${suites.length} suites, ${totalElapsed}s)`)
   if (acceptedIssues.length) console.log(` Accepted issues: ${acceptedIssues.join(', ')}`)
-  console.log(`============================================================`)
+  console.log(` Report: ${resolve(directory, 'report.json')}`)
+  console.log('============================================================')
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
 })

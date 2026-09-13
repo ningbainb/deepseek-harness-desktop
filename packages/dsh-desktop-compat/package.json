@@ -3,7 +3,7 @@
   "description": "Desktop-only compatibility fixes for DeepSeek Harness queue continuation and cancellation presentation.",
   "version": "2.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },

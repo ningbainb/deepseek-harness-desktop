@@ -14,7 +14,8 @@ import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import sharp from 'sharp'
 
-import { createMemorySample, normalizeProcessSnapshot } from './packaged-memory-metrics.mjs'
+import { createMemorySample, normalizeProcessSnapshot, normalizePosixProcessSnapshot } from './packaged-memory-metrics.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const executeFile = promisify(execFile)
@@ -27,7 +28,6 @@ const maxSourceBytes = 32 * 1024 * 1024
 const retainedGrowthFloorBytes = 64 * 1024 * 1024
 const runtimeReadyTimeoutMs = process.env.CI ? 240_000 : 180_000
 
-if (process.platform !== 'win32') throw new Error('packaged image-drop verification currently requires Windows')
 if (!existsSync(appPath)) throw new Error(`packaged executable does not exist: ${appPath}`)
 
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-image-drop-'))
@@ -294,14 +294,14 @@ async function electronMemorySample(application, label) {
     rows: app.getAppMetrics().map(metric => ({
       type: metric.type,
       workingSetBytes: (metric.memory?.workingSetSize ?? 0) * 1024,
-      privateBytes: (metric.memory?.privateBytes ?? 0) * 1024,
+      privateBytes: typeof metric.memory?.privateBytes === 'number' ? metric.memory.privateBytes * 1024 : null,
     })),
     mainProcessMemory: process.memoryUsage(),
   }))
   return {
     label,
     totalWorkingSetBytes: rows.reduce((sum, row) => sum + row.workingSetBytes, 0),
-    totalPrivateBytes: rows.reduce((sum, row) => sum + row.privateBytes, 0),
+    totalPrivateBytes: rows.every(row => row.privateBytes !== null) ? rows.reduce((sum, row) => sum + row.privateBytes, 0) : null,
     processCount: rows.length,
     processes: rows,
     mainProcessMemory,
@@ -380,6 +380,10 @@ const snapshotCommand = [
 ].join(' ')
 
 async function processTreeSample(rootProcessId, elapsedMs) {
+  if (process.platform !== 'win32') {
+    const { stdout } = await executeFile('ps', ['-axo', 'pid=,ppid=,rss=,command='], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 15000 })
+    return { ...createMemorySample(normalizePosixProcessSnapshot(stdout), rootProcessId, elapsedMs), totalPrivateBytes: null }
+  }
   const { stdout } = await executeFile('powershell.exe', [
     '-NoLogo',
     '-NoProfile',
@@ -411,6 +415,7 @@ try {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  await useChineseFixtureLocale(activeApplication)
   let page = await activeApplication.firstWindow()
   if (sourceOnly) {
     const deadline = Date.now() + runtimeReadyTimeoutMs
@@ -546,6 +551,7 @@ try {
   assert.equal(finalState.createdUrls, finalState.revokedUrls)
   assert.equal(finalState.inputDisabled, false)
 
+  assert.ok(groupIdle.every(sample => sample.totalWorkingSetBytes > 0), 'memory growth checks require real nonzero resident memory samples')
   const firstIdle = groupIdle[0].totalWorkingSetBytes
   const lastIdle = groupIdle.at(-1).totalWorkingSetBytes
   const allowedRetainedGrowthBytes = Math.max(retainedGrowthFloorBytes, Math.round(firstIdle * 0.1))
@@ -577,7 +583,7 @@ try {
     memory: {
       baseline,
       electronWorkingSetPeakBytes: Math.max(...activityMemory.map(sample => sample.totalWorkingSetBytes)),
-      electronPrivatePeakBytes: Math.max(...activityMemory.map(sample => sample.totalPrivateBytes)),
+      electronPrivatePeakBytes: process.platform === 'win32' ? Math.max(...activityMemory.map(sample => sample.totalPrivateBytes)) : null,
       groupIdle,
       allowedRetainedGrowthBytes,
       observedRetainedGrowthBytes: lastIdle - firstIdle,

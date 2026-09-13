@@ -277,27 +277,42 @@ try {
   const nativeDock = await app.browserWindow(dock)
   if (process.platform === 'win32') assert.equal(await nativeDock.evaluate(window => window.getParentWindow()), null, 'Windows Dock is a normal taskbar window')
   const normalBounds = await nativeDock.evaluate(window => window.getBounds())
-  await nativeDock.evaluate(window => window.minimize())
-  await app.evaluate(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
-  assert.equal(await nativeDock.evaluate(window => window.isMinimized()), true)
-  assert.equal(await nativeDock.evaluate(window => window.contentView.children.find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getVisible()), false, 'minimized child view is hidden')
-  await nativeDock.evaluate(window => { window.restore(); window.focus() })
-  await app.evaluate(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
-  assert.equal(await nativeDock.evaluate(window => window.isMinimized()), false)
-  assert.deepEqual(await nativeDock.evaluate(window => window.getBounds()), normalBounds)
-  assert.equal(await memory.locator('[data-memory-activity]').isVisible(), true, 'restored settings remain usable')
-  await nativeDock.evaluate(window => window.maximize())
-  await settings.waitForFunction(() => innerWidth > 800)
-  assert.equal(await settings.evaluate(() => document.querySelector('[data-dsh-dock-settings]').scrollWidth > innerWidth), false)
-  await nativeDock.evaluate(window => window.unmaximize())
-  await settings.waitForFunction(() => innerWidth < 800)
-  assert.deepEqual(await nativeDock.evaluate(window => window.getBounds()), normalBounds)
+  const nativeWindowFailures = []
+  const checkNativeWindowAction = async (name, action) => {
+    try { await action() } catch (cause) {
+      nativeWindowFailures.push(new Error(`Native Dock ${name}: ${cause.message}`, { cause }))
+    }
+  }
+  await checkNativeWindowAction('minimize', async () => {
+    await nativeDock.evaluate(window => window.minimize())
+    for (let attempt = 0; attempt < 100 && !await nativeDock.evaluate(window => window.isMinimized()); attempt++) await new Promise(resolve => setTimeout(resolve, 50))
+    assert.equal(await nativeDock.evaluate(window => window.isMinimized()), true, JSON.stringify(await nativeDock.evaluate(window => ({ visible: window.isVisible(), minimizable: window.isMinimizable(), parent: window.getParentWindow()?.id, bounds: window.getBounds() }))))
+    assert.equal(await nativeDock.evaluate(window => window.contentView.children.find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getVisible()), false, 'minimized child view is hidden')
+  })
+  await checkNativeWindowAction('restore', async () => {
+    await nativeDock.evaluate(window => { window.restore(); window.focus() })
+    for (let attempt = 0; attempt < 100 && await nativeDock.evaluate(window => window.isMinimized()); attempt++) await new Promise(resolve => setTimeout(resolve, 50))
+    assert.equal(await nativeDock.evaluate(window => window.isMinimized()), false)
+    assert.deepEqual(await nativeDock.evaluate(window => window.getBounds()), normalBounds)
+    assert.equal(await memory.locator('[data-memory-activity]').isVisible(), true, 'restored settings remain usable')
+  })
+  await checkNativeWindowAction('maximize', async () => {
+    await nativeDock.evaluate(window => window.maximize())
+    await settings.waitForFunction(() => innerWidth > 800)
+    assert.equal(await settings.evaluate(() => document.querySelector('[data-dsh-dock-settings]').scrollWidth > innerWidth), false)
+  })
+  await checkNativeWindowAction('unmaximize', async () => {
+    await nativeDock.evaluate(window => window.unmaximize())
+    await settings.waitForFunction(() => innerWidth < 800)
+    assert.deepEqual(await nativeDock.evaluate(window => window.getBounds()), normalBounds)
+  })
   await nativeDock.evaluate(window => window.close())
   for (let attempt = 0; attempt < 60 && !dock.isClosed(); attempt++) await new Promise(resolve => setTimeout(resolve, 50))
   assert.equal(dock.isClosed(), true, 'clean Dock closes directly without a confirmation')
   assert.equal(main.isClosed(), false, 'closing Dock never closes the main chat')
   assert.deepEqual(errors, [])
   assert.equal(await main.locator('[data-memory-activity]').count(), 0, 'main conversation has no memory entry')
+  if (nativeWindowFailures.length) throw new AggregateError(nativeWindowFailures, 'Native Dock window controls failed; all remaining form and window checks ran')
   console.log(`Dock settings: six working pages, preserved management entry, centered bounds; screenshots ${process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ? `saved to ${output}` : 'validated'}`)
 } catch (error) {
   console.error('Settings URL:', settings?.url())

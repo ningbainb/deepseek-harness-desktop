@@ -69,6 +69,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   let navigation = 0
   let allowClose = false
   let checkingClose = false
+  let closeCheck
   let theme = getWindowChromeTheme(window)
   let palette = getWindowPalette(mainWindow)
   let lastBounds
@@ -80,37 +81,48 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
     ]).finally(() => clearTimeout(timer))
   }
   const inspect = (script, timeoutMs = closeCheckTimeoutMs) => bounded(view.webContents.executeJavaScript(script), timeoutMs, 'settings inspection timed out')
-  const checkClose = event => {
-    if (allowClose || !view || view.webContents.isDestroyed() || !dialog) return
-    event.preventDefault()
-    if (checkingClose) return
+  const prepareClose = () => {
+    if (allowClose || !view || view.webContents.isDestroyed() || !dialog) {
+      allowClose = true
+      return Promise.resolve(true)
+    }
+    if (checkingClose) return closeCheck
     checkingClose = true
-    void (async () => {
+    closeCheck = (async () => {
       const dirty = await inspect('Boolean(document.querySelector(\'[data-dock-dirty="true"]\'))')
       if (dirty) {
         const { response } = await dialog.showMessageBox(window, {
           type: 'question', title: '保存未完成的编辑', message: '设置中有尚未保存的修改。',
           buttons: ['保存并关闭', '返回编辑', '放弃并关闭'], defaultId: 1, cancelId: 1, noLink: true,
         })
-        if (response === 1) return
+        if (response === 1) return false
         if (response === 0) {
           const saved = await inspect(`(${saveDockSettingsDrafts.toString()})()`, 32000)
           if (!saved) {
             await dialog.showMessageBox(window, { type: 'warning', message: '修改未能全部保存，请返回对应设置检查后重试。' })
-            return
+            return false
           }
         }
       }
       allowClose = true
-      window.close()
+      return true
     })().catch(async () => {
-      if (window.isDestroyed()) return
+      if (window.isDestroyed()) return true
       const { response } = await dialog.showMessageBox(window, {
         type: 'warning', message: '暂时无法确认编辑状态。关闭可能丢失未保存的修改。',
         buttons: ['返回编辑', '仍然关闭'], defaultId: 0, cancelId: 0, noLink: true,
       })
-      if (response === 1) { allowClose = true; window.close() }
-    }).catch(() => {}).finally(() => { checkingClose = false })
+      if (response === 1) { allowClose = true; return true }
+      return false
+    }).catch(() => false).finally(() => { checkingClose = false })
+    return closeCheck
+  }
+  const checkClose = event => {
+    if (allowClose || !view || view.webContents.isDestroyed() || !dialog) return
+    event.preventDefault()
+    void prepareClose().then(approved => {
+      if (approved && !window.isDestroyed()) window.close()
+    })
   }
   window.on('close', checkClose)
   const layout = () => {
@@ -201,6 +213,8 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
     view = undefined
   })
   return {
+    prepareClose,
+    cancelClose: () => { allowClose = false },
     setInteracting: active => publishWindowMotion(view?.webContents, active),
     select: async id => {
       const request = ++navigation
