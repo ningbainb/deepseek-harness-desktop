@@ -16,6 +16,7 @@ const root = await mkdtemp(join(tmpdir(), 'dsh-macos-lifecycle-'))
 const userData = join(root, 'user-data')
 let application
 let processDiagnostics = ''
+let settingsPage
 try {
   await seedPrimaryRuntimePermissionForTest({ userData })
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
@@ -53,14 +54,28 @@ try {
   await prompt.locator('textarea').first().fill('persist-before-quit-fixture')
   await application.evaluate(({ app, dialog }) => {
     globalThis.quitDraftPrompts = 0
-    dialog.showMessageBox = async () => { globalThis.quitDraftPrompts++; return { response: 1 } }
+    globalThis.quitLifecycleEvents = []
+    for (const name of ['before-quit', 'will-quit', 'quit']) app.on(name, event => {
+      globalThis.quitLifecycleEvents.push({ name, prevented: event?.defaultPrevented, at: Date.now() })
+    })
+    dialog.showMessageBox = async (_window, options) => {
+      globalThis.quitDraftPrompts++
+      globalThis.quitLifecycleEvents.push({ name: 'dialog', message: options?.message, response: 1 })
+      return { response: 1 }
+    }
     app.quit()
   })
   for (let attempt = 0; attempt < 100 && !await application.evaluate(() => globalThis.quitDraftPrompts); attempt++) await delay(50)
   assert.equal(await application.evaluate(() => globalThis.quitDraftPrompts), 1)
   assert.equal(await prompt.locator('textarea').first().inputValue(), 'persist-before-quit-fixture')
   assert.equal(await page.evaluate(async () => (await fetch('/api/skin-center/v2/catalog')).ok), true, 'cancelled quit preserves the live Runtime')
-  await application.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 0 }) })
+  settingsPage = settings
+  await application.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async (_window, options) => {
+      globalThis.quitLifecycleEvents.push({ name: 'dialog', message: options?.message, response: 0 })
+      return { response: 0 }
+    }
+  })
   const pid = application.process().pid
   const rows = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' }).trim().split('\n').map(row => row.trim().split(/\s+/).map(Number))
   const children = new Set([pid])
@@ -90,7 +105,27 @@ try {
   console.log('PASS draft cancellation and save-before-quit, unsigned macOS updates, native menu, close-to-hide, Dock activation and explicit quit process cleanup')
 } catch (error) {
   const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
-  console.error('macOS lifecycle failure diagnostics', JSON.stringify({ processDiagnostics, runtimeLog: runtimeLog.slice(-12000) }))
+  const inspect = async operation => {
+    let timer
+    try {
+      return await Promise.race([operation(), new Promise(resolve => { timer = setTimeout(() => resolve('inspection timed out'), 2000) })])
+    } catch (error) { return String(error) }
+    finally { clearTimeout(timer) }
+  }
+  const appState = await inspect(() => application.evaluate(({ BrowserWindow }) => ({
+    events: globalThis.quitLifecycleEvents,
+    windows: BrowserWindow.getAllWindows().map(window => ({ id: window.id, visible: window.isVisible(), focused: window.isFocused() })),
+  })))
+  const settingsState = await inspect(() => settingsPage.evaluate(() => ({
+    visibility: document.visibilityState,
+    forms: [...document.querySelectorAll('[data-dock-dirty]')].map(form => ({
+      owner: form.getAttribute('data-dock-owner'), dirty: form.getAttribute('data-dock-dirty'),
+      saveDisabled: form.querySelector('[data-dock-save]')?.disabled,
+      alerts: [...form.querySelectorAll('[role="alert"]')].map(alert => alert.textContent),
+    })),
+  })))
+  const draftPersisted = await readFile(join(root, 'dsh-home', 'settings.yaml'), 'utf8').then(content => content.includes('persist-before-quit-fixture'), () => false)
+  console.error('macOS lifecycle failure diagnostics', JSON.stringify({ appState, settingsState, draftPersisted, processDiagnostics, runtimeLog: runtimeLog.slice(-12000) }))
   throw error
 } finally {
   await application?.close().catch(() => {})

@@ -4837,7 +4837,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-macos-lifecycle.mjs",
-      "line": 23,
+      "line": 24,
       "operation": "DSH_HOME"
     },
     {
