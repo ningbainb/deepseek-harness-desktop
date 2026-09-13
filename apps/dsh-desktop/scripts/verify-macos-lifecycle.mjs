@@ -15,6 +15,7 @@ const executablePath = process.env.DSH_DESKTOP_E2E_EXECUTABLE ?? await resolvePa
 const root = await mkdtemp(join(tmpdir(), 'dsh-macos-lifecycle-'))
 const userData = join(root, 'user-data')
 let application
+let processDiagnostics = ''
 try {
   await seedPrimaryRuntimePermissionForTest({ userData })
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
@@ -23,6 +24,9 @@ try {
     DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_DISABLE_UPDATES: '0',
     DSH_DESKTOP_VERIFY_UPDATER: '0',
   } })
+  application.process().stderr?.on('data', chunk => {
+    processDiagnostics = (processDiagnostics + chunk.toString()).slice(-8000)
+  })
   await useChineseFixtureLocale(application)
   const page = await application.firstWindow()
   await page.waitForURL(/^http:\/\/127\.0\.0\.1:/u, { timeout: 120000 })
@@ -67,13 +71,27 @@ try {
   assert.ok(children.size > 1, 'packaged Runtime descendants are running before explicit quit')
   let timer
   try {
-    await Promise.race([application.close(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('macOS explicit quit timed out')), 20000) })])
+    // Keep the automation connection alive while the application resolves
+    // drafts. Playwright's close() detaches the main-process debugger as soon
+    // as app.quit() returns, before the asynchronous quit preparation finishes.
+    const quit = async () => {
+      await application.evaluate(({ app }) => new Promise(resolve => {
+        app.once('will-quit', () => resolve(true))
+        app.quit()
+      }))
+      await application.close()
+    }
+    await Promise.race([quit(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('macOS explicit quit timed out')), 20000) })])
   } finally { clearTimeout(timer) }
   const alive = pid => { try { process.kill(pid, 0); return true } catch (error) { if (error.code === 'ESRCH') return false; throw error } }
   for (let attempt = 0; attempt < 100 && [...children].some(alive); attempt++) await delay(50)
   assert.deepEqual([...children].filter(alive), [], 'explicit quit reclaims the packaged Runtime and renderer processes')
   assert.match(await readFile(join(root, 'dsh-home', 'settings.yaml'), 'utf8'), /persist-before-quit-fixture/u, 'draft was persisted before Runtime shutdown')
   console.log('PASS draft cancellation and save-before-quit, unsigned macOS updates, native menu, close-to-hide, Dock activation and explicit quit process cleanup')
+} catch (error) {
+  const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
+  console.error('macOS lifecycle failure diagnostics', JSON.stringify({ processDiagnostics, runtimeLog: runtimeLog.slice(-12000) }))
+  throw error
 } finally {
   await application?.close().catch(() => {})
   await rm(root, { recursive: true, force: true })
