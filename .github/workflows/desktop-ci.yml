@@ -34,6 +34,19 @@ jobs:
       - run: pnpm --filter @deepseek-ai/dsh-desktop exec playwright install chromium
       - name: Feature preservation baseline check
         run: pnpm feature-baseline:check
+      - name: Build unsigned Apple Silicon app
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:mac:dir
+      - name: Verify macOS package integrity and native bindings
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify:mac:dir
+      - name: Verify isolated macOS packaged startup
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke:mac
+      - name: Verify native macOS lifecycle and unsigned update policy
+        if: runner.os == 'macOS'
+        run: pnpm --filter @deepseek-ai/dsh-desktop test:macos-lifecycle:e2e
+
       - name: Desktop core regression E2E gate
         # Only the maintainer-approved 3.4.0 DPI position assertion is accepted.
         # The test still runs; every other failure and version stays blocking.
@@ -57,16 +70,3 @@ jobs:
       - run: pnpm community:check
       - run: pnpm docs:check
       - run: git diff --check
-
-      - name: Build unsigned Apple Silicon app
-        if: runner.os == 'macOS'
-        run: pnpm --filter @deepseek-ai/dsh-desktop pack:mac:dir
-      - name: Verify macOS package integrity and native bindings
-        if: runner.os == 'macOS'
-        run: pnpm --filter @deepseek-ai/dsh-desktop pack:verify:mac:dir
-      - name: Verify isolated macOS packaged startup
-        if: runner.os == 'macOS'
-        run: pnpm --filter @deepseek-ai/dsh-desktop pack:smoke:mac
-      - name: Verify native macOS lifecycle and unsigned update policy
-        if: runner.os == 'macOS'
-        run: pnpm --filter @deepseek-ai/dsh-desktop test:macos-lifecycle:e2e
