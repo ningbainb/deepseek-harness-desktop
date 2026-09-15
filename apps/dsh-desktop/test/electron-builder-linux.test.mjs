@@ -7,6 +7,7 @@ import test from 'node:test'
 import YAML from 'yaml'
 
 const appDirectory = join(dirname(fileURLToPath(import.meta.url)), '..')
+const repositoryDirectory = join(appDirectory, '..', '..')
 
 async function readPackagingConfig() {
   return YAML.parse(await readFile(join(appDirectory, 'electron-builder.yml'), 'utf8'))
@@ -41,4 +42,12 @@ test('Linux packaging uses system Git and never inherits bundled MinGit', async 
   assert.equal(topLevel.some((entry) => entry.to === 'managed-git/current'), false)
   assert.equal(linux.some((entry) => entry.to === 'managed-git/current'), false)
   assert.equal(config.win.extraResources.some((entry) => entry.to === 'managed-git/current'), true)
+})
+
+test('Linux CI smoke keeps the Chromium sandbox enabled with installed permissions', async () => {
+  const workflow = await readFile(join(repositoryDirectory, '.github', 'workflows', 'linux-preview.yml'), 'utf8')
+  assert.match(workflow, /sudo chown root:root "\$sandbox"/u)
+  assert.match(workflow, /sudo chmod 4755 "\$sandbox"/u)
+  assert.match(workflow, /stat -c '%U:%G %a'/u)
+  assert.doesNotMatch(workflow, /--no-sandbox/u)
 })

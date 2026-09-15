@@ -93,7 +93,14 @@ jobs:
       - name: Verify packaged Landlock enforcement
         run: pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux
       - name: Run packaged Electron smoke under Xvfb
-        run: xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          sandbox=apps/dsh-desktop/dist/linux-unpacked/chrome-sandbox
+          sudo chown root:root "$sandbox"
+          sudo chmod 4755 "$sandbox"
+          test "$(stat -c '%U:%G %a' "$sandbox")" = 'root:root 4755'
+          xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux
       - name: Validate Linux archives and write checksums
         shell: bash
         working-directory: apps/dsh-desktop/dist
