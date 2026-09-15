@@ -5,11 +5,11 @@ Linux 版本目前是独立预览通道，不会替换 Windows 正式版或 macO
 ## 支持范围
 
 - 架构：x86_64 / amd64
-- 目标验证系统：Ubuntu 22.04 LTS、Ubuntu 24.04 LTS
+- CI 已验证系统：Ubuntu 22.04 LTS、Ubuntu 24.04 LTS
 - 产物：AppImage、deb
 - 更新：暂不支持应用内自动更新，请从项目 GitHub Releases 手动下载新版本
 
-只有通过对应版本的真实 CI 后才会将系统标记为已验证。其他基于 Debian、Ubuntu 的发行版可能可以运行，但在完成真实测试前不属于已支持范围。Arch Linux、Fedora、openSUSE、Alpine 和 ARM64 当前均未验证。
+Ubuntu 22.04/24.04 已通过 GitHub Actions 中的真实打包、沙箱和 Xvfb 启动验收。实体桌面的 deb 安装与 AppImage 手工体验仍属于 Preview 用户验收范围，因此暂不宣称为 Linux 正式版。其他基于 Debian、Ubuntu 的发行版可能可以运行，但在完成真实测试前不属于已支持范围。Arch Linux、Fedora、openSUSE、Alpine 和 ARM64 当前均未验证。
 
 ## AppImage
 

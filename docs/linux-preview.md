@@ -5,11 +5,11 @@ Linux is distributed through a separate preview channel. It does not replace the
 ## Supported preview scope
 
 - Architecture: x86_64 / amd64
-- Target validation distributions: Ubuntu 22.04 LTS and Ubuntu 24.04 LTS
+- CI-validated distributions: Ubuntu 22.04 LTS and Ubuntu 24.04 LTS
 - Artifacts: AppImage and deb
 - Updates: in-app updates are disabled; download new builds manually from this project's GitHub Releases
 
-A distribution is only marked as validated after its real CI job passes. Other Debian- or Ubuntu-based distributions may work, but they are not supported until validated. Arch Linux, Fedora, openSUSE, Alpine and ARM64 are currently unverified.
+Ubuntu 22.04 and 24.04 pass real GitHub Actions packaging, sandbox, and Xvfb startup checks. Physical-desktop deb installation and AppImage usability remain Preview user-acceptance work, so this is not yet presented as a Linux stable release. Other Debian- or Ubuntu-based distributions may work, but they are not supported until validated. Arch Linux, Fedora, openSUSE, Alpine and ARM64 are currently unverified.
 
 ## AppImage
 

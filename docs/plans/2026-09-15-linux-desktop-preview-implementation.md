@@ -61,3 +61,10 @@ Linux Preview 不自动进入 Windows 正式更新通道，不宣称覆盖所有
 3. 打包冒烟和平台交互修正。
 4. Ubuntu CI 与双系统版本矩阵。
 5. 生成 Preview 产物、校验 SHA-256，再决定是否创建独立预览 Release。
+
+## 2026-09-15 实施进展
+
+- 已完成 Linux x64 AppImage 与 deb 打包链路、原生依赖恢复和平台裁剪。
+- 已在 Ubuntu 22.04 与 Ubuntu 24.04 通过功能基线、类型检查、打包契约、原生包校验、Landlock 写入拒绝、Chromium 沙箱和 Xvfb 启动验收。
+- 已生成带 SHA-256 清单的 CI artifacts，未创建 GitHub Release，未合并到 `main`。
+- 待 Preview 用户在实体 Ubuntu 桌面完成 deb 安装、AppImage 启动、会话、终端与插件安装体验后，再决定是否发布独立 Linux Preview Release。
