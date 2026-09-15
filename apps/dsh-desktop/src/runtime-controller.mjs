@@ -333,7 +333,7 @@ export function terminateChildProcessTree(
     return Promise.resolve()
   }
   const targetPid = Number.isInteger(rootPid) && rootPid > 0 ? rootPid : child.pid
-  const executable = systemRoot ? join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill.exe'
+  const executable = systemRoot ? win32.join(systemRoot, 'System32', 'taskkill.exe') : 'taskkill.exe'
   return new Promise((resolve, reject) => {
     execFileFn(
       executable,
@@ -1015,7 +1015,7 @@ export class DshRuntimeController extends EventEmitter {
       this.lastCrashFingerprint = fingerprint
       this.sameCrashCount = 1
     }
-    const exitError = formatRuntimeExit(code, signal)
+    const exitError = formatRuntimeExit(code, signal, { platform: this.platform })
     this.#setStatus('crashed', { error: exitError }, redactionToken)
     if (!this.autoRestart) return
     if (this.sameCrashCount >= 2) {

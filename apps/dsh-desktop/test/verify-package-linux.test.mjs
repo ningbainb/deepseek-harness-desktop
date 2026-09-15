@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -24,8 +24,12 @@ async function createLinuxSurface(root, { foreignPrebuild } = {}) {
   const appRoot = join(root, 'linux-unpacked')
   const resources = join(appRoot, 'resources')
   const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
-  await writeFixture(join(appRoot, LINUX_EXECUTABLE_NAME))
-  await writeFixture(join(appRoot, 'chrome-sandbox'))
+  const executable = join(appRoot, LINUX_EXECUTABLE_NAME)
+  const chromeSandbox = join(appRoot, 'chrome-sandbox')
+  await writeFixture(executable)
+  await writeFixture(chromeSandbox)
+  await chmod(executable, 0o755)
+  await chmod(chromeSandbox, 0o755)
   await writeFixture(join(resources, 'app.asar'))
   await writeFixture(join(unpackedModules, 'node-pty', 'prebuilds', 'linux-x64', 'pty.node'))
   if (foreignPrebuild) {

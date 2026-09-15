@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { delimiter, posix, win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 const DEFAULT_TERMINAL_SIZE = Object.freeze({ cols: 80, rows: 24 })
 const MAX_TERMINAL_INPUT_LENGTH = 65_536
@@ -99,20 +99,21 @@ export function createTerminalEnvironment({
   delete result.ELECTRON_RUN_AS_NODE
   const entries = normalizedPathEntries(pathEntries)
   const path = terminalPath(result)
+  const pathDelimiter = platform === 'win32' ? ';' : ':'
   if (entries.length > 0) {
     const identity = (value) => platform === 'win32'
       ? value.replaceAll('/', '\\').replace(/\\+$/u, '').toLowerCase()
       : value.replace(/\/+$/u, '')
     const seen = new Set()
     const combined = []
-    for (const entry of [...entries, ...(typeof path.value === 'string' ? path.value.split(delimiter) : [])]) {
+    for (const entry of [...entries, ...(typeof path.value === 'string' ? path.value.split(pathDelimiter) : [])]) {
       if (entry.length === 0) continue
       const key = identity(entry)
       if (seen.has(key)) continue
       seen.add(key)
       combined.push(entry)
     }
-    result[path.key] = combined.join(delimiter)
+    result[path.key] = combined.join(pathDelimiter)
   }
   result.TERM = 'xterm-256color'
   result.COLORTERM = 'truecolor'
