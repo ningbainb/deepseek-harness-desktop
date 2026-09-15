@@ -13,6 +13,10 @@ import {
   resolvePackagedResourcesPath,
   verifyMacPackagedSurface,
 } from './verify-package-mac.mjs'
+import {
+  linuxAppRootFromResources,
+  verifyLinuxPackagedSurface,
+} from './verify-package-linux.mjs'
 
 import { selectManagedGitRelease, verifyManagedGitInstall } from '../src/managed-git.mjs'
 import { MANAGED_GIT_MANIFEST } from '../src/managed-git-manifest.mjs'
@@ -85,6 +89,15 @@ const REQUIRED_NATIVE_BINDINGS = Object.freeze({
     '@vscode/ripgrep-win32-x64',
     'lightningcss-win32-x64-msvc',
     'node-addon-require-builtin-win32-x64-msvc',
+  ]),
+  'linux-x64': Object.freeze([
+    '@img/sharp-linux-x64',
+    '@img/sharp-libvips-linux-x64',
+    '@koromix/koffi-linux-x64',
+    '@vscode/ripgrep-linux-x64',
+    'lightningcss-linux-x64-gnu',
+    'node-addon-require-builtin-linux-x64-gnu',
+    '@deepseek-ai/node-addon-system-linux-x64',
   ]),
 })
 const requiredNativeBindings = REQUIRED_NATIVE_BINDINGS[
@@ -195,7 +208,7 @@ for (const packageRoot of packagedPackageDirectories) {
   }
 }
 
-if (TARGET_PLATFORM.platform === 'win32') {
+if (TARGET_PLATFORM.platform !== 'darwin') {
   const electronLocales = (await readdir(join(resources, '..', 'locales')))
     .filter(file => file.endsWith('.pak'))
     .toSorted()
@@ -597,8 +610,16 @@ if (TARGET_PLATFORM.platform === 'win32') {
     && packagingConfig.extraResources.some((entry) => entry.to === 'managed-git/current')) {
     throw new Error('bundled managed Git must stay a Windows extra resource')
   }
-} else if (packagingConfig.mac?.extraResources?.some((entry) => entry.to === 'managed-git/current')) {
+} else if (
+  TARGET_PLATFORM.platform === 'darwin'
+  && packagingConfig.mac?.extraResources?.some((entry) => entry.to === 'managed-git/current')
+) {
   throw new Error('macOS packaging config must not bundle MinGit')
+} else if (
+  TARGET_PLATFORM.platform === 'linux'
+  && packagingConfig.linux?.extraResources?.some((entry) => entry.to === 'managed-git/current')
+) {
+  throw new Error('Linux packaging config must not bundle MinGit')
 }
 
 if (TARGET_PLATFORM.platform === 'darwin') {
@@ -609,6 +630,15 @@ if (TARGET_PLATFORM.platform === 'darwin') {
     appId: packagingConfig.appId,
     productName: packagingConfig.productName,
     electronLanguages: packagingConfig.electronLanguages,
+  })
+}
+
+if (TARGET_PLATFORM.platform === 'linux') {
+  await verifyLinuxPackagedSurface({
+    appRoot: linuxAppRootFromResources(resources),
+    resources,
+    unpackedModules,
+    executableName: packagingConfig.linux?.executableName,
   })
 }
 

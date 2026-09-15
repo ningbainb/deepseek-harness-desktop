@@ -328,6 +328,19 @@
       ]
     },
     {
+      "id": "linux-x64-preview",
+      "name": "Linux x64 Preview 打包、隔离启动与原生模块保全",
+      "e2eScript": "scripts/verify-packaged-smoke-linux.mjs",
+      "features": [
+        "ubuntu-22.04-and-24.04-preview-matrix",
+        "appimage-and-deb-x64-artifacts",
+        "linux-native-runtime-binding-validation",
+        "linux-system-git-without-mingit",
+        "linux-packaged-smoke-isolates-real-dsh-home",
+        "linux-preview-manual-update-boundary"
+      ]
+    },
+    {
       "id": "settings-window",
       "features": [
         "dom-ready-settings-adaptation",

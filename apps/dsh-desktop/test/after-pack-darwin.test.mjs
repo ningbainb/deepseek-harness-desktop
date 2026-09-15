@@ -195,11 +195,11 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
   }
 })
 
-test('afterPack still no-ops on linux so Windows-only early return is not inverted', async () => {
+test('afterPack still no-ops on unsupported platforms', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-after-pack-linux-'))
   try {
     await afterPack({
-      electronPlatformName: 'linux',
+      electronPlatformName: 'freebsd',
       arch: 'x64',
       appOutDir: join(root, 'linux-unpacked'),
       outDir: root,

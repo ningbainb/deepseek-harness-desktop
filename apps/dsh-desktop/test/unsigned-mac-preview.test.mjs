@@ -7,6 +7,7 @@ import test from 'node:test'
 import { DesktopUpdateController } from '../src/updater.mjs'
 import { publicUpdateStatus } from '../src/ipc.mjs'
 import {
+  LINUX_PREVIEW_REASON,
   UNSIGNED_MAC_PREVIEW_REASON,
   inspectMacCodeSignature,
   resolveUpdateAvailability,
@@ -26,6 +27,17 @@ test('Windows packaged builds keep updates enabled unless explicitly disabled', 
       disableRequested: true,
     }),
     { enabled: false, reason: 'explicit' },
+  )
+})
+
+test('packaged Linux preview disables automatic updates with an explicit reason', () => {
+  assert.deepEqual(
+    resolveUpdateAvailability({ platform: 'linux', packaged: true }),
+    { enabled: false, reason: LINUX_PREVIEW_REASON },
+  )
+  assert.deepEqual(
+    resolveUpdateAvailability({ platform: 'linux', packaged: false }),
+    { enabled: false, reason: 'unavailable' },
   )
 })
 
@@ -116,6 +128,8 @@ test('update surface copy names the unsigned macOS preview and install docs ment
   assert.match(surface, /预览版不支持自动更新/u)
   assert.match(surface, /未签名的 macOS 预览版无法使用应用内更新/u)
   assert.match(surface, /unsigned-mac-preview/u)
+  assert.match(surface, /Linux 预览版请手动更新/u)
+  assert.match(surface, /linux-preview/u)
 
   const zh = await readFile(join(appDirectory, '..', '..', 'docs', 'macos-preview.zh.md'), 'utf8')
   const en = await readFile(join(appDirectory, '..', '..', 'docs', 'macos-preview.md'), 'utf8')

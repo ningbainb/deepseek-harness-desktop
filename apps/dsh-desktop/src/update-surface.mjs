@@ -413,6 +413,10 @@ export function createUpdateSurfaceScript() {
           title.textContent = '预览版不支持自动更新';
           status.textContent = '未签名的 macOS 预览版无法使用应用内更新。请到 GitHub Release 页手动下载新版本。';
           actions.append(github, later);
+        } else if (value.reason === 'linux-preview') {
+          title.textContent = 'Linux 预览版请手动更新';
+          status.textContent = 'Linux 预览版暂不使用应用内更新。请到 GitHub Release 页下载新的 AppImage 或 deb。';
+          actions.append(github, later);
         } else {
           title.textContent = '当前环境无法检查更新';
           status.textContent = '桌面更新仅在已安装的 Windows 版本中可用。';

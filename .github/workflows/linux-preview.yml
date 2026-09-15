@@ -1,0 +1,125 @@
+name: Linux x64 Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/linux-preview-4.0
+    paths:
+      - '.github/workflows/linux-preview.yml'
+      - 'apps/dsh-desktop/**'
+      - 'packages/**'
+      - 'shared/**'
+      - 'scripts/feature-baseline.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      REQUIRE_SIGNING: 'false'
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Linux x64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          uname -a
+          . /etc/os-release
+          printf '%s %s\n' "$NAME" "$VERSION_ID"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify source and Linux packaging contracts
+        run: |
+          pnpm feature-baseline:check
+          pnpm typecheck
+          node --test \
+            apps/dsh-desktop/test/electron-builder-linux.test.mjs \
+            apps/dsh-desktop/test/package-linux.test.mjs \
+            apps/dsh-desktop/test/verify-package-linux.test.mjs \
+            apps/dsh-desktop/test/after-pack-linux.test.mjs \
+            apps/dsh-desktop/test/unsigned-mac-preview.test.mjs \
+            apps/dsh-desktop/test/terminal-session.test.mjs \
+            apps/dsh-desktop/test/runtime-controller.test.mjs
+      - name: Configure official anonymous product metrics
+        shell: bash
+        env:
+          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises'
+
+          const endpointText = process.env.DSH_TELEMETRY_ENDPOINT?.trim()
+          if (!endpointText) throw new Error('Repository variable DSH_TELEMETRY_ENDPOINT is required')
+          const endpoint = new URL(endpointText)
+          if (endpoint.protocol !== 'https:'
+            || endpoint.pathname !== '/v1/events'
+            || endpoint.search !== ''
+            || endpoint.hash !== ''
+            || endpoint.username !== ''
+            || endpoint.password !== '') {
+            throw new Error('DSH_TELEMETRY_ENDPOINT must be a credential-free HTTPS URL ending exactly in /v1/events')
+          }
+          await writeFile(
+            'apps/dsh-desktop/build/telemetry-config.json',
+            `${JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2)}\n`,
+          )
+          NODE
+      - name: Build Linux x64 AppImage and deb
+        run: pnpm --filter @linxin666/dsh-desktop pack:linux
+      - name: Verify packaged Linux runtime
+        run: pnpm --filter @linxin666/dsh-desktop pack:verify:linux
+      - name: Verify packaged Landlock enforcement
+        run: pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux
+      - name: Run packaged Electron smoke under Xvfb
+        run: xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux
+      - name: Validate Linux archives and write checksums
+        shell: bash
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('../package.json').version")"
+          appimage="DeepSeek-Harness-Desktop-${version}-x86_64.AppImage"
+          deb="DeepSeek-Harness-Desktop-${version}-amd64.deb"
+          chmod +x "$appimage"
+          rm -rf squashfs-root
+          "./$appimage" --appimage-extract AppRun >/dev/null
+          test -x squashfs-root/AppRun
+          rm -rf squashfs-root
+          dpkg-deb --info "$deb" >/dev/null
+          dpkg-deb --contents "$deb" > deb-contents.txt
+          grep -q 'deepseek-harness-desktop' deb-contents.txt
+          rm deb-contents.txt
+          sha256sum "$appimage" "$deb" > SHA256SUMS-linux.txt
+          sha256sum -c SHA256SUMS-linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeek-Harness-Desktop-4.0.0-linux-x64-preview-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-amd64.deb
+            apps/dsh-desktop/dist/SHA256SUMS-linux.txt
+            apps/dsh-desktop/dist/runtime-prune-report.json

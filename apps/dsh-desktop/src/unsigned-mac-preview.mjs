@@ -1,4 +1,5 @@
 export const UNSIGNED_MAC_PREVIEW_REASON = 'unsigned-mac-preview'
+export const LINUX_PREVIEW_REASON = 'linux-preview'
 
 export function resolveUpdateAvailability({
   platform = 'win32',
@@ -8,6 +9,9 @@ export function resolveUpdateAvailability({
 } = {}) {
   if (disableRequested) return Object.freeze({ enabled: false, reason: 'explicit' })
   if (platform === 'win32' && packaged) return Object.freeze({ enabled: true, reason: null })
+  if (platform === 'linux' && packaged) {
+    return Object.freeze({ enabled: false, reason: LINUX_PREVIEW_REASON })
+  }
   if (platform === 'darwin' && packaged && codesignVerified !== true) {
     return Object.freeze({ enabled: false, reason: UNSIGNED_MAC_PREVIEW_REASON })
   }

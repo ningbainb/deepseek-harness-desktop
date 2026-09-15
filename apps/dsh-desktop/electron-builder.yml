@@ -97,6 +97,30 @@ dmg:
   artifactName: DeepSeek-Harness-Desktop-${version}-${arch}.${ext}
   title: DeepSeek Harness Desktop ${version}
 
+linux:
+  icon: build/icon.png
+  category: Development
+  maintainer: ningbainb <ningbainb@users.noreply.github.com>
+  vendor: ningbainb
+  executableName: deepseek-harness-desktop
+  synopsis: AI coding desktop workspace
+  description: DeepSeek Harness Desktop integrates AI conversations, project files, Git, skills and automation in one workspace.
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+
+appImage:
+  artifactName: DeepSeek-Harness-Desktop-${version}-x86_64.${ext}
+
+deb:
+  artifactName: DeepSeek-Harness-Desktop-${version}-amd64.${ext}
+  packageCategory: devel
+  priority: optional
+
 publish:
   provider: github
   owner: ningbainb

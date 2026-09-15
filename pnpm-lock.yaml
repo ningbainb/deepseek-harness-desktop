@@ -302,6 +302,9 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: 0.1.5-rc.2
         version: 0.1.5-rc.2(2faf0849fbdc6ac5919de8226950d80c)
+      '@deepseek-ai/node-addon-system':
+        specifier: 0.1.2
+        version: 0.1.2
       '@linxin666/dsh-client-ui-mode-switcher':
         specifier: workspace:*
         version: link:../../packages/dsh-mode-switcher

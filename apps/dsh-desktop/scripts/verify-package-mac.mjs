@@ -22,7 +22,7 @@ export function parseVerifyPackageArguments(argv) {
     if (argument === '--platform') {
       const value = argv[index + 1]
       if (value === undefined || value.startsWith('--')) {
-        throw new Error('verify-package --platform requires win32 or darwin')
+        throw new Error('verify-package --platform requires win32, darwin or linux')
       }
       platform = value
       index += 1
@@ -43,7 +43,7 @@ export function parseVerifyPackageArguments(argv) {
 
   const resolvedPlatform = platform ?? 'win32'
   const resolvedArch = arch ?? (resolvedPlatform === 'darwin' ? 'arm64' : 'x64')
-  if (resolvedPlatform !== 'win32' && resolvedPlatform !== 'darwin') {
+  if (resolvedPlatform !== 'win32' && resolvedPlatform !== 'darwin' && resolvedPlatform !== 'linux') {
     throw new Error(`unsupported verify-package platform: ${resolvedPlatform}`)
   }
   if (resolvedPlatform === 'darwin' && resolvedArch !== 'arm64') {
@@ -51,6 +51,9 @@ export function parseVerifyPackageArguments(argv) {
   }
   if (resolvedPlatform === 'win32' && resolvedArch !== 'x64') {
     throw new Error('Windows package verification only supports x64')
+  }
+  if (resolvedPlatform === 'linux' && resolvedArch !== 'x64') {
+    throw new Error('Linux package verification only supports x64')
   }
 
   return {
@@ -76,10 +79,9 @@ export function darwinResourcesCandidates(appDir, productFilename = PRODUCT_FILE
 }
 
 export function defaultPackagedResourcesPath(appDir, target) {
-  if (target.platform !== 'darwin') {
-    return join(appDir, 'dist', 'win-unpacked', 'resources')
-  }
-  return darwinResourcesCandidates(appDir)[0]
+  if (target.platform === 'darwin') return darwinResourcesCandidates(appDir)[0]
+  if (target.platform === 'linux') return join(appDir, 'dist', 'linux-unpacked', 'resources')
+  return join(appDir, 'dist', 'win-unpacked', 'resources')
 }
 
 export async function resolvePackagedResourcesPath({ appDir, parsed }) {

@@ -76,6 +76,38 @@ const REQUIRED_PACKAGED_NATIVE_BINDINGS = Object.freeze({
       resolveFrom: '@deepseek-ai/dsh',
     }),
   ]),
+  'linux-x64': Object.freeze([
+    Object.freeze({
+      packageName: '@img/sharp-linux-x64',
+      resolveFrom: 'sharp',
+      sourceFromEntry: Object.freeze(['..', '..', '@img', 'sharp-linux-x64']),
+    }),
+    Object.freeze({
+      packageName: '@img/sharp-libvips-linux-x64',
+      resolveFrom: 'sharp',
+      sourceFromEntry: Object.freeze(['..', '..', '@img', 'sharp-libvips-linux-x64']),
+    }),
+    Object.freeze({
+      packageName: '@koromix/koffi-linux-x64',
+      resolveFrom: 'koffi',
+    }),
+    Object.freeze({
+      packageName: '@vscode/ripgrep-linux-x64',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+    Object.freeze({
+      packageName: 'lightningcss-linux-x64-gnu',
+      resolveFrom: '@linxin666/dsh-client-ui-skin-center',
+    }),
+    Object.freeze({
+      packageName: 'node-addon-require-builtin-linux-x64-gnu',
+      resolveFrom: '@deepseek-ai/dsh',
+    }),
+    Object.freeze({
+      packageName: '@deepseek-ai/node-addon-system-linux-x64',
+      resolveFrom: '@deepseek-ai/node-addon-system',
+    }),
+  ]),
 })
 
 const SOURCE_ROOTS = new Map([
@@ -475,7 +507,7 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
 
 async function afterPack(context) {
   const platform = context.electronPlatformName
-  if (platform !== 'win32' && platform !== 'darwin') return
+  if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') return
   const target = packingTargetFromContext(context)
   const nodeModulesRoot = packagedNodeModulesRoot(context)
   const restoredPeers = await restoreRequiredPackagedPeers(nodeModulesRoot)
