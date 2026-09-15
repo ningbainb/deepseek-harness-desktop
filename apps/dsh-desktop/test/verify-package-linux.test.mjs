@@ -42,6 +42,8 @@ async function createLinuxSurface(root, { foreignPrebuild } = {}) {
       await writeFixture(join(packageRoot, 'bin', 'rg'))
     } else if (packageName === '@deepseek-ai/node-addon-system-linux-x64') {
       await writeFixture(join(packageRoot, 'bin', 'landlock-run'))
+    } else if (packageName === '@img/sharp-libvips-linux-x64') {
+      await writeFixture(join(packageRoot, 'lib', 'libvips-cpp.so.8.17.3'))
     } else {
       await writeFixture(join(packageRoot, 'prebuilt', 'binding.node'))
     }

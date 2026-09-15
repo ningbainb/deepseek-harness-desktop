@@ -96,7 +96,7 @@ export async function verifyLinuxPackagedSurface({
     }
     const hasNativePayload = await hasFileMatching(
       root,
-      (name) => name.endsWith('.node') || name === 'landlock-run' || name.endsWith('.so'),
+      (name) => name.endsWith('.node') || name === 'landlock-run' || /\.so(?:\.|$)/u.test(name),
     )
     if (!hasNativePayload) throw new Error(`packaged Linux native package has no binary payload: ${packageName}`)
   }
