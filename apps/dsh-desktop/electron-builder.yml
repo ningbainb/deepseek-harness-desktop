@@ -103,6 +103,7 @@ linux:
   maintainer: ningbainb <ningbainb@users.noreply.github.com>
   vendor: ningbainb
   executableName: deepseek-harness-desktop
+  syncDesktopName: true
   synopsis: AI coding desktop workspace
   description: DeepSeek Harness Desktop integrates AI conversations, project files, Git, skills and automation in one workspace.
   target:

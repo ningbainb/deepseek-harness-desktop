@@ -3,6 +3,12 @@
   "version": "4.0.0",
   "private": true,
   "description": "Lossless desktop shell for DeepSeek Harness and the complete dsh-web-ui plugin collection",
+  "homepage": "https://github.com/ningbainb/deepseek-harness-desktop",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ningbainb/deepseek-harness-desktop.git"
+  },
+  "desktopName": "com.ningbainb.deepseek-harness.desktop",
   "author": "ningbai牛逼",
   "type": "module",
   "main": "src/main.mjs",
