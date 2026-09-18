@@ -9,7 +9,7 @@ export const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..')
 export const BASELINE_PATH = resolve(SCRIPT_DIR, 'dsh-import-boundary.baseline.json')
 
 const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx'])
-const IGNORED_SOURCE_PREFIXES = Object.freeze(['.cache/', '.patch-work/'])
+const IGNORED_SOURCE_PREFIXES = Object.freeze(['.cache/', '.patch-work/', '.pnpm_patches/'])
 const CONTROLLED_PREFIXES = Object.freeze([
   'apps/dsh-desktop/src/runtime-provider.mjs',
   'packages/dsh-desktop-pipe-webserver/lib/',

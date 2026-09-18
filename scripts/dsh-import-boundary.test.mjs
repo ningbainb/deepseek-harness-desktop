@@ -82,9 +82,11 @@ test('repository import scan excludes generated cache and patch construction scr
     await execFileAsync('git', ['init'], { cwd: root, windowsHide: true })
     await mkdir(resolve(root, '.patch-work'), { recursive: true })
     await mkdir(resolve(root, '.cache'), { recursive: true })
+    await mkdir(resolve(root, '.pnpm_patches'), { recursive: true })
     await writeFile(resolve(root, 'kept.mjs'), "import '@deepseek-ai/dsh-session'\n")
     await writeFile(resolve(root, '.patch-work', 'scratch.mjs'), "import '@deepseek-ai/dsh-settings'\n")
     await writeFile(resolve(root, '.cache', 'scratch.mjs'), "import '@deepseek-ai/dsh-settings'\n")
+    await writeFile(resolve(root, '.pnpm_patches', 'scratch.mjs'), `import '${'@deepseek-ai/' + 'dsh-settings'}'\n`)
 
     assert.deepEqual(await scanRepositoryImports(root), [{
       path: 'kept.mjs',
