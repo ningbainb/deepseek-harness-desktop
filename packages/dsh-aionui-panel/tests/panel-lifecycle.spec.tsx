@@ -151,8 +151,12 @@ it('isolates an AionUI render failure without blocking the conversation or the o
   panelFailure.explorer = true
   const disposePanels = mountPanels({} as never, vi.fn(), () => true)
   try {
-    await vi.waitFor(() => expect(shell.querySelectorAll('[data-aionui-panel-unavailable]')).toHaveLength(1))
-    expect(shell.querySelectorAll('[data-preview-probe]')).toHaveLength(1)
+    // The explorer error boundary and the independent preview root schedule separately.
+    // Wait for the complete isolation outcome instead of observing their transient order.
+    await vi.waitFor(() => {
+      expect(shell.querySelectorAll('[data-aionui-panel-unavailable]')).toHaveLength(1)
+      expect(shell.querySelectorAll('[data-preview-probe]')).toHaveLength(1)
+    })
     send.click()
     expect(onSend).toHaveBeenCalledOnce()
   } finally { disposePanels(); layout.dispose() }
