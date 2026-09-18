@@ -713,6 +713,17 @@ main { padding: 24px 26px 28px; }
 .workspace-heading { margin-bottom: 20px; padding-right: 74px; }
 .workspace-heading h2 { margin: 6px 0 0; font-size: 23px; font-weight: 650; }
 .content-toolbar { top: 31px; right: 26px; }
+
+/* The Dock's 960x680 compact window is a first-class desktop size. Keep every
+ * primary destination visible there instead of making the navigation scroll. */
+@media (max-height: 700px) {
+  .settings-sidebar { padding-top: 8px; padding-bottom: 6px; }
+  .settings-sidebar header { padding-bottom: 5px; }
+  .settings-sidebar h1 { font-size: 16px; }
+  .settings-sidebar nav button.tab { height: 27px; min-height: 27px; font-size: 12px; }
+  .nav-group-label { margin-top: 2px; margin-bottom: 0; font-size: 10px; line-height: 12px; }
+  .settings-sidebar .sidebar-note { display: none; }
+}
 nav.page-tabs { display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--harness-border); }
 .page-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 1px 12px; color: var(--harness-text-secondary); background: transparent; font-size: 13px; }
 .page-tabs button.active { border-bottom-color: var(--harness-accent); color: var(--harness-text); font-weight: 600; }
