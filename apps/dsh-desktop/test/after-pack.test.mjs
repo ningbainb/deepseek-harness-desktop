@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
 
 import YAML from 'yaml'
@@ -264,8 +264,11 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
     }
     await prunePackagedRuntime(root)
     const isolatedRequire = createRequire(join(temporary, 'ssh-probe.cjs'))
+    const physicalRoot = await realpath(root)
     for (const packageName of ['ssh2', 'asn1', 'safer-buffer', 'bcrypt-pbkdf', 'tweetnacl']) {
-      assert.ok(isolatedRequire.resolve(`${packageName}/package.json`).startsWith(root))
+      const resolved = await realpath(isolatedRequire.resolve(`${packageName}/package.json`))
+      const pathFromRoot = relative(physicalRoot, resolved)
+      assert.equal(pathFromRoot.startsWith('..'), false, `${packageName} must resolve from the packaged dependency root`)
     }
     assert.equal(typeof isolatedRequire('ssh2').Client, 'function')
     assert.deepEqual(await restoreRequiredPackagedPeers(root), [])
