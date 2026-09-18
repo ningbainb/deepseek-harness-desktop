@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import test from 'node:test'
 
 import YAML from 'yaml'
@@ -17,6 +19,8 @@ const {
   restoreRequiredNativeBindings,
   restoreRequiredPackagedPeers,
 } = afterPack
+
+const execFileAsync = promisify(execFile)
 
 test('release package constraints retain only the target operating system and architecture', () => {
   const target = { platform: 'win32', arch: 'x64' }
@@ -270,10 +274,12 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
       const pathFromRoot = relative(physicalRoot, resolved)
       assert.equal(pathFromRoot.startsWith('..'), false, `${packageName} must resolve from the packaged dependency root`)
     }
-    assert.equal(typeof isolatedRequire('ssh2').Client, 'function')
+    const probePath = join(temporary, 'ssh-probe.cjs')
+    await writeFile(probePath, "const { Client } = require('ssh2')\nif (typeof Client !== 'function') process.exit(1)\n")
+    await execFileAsync(process.execPath, [probePath], { windowsHide: true })
     assert.deepEqual(await restoreRequiredPackagedPeers(root), [])
   } finally {
-    await rm(temporary, { recursive: true, force: true })
+    await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })
 
