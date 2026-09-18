@@ -255,7 +255,7 @@ try {
   app = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args: packagedExecutable === undefined ? [mainEntry] : [],
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -271,7 +271,7 @@ try {
   const rendererErrors = []
   page.on('pageerror', error => rendererErrors.push(error.message))
   await page.waitForURL(/^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/)/u, { timeout: 120_000 })
-  await page.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', { state: 'attached', timeout: 120_000 })
+  await page.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
   await dismissStartup(page)
 
   const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
@@ -282,8 +282,17 @@ try {
   if (await group.getAttribute('aria-expanded') !== 'true') await group.click({ force: true })
   const beforeIds = new Set((await rpc(page, 'session.list', {})).items.map(item => item.sessionId))
   await group.hover()
-  const newSession = page.locator('button[aria-label*="中新建会话"], button[aria-label^="New session in"]').first()
-  await newSession.waitFor({ state: 'visible', timeout: 30_000 })
+  const newSessionCandidates = page.locator('button[aria-label*="中新建会话"], button[aria-label^="New session in"]')
+  await newSessionCandidates.first().waitFor({ state: 'attached', timeout: 30_000 })
+  let newSession
+  for (let index = 0; index < await newSessionCandidates.count(); index += 1) {
+    const candidate = newSessionCandidates.nth(index)
+    if (await candidate.isVisible()) {
+      newSession = candidate
+      break
+    }
+  }
+  assert.ok(newSession !== undefined, `workspace new-session control must be visible: ${JSON.stringify(await newSessionCandidates.evaluateAll(nodes => nodes.map(node => ({ label: node.getAttribute('aria-label'), visible: node.checkVisibility() }))))}`)
   await newSession.click()
   let sessionId
   let observed = []
@@ -311,9 +320,13 @@ try {
   ).first()
   await composer.waitFor({ state: 'visible', timeout: 30_000 })
   await composer.fill(`Create ${markerPath} and report completion.`)
-  const promptRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt')
+  const requestCountBeforePrompt = requests.length
   await page.getByRole('button', { name: '发送消息', exact: true }).click()
-  await promptRequest
+  const promptDeadline = Date.now() + 30_000
+  while (requests.length === requestCountBeforePrompt && Date.now() < promptDeadline) {
+    await page.waitForTimeout(100)
+  }
+  assert.ok(requests.length > requestCountBeforePrompt, 'sending a message did not reach the selected model')
   await page.getByRole('paragraph').filter({ hasText: finalText }).last().waitFor({ state: 'visible', timeout: 60_000 })
   await rpc(page, 'session.rename', { sessionId, title: sessionTitle })
   const agentRequests = requests.filter(request => Array.isArray(request.tools) && request.tools.length > 0)
@@ -334,7 +347,7 @@ try {
   app = await electron.launch({
     executablePath: reopenExecutable ?? electronPath,
     args: reopenExecutable === undefined ? [mainEntry] : [],
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -350,7 +363,7 @@ try {
   const reopenedRendererErrors = []
   reopenedPage.on('pageerror', error => reopenedRendererErrors.push(error.message))
   await reopenedPage.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
-  await reopenedPage.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', { state: 'attached', timeout: 120_000 })
+  await reopenedPage.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
   await dismissStartup(reopenedPage)
   await openCreatedSession(reopenedPage, sessionId)
   await reopenedPage.getByRole('paragraph').filter({ hasText: finalText }).last()
@@ -364,19 +377,15 @@ try {
   ).first()
   await reopenedComposer.waitFor({ state: 'visible', timeout: 30_000 })
   await reopenedComposer.fill(contextProbePrompt)
-  const contextPromptRequest = reopenedPage.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt')
-  const contextPromptResponse = reopenedPage.waitForResponse(response => new URL(response.url()).pathname === '/api/session/prompt')
   await reopenedPage.getByRole('button', { name: '发送消息', exact: true }).click()
-  await contextPromptRequest
-  const completedPromptResponse = await contextPromptResponse
-  await completedPromptResponse.finished()
-  assert.equal(completedPromptResponse.status(), 200, 'the post-restart prompt transport did not complete successfully')
   const contextProbeDeadline = Date.now() + 60_000
   while (!contextProbeDetected && Date.now() < contextProbeDeadline) {
     await reopenedPage.waitForTimeout(250)
   }
   assert.equal(contextProbeDetected, true, 'the fixture server did not detect the context probe')
   assert.equal(contextProbeSawHistory, true, 'the model request lost the pre-restart history context')
+  await reopenedPage.getByRole('paragraph').filter({ hasText: contextRetainedText }).last()
+    .waitFor({ state: 'visible', timeout: 60_000 })
   assert.equal(await historyFailure.count(), 0, 'post-restart prompting must not trigger a history load failure')
   assert.deepEqual(reopenedRendererErrors, [])
 

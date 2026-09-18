@@ -42,6 +42,105 @@ import {
   setAgentTeamProfileEnabled,
 } from '../src/profile.mjs'
 
+test('alpha Web aggregate cannot silently remove Desktop-only profile rows', () => {
+  const legacy = '@linxin666/dsh-web-ui-all'
+  const alpha = '@linxin666/dsh-web-all'
+  const roots = resolveRuntimePackages([legacy, alpha])
+  const patchRows = (packageName) => parse(readFileSync(join(roots.get(packageName), 'cordis.patch.yml'), 'utf8'))
+  const insertIds = rows => rows.flatMap(row => (row.insert ?? []).map(insert => insert.id))
+  const legacyIds = new Set(insertIds(patchRows(legacy)))
+  const alphaIds = new Set(insertIds(patchRows(alpha)))
+  const desktopOnly = [
+    'user-scope',
+    'ui-model-preferences',
+    'personal-prompt',
+    'memory',
+    'web-ui-mode-switcher',
+    'live-stats',
+    'web-ui-dsh-aionui-panel',
+    'web-ui-chat-recovery',
+    'web-ui-desktop-launcher',
+  ]
+  assert.deepEqual([...legacyIds].filter(id => !alphaIds.has(id)).toSorted(), desktopOnly.toSorted())
+  assert.equal(BUILTIN_BUNDLES.filter(name => name === legacy || name === alpha).length, 1,
+    'the two aggregate patches reuse loader IDs and must not be mounted together')
+  const active = BUILTIN_BUNDLES.includes(alpha) ? alpha : legacy
+  const managedIds = insertIds(parse(DESKTOP_PATCH_CONFIG))
+  const activeIds = insertIds(patchRows(active))
+  const managedOverrides = parse(DESKTOP_PATCH_CONFIG)
+  assert.equal(managedOverrides.find(row => row.id === 'web-ui-settings')?.disabled, true,
+    'the upstream folded settings client must not duplicate the Desktop settings root')
+  assert.ok(managedIds.includes('desktop-web-ui-settings'), 'Desktop mounts its settings document as a direct client entry')
+  for (const [upstreamId, desktopId, packageName] of [
+    ['web-ui-task-board', 'ui-task-board', '@linxin666/dsh-client-ui-task-board'],
+    ['web-ui-git-graph', 'ui-git-graph', '@linxin666/dsh-client-ui-git-graph'],
+    ['web-ui-pet', 'pet', '@linxin666/dsh-pet'],
+    ['web-ui-ssh', 'ssh', '@linxin666/dsh-ssh'],
+  ]) {
+    assert.equal(managedOverrides.find(row => row.id === upstreamId)?.disabled, true,
+      `${upstreamId} must not mix an upstream client with Desktop-only Host routes`)
+    assert.equal(managedOverrides.flatMap(row => row.insert ?? []).find(row => row.id === desktopId)?.name,
+      packageName, `${desktopId} preserves the 4.1 loader ID and user disable override`)
+  }
+  assert.equal(managedOverrides.find(row => row.id === 'web-ui-ssh')?.disabled, true,
+    'the upstream five-tab SSH client must not replace the Desktop six-tab client')
+  for (const id of ['web-ui-describe-image', 'web-ui-liangshen']) {
+    assert.equal(patchRows(alpha).find(row => row.id === id)?.disabled, true, `${id} must be opt-in upstream`)
+    assert.equal(managedOverrides.find(row => row.id === id)?.disabled, false,
+      `${id} was enabled in 4.1 and must remain available after upgrade`)
+  }
+  for (const id of desktopOnly) {
+    assert.equal(activeIds.filter(row => row === id).length + managedIds.filter(row => row === id).length, 1,
+      `Desktop-owned row ${id} must survive the aggregate switch exactly once`)
+  }
+  if (active === alpha) {
+    const patch = parse(DESKTOP_PATCH_CONFIG)
+    for (const [id, directBundle] of [
+      ['web-ui-model-capabilities', '@linxin666/dsh-client-ui-model-capabilities'],
+      ['web-ui-usage', '@linxin666/dsh-usage'],
+      ['web-ui-session-archive', '@linxin666/dsh-session-archive'],
+    ]) {
+      assert.ok(BUILTIN_BUNDLES.includes(directBundle), `${directBundle} retains the 4.1 entry`)
+      assert.equal(patch.find(row => row.id === id)?.disabled, true,
+        `${id} must not mount a duplicate host plugin before its saved state migrates`)
+    }
+    assert.equal(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@linxin666/dsh-session-archive'],
+      'file:../../vendor/dsh-web-alpha-0.3.23/linxin666-dsh-session-archive-0.3.23.tgz',
+      'the direct archive entry must use the alpha-compatible settings section')
+  }
+})
+
+test('4.1 user disable overrides for reused aggregate row IDs remain later than Desktop defaults', () => {
+  const existing = '- id: web-ui-liangshen\n  disabled: true\n- id: web-ui-ssh\n  disabled: true\n- id: ui-task-board\n  disabled: true\n- id: ui-git-graph\n  disabled: true\n- id: pet\n  disabled: true\n'
+  const rows = parse(mergeDesktopPatch(existing))
+  for (const id of ['web-ui-liangshen']) {
+    assert.deepEqual(rows.filter(row => row.id === id).map(row => row.disabled), [false, true])
+  }
+  assert.deepEqual(rows.filter(row => row.id === 'web-ui-ssh').map(row => row.disabled), [true])
+  assert.deepEqual(rows.filter(row => row.id === 'ssh').map(row => row.disabled), [true])
+  for (const id of ['ui-task-board', 'ui-git-graph', 'pet']) {
+    const mountedAt = rows.findIndex(row => row.insert?.some(insert => insert.id === id))
+    const disabledAt = rows.findIndex(row => row.id === id && row.disabled === true)
+    assert.ok(mountedAt >= 0 && disabledAt > mountedAt, `${id} must retain the 4.1 user disable override`)
+  }
+})
+
+test('4.1 SSH enable and config move to the preserved Desktop SSH row without re-enabling the upstream client', () => {
+  const rows = parse(mergeDesktopPatch('- id: web-ui-ssh\n  disabled: false\n  config:\n    announceToAgent: false\n'))
+  assert.deepEqual(rows.filter(row => row.id === 'web-ui-ssh').map(row => row.disabled), [true])
+  assert.deepEqual(rows.filter(row => row.id === 'ssh' && row.disabled === false).map(row => row.config), [
+    { announceToAgent: false },
+  ])
+})
+
+
+test('Chat Recovery registers a stable alpha.2 turn-tail list entry', () => {
+  const root = resolveRuntimePackages().get('@linxin666/dsh-chat-recovery')
+  const client = readFileSync(join(root, 'lib/client.js'), 'utf8')
+  assert.match(client,
+    /ctx\.slots\.register\(\{\s*name: "conversation\.chat\.turnTail",\s*id: "chat-recovery-turn-actions"/u)
+})
+
 test('Desktop aggregate ships the current conversation navigator build', async () => {
   const root = resolveRuntimePackages(['@linxin666/dsh-web-ui-all']).get('@linxin666/dsh-web-ui-all')
   const shipped = readFileSync(join(root, 'lib/client.js'), 'utf8').replaceAll('\r\n', '\n')
@@ -928,7 +1027,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
 
     await writeFile(join(dshHome, 'cordis.patch.yml'), '# legacy placeholder\n{}\n')
     await writeFile(join(profileDir, 'cordis.patch.yml'), '{}\n')
-    await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome, packageRoots: resolveRuntimePackages() })
 
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), '[]\n')
     const profilePatch = await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')
@@ -946,7 +1045,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
     assert.equal(composed.status, 0, composed.stderr)
 
     await writeFile(join(dshHome, 'cordis.patch.yml'), 'plugin: retained\n')
-    await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome, packageRoots: resolveRuntimePackages() })
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), 'plugin: retained\n')
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -956,7 +1055,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
 test('profile bootstrap leaves a missing root patch absent when the pinned runtime succeeds without it', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-missing-root-patch-'))
   try {
-    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome: root, packageRoots: resolveRuntimePackages() })
     await assert.rejects(
       readFile(join(root, 'cordis.patch.yml'), 'utf8'),
       (error) => error?.code === 'ENOENT',
@@ -1070,13 +1169,20 @@ test('runtime resolver finds every bundled and desktop support package', async (
     '@deepseek-ai/dsh-workspace',
   ])
 
-  const aggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'package.json'), 'utf8'))
-  const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'cordis.patch.yml'), 'utf8')
+  const aggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-all'), 'package.json'), 'utf8'))
+  const liangshen = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-liangshen'), 'package.json'), 'utf8'))
+  const rollbackAggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'package.json'), 'utf8'))
+  const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-all'), 'cordis.patch.yml'), 'utf8')
+  assert.equal(aggregate.version, '0.3.23')
+  assert.equal(liangshen.version, '0.3.23', 'the active Liangshen row must not resolve an old workspace package')
+  assert.equal(rollbackAggregate.version, '0.2.5', 'the dormant rollback carrier must retain its patched release')
   assert.match(
-    aggregatePatch,
+    DESKTOP_PATCH_CONFIG,
     /- id: web-ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u,
-    'the published aggregate must mount the Desktop-owned mode switcher',
+    'the Desktop patch must retain its mode switcher after removing the old aggregate',
   )
+  assert.doesNotMatch(aggregatePatch, /- id: web-ui-mode-switcher/u)
+  assert.match(aggregatePatch, /- id: web-ui-market\s+name: '@linxin666\/dsh-web-all\/market'/u)
   assert.doesNotMatch(
     aggregatePatch,
     /- id: ui-community-plugins\s+name: '@linxin666\/dsh-client-ui-community-plugins'/u,
@@ -1129,12 +1235,16 @@ test('runtime resolver finds every bundled and desktop support package', async (
       || packageName === 'dsh-better-sidebar'
     ) continue
     const manifest = JSON.parse(readFileSync(join(resolved.get(packageName), 'package.json'), 'utf8'))
-    assert.equal(manifest.version, aggregate.version, `${packageName} did not resolve from the aggregate release`)
+    const expectedVersion = ['@linxin666/dsh-chat-recovery', '@linxin666/dsh-client-ui-skin-center', '@linxin666/dsh-pet']
+      .includes(packageName) ? '0.2.5' : packageName === '@linxin666/dsh-skins' ? '0.1.15' : aggregate.version
+    assert.equal(manifest.version, expectedVersion, `${packageName} did not resolve from its reviewed source`)
   }
   const reviewedPublicVersions = {
+    '@linxin666/dsh-client-ui-model-capabilities': '0.3.20',
     '@linxin666/dsh-client-ui-plugin-manager': '0.3.20',
     '@linxin666/dsh-client-ui-skill-explorer': '0.3.20',
     '@linxin666/dsh-desktop-launcher': '0.3.13',
+    '@linxin666/dsh-web-ui-all': '0.2.5',
   }
   assert.deepEqual(DESKTOP_PUBLISHED_OVERRIDE_PACKAGES, Object.keys(reviewedPublicVersions).toSorted())
   for (const [name, version] of Object.entries(reviewedPublicVersions)) {

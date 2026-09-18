@@ -26,14 +26,15 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-workspace"
       ],
       "platform": "web"
     }
   },
   "scripts": {
     "build": "tsc -b && tsdown",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --force --pretty false",
     "test": "vitest run",
     "prepare": "tsdown"
   },
@@ -44,16 +45,18 @@
     "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.1 || ^0.1.5-alpha.1 || ^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.1 || ^0.1.5-alpha.1 || ^0.1.5-rc.1",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.1 || ^0.1.5-alpha.1 || ^0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-workspace": "^0.1.6-alpha.2",
     "react": "^18.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-api-remotes": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-client-connection": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-client-locale": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-client-ui-slots": "0.1.6-alpha.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-connection": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-locale": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.6-alpha.2",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.1.6-alpha.2",
     "@types/react": "~18.3.1",
     "lightningcss": "^1.32.0",
     "react": "^18.3.1",

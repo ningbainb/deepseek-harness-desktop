@@ -40,19 +40,21 @@ afterEach(() => {
 })
 
 describe('Web UI settings section', () => {
-  it('moves the five forms to the Desktop Dock while preserving other plugin cards', async () => {
+  it('uses the Desktop Plugin Center as the only Desktop plugin-management destination', async () => {
     vi.spyOn(desktop, 'getDockEntryState').mockResolvedValue({ available: true, showNudge: false })
+    vi.spyOn(desktop, 'openDesktopSurface').mockResolvedValue(true)
     const renderSlot = vi.fn((_slot, _owner, options) => <li>{options?.only ?? 'all cards'}</li>)
     render(<WebUIPluginsSection {...{
       t: (key: string) => key,
       close: () => {},
-      getPluginIds: () => ['value-mode', 'memory', 'personal-prompt', 'particle-theme', 'describe-image', 'task-board'],
       renderSlot,
     } as Parameters<typeof WebUIPluginsSection>[0]} />)
-    await waitFor(() => expect(screen.getByText('task-board')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('desktopPluginCenterTitle')).toBeTruthy())
     expect(screen.queryByText('all cards')).toBeNull()
-    expect(screen.queryByText('memory')).toBeNull()
+    expect(renderSlot).not.toHaveBeenCalled()
     expect(screen.getByTestId('desktop-dock-banner')).toBeTruthy()
+    screen.getByRole('button', { name: 'dockBannerAction' }).click()
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'plugins' }))
   })
   it('registers a list-style rc.7 settings.section and declares the family child slot', () => {
     const register = vi.fn(() => () => {})
@@ -135,7 +137,8 @@ describe('Web UI settings section', () => {
     expect(register.mock.calls[1]![1]).toBe(RelayOnboardingCard)
   })
 
-  it('renders the declared web-ui.plugin.item child slot under the static section heading', () => {
+  it('renders the declared web-ui.plugin.item child slot on non-Desktop hosts', async () => {
+    vi.spyOn(desktop, 'getDockEntryState').mockResolvedValue({ available: false, reason: 'unavailable' })
     const renderSlot = vi.fn(() => <li data-testid="family-card">Task board settings</li>)
     const props = {
       close: () => {},
@@ -151,7 +154,7 @@ describe('Web UI settings section', () => {
 
     expect(screen.getByRole('heading', { name: 'Web UI Plugins' })).toBeTruthy()
     expect(screen.getByText('Family configuration')).toBeTruthy()
-    expect(screen.getByTestId('family-card')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('family-card')).toBeTruthy())
     expect(renderSlot).toHaveBeenCalledWith('web-ui.plugin.item', {})
   })
 })

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
@@ -245,10 +246,15 @@ try {
   // Real browser requests: a stalled decorative read must not accumulate on
   // every tick, nor block unrelated settings reads across Runtime views.
   const petReadCounts = [0, 0]
+  const petReadPaths = [[], []]
   const petPages = [page, dockPage]
   const petHandlers = petPages.map((_petPage, index) => request => {
     const url = new URL(request.url())
-    if (url.protocol === 'dsh-runtime:' && url.hostname === 'app' && url.pathname === '/api/pet/state') petReadCounts[index] += 1
+    if (url.protocol === 'dsh-runtime:' && url.hostname === 'app'
+      && desktopLocalPath(url.pathname) === '/api/pet/state') {
+      petReadCounts[index] += 1
+      petReadPaths[index].push(url.pathname)
+    }
   })
   try {
     for (let index = 0; index < petPages.length; index += 1) {
@@ -257,9 +263,10 @@ try {
     }
     await writeFile(runtimeFetchGate, 'stall-pet')
     await page.waitForTimeout(6500)
-    assert.deepEqual(petReadCounts, [1, 1], 'Each visible Runtime view must keep one stalled pet read, not one per tick')
+    assert.deepEqual(petReadCounts, [1, 1], `Each visible Runtime view must keep one stalled pet read, not one per tick: ${JSON.stringify(petReadPaths)}`)
     assert.equal(await readParticleEnabled(), true, 'Settings remain readable while pet reads are held')
-    const recovered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/pet/state' && response.ok(), { timeout: 10_000 })
+    const recovered = page.waitForResponse(response =>
+      desktopLocalPath(new URL(response.url()).pathname) === '/api/pet/state' && response.ok(), { timeout: 10_000 })
     await writeFile(runtimeFetchGate, 'open')
     await recovered
   } finally {

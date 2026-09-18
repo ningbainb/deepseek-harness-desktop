@@ -167,7 +167,12 @@ try {
   await page.mouse.down()
   await page.mouse.move(dragBox.x + dragBox.width / 2 - 90, dragBox.y + dragBox.height / 2 + 28, { steps: 8 })
   await page.mouse.up()
-  state = await panelState(dialog)
+  const dragSettleDeadline = Date.now() + 3_000
+  do {
+    state = await panelState(dialog)
+    if (Math.abs(state.box.x - initial.x) > 20 || Math.abs(state.box.y - initial.y) > 20) break
+    await page.waitForTimeout(50)
+  } while (Date.now() < dragSettleDeadline)
   assert.ok(Math.abs(state.box.x - initial.x) > 20 || Math.abs(state.box.y - initial.y) > 20, JSON.stringify({ initial, moved: state.box }))
   assert.ok(Math.abs(state.box.width - initial.width) <= 2, JSON.stringify({ initial, moved: state.box }))
   assert.ok(Math.abs(state.box.height - initial.height) <= 2, JSON.stringify({ initial, moved: state.box }))

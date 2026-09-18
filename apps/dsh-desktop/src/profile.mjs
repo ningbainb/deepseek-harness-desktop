@@ -25,7 +25,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-web-app',
   '@linxin666/dsh-value-mode',
   'dsh-better-sidebar',
-  '@linxin666/dsh-web-ui-all',
+  '@linxin666/dsh-web-all',
   // The Desktop pins a newer Skill Center than the aggregate release. Mount
   // it directly so the profile cannot silently keep only the dependency
   // bytes while omitting its host routes and browser entry.
@@ -38,7 +38,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
 ])
 
 export const AGENT_TEAM_PROFILE_BUNDLE = '@deepseek-ai/dsh-experimental-agent-team-profile'
-export const AGENT_TEAM_VERSION = '0.1.6-alpha.1'
+export const AGENT_TEAM_VERSION = '0.1.6-alpha.2'
 export const AGENT_TEAM_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-experimental-agent-team',
   AGENT_TEAM_PROFILE_BUNDLE,
@@ -192,6 +192,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
   '@linxin666/dsh-value-mode',
+  '@linxin666/dsh-web-all',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   '@ningbainb/dsh-chat-artifacts',
@@ -234,6 +235,7 @@ function isRetiredManagedPackage(packageName) {
 export const DEPENDENCY_ONLY_BUNDLES = Object.freeze([
   '@linxin666/dsh-client-ui-mode-switcher',
   '@linxin666/dsh-particle-theme',
+  '@linxin666/dsh-web-ui-all',
 ].toSorted())
 
 // Compatibility dependencies for supported community plugins whose published
@@ -257,9 +259,13 @@ export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
 // Reviewed public releases override the older aggregate carrier. Keep these
 // direct so development and packaged profiles resolve the same patched builds.
 export const DESKTOP_PUBLISHED_OVERRIDE_PACKAGES = Object.freeze([
+  '@linxin666/dsh-client-ui-model-capabilities',
   '@linxin666/dsh-client-ui-plugin-manager',
   '@linxin666/dsh-client-ui-skill-explorer',
   '@linxin666/dsh-desktop-launcher',
+  // Kept as a dependency-only rollback carrier. Never resolve the local 0.1.x
+  // workspace build through pnpm's hidden hoist instead of the patched 0.2.5.
+  '@linxin666/dsh-web-ui-all',
 ].toSorted())
 
 // These bundles deliberately resolve through the workspace overrides in
@@ -414,6 +420,58 @@ export function renderControlCenterPatch(configuration = createDefaultControlCen
 function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration()) {
   return `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- id: web-ui-settings
+  disabled: true
+- id: web-ui-task-board
+  disabled: true
+- id: web-ui-git-graph
+  disabled: true
+- id: web-ui-pet
+  disabled: true
+- id: web-ui-ssh
+  disabled: true
+- insert:
+    - id: desktop-web-ui-settings
+      name: '@linxin666/dsh-client-ui-web-ui-settings'
+    - id: ui-task-board
+      name: '@linxin666/dsh-client-ui-task-board'
+    - id: ui-git-graph
+      name: '@linxin666/dsh-client-ui-git-graph'
+    - id: pet
+      name: '@linxin666/dsh-pet'
+    - id: ssh
+      name: '@linxin666/dsh-ssh'
+    - id: user-scope
+      name: '@ningbainb/dsh-user-scope'
+    - id: ui-model-preferences
+      name: '@linxin666/dsh-client-ui-model-preferences'
+    - id: personal-prompt
+      name: '@ningbainb/dsh-personal-prompt'
+    - id: memory
+      name: '@ningbainb/dsh-memory'
+    - id: web-ui-mode-switcher
+      name: '@linxin666/dsh-client-ui-mode-switcher'
+    - id: live-stats
+      name: '@linxin666/dsh-live-stats'
+    - id: web-ui-dsh-aionui-panel
+      name: '@linxin666/dsh-client-ui-aionui-panel'
+    - id: web-ui-chat-recovery
+      name: '@linxin666/dsh-chat-recovery'
+    - id: web-ui-desktop-launcher
+      name: '@linxin666/dsh-desktop-launcher'
+- id: web-ui-model-capabilities
+  disabled: true
+- id: web-ui-usage
+  disabled: true
+- id: web-ui-session-archive
+  disabled: true
+# Preserve 4.1's SSH Host and six-tab client through its direct bundle. The
+# upstream five-tab SSH client has a different interaction and storage shape.
+# Image-tool and Liangshen use their alpha-compatible upstream clients.
+- id: web-ui-describe-image
+  disabled: false
+- id: web-ui-liangshen
+  disabled: false
 - id: web-startup
   name: '@linxin666/dsh-remote-web-ui/startup'
 - insert:
@@ -960,7 +1018,14 @@ export function mergeDesktopPatch(existing = '', controlCenterConfiguration = cr
   } else if (userPatch.startsWith(LEGACY_DESKTOP_PATCH_CONFIG)) {
     userPatch = userPatch.slice(LEGACY_DESKTOP_PATCH_CONFIG.length)
   }
-  const suffix = userPatch.trim()
+  // The 4.1 aggregate used `web-ui-ssh`; the preserved Desktop Host/client
+  // now use `ssh`. Move user rows to that identity while retaining their
+  // ordering, disabled state, config, and surrounding text. The upstream row
+  // remains disabled so an explicit 4.1 enable does not mount two clients.
+  const suffix = userPatch.trim().replace(
+    /^([ \t]*-[ \t]*id:[ \t]*)(['"]?)web-ui-ssh\2([ \t]*(?:#.*)?)$/gmu,
+    '$1$2ssh$2$3',
+  )
   const managed = desktopPatchConfig(controlCenterConfiguration)
   return suffix ? `${managed.trimEnd()}\n\n${suffix}\n` : managed
 }
@@ -1385,11 +1450,11 @@ export function resolveRuntimePackages(
   const anchors = [initialAnchor]
   const resolved = new Map()
 
-  // Resolve the published aggregate first and prefer its dependency tree for
+  // Resolve the pinned alpha source aggregate first and prefer its dependency tree for
   // every package that it owns. In a workspace checkout, resolving all names
   // from this source file first would silently select older local packages
   // instead of the release pinned by the desktop application.
-  const aggregateName = '@linxin666/dsh-web-ui-all'
+  const aggregateName = '@linxin666/dsh-web-all'
   if (pending.has(aggregateName)) {
     const aggregateRoot = resolvePackageRoot(aggregateName, anchors)
     if (aggregateRoot !== undefined) {

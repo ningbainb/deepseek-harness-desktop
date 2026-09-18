@@ -3,11 +3,12 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { ModeSwitcher } from './ModeSwitcher.tsx'
 import { ModeSwitcherController } from './mode-controller.ts'
 import { modeSwitcherDependencies } from './runtime-adapter.ts'
 
-export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'conversation']
+export const inject = ['slots', 'sessions', 'workspaces', 'uiWorkspace', 'connection', 'conversation']
 
 export function apply(ctx: ClientContext): void {
   if (typeof (ctx.sessions as unknown as { noteAgentPreset?: unknown }).noteAgentPreset === 'function') {

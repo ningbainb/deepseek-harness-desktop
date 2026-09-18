@@ -115,7 +115,6 @@ export function apply(ctx: ClientContext): void {
     label: () => ctx.locale.bind('web-ui-plugins')('title'),
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
-    inject: () => ({ getPluginIds: () => ctx.slots.entriesOfSlot('web-ui.plugin.item').flatMap(entry => entry.options.id ? [entry.options.id] : []) }),
   }, WebUIPluginsSection))
 
   if (dockSetting) {

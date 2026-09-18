@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
@@ -234,8 +235,10 @@ test('release pruner removes the retired skin carrier assets while retaining its
 })
 
 test('release recovery restores pnpm peer snapshots omitted by electron-builder', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-peers-'))
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-runtime-peers-'))
+  const root = join(temporary, 'node_modules')
   try {
+    await mkdir(root)
     const restored = await restoreRequiredPackagedPeers(root)
     assert.deepEqual(restored, [
       '@deepseek-ai/dsh-atomic-write',
@@ -249,14 +252,25 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
       '@deepseek-ai/dsh-typert-protocol',
       '@deepseek-ai/dsh-user-approval',
       '@deepseek-ai/dsh-workspace',
+      'ssh2',
+      'asn1',
+      'safer-buffer',
+      'bcrypt-pbkdf',
+      'tweetnacl',
     ])
     for (const packageName of restored) {
       const manifest = JSON.parse(await readFile(join(root, ...packageName.split('/'), 'package.json'), 'utf8'))
       assert.equal(manifest.name, packageName)
     }
+    await prunePackagedRuntime(root)
+    const isolatedRequire = createRequire(join(temporary, 'ssh-probe.cjs'))
+    for (const packageName of ['ssh2', 'asn1', 'safer-buffer', 'bcrypt-pbkdf', 'tweetnacl']) {
+      assert.ok(isolatedRequire.resolve(`${packageName}/package.json`).startsWith(root))
+    }
+    assert.equal(typeof isolatedRequire('ssh2').Client, 'function')
     assert.deepEqual(await restoreRequiredPackagedPeers(root), [])
   } finally {
-    await rm(root, { recursive: true, force: true })
+    await rm(temporary, { recursive: true, force: true })
   }
 })
 

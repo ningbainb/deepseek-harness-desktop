@@ -131,7 +131,9 @@ async function launch() {
   })
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
-    await page.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', {
+    // The alpha aggregate no longer emits the old CSS tag. Its Desktop
+    // compatibility hook stamps the pane we actually exercise below.
+    await page.waitForSelector('[data-pane="conversation"]', {
       state: 'attached',
       timeout: runtimeReadyTimeoutMs,
     })
@@ -297,14 +299,18 @@ async function openSeededSession(page, sessionId) {
 }
 
 async function verifyStatsSupplement(page) {
-  const native = page.locator('[data-composer-stats]')
+  const composer = page.locator('[data-slot="conversation.composer"]')
+  const nativeTime = composer.getByRole('button', { name: /tok\/s/u })
+  const nativeUsage = composer.getByRole('button', { name: /340 tok/u })
   const supplement = page.locator('[data-dsh-live-stats]')
-  await native.waitFor({ state: 'visible' })
+  await nativeTime.waitFor({ state: 'visible' })
+  await nativeUsage.waitFor({ state: 'visible' })
   await supplement.waitFor({ state: 'visible' })
-  assert.equal(await native.count(), 1, 'the official cumulative stats have one owner')
+  assert.equal(await nativeTime.count(), 1, 'the official speed pill has one owner')
+  assert.equal(await nativeUsage.count(), 1, 'the official cumulative usage pill has one owner')
   assert.equal(await supplement.count(), 1, 'desktop contributes one compact supplement')
-  assert.match(await native.innerText(), /340/u, 'official provider usage remains visible')
-  assert.match(await native.innerText(), /tok\/s/u, 'official average speed remains visible')
+  assert.match(await nativeUsage.innerText(), /340/u, 'official provider usage remains visible')
+  assert.match(await nativeTime.innerText(), /tok\/s/u, 'official average speed remains visible')
   const summary = supplement.locator('summary')
   assert.match(await summary.innerText(), /^≈¥[\d.,]+ · 明细$/u)
   assert.equal(await supplement.evaluate(element => element.open), false)
@@ -326,7 +332,7 @@ async function verifyStatsSupplement(page) {
   assert.equal(await supplement.evaluate(element => element.open), false)
   assert.equal(await supplement.locator('dl').isVisible(), false)
   // Native drill-down is still usable; we never mutate or replace its controls.
-  await native.getByRole('button').filter({ hasText: '340' }).click()
+  await nativeUsage.click()
   await page.locator('[data-session-stats-usage]').waitFor({ state: 'visible', timeout: 5_000 })
   await page.keyboard.press('Escape')
 }
@@ -610,6 +616,12 @@ try {
     await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession })
   }
   assert.deepEqual(second.rendererErrors, [])
+  const taskBoardState = await second.page.evaluate(async () => {
+    const response = await fetch('/api/dsh-task-board/v3')
+    return { status: response.status, state: response.ok ? await response.json() : undefined }
+  })
+  assert.equal(taskBoardState.status, 200, 'the Desktop Task Board client and Host must share the v3 route')
+  assert.equal(taskBoardState.state?.schemaVersion, 3, 'the Desktop task ledger must remain readable')
   const seriousConsole = second.rendererConsole.filter(line => !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
   assert.deepEqual(seriousConsole, [])
 

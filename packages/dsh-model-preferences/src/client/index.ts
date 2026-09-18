@@ -191,8 +191,8 @@ export function apply(ctx: ClientContext): void {
             if (available) directory.load().catch(() => {})
           },
           select: selection => available
-            ? selectModelWithPreferences(directory, settingsScope, selection).then(() => true, () => false)
-            : Promise.resolve(false),
+            ? selectModelWithPreferences(directory, settingsScope, selection)
+            : Promise.resolve(undefined),
         }
       },
     }, ModelSelect))

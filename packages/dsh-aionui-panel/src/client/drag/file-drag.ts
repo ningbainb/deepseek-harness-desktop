@@ -80,9 +80,11 @@ export const MAX_SAFE_IMAGE_BYTES = 3 * 1024 * 1024
 
 /**
  * Target maximum width or height in pixels.
- * 2048px preserves crisp text, diagrams, and fine detail while keeping payload modest.
+ * 1280px preserves document and diagram detail while keeping each decoded
+ * preview below the GPU texture footprint that can accumulate during rapid
+ * repeated drops.
  */
-export const MAX_IMAGE_DIMENSION = 2048
+export const MAX_IMAGE_DIMENSION = 1280
 
 /** Hard admission limits applied before browser image decoding. */
 export const MAX_SOURCE_IMAGE_BYTES = 32 * 1024 * 1024
@@ -301,6 +303,18 @@ async function canvasBlob(canvas: HTMLCanvasElement, quality: number, signal?: A
 }
 
 /**
+ * Let Chromium observe a released decode/canvas pair before the next large
+ * image is admitted. `ImageBitmap.close()` releases the JavaScript handle,
+ * but composited GPU textures are retired on a later frame. Without this
+ * bounded handoff, a rapid sequence of drops can temporarily retain several
+ * 4K decode surfaces at once.
+ */
+async function yieldReleasedImageResources(): Promise<void> {
+  if (typeof requestAnimationFrame !== 'function') return
+  await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+}
+
+/**
  * Calculate scaled dimensions that fit within maxDimension while maintaining aspect ratio.
  */
 export function calculateScaledDimensions(
@@ -363,6 +377,7 @@ export async function compressImageFileToFit(
   onPhase?.('decoding')
   const decoded = await decodeImage(file, headerDimensions, signal)
   const canvas = document.createElement('canvas')
+  let context: CanvasRenderingContext2D | null = null
   try {
     const { width: targetW, height: targetH } = calculateScaledDimensions(
       decoded.dimensions.width,
@@ -375,7 +390,7 @@ export async function compressImageFileToFit(
     canvas.height = targetH
     // This offscreen canvas is encoded to a Blob immediately, so prefer CPU
     // storage instead of retaining GPU textures for repeated large drops.
-    const context = canvas.getContext('2d', { willReadFrequently: true })
+    context = canvas.getContext('2d', { willReadFrequently: true })
     if (context === null) throw new ImageProcessingError('canvas-unavailable', 'image canvas is unavailable')
     context.imageSmoothingEnabled = true
     context.imageSmoothingQuality = 'high'
@@ -392,8 +407,12 @@ export async function compressImageFileToFit(
     return new File([output], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
   } finally {
     decoded.release()
+    // Clear first, then resize. The explicit clear breaks the draw source
+    // reference in engines that defer backing-store replacement until paint.
+    context?.clearRect?.(0, 0, canvas.width, canvas.height)
     canvas.width = 0
     canvas.height = 0
+    await yieldReleasedImageResources()
   }
 }
 

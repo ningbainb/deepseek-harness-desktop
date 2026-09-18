@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PairingPhase } from '../pairing.ts'
 import { createDesktopClient, type DesktopAvailability, type LocalLanGatewayStatus } from '@linxin666/dsh-desktop-client'
@@ -52,11 +53,9 @@ function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
 const EMPTY_SESSION_LIST = {
   ids: [],
   byId: {},
-  current: undefined,
   phase: 'ready',
   subagentsByParent: {},
   jobsBySession: {},
-  currentAddress: undefined,
 } as const
 const EMPTY_WORKSPACE_LIST = {
   items: [],
@@ -97,10 +96,13 @@ export function RemoteEntry({ wide, sessions, workspaces, useWorkspaces, t }: Re
     () => workspaceSource.getSnapshot(),
     () => workspaceSource.getSnapshot(),
   )
-  const legacyWorkspaceId = useWorkspaces?.(state => state.recentWorkspaceId) as string | undefined
-  const currentWorkspaceId = sessionList.current === undefined
+  const legacyWorkspaceId = useWorkspaces?.(state => 'recentWorkspaceId' in state
+    && typeof state.recentWorkspaceId === 'string' ? state.recentWorkspaceId : undefined) as string | undefined
+  const currentSessionId = Object.values(sessionList.byId)
+    .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
+  const currentWorkspaceId = currentSessionId === undefined
     ? undefined
-    : workspaceList.items.find(workspace => workspace.sessionIds.includes(sessionList.current!))?.workspaceId
+    : workspaceList.items.find(workspace => workspace.sessionIds.includes(currentSessionId))?.workspaceId
   const workspaceId = currentWorkspaceId ?? workspaceList.items[0]?.workspaceId ?? legacyWorkspaceId
 
   const closeEventSource = useCallback(() => {

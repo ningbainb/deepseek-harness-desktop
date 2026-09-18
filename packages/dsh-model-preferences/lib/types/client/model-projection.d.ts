@@ -3,6 +3,7 @@ import type { SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client';
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client';
 import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types';
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol';
 import { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog, type ModelCatalogSnapshot, type ModelKey, type ModelPreferencesConfig, type SortedModelCatalog, type SortedModelOption } from '../core/config.ts';
 export { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog };
 export type { ModelCatalogSnapshot, ModelKey, ModelPreferencesConfig, SortedModelCatalog, SortedModelOption };
@@ -12,11 +13,11 @@ export declare function catalogFromDirectory(state: ModelDirectoryState): ModelC
 export declare function selectionFromOptionId(state: ModelDirectoryState, id: string, config: ModelPreferencesConfig): ModelSelection | undefined;
 /** Shared selection path used by both `/model` and the composer seat. */
 export declare function selectModelWithPreferences(directory: {
-    select(selection: ModelSelection): Promise<void>;
+    select(selection: ModelSelection): Promise<void | RemoteResult<void>>;
     store: {
         getSnapshot(): ModelDirectoryState;
     };
-}, settingsScope: SettingsScope<ModelPreferencesConfig>, selection: ModelSelection): Promise<void>;
+}, settingsScope: SettingsScope<ModelPreferencesConfig>, selection: ModelSelection): Promise<RemoteResult<void> | undefined>;
 /** Display label that remains useful for an advertised or stale current route. */
 export declare function modelDisplayName(option: SortedModelOption | undefined, current: ModelSelection | null): string;
 /** Resolve one model from a provider group without comparing display names. */

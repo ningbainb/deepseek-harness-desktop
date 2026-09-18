@@ -9,7 +9,7 @@ import css from './dock-settings.module.css'
 export const DOCK_SETTINGS = ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
-export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'dsh-session-archive' } as const
+export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions' } as const
 function sectionFor(id: DockSetting): string | undefined { return DOCK_SECTIONS[id as keyof typeof DOCK_SECTIONS] }
 
 export function isDockSetting(value: unknown): value is DockSetting {
@@ -55,6 +55,27 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
       window.removeEventListener('dsh:dock-palette', syncPalette)
     }
   }, [])
+  useEffect(() => {
+    if (selected !== 'describe-image') return
+    const section = document.getElementById('dock-form-describe-image')
+    if (!section) return
+    let opened = false
+    const reveal = () => {
+      if (opened) return
+      const button = section.querySelector('li button[aria-expanded="false"]')
+      if (!(button instanceof HTMLButtonElement)) return
+      opened = true
+      observer.disconnect()
+      button.click()
+    }
+    // The upstream alpha card deliberately starts collapsed in the ordinary
+    // plugin list. The dedicated Desktop page has already selected this one
+    // card, so reveal it once without changing the upstream plugin package.
+    const observer = new MutationObserver(reveal)
+    observer.observe(section, { childList: true, subtree: true })
+    reveal()
+    return () => observer.disconnect()
+  }, [selected])
   const personal = selected === 'personal-prompt' || selected === 'memory'
   const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions' } as const
   const sectionTitle = sectionTitles[selected as keyof typeof sectionTitles]

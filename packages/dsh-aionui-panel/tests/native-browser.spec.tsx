@@ -210,7 +210,7 @@ it('explicit new browser tabs get independent native identities and unavailable 
   const openResource = vi.fn()
   let available = true
   const ctx = {
-    sessions: { list: { getSnapshot: () => ({ current: 's1' }) } },
+    sessions: { list: { getSnapshot: () => ({ byId: { s1: { id: 's1', retainedBy: { mainView: 1 } } } }) } },
     get: (name: string) => !available ? undefined : name === 'sidebarRight' ? { openResource } : { get: () => nativeBrowserDefinition },
   }
   expect(openNativeBrowser(ctx as never)).toBe(true)

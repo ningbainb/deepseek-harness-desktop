@@ -25,42 +25,52 @@ test('every bundled custom persona validates against the installed official SDK'
       const persona = rows.find(row => row.name === '@deepseek-ai/dsh-persona')
       assert.ok(persona, `${id} must retain its persona`)
       const validated = Config(persona.config)
-      assert.equal(validated.prefix, 'You are a helpful software engineer assistant.')
+      const base = 'You are a helpful software engineer assistant.'
+      assert.ok(validated.prefix.startsWith(base), `${id} must retain the official Minimal persona base`)
+      assert.equal(validated.prefix.split(base).length - 1, 1, `${id} must not duplicate the persona base`)
+      if (id === 'liangshen' && typeof path === 'string') {
+        assert.match(validated.prefix, /Thinking Disruption/u)
+        assert.match(validated.prefix, /Action-Oriented/u)
+      }
       assert.equal(validated.complete, false, `${id} must permit post-bootstrap instructions`)
     }
   }
 })
 
-test('shipped LiangShen keeps SDK persona sections, restores workspace and retains compaction re-anchoring', async () => {
+test('shipped LiangShen keeps the upstream Minimal prompt, workspace line and official tool surface after compaction', async () => {
   const root = resolveRuntimePackages().get('@linxin666/dsh-liangshen')
-  const { apply } = await import(pathToFileURL(join(root, 'presets/liangshen/tool-bootstrap.mjs')).href)
+  const { apply } = await import(pathToFileURL(join(root, 'presets/liangshen/minimal-prompt.mjs')).href)
   const prompt = await import(pathToFileURL(webAppRequire.resolve('@deepseek-ai/dsh-system-prompt')).href)
   const listeners = new Map()
   const session = { id: 'liangshen-sdk-session', header: { cwd: '/workspace' } }
-  const events = []
   apply({
     on: (name, listener) => listeners.set(name, listener),
-    sessionQuery: { async readSession() { return { events } } },
-  }, { shellTools: ['bash'],
-    commonTools: ['str_replace_editor'], compactionTools: ['read'] })
+  }, {})
   const agent = { session }
   const sections = [{ name: prompt.PERSONA_PREFIX_SECTION, text: 'Persona' },
-    { name: 'plan:policy', text: 'Plan policy' }, { name: prompt.PERSONA_SUFFIX_SECTION, text: 'Suffix' }]
+    { name: 'plan:policy', text: 'Plan policy' },
+    { name: 'tools:sdk', text: 'Official tool definitions' },
+    { name: prompt.PERSONA_SUFFIX_SECTION, text: 'Suffix' }]
   const assembly = { sections, contexts: [{ name: 'workspace', text: '/workspace' }],
     tools: ['bash', 'str_replace_editor', 'read', 'extra'].map(name => ({ name })) }
   const assemble = () => listeners.get('system-prompt/assemble')(undefined, { agent }, async () => assembly)
   const first = await assemble()
-  assert.deepEqual(first.sections, [sections[0], sections[2]])
-  assert.deepEqual(first.tools.map(tool => tool.name), ['bash', 'str_replace_editor'])
-  events.push({ type: 'tool/call' })
-  const promoted = await assemble()
-  assert.deepEqual(promoted.sections, [{ ...sections[0], text: 'Persona\n\nYour working directory is /workspace.' }, sections[1], sections[2]])
-  assert.deepEqual(promoted.tools, assembly.tools)
-  events.push({ type: 'compaction/end' })
-  await listeners.get('session/event')(session, events.at(-1))
+  const anchoredPersona = { ...sections[0], text: 'Persona\n\nYour working directory is /workspace.' }
+  assert.deepEqual(first.sections, [anchoredPersona, sections[1]])
+  assert.deepEqual(first.tools, assembly.tools, 'the current official tool roster must not be staged or truncated')
+  const ptc = await listeners.get('system-prompt/assemble')(undefined, { agent }, async () => ({
+    ...assembly, tools: [{ name: 'run_code' }],
+  }))
+  assert.deepEqual(ptc.sections, [anchoredPersona, sections[1], sections[2]],
+    'the official SDK definitions must remain when run_code is present')
+  const hostInstruction = { role: 'user', content: [{ type: 'text', text: 'Host workspace instructions' }] }
+  const decision = await listeners.get('agent/pre-step')({ agent, messages: [hostInstruction] },
+    async () => ({ kind: 'enter', messages: [hostInstruction] }))
+  assert.deepEqual(decision.messages, [hostInstruction], 'host-owned instructions must not be dropped or duplicated')
+  await listeners.get('session/event')(session, { type: 'compaction/end' })
   const compacted = await assemble()
-  assert.deepEqual(compacted.sections, [sections[0], sections[2]])
-  assert.deepEqual(compacted.tools.map(tool => tool.name), ['bash', 'str_replace_editor', 'read'])
+  assert.deepEqual(compacted.sections, [anchoredPersona, sections[1]])
+  assert.deepEqual(compacted.tools, assembly.tools)
 })
 
 function resolveManifest(name, resolver = appRequire) {

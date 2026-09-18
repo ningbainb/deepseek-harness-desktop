@@ -107,17 +107,16 @@ describe('runPairBootFlow', () => {
             list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-7' }] }) },
           }
         }
-        if (name === 'sessions') {
+        if (name === 'uiWorkspace') {
           return {
-            create: async ({ workspaceId }: { workspaceId: string }) => { opened.push(workspaceId); return 'session-9' },
-            open: (id: string) => { opened.push(id) },
+            openWorkspace: async (workspaceId: string) => { opened.push(workspaceId) },
           }
         }
         return undefined
       },
     }
     runPairBootFlow(ctx as never, '?workspace=ws-7', page)
-    await vi.waitFor(() => expect(opened).toEqual(['ws-7', 'session-9']))
+    await vi.waitFor(() => expect(opened).toEqual(['ws-7']))
     await vi.waitFor(() => expect(replaceState).toHaveBeenCalledWith('/'))
   })
 
@@ -132,10 +131,9 @@ describe('runPairBootFlow', () => {
             list: { getSnapshot: () => ({ items }) },
           }
         }
-        if (name === 'sessions') {
+        if (name === 'uiWorkspace') {
           return {
-            create: async ({ workspaceId }: { workspaceId: string }) => { opened.push(workspaceId); return 'session-9' },
-            open: (id: string) => { opened.push(id) },
+            openWorkspace: async (workspaceId: string) => { opened.push(workspaceId) },
           }
         }
         return undefined
@@ -145,7 +143,7 @@ describe('runPairBootFlow', () => {
     await new Promise(resolve => setTimeout(resolve, 400))
     expect(opened).toEqual([])
     items = [{ workspaceId: 'ws-7' }]
-    await vi.waitFor(() => expect(opened).toEqual(['ws-7', 'session-9']))
+    await vi.waitFor(() => expect(opened).toEqual(['ws-7']))
     await vi.waitFor(() => expect(replaceState).toHaveBeenCalledWith('/'))
   })
 })

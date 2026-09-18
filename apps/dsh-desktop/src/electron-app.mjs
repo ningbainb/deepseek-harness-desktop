@@ -34,6 +34,7 @@ import {
 import { createDesktopIngress, registerDesktopProtocolClient } from './desktop-ingress.mjs'
 import { CommunityHomeMigration } from './community-home-migration.mjs'
 import { DesktopV41Migration } from './desktop-v41-migration.mjs'
+import { DesktopV42Migration } from './desktop-v42-migration.mjs'
 import { LegacyPluginRecovery } from './legacy-plugin-recovery.mjs'
 import { createRuntimePresentationGuard } from './runtime-presentation.mjs'
 import { createDesktopInstallPreparation } from './install-preparation.mjs'
@@ -169,6 +170,8 @@ import {
 } from './tray-lifecycle.mjs'
 import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
+import { syncPersistedSkinToMain } from './desktop-skin-sync.mjs'
+import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowStateForRestore } from './window-state.mjs'
@@ -662,6 +665,8 @@ export async function startElectronApp(metadata) {
   }
   const desktopV41Migration = new DesktopV41Migration({ dshHome, desktopVersion })
   let desktopV41MigrationResult
+  const desktopV42Migration = new DesktopV42Migration({ dshHome, desktopVersion })
+  let desktopV42MigrationResult
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -1228,6 +1233,8 @@ export async function startElectronApp(metadata) {
             + ` endpoint=${desktopV41MigrationResult.officialEndpointMigrated === true}`
             + ` e2b=${desktopV41MigrationResult.e2bRetired === true}`,
           )
+          desktopV42MigrationResult = await desktopV42Migration.prepare()
+          await logStore.append(`[migration] desktop-v4.2 state=${desktopV42MigrationResult.state}`)
         }
         const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
         if (mode === 'full') {
@@ -1635,9 +1642,10 @@ export async function startElectronApp(metadata) {
   const runtimeProtocolLifecycle = await installDesktopRuntimeProtocol({
     protocol: mainWindow.webContents.session.protocol,
     getProvider: () => runtimeProvider,
+    afterFetch: (request, response) => syncPersistedSkinToMain({ request, response, mainWindow }),
     beforeFetch: process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE
       ? async (request) => {
-          const pathname = new URL(request.url).pathname
+          const pathname = desktopLocalPath(new URL(request.url).pathname)
           let action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
           while (pathname === '/api/session/modelCatalog' && action === 'stall') {
             await new Promise(resolve => setTimeout(resolve, 50))
@@ -1984,6 +1992,7 @@ export async function startElectronApp(metadata) {
       try {
         const window = await createExtensionWindow()
         if (options.setting) window.webContents.send('extensions:navigate', { setting: options.setting })
+        else if (options.tab) window.webContents.send('extensions:navigate', { tab: options.tab })
         productMetrics.recordDockOpened(true)
         return true
       } catch (error) {
@@ -2731,6 +2740,10 @@ export async function startElectronApp(metadata) {
       }
       if (state === 'rolling-back') await showDirectStartupState('repairing')
       if (state === 'ready-full') {
+        if (desktopV42MigrationResult?.state === 'PREPARED') {
+          desktopV42MigrationResult = await desktopV42Migration.commitHealthy()
+          await logStore.append('[migration] desktop-v4.2 committed after full Runtime health verification')
+        }
         if (desktopV41MigrationResult?.state === 'PREPARED') {
           desktopV41MigrationResult = await desktopV41Migration.commitHealthy()
           await logStore.append('[migration] desktop-v4.1 committed after full Runtime health verification')
@@ -2770,6 +2783,12 @@ export async function startElectronApp(metadata) {
         }
       }
       if (state === 'ready-builtins') {
+        if (desktopV42MigrationResult?.state === 'PREPARED') {
+          desktopV42MigrationResult = await desktopV42Migration.rollback('full-runtime-unavailable').catch(async (error) => {
+            await logStore.append(`[migration] desktop-v4.2 rollback failed: ${error instanceof Error ? error.name : 'unknown'}`)
+            return desktopV42MigrationResult
+          })
+        }
         if (desktopV41MigrationResult?.state === 'PREPARED') {
           desktopV41MigrationResult = await desktopV41Migration.rollback('full-runtime-unavailable').catch(async (error) => {
             await logStore.append(`[migration] desktop-v4.1 rollback failed: ${error instanceof Error ? error.name : 'unknown'}`)

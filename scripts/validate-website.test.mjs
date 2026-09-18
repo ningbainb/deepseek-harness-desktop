@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
-import { collectDiscoveryErrors, collectPrivacyErrors, collectWebsiteErrors, collectWebsiteScriptErrors } from './validate-website.mjs'
+import { collectDiscoveryErrors, collectPrivacyErrors, collectWebsiteErrors, collectWebsiteScriptErrors, resolveWebsiteVersion } from './validate-website.mjs'
 import { sumInstallerDownloads } from '../website/release-stats.mjs'
 
 const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
@@ -14,7 +14,14 @@ const desktopPackage = JSON.parse(await readFile(desktopPackagePath, 'utf8'))
 const desktopVersion = desktopPackage.version
 const websiteHtml = await readFile(websitePath, 'utf8')
 const publishedVersion = /<html\b[^>]*\bdata-release-version=["'](\d+\.\d+\.\d+)["']/iu.exec(websiteHtml)?.[1]
-const expectedWebsiteVersion = desktopVersion.includes('-') ? publishedVersion : desktopVersion
+const expectedWebsiteVersion = resolveWebsiteVersion(desktopVersion, publishedVersion)
+
+test('unreleased desktop candidates keep the public site on the last published installer', () => {
+  assert.equal(resolveWebsiteVersion('4.2.0', '4.1.0'), '4.1.0')
+  assert.equal(resolveWebsiteVersion('4.2.0-rc.1', '4.1.0'), '4.1.0')
+  assert.throws(() => resolveWebsiteVersion('4.1.0', '4.2.0'), /newer than desktop/u)
+  assert.throws(() => resolveWebsiteVersion('4.2.0', undefined), /data-release-version/u)
+})
 
 test('privacy page states anonymous retention analytics and user-confirmed diagnostics boundaries', async () => {
   const html = await readFile(privacyPath, 'utf8')

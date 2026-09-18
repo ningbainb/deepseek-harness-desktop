@@ -420,11 +420,11 @@ try {
   if (sourceOnly) {
     const deadline = Date.now() + runtimeReadyTimeoutMs
     while (Date.now() < deadline) {
-      const runtimePage = activeApplication.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+      const runtimePage = activeApplication.windows().find(candidate => /^dsh-runtime:\/\/app\//u.test(candidate.url()))
       if (runtimePage) { page = runtimePage; break }
       await wait(100)
     }
-    assert.match(page.url(), /^http:\/\/127\.0\.0\.1:/u, 'source Runtime window must be ready')
+    assert.match(page.url(), /^dsh-runtime:\/\/app\//u, 'source Runtime window must be ready')
   }
   const rendererErrors = []
   const rendererConsole = []

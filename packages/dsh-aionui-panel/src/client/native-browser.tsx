@@ -8,6 +8,7 @@ import type { StateHandle } from './store.ts'
 import { NS, t } from './locales.ts'
 import { SplitIcon } from './components/icons.tsx'
 import previewCss from './styles/preview.module.css'
+import { currentMainSessionId } from './session-selection.ts'
 
 export const NATIVE_BROWSER = 'dsh-browser'
 const ADDRESS_PREFIX = 'dsh-resource://desktop-browser/'
@@ -54,7 +55,7 @@ export function registerNativeBrowser(ctx: Context): () => void {
 
 /** Each explicit plus action opens an independent tab in the native strip. */
 export function openNativeBrowser(ctx: Context): boolean {
-  if (!ctx.sessions.list.getSnapshot().current) return false
+  if (!currentMainSessionId(ctx.sessions.list.getSnapshot())) return false
   const sidebar = ctx.get('sidebarRight', false)
   const registry = ctx.get('sidebarRightTabs', false)
   if (!sidebar || !registry?.get(NATIVE_BROWSER)) return false
@@ -122,7 +123,7 @@ export function registerNativeSidebarReturn(ctx: Context): () => void {
     scope.effect(() => scope.slots.inject('conversation.input.left', () => scope.slots.register({
       name: 'conversation.input.left', id: 'aionui-native-sidebar-return', order: 90,
     }, props => <NativeSidebarReturn getSidebar={() => scope.get('sidebarRight', false)}
-      isCurrent={() => scope.sessions.list.getSnapshot().current === props.sessionId} />)), 'aionui: native sidebar return without header')
+      isCurrent={() => currentMainSessionId(scope.sessions.list.getSnapshot()) === props.sessionId} />)), 'aionui: native sidebar return without header')
   })
   return () => { void fork.dispose() }
 }

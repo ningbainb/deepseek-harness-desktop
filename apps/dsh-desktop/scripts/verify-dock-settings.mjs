@@ -258,9 +258,14 @@ try {
   await dock.locator('#plugins-hub-tab').click()
   await dock.locator('#install-plugin > summary').click()
   await dock.locator('#plugin-form').waitFor({ state: 'visible' })
+  await dock.locator('#market-hub-tab').click()
+  await dock.locator('#market').waitFor({ state: 'visible' })
+  await dock.locator('#market-bridge').filter({ hasText: 'Desktop 安全事务接管' }).waitFor({ state: 'visible' })
+  assert.equal(await dock.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'false', 'plugin management is not also selected when the direct market destination opens')
+  assert.equal(await dock.locator('#market-hub-tab').getAttribute('aria-selected'), 'true', 'the direct marketplace destination remains selected')
   assert.deepEqual(await dock.locator('.settings-sidebar [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
     'control-center-tab', 'models-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
-    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'skills-tab', 'qqbot-tab',
+    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'market-hub-tab', 'skills-tab', 'qqbot-tab',
     'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
   ], 'the combined model destination and all other destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()

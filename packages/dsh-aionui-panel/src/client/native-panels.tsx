@@ -7,6 +7,7 @@ import { useStore } from './hooks/useStore.ts'
 import { NS, t } from './locales.ts'
 import type { PanelStores } from './store.ts'
 import type { PanelLayoutController } from './layout.ts'
+import { currentMainSessionId } from './session-selection.ts'
 
 export const NATIVE_FILE_TOOLS = 'dsh-file-tools'
 export const NATIVE_GIT_CHANGES = 'dsh-git-changes'
@@ -43,7 +44,7 @@ export type NativePanelProps = PropsRuntime<'sidebar.right.pane.tab'> & {
 
 /** A hidden or non-current session must never expose actions on the shared current-workspace stores. */
 export function NativePanelBody({ stores, section, insertPath, sessionId, useSessions, useTabInfo }: NativePanelProps) {
-  const current = useSessions(snapshot => snapshot.current)
+  const current = useSessions(currentMainSessionId)
   const root = useSessions(snapshot => snapshot.byId[sessionId]?.cwd)
   const explorer = useStore(stores.explorer)
   const scm = useStore(stores.scm)
@@ -81,7 +82,8 @@ export function registerNativePanels(ctx: Context, stores: PanelStores, insertPa
 export function openNativePanel(ctx: Context, section: 'files' | 'changes'): boolean {
   const kind = section === 'files' ? 'files' : NATIVE_GIT_CHANGES
   const snapshot = ctx.sessions.list.getSnapshot()
-  if (!snapshot.current || !snapshot.byId[snapshot.current]?.cwd) return false
+  const current = currentMainSessionId(snapshot)
+  if (!current || !snapshot.byId[current]?.cwd) return false
   const sidebar = ctx.get('sidebarRight', false)
   const registry = ctx.get('sidebarRightTabs', false)
   if (!sidebar || !registry?.get(kind)) return false

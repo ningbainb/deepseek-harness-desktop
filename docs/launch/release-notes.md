@@ -1,67 +1,45 @@
-# DeepSeek Harness Desktop 4.1.0
+# DeepSeek Harness Desktop 4.2.0
 
 ## 中文
 
 ### 本次亮点
 
-4.1.0 精确锁定官方公开 NPM 的 `@deepseek-ai/dsh@0.1.6-alpha.1`，首次将 Browser Use 与 Computer Use 整合进社区桌面端。会话侧栏新增“智能操控”，可直接进入单例拓展坞的操控中心，查看 Provider、系统权限、浏览器发现结果和安全测试状态。
+4.2.0 精确适配官方 DeepSeek Harness `0.1.6-alpha.2` 内核，并从 dsh-web `alpha` 的固定源码提交同步 0.3.23 Web 组件。新版 Session 多实例与 Workspace 导航由官方服务负责，桌面端专注于窗口、私有传输、系统能力和用户数据继承。长历史会话、模式切换和拓展坞设置在新版客户端路由下继续可用。
 
-- Browser Use 默认使用官方 Playwright MCP，启动可见的独立浏览器与隔离会话，并自动发现系统 Chrome、Edge 或 Chromium。Chrome DevTools MCP 用于高级诊断；Stagehand 仅在配置独立模型凭据后可用。
-- Computer Use 默认使用随包安装的 Cua Driver Native，外置 Cua Driver MCP 可作为进程隔离回退。macOS 提供辅助功能与屏幕录制权限引导，Windows 和 Linux 按实际驱动与图形会话报告能力。
-- 两项实验能力默认关闭。页面读取、截图和窗口枚举等观察操作可直接进行；点击、输入、上传、下载以及鼠标键盘操作继续经过 Harness 审批。连续启动失败会自动停用 Computer Use 并以安全模式恢复 Runtime，不删除用户配置。
+插件不再只看版本号就混装。上游 Task Board、Git Graph 和桌宠与桌面既有 Worktree、证据或保存状态接口不一致时，4.2.0 保留完整的桌面客户端与 Host 配对，以及原有插件行 ID；其他经过核验的上游组件按固定来源装载。这样既能吸收上游对新内核的适配，也不会把用户正在使用的桌面能力静默换掉。
 
 ### 验证
 
-本版完成 DSH 0.1.6 的 Agent、Session、PTC、Workflow、Sandbox 与 Agent Team 接口迁移。生命周期改用异步串行 `agent/created`，历史与 Memory 改用异步 Session 查询，PTC 使用 `ptc-runtime-node`，Workflow 使用 `workflow-ptc`，Agent Team 使用 `spawn_teammate`。Sandbox 与 Shell 遵守可取消异步契约，不再发起相同或更低权限的伪升级请求。
+4.1.x 升级会先备份桌面负责修改的 Profile 清单、锁文件、补丁及相关设置，记录指纹，并在 Runtime 健康后提交。异常启动可恢复旧文件；原始会话日志、工作区文件、凭据、Skills 和第三方插件内容不会被此次迁移直接改写。可选插件故障应降级隔离，不应阻断主会话页面。
 
-首次启动会事务迁移 3.5 和 4.0 的会话、上下文、Workspace、模型、凭据引用、Skills、插件及启停状态、皮肤、桌宠、Agent Team 与性价比模式。修改前生成版本化备份和迁移指纹；失败时恢复旧 Profile，原始 Session 日志不被无备份改写。大历史会话继续使用分片管道，关闭、重启后仍可恢复并继续提问。
-
-明确不兼容的第三方插件默认阻止激活，但仍保留“风险安装”入口。用户确认后，安装会先经过隔离 staging、包名与 Bundle 校验、运行图检查和失败回滚；可选插件失败不会阻断 Runtime。
+Browser Use 与 Computer Use 继续默认关闭，并沿用原有权限确认和安全边界。私有 Electron 管道仅映射受限的本地 Web 路径，公开 LAN 入口不因此获得额外能力。Task Board、Git Graph 和桌宠的上游新版实现将在保存状态与桌面特性完成双向验证后再切换。
 
 ### 下载与校验
 
-- Windows 10/11 x64：正式版，提供 Setup EXE、blockmap 与 `latest.yml`。本版按维护者决定不进行代码签名，Windows 可能显示未知发布者或 SmartScreen 提示。
-- macOS Apple Silicon arm64：Preview，提供 DMG 与 ZIP，未签名、未公证。
-- Linux x64：Preview，提供 AppImage 与 DEB；可用性取决于发行版、桌面会话和系统沙箱能力。
-
-三个系统由同一发布编排构建。只有三端全部通过依赖、基线、打包和应用冒烟门禁后才会创建本 Release，不发布残缺的平台组合。请只从本项目 GitHub Release 下载，并使用同一 Release 的 `SHA256SUMS.txt` 与 `release-manifest-all-platforms.json` 核对五个安装资产。原 `release-manifest.json` 是 Windows 构建阶段清单，其中 `SHA256SUMS.txt` 记录的是合并三端前的 Windows 本地文件哈希，不能用于校验 Release 中的公共同名文件；公共校验和以同一 Release 的 `SHA256SUMS.txt` 为准。
+请从本项目对应的 GitHub Release 下载匹配平台的资产，并按同一 Release 的 `SHA256SUMS.txt` 核对 SHA-256。Windows x64 安装包不进行代码签名，系统可能提示未知发布者；macOS arm64 与 Linux x64 仍按 Preview 标注，以实际发布资产和平台说明为准。源码中的 4.2.0 版本号本身不代表安装包已经发布。
 
 ### 说明
 
-匿名埋点仅增加操控中心访问、功能启停结果、Provider 类别、权限检查结果和安全探测结果等固定词表事件。不会记录 URL、域名、页面内容、应用或窗口名称、截图、提示词、工具参数、路径或凭据。
-
-详细说明：[智能操控指南](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/docs/smart-control.md) · [升级与回滚](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/docs/upgrade-and-rollback.md) · [隐私政策](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/PRIVACY.md)
-
-本项目由 ningbai牛逼 维护，是社区开源桌面端，并非 DeepSeek 官方客户端。
-
-[项目与反馈](https://github.com/ningbainb/deepseek-harness-desktop) · [爱发电支持](https://afdian.com/a/ningbai)
+本项目是 ningbai牛逼 维护的社区开源桌面端，并非 DeepSeek 官方客户端。升级前如有重要本地数据，建议保留独立备份；遇到插件或历史异常时，不要删除 `DSH_HOME`、Profile、`node_modules` 或会话日志，请先使用诊断与回滚指引。完整技术例外见 [上游同步记录](../upstream-web-sync.md)，操作步骤见 [升级与回滚](../upgrade-and-rollback.md)。
 
 ## English
 
 ### Highlights
 
-Desktop 4.1.0 exact-pins the public `@deepseek-ai/dsh@0.1.6-alpha.1` runtime and integrates Browser Use and Computer Use into the community desktop host. A new Smart Control entry opens the singleton Dock directly on a control center that reports providers, system permissions, browser discovery, runtime state, and safe probes.
+Desktop 4.2.0 pins the official DeepSeek Harness `0.1.6-alpha.2` runtime and a source-verified 0.3.23 cohort from the dsh-web `alpha` branch. Official Session and Workspace services own multi-session navigation, while the Desktop shell continues to own windows, authenticated local transport, operating-system capabilities, and user-data migration. Long conversations, mode switching, and Dock settings remain part of the compatibility checks for the new client routing model.
 
-Browser Use defaults to the official Playwright MCP with a visible, isolated browser session and discovers an installed Chrome, Edge, or Chromium. Computer Use defaults to the bundled Cua Driver Native provider, with an external Cua Driver MCP as an isolated fallback. Both experimental capabilities are off by default. Observation operations may run directly, while clicks, typing, uploads, downloads, and mouse or keyboard actions remain approval-gated. Repeated native startup failure disables Computer Use for a safe Runtime recovery without deleting the saved choice.
+The update does not equate a package version with proven compatibility. The newer upstream Task Board, Git Graph, and Pet clients do not yet share all of the Desktop Worktree, evidence, or saved-state contracts. Those three features therefore retain complete Desktop client and Host pairs under their existing loader IDs. Other reviewed upstream components are pinned by source commit and content hashes, reducing repeated Desktop-specific migration work without silently dropping established functionality.
 
 ### Verification
 
-This release adapts the breaking Agent, Session, PTC, Workflow, Sandbox, and Agent Team contracts in DSH 0.1.6. A transactional first-run migration preserves 3.5 and 4.0 sessions, long context, workspaces, provider settings, credential references, Skills, plugins and enablement, themes, pet settings, Agent Team, and Value Mode. It creates a versioned backup and fingerprint before changing the Desktop Profile, restores the old Profile on failure, and never rewrites original Session logs without a backup.
+An upgrade from 4.1.x prepares a versioned, fingerprinted backup of the Desktop-owned profile manifest, lockfile, patches, and related settings before mutation. The migration commits only after Runtime health succeeds and can restore those files after an interrupted or failed start. It does not directly rewrite original Session logs, Workspace files, credentials, Skills, or third-party plugin contents. Optional plugin failures must degrade in isolation instead of blocking the primary conversation view.
 
-Incompatible third-party plugins are blocked by default, but informed users retain a risk-install path. Each attempt still passes isolated staging, package and Bundle validation, runtime-graph checks, and rollback. Optional plugin failure cannot block Runtime startup.
+Browser Use and Computer Use remain off by default and keep their existing approval boundaries. The authenticated Electron pipe maps only a small allowlist of local Web paths; public LAN access gains no additional authority. The three retained Desktop plugin pairs will move to upstream implementations only after saved-state and feature-parity checks are complete.
 
 ### Download and verification
 
-- Windows 10/11 x64: stable Setup EXE, blockmap, and `latest.yml`; intentionally unsigned.
-- macOS Apple Silicon arm64: unsigned and unnotarized Preview, distributed as DMG and ZIP.
-- Linux x64: Preview AppImage and DEB, subject to distribution, desktop-session, and sandbox differences.
-
-One workflow builds all three platforms, and the GitHub Release is created only after every platform gate succeeds. Download only from this repository and verify the five installers with the same Release's `SHA256SUMS.txt` and `release-manifest-all-platforms.json`. The original `release-manifest.json` is scoped to the Windows build: its `SHA256SUMS.txt` hash refers to the pre-merge Windows-local file, not the public combined checksum file. Use the public `SHA256SUMS.txt` for Release downloads.
+Use assets from the matching GitHub Release and verify their SHA-256 values against that same Release's `SHA256SUMS.txt`. The Windows x64 installer is intentionally unsigned, so the operating system may display an unknown-publisher warning. macOS arm64 and Linux x64 remain Preview targets; consult the actual Release assets and platform notes for availability. A 4.2.0 source version alone does not imply that installers have already been published.
 
 ### Notice
 
-Anonymous telemetry adds only fixed-vocabulary outcomes for control-center visits, enablement, provider category, permission checks, and safe probes. It excludes URLs, domains, page content, application or window names, screenshots, prompts, tool arguments, paths, and credentials.
-
-Guides: [Smart Control](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/docs/smart-control.md) · [Upgrade and rollback](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/docs/upgrade-and-rollback.md) · [Privacy](https://github.com/ningbainb/deepseek-harness-desktop/blob/desktop-v4.1.0/PRIVACY.md)
-
-Maintained by ningbai牛逼 as a community open-source project; it is not an official DeepSeek client.
+This is a community-maintained open-source Desktop application, not an official DeepSeek client. Keep an independent backup of important local data. If a plugin or historical session fails during an upgrade, do not delete `DSH_HOME`, the Profile, `node_modules`, or Session logs. Consult the [upgrade and rollback guide](../upgrade-and-rollback.md) and the [upstream sync ledger](../upstream-web-sync.md) before attempting repair.

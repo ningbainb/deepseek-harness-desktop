@@ -20,6 +20,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface Context merge (ctx.settingsScope).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { BoardController } from '../core/controller.ts'
 import { ExecutionService, type ExecutionHistoryEvent } from '../core/execution.ts'
 import { InMemoryEvidenceStore } from '../core/evidence.ts'
@@ -38,6 +39,7 @@ import { EvidenceReviewService } from '../core/review.ts'
 import { mountSidebarEntry } from './sidebar-entry.ts'
 import { TaskBoardSettingsCard, TaskBoardSettingsCardController, type TaskBoardSettings } from './TaskBoardSettingsCard.tsx'
 import { en, zh, type TaskBoardKey } from './locales.ts'
+import { mainSessionId } from './main-session.ts'
 
 /** Locale namespace this plugin owns. */
 const NS = 'task-board'
@@ -81,7 +83,7 @@ declare module '@deepseek-ai/cordis' {
 
 
 /** Required services (fiber inject waiting — the runtime must be up first). */
-export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'settingsScope', 'locale', 'remote']
+export const inject = ['slots', 'sessions', 'workspaces', 'uiWorkspace', 'connection', 'settingsScope', 'locale', 'remote']
 
 /**
  * Mount the task board.
@@ -134,6 +136,7 @@ export function apply(ctx: ClientContext): void {
     void (async () => {
       const sessions = ctx.sessions
       const workspaces = ctx.workspaces
+      const ownedSessions = new Set<{ release(): void }>()
 
       // HostTaskStore v3 is authoritative when reachable. Its Host half does
       // the copy-first v2 migration; the old v2/local path remains the safe
@@ -153,6 +156,21 @@ export function apply(ctx: ClientContext): void {
         sessions: {
           list: sessions.list,
           binding: id => sessions.binding(id as SessionId),
+          acquire: id => {
+            const reference = sessions.retain(id as SessionId, { source: 'taskBoard' })
+            ownedSessions.add(reference)
+            let released = false
+            return {
+              binding: reference.binding,
+              ready: reference.ready,
+              release: () => {
+                if (released) return
+                released = true
+                ownedSessions.delete(reference)
+                reference.release()
+              },
+            }
+          },
         },
         workspaces: {
           // DSH 1.1.5 moved Session creation out of the Workspace Controller.
@@ -161,14 +179,14 @@ export function apply(ctx: ClientContext): void {
           list: {
             getSnapshot: () => {
               const snapshot = workspaces.list.getSnapshot()
-              const currentSessionId = sessions.list.getSnapshot().current
+              const currentSessionId = mainSessionId(sessions.list.getSnapshot())
               const recentWorkspaceId = currentSessionId === undefined
                 ? undefined
                 : snapshot.items.find(item => item.sessionIds.includes(currentSessionId))?.workspaceId
               return { items: snapshot.items, recentWorkspaceId }
             },
           },
-          connectWorkspace: id => sessions.create({ workspaceId: id as WorkspaceId }),
+          connectWorkspace: id => ctx.uiWorkspace.connectWorkspace(id as WorkspaceId),
         },
         history: {
           loadTail: async sessionId => {
@@ -186,8 +204,11 @@ export function apply(ctx: ClientContext): void {
         evidenceStore,
         reviewService: store === v3Store ? new EvidenceReviewService({ store: v3Store, worktrees: new RemoteWorktreeReviewClient() }) : undefined,
         sessions: {
-          list: sessions.list,
-          open: id => sessions.open(id as SessionId),
+          list: {
+            getSnapshot: () => ({ current: mainSessionId(sessions.list.getSnapshot()) }),
+            subscribe: fn => sessions.list.subscribe(fn),
+          },
+          open: id => ctx.uiWorkspace.openSession(id as SessionId),
         },
         onExecutionSettled: event => {
           const desktop = (window as typeof window & {
@@ -225,6 +246,10 @@ export function apply(ctx: ClientContext): void {
       scheduler.start()
 
       const disposers: Array<() => void> = []
+      disposers.push(() => {
+        for (const reference of ownedSessions) reference.release()
+        ownedSessions.clear()
+      })
       const openSessionFromDeepLink = async (sessionId: string): Promise<void> => {
         const refresh = (sessions as typeof sessions & { refresh?: () => Promise<void> }).refresh
         // Keep the SessionRuntime receiver when the optional compatibility
@@ -239,7 +264,7 @@ export function apply(ctx: ClientContext): void {
         let attempt = 0
         while (Date.now() < deadline) {
           try {
-            sessions.open(sessionId as SessionId)
+            ctx.uiWorkspace.openSession(sessionId as SessionId)
             return
           } catch (error) {
             lastError = error

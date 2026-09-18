@@ -52,9 +52,12 @@ export const zh = {
   'controlLabel': '智能操控',
   'controlOpenFailed': '智能操控未能打开，请从“工具 → 拓展坞”重试。',
   'dockBannerTitle': '桌面原生能力已整合至拓展坞',
-  'dockBannerDesc': '性价比模式、Prompt、记忆、鲸鱼粒子和图像理解已移到拓展坞左侧，按需打开设置。',
+  'dockBannerDesc': '已安装插件、社区市场、官方内核能力和诊断统一由拓展坞管理。',
   'dockSettingUnavailable': '此设置暂时不可用，请重新加载拓展坞或重启运行时。',
-  'dockBannerAction': '打开拓展坞',
+  'dockBannerAction': '打开插件中心',
+  'desktopPluginCenterTitle': '插件中心',
+  'desktopPluginCenterDescription': '桌面版插件统一在拓展坞中管理，避免与新内核原生列表重复。',
+  'desktopPluginCenterNotice': '智能体团队、终端和网页搜索等属于新内核能力；Desktop 保留其运行时支持，但不在此页重复展示或安装。',
 } satisfies Record<string, string>
 
 /** Key union for this namespace. */
@@ -111,8 +114,11 @@ export const en = {
   'controlLabel': 'Smart Control',
   'controlOpenFailed': 'Smart Control could not open. Try Tools → Extension Dock.',
   'dockBannerTitle': 'Desktop Native Capabilities in Extension Dock',
-  'dockBannerDesc': 'Open Value Mode, Prompt, memory, whale particles, and image understanding from the Dock sidebar.',
-  'dockBannerAction': 'Open Extension Dock',
+  'dockBannerDesc': 'Installed plugins, the community market, core capabilities, and diagnostics are managed in one Extension Dock.',
+  'dockBannerAction': 'Open Plugin Center',
+  'desktopPluginCenterTitle': 'Plugin Center',
+  'desktopPluginCenterDescription': 'Desktop plugins are managed in the Extension Dock, separate from the new runtime native list.',
+  'desktopPluginCenterNotice': 'Agent Team, Terminal, and Web Search are runtime capabilities. Desktop preserves runtime support without listing or installing them again here.',
 } satisfies Record<WebUIPluginsKey, string>
 
 /** ChatGPT authorization settings copy. */

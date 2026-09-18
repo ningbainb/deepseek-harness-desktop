@@ -369,10 +369,12 @@ test('desktop repair status degrades to unavailable when the incident store cann
   }
 })
 
-test('Extension Dock deep links accept only the collaboration page allowlist', () => {
+test('Extension Dock deep links accept only the collaboration settings and plugin-center tab allowlists', () => {
   assert.deepEqual(normalizeDesktopDockOpenOptions(undefined), {})
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
-  for (const value of [null, 'value-mode', { setting: 'plugins' }, { setting: 'value-mode', url: 'https://example.com' }]) {
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'market' }), { tab: 'market' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'plugins' }), { tab: 'plugins' })
+  for (const value of [null, 'value-mode', { setting: 'plugins' }, { tab: 'settings' }, { setting: 'value-mode', tab: 'market' }, { setting: 'value-mode', url: 'https://example.com' }]) {
     assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
   }
 })

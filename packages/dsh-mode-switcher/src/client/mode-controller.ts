@@ -30,12 +30,10 @@ interface RpcEnvelope<T> {
 
 export interface ModeSwitcherDeps {
   sessions: {
-    list: {
-      getSnapshot(): { current: string | undefined; byId: Record<string, SessionSummaryLike> }
-    }
+    list: { getSnapshot(): { byId: Record<string, SessionSummaryLike> } }
+    current(): string | undefined
     open(sessionId: string): void
     refresh(): Promise<void>
-    clear(): void
     noteAgentPreset?(sessionId: string, agentPreset: string): void
   }
   workspaces: {
@@ -126,8 +124,7 @@ export class ModeSwitcherController {
       this.deps.sessions.noteAgentPreset?.(targetSessionId, response.result.value.agentPreset ?? agentPreset)
       // Preserve the old view through both fallible operations. A late result
       // may register its new session, but must not replace newer user navigation.
-      if (this.deps.sessions.list.getSnapshot().current === summary.id) {
-        this.deps.sessions.clear()
+      if (this.deps.sessions.current() === summary.id) {
         this.deps.sessions.open(targetSessionId)
       }
       await restoreDefault()

@@ -38,6 +38,8 @@ const nativePluginGrid = document.querySelector('#native-plugin-grid')
 const nativeResultState = document.querySelector('#native-result-state')
 const skillCount = document.querySelector('#skill-count')
 const marketCount = document.querySelector('#market-count')
+const sidebarMarketCount = document.querySelector('#sidebar-market-count')
+const marketBridge = document.querySelector('#market-bridge')
 const marketTotal = document.querySelector('#market-total')
 const marketUpdated = document.querySelector('#market-updated')
 const marketQuery = document.querySelector('#market-query')
@@ -751,7 +753,11 @@ function refreshMarket({ force = false } = {}) {
       const catalog = await window.dshDesktop.listCommunityMarket(force)
       marketCatalog = catalog
       marketPage = 1
+      marketBridge.textContent = catalog.bridge?.provider === 'dshmarket' && catalog.bridge?.installation === 'desktop-managed'
+        ? '已接入 dshmarket 兼容目录；安装、卸载和回滚由 Desktop 安全事务接管。'
+        : '社区目录已接入；安装、卸载和回滚由 Desktop 安全事务接管。'
       marketCount.textContent = compactNumber.format(catalog.count)
+      sidebarMarketCount.textContent = compactNumber.format(catalog.count)
       marketTotal.textContent = compactNumber.format(catalog.count)
       marketUpdated.textContent = catalog.updated ?? '--'
       const selectedCategory = marketCategory.value
@@ -772,7 +778,9 @@ function refreshMarket({ force = false } = {}) {
       }
       marketCatalog = undefined
       marketView = undefined
+      marketBridge.textContent = '市场目录暂时不可用；不会影响已安装插件。'
       marketCount.textContent = '--'
+      sidebarMarketCount.textContent = '--'
       marketTotal.textContent = '--'
       marketUpdated.textContent = '--'
       marketResultState.textContent = '社区目录暂时不可用'
@@ -1185,7 +1193,7 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'market-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
@@ -1239,8 +1247,15 @@ function activateTab(tab, focus = false, settingOverride) {
     }
   })
   for (const item of tabs) {
-    const active = item.closest('.settings-sidebar')
-      ? item.dataset.group === tab.dataset.group
+    const sidebarItem = item.closest('.settings-sidebar')
+    const exactSidebarDestination = sidebarItem && tabs.some((candidate) => {
+      if (!candidate.closest('.settings-sidebar')) return false
+      return candidate.dataset.tab === tab.dataset.tab && (candidate.dataset.setting ?? '') === (tab.dataset.setting ?? '')
+    })
+    const active = sidebarItem
+      ? (exactSidebarDestination
+          ? item.dataset.tab === tab.dataset.tab && (item.dataset.setting ?? '') === (tab.dataset.setting ?? '')
+          : item.dataset.group === tab.dataset.group)
       : item.dataset.tab === tab.dataset.tab
     item.classList.toggle('active', active)
     item.setAttribute('aria-selected', String(active))
@@ -1278,7 +1293,7 @@ const searchEntries = [
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
-  ['发现插件', '插件市场 社区 群友作品', 'market-tab'],
+  ['插件市场', '插件市场 社区 群友作品', 'market-hub-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
   ['技能', '导入技能 Skill', 'skills-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],

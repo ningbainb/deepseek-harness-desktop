@@ -236,6 +236,12 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
                 if (options?.setting !== undefined && !['control-center', 'value-mode'].includes(options.setting)) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting');
                 }
+                if (options?.tab !== undefined && !['plugins', 'market'].includes(options.tab)) {
+                    throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock tab');
+                }
+                if (options?.setting !== undefined && options?.tab !== undefined) {
+                    throw new DesktopClientError('desktop-invalid-argument', 'Extension Dock navigation accepts one target');
+                }
                 if (!await hasBridgeCapability('extensions.open'))
                     return false;
                 const result = asRecord(await bridge.openExtensionDock(options));

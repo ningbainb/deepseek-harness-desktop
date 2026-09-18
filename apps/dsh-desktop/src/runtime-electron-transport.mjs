@@ -36,7 +36,7 @@ function runtimeRequest(request) {
   return new Request(target, request)
 }
 
-export async function installDesktopRuntimeProtocol({ protocol, getProvider, beforeFetch }) {
+export async function installDesktopRuntimeProtocol({ protocol, getProvider, beforeFetch, afterFetch }) {
   if (typeof protocol?.handle !== 'function' || typeof getProvider !== 'function') {
     throw new TypeError('runtime protocol and provider getter are required')
   }
@@ -73,6 +73,9 @@ export async function installDesktopRuntimeProtocol({ protocol, getProvider, bef
     try {
       const override = await beforeFetch?.(forwarded)
       const response = override instanceof Response ? override : await provider.fetch(forwarded)
+      if (afterFetch) {
+        try { await afterFetch(forwarded, response) } catch { /* observer must not break Runtime transport */ }
+      }
       return closeOnQuiesce(response)
     } catch (error) {
       if (quiescing) return new Response(null, { status: 204 })

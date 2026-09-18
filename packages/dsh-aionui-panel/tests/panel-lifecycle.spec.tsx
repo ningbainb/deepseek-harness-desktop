@@ -4,9 +4,13 @@ import { PanelLayoutController } from '../src/client/layout.ts'
 import { createLayoutStore } from '../src/client/store.ts'
 import { mountPanels } from '../src/client/mount.tsx'
 
-vi.mock('../src/client/components/ExplorerPanel.tsx', () => ({ ExplorerPanel: () => <button data-explorer-probe>Explorer</button> }))
+const panelFailure = vi.hoisted(() => ({ explorer: false }))
+vi.mock('../src/client/components/ExplorerPanel.tsx', () => ({ ExplorerPanel: () => {
+  if (panelFailure.explorer) throw new Error('optional explorer render failed')
+  return <button data-explorer-probe>Explorer</button>
+} }))
 vi.mock('../src/client/preview/PreviewPanel.tsx', () => ({ PreviewPanel: () => <button data-preview-probe>Preview</button> }))
-afterEach(() => { document.body.innerHTML = ''; localStorage.clear(); vi.unstubAllGlobals() })
+afterEach(() => { panelFailure.explorer = false; document.body.innerHTML = ''; localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 it('gives an available native sidebar the initial layout without opening tabs or rewriting saved tools', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
@@ -128,4 +132,28 @@ it('remounts both panels after the shell replaces its frame or removes injected 
   } finally { disposePanels(); layout.dispose() }
   expect(document.querySelector('[data-aionui-explorer-col]')).toBeNull()
   expect(document.querySelector('.aionui-floating-expand')).toBeNull()
+})
+
+it('isolates an AionUI render failure without blocking the conversation or the other panel', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const shell = document.createElement('div')
+  shell.dataset.dshFrame = ''
+  shell.style.gridTemplateColumns = '280px minmax(0, 1fr) 0px'
+  shell.getBoundingClientRect = () => ({ width: 1400, height: 800 } as DOMRect)
+  const send = document.createElement('button')
+  send.textContent = 'Send'
+  const onSend = vi.fn()
+  send.addEventListener('click', onSend)
+  document.body.append(shell, send)
+  const layout = new PanelLayoutController(createLayoutStore())
+  layout.mount()
+  panelFailure.explorer = true
+  const disposePanels = mountPanels({} as never, vi.fn(), () => true)
+  try {
+    await vi.waitFor(() => expect(shell.querySelectorAll('[data-aionui-panel-unavailable]')).toHaveLength(1))
+    expect(shell.querySelectorAll('[data-preview-probe]')).toHaveLength(1)
+    send.click()
+    expect(onSend).toHaveBeenCalledOnce()
+  } finally { disposePanels(); layout.dispose() }
 })

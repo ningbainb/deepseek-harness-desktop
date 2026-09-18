@@ -8,8 +8,7 @@ afterEach(cleanup)
 function services(items: unknown[] = []) {
   return {
     workspaces: { list: { getSnapshot: () => ({ items }) }, create: vi.fn(async () => ({ workspaceId: 'w', path: 'D:\\example' })), rename: vi.fn(async () => ({})) },
-    uiWorkspace: { pickDirectory: vi.fn(async () => 'D:\\example'), connectWorkspace: vi.fn(async () => 'session') },
-    sessions: { open: vi.fn() },
+    uiWorkspace: { pickDirectory: vi.fn(async () => 'D:\\example'), connectWorkspace: vi.fn(async () => 'session'), openSession: vi.fn() },
   }
 }
 it('chooses a folder, seeds its name, registers and enters a real workspace', async () => {
@@ -25,7 +24,7 @@ it('chooses a folder, seeds its name, registers and enters a real workspace', as
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1))
   expect(api.workspaces.create).toHaveBeenCalledWith({ path: 'D:\\example' })
   expect(api.workspaces.rename).toHaveBeenCalledWith('w', '我的项目')
-  expect(api.sessions.open).toHaveBeenCalledWith('session')
+  expect(api.uiWorkspace.openSession).toHaveBeenCalledWith('session')
   expect(telemetry.mock.calls).toEqual([
     [{ feature: 'project', outcome: 'started', detail: 'create' }],
     [{ feature: 'project', outcome: 'succeeded', detail: 'create' }],
@@ -40,7 +39,7 @@ it('keeps an edited name and opens duplicate folders without renaming them', asy
   await screen.findByRole('button', { name: '打开已有项目' })
   expect((screen.getByLabelText('项目名称') as HTMLInputElement).value).toBe('Custom')
   fireEvent.click(screen.getByRole('button', { name: '打开已有项目' }))
-  await waitFor(() => expect(api.sessions.open).toHaveBeenCalled())
+  await waitFor(() => expect(api.uiWorkspace.openSession).toHaveBeenCalled())
   expect(api.workspaces.create).not.toHaveBeenCalled(); expect(api.workspaces.rename).not.toHaveBeenCalled()
 })
 it('retains the registered workspace on a rename failure and safely retries', async () => {
@@ -80,7 +79,7 @@ it('routes the home workspace selector to the new dialog and retains existing pr
     await screen.findByRole('dialog', { name: '选择工作区' })
     fireEvent.click(screen.getByRole('button', { name: /Existing D:\/example/ }))
     fireEvent.click(screen.getByRole('button', { name: '打开已有项目' }))
-    await waitFor(() => expect(api.sessions.open).toHaveBeenCalled())
+    await waitFor(() => expect(api.uiWorkspace.openSession).toHaveBeenCalled())
     expect(api.workspaces.create).not.toHaveBeenCalled()
     expect(api.workspaces.rename).not.toHaveBeenCalled()
     expect(pickFolder).not.toHaveBeenCalled()

@@ -4,6 +4,23 @@
   "description": "DeepSeek Harness Desktop & dsh-web-ui 核心功能与内置插件保全基线清单",
   "plugins": [
     {
+      "id": "web-all-alpha-source",
+      "package": "@linxin666/dsh-web-all",
+      "path": "vendor/dsh-web-alpha-0.3.23",
+      "description": "DSH alpha.2 上游 Web 聚合包，来源与哈希固定并保留桌面差异行",
+      "features": [
+        "upstream-alpha-source-provenance",
+        "desktop-only-rows-preserved",
+        "desktop-task-board-git-graph-and-pet-client-host-pairs-preserved",
+        "desktop-ssh-client-host-pair-preserved",
+        "optional-plugin-failure-isolation"
+      ],
+      "patchId": "web-ui-compat",
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
+    },
+    {
       "id": "ui-web-ui-compat",
       "package": "@linxin666/dsh-web-ui-all",
       "path": "packages/dsh-web-ui-all",
@@ -30,7 +47,8 @@
         "same-field-draft-preserved-during-save",
         "conversation-collaboration-entry",
         "conversation-smart-control-entry",
-        "desktop-control-actions-require-approval"
+        "desktop-control-actions-require-approval",
+        "desktop-plugin-center-single-destination"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -103,6 +121,9 @@
       "path": "packages/dsh-aionui-panel",
       "description": "AionUI 桌面多端管理侧边面板",
       "patchId": "ui-dsh-aionui-panel",
+      "features": [
+        "aionui-render-failure-isolation"
+      ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
       "requiredInDesktop": false
@@ -160,7 +181,8 @@
       "features": [
         "settings-mutate-void-contract",
         "settings-save-always-settles",
-        "failed-save-preserves-draft"
+        "failed-save-preserves-draft",
+        "pet-settings-no-unbounded-batch-mutation"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -217,7 +239,8 @@
       "id": "ssh",
       "features": [
         "host-isolated-transfer-browser",
-        "active-transfer-target-lock"
+        "active-transfer-target-lock",
+        "desktop-ssh-client-host-pair-preserved"
       ],
       "package": "@linxin666/dsh-ssh",
       "path": "packages/dsh-ssh",
@@ -225,7 +248,7 @@
       "patchId": "ssh",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
-      "requiredInDesktop": false
+      "requiredInDesktop": true
     },
     {
       "id": "describe-image",
@@ -281,6 +304,7 @@
     "@deepseek-ai/dsh-web-app",
     "@linxin666/dsh-value-mode",
     "dsh-better-sidebar",
+    "@linxin666/dsh-web-all",
     "@linxin666/dsh-web-ui-all",
     "@linxin666/dsh-client-ui-skill-explorer",
     "@tencent-connect/dsh-qqbot",
@@ -621,6 +645,9 @@
         "collapsed-settings-draft-close-save",
         "close-save-waits-for-new-draft",
         "plugin-update-refresh-outside-mutation-lock",
+        "extension-dock-plugin-market-direct-entry",
+        "extension-dock-plugin-market-deep-link-allowlist",
+        "dshmarket-catalog-bridge-with-desktop-owned-mutations",
         "plugin-repair-retry-within-active-operation",
         "plugin-diagnostics-use-loaded-inventory",
         "collaboration-deep-link-single-window",
@@ -832,7 +859,10 @@
         "native-skin-center-preserves-fifteen-offline-skins",
         "models-use-official-provider-card-slots",
         "usage-and-session-sections-in-unprivileged-dock",
-        "declarative-palette-sync-and-reset"
+        "describe-image-direct-form-and-legacy-disable-state",
+        "declarative-palette-sync-and-reset",
+        "private-remote-channel-mirror",
+        "persisted-skin-selection-sync-without-preview-leak"
       ],
       "e2eScript": "scripts/verify-native-plugin-pages.mjs"
     },

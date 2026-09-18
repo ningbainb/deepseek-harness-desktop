@@ -25,6 +25,7 @@
           <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
           <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
+          <button type="button" class="tab" id="market-hub-tab" role="tab" aria-controls="market" data-tab="market" data-group="plugins"><span class="tab-title">插件市场</span><small id="sidebar-market-count">--</small></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
           <p class="nav-group-label">桌面体验</p>
@@ -41,7 +42,7 @@
         <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
           <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
-          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">发现 <small id="market-count">--</small></button>
+          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">插件市场 <small id="market-count">--</small></button>
           <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
         </nav>
         <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
@@ -134,13 +135,14 @@
           <div class="market-intro">
             <p class="market-kicker">发现扩展</p>
             <h2>社区插件市场</h2>
-            <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+            <p>兼容 dshmarket 使用的社区目录；搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
           </div>
           <div class="market-metrics" aria-label="目录状态">
             <div><strong id="market-total">--</strong><span>可安装条目</span></div>
             <div><strong id="market-updated">--</strong><span>目录更新</span></div>
           </div>
         </header>
+        <p class="market-bridge" id="market-bridge" role="status">正在确认市场目录兼容状态</p>
         <section class="community-feature" aria-labelledby="community-feature-heading">
           <div class="feature-heading">
             <div>

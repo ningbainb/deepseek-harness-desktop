@@ -99,6 +99,30 @@ test('rejects missing patch declarations and stale lock hashes', () => {
   assert.match(errors, /patch and lockfile hash differ/)
 })
 
+test('vendored source requires its exact lockfile entry and tarball hash', () => {
+  const f = fixture()
+  const sourcePath = 'vendor/upstream/test-plugin-1.0.0.tgz'
+  const bytes = Buffer.from('reviewed upstream build')
+  f.plugin.selection = {
+    source: 'vendor', version: '1.0.0', path: sourcePath,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  }
+  f.state.packages.get(f.plugin.name).root = join(f.state.repoRoot, 'node_modules', '.pnpm', 'test', 'node_modules', '@desktop', 'test-plugin')
+  f.state.lockPackages = [`${f.plugin.name}@file:${sourcePath}`]
+  f.files.set(join(f.state.repoRoot, sourcePath), bytes)
+  const io = {
+    exists: path => f.files.has(path),
+    realpath: path => path,
+    readText: path => f.files.get(path),
+    readBytes: path => f.files.get(path),
+  }
+  assert.deepEqual(validateBuiltinPluginAdaptation(f.manifest, f.state, io).errors, [])
+  f.files.set(join(f.state.repoRoot, sourcePath), Buffer.from('changed'))
+  assert.match(validateBuiltinPluginAdaptation(f.manifest, f.state, io).errors.join('\n'), /tarball hash changed/u)
+  f.state.lockPackages = []
+  assert.match(validateBuiltinPluginAdaptation(f.manifest, f.state, io).errors.join('\n'), /absent from lockfile/u)
+})
+
 test('rejects removed, duplicate, and reordered aggregate mounts', () => {
   const f = fixture()
   f.state.aggregateEntries = []

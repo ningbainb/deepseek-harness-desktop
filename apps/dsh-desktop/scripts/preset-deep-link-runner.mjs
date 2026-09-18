@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 import { _electron as electron } from 'playwright'
 
@@ -57,7 +57,7 @@ export async function runPresetDeepLinkE2E({ appDir, executablePath, electronPat
       args: executablePath
         ? [presetPath, 'dsh-community://extensions']
         : [join(appDir, 'src', 'main.mjs'), presetPath, 'dsh-community://extensions'],
-      cwd: appDir,
+      cwd: executablePath ? dirname(resolve(executablePath)) : appDir,
       env: {
         ...process.env,
         DSH_HOME: dshHome,

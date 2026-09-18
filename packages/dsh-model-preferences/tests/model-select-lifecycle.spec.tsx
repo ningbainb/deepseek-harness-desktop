@@ -40,7 +40,7 @@ function createProps(load: () => void, modelSessionId = 'session-a') {
       getSnapshot: () => SETTINGS_STATE,
     },
     load,
-    select: vi.fn(async () => true),
+    select: vi.fn(async () => ({ ok: true as const, value: undefined })),
     t: (key: string) => key,
   }
 }

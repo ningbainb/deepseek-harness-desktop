@@ -38,7 +38,7 @@ async function loadInstalledSettingsForm() {
   return module.exports
 }
 
-function makeBatchedScope(initial, mutate) {
+function makeSettingsScope(initial, write) {
   let user = {}
   const base = { ...initial }
   return {
@@ -50,19 +50,19 @@ function makeBatchedScope(initial, mutate) {
       user,
     }),
     subscribe: () => () => {},
-    mutate: async writes => {
-      await mutate?.(writes)
-      for (const write of writes) {
-        if (write.op === 'set') user = { ...user, [write.field]: write.value }
-        else {
-          const next = { ...user }
-          delete next[write.field]
-          user = next
-        }
-      }
+    // A bridge-only batch can hang indefinitely on current Desktop runtimes;
+    // saving must stay on the public per-field SettingsScope contract.
+    mutate: async () => new Promise(() => {}),
+    set: async (field, value) => {
+      await write?.({ field, op: 'set', value })
+      user = { ...user, [field]: value }
     },
-    set: async () => assert.fail('batched scope must not use per-field set'),
-    unset: async () => assert.fail('batched scope must not use per-field unset'),
+    unset: async field => {
+      await write?.({ field, op: 'unset' })
+      const next = { ...user }
+      delete next[field]
+      user = next
+    },
   }
 }
 
@@ -122,7 +122,8 @@ function setup(t) {
     effect: registerDispose, get: () => undefined, settingsScope: { bind: () => scope },
     slots: { inject: (_name, callback) => registerDispose(callback), register: () => () => {} },
     locale: { register: () => () => {}, bind: () => value => value },
-    sessions: { list: { getSnapshot: () => ({ byId: { 'existing-session': {} } }) }, open: id => opened.push(id) },
+    sessions: { list: { getSnapshot: () => ({ byId: { 'existing-session': {} } }) } },
+    uiWorkspace: { openSession: id => opened.push(id) },
   }
   exported.apply(ctx)
   const dispose = () => { for (const cleanup of [...disposers].reverse()) cleanup() }
@@ -139,22 +140,21 @@ test('installed multi-pet client and workspace use the same tested polling imple
     await readFile(resolve(appDir, '../../packages/dsh-pet/src/client/poll-request.ts'), 'utf8'))
 })
 
-test('installed pet settings patch follows the void mutate contract and always settles saving state', async () => {
+test('installed pet settings avoids a hanging batch mutation and always settles saving state', async () => {
   const source = await readFile(resolve(packageDir, 'src/client/settings-form.ts'), 'utf8')
   const runtime = await readFile(resolve(packageDir, 'lib/client.js'), 'utf8')
-  assert.match(source, /mutate: \(writes: BatchedWrite\[\]\) => Promise<void>/u)
-  assert.match(source, /await batch\.mutate\(plannedWrites\)/u)
-  assert.doesNotMatch(source, /result\.ok/u)
+  assert.doesNotMatch(source, /batch\.mutate/u)
+  assert.doesNotMatch(source, /batchedScope/u)
+  assert.match(source, /for \(const item of valid\)[\s\S]*await item\.run!\(\)/u)
   assert.match(source, /finally \{[\s\S]*this\.saving = false[\s\S]*this\.failed = landed\.size !== pending\.size/u)
   assert.match(source, /catch \(error\)[\s\S]*this\.failedReason/u)
-  assert.match(runtime, /await batch\.mutate\(plannedWrites\)/u)
-  assert.match(runtime, /finally \{[\s\S]*this\.saving = false/u)
+  assert.doesNotMatch(runtime, /batch\.mutate/u)
 })
 
-test('installed pet settings form saves display, size, and position through a void batch mutation', async () => {
+test('installed pet settings form saves display, size, and position with public per-field writes', async () => {
   const { CardForm, booleanField, numberField } = await loadInstalledSettingsForm()
-  const mutations = []
-  const scope = makeBatchedScope({ visible: false, size: 96, right: 12 }, writes => { mutations.push(writes) })
+  const writes = []
+  const scope = makeSettingsScope({ visible: false, size: 96, right: 12 }, write => { writes.push(write) })
   const form = new CardForm(scope, [
     booleanField('visible'),
     numberField('size', { integer: true, min: 32 }),
@@ -166,8 +166,7 @@ test('installed pet settings form saves display, size, and position through a vo
 
   await form.save()
 
-  assert.equal(mutations.length, 1)
-  assert.deepEqual(JSON.parse(JSON.stringify(mutations[0])), [
+  assert.deepEqual(JSON.parse(JSON.stringify(writes)), [
     { field: 'visible', op: 'set', value: true },
     { field: 'size', op: 'set', value: 160 },
     { field: 'right', op: 'set', value: 672 },
@@ -183,7 +182,7 @@ test('installed pet settings form saves display, size, and position through a vo
 test('installed pet settings form retains drafts after failure and exits saving before retry', async () => {
   const { CardForm, numberField } = await loadInstalledSettingsForm()
   let attempts = 0
-  const scope = makeBatchedScope({ size: 96 }, async () => {
+  const scope = makeSettingsScope({ size: 96 }, async () => {
     attempts += 1
     if (attempts === 1) throw new Error('fixture write rejected')
   })

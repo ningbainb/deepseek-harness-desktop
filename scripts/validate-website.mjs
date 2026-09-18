@@ -209,6 +209,22 @@ export function collectDiscoveryErrors(sitemap, robots, llms, keyFile, expectedV
   return errors
 }
 
+export function resolveWebsiteVersion(candidateVersion, publishedVersion) {
+  if (!publishedVersion) throw new Error('public website requires a stable data-release-version')
+  const parseVersion = value => {
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?$/u.exec(value)
+    if (!match) throw new Error(`invalid desktop or website version: ${value}`)
+    return match.slice(1, 4).map(Number)
+  }
+  const candidate = parseVersion(candidateVersion)
+  const published = parseVersion(publishedVersion)
+  for (let index = 0; index < 3; index += 1) {
+    if (candidate[index] > published[index]) return publishedVersion
+    if (candidate[index] < published[index]) throw new Error(`public website ${publishedVersion} is newer than desktop ${candidateVersion}`)
+  }
+  return publishedVersion
+}
+
 export async function validateWebsite() {
   const [html, privacy, siteScript, sitemap, robots, llms, keyFile, desktopPackage] = await Promise.all([
     readFile(htmlPath, 'utf8'),
@@ -222,8 +238,9 @@ export async function validateWebsite() {
   ])
   const candidateVersion = JSON.parse(desktopPackage).version
   const publishedVersion = /<html\b[^>]*\bdata-release-version=["'](\d+\.\d+\.\d+)["']/iu.exec(html)?.[1]
-  const version = candidateVersion.includes('-') ? publishedVersion : candidateVersion
-  if (version === undefined) throw new Error('prerelease builds require a stable data-release-version on the public website')
+  // Local candidates may be ahead of the published release. Do not point the public
+  // fallback download at an installer that does not exist yet.
+  const version = resolveWebsiteVersion(candidateVersion, publishedVersion)
   const errors = [
     ...await collectWebsiteErrors(html, version),
     ...collectPrivacyErrors(privacy),

@@ -1,6 +1,16 @@
 import { createHash } from 'node:crypto'
 
 export const COMMUNITY_MARKET_URL = 'https://awesome-dsh-plugin.com/plugins.json'
+/**
+ * dshmarket consumes this public registry for discovery. Desktop exposes that
+ * compatible catalog in its own Dock while retaining Desktop-owned staging,
+ * approval, and rollback for every mutation.
+ */
+export const DSHMARKET_CATALOG_BRIDGE = Object.freeze({
+  provider: 'dshmarket',
+  catalog: 'awesome-dsh-plugin',
+  installation: 'desktop-managed',
+})
 
 const DEFAULT_TIMEOUT_MS = 6_000
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000
@@ -173,6 +183,7 @@ function projectCatalog(value) {
   const publicCatalog = Object.freeze({
     updated: boundedString(value.updated, 32),
     count: plugins.length,
+    bridge: DSHMARKET_CATALOG_BRIDGE,
     categories: Object.freeze(categories),
     plugins: Object.freeze(plugins),
   })

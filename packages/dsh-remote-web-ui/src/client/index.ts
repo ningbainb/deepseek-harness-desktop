@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { FooterRemoteEntry } from './FooterRemoteEntry.tsx'
 import { RemoteEntry } from './RemoteEntry.tsx'
 import { PairFailedNotice } from './PairFailedNotice.tsx'
@@ -94,7 +95,7 @@ const REMOTE_WEB_UI_NS = 'remote-web-ui'
 const HEARTBEAT_INTERVAL_MS = 10_000
 
 /** Services required by this plugin. */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions', 'workspaces']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions', 'workspaces', 'uiWorkspace']
 
 /**
  * Register the remote-control surface.

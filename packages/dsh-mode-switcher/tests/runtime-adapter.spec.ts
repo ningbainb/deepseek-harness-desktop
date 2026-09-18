@@ -8,7 +8,7 @@ import { apply } from '../src/client/index.ts'
 function nativeFixture(blank = false) {
   const state = { current: 'old' as string | undefined,
     byId: { old: { id: 'old', cwd: 'C:/project', blank,
-      projectionValues: { agentPreset: 'standard' } } } as Record<string, any> }
+      retainedBy: { mainView: 1 }, projectionValues: { agentPreset: 'standard' } } } as Record<string, any> }
   const remote = {
     agentPresets: {
       list: vi.fn(async () => ({ ok: true, value: { presets: [
@@ -28,15 +28,20 @@ function nativeFixture(blank = false) {
     clear: vi.fn(() => { state.current = undefined }),
     open: vi.fn((id: string) => { state.current = id }),
   }
+  const uiWorkspace = { openSession: vi.fn((id: string) => {
+    state.byId.old.retainedBy = {}
+    state.byId[id].retainedBy = { mainView: 1 }
+    state.current = id
+  }) }
   const get = vi.fn((name: string) => {
     if (name === 'remote.agentPresets') return remote.agentPresets
     if (name === 'remote.session') return remote.session
     throw new Error(`modern branch must not read ${name}`)
   })
-  const ctx = { get, sessions,
+  const ctx = { get, sessions, uiWorkspace,
     workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'workspace', path: 'C:/project' }] }) } },
   } as unknown as Context
-  return { ctx, state, remote, sessions }
+  return { ctx, state, remote, sessions, uiWorkspace }
 }
 
 describe('official mode Runtime adapter', () => {
@@ -70,6 +75,7 @@ describe('official mode Runtime adapter', () => {
     expect(f.remote.session.create).toHaveBeenCalledWith({ workspaceId: 'workspace', agentPreset: 'minimal' })
     expect(f.sessions.refresh).toHaveBeenCalledOnce()
     expect(f.state.current).toBe('new')
+    expect(f.uiWorkspace.openSession).toHaveBeenCalledWith('new')
     expect(sessionPreset(f.state.byId.new)).toBe('minimal')
     expect(f.remote.settings.update).not.toHaveBeenCalled()
   })
@@ -98,7 +104,7 @@ describe('official mode Runtime adapter', () => {
     const legacy = { ...f.ctx, sessions, get: (name: string) => name === 'connection' ? { api } : undefined } as unknown as Context
     const deps = modeSwitcherDependencies(legacy)
     expect(deps.api).toBe(api)
-    expect(deps.sessions).toBe(sessions)
+    expect(deps.sessions.open).toBe(sessions.open)
     expect(deps.api.settings?.update).toBe(api.settings.update)
   })
 })

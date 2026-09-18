@@ -28,6 +28,7 @@ const osHome = join(temporary, 'os-home')
 const storeFile = join(osHome, '.dsh', 'dsh-ssh.json')
 let activeApplication
 let sshServer
+let verificationError
 
 if (process.platform !== 'win32') throw new Error('packaged SSH verification currently requires Windows')
 if (!existsSync(appPath)) throw new Error(`packaged executable does not exist: ${appPath}`)
@@ -53,7 +54,7 @@ async function launchDesktop() {
   const rendererErrors = []
   const application = await electron.launch({
     executablePath: appPath,
-    cwd: appDir,
+    cwd: dirname(appPath),
     env: {
       ...process.env,
       HOME: osHome,
@@ -84,7 +85,24 @@ async function openSshPanel(application, page) {
   ))
   await page.locator('[data-dsh-ssh-entry]').click()
   await page.locator('[data-dsh-ssh-view]').waitFor({ state: 'visible', timeout: 20_000 })
-  await page.locator('#dsh-ssh-tab-hosts[aria-selected="true"]').waitFor({ state: 'visible', timeout: 20_000 })
+  try {
+    await page.locator('#dsh-ssh-tab-hosts[aria-selected="true"]').waitFor({ state: 'visible', timeout: 20_000 })
+  } catch (error) {
+    const panelState = await page.evaluate(() => {
+      const panel = document.querySelector('[data-dsh-ssh-view]')
+      return {
+        mounted: panel !== null,
+        active: document.documentElement.hasAttribute('data-dsh-ssh-active'),
+        text: panel?.textContent?.slice(0, 400),
+        tabs: [...(panel?.querySelectorAll('[role="tab"]') ?? [])].map(tab => ({
+          id: tab.id,
+          selected: tab.getAttribute('aria-selected'),
+          visible: tab.getBoundingClientRect().width > 0,
+        })),
+      }
+    }).catch(() => ({ unavailable: true }))
+    throw new Error(`SSH panel did not render its Hosts tab: ${JSON.stringify(panelState)}`, { cause: error })
+  }
   const windowsAfter = await application.evaluate(({ BrowserWindow }) => (
     BrowserWindow.getAllWindows().map(window => window.id).toSorted((left, right) => left - right)
   ))
@@ -191,9 +209,17 @@ try {
   )
 
   console.log('verified packaged SSH panel mount, GUI host creation, password-auth connection test, PTY input/output, persisted host reuse after full application relaunch, and no popup BrowserWindow')
+} catch (error) {
+  verificationError = error
+  throw error
 } finally {
   await closeApplication().catch(() => undefined)
   sshServer?.killAllClients()
   await sshServer?.stop().catch(() => undefined)
-  await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 })
+  try {
+    await rm(temporary, { recursive: true, force: true, maxRetries: 30, retryDelay: 500 })
+  } catch (cleanupError) {
+    if (verificationError === undefined) throw cleanupError
+    console.warn(`SSH test cleanup could not remove temporary data: ${cleanupError.message}`)
+  }
 }

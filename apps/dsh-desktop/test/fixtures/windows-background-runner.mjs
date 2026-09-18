@@ -1,5 +1,6 @@
 // Exercise the real official Windows Job runner under Electron's GUI subsystem.
 import { createRequire } from 'node:module'
+import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
@@ -15,6 +16,7 @@ const kernel32 = koffi.load('kernel32.dll')
 const consoleProcesses = kernel32.func('__stdcall', 'GetConsoleProcessList', 'uint32', ['uint32*', 'uint32'])
 const consoleWindow = kernel32.func('__stdcall', 'GetConsoleWindow', 'uintptr', [])
 const runtimeConsole = { window: consoleWindow(), members: consoleProcesses(Buffer.alloc(128), 32) }
+const positiveControl = process.argv.includes('--positive-control')
 const script = String.raw`
 Add-Type -TypeDefinition @'
 using System;
@@ -22,9 +24,18 @@ using System.Runtime.InteropServices;
 public static class DshConsoleProbe {
   [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
   [DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList([Out] uint[] processes, uint size);
+  [DllImport("kernel32.dll")] public static extern bool FreeConsole();
+  [DllImport("kernel32.dll")] public static extern bool AllocConsole();
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
 }
 '@
+$ForceVisible = ${positiveControl ? '$true' : '$false'}
+if ($ForceVisible) {
+  [void][DshConsoleProbe]::FreeConsole()
+  if (-not [DshConsoleProbe]::AllocConsole()) { throw 'positive control could not allocate its own console' }
+  [void][DshConsoleProbe]::ShowWindow([DshConsoleProbe]::GetConsoleWindow(), 5)
+}
 $handle = [DshConsoleProbe]::GetConsoleWindow()
 $processes = New-Object uint[] 32
 $count = [DshConsoleProbe]::GetConsoleProcessList($processes, 32)
@@ -33,6 +44,18 @@ $count = [DshConsoleProbe]::GetConsoleProcessList($processes, 32)
 try {
   const results = []
   for (let index = 0; index < 3; index += 1) {
+    if (positiveControl) {
+      // Probe the observer with a deliberately unhidden raw child. The
+      // official alpha.2 subprocess runner can hide consoles by itself, so
+      // it is no longer a reliable positive control for Desktop's shim.
+      const raw = spawnSync('powershell.exe', [
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+        Buffer.from(script, 'utf16le').toString('base64'),
+      ], { cwd: process.cwd(), windowsHide: false, encoding: 'utf8', timeout: 15_000 })
+      if (raw.status !== 0) throw new Error(`positive console probe failed: ${raw.stderr || raw.error}`)
+      results.push(JSON.parse(raw.stdout))
+      continue
+    }
     const handle = service.spawn({
       argv: ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
       cwd: process.cwd(),

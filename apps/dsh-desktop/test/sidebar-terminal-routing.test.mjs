@@ -10,6 +10,26 @@ const aggregateRequire = createRequire(desktopRequire.resolve('@linxin666/dsh-we
 const sidebar = dirname(aggregateRequire.resolve('dsh-better-sidebar/package.json'))
 
 for (const bundle of ['client.js', 'client-registry.js']) {
+  test(`${bundle}: produced-file row follows the alpha.2 list-slot contract and closing Turn`, () => {
+    const source = readFileSync(join(sidebar, 'lib', bundle), 'utf8')
+    const selection = source.match(/function selectProducedFiles\(owner\) \{[\s\S]*?\n\t\t\}/u)?.[0]
+    assert.ok(selection, 'patched sidebar must expose its Turn-local produced-file selector')
+    const select = vm.runInNewContext(`(${selection})`)
+    const owner = {
+      seq: 5,
+      turn: { data: new Map([['deliverables', { produced: [
+        { seq: 2, path: 'a.txt' }, { seq: 4, path: 'a.txt' },
+        { seq: 5, path: 'b.txt' }, { seq: 6, path: 'future.txt' },
+      ] }]]) },
+    }
+    assert.deepEqual([...select(owner)], ['a.txt', 'b.txt'])
+    assert.equal(select({ ...owner, turn: { data: new Map() } }), null)
+    const registration = source.match(/function registerTurnTailInterception\(ctx, store\) \{[\s\S]*?\n\t\t\}/u)?.[0]
+    assert.ok(registration)
+    assert.match(registration, /id: "dsh-better-sidebar-produced-files"/u)
+    assert.doesNotMatch(registration, /select: \(owner\)/u)
+  })
+
   test(`${bundle}: UI terminals use Desktop, without stealing web, agent or inactive-session PTYs`, async () => {
     const source = readFileSync(join(sidebar, 'lib', bundle), 'utf8')
     const start = source.indexOf('const openTab = (seed, scope) => {')

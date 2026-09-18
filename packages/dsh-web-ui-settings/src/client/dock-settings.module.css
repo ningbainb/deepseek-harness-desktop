@@ -48,6 +48,7 @@
 .content { max-width: 740px; margin: 0 auto; min-width: 0; }
 .content[hidden] { display: none; }
 .content > * { list-style: none; min-width: 0; }
+.page[data-dsh-dock-settings='appearance'] .content :global([class*='cardHeaderStatic']) { box-sizing: border-box; }
 .content input, .content textarea, .content select { max-width: 100%; box-sizing: border-box; }
 .breadcrumb { margin: 0 auto 9px; max-width: 740px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .heading { max-width: 740px; margin: 0 auto 16px; font-size: 21px; font-weight: 650; letter-spacing: -.3px; }

@@ -5,7 +5,13 @@ import { installDesktopAppearance, opaqueColor, surfaceColor } from '../src/clie
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 describe('native Dock sections', () => {
-  for (const [id, section] of [['appearance', 'skin-center'], ['models', 'models'], ['usage', 'dsh-usage'], ['sessions', 'dsh-session-archive']]) {
+  it('reveals the upstream image card when its dedicated Desktop page opens', () => {
+    window.history.replaceState({}, '', '/?desktop-dock-setting=describe-image')
+    const renderSlot = vi.fn(() => <li><button aria-expanded="false" onClick={event => event.currentTarget.setAttribute('aria-expanded', 'true')}>Image settings</button></li>)
+    render(<DockSettingsPage renderSlot={renderSlot as never} t={((key: string) => key) as never} />)
+    expect(screen.getByRole('button', { name: 'Image settings' }).getAttribute('aria-expanded')).toBe('true')
+  })
+  for (const [id, section] of [['appearance', 'skin-center'], ['models', 'models'], ['usage', 'dsh-usage'], ['sessions', 'archived-sessions']]) {
     it(`renders ${id} through the official section contract`, () => {
       window.history.replaceState({}, '', `/?desktop-dock-setting=${id}`)
       const renderSlot = vi.fn((slot: string, _owner: unknown, _options: { only: string }) => slot === 'settings.section'

@@ -55,7 +55,9 @@ function persistRecentSelection(settingsScope, selection) {
 }
 /** Shared selection path used by both `/model` and the composer seat. */
 export async function selectModelWithPreferences(directory, settingsScope, selection) {
-    await directory.select(selection);
+    const result = await directory.select(selection);
+    if (result !== undefined && !result.ok)
+        throw new Error(result.error.message);
     try {
         persistRecentSelection(settingsScope, { provider: selection.provider, model: selection.model });
     }
@@ -64,6 +66,7 @@ export async function selectModelWithPreferences(directory, settingsScope, selec
         // unavailable settings mirror must not make a valid model switch appear
         // to have failed.
     }
+    return result ?? undefined;
 }
 /** Display label that remains useful for an advertised or stale current route. */
 export function modelDisplayName(option, current) {

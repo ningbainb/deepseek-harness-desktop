@@ -62,7 +62,11 @@ describe('balance model selection lifecycle', () => {
       return { getSnapshot: () => value, subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
         set: (next: T) => { value = next; for (const fn of listeners) fn() }, listeners }
     }
-    const list = store({ current: 'a' })
+    const selected = (id: string) => ({ byId: {
+      a: { id: 'a', retainedBy: id === 'a' ? { mainView: 1 } : {} },
+      b: { id: 'b', retainedBy: id === 'b' ? { mainView: 1 } : {} },
+    } })
+    const list = store(selected('a'))
     const a = store({ current: { provider: 'official', model: 'a' } })
     const b = store({ current: { provider: 'relay', model: 'b' } })
     const controller = { setSelection: vi.fn() }
@@ -71,7 +75,7 @@ describe('balance model selection lifecycle', () => {
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'official', model: 'a' })
     a.set({ current: { provider: 'relay', model: 'pro' } })
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'relay', model: 'pro' })
-    list.set({ current: 'b' })
+    list.set(selected('b'))
     expect(a.listeners.size).toBe(0)
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'relay', model: 'b' })
     dispose(); await Promise.resolve()
@@ -83,7 +87,7 @@ describe('balance model selection lifecycle', () => {
     const controller = { setSelection: vi.fn() }
     const directory = { store: { getSnapshot: () => ({ current: { provider: 'relay', model: 'flash' } }), subscribe: () => () => {} }, load: async () => {} }
     const directoryFor = vi.fn().mockImplementationOnce(() => { throw new Error('scope is not ready') }).mockReturnValue(directory)
-    const dispose = followBalanceSelection(controller as never, { list: { getSnapshot: () => ({ current: 'new' }), subscribe: () => () => {} } } as never, { directoryFor } as never)
+    const dispose = followBalanceSelection(controller as never, { list: { getSnapshot: () => ({ byId: { new: { id: 'new', retainedBy: { mainView: 1 } } } }), subscribe: () => () => {} } } as never, { directoryFor } as never)
     expect(controller.setSelection).toHaveBeenLastCalledWith(null)
     await vi.advanceTimersByTimeAsync(100)
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'relay', model: 'flash' })

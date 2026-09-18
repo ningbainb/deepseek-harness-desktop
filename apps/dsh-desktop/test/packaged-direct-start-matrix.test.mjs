@@ -27,6 +27,7 @@ test('direct-start fixtures have release-commit provenance and complete text has
   assert.ok(verified.files.includes('3.0.1/home.json'))
   assert.ok(verified.files.includes('3.3.0/home.json'))
   assert.ok(verified.files.includes('3.4.0/home.json'))
+  assert.ok(verified.files.includes('4.1.0/home.json'))
   assert.ok(verified.files.includes('probe-package/index.mjs'))
 })
 
@@ -108,6 +109,48 @@ test('3.4.0 verification retains its complete enabled bundle set', async context
   const layout = await materializeDirectStartFixture({ root, version: '3.4.0' })
   assert.equal(layout.expectedLegacyBundles.length, 8)
   assert.ok(layout.expectedLegacyBundles.includes('dsh-better-sidebar'))
+})
+
+test('4.1.0 verification preserves all enabled Desktop and community-facing bundles', async context => {
+  const root = await mkdtemp(join(tmpdir(), 'direct-start-410-bundles-'))
+  context.after(() => rm(root, { recursive: true, force: true }))
+  const layout = await materializeDirectStartFixture({ root, version: '4.1.0' })
+  assert.equal(layout.expectedLegacyBundles.length, 12)
+  assert.ok(layout.expectedLegacyBundles.includes('@linxin666/dsh-web-ui-all'))
+  assert.ok(layout.expectedLegacyBundles.includes('@linxin666/dsh-client-ui-skill-explorer'))
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(layout.runtimeReadablePath, JSON.stringify({
+    marker: layout.sessionMarker, profile: 'desktop', legacyCredentialVisible: false,
+  }))
+  assert.equal((await verifyPackagedDirectStart(layout, {
+    runtimeLog: '[startup] direct-state=ready-full\n',
+  })).version, '4.1.0')
+
+  const manifestPath = join(layout.profileDir, 'package.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(
+    name => name !== '@linxin666/dsh-web-ui-all',
+  )
+  manifest.dsh.profile.bundles.push('@linxin666/dsh-web-all')
+  manifest.dependencies['@linxin666/dsh-web-ui-all'] = 'link:legacy-carrier'
+  await writeFile(manifestPath, JSON.stringify(manifest))
+  assert.equal((await verifyPackagedDirectStart(layout, {
+    runtimeLog: '[startup] direct-state=ready-full\n',
+  })).version, '4.1.0')
+
+  delete manifest.dependencies['@linxin666/dsh-web-ui-all']
+  await writeFile(manifestPath, JSON.stringify(manifest))
+  await assert.rejects(verifyPackagedDirectStart(layout, {
+    runtimeLog: '[startup] direct-state=ready-full\n',
+  }), /dropped an enabled legacy bundle/u)
+  manifest.dependencies['@linxin666/dsh-web-ui-all'] = 'link:legacy-carrier'
+  manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(
+    name => name !== '@linxin666/dsh-client-ui-skill-explorer',
+  )
+  await writeFile(manifestPath, JSON.stringify(manifest))
+  await assert.rejects(verifyPackagedDirectStart(layout, {
+    runtimeLog: '[startup] direct-state=ready-full\n',
+  }), /dropped an enabled legacy bundle/u)
 })
 
 test('packaged direct-start matrix covers every historical Home plus a truly fresh Home', async () => {

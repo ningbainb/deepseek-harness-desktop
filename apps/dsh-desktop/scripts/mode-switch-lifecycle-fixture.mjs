@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
+import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
 
 // Runs against the real loaded client and an isolated durable conversation.
 // Only the first create response is fault-injected; successful mode selection
 // uses the real Host, workspace, preset composition and session persistence.
 export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspaceId,
   workspacePath, messageCount, logPath, openSeededSession, runtimeFetchGate }) {
+  const isSessionCreateResponse = response => desktopLocalPath(new URL(response.url()).pathname) === '/api/session/create'
+    && response.request().method() === 'POST'
   async function roster() {
     const response = await page.evaluate(async rpcId => {
       const result = await fetch('/api/agentPresets/list', {
@@ -59,7 +62,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
     const pageUrl = new URL(page.url())
     const ownedRuntime = (url.protocol === 'dsh-runtime:' && url.hostname === 'app') || url.origin === pageUrl.origin
     if (request.method() === 'POST' && ownedRuntime) {
-      requestPaths.push(url.pathname)
+      requestPaths.push(desktopLocalPath(url.pathname))
       if (requestPaths.length > 12) requestPaths.shift()
     }
   }
@@ -67,8 +70,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
   await writeFile(runtimeFetchGate, 'reject-session-create')
   page.on('request', noteRequest)
   try {
-    const rejectedResponsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/session/create'
-      && response.request().method() === 'POST', { timeout: 30_000 })
+    const rejectedResponsePromise = page.waitForResponse(isSessionCreateResponse, { timeout: 30_000 })
     await selectTarget()
     const rejectedResponse = await rejectedResponsePromise
     const rejectedBody = await rejectedResponse.json()
@@ -98,9 +100,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
     page.off('request', noteRequest)
   }
 
-  const responsePromise = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/session/create'
-      && response.request().method() === 'POST', { timeout: 30_000 })
+  const responsePromise = page.waitForResponse(isSessionCreateResponse, { timeout: 30_000 })
   // Attach the rejection handler immediately so a click failure cannot leave
   // an unhandled response waiter; the original error still propagates below.
   responsePromise.catch(() => {})
@@ -132,8 +132,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
   for (const id of ['liangshen', 'value-mode']) {
     const preset = (await roster()).find(item => item.id === id)
     assert.ok(preset && !preset.broken, `${id} must be available in the shipped mode menu`)
-    const pending = page.waitForResponse(response => new URL(response.url()).pathname === '/api/session/create'
-      && response.request().method() === 'POST', { timeout: 30_000 })
+    const pending = page.waitForResponse(isSessionCreateResponse, { timeout: 30_000 })
     pending.catch(() => {})
     await selectTarget(preset)
     const response = await pending

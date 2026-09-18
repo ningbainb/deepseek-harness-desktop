@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.0 - 2026-09-18 (候选)
+
+- 精确锁定 DSH `0.1.6-alpha.2`；从 dsh-web `alpha` 固定提交构建并校验 0.3.23 上游 Web 组件，不把公开同版本号但内容不同的 NPM 聚合包误认为相同来源。
+- 适配新版 Session/Workspace 导航、会话历史、模式切换与跨窗口设置；桌面私有管道仅映射受限的 `/remote/{api,sidebar,git,pet}` 路径，网络端点不继承该映射。
+- 上游 Task Board、Git Graph、Pet 客户端与桌面既有 Host 合约不一致时，保留完整桌面实现和原插件行 ID，避免 404、自动隔离告警、重复宠物轮询及用户禁用状态反转。后续有数据迁移和功能对齐证据后再切换这三项。
+- 新增 4.1.x 升级事务：修改桌面 Profile 前对相关清单、补丁、设置和皮肤状态做版本化备份与指纹校验，Runtime 健康后提交；失败恢复，不改写原始会话或项目文件。
+- 保留 Browser/Computer Use、AionUI、Live Stats、Value Mode、Memory、Personal Prompt、Chat Recovery、会话导入、原生 Sidebar 和桌面权限边界；每项仍需通过完整回归及打包验收。
+
 ## 4.0.0 - 2026-09-15
 
 - 融合公开的官方 DSH 0.1.5-rc.2 Runtime、Web UI、拆分 SDK 与官方仓库可见的 Desktop 能力边界；社区应用继续使用独立身份、数据目录、协议和更新源，并明确不是 DeepSeek 官方客户端。

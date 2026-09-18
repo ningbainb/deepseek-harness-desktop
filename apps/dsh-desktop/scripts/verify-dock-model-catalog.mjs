@@ -93,6 +93,9 @@ try {
 
   // Hold only the native advisory catalog RPC, then verify bounded UI failure and retry.
   await writeFile(fetchGate, 'stall')
+  // The second picker intentionally reused the 30-second advisory cache.
+  // Expire that cache before exercising the real Runtime timeout path.
+  await settings.waitForTimeout(30_100)
   await settings.getByRole('button', { name: /^更省/ }).click()
   await settings.waitForFunction(() => [...document.querySelectorAll('[data-value-mode-card] button')].some(button => button.textContent.startsWith('更省') && button.getAttribute('aria-pressed') === 'true'))
   await settings.getByRole('button', { name: /^更省/ }).getAttribute('aria-pressed').then(value => assert.equal(value, 'true'))

@@ -6,11 +6,11 @@ function deps(blank: boolean, withOfficialDefault = false): ModeSwitcherDeps {
   return {
     sessions: {
       list: { getSnapshot: () => state },
+      current: () => state.current,
       open: vi.fn((id: string) => { state.current = id }),
       refresh: vi.fn(async () => {
         if (!state.byId.new) state.byId.new = { id: 'new', cwd: 'C:/repo', blank: true, agentPreset: 'plan' }
       }),
-      clear: vi.fn(() => { state.current = undefined }),
       noteAgentPreset: vi.fn((id: string, agentPreset: string) => { state.byId[id] = { ...state.byId[id], id, blank: true, agentPreset } }),
     },
     workspaces: {
@@ -45,7 +45,7 @@ describe('ModeSwitcherController', () => {
     const d = deps(true)
     const controller = new ModeSwitcherController(d)
     await expect(controller.switch('old', 'plan')).resolves.toBe('old')
-    expect(d.sessions.clear).not.toHaveBeenCalled()
+    expect(d.sessions.open).not.toHaveBeenCalled()
     expect(d.api.sessions.create).not.toHaveBeenCalled()
     expect(d.api.agentPresets.select).toHaveBeenCalledWith({ sessionId: 'old', agentPreset: 'plan' })
   })

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -15,11 +15,12 @@ test('upgraded custom presets mount and create sessions through the official run
   try {
     const ids = ['liangshen', 'value-mode']
     for (const id of ids) {
-      const source = await readFile(new URL(
-        `../../../packages/dsh-${id}/presets/${id}/agent.cordis.yml`, import.meta.url), 'utf8')
+      const sourceDir = new URL(`../../../packages/dsh-${id}/presets/${id}/`, import.meta.url)
       const target = join(root, '.agent-presets', id)
-      await mkdir(target, { recursive: true })
-      await writeFile(join(target, 'agent.cordis.yml'), source.replace('prefix:', 'text:'))
+      await cp(sourceDir, target, { recursive: true })
+      const agentFile = join(target, 'agent.cordis.yml')
+      const source = await readFile(agentFile, 'utf8')
+      await writeFile(agentFile, source.replace('prefix:', 'text:'))
     }
     const sentinel = join(root, 'sessions', 'existing-history.txt')
     await mkdir(join(root, 'sessions'), { recursive: true })
@@ -53,7 +54,15 @@ test('upgraded custom presets mount and create sessions through the official run
       const created = await rpc('session/create', { request: { workspaceId: workspace.workspaceId, agentPreset: id } })
       assert.equal(typeof created.sessionId, 'string')
       const synced = await readFile(join(root, '.agent-presets', id, 'agent.cordis.yml'), 'utf8')
-      assert.match(synced, /prefix: You are a helpful software engineer assistant\./u)
+      if (id === 'liangshen') {
+        assert.match(synced, /^- id: tool-catalog$/mu, 'upstream 0.3.23 preset must replace the old tool bootstrap')
+        assert.match(synced, /^- id: minimal-prompt$/mu)
+        assert.doesNotMatch(synced, /^- id: tool-bootstrap$/mu)
+        await assert.rejects(readFile(join(root, '.agent-presets', id, 'tool-bootstrap.mjs')), { code: 'ENOENT' })
+        assert.ok((await readFile(join(root, '.agent-presets', id, 'tool-catalog.mjs'))).length > 100)
+      } else {
+        assert.match(synced, /prefix: You are a helpful software engineer assistant\./u)
+      }
       console.log(`PASS official runtime ${id}: legacy preset refreshed, session created`)
     }
     assert.equal(await readFile(sentinel, 'utf8'), 'existing-history-must-not-change')

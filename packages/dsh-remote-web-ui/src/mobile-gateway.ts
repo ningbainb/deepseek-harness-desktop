@@ -209,10 +209,10 @@ async function* controlFrames(
   for await (const value of stream) {
     const frame = value as SessionControlFrame
     if (frame.type === 'baseline') {
-      const queue = frame.value.queues[sessionId as keyof typeof frame.value.queues]
       const jobs = frame.value.jobs[sessionId as keyof typeof frame.value.jobs]
       const projections = frame.value.projections[sessionId as keyof typeof frame.value.projections]
-      if (queue !== undefined) yield { type: 'session/queue', sessionId, items: queue }
+      // 0.1.6 removed queue data from the Host-wide control stream. Pending
+      // occurrences are owned by session.follow; never invent an empty queue.
       if (jobs !== undefined) yield { type: 'session/jobs', sessionId, jobs }
       if (projections !== undefined) {
         for (const projection of projectionFrames(sessionId, projections)) yield projection
@@ -220,8 +220,7 @@ async function* controlFrames(
       continue
     }
     if (String(frame.sessionId) !== sessionId) continue
-    if (frame.type === 'queue') yield { type: 'session/queue', sessionId, items: frame.items }
-    else if (frame.type === 'jobs') yield { type: 'session/jobs', sessionId, jobs: frame.jobs }
+    if (frame.type === 'jobs') yield { type: 'session/jobs', sessionId, jobs: frame.jobs }
     else yield { type: 'session/projection', sessionId, key: frame.key, value: frame.value, seq: frame.seq }
   }
 }

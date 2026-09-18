@@ -11,7 +11,8 @@ export function followBalanceSelection(controller: BalanceController, sessions: 
   let attempts = 0
   const sync = () => {
     if (disposed) return
-    const id = sessions.list.getSnapshot().current
+    const id = Object.values(sessions.list.getSnapshot().byId)
+      .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
     if (id === current && (!id || unsubscribeModel)) return
     if (id !== current) { attempts = 0; clearTimeout(retry) }
     current = id

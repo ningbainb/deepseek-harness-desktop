@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   COMMUNITY_MARKET_URL,
+  DSHMARKET_CATALOG_BRIDGE,
   createCommunityMarketService,
 } from '../src/extensions/community-market.mjs'
 
@@ -89,6 +90,12 @@ test('community market projects bounded catalog data and derives install sources
   assert.equal(requests[0][0], COMMUNITY_MARKET_URL)
   assert.equal(result.updated, '2026-08-21')
   assert.equal(result.count, 4)
+  assert.deepEqual(result.bridge, DSHMARKET_CATALOG_BRIDGE)
+  assert.deepEqual(result.bridge, {
+    provider: 'dshmarket',
+    catalog: 'awesome-dsh-plugin',
+    installation: 'desktop-managed',
+  })
   assert.deepEqual(result.categories, [
     { id: 'tools', label: { zh: '工具', en: 'Tools' } },
     { id: 'ui', label: { zh: '界面', en: 'Interface' } },

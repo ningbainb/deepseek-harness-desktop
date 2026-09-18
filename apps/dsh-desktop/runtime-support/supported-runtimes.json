@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.1.6-alpha.1",
+      "upstreamVersion": "0.1.6-alpha.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=4.1.0",
+      "desktopRange": "=4.2.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,23 +55,23 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-09-16",
+      "verifiedAt": "2026-09-18",
       "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
       "knownIssues": [],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.1.6-alpha.1",
-          "integrity": "sha512-i6rIfIF2FEAINJY9TnihdFFuE1CfD/Htjcb7sqpYWujLrfkxwsFp8shyvAUz+Aj2yU28N0zd/HSxMaOnbRhoBw==",
+          "version": "0.1.6-alpha.2",
+          "integrity": "sha512-PHR/3ZHpJNWXlDQ3U9weFb7calWbSMJd2GD3z2iPJ8zAKL7ipuzyPy5xGbaXf2OA8hc0SAGJeoUW7nfatCNOYw==",
           "files": {
-            "package.json": "cdc05ff6850d395e74d76c7e76e64cecd5d5b7f0fb349c54f14680438ba05348",
-            "lib/bin.js": "cd47a5e19d82b3114c68ace4aeb7f8378e659a248bb7c5cfff25509f14c1c72c"
+            "package.json": "a969831d0bbe6db453932f47defc4ced801cc74361c7540c3c98e5383e5f4d1b",
+            "lib/bin.js": "69c49c871735dc7ee81ec51f266bbec129f075fd5066e046374f4b13ab02a705"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "7061aca8a536f348a322ea4e68319fd6e2c6b6c9285e55a9fc2804c19375f329"
+          "sha256": "e11afe738361389454666d00f8a3a3bd8ab3ec2ff1d4002696fb54a299fc8c29"
         },
         "slots": [
           "conversation.composer.dock",

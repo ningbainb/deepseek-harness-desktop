@@ -163,7 +163,7 @@ export function ModelSelect(props: ModelSelectProps) {
     lastActionRef.current = 'select'
     try {
       const accepted = await select(selection)
-      if (!accepted) throw new Error(t('error.select'))
+      if (accepted === undefined || !accepted.ok) throw new Error(t('error.select'))
       refreshBridgeRef.current?.announce()
       close()
       triggerRef.current?.focus()

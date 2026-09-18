@@ -463,6 +463,35 @@ async function restoreRequiredPackagedPeers(nodeModulesRoot) {
     await cp(source, target, { recursive: true, force: false, errorOnExist: true })
     restored.push(packageName)
   }
+
+  // electron-builder can omit ssh2 even when the Desktop manifest pins it.
+  // Restore its production dependency closure from the exact installed pnpm
+  // snapshot; copying ssh2 alone would leave password and key authentication
+  // broken in an installed app outside the source worktree.
+  const visited = new Set()
+  async function restoreSshDependency(packageName, resolveFrom) {
+    if (visited.has(packageName)) return
+    visited.add(packageName)
+    const manifestPath = require.resolve(`${packageName}/package.json`, {
+      paths: [resolveFrom],
+    })
+    const source = dirname(manifestPath)
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    if (manifest.name !== packageName) throw new Error(`SSH dependency name mismatch: ${packageName}`)
+    const target = join(nodeModulesRoot, ...packageName.split('/'))
+    try {
+      await stat(target)
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+      await mkdir(dirname(target), { recursive: true })
+      await cp(source, target, { recursive: true, force: false, errorOnExist: true })
+      restored.push(packageName)
+    }
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      await restoreSshDependency(dependency, source)
+    }
+  }
+  await restoreSshDependency('ssh2', __dirname)
   return restored
 }
 
@@ -484,7 +513,7 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
     try {
       resolutionAnchor = require.resolve(resolveFrom)
     } catch (error) {
-      if (error?.code !== 'MODULE_NOT_FOUND') throw error
+      if (error?.code !== 'MODULE_NOT_FOUND' && error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error
       resolutionAnchor = require.resolve(`${resolveFrom}/package.json`)
     }
     const source = Array.isArray(sourceFromEntry)

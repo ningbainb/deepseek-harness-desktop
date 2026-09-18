@@ -12,7 +12,6 @@ import {
   loadOptionalPatches,
   loadOverlayPatches,
   loadProfileDirectory,
-  watchUserPatches,
 } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
@@ -25,6 +24,7 @@ import {
   RUNTIME_PIPE_TOKEN_ENV,
 } from './runtime-pipe.mjs'
 import { mergeDesktopPipeCookies } from './runtime-cookie.mjs'
+import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { consumeRuntimeShutdownControl, listenRuntimeShutdownControl } from './runtime-shutdown-control.mjs'
 import { createRuntimeEventStreamDrain } from './runtime-stream-drain.mjs'
 import { createRuntimeStartupTiming } from './runtime-startup-timing.mjs'
@@ -98,11 +98,15 @@ function createDesktopPipeFetch(ctx) {
     headers.set('cookie', mergeDesktopPipeCookies(browserCookie, sourceCookie))
     const request = new Request(sourceRequest, { headers })
     const url = new URL(request.url)
+    const localPath = desktopLocalPath(url.pathname)
+    const redirected = localPath !== url.pathname
+    if (redirected) url.pathname = localPath
+    const localRequest = redirected ? new Request(url, request) : request
     const route = ctx.webServer.match(url.pathname)
-    if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(request)
-    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return api.fetch(request)
-    if (url.pathname === '/plugins' || url.pathname.startsWith('/plugins/')) return ctx.clientModules.fetchBundle(request)
-    if (route !== undefined) return ctx.webServer.fetch(request)
+    if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(localRequest)
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return api.fetch(localRequest)
+    if (url.pathname === '/plugins' || url.pathname.startsWith('/plugins/')) return ctx.clientModules.fetchBundle(localRequest)
+    if (route !== undefined) return ctx.webServer.fetch(localRequest)
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('method not allowed', { status: 405 })
 
     const requested = url.pathname === '/' ? indexPath : safeFrontendPath(dist, url.pathname)
@@ -277,8 +281,23 @@ async function run() {
   })
 
   const ready = createReadySignal()
+  // The official 0.1.6 Plugin Manager and HMR services consume this launch
+  // snapshot. Their profile watcher owns live patch reconciliation; the old
+  // watchUserPatches export was removed from app-boot.
+  const profileContext = {
+    name: invocation.profile,
+    dir: profile.dir,
+    patchPath: profile.patchPath,
+    installAnchor,
+    startedBundles: profile.layers.map(layer => layer.packageName),
+    cwd: process.cwd(),
+    home: dshHome,
+    overlays: overlayPatches,
+    telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
+  }
   ctx = await boot(NAME, rootConfig, allPatches, hostCtx => {
     ctx = hostCtx
+    hostCtx.provide('profileContext', profileContext)
     hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     provideCmdline(hostCtx, {
       args: invocation.args,
@@ -312,21 +331,6 @@ async function run() {
     onStopped: () => process.exit(process.exitCode ?? 0),
   })
 
-  if (profile.patchReload === 'live' && ctx.fiber.state === 2 && ctx.get('loader') !== undefined) {
-    if (ctx.get('hmr') === undefined) {
-      if (ctx.get('timer') === undefined) await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-timer' })
-      await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-hmr', config: { root: [] } })
-    }
-    const composeLive = () => [
-      ...bundlePatches,
-      ...(loadOptionalPatches(NAME, profile.patchPath) ?? []),
-      ...(loadOptionalPatches(NAME, homePatchPath) ?? []),
-      ...overlayPatches,
-      ...telemetryPatch([bundlePatches, profile.patches, homePatches, overlayPatches]),
-    ]
-    await watchUserPatches(ctx, { binName: NAME, filename: profile.patchPath, compose: composeLive })
-    await watchUserPatches(ctx, { binName: NAME, filename: homePatchPath, compose: composeLive })
-  }
   if (!shuttingDown && ctx.fiber.state === 2 && ctx.get('loader') !== undefined) {
     markStartup('ready')
     ready.commit()

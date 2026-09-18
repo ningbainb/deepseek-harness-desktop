@@ -52,14 +52,14 @@ test('repeated official Windows Job children create no visible console under Ele
   assert.equal(new Set(probes.map(probe => probe.console)).size, 1, 'children must reuse one hidden console')
 })
 
-test('console observer detects the unadapted Electron runner positive control', { skip: process.platform !== 'win32', timeout: 60_000 }, async () => {
+test('console observer detects a deliberately unhidden Electron child positive control', { skip: process.platform !== 'win32', timeout: 60_000 }, async () => {
   const observer = await startWindowsConsoleObserver()
   let child
   let observation
   try {
-    // Positive control reproduces the real pre-fix chain without the Desktop
-    // preload. It intentionally creates short-lived consoles in isolation.
-    child = spawnSync(require('electron'), [fileURLToPath(new URL('./fixtures/windows-background-runner.mjs', import.meta.url))], {
+    // The official runner may now hide consoles itself; a raw unhidden child
+    // still tests that this observer can detect a real visible console.
+    child = spawnSync(require('electron'), [fileURLToPath(new URL('./fixtures/windows-background-runner.mjs', import.meta.url)), '--positive-control'], {
       cwd: fileURLToPath(new URL('..', import.meta.url)),
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       windowsHide: true, timeout: 50_000, encoding: 'utf8',

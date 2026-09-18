@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { openDockSetting } from './dock-settings-fixture.mjs'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
@@ -51,7 +52,7 @@ async function launch(scaleFactor) {
   const instance = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args,
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -85,24 +86,19 @@ async function launch(scaleFactor) {
   return { instance, page, rendererErrors, rendererConsole }
 }
 
-async function openSkinCenter(page) {
-  await page.getByRole('button', { name: /设置|Settings/iu }).first().click({ force: true })
-  const dialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
+async function openSkinCenter(app, page) {
+  const { dock, settings } = await openDockSetting(app, page, 'appearance')
+  const dialog = settings.locator('[data-dsh-dock-settings="appearance"] > section:not([hidden])')
   await dialog.waitFor({ state: 'visible', timeout: 30_000 })
-
-  const pluginsTab = dialog.getByRole('button', { name: /^(?:插件|Plugins)$/u })
-  if (await pluginsTab.isVisible().catch(() => false)) await pluginsTab.click()
-  const webUiGroup = dialog.getByRole('button', { name: /Web UI (?:插件|Plugins)/iu })
-  if (await webUiGroup.isVisible().catch(() => false)) await webUiGroup.click()
-
-  const header = dialog.getByRole('button', { name: /皮肤中心|Skin Center/iu })
-  await header.waitFor({ state: 'visible', timeout: 30_000 })
-  await header.scrollIntoViewIfNeeded()
-  if (await header.getAttribute('aria-expanded') !== 'true') await header.click()
+  const wallpaperSwitch = dialog.getByRole('switch', { name: /壁纸|Wallpaper/iu }).first()
+  if (await wallpaperSwitch.getAttribute('aria-checked') === 'true') {
+    await wallpaperSwitch.click()
+    await settings.waitForFunction(() => !document.body.hasAttribute('data-dsh-wallpaper-active'))
+  }
   const title = dialog.getByText('Blue Fantasy', { exact: true })
   await title.waitFor({ state: 'visible', timeout: 30_000 })
   await title.scrollIntoViewIfNeeded()
-  return { dialog, header, card: title.locator('xpath=../..') }
+  return { dock, settings, dialog, card: title.locator('xpath=../..') }
 }
 
 async function skinState(page) {
@@ -132,27 +128,15 @@ async function assertCssVariableRemains(page, property, expected, quietMs = 500)
 }
 
 async function visualState(page, dialog) {
-  return page.evaluate((dialogElement) => {
+  const main = await page.evaluate(() => {
     const root = document.querySelector('#root')
-    if (!(root instanceof HTMLElement) || !(dialogElement instanceof HTMLElement)) {
-      throw new Error('root or settings dialog is unavailable')
-    }
+    if (!(root instanceof HTMLElement)) throw new Error('conversation root is unavailable')
     const conversation = document.querySelector('[data-pane="conversation"]')
-    const content = dialogElement.querySelector(':scope > nav + div')
-    if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')
-    const dialogBox = dialogElement.getBoundingClientRect()
-    const coveringAncestors = []
-    for (let element = dialogElement.parentElement; element !== null; element = element.parentElement) {
-      const style = getComputedStyle(element)
-      coveringAncestors.push({
-        tag: element.tagName,
-        id: element.id,
-        backdropFilter: style.backdropFilter,
-        webkitBackdropFilter: style.webkitBackdropFilter,
-      })
-    }
     return {
       activeSkin: document.documentElement.getAttribute('data-dsh-skin'),
+      wallpaperActive: document.body.dataset.dshWallpaperActive === 'true',
+      mainBackdropActive: document.body.dataset.dshBackdropActive === 'true',
+      mainArtworkSrc: document.querySelector('[data-dsh-skin-layer="background"] img')?.getAttribute('src') ?? '',
       backgroundImage: getComputedStyle(document.body).backgroundImage,
       bodyInlineBackgroundImage: document.body.style.getPropertyValue('background-image'),
       brand: getComputedStyle(root).getPropertyValue('--dsw-alias-brand-primary').trim(),
@@ -161,15 +145,8 @@ async function visualState(page, dialog) {
         ? getComputedStyle(conversation).getPropertyValue('--dsw-alias-brand-primary').trim()
         : '',
       devicePixelRatio: window.devicePixelRatio,
-      dialog: {
-        left: dialogBox.left,
-        top: dialogBox.top,
-        right: dialogBox.right,
-        bottom: dialogBox.bottom,
-      },
       viewport: { width: innerWidth, height: innerHeight },
       rootOverflow: { clientWidth: root.clientWidth, scrollWidth: root.scrollWidth },
-      contentOverflow: { clientWidth: content.clientWidth, scrollWidth: content.scrollWidth },
       scrim: document.body.style.getPropertyValue('--dsw-skin-scrim').trim(),
       activeMedia: document.body.style.getPropertyValue('--dsh-skin-scrim').trim(),
       stylesheetCount: [...document.querySelectorAll('link[rel="stylesheet"]')]
@@ -186,29 +163,61 @@ async function visualState(page, dialog) {
           ? [{ id: element.id, className: element.className, backdrop, inlineStyle: element.getAttribute('style') }]
           : []
       }),
+    }
+  })
+  const panel = await dialog.evaluate(dialogElement => {
+    const pageElement = document.querySelector('[data-dsh-dock-settings]')
+    if (!(pageElement instanceof HTMLElement)) throw new Error('Dock settings page is unavailable')
+    const bounds = pageElement.getBoundingClientRect()
+    const coveringAncestors = []
+    for (let element = dialogElement.parentElement; element !== null; element = element.parentElement) {
+      const style = getComputedStyle(element)
+      coveringAncestors.push({
+        tag: element.tagName,
+        id: element.id,
+        backdropFilter: style.backdropFilter,
+        webkitBackdropFilter: style.webkitBackdropFilter,
+      })
+    }
+    const root = document.querySelector('#root')
+    return {
+      dialog: { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom },
+      dialogViewport: { width: innerWidth, height: innerHeight },
+      contentOverflow: { clientWidth: pageElement.clientWidth, scrollWidth: pageElement.scrollWidth },
+      previewSkin: document.documentElement.getAttribute('data-dsh-skin'),
+      previewBrand: root instanceof HTMLElement
+        ? getComputedStyle(root).getPropertyValue('--dsw-alias-brand-primary').trim()
+        : '',
+      previewBackgroundImage: getComputedStyle(document.body).backgroundImage,
+      previewBackdropActive: document.body.dataset.dshBackdropActive === 'true',
+      previewArtworkSrc: document.querySelector('[data-dsh-skin-layer="background"] img')?.getAttribute('src') ?? '',
+      previewStylesheetCount: [...document.querySelectorAll('link[rel="stylesheet"]')]
+        .filter(link => link.href.includes('/api/skin-center/v2/skins/blue-fantasy/stylesheet')).length,
       blurInputs: [...dialogElement.querySelectorAll('input[id^="skin-center-background-blur"]')]
         .map(element => ({ id: element.id, value: element.value })),
       coveringAncestors,
     }
-  }, await dialog.elementHandle())
+  })
+  return { ...main, ...panel }
 }
 
 function assertGeometry(state) {
   const tolerance = 2
   assert.ok(state.dialog.left >= -tolerance, JSON.stringify(state))
   assert.ok(state.dialog.top >= -tolerance, JSON.stringify(state))
-  assert.ok(state.dialog.right <= state.viewport.width + tolerance, JSON.stringify(state))
-  assert.ok(state.dialog.bottom <= state.viewport.height + tolerance, JSON.stringify(state))
+  assert.ok(state.dialog.right <= state.dialogViewport.width + tolerance, JSON.stringify(state))
+  assert.ok(state.dialog.bottom <= state.dialogViewport.height + tolerance, JSON.stringify(state))
   assert.ok(state.rootOverflow.scrollWidth <= state.rootOverflow.clientWidth + tolerance, JSON.stringify(state))
   assert.ok(state.contentOverflow.scrollWidth <= state.contentOverflow.clientWidth + tolerance, JSON.stringify(state))
 }
 
 function assertBlueFantasy(state) {
   assert.equal(state.activeSkin, 'blue-fantasy', JSON.stringify(state))
-  assert.match(state.backgroundImage, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
-  assert.match(state.bodyInlineBackgroundImage, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
+  assert.equal(state.mainBackdropActive, true, JSON.stringify(state))
+  assert.match(state.mainArtworkSrc, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
+  assert.equal(state.backgroundImage, 'none', 'skin artwork lives in its own decoration layer')
+  assert.equal(state.bodyInlineBackgroundImage, 'none')
   assert.equal(state.scrim, '0')
-  assert.equal(state.activeMedia, '1')
   assert.ok(state.stylesheetCount >= 1, JSON.stringify(state))
   assert.equal(state.blurLayerCount, 0, JSON.stringify(state))
   for (const ancestor of state.coveringAncestors) {
@@ -220,17 +229,17 @@ function assertBlueFantasy(state) {
 try {
   const first = await launch(1)
   activeApp = first.instance
-  const firstCenter = await openSkinCenter(first.page)
+  const firstCenter = await openSkinCenter(activeApp, first.page)
   const official = await visualState(first.page, firstCenter.dialog)
   assert.equal(official.activeSkin, null)
 
   const tryOn = firstCenter.card.getByRole('button', { name: /^(?:试穿|Try on)$/iu })
   await tryOn.click()
   try {
-    await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
+    await firstCenter.settings.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
   } catch (error) {
     console.error(`skin card after failed try-on:\n${await firstCenter.card.innerText().catch(() => '(unavailable)')}`)
-    console.error(`skin DOM after failed try-on:\n${JSON.stringify(await first.page.evaluate(() => ({
+    console.error(`skin DOM after failed try-on:\n${JSON.stringify(await firstCenter.settings.evaluate(() => ({
       bodyAttributes: [...document.body.attributes].map(attribute => [attribute.name, attribute.value]),
       pluginStyles: [...document.querySelectorAll('style[data-plugin]')]
         .map(element => ({
@@ -245,39 +254,45 @@ try {
     throw error
   }
   const tried = await visualState(first.page, firstCenter.dialog)
-  assertBlueFantasy(tried)
+  assert.equal(tried.previewSkin, 'blue-fantasy', JSON.stringify(tried))
+  assert.equal(tried.previewBackdropActive, true, JSON.stringify(tried))
+  assert.match(tried.previewArtworkSrc, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
+  assert.equal(tried.previewBackgroundImage, 'none', 'preview artwork lives in its own decoration layer')
+  assert.ok(tried.previewStylesheetCount >= 1, JSON.stringify(tried))
+  assert.equal(tried.activeSkin, null, 'try-on must remain isolated from the live conversation')
   assert.equal(tried.conversationFound, true, JSON.stringify(tried))
-  assert.notEqual(tried.brand.toLowerCase(), official.brand.toLowerCase())
-  assert.notEqual(tried.conversationBrand.toLowerCase(), official.conversationBrand.toLowerCase())
+  assert.notEqual(tried.previewBrand.toLowerCase(), official.previewBrand.toLowerCase())
+  assert.equal(tried.conversationBrand.toLowerCase(), official.conversationBrand.toLowerCase())
   assertGeometry(tried)
 
   const backgroundRange = firstCenter.dialog.locator('#skin-center-background-opacity')
   await backgroundRange.fill('80')
-  await assertCssVariableRemains(first.page, '--dsw-skin-scrim', '0.8')
-  await waitForBackgroundSettings(first.page, { backgroundOpacity: 80 })
+  await assertCssVariableRemains(firstCenter.settings, '--dsw-skin-scrim', '0.8')
+  await waitForBackgroundSettings(firstCenter.settings, { backgroundOpacity: 80 })
   await backgroundRange.fill('0')
-  await waitForBackgroundSettings(first.page, { backgroundOpacity: 0 })
-  await assertCssVariableRemains(first.page, '--dsw-skin-scrim', '0', 1_000)
+  await waitForBackgroundSettings(firstCenter.settings, { backgroundOpacity: 0 })
+  await assertCssVariableRemains(firstCenter.settings, '--dsw-skin-scrim', '0', 1_000)
   const blurEmptyRange = firstCenter.dialog.locator('#skin-center-background-blur-empty')
   const blurContentRange = firstCenter.dialog.locator('#skin-center-background-blur-content')
   await blurEmptyRange.fill('8')
-  await first.page.waitForFunction(() => [...document.body.children].some(element => {
+  await firstCenter.settings.waitForFunction(() => [...document.body.children].some(element => {
     const style = getComputedStyle(element)
     const backdrop = style.backdropFilter || style.webkitBackdropFilter
     return style.position === 'fixed' && style.zIndex === '-1' && backdrop.includes('blur(8px)')
   }))
-  await waitForBackgroundSettings(first.page, { backgroundBlurEmpty: 8 })
+  await waitForBackgroundSettings(firstCenter.settings, { backgroundBlurEmpty: 8 })
   await blurEmptyRange.fill('0')
   await blurContentRange.fill('0')
-  await waitForBackgroundSettings(first.page, { backgroundBlurEmpty: 0, backgroundBlurContent: 0 })
-  await first.page.waitForFunction(() => ![...document.body.children].some(element => {
+  await waitForBackgroundSettings(firstCenter.settings, { backgroundBlurEmpty: 0, backgroundBlurContent: 0 })
+  await firstCenter.settings.waitForFunction(() => ![...document.body.children].some(element => {
     const style = getComputedStyle(element)
     const backdrop = style.backdropFilter || style.webkitBackdropFilter
     return style.position === 'fixed' && style.zIndex === '-1' && backdrop !== '' && backdrop !== 'none'
   }))
-  assertBlueFantasy(await visualState(first.page, firstCenter.dialog))
+  assert.equal((await visualState(first.page, firstCenter.dialog)).previewSkin, 'blue-fantasy')
 
   await firstCenter.card.getByRole('button', { name: /^(?:退出试穿|Exit try-on)$/iu }).click()
+  await firstCenter.settings.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === null)
   await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === null)
   await first.page.waitForFunction(async () => {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
@@ -286,7 +301,9 @@ try {
   })
   const restored = await visualState(first.page, firstCenter.dialog)
   assert.equal(restored.activeSkin, null)
+  assert.equal(restored.previewSkin, null)
   assert.equal(restored.stylesheetCount, 0)
+  assert.equal(restored.previewStylesheetCount, 0)
 
   await firstCenter.card.getByRole('button', { name: /^(?:应用|Apply)$/iu }).click()
   await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
@@ -317,7 +334,7 @@ try {
     assert.equal(state.payload?.ok, true, JSON.stringify(state))
     assert.equal(state.payload?.active, 'blue-fantasy', JSON.stringify(state))
     await current.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
-    const center = await openSkinCenter(current.page)
+    const center = await openSkinCenter(activeApp, current.page)
     const visual = await visualState(current.page, center.dialog)
     assertBlueFantasy(visual)
     assertGeometry(visual)
@@ -350,5 +367,5 @@ try {
   }, null, 2))
 } finally {
   await activeApp?.close()
-  await rm(temporary, { recursive: true, force: true })
+  await rm(temporary, { recursive: true, force: true, maxRetries: 20, retryDelay: 300 })
 }

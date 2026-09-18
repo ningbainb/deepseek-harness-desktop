@@ -42,6 +42,16 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
+### 4.2.0 升级候选：与新版 Harness 更稳地协作
+
+本分支的 Desktop 版本号为 4.2.0，精确锁定官方 DSH `0.1.6-alpha.2`，并基于 dsh-web `alpha` 的 0.3.23 源码快照同步 Web 能力。公开下载仍以 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 实际发布资产为准；源码版本号不代表三端安装包已经发布。
+
+- **会话与工作区**：适配新版多实例 Session 和官方 `uiWorkspace` 导航，修复长历史恢复、模式切换以及跨窗口设置读取在新 Web 通道下的路径问题。
+- **插件兼容**：上游组件按固定源码提交和哈希装入；Task Board、Git Graph 与桌宠暂留完整的桌面端客户端/Host 配对，保住 Worktree、证据、旧设置与插件禁用状态，不把两代接口混装。
+- **升级保护**：4.1.x 用户的桌面 Profile 修改前建立版本化备份和指纹；异常启动可回滚。会话日志、工作区文件与第三方插件内容不由此次迁移改写。
+
+[4.2 上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [4.2 发布说明](docs/launch/release-notes.md)
+
 ### 4.1.0：让 DeepSeek 操作浏览器和电脑
 
 当前公开稳定版为 4.1.0。Windows x64 为正式版，macOS arm64 与 Linux x64 为 Preview；三端全部通过后才会进入同一个 GitHub Release。

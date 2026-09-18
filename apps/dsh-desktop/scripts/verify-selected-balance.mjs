@@ -46,7 +46,7 @@ try {
   await useChineseFixtureLocale(app)
   const page = await app.firstWindow()
   const errors = []
-  page.on('pageerror', error => errors.push(error.message))
+  page.on('pageerror', error => errors.push((error.stack ?? error.message).slice(0, 2_000)))
   page.on('console', message => consoleMessages.push(`${message.type()}: ${message.text()}`))
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
   for (let index = 0; index < 12; index++) {
@@ -63,7 +63,7 @@ try {
     const response = await fetch('/api/live-stats/balance?' + new URLSearchParams({ ...selection, force: '1' }))
     return response.json()
   }, selection)
-  assert.equal((await query({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })).totalBalance, '11.25')
+  assert.equal((await query({ provider: 'deepseek-official', model: 'deepseek-flash' })).totalBalance, '11.25')
   assert.equal((await query({ provider: 'balance-relay', model: 'balance-test-model' })).totalBalance, '7.5')
   await app.evaluate(({ dialog }, directory) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] })
@@ -74,7 +74,7 @@ try {
   await picker.getByRole('textbox').fill('Balance fixture')
   await picker.getByRole('button', { name: /^(创建项目|打开已有项目)$/u }).click()
   await picker.waitFor({ state: 'hidden' })
-  // The rc.2 shell keeps the root Hero sessionless. Use the official
+  // The alpha.2 shell keeps the root Hero sessionless. Use the official
   // workspace-specific New Session action so the composer gets a live,
   // session-scoped model seat without sending a paid prompt.
   const group = page.getByRole('treeitem').filter({ hasText: 'Balance fixture' }).first()
@@ -91,12 +91,12 @@ try {
     await menu.getByRole('menuitemradio', { name }).first().click()
     await menu.waitFor({ state: 'hidden' })
   }
-  await chooseModel(/DeepSeek-V4-Flash/u)
+  await chooseModel(/DeepSeek-V41-Flash/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '11.25 CNY')
   await chooseModel(/Balance Test Model/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '7.5 USD')
   assert.match(await page.locator('[data-dsh-balance-entry]').getAttribute('title'), /balance-relay/u)
-  await chooseModel(/DeepSeek-V4-Flash/u)
+  await chooseModel(/DeepSeek-V41-Flash/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '11.25 CNY')
   assert.ok(requests.length > 0)
   assert.ok(requests.every(request => request.authorized && request.method === 'GET' && !/completions|responses/.test(request.path)))
@@ -108,6 +108,15 @@ try {
     amount: document.querySelector('[data-dsh-balance-amount]')?.textContent,
     title: document.querySelector('[data-dsh-balance-entry]')?.getAttribute('title'),
     model: document.querySelector('[data-slot="conversation.input.model"]')?.textContent,
+    modelMenus: [...document.querySelectorAll('[role="menu"]')].map(node => ({
+      label: node.getAttribute('aria-label'),
+      visible: Boolean(node.getClientRects().length),
+      radios: JSON.stringify([...node.querySelectorAll('[role="menuitemradio"]')].map(item => ({
+        text: item.textContent?.trim(),
+        visible: Boolean(item.getClientRects().length),
+        disabled: item.hasAttribute('disabled'),
+      })).slice(0, 15)),
+    })),
     slots: [...document.querySelectorAll('[data-slot]')].map(node => node.getAttribute('data-slot')).filter(Boolean),
     treeitems: [...document.querySelectorAll('[role="treeitem"]')].map(node => ({ text: node.textContent?.trim(), selected: node.getAttribute('aria-selected'), expanded: node.getAttribute('aria-expanded') })),
     buttons: [...document.querySelectorAll('button')].slice(-24).map(node => node.textContent?.trim()).filter(Boolean),

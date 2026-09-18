@@ -124,7 +124,7 @@ export function ModelSelect(props) {
         lastActionRef.current = 'select';
         try {
             const accepted = await select(selection);
-            if (!accepted)
+            if (accepted === undefined || !accepted.ok)
                 throw new Error(t('error.select'));
             refreshBridgeRef.current?.announce();
             close();

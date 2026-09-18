@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { performance } from 'node:perf_hooks'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { terminateChildProcessTree } from '../src/runtime-controller.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
@@ -53,6 +53,7 @@ export async function runPackagedDesktop({
     if (seedPrimaryRuntimePermission) await seedPrimaryRuntimePermissionForTest({ userData })
     const startedAt = performance.now()
     child = spawn(appPath, forceRendererAccessibility ? ['--force-renderer-accessibility'] : [], {
+      cwd: dirname(appPath),
       env: {
         ...process.env,
         DSH_DESKTOP_USER_DATA: userData,

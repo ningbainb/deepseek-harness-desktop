@@ -399,10 +399,15 @@ export function normalizeDesktopDockOpenOptions(value) {
     throw new TypeError('invalid Extension Dock navigation options')
   }
   const keys = Object.keys(value)
-  if (keys.some(key => key !== 'setting') || (value.setting !== undefined && !['control-center', 'value-mode'].includes(value.setting))) {
-    throw new TypeError('invalid Extension Dock setting')
+  if (
+    keys.some(key => key !== 'setting' && key !== 'tab')
+    || (value.setting !== undefined && !['control-center', 'value-mode'].includes(value.setting))
+    || (value.tab !== undefined && !['plugins', 'market'].includes(value.tab))
+    || (value.setting !== undefined && value.tab !== undefined)
+  ) {
+    throw new TypeError('invalid Extension Dock navigation target')
   }
-  return Object.freeze(value.setting === undefined ? {} : { setting: value.setting })
+  return Object.freeze(value.setting !== undefined ? { setting: value.setting } : value.tab !== undefined ? { tab: value.tab } : {})
 }
 
 /** Narrow clone-safe projection of the optional Desktop-owned LAN listener. */

@@ -1229,7 +1229,10 @@ export class PluginManager {
         pluginIds: [name],
       })
       try {
-        await this.#runPnpm(['remove', name, '--offline'], staged.stageDir)
+        // pnpm 11 no longer accepts --offline on `remove`. Removal only edits
+        // the staged profile and never needs to resolve a package from the
+        // registry, so omitting it preserves the transactional rollback path.
+        await this.#runPnpm(['remove', name], staged.stageDir)
         // Removing the last community package may make pnpm omit the physical
         // directory. Activation still swaps one complete dependency root.
         await mkdir(join(staged.stageDir, 'node_modules'), { recursive: true })

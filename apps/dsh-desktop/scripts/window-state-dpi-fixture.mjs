@@ -32,6 +32,16 @@ async function main() {
   if (action === 'maximize') window.maximize()
   if (action === 'restore') window.unmaximize()
   if (action === 'resize') window.setBounds({ x: 100, y: 90, width: 1100, height: 740 })
+  // On a busy Windows desktop, native maximize state can settle after the
+  // unmaximize call returns. Wait for the requested state, not an arbitrary
+  // fixed delay; the outer assertion still fails if it never changes.
+  if (action === 'restore' || action === 'maximize') {
+    const expectedMaximized = action === 'maximize'
+    const deadline = Date.now() + 3_000
+    while (window.isMaximized() !== expectedMaximized && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+  }
   await new Promise(resolve => setTimeout(resolve, 200))
   await save()
   const result = { source, displays: displays.map(({ bounds, workArea, scaleFactor }) => ({ bounds, workArea, scaleFactor })),

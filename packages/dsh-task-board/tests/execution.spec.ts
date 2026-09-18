@@ -113,6 +113,38 @@ function sampleTask() {
 }
 
 describe('ExecutionService.run', () => {
+  it('retains a background Session until the turn settles, then releases it', async () => {
+    const { env, drivers } = makeEnv()
+    const release = vi.fn()
+    const acquire = vi.fn((id: string) => {
+      const driver = drivers.get(id)!
+      return { binding: { session: driver, eventSource: driver.eventSource }, ready: Promise.resolve(), release }
+    })
+    env.sessions.acquire = acquire
+    const task = sampleTask()
+    const { execution } = startExecution(task, NOW, 'exec-1')
+    await new ExecutionService(env).run(task, execution, () => {})
+    expect(acquire).toHaveBeenCalledWith('s-1')
+    expect(release).not.toHaveBeenCalled()
+    drivers.get('s-1')?.setSnapshot({ running: false, turns: 1 })
+    expect(release).toHaveBeenCalledOnce()
+  })
+
+  it('releases an owned Session when its history opening fails', async () => {
+    const { env, drivers } = makeEnv()
+    const release = vi.fn()
+    env.sessions.acquire = (id: string) => {
+      const driver = drivers.get(id)!
+      return { binding: { session: driver }, ready: Promise.reject(new Error('history failed')), release }
+    }
+    const task = sampleTask()
+    const { execution } = startExecution(task, NOW, 'exec-1')
+    const events: Array<{ kind: string; outcome?: string }> = []
+    await new ExecutionService(env).run(task, execution, event => events.push(event))
+    expect(events.at(-1)).toMatchObject({ kind: 'settled', outcome: 'failed' })
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('creates a session in the recent workspace, sends the task prompt, and settles succeeded on turn completion', async () => {
     const { env, drivers, connectCalls } = makeEnv({ recentWorkspaceId: 'ws-recent' })
     const service = new ExecutionService(env)
