@@ -18,11 +18,11 @@ test('Extension Dock presents declared Desktop compatibility requirements and ru
   assert.match(source, /保留安装状态，请移除或改用后续经验证版本/u)
 })
 
-test('Extension Dock exposes only installed discover and settings as plugin top-level areas', async () => {
+test('Extension Dock exposes only installed market and settings as plugin top-level areas', async () => {
   const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
   const group = /<nav class="page-tabs" data-tab-group="plugins"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? ''
   assert.match(group, />已安装 /u)
-  assert.match(group, />发现 /u)
+  assert.match(group, />插件市场 /u)
   assert.match(group, />设置</u)
   assert.doesNotMatch(group, />内置能力 /u)
 })
