@@ -86,6 +86,25 @@ function icns(images) {
   return Buffer.concat([header, ...chunks])
 }
 
+function roundedTile(width, height, radius, color) {
+  const data = Buffer.alloc(width * height * 4)
+  const [red, green, blue] = color
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const cornerX = x < radius ? radius - x : x >= width - radius ? x - (width - radius - 1) : 0
+      const cornerY = y < radius ? radius - y : y >= height - radius ? y - (height - radius - 1) : 0
+      const inside = cornerX === 0 || cornerY === 0 || (cornerX * cornerX + cornerY * cornerY <= radius * radius)
+      if (!inside) continue
+      const offset = (y * width + x) * 4
+      data[offset] = red
+      data[offset + 1] = green
+      data[offset + 2] = blue
+      data[offset + 3] = 255
+    }
+  }
+  return { input: data, raw: { width, height, channels: 4 } }
+}
+
 async function preview(imagesBySize) {
   const width = 720
   const height = 240
@@ -99,7 +118,7 @@ async function preview(imagesBySize) {
       const tileWidth = 96
       const tileHeight = 96
       panels.push({
-        input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${tileWidth}" height="${tileHeight}"><rect width="100%" height="100%" rx="8" fill="${row === 0 ? '#ffffff' : '#07152f'}"/></svg>`),
+        ...roundedTile(tileWidth, tileHeight, 8, row === 0 ? [255, 255, 255] : [7, 21, 47]),
         left: x,
         top: y,
       })
