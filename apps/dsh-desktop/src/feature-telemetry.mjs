@@ -1,6 +1,8 @@
 const POLICIES = Object.freeze({
   project: { outcomes: ['started', 'succeeded', 'failed'], details: ['create', 'connect'] },
   attachment: { outcomes: ['started', 'succeeded', 'failed', 'cancelled'], details: ['file'] },
+  'bai-connect': { outcomes: ['viewed', 'started', 'succeeded', 'failed', 'continued'], details: ['entry', 'browser', 'manual', 'model-picker'] },
+  'chatgpt-login': { outcomes: ['viewed', 'started', 'succeeded', 'failed', 'continued'], details: ['entry', 'browser', 'device-code', 'model-picker'] },
   skill: { outcomes: ['opened', 'succeeded', 'failed'], details: ['conversation-menu', 'conversation-insert'] },
   'dock-setting': { outcomes: ['opened', 'failed'], details: ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'] },
   'agent-team': { outcomes: ['succeeded', 'failed'], details: ['enable', 'disable'] },

@@ -539,6 +539,7 @@ export function registerDesktopIpc({
     'desktop:update-channel-get',
     'desktop:update-channel-set',
     'desktop:update-check',
+    'desktop:update-dismiss',
     'desktop:update-install',
     'desktop:plugin-install-request',
     'desktop:settings-window-bounds-get',
@@ -664,6 +665,7 @@ export function registerDesktopIpc({
     try { onUpdateCheck() } catch (error) { logDiagnostic('ipc', 'update-check', error) }
     return getUpdateController?.()?.check?.({ manual: true })
   })
+  handle('desktop:update-dismiss', main, () => getUpdateController?.()?.dismiss?.() === true)
   handle('desktop:update-install', main, () => getUpdateController?.()?.install?.())
   handle('desktop:plugin-install-request', main, async (_event, _surface, rawSource) => {
     // A web panel may only hand over a remote npm/git/HTTPS reference — the

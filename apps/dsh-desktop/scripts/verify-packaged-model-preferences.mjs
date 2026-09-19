@@ -116,7 +116,7 @@ async function openSettings(page) {
     throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
   }
   const relay = card.locator('[data-relay-onboarding-card="true"]')
-  await relay.getByRole('heading', { name: '推荐：使用 bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  await relay.getByRole('heading', { name: '推荐：登录 bai，自动同步可用模型', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   return { settings, card }
 }
 

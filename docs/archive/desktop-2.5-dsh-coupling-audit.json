@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "4.2.0",
+  "desktopVersion": "4.2.1",
   "upstreamVersion": "0.1.6-alpha.2",
   "lockfileSha256": "c54bad458a28fe4a69b6fb34982580885a2026b5f1ad9db1b99247029ecc9e73",
   "policy": {
@@ -4680,6 +4680,12 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/capture-all-surfaces.mjs",
+      "line": 154,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/capture-qqbot-qr-3.3.0.mjs",
       "line": 12,
       "operation": "DSH_HOME"
@@ -4927,7 +4933,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs",
-      "line": 78,
+      "line": 81,
       "operation": "DSH_HOME"
     },
     {
@@ -5575,12 +5581,6 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 76,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extension-ipc.mjs",
       "line": 77,
       "operation": "profileDir"
     },
@@ -5599,13 +5599,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 81,
+      "line": 80,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 97,
+      "line": 82,
       "operation": "profileDir"
     },
     {
@@ -5623,7 +5623,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 112,
+      "line": 100,
       "operation": "profileDir"
     },
     {
@@ -5641,13 +5641,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 843,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 844,
+      "line": 115,
       "operation": "profileDir"
     },
     {
@@ -5659,55 +5653,67 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 849,
+      "line": 846,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 850,
+      "line": 847,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 858,
+      "line": 851,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 859,
+      "line": 852,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 864,
+      "line": 860,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 869,
+      "line": 861,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 882,
+      "line": 866,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 887,
+      "line": 871,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 898,
+      "line": 884,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extension-ipc.mjs",
+      "line": 889,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extension-ipc.mjs",
+      "line": 900,
       "operation": "profileDir"
     },
     {
@@ -7363,145 +7369,127 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1691,
+      "line": 1723,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1692,
+      "line": 1724,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1693,
+      "line": 1725,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1694,
+      "line": 1726,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1717,
+      "line": 1749,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1718,
+      "line": 1750,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1719,
+      "line": 1751,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1739,
+      "line": 1771,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1740,
+      "line": 1772,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1741,
+      "line": 1773,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1768,
+      "line": 1800,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1780,
+      "line": 1812,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1783,
+      "line": 1815,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1820,
+      "line": 1852,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1821,
+      "line": 1853,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1822,
+      "line": 1854,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1834,
+      "line": 1866,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1835,
+      "line": 1867,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1846,
+      "line": 1878,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1861,
+      "line": 1893,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1862,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1863,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1879,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1880,
+      "line": 1894,
       "operation": "profileDir"
     },
     {
@@ -7513,7 +7501,25 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
-      "line": 1896,
+      "line": 1911,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
+      "line": 1912,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
+      "line": 1927,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/extension-ipc.test.mjs",
+      "line": 1928,
       "operation": "profileDir"
     },
     {
@@ -12415,25 +12421,25 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 863,
+      "line": 865,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 876,
+      "line": 878,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 1013,
+      "line": 1019,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/extension-ipc.mjs",
-      "line": 1015,
+      "line": 1021,
       "operation": "start"
     },
     {

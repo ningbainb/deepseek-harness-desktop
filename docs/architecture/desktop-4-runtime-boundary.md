@@ -4,7 +4,7 @@
 
 DeepSeek Harness Desktop 4 uses the official public `@deepseek-ai/*` npm packages as its Runtime and client implementation. The Desktop shell owns process supervision, local transport, migration, plugin transactions, update coordination, recovery, and operating-system capabilities. Runtime business services do not receive authority to install packages, migrate credentials, replace an application, or repair the managed profile.
 
-The 4.2.0 candidate pins DSH `0.1.6-alpha.2` and the reviewed `dsh-web` alpha 0.3.23 source cohort. Official Session and `uiWorkspace` services continue to own session creation, selection and Workspace navigation. Desktop keeps only its native transport, lifecycle, migration and capability gates. The remote Web plugin rewrites calls made from the non-loopback `dsh-runtime://app` origin; the authenticated private pipe maps only its known `/remote/{api,sidebar,git,pet}` mirrors back to local routes. The public LAN gateway does not inherit that mapping.
+Desktop 4.2.1 Stable pins DSH `0.1.6-alpha.2` and the reviewed `dsh-web` alpha 0.3.23 source cohort. Official Session and `uiWorkspace` services continue to own session creation, selection and Workspace navigation. Desktop keeps only its native transport, lifecycle, migration and capability gates. The remote Web plugin rewrites calls made from the non-loopback `dsh-runtime://app` origin; the authenticated private pipe maps only its known `/remote/{api,sidebar,git,pet}` mirrors back to local routes. The public LAN gateway does not inherit that mapping.
 
 Task Board, Git Graph and Pet remain explicit Desktop client/Host exceptions because their Worktree, Evidence or saved-state contracts do not match the current upstream client implementations. The 4.2 profile disables those three upstream aggregate rows and mounts the existing complete Desktop pairs under their original IDs. This keeps the current user-facing behavior and disable overrides while leaving the other reviewed upstream components on the pinned cohort. The exact exceptions and exit criteria are listed in [the sync ledger](../upstream-web-sync.md).
 
@@ -36,7 +36,7 @@ Application rollback, plugin-environment rollback, data-format rollback, and res
 
 The Windows x64 native dependency contract is [native-dependency-inventory.json](./native-dependency-inventory.json). Production packaging verifies the actual unpacked dependency graph, native modules, bundled Git identity, exact Runtime graph, ASAR contents, updater metadata, checksums, and executable signature state.
 
-The historical 4.0.0-rc.2 candidate used the official 0.1.5-rc.2 family. For 4.2.0, an unsigned local installer remains a test artifact until the exact package passes the release gates; it must be labeled unsigned and is not evidence of publisher identity. The maintainer has explicitly chosen unsigned distribution, so signing is reported as a limitation rather than silently treated as a passing authenticity check.
+The historical 4.0.0-rc.2 candidate used the official 0.1.5-rc.2 family. For 4.2.x, an unsigned local installer remains a test artifact until the exact package passes the release gates; it must be labeled unsigned and is not evidence of publisher identity. The maintainer has explicitly chosen unsigned distribution, so signing is reported as a limitation rather than silently treated as a passing authenticity check.
 
 ## Acceptance evidence
 

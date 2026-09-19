@@ -534,6 +534,7 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   )
   assert.equal(await handlers.get('desktop:settings-opened')({ sender }), true)
   await handlers.get('desktop:update-check')({ sender })
+  assert.equal(await handlers.get('desktop:update-dismiss')({ sender }), false)
   assert.deepEqual(await handlers.get('desktop:update-channel-get')({ sender }), {
     channel: 'stable',
     noAutomaticDowngrade: true,

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { CHATGPT_CREDENTIAL_KEY, ChatGptAuthorizationController } from '../src/chatgpt-auth.ts'
+import {
+  CHATGPT_CREDENTIAL_KEY,
+  chatGptAuthErrorCode,
+  ChatGptAuthorizationController,
+} from '../src/chatgpt-auth.ts'
 import { makeChatGptAuthRoutes } from '../src/chatgpt-auth-routes.ts'
 import { CHATGPT_AUTH_BRIDGE_PREFIX } from '../src/chatgpt-auth-protocol.ts'
 
@@ -45,7 +49,7 @@ function fakeRuntime(options: { available?: boolean; configured?: boolean } = {}
         message: 'Choose a sign-in method',
         options: [
           { id: 'browser', label: 'Browser' },
-          { id: 'device', label: 'Device code' },
+          { id: 'device_code', label: 'Device code' },
         ],
       })
       expect(answer).toBe('browser')
@@ -96,7 +100,7 @@ describe('ChatGPT authorization controller', () => {
       message: 'Choose a sign-in method',
       options: [
         { id: 'browser', label: 'Browser' },
-        { id: 'device', label: 'Device code' },
+        { id: 'device_code', label: 'Device code' },
       ],
     })
 
@@ -110,6 +114,25 @@ describe('ChatGPT authorization controller', () => {
       phase: 'authorized',
     })
     expect(authorized.notice).toBeUndefined()
+  })
+
+  it('answers only the official login-mode prompt when a Desktop mode is selected', async () => {
+    const runtime = fakeRuntime()
+    const controller = new ChatGptAuthorizationController(runtime)
+
+    await controller.begin('oauth', 'browser')
+    await runtime.entered
+    await viWait()
+
+    expect(await controller.state()).toMatchObject({ configured: true, phase: 'authorized' })
+  })
+
+  it('classifies provider failures without returning provider text', () => {
+    expect(chatGptAuthErrorCode(new Error('OpenAI Codex token exchange failed (403): private response')))
+      .toBe('TOKEN_EXCHANGE_FAILED')
+    expect(chatGptAuthErrorCode(new Error('fetch failed: private endpoint'))).toBe('AUTH_NETWORK_FAILED')
+    expect(chatGptAuthErrorCode(new Error('Failed to extract accountId from token'))).toBe('ACCOUNT_NOT_AVAILABLE')
+    expect(chatGptAuthErrorCode(new Error('unrecognized private failure'))).toBe('AUTHORIZATION_FAILED')
   })
 
   it('cancels a running attempt and deletes only the owned credential record', async () => {
@@ -210,6 +233,15 @@ describe('ChatGPT authorization routes', () => {
   it('rejects malformed begin bodies with a stable value-free error', async () => {
     const controller = new ChatGptAuthorizationController(fakeRuntime())
     const result = await invokeAuthRoute(controller, '/begin', authRequest({ body: { method: 42 } }))
+
+    expect(result).toEqual({ status: 400, body: { ok: false, code: 'malformed-request' } })
+  })
+
+  it('rejects an unknown login mode before beginning authorization', async () => {
+    const controller = new ChatGptAuthorizationController(fakeRuntime())
+    const result = await invokeAuthRoute(controller, '/begin', authRequest({
+      body: { loginMode: 'unsafe-mode' },
+    }))
 
     expect(result).toEqual({ status: 400, body: { ok: false, code: 'malformed-request' } })
   })

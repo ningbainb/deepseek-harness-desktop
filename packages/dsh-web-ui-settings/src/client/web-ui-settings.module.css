@@ -457,6 +457,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  overflow: visible;
 }
 
 .dockEntry[data-wide='rail'] {
@@ -471,6 +473,7 @@
 }
 
 .dockTrigger {
+  box-sizing: border-box;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -484,6 +487,7 @@
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  overflow: visible;
 }
 
 .dockEntry[data-wide='wide'] .dockTrigger {
@@ -494,10 +498,42 @@
   border-radius: 9px;
 }
 
+/* The official footer action seat is a single nowrap row. Desktop contributes
+   enough first-class actions to exceed the 256px content width, so reserve a
+   deliberate second row for the primary Extension Dock destination. */
+:global([data-pane='sidebar'] [class*='footerActions']):has(.dockEntry[data-dsh-extension-dock-entry][data-wide='wide']) {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.dockEntry[data-dsh-extension-dock-entry][data-wide='wide'] {
+  box-sizing: border-box;
+  flex-basis: 100%;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.dockEntry[data-dsh-extension-dock-entry][data-wide='wide'] .dockTrigger {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .dockTriggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
   line-height: 1;
+}
+
+.dockBrandIcon {
+  display: block;
+  flex: none;
+  max-width: 22px;
+  max-height: 22px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .dockTrigger:hover:not(:disabled) {

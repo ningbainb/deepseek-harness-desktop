@@ -197,6 +197,27 @@ test('manual check during a background download reveals the current progress', a
   assert.equal(harness.controller.getStatus().percent, 42.5)
 })
 
+test('dismissing the update surface keeps the background download alive and hidden', async () => {
+  const harness = createHarness()
+  await harness.controller.check()
+  harness.updater.emit('update-available', { version: '1.1.0', releaseNotes: 'Ready.' })
+  await tick()
+  harness.updater.emit('download-progress', { percent: 21 })
+
+  assert.equal(await harness.controller.check({ manual: true }), false)
+  assert.equal(harness.controller.getStatus().visible, true)
+  assert.equal(harness.controller.dismiss(), true)
+  assert.equal(harness.controller.getStatus().visible, false)
+  assert.equal(harness.controller.getStatus().phase, 'downloading')
+  assert.equal(harness.updater.downloads, 1)
+
+  harness.updater.emit('download-progress', { percent: 64 })
+  assert.equal(harness.controller.getStatus().visible, false)
+  assert.equal(harness.controller.getStatus().phase, 'downloading')
+  assert.equal(harness.controller.getStatus().percent, 64)
+  assert.equal(harness.controller.dismiss(), false)
+})
+
 test('downloaded update waits for an explicit renderer install action', async () => {
   const harness = createHarness()
   await harness.controller.check()

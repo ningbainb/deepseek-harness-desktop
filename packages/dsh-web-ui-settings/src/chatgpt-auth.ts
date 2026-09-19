@@ -10,9 +10,10 @@ import type {
   ChatGptAuthPhase,
   ChatGptAuthPromptView,
   ChatGptAuthState,
+  ChatGptLoginMode,
 } from './chatgpt-auth-protocol.ts'
 
-/** Official DSH 0.1.5 record written by the built-in pi-ai OpenAI Codex flow. */
+/** Official DSH 0.1.6 record written by the built-in pi-ai OpenAI Codex flow. */
 export const CHATGPT_CREDENTIAL_KEY = credentialKey('llm-pi-ai', 'openai-codex')
 
 const MAX_LABEL_CHARS = 256
@@ -79,13 +80,43 @@ function noticeView(notice: { message: string; url?: string; code?: string }): C
   }
 }
 
-function errorCode(error: unknown): string {
-  const candidate = typeof error === 'object' && error !== null && 'code' in error
-    ? (error as { code?: unknown }).code
-    : undefined
-  return typeof candidate === 'string' && /^[A-Z][A-Z0-9_-]{0,63}$/u.test(candidate)
-    ? candidate
-    : 'AUTHORIZATION_FAILED'
+function errorChain(error: unknown): unknown[] {
+  const chain: unknown[] = []
+  let current = error
+  for (let depth = 0; depth < 4 && current !== undefined && current !== null; depth += 1) {
+    chain.push(current)
+    current = typeof current === 'object' && 'cause' in current
+      ? (current as { cause?: unknown }).cause
+      : undefined
+  }
+  return chain
+}
+
+/** Reduce provider errors to a fixed, value-free troubleshooting vocabulary. */
+export function chatGptAuthErrorCode(error: unknown): string {
+  for (const candidate of errorChain(error)) {
+    const code = typeof candidate === 'object' && candidate !== null && 'code' in candidate
+      ? (candidate as { code?: unknown }).code
+      : undefined
+    if (typeof code === 'string' && /^[A-Z][A-Z0-9_-]{0,63}$/u.test(code)) return code
+  }
+  const message = errorChain(error)
+    .map(candidate => candidate instanceof Error ? candidate.message : '')
+    .join(' ')
+    .toLowerCase()
+  if (/token (?:exchange|endpoint)|oauth\/token/u.test(message)) return 'TOKEN_EXCHANGE_FAILED'
+  if (/failed to extract accountid|account id/u.test(message)) return 'ACCOUNT_NOT_AVAILABLE'
+  if (/state mismatch/u.test(message)) return 'AUTH_STATE_MISMATCH'
+  if (/missing authorization code/u.test(message)) return 'AUTH_CODE_MISSING'
+  if (/no credential store|not committed|read.?only|eacces|eperm/u.test(message)) return 'CREDENTIAL_STORE_FAILED'
+  if (/fetch failed|network|econn|enotfound|timed? ?out|socket/u.test(message)) return 'AUTH_NETWORK_FAILED'
+  return 'AUTHORIZATION_FAILED'
+}
+
+function canAutoAnswerLoginMode(prompt: AuthorizationPrompt, mode: ChatGptLoginMode | undefined): boolean {
+  if (mode === undefined || prompt.kind !== 'select') return false
+  const ids = new Set(prompt.options.map(option => option.id))
+  return ids.has('browser') && ids.has('device_code') && ids.has(mode)
 }
 
 /**
@@ -133,7 +164,7 @@ export class ChatGptAuthorizationController {
   }
 
   /** Start the official OAuth flow and return immediately for polling clients. */
-  async begin(method?: string): Promise<ChatGptAuthState> {
+  async begin(method?: string, loginMode?: ChatGptLoginMode): Promise<ChatGptAuthState> {
     const entry = this.deps.authorization.describe(CHATGPT_CREDENTIAL_KEY)
     if (entry === undefined) throw new ChatGptAuthError('authorization-unavailable')
     if (this.operation !== undefined || entry.inFlight) throw new ChatGptAuthError('authorization-in-flight')
@@ -161,7 +192,9 @@ export class ChatGptAuthorizationController {
         }
         this.phase = 'awaiting-user'
       },
-      prompt: prompt => this.prompt(prompt, attemptAbort),
+      prompt: prompt => canAutoAnswerLoginMode(prompt, loginMode)
+        ? Promise.resolve(loginMode as ChatGptLoginMode)
+        : this.prompt(prompt, attemptAbort),
     }
     const operation = Promise.resolve()
       .then(() => this.deps.authorization.begin({
@@ -178,7 +211,7 @@ export class ChatGptAuthorizationController {
       })
       .catch((error: unknown) => {
         if (this.attemptAbort !== attemptAbort || this.phase === 'cancelled') return
-        this.failureCode = errorCode(error)
+        this.failureCode = chatGptAuthErrorCode(error)
         this.phase = 'failed'
         this.clearPending(new Error('authorization failed'))
         this.deps.onError?.(error)

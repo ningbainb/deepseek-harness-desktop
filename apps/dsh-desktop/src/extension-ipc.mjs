@@ -10,6 +10,7 @@ import { desktopDeepLink } from './distribution-identity.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 import { assertDockSetting } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
+import { normalizeFeatureEvent } from './feature-telemetry.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
 const PROFILE_RESET_BACKUP_LIMIT = 3
@@ -178,6 +179,7 @@ const CHANNELS = [
   'extensions:qqbot-unbind',
   'dock-settings:agent-team-status',
   'dock-settings:agent-team-set',
+  'dock-settings:bai-acquisition-event',
   'dock-settings:control-center-state',
   'dock-settings:browser-use-set',
   'dock-settings:computer-use-set',
@@ -949,6 +951,10 @@ export function registerExtensionIpc({
     })
   }
   handleDockSettings('dock-settings:agent-team-status', () => agentTeamFeature.status())
+  handleDockSettings('dock-settings:bai-acquisition-event', (_event, value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('invalid bai acquisition event')
+    return recordFeatureEvent(normalizeFeatureEvent({ feature: 'bai-connect', ...value }))
+  })
   handleDockSettings('dock-settings:agent-team-set', (event, enabled) => {
     event.sender.send?.('dock-settings:agent-team-progress', { phase: 'saving' })
     return setAgentTeamEnabled(event, enabled)

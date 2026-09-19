@@ -12,7 +12,7 @@
       "status": "supported",
       "upstreamVersion": "0.1.6-alpha.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=4.2.0",
+      "desktopRange": "=4.2.1",
       "capabilities": [
         {
           "id": "host-service.register",

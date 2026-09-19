@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('dshDesktopTransport', Object.freeze({
 }))
 
 contextBridge.exposeInMainWorld('dshDockSettings', Object.freeze({
+  recordBaiAcquisitionEvent: (outcome, detail) => ipcRenderer.invoke('dock-settings:bai-acquisition-event', { outcome, detail }),
   getAgentTeamStatus: () => ipcRenderer.invoke('dock-settings:agent-team-status'),
   setAgentTeamEnabled: (enabled) => ipcRenderer.invoke('dock-settings:agent-team-set', enabled),
   onAgentTeamProgress: (listener) => {

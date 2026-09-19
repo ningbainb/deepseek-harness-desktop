@@ -3037,7 +3037,10 @@ export async function startElectronApp(metadata) {
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
     getWindow: () => mainWindow,
-    currentVersion: app.getVersion(),
+    // In development Electron reports its own framework version here. Use the
+    // already resolved Desktop manifest version so the update surface and
+    // channel policy see the same product version in every environment.
+    currentVersion: desktopVersion,
     enabled: Boolean(autoUpdater),
     unavailableReason: updateAvailability.reason === UNSIGNED_MAC_PREVIEW_REASON
       ? UNSIGNED_MAC_PREVIEW_REASON

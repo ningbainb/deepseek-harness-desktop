@@ -82,6 +82,7 @@ const api = Object.freeze({
   getUpdateChannel: () => ipcRenderer.invoke('desktop:update-channel-get'),
   setUpdateChannel: (channel) => ipcRenderer.invoke('desktop:update-channel-set', channel),
   checkForUpdates: () => ipcRenderer.invoke('desktop:update-check'),
+  dismissUpdate: () => ipcRenderer.invoke('desktop:update-dismiss'),
   installUpdate: () => ipcRenderer.invoke('desktop:update-install'),
   getSettingsWindowBounds: () => ipcRenderer.invoke('desktop:settings-window-bounds-get'),
   setSettingsWindowBounds: (bounds) => ipcRenderer.invoke('desktop:settings-window-bounds-set', bounds),

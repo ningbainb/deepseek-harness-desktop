@@ -12,6 +12,7 @@ test('main preload exposes product actions without extension mutation channels',
   assert.match(source, /onDeepLink:\s*createBufferedSubscription/u)
   assert.doesNotMatch(source, /require\(['"]\.\/preload-common\.cjs['"]\)/u)
   assert.match(source, /desktop:update-install/u)
+  assert.match(source, /desktop:update-dismiss/u)
   assert.match(source, /desktop:update-channel-get/u)
   assert.match(source, /desktop:update-channel-set/u)
   assert.match(source, /desktop:skills-list/u)
@@ -46,19 +47,22 @@ test('extension preload exposes extension operations without product update acti
   assert.match(source, /getLegacyPluginRestoreState: \(\) => ipcRenderer\.invoke\('extensions:legacy-plugin-restore-state'\)/u)
   assert.match(source, /restoreLegacyGitPlugin: \(id\) => ipcRenderer\.invoke\('extensions:legacy-plugin-restore-git', id\)/u)
   assert.doesNotMatch(source, /desktop:update-install/u)
+  assert.doesNotMatch(source, /desktop:update-dismiss/u)
   assert.doesNotMatch(source, /desktop:update-channel-(?:get|set)/u)
   assert.doesNotMatch(source, /desktop:action/u)
   assert.doesNotMatch(source, /desktop:deep-link/u)
 })
 
-test('Dock settings preload exposes only runtime transport and Agent Team settings', async () => {
+test('Dock settings preload exposes only runtime transport and bounded settings actions', async () => {
   const source = await read('preload-dock-settings.cjs')
   assert.match(source, /dshDesktopTransport/u)
   assert.match(source, /dshDockSettings/u)
   assert.match(source, /dock-settings:agent-team-status/u)
   assert.match(source, /dock-settings:agent-team-set/u)
+  assert.match(source, /dock-settings:bai-acquisition-event/u)
   assert.doesNotMatch(source, /extensions:plugin-install/u)
   assert.doesNotMatch(source, /desktop:update-install/u)
+  assert.doesNotMatch(source, /desktop:update-dismiss/u)
 })
 
 test('Electron binds each renderer window to its dedicated preload', async () => {

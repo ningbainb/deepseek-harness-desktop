@@ -12,6 +12,11 @@ const api = vi.hoisted(() => ({
   cancel: vi.fn(),
   logout: vi.fn(),
 }))
+const desktop = vi.hoisted(() => ({ openDesktopSurface: vi.fn() }))
+
+vi.mock('@linxin666/dsh-desktop-client', () => ({
+  openDesktopSurface: desktop.openDesktopSurface,
+}))
 
 vi.mock('../src/client/chatgpt-auth-client.ts', () => ({
   chatGptAuthClient: api,
@@ -23,6 +28,7 @@ vi.mock('../src/client/chatgpt-auth-client.ts', () => ({
 }))
 
 import { ChatGptAuthSection } from '../src/client/ChatGptAuthSection.tsx'
+import { ChatGptAuthClientError } from '../src/client/chatgpt-auth-client.ts'
 
 const signedOut: ChatGptAuthState = {
   available: true,
@@ -55,6 +61,7 @@ beforeEach(() => {
   api.answer.mockResolvedValue(signedOut)
   api.cancel.mockResolvedValue(signedOut)
   api.logout.mockResolvedValue(signedOut)
+  desktop.openDesktopSurface.mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -69,10 +76,10 @@ describe('ChatGPT authorization settings section', () => {
     vi.useFakeTimers()
     api.state.mockResolvedValue({ ...awaitingBrowser })
     await act(async () => { renderSection() })
-    await act(async () => { await vi.advanceTimersByTimeAsync(2700) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(7500) })
     expect(api.state).toHaveBeenCalledTimes(4)
     api.state.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
-    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
     expect(api.state).toHaveBeenCalledTimes(5)
@@ -87,7 +94,7 @@ describe('ChatGPT authorization settings section', () => {
     expect(screen.getByRole('alert')).toBeTruthy()
     await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
     expect(screen.queryByRole('alert')).toBeNull()
-    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
   })
 
@@ -132,13 +139,13 @@ describe('ChatGPT authorization settings section', () => {
       .mockResolvedValue({ ...awaitingBrowser })
     api.answer.mockResolvedValue({ ...awaitingBrowser })
     await act(async () => { renderSection() })
-    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Browser' })) })
     expect(api.answer).toHaveBeenCalledWith('choose-method', 'browser')
     await act(async () => { finishOldPoll(promptState) })
     expect(screen.queryByRole('button', { name: 'Browser' })).toBeNull()
     api.state.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
-    await act(async () => { await vi.advanceTimersByTimeAsync(900) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     expect(screen.getByRole('button', { name: t('logout') })).toBeTruthy()
   })
 
@@ -148,7 +155,25 @@ describe('ChatGPT authorization settings section', () => {
 
     fireEvent.click(button)
 
-    await waitFor(() => expect(api.begin).toHaveBeenCalledWith())
+    await waitFor(() => expect(api.begin).toHaveBeenCalledWith('browser'))
+  })
+
+  it('starts device-code login as a first-level fallback', async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: t('deviceLogin') }))
+
+    await waitFor(() => expect(api.begin).toHaveBeenCalledWith('device_code'))
+  })
+
+  it('recovers from a rejected browser-login transport without leaving the action locked', async () => {
+    api.begin.mockRejectedValueOnce(new ChatGptAuthClientError('transport-unavailable'))
+    renderSection()
+    const button = await screen.findByRole('button', { name: t('login') })
+
+    fireEvent.click(button)
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(t('transportFailed')))
+    expect((screen.getByRole('button', { name: t('login') }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('opens an authorization notice through the Desktop popup policy', async () => {
@@ -179,6 +204,28 @@ describe('ChatGPT authorization settings section', () => {
 
     await waitFor(() => expect(api.logout).toHaveBeenCalledTimes(1))
     expect(await screen.findByText('尚未登录')).toBeTruthy()
+  })
+
+  it('opens the Codex model page after authorization succeeds', async () => {
+    api.state.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
+    const close = vi.fn()
+    render(<ChatGptAuthSection close={close} t={t} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: t('chooseModel') }))
+
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { setting: 'models' }))
+    await waitFor(() => expect(close).toHaveBeenCalledOnce())
+  })
+
+  it('explains token exchange failure after the browser callback', async () => {
+    api.state.mockResolvedValue({
+      ...signedOut,
+      phase: 'failed',
+      errorCode: 'TOKEN_EXCHANGE_FAILED',
+    })
+    renderSection()
+
+    expect(await screen.findByText(t('tokenExchangeFailed'))).toBeTruthy()
   })
 
   it('explains a missing flow and disables sign-in', async () => {

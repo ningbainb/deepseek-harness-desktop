@@ -1,6 +1,6 @@
 # Desktop 插件兼容性声明
 
-Desktop 4.2.0 候选版精确使用 DSH `0.1.6-alpha.2`。上游 `dsh-web` alpha 0.3.23 的版本号本身不等于 Desktop 插件已兼容；实际装载还必须满足 Host/Client 接口、用户配置继承和运行图检查。Task Board 与 Git Graph 暂时保留桌面端完整实现及旧 loader ID，避免把上游新版客户端与桌面 Worktree/Evidence Host 混装。具体来源与例外见 [上游同步记录](upstream-web-sync.md)。
+Desktop 4.2.1 Stable 精确使用 DSH `0.1.6-alpha.2`。上游 `dsh-web` alpha 0.3.23 的版本号本身不等于 Desktop 插件已兼容；实际装载还必须满足 Host/Client 接口、用户配置继承和运行图检查。Task Board 与 Git Graph 暂时保留桌面端完整实现及旧 loader ID，避免把上游新版客户端与桌面 Worktree/Evidence Host 混装。具体来源与例外见 [上游同步记录](upstream-web-sync.md)。
 
 社区 DSH bundle 可以在 `package.json` 的 `dsh.compatibility` 写入可验证的 Desktop 契约。该声明是兼容性证据而非权限授予：扩展坞会展示并评估它，不能由插件自行扩大 Renderer 或 Host 权限。
 

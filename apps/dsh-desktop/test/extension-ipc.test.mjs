@@ -214,6 +214,38 @@ test('Agent Team switch restarts Runtime and returns the persisted feature state
   } finally { await unregister() }
 })
 
+test('bai acquisition telemetry accepts only the fixed privacy-safe funnel', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  const telemetry = []
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh', qqBotBinding,
+    isDockSettingsSender: sender => sender === ipcMain.sender,
+    recordFeatureEvent: event => { telemetry.push(event); return true },
+  })
+  try {
+    assert.equal(await ipcMain.handlers.get('dock-settings:bai-acquisition-event')(undefined, {
+      outcome: 'started', detail: 'browser',
+    }), true)
+    assert.deepEqual(telemetry, [{ feature: 'bai-connect', outcome: 'started', detail: 'browser' }])
+    await assert.rejects(
+      ipcMain.handlers.get('dock-settings:bai-acquisition-event')(undefined, {
+        outcome: 'started', detail: 'account@example.com',
+      }),
+      error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+    )
+    await assert.rejects(
+      ipcMain.handlers.get('dock-settings:bai-acquisition-event')({ sender: {} }, {
+        outcome: 'started', detail: 'browser',
+      }),
+      error => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED,
+    )
+  } finally { await unregister() }
+})
+
 test('Agent Team switch rolls profile state back when Runtime cannot restart', async () => {
   const ipcMain = new FakeIpcMain()
   const qqBotBinding = new EventEmitter()

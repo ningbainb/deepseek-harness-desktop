@@ -75,7 +75,7 @@ export function ControlCenterSettingsCard() {
 
   return <div className={css.controlCenter} data-control-center>
     <section className={css.controlHero}>
-      <div><span className={css.controlKicker}>DeepSeek Harness Desktop 4.1</span><h1>让 DeepSeek 操作浏览器和电脑</h1><p>两项实验能力默认关闭。启用后，读取状态可直接进行；点击、输入、上传、下载等外部操作仍由 Harness 审批确认。</p></div>
+      <div><span className={css.controlKicker}>DeepSeek Harness Desktop</span><h1>让 DeepSeek 操作浏览器和电脑</h1><p>两项实验能力默认关闭。启用后，读取状态可直接进行；点击、输入、上传、下载等外部操作仍由 Harness 审批确认。</p></div>
       <span className={css.controlSafety}>默认关闭</span>
     </section>
     <div className={css.controlGrid}>

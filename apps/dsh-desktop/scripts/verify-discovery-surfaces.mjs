@@ -53,7 +53,10 @@ async function dismissFirstRunSurfaces(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
     await page.waitForTimeout(250)
     if (await introDialog.isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
+      const action = continueButton.last()
+      if (await action.isEnabled().catch(() => false)) {
+        await action.click({ force: true, timeout: 2_000 }).catch(() => {})
+      }
       continue
     }
     if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
@@ -112,6 +115,38 @@ try {
     chatGptAuth.result?.value?.methods?.some(method => method.id === 'oauth'),
     `ChatGPT OAuth is absent from the authorization bridge: ${JSON.stringify(chatGptAuth)}`,
   )
+
+  const chatGptBrowserProbe = await page.evaluate(async () => {
+    const post = async (path, body = {}) => {
+      const response = await fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      return { status: response.status, result: await response.json() }
+    }
+
+    let snapshot = await post('/api/dsh-chatgpt-auth/begin', { loginMode: 'browser' })
+    const deadline = Date.now() + 15_000
+    while (
+      Date.now() < deadline
+      && snapshot.result?.value?.phase !== 'failed'
+      && snapshot.result?.value?.notice?.url === undefined
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+      snapshot = await post('/api/dsh-chatgpt-auth/state')
+    }
+    await post('/api/dsh-chatgpt-auth/cancel')
+    return snapshot
+  })
+  assert.equal(chatGptBrowserProbe.status, 200, JSON.stringify(chatGptBrowserProbe))
+  assert.equal(chatGptBrowserProbe.result?.ok, true, JSON.stringify(chatGptBrowserProbe))
+  assert.notEqual(chatGptBrowserProbe.result?.value?.phase, 'failed', JSON.stringify(chatGptBrowserProbe))
+  assert.ok(chatGptBrowserProbe.result?.value?.notice?.url, JSON.stringify(chatGptBrowserProbe))
+  assert.notEqual(chatGptBrowserProbe.result?.value?.prompt?.kind, 'select', JSON.stringify(chatGptBrowserProbe))
 
   const nudge = page.getByText(/插件、技能和桌面核心功能在这里|Plugins, skills, and core Desktop features are here/u)
   await nudge.waitFor({ state: 'visible' })
@@ -177,6 +212,50 @@ try {
   assert.equal(await pluginManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'plugins')
   assert.equal(await skillManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'skills')
   assert.equal(await page.locator('[data-dsh-skill-explorer-entry]').isVisible(), true)
+  const dockEntryTrigger = page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
+  await dockEntryTrigger.waitFor({ state: 'visible' })
+  const dockEntryGeometry = await dockEntryTrigger.evaluate((button) => {
+    const bounds = button.getBoundingClientRect()
+    const icon = button.querySelector('img')?.getBoundingClientRect()
+    const ancestry = []
+    let current = button.parentElement
+    for (let depth = 0; current !== null && depth < 5; depth += 1, current = current.parentElement) {
+      const rect = current.getBoundingClientRect()
+      const style = getComputedStyle(current)
+      ancestry.push({
+        tag: current.tagName,
+        className: current.className,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        overflow: style.overflow,
+        display: style.display,
+        flexWrap: style.flexWrap,
+      })
+    }
+    return {
+      wide: button.parentElement?.getAttribute('data-wide'),
+      text: button.textContent?.trim(),
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      icon: icon === undefined ? undefined : { left: icon.left, right: icon.right, top: icon.top, bottom: icon.bottom },
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      ancestry,
+    }
+  })
+  assert.equal(dockEntryGeometry.wide, 'wide', JSON.stringify(dockEntryGeometry))
+  assert.match(dockEntryGeometry.text ?? '', /打开拓展坞|Open Extension Dock/u)
+  const footerActions = dockEntryGeometry.ancestry.find(ancestor => /footerActions/u.test(String(ancestor.className)))
+  assert.ok(footerActions, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.left >= footerActions.left, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.right <= footerActions.right, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon.left >= dockEntryGeometry.left, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon.right <= dockEntryGeometry.right, JSON.stringify(dockEntryGeometry))
   await page.screenshot({ path: output })
 
   const extensionWindowPromise = electronApp.waitForEvent('window', {
@@ -187,12 +266,14 @@ try {
   extensionWindow = await extensionWindowPromise
   assert.ok(extensionWindow, 'plugin-management shortcut did not open extensions.html')
   await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
+  await extensionWindow.waitForFunction(() => document.querySelector('#plugins-hub-tab')?.getAttribute('aria-selected') === 'true')
   assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
   if (pluginDockOutput) await extensionWindow.screenshot({ path: pluginDockOutput })
 
   await page.bringToFront()
   await skillManagementTrigger.click()
   await extensionWindow.locator('#skills').waitFor({ state: 'visible' })
+  await extensionWindow.waitForFunction(() => document.querySelector('#skills-tab')?.getAttribute('aria-selected') === 'true')
   assert.equal(await extensionWindow.locator('#skills-tab').getAttribute('aria-selected'), 'true')
   assert.equal(
     electronApp.windows().filter(candidate => candidate.url().includes('extensions.html')).length,
@@ -238,12 +319,15 @@ try {
 
   console.log(JSON.stringify({
     nudgeGeometry,
+    dockEntryGeometry,
     codexProvider: codex.name,
     codexModels: codex.models,
     chatGptAuth: {
       available: chatGptAuth.result.value.available,
       writable: chatGptAuth.result.value.writable,
       methods: chatGptAuth.result.value.methods.map(method => method.id),
+      browserModeReachedCallbackWait: chatGptBrowserProbe.result.value.notice?.url !== undefined,
+      browserModePromptKind: chatGptBrowserProbe.result.value.prompt?.kind,
     },
     installedMarketPlugin,
     screenshot: output,

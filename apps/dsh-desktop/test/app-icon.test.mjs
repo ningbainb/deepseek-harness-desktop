@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import test from 'node:test'
 
@@ -25,4 +26,13 @@ test('runtime icon is applied explicitly to a BrowserWindow', () => {
   const icon = { source: 'kawaii-deepseek' }
   assert.equal(applyWindowIcon(window, icon), window)
   assert.deepEqual(calls, [icon])
+})
+
+test('all platform and in-app brand icons match the canonical source', () => {
+  const result = spawnSync(process.execPath, ['scripts/generate-app-icons.mjs', '--check'], {
+    cwd: new URL('..', import.meta.url),
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+  assert.match(result.stdout, /verified 7 app icon assets/u)
 })

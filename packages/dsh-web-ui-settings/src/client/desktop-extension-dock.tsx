@@ -15,6 +15,7 @@ import {
   type DockDismissReason,
 } from '@linxin666/dsh-desktop-client'
 import type { WebUIPluginsKey } from './locales.ts'
+import { APP_BRAND_ICON_DATA_URL } from './app-brand-icon.generated.ts'
 import css from './web-ui-settings.module.css'
 
 export type DesktopExtensionDockEntryProps = {
@@ -282,7 +283,7 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
   const label = t('dockLabel' satisfies WebUIPluginsKey)
 
   return (
-    <div className={css.dockEntry} data-wide={wide ? 'wide' : 'rail'}>
+    <div className={css.dockEntry} data-wide={wide ? 'wide' : 'rail'} data-dsh-extension-dock-entry="">
       <button
         ref={triggerRef}
         type="button"
@@ -294,6 +295,7 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
         onClick={() => { void openDock() }}
       >
         <DockIcon wide={wide} />
+        {wide && <span className={css.dockTriggerLabel}>{label}</span>}
       </button>
       {showNudge && nudgePosition && createPortal(
         <div
@@ -328,24 +330,15 @@ export function DesktopExtensionDockEntry({ wide, t }: DesktopExtensionDockEntry
 }
 
 function DockIcon({ wide }: { wide?: boolean }) {
-  const size = wide ? 16 : 18
   return (
-    <svg
-      viewBox="0 0 16 16"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <img
+      className={css.dockBrandIcon}
+      src={APP_BRAND_ICON_DATA_URL}
+      width={wide ? 20 : 22}
+      height={wide ? 20 : 22}
+      alt=""
       aria-hidden="true"
-    >
-      <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" />
-      <rect x="9" y="2.5" width="4.5" height="4.5" rx="1.2" />
-      <rect x="2.5" y="9" width="4.5" height="4.5" rx="1.2" />
-      <path d="M11.25 9v4.5M9 11.25h4.5" />
-    </svg>
+    />
   )
 }
 

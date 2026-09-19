@@ -1,45 +1,45 @@
-# DeepSeek Harness Desktop 4.2.0
+# DeepSeek Harness Desktop 4.2.1
 
 ## 中文
 
 ### 本次亮点
 
-4.2.0 精确适配官方 DeepSeek Harness `0.1.6-alpha.2` 内核，并从 dsh-web `alpha` 的固定源码提交同步 0.3.23 Web 组件。新版 Session 多实例与 Workspace 导航由官方服务负责，桌面端专注于窗口、私有传输、系统能力和用户数据继承。长历史会话、模式切换和拓展坞设置在新版客户端路由下继续可用。
+4.2.1 是面向 4.2.0 用户反馈的稳定性补丁，继续精确使用官方 DeepSeek Harness `0.1.6-alpha.2` 与经过来源校验的 dsh-web 0.3.23 组件，不引入新的内核漂移。ChatGPT 登录改为一次点击直接进入浏览器授权；浏览器回调成功后，桌面端会继续等待令牌交换、账户识别和本机凭据提交，只有完整链路成功才显示“已登录”。设备码登录作为同级兜底保留，失败会区分网络、令牌交换、账户、回调状态和凭据存储，但不会显示服务端正文、账号、Token 或授权 URL。
 
-插件不再只看版本号就混装。上游 Task Board、Git Graph 和桌宠与桌面既有 Worktree、证据或保存状态接口不一致时，4.2.0 保留完整的桌面客户端与 Host 配对，以及原有插件行 ID；其他经过核验的上游组件按固定来源装载。这样既能吸收上游对新内核的适配，也不会把用户正在使用的桌面能力静默换掉。
+更新下载窗口现在可以关闭，下载任务仍在后台存活，用户重新打开更新界面即可继续查看进度或安装。主界面的插件、Skills 与模型设置入口统一直达拓展坞对应页面，bai 供应商登录保留置顶的单一主操作。Windows 可执行文件、安装器、快捷方式、任务栏、窗口和托盘，以及 macOS、Linux、应用内拓展坞、官网和文档，统一使用新版浅蓝角色图标。
 
 ### 验证
 
-4.1.x 升级会先备份桌面负责修改的 Profile 清单、锁文件、补丁及相关设置，记录指纹，并在 Runtime 健康后提交。异常启动可恢复旧文件；原始会话日志、工作区文件、凭据、Skills 和第三方插件内容不会被此次迁移直接改写。可选插件故障应降级隔离，不应阻断主会话页面。
+ChatGPT 授权控制器覆盖浏览器模式自动选择、设备码回退、回调等待、取消、传输失败恢复、安全错误分类和成功后进入 Codex 模型页。隔离 Electron 探针确认官方授权桥可写，浏览器模式不再停在登录方式选择页，并能到达回调等待；真实用户账号的最终 OAuth 授权仍由用户本人在浏览器中完成。授权等待轮询已降频、禁止重叠，并会在成功、失败、取消或界面卸载时停止。
 
-Browser Use 与 Computer Use 继续默认关闭，并沿用原有权限确认和安全边界。私有 Electron 管道仅映射受限的本地 Web 路径，公开 LAN 入口不因此获得额外能力。Task Board、Git Graph 和桌宠的上游新版实现将在保存状态与桌面特性完成双向验证后再切换。
+4.2.0 的历史会话、Workspace、插件事务、桌宠设置、技能目录和迁移回滚边界继续保留。发布门禁包含共享文件一致性、功能基线、单元测试、真实 Windows Electron 回归、打包后检查，以及 GitHub Actions 上的 Windows x64、macOS arm64 Preview 与 Linux x64 Preview 构建。匿名埋点只使用固定的访问、开始、成功、失败和继续结果，不记录账号、凭据、URL、模型 ID、提示词、页面内容、路径或原始错误。
 
 ### 下载与校验
 
-请从本项目对应的 GitHub Release 下载匹配平台的资产，并按同一 Release 的 `SHA256SUMS.txt` 核对 SHA-256。Windows x64 安装包不进行代码签名，系统可能提示未知发布者；macOS arm64 与 Linux x64 仍按 Preview 标注，以实际发布资产和平台说明为准。源码中的 4.2.0 版本号本身不代表安装包已经发布。
+请从 `desktop-v4.2.1` 对应的 GitHub Release 下载匹配平台的资产，并使用同一 Release 内的 `SHA256SUMS.txt` 核对 SHA-256。Windows x64 安装包按维护者决定不进行代码签名，系统可能显示未知发布者；macOS arm64 与 Linux x64 仍标记为 Preview。三个平台任务全部通过后才会创建公开 Release，不发布残缺的平台集合。
 
 ### 说明
 
-本项目是 ningbai牛逼 维护的社区开源桌面端，并非 DeepSeek 官方客户端。升级前如有重要本地数据，建议保留独立备份；遇到插件或历史异常时，不要删除 `DSH_HOME`、Profile、`node_modules` 或会话日志，请先使用诊断与回滚指引。完整技术例外见 [上游同步记录](../upstream-web-sync.md)，操作步骤见 [升级与回滚](../upgrade-and-rollback.md)。
+本项目由 ningbai牛逼 维护，是社区开源桌面端，并非 DeepSeek 官方客户端。4.2.1 不会覆盖已经公开且有用户下载的 4.2.0 Release，而是以独立补丁版本提供可追溯升级和回滚。升级前仍建议备份重要数据；遇到插件、历史会话或登录异常时，请勿删除 `DSH_HOME`、Profile、凭据目录或会话日志，先使用诊断与回滚指引。
 
 ## English
 
 ### Highlights
 
-Desktop 4.2.0 pins the official DeepSeek Harness `0.1.6-alpha.2` runtime and a source-verified 0.3.23 cohort from the dsh-web `alpha` branch. Official Session and Workspace services own multi-session navigation, while the Desktop shell continues to own windows, authenticated local transport, operating-system capabilities, and user-data migration. Long conversations, mode switching, and Dock settings remain part of the compatibility checks for the new client routing model.
+Desktop 4.2.1 is a focused Stable patch for feedback reported against 4.2.0. It keeps the exact official DeepSeek Harness `0.1.6-alpha.2` pin and the source-verified dsh-web 0.3.23 cohort, avoiding another runtime transition. ChatGPT browser sign-in now starts with one click. A successful browser callback is treated only as an intermediate step: Desktop continues through token exchange, account resolution, and local credential commit before it reports the account as signed in. Device-code login remains a first-level fallback. Failures are classified into safe network, token-exchange, account, callback-state, and credential-store guidance without exposing provider response bodies, account data, tokens, or authorization URLs.
 
-The update does not equate a package version with proven compatibility. The newer upstream Task Board, Git Graph, and Pet clients do not yet share all of the Desktop Worktree, evidence, or saved-state contracts. Those three features therefore retain complete Desktop client and Host pairs under their existing loader IDs. Other reviewed upstream components are pinned by source commit and content hashes, reducing repeated Desktop-specific migration work without silently dropping established functionality.
+The update window can now be dismissed while the download remains alive in the background; reopening the update surface shows the continuing state. Main-window Plugins, Skills, and model settings open the corresponding Extension Dock management pages, and the promoted bai sign-in route remains a single primary action. One new light-blue character icon is used by the Windows executable, installer, shortcuts, taskbar, windows and tray, by macOS and Linux packages, and by the Dock, website, and project documentation.
 
 ### Verification
 
-An upgrade from 4.1.x prepares a versioned, fingerprinted backup of the Desktop-owned profile manifest, lockfile, patches, and related settings before mutation. The migration commits only after Runtime health succeeds and can restore those files after an interrupted or failed start. It does not directly rewrite original Session logs, Workspace files, credentials, Skills, or third-party plugin contents. Optional plugin failures must degrade in isolation instead of blocking the primary conversation view.
+The ChatGPT controller is covered for automatic browser-mode selection, device-code fallback, callback waiting, cancellation, rejected transport recovery, safe terminal diagnostics, and navigation to the Codex model picker after success. An isolated real Electron probe confirms that the official authorization bridge is writable, that browser mode no longer stops at the mode selector, and that it reaches callback waiting. A final OAuth exchange with a real ChatGPT account must still be completed by the user in their own browser. Polling is slower, non-overlapping, and stops after success, failure, cancellation, or unmount.
 
-Browser Use and Computer Use remain off by default and keep their existing approval boundaries. The authenticated Electron pipe maps only a small allowlist of local Web paths; public LAN access gains no additional authority. The three retained Desktop plugin pairs will move to upstream implementations only after saved-state and feature-parity checks are complete.
+The 4.2.0 safeguards for historical sessions, Workspaces, plugin transactions, pet settings, Skill directories, and migration rollback remain in place. Release gates include shared-output consistency, the machine-readable feature baseline, unit tests, real Windows Electron regression, packaged checks, and Windows x64, macOS arm64 Preview, and Linux x64 Preview jobs on GitHub Actions. Analytics use only fixed viewed, started, succeeded, failed, and continued outcomes and exclude accounts, credentials, URLs, model identifiers, prompts, page content, file paths, and raw errors.
 
 ### Download and verification
 
-Use assets from the matching GitHub Release and verify their SHA-256 values against that same Release's `SHA256SUMS.txt`. The Windows x64 installer is intentionally unsigned, so the operating system may display an unknown-publisher warning. macOS arm64 and Linux x64 remain Preview targets; consult the actual Release assets and platform notes for availability. A 4.2.0 source version alone does not imply that installers have already been published.
+Download platform assets from the GitHub Release tagged `desktop-v4.2.1` and verify SHA-256 values with the `SHA256SUMS.txt` file from that same Release. The Windows x64 installer is intentionally unsigned by maintainer decision, so Windows may display an unknown-publisher warning. macOS arm64 and Linux x64 remain Preview targets. The public Release is created only after all three platform jobs succeed, so an incomplete platform set is never published as Stable.
 
 ### Notice
 
-This is a community-maintained open-source Desktop application, not an official DeepSeek client. Keep an independent backup of important local data. If a plugin or historical session fails during an upgrade, do not delete `DSH_HOME`, the Profile, `node_modules`, or Session logs. Consult the [upgrade and rollback guide](../upgrade-and-rollback.md) and the [upstream sync ledger](../upstream-web-sync.md) before attempting repair.
+This project is a community-maintained open-source Desktop application maintained by ningbai牛逼; it is not an official DeepSeek client. The existing 4.2.0 Release is retained because users have already downloaded it. Version 4.2.1 is a separate patch so updates and rollback remain traceable. Back up important data before upgrading. If plugins, history, or sign-in fail, do not delete `DSH_HOME`, the Profile, credential storage, or Session logs; use the diagnostic and rollback guidance first.

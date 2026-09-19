@@ -1,12 +1,18 @@
 # Desktop upgrade and rollback
 
-## 4.1.x to 4.2.0 candidate
+## 4.2.0 to 4.2.1
+
+4.2.1 keeps the same DSH `0.1.6-alpha.2` runtime family and the existing `desktop-v4.2.0` migration record. It does not rerun or rename the 4.2 data migration. The patch changes Desktop UI, authorization bridging, update-window behavior, generated brand assets, and compatibility guards; Session JSONL, Workspace files, credentials, Skills, third-party plugin bytes, and project files remain outside direct migration writes.
+
+If ChatGPT browser authorization reports success in the browser but Desktop does not show “signed in”, keep the Desktop open and use the displayed local diagnostic category. Token exchange, account resolution, and local credential commit happen after the browser callback. Retry with device-code login when browser callback delivery is unavailable; do not copy credentials into project files or delete the credential store.
+
+## 4.1.x to 4.2.0
 
 Desktop 4.2.0 pins `@deepseek-ai/dsh@0.1.6-alpha.2` and the reviewed `dsh-web` alpha-source 0.3.23 cohort. On the first start, the Desktop-owned migration prepares a versioned backup of the profile manifest, lockfile, patch files, settings and skin selection before changing those files. It records a source fingerprint and commits only after a healthy Runtime start. Repeated starts are idempotent; an interrupted or failed start restores the backed-up Desktop-owned files. Session JSONL, Workspace files, credentials, Skills, third-party plugin bytes and user project files are not rewritten by this migration.
 
 The alpha Web aggregate is not mounted beside the old aggregate. Its Task Board, Git Graph and Pet clients are disabled in the Desktop profile because they do not share the currently pinned Desktop Host/data contracts. Their existing `ui-task-board`, `ui-git-graph` and `pet` loader IDs and complete Desktop client/Host pairs remain active, so existing disabled overrides are not silently reversed. The other pinned upstream components are admitted individually; an optional plugin failure must not block the conversation UI. See the [upstream sync ledger](upstream-web-sync.md) for the exact exceptions and validation state.
 
-If 4.2 startup fails, retain the entire `DSH_HOME` and the versioned migration backup. Use the in-app repair/rollback flow or reinstall the previous Desktop build; do not delete the profile, `node_modules`, or Session logs. A released 4.1 profile remains readable by its matching 4.1 installer. The 4.2 candidate must pass an isolated 4.1-to-4.2 overlay and packaged-app check before a public download is advertised.
+If 4.2 startup fails, retain the entire `DSH_HOME` and the versioned migration backup. Use the in-app repair/rollback flow or reinstall the previous Desktop build; do not delete the profile, `node_modules`, or Session logs. A released 4.1 profile remains readable by its matching 4.1 installer. Every 4.2 release must pass an isolated overlay and packaged-app check before a public download is advertised.
 
 ## Earlier 4.1.0 migration
 

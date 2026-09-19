@@ -351,6 +351,18 @@ export class DesktopUpdateController extends EventEmitter {
     return { ...this.status }
   }
 
+  /**
+   * Dismiss only the renderer surface. The updater, download router and
+   * taskbar progress continue to run in the main process. Publishing the
+   * hidden state prevents the next download-progress event from reopening a
+   * panel the user explicitly closed.
+   */
+  dismiss() {
+    if (this.status.visible !== true) return false
+    this.#publish({ ...this.status, visible: false })
+    return true
+  }
+
   getChannel() {
     return this.updateChannel
   }

@@ -1,5 +1,7 @@
 # DeepSeek Harness Desktop
 
+<p align="center"><img src="docs/brand/app-icon.png" width="160" alt="DeepSeek Harness Desktop 应用图标"></p>
+
 中文 | [English](README.en.md)
 
 > **项目由 ningbai牛逼 维护**：如果 DeepSeek Harness Desktop 对你有帮助，欢迎在[爱发电支持 ningbai牛逼](https://www.ifdian.net/a/ningbai)。你的支持将用于服务器、测试环境和后续维护。
@@ -7,8 +9,6 @@
 > 扫码支持：
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="爱发电赞助二维码"></a>
-
-![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
 ## DeepSeek Harness Desktop 用户交流群
 
@@ -42,19 +42,20 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-### 4.2.0 升级候选：与新版 Harness 更稳地协作
+### 4.2.1：登录、更新与扩展管理稳定性修复
 
-本分支的 Desktop 版本号为 4.2.0，精确锁定官方 DSH `0.1.6-alpha.2`，并基于 dsh-web `alpha` 的 0.3.23 源码快照同步 Web 能力。公开下载仍以 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 实际发布资产为准；源码版本号不代表三端安装包已经发布。
+当前稳定版为 4.2.1，继续精确锁定官方 DSH `0.1.6-alpha.2`，并基于 dsh-web `alpha` 的 0.3.23 固定源码快照同步 Web 能力。本次补丁优先处理 4.2.0 用户反馈，不改写用户会话、项目或第三方插件内容。
 
-- **会话与工作区**：适配新版多实例 Session 和官方 `uiWorkspace` 导航，修复长历史恢复、模式切换以及跨窗口设置读取在新 Web 通道下的路径问题。
-- **插件兼容**：上游组件按固定源码提交和哈希装入；Task Board、Git Graph 与桌宠暂留完整的桌面端客户端/Host 配对，保住 Worktree、证据、旧设置与插件禁用状态，不把两代接口混装。
-- **升级保护**：4.1.x 用户的桌面 Profile 修改前建立版本化备份和指纹；异常启动可回滚。会话日志、工作区文件与第三方插件内容不由此次迁移改写。
+- **ChatGPT 登录闭环**：浏览器授权改为一键直达；只有令牌交换、账户识别和本机凭据提交全部完成后才显示已登录。设备码登录保留为显眼兜底，失败提示不暴露账号、令牌、URL 或服务端正文。
+- **更新体验**：更新下载窗口可以关闭，下载继续在后台进行；完成后仍可从应用内继续安装。
+- **统一入口与界面**：主界面的插件、Skills 与模型入口直达拓展坞对应管理页；bai 登录入口置顶并保持单一主路径；全局应用图标统一为新版浅蓝角色图标。
+- **兼容与性能**：保留 4.2.0 的新版 Session、Workspace、历史会话、插件回滚和设置保存适配；授权等待轮询降频且禁止并发，不增加持续后台负担。
 
-[4.2 上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [4.2 发布说明](docs/launch/release-notes.md)
+[4.2 上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [4.2.1 发布说明](docs/launch/release-notes.md)
 
 ### 4.1.0：让 DeepSeek 操作浏览器和电脑
 
-当前公开稳定版为 4.1.0。Windows x64 为正式版，macOS arm64 与 Linux x64 为 Preview；三端全部通过后才会进入同一个 GitHub Release。
+4.1.0 引入智能操控。Windows x64 为正式版，macOS arm64 与 Linux x64 为 Preview；三端全部通过后才会进入同一个 GitHub Release。
 
 - **Browser Use**：默认使用官方 Playwright MCP，在可见、隔离的系统浏览器会话中执行；自动发现 Chrome、Edge 或 Chromium，点击、输入、上传和下载仍需审批。
 - **Computer Use**：默认使用随包安装的 Cua Driver Native，外置 MCP 可作为隔离回退；截图和窗口枚举可观察，鼠标键盘操作逐次确认，连续启动失败自动进入安全模式。

@@ -1,5 +1,7 @@
 # DeepSeek Harness Desktop
 
+<p align="center"><img src="docs/brand/app-icon.png" width="160" alt="DeepSeek Harness Desktop application icon"></p>
+
 [中文](README.md) | English
 
 > **Maintained by ningbai牛逼**: If DeepSeek Harness Desktop helps you, consider [supporting ningbai牛逼 on Afdian](https://www.ifdian.net/a/ningbai). Your support helps fund servers, testing, and continued maintenance.
@@ -7,8 +9,6 @@
 > Scan to support the project:
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="Afdian sponsorship QR code"></a>
-
-![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
 ## DeepSeek Harness Desktop Community
 
@@ -42,9 +42,20 @@ The installer includes the main runtime components, so you do not need to separa
 
 [Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
+### 4.2.1: sign-in, update, and extension-management reliability
+
+The current Stable release is 4.2.1. It keeps the exact official DSH `0.1.6-alpha.2` pin and the source-verified dsh-web 0.3.23 cohort while addressing feedback from 4.2.0 without rewriting user conversations, projects, or third-party plugin contents.
+
+- **ChatGPT sign-in completion**: browser authorization is one click, but Desktop reports success only after token exchange, account resolution, and local credential commit. Device-code login remains a visible fallback, and diagnostics exclude accounts, tokens, URLs, and provider response bodies.
+- **Background updates**: the update window can be dismissed while the download remains alive in the background.
+- **Unified navigation and identity**: Plugins, Skills, and model settings open their matching Extension Dock pages; the bai sign-in path remains promoted; the new light-blue character icon is used across the app and documentation.
+- **Bounded overhead**: authorization waiting uses slower, non-overlapping polling and stops on terminal state or unmount.
+
+[4.2 upstream sync ledger](docs/upstream-web-sync.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md) · [4.2.1 release notes](docs/launch/release-notes.md)
+
 ### 4.1.0: let DeepSeek control the browser and computer
 
-The current public stable release is 4.1.0. Windows x64 is stable; macOS arm64 and Linux x64 are Preview builds. One GitHub Release is created only after all three platform jobs pass.
+4.1.0 introduced Smart Control. Windows x64 is stable; macOS arm64 and Linux x64 are Preview builds. One GitHub Release is created only after all three platform jobs pass.
 
 - **Browser Use** defaults to the official Playwright MCP in a visible, isolated system-browser session and discovers Chrome, Edge, or Chromium. Clicks, typing, uploads, and downloads remain approval-gated.
 - **Computer Use** defaults to the bundled Cua Driver Native provider, with an external MCP fallback. Observation is separated from per-action approval, and repeated native startup failure recovers through safe mode.

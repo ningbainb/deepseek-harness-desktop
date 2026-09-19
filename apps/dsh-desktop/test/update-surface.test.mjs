@@ -35,6 +35,7 @@ test('update surface is an accessible Harness-themed dialog driven by desktop up
   assert.match(script, /正在启动更新程序/)
   assert.match(script, /下载源.*value\.source/u)
   assert.match(script, /checkForUpdates\(\)\.catch\(\(\) => \{\}\)/u)
+  assert.match(script, /dismissUpdate\?\.\(\)\.catch\(\(\) => \{\}\)/u)
   assert.match(script, /installUpdate\(\)\.catch\(\(\) => \{\}\)\.finally/u)
 })
 

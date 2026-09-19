@@ -78,6 +78,25 @@ describe('Desktop Extension Dock entry', () => {
     expect(screen.queryByRole('button', { name: '打开拓展坞' })).toBeNull()
   })
 
+  it('shows the shared brand icon and full label without clipping in the wide sidebar', async () => {
+    const { container } = render(<DesktopExtensionDockEntry wide={true} t={t} />)
+    const trigger = await screen.findByRole('button', { name: '打开拓展坞' })
+    expect(trigger.textContent).toContain('打开拓展坞')
+    expect(trigger.parentElement?.hasAttribute('data-dsh-extension-dock-entry')).toBe(true)
+    const icon = container.querySelector('img[aria-hidden="true"]')
+    expect(icon?.getAttribute('src')).toMatch(/^data:image\/png;base64,/u)
+    expect(icon?.getAttribute('width')).toBe('20')
+  })
+
+  it('keeps the brand icon inside the collapsed sidebar safe area', async () => {
+    const { container } = render(<DesktopExtensionDockEntry wide={false} t={t} />)
+    const trigger = await screen.findByRole('button', { name: '打开拓展坞' })
+    expect(trigger.textContent).toBe('')
+    const icon = container.querySelector('img[aria-hidden="true"]')
+    expect(icon?.getAttribute('width')).toBe('22')
+    expect(trigger.getAttribute('title')).toBe('打开拓展坞')
+  })
+
   it('shows the exact lightweight first-three-launch message and closes without blocking', async () => {
     render(<DesktopExtensionDockEntry wide={true} t={t} />)
     const copy = await screen.findByText('插件、技能和桌面核心功能在这里')

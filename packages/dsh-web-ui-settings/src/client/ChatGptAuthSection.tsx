@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import type { ChatGptAuthState } from '../chatgpt-auth-protocol.ts'
+import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
+import type { ChatGptAuthState, ChatGptLoginMode } from '../chatgpt-auth-protocol.ts'
 import { chatGptAuthClient, ChatGptAuthClientError } from './chatgpt-auth-client.ts'
+import { reportFeatureEvent } from './feature-telemetry.ts'
 import type { ChatGptAuthKey } from './locales.ts'
+import { openExternalUrl } from './open-external.ts'
 import css from './chatgpt-auth.module.css'
 
 export interface ChatGptAuthSectionProps {
@@ -30,8 +33,24 @@ function needsRefresh(state: ChatGptAuthState): boolean {
   return state.inFlight || state.phase === 'starting' || state.phase === 'awaiting-user'
 }
 
-/** First-level settings surface for the official DSH 0.1.5 OpenAI Codex flow. */
-export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
+function pollDelay(state: ChatGptAuthState | undefined): number {
+  if (state === undefined) return 2000
+  return state.phase === 'awaiting-user' ? 2500 : 1200
+}
+
+function failureKey(code: string | undefined): ChatGptAuthKey {
+  if (code === 'TOKEN_EXCHANGE_FAILED') return 'tokenExchangeFailed'
+  if (code === 'AUTH_NETWORK_FAILED') return 'networkFailed'
+  if (code === 'ACCOUNT_NOT_AVAILABLE') return 'accountFailed'
+  if (code === 'AUTH_STATE_MISMATCH' || code === 'AUTH_CODE_MISSING') return 'callbackFailed'
+  if (code === 'CREDENTIAL_STORE_FAILED' || code === 'NOT_COMMITTED' || code === 'NO_CREDENTIAL_STORE') {
+    return 'credentialFailed'
+  }
+  return 'failed'
+}
+
+/** First-level settings surface for the official DSH 0.1.6 OpenAI Codex flow. */
+export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): ReactNode {
   const [state, setState] = useState<ChatGptAuthState>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<SurfaceError>()
@@ -40,6 +59,8 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
   const mounted = useRef(false)
   const generation = useRef(0)
   const operationPending = useRef(false)
+  const viewed = useRef(false)
+  const loginAttempt = useRef<ChatGptLoginMode>()
 
   useEffect(() => {
     mounted.current = true
@@ -72,11 +93,37 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
       if (next !== undefined && !needsRefresh(next)) return
       // Re-arm after unchanged waiting states and retry transient failures.
       // Schedule only after settlement so state requests never overlap.
-      timer = window.setTimeout(() => { void poll() }, next === undefined ? 2000 : 900)
+      timer = window.setTimeout(() => { void poll() }, pollDelay(next))
     }
     void poll()
     return () => { disposed = true; window.clearTimeout(timer) }
   }, [refresh, pollingRequired, pending, refreshEpoch])
+
+  useEffect(() => {
+    if (viewed.current || state?.available !== true) return
+    viewed.current = true
+    reportFeatureEvent({ feature: 'chatgpt-login', outcome: 'viewed', detail: 'entry' })
+  }, [state?.available])
+
+  useEffect(() => {
+    const mode = loginAttempt.current
+    if (mode === undefined || state === undefined) return
+    if (state.configured && state.phase === 'authorized') {
+      reportFeatureEvent({
+        feature: 'chatgpt-login',
+        outcome: 'succeeded',
+        detail: mode === 'device_code' ? 'device-code' : 'browser',
+      })
+      loginAttempt.current = undefined
+    } else if (state.phase === 'failed') {
+      reportFeatureEvent({
+        feature: 'chatgpt-login',
+        outcome: 'failed',
+        detail: mode === 'device_code' ? 'device-code' : 'browser',
+      })
+      loginAttempt.current = undefined
+    }
+  }, [state])
 
   const run = useCallback(async (operation: () => Promise<ChatGptAuthState>) => {
     if (operationPending.current) return
@@ -104,15 +151,39 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
   const openBrowser = useCallback(() => {
     const href = state?.notice?.url
     if (href === undefined) return
-    try {
-      const url = new URL(href)
-      if (url.protocol !== 'https:' || url.username !== '' || url.password !== '') return
-      const authWindow = window.open('about:blank', '_blank')
-      if (authWindow !== null) authWindow.location.href = url.href
-    } catch {
-      setError('authorization')
-    }
+    if (!openExternalUrl(href)) setError('authorization')
   }, [state?.notice?.url])
+
+  const startLogin = useCallback((mode: ChatGptLoginMode) => {
+    loginAttempt.current = mode
+    reportFeatureEvent({
+      feature: 'chatgpt-login',
+      outcome: 'started',
+      detail: mode === 'device_code' ? 'device-code' : 'browser',
+    })
+    void run(async () => {
+      try {
+        return await chatGptAuthClient.begin(mode)
+      } catch (cause) {
+        if (loginAttempt.current === mode) {
+          loginAttempt.current = undefined
+          reportFeatureEvent({
+            feature: 'chatgpt-login',
+            outcome: 'failed',
+            detail: mode === 'device_code' ? 'device-code' : 'browser',
+          })
+        }
+        throw cause
+      }
+    })
+  }, [run])
+
+  const openModels = useCallback(() => {
+    reportFeatureEvent({ feature: 'chatgpt-login', outcome: 'continued', detail: 'model-picker' })
+    void openDesktopSurface('extensions', { setting: 'models' }).then(opened => {
+      if (opened) close()
+    }).catch(() => { setError('transport') })
+  }, [close])
 
   const submitAnswer = useCallback((value: string) => {
     const prompt = state?.prompt
@@ -156,7 +227,14 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
           </p>
         )}
         {state?.phase === 'failed' && error === undefined && (
-          <p className={css.error} role="alert">{t('failed' satisfies ChatGptAuthKey)}</p>
+          <p className={css.error} role="alert">{t(failureKey(state.errorCode))}</p>
+        )}
+
+        {state?.configured === true && (
+          <div className={css.success} role="status">
+            <p>{t('signedInGuide')}</p>
+            <button type="button" className={css.secondaryButton} onClick={openModels}>{t('chooseModel')}</button>
+          </div>
         )}
 
         {state?.notice !== undefined && (
@@ -169,9 +247,12 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
               </div>
             )}
             {state.notice.url !== undefined && (
-              <button type="button" className={css.secondaryButton} onClick={openBrowser}>
-                {t('openBrowser' satisfies ChatGptAuthKey)}
-              </button>
+              <>
+                <p className={css.browserGuide}>{t('browserGuide')}</p>
+                <button type="button" className={css.secondaryButton} onClick={openBrowser}>
+                  {t('openBrowser' satisfies ChatGptAuthKey)}
+                </button>
+              </>
             )}
           </div>
         )}
@@ -230,7 +311,7 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
               type="button"
               className={css.primaryButton}
               disabled={pending || state?.available !== true || !state.writable || state.inFlight}
-              onClick={() => { void run(() => chatGptAuthClient.begin()) }}
+              onClick={() => { startLogin('browser') }}
             >
               {pending || state?.phase === 'starting' ? (
                 <>
@@ -245,12 +326,25 @@ export function ChatGptAuthSection({ t }: ChatGptAuthSectionProps): ReactNode {
               )}
             </button>
           )}
+          {state?.configured !== true && state?.inFlight !== true && (
+            <button
+              type="button"
+              className={css.secondaryButton}
+              disabled={pending || state?.available !== true || !state.writable}
+              onClick={() => { startLogin('device_code') }}
+            >
+              {t('deviceLogin')}
+            </button>
+          )}
           {state?.inFlight === true && (
             <button
               type="button"
               className={css.quietButton}
               disabled={pending}
-              onClick={() => { void run(() => chatGptAuthClient.cancel()) }}
+              onClick={() => {
+                loginAttempt.current = undefined
+                void run(() => chatGptAuthClient.cancel())
+              }}
             >
               {t('cancel' satisfies ChatGptAuthKey)}
             </button>
