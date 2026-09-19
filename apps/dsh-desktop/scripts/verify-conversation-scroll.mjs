@@ -554,7 +554,10 @@ try {
     const nativeWindow = await activeApp.browserWindow(second.page)
     // Native-default layout no longer spends 260px on a legacy Explorer.
     // Narrow the actual conversation, not a window size that used to imply it.
-    await nativeWindow.evaluate(window => window.setSize(1000, 820))
+    await nativeWindow.evaluate(window => {
+      window.unmaximize()
+      window.setContentSize(900, 820)
+    })
     await second.page.waitForFunction(() => document.querySelector('[data-pane="conversation"]')?.getBoundingClientRect().width < 800)
     assert.equal(await rail.isVisible(), false, 'DSH hides its native rail in a narrow container')
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'narrow Desktop stays free of the removed pager')
@@ -566,7 +569,7 @@ try {
       return scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
     })
 
-    await nativeWindow.evaluate(window => window.setSize(1700, 820))
+    await nativeWindow.evaluate(window => window.setContentSize(1700, 820))
     await rail.waitFor({ state: 'visible' })
     await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
   } else {
