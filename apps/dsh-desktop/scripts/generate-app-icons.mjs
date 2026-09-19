@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { deflateSync } from 'node:zlib'
 
 import sharp from 'sharp'
 
@@ -86,30 +87,90 @@ function icns(images) {
   return Buffer.concat([header, ...chunks])
 }
 
-function roundedTile(width, height, radius, color) {
-  const data = Buffer.alloc(width * height * 4)
-  const [red, green, blue] = color
+function crc32(buffer) {
+  let crc = 0xffffffff
+  for (const byte of buffer) {
+    crc ^= byte
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function pngChunk(type, data) {
+  const typeBuffer = Buffer.from(type, 'ascii')
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(data.length)
+  const checksum = Buffer.alloc(4)
+  checksum.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])))
+  return Buffer.concat([length, typeBuffer, data, checksum])
+}
+
+function encodeRgbaPng(width, height, pixels) {
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header[8] = 8
+  header[9] = 6
+  const scanlines = Buffer.alloc((width * 4 + 1) * height)
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (width * 4 + 1)
+    scanlines[row] = 0
+    pixels.copy(scanlines, row + 1, y * width * 4, (y + 1) * width * 4)
+  }
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(scanlines, { level: 9 })),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+function paintRoundedTile(canvas, canvasWidth, left, top, width, height, radius, color) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const cornerX = x < radius ? radius - x : x >= width - radius ? x - (width - radius - 1) : 0
       const cornerY = y < radius ? radius - y : y >= height - radius ? y - (height - radius - 1) : 0
-      const inside = cornerX === 0 || cornerY === 0 || (cornerX * cornerX + cornerY * cornerY <= radius * radius)
-      if (!inside) continue
-      const offset = (y * width + x) * 4
-      data[offset] = red
-      data[offset + 1] = green
-      data[offset + 2] = blue
-      data[offset + 3] = 255
+      if (cornerX !== 0 && cornerY !== 0 && cornerX * cornerX + cornerY * cornerY > radius * radius) continue
+      const offset = ((top + y) * canvasWidth + left + x) * 4
+      canvas[offset] = color[0]
+      canvas[offset + 1] = color[1]
+      canvas[offset + 2] = color[2]
+      canvas[offset + 3] = 255
     }
   }
-  return { input: data, raw: { width, height, channels: 4 } }
+}
+
+function compositeRgba(canvas, canvasWidth, sourcePixels, sourceWidth, sourceHeight, left, top) {
+  for (let y = 0; y < sourceHeight; y += 1) {
+    for (let x = 0; x < sourceWidth; x += 1) {
+      const sourceOffset = (y * sourceWidth + x) * 4
+      const alpha = sourcePixels[sourceOffset + 3]
+      if (alpha === 0) continue
+      const targetOffset = ((top + y) * canvasWidth + left + x) * 4
+      if (alpha === 255) {
+        sourcePixels.copy(canvas, targetOffset, sourceOffset, sourceOffset + 4)
+        continue
+      }
+      const inverse = 255 - alpha
+      for (let channel = 0; channel < 3; channel += 1) {
+        canvas[targetOffset + channel] = Math.round((sourcePixels[sourceOffset + channel] * alpha + canvas[targetOffset + channel] * inverse) / 255)
+      }
+      canvas[targetOffset + 3] = 255
+    }
+  }
 }
 
 async function preview(imagesBySize) {
   const width = 720
   const height = 240
   const sizes = [16, 24, 32, 48, 64, 96]
-  const panels = []
+  const canvas = Buffer.alloc(width * height * 4)
+  for (let offset = 0; offset < canvas.length; offset += 4) {
+    canvas[offset] = 238
+    canvas[offset + 1] = 242
+    canvas[offset + 2] = 247
+    canvas[offset + 3] = 255
+  }
   for (let row = 0; row < 2; row += 1) {
     for (let column = 0; column < sizes.length; column += 1) {
       const size = sizes[column]
@@ -117,23 +178,21 @@ async function preview(imagesBySize) {
       const y = 16 + row * 112
       const tileWidth = 96
       const tileHeight = 96
-      panels.push({
-        ...roundedTile(tileWidth, tileHeight, 8, row === 0 ? [255, 255, 255] : [7, 21, 47]),
-        left: x,
-        top: y,
-      })
+      paintRoundedTile(canvas, width, x, y, tileWidth, tileHeight, 8, row === 0 ? [255, 255, 255] : [7, 21, 47])
       const icon = imagesBySize.get(size) ?? await png(size)
-      panels.push({
-        input: icon,
-        left: x + Math.floor((tileWidth - size) / 2),
-        top: y + Math.floor((tileHeight - size) / 2),
-      })
+      const { data, info } = await sharp(icon).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      compositeRgba(
+        canvas,
+        width,
+        data,
+        info.width,
+        info.height,
+        x + Math.floor((tileWidth - size) / 2),
+        y + Math.floor((tileHeight - size) / 2),
+      )
     }
   }
-  return sharp({ create: { width, height, channels: 4, background: '#eef2f7' } })
-    .composite(panels)
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toBuffer()
+  return encodeRgbaPng(width, height, canvas)
 }
 
 async function expectedOutputs() {
