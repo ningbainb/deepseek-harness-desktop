@@ -13,6 +13,12 @@ const output = resolve(process.env.DSH_DESKTOP_E2E_SCREENSHOT ?? resolve(tempora
 const dockOutput = process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT
   ? resolve(process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT)
   : undefined
+const pluginDockOutput = process.env.DSH_DESKTOP_E2E_PLUGIN_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_PLUGIN_SCREENSHOT)
+  : undefined
+const skillDockOutput = process.env.DSH_DESKTOP_E2E_SKILL_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_SKILL_SCREENSHOT)
+  : dockOutput
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const marketInstallId = process.env.DSH_DESKTOP_E2E_MARKET_INSTALL_ID
 if (marketInstallId !== undefined && !/^[A-Za-z0-9_-]{20}$/u.test(marketInstallId)) {
@@ -182,6 +188,7 @@ try {
   assert.ok(extensionWindow, 'plugin-management shortcut did not open extensions.html')
   await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
   assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
+  if (pluginDockOutput) await extensionWindow.screenshot({ path: pluginDockOutput })
 
   await page.bringToFront()
   await skillManagementTrigger.click()
@@ -192,7 +199,7 @@ try {
     1,
     'management shortcuts must reuse the singleton Extension Dock window',
   )
-  if (dockOutput) await extensionWindow.screenshot({ path: dockOutput })
+  if (skillDockOutput) await extensionWindow.screenshot({ path: skillDockOutput })
 
   await page.bringToFront()
   await pluginManagementTrigger.click()
@@ -240,7 +247,8 @@ try {
     },
     installedMarketPlugin,
     screenshot: output,
-    dockScreenshot: dockOutput,
+    dockScreenshot: skillDockOutput,
+    pluginDockScreenshot: pluginDockOutput,
   }))
 } catch (error) {
   console.error(JSON.stringify({

@@ -327,7 +327,13 @@ input[type="search"] {
 input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: 0 0 0 2px rgb(77 120 232 / 14%); }
 .risk-check { display: flex; align-items: center; gap: 8px; margin: 11px 0 0; color: var(--harness-text-secondary); font-weight: 400; cursor: pointer; }
 .risk-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--harness-accent); }
-.skill-actions { display: flex; gap: 8px; }
+.skill-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.skill-actions-copy { display: grid; min-width: 0; gap: 3px; }
+.skill-actions-copy strong { color: var(--harness-text); font-size: 12px; font-weight: 600; }
+.skill-actions-copy small { overflow: hidden; color: var(--harness-text-secondary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.skill-list .item { grid-template-columns: minmax(0, 1fr) auto; min-height: 58px; padding: 10px 12px; }
+.skill-list .description { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-source { min-width: 88px; border-color: var(--harness-border); color: var(--harness-text-secondary); white-space: nowrap; }
 
 .list { display: block; }
 .item + .item { border-top: 1px solid var(--harness-border); }
@@ -915,4 +921,11 @@ input[role="switch"] { width: 34px; height: 18px; flex: 0 0 34px; margin: 0; acc
   .plugin-advanced-information dl > div { grid-template-columns: 1fr; gap: var(--space-1); }
   .market-controls,
   .market-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .skill-actions { align-items: flex-start; flex-direction: column; }
+  .skill-list .item { grid-template-columns: 1fr; }
+  .skill-list .item-actions { justify-content: flex-start; }
+  .skill-source { justify-self: start; }
 }

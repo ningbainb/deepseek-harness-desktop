@@ -38,7 +38,6 @@ const nativePluginGrid = document.querySelector('#native-plugin-grid')
 const nativeResultState = document.querySelector('#native-result-state')
 const skillCount = document.querySelector('#skill-count')
 const marketCount = document.querySelector('#market-count')
-const sidebarMarketCount = document.querySelector('#sidebar-market-count')
 const marketBridge = document.querySelector('#market-bridge')
 const marketTotal = document.querySelector('#market-total')
 const marketUpdated = document.querySelector('#market-updated')
@@ -652,7 +651,14 @@ function renderNativePlugins(installedPlugins = cachedInstalledPlugins) {
 
 function skillMarkup(skill) {
   const shadow = skill.shadowed ? '<span class="badge shadowed">SHADOWED</span>' : ''
-  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(skill.name)}</span>${shadow}</div><p class="description">${escapeHtml(skill.description)}</p></div><button type="button" class="item-action" data-open-skill="${escapeHtml(skill.id)}">${escapeHtml(skill.source)}</button></article>`
+  const sourceLabels = {
+    'project-dsh': '项目 · .dsh',
+    'project-agents': '项目 · .agents',
+    'user-dsh': '用户 · .dsh',
+    'user-agents': '用户 · .agents',
+  }
+  const source = sourceLabels[skill.source] ?? skill.source
+  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(skill.name)}</span>${shadow}</div><p class="description">${escapeHtml(skill.description)}</p></div><button type="button" class="item-action skill-source" data-open-skill="${escapeHtml(skill.id)}" title="打开 ${escapeHtml(skill.source)} 技能目录">${escapeHtml(source)}</button></article>`
 }
 
 function communityPluginMarkup(plugin) {
@@ -757,7 +763,6 @@ function refreshMarket({ force = false } = {}) {
         ? '已接入 dshmarket 兼容目录；安装、卸载和回滚由 Desktop 安全事务接管。'
         : '社区目录已接入；安装、卸载和回滚由 Desktop 安全事务接管。'
       marketCount.textContent = compactNumber.format(catalog.count)
-      sidebarMarketCount.textContent = compactNumber.format(catalog.count)
       marketTotal.textContent = compactNumber.format(catalog.count)
       marketUpdated.textContent = catalog.updated ?? '--'
       const selectedCategory = marketCategory.value
@@ -780,7 +785,6 @@ function refreshMarket({ force = false } = {}) {
       marketView = undefined
       marketBridge.textContent = '市场目录暂时不可用；不会影响已安装插件。'
       marketCount.textContent = '--'
-      sidebarMarketCount.textContent = '--'
       marketTotal.textContent = '--'
       marketUpdated.textContent = '--'
       marketResultState.textContent = '社区目录暂时不可用'
@@ -1193,13 +1197,13 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'market-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
 let activeSettingsTab
 const groupTitles = {
-  plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能'], qqbot: ['扩展能力', 'QQ 机器人'],
+  plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能中心'], qqbot: ['扩展能力', 'QQ 机器人'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
 function activateTab(tab, focus = false, settingOverride) {
@@ -1293,9 +1297,9 @@ const searchEntries = [
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
-  ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-hub-tab'],
+  ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
-  ['技能', '导入技能 Skill', 'skills-tab'],
+  ['技能中心', '导入技能 Skill', 'skills-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
   ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
   ['环境预设', '备份 导入 导出 Preset', 'presets-tab'],

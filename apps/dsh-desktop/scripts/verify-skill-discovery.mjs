@@ -84,7 +84,8 @@ try {
   const row = dock.locator('#skill-list .item').filter({ hasText: skillName })
   await row.waitFor({ state: 'visible', timeout: 20_000 })
   assert.match(await row.textContent() ?? '', /Desktop canonical skill root check/u)
-  assert.match(await row.textContent() ?? '', /user-dsh/iu)
+  assert.match(await row.textContent() ?? '', /用户 · \.dsh/iu)
+  assert.match(await row.locator('[data-open-skill]').getAttribute('title') ?? '', /user-dsh/iu)
   assert.match(await dock.locator('#skills').textContent() ?? '', /~\/.dsh\/skills/u)
 
   const apiPayload = await page.evaluate(async () => {

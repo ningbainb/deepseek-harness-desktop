@@ -1,12 +1,12 @@
 # 开发流程（development）
 
-dsh-web-ui 是 DeepSeek Harness Web GUI 的插件与皮肤 monorepo。本文定义
-贡献者日常流程；仓库规则见根 [AGENTS.md](../AGENTS.md)，包级规则见
-[packages/AGENTS.md](../packages/AGENTS.md)，文档标准见 [AGENTS.md](AGENTS.md)。
+dsh-web-ui 是 DeepSeek Harness Web GUI 的插件与皮肤 monorepo。仓库、包级和
+文档规则分别见根 [AGENTS.md](../AGENTS.md)、[packages/AGENTS.md](../packages/AGENTS.md)
+和 [AGENTS.md](AGENTS.md)。
 
 ## 环境准备
 
-- Node.js >= 22 与 pnpm 11；
+- Node.js >= 22.19 与 pnpm 11；
 - 依赖解析官方 NPM SDK（registry.npmjs.org）。仍使用私有 scope 认证时需
   `NPM_TOKEN` 环境变量（真实令牌只放环境变量，勿提交）；token 配置放
   用户级 `~/.npmrc`，项目 `.npmrc` 只留 scope 映射（见
@@ -30,28 +30,18 @@ skin-center / docs / emoji）。
 
 ### 审核远程 PR
 
-维护者可用 `node scripts/pr-review.mjs` 本地批量审核外部 PR（一次多个，
-如 `--open` 审核全部 open PR）：先做静态硬性检查（规模上限新增/删除各
-1 万行直接拒绝、禁止提交依赖缓存与密钥、emoji 扫描、PR 模板必填项、
-密钥扫描、CI 文件保护），再在工作区 worktree 上按 CI 门禁序列构建验证
-（install/typecheck/gallery/skin-center/community/build/test/
-test:scripts/aggregate/docs）。worktree 与 e2e 验证统一放在
-`~/remote-e2e`（同 head 复用，跑完保留便于排查），定期用
-`pnpm pr:review --cleanup` 或手动 `rm -rf ~/remote-e2e` 清理。
+维护者可用 `node scripts/pr-review.mjs` 批量审核外部 PR（`--open` 审核全部）：
+先检查规模、缓存、密钥、emoji、模板和 CI 文件，再在隔离 worktree 运行完整
+CI 门禁。验证目录统一放在 `~/remote-e2e`，同 head 复用；定期运行
+`pnpm pr:review --cleanup` 清理。
 
-皮肤 PR 额外自动做视觉验证：生成亮/暗预览与画廊页截图（
-`~/remote-e2e/e2e-<pr>/previews/`），像素指标分析自动判定过曝
-（太闪）与对比度不足（看不清），截图供视觉模型复核；同时提醒
-作者声明贡献者版权（模板「贡献者版权声明」节），并检查新皮肤
-是否适配画廊（`gallery/bundles.js`/`gallery/manifest.js` 注册与
-`docs/screenshots/` 截图）。
-用法与 verdict 语义见脚本头部注释；`pnpm pr:review --help` 查看全部选项。
+皮肤 PR 还会生成亮/暗预览与画廊截图，检查过曝、对比度、版权声明和画廊注册。
+用法与 verdict 语义见脚本注释或 `pnpm pr:review --help`。
 
 ### 修改 shared 运行时模块
 
-shared/ 是 settings 卡片、轮询护栏、DSH_HOME 解析等跨包模块的唯一事实源；各包内的
-同名文件是 scripts/sync-shared.mjs 生成的同步副本。改 shared 源后运行
-node scripts/sync-shared.mjs 并把副本一并提交；pnpm test:scripts 的 drift 门禁防止副本漂移。
+shared/ 是跨包模块的唯一事实源；包内同名文件由 `scripts/sync-shared.mjs` 生成。
+修改后运行该脚本并提交副本；`pnpm test:scripts` 会检查漂移。
 
 ### 新增插件包
 

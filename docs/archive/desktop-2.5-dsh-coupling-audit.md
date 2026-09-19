@@ -597,7 +597,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs | 48 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs | 158 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-directory-picker.mjs | 58 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs | 72 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs | 78 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-dock-model-catalog.mjs | 34 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-dock-settings.mjs | 31 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 9 | ensureDesktopProfile |

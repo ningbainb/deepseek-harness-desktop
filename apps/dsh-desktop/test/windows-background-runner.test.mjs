@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url)
 
 test('repeated official Windows Job children create no visible console under Electron', {
   skip: process.platform !== 'win32',
-  timeout: 60_000,
+  timeout: 90_000,
 }, async () => {
   const observer = await startWindowsConsoleObserver()
   let result
@@ -27,7 +27,7 @@ test('repeated official Windows Job children create no visible console under Ele
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       windowsHide: true,
       encoding: 'utf8',
-      timeout: 55_000,
+      timeout: 85_000,
     })
   } finally { observation = await observer.stop() }
   assert.equal(result.status, 0, `${result.error ?? ''}\n${result.stderr}\n${result.stdout}`)

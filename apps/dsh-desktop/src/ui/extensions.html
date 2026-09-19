@@ -25,8 +25,7 @@
           <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
           <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
-          <button type="button" class="tab" id="market-hub-tab" role="tab" aria-controls="market" data-tab="market" data-group="plugins"><span class="tab-title">创意工坊</span><small id="sidebar-market-count">--</small></button>
-          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
+          <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能中心</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
           <p class="nav-group-label">桌面体验</p>
           <button type="button" class="tab" id="appearance-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="appearance" data-group="skins"><span class="tab-title">皮肤与壁纸</span></button>
@@ -102,7 +101,7 @@
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
         <div class="panel-head">
-          <div><h2 id="plugin-heading">插件</h2></div>
+          <div><h2 id="plugin-heading">已安装插件</h2></div>
           <p>统一管理已安装插件的启停、更新、卸载和恢复；创意工坊只负责发现与安装。</p>
         </div>
         <label class="plugin-search" for="plugin-search"><span class="sr-only">搜索已安装插件</span><input type="search" id="plugin-search" placeholder="搜索插件…" autocomplete="off" spellcheck="false"></label>
@@ -191,16 +190,16 @@
         </details>
       </section>
 
-      <section id="skills" class="panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
+      <section id="skills" class="panel skills-panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
         <div class="panel-head">
           <div><h2 id="skill-heading">技能目录</h2></div>
           <p>统一展示项目与用户技能；用户技能默认写入 <code>~/.dsh/skills</code>，并兼容扫描 <code>~/.agents/skills</code>。</p>
         </div>
         <div class="skill-actions">
-          <button type="button" class="primary" id="import-skill">导入技能目录</button>
-          <button type="button" class="secondary" id="open-skill-root">打开用户技能目录</button>
+          <div class="skill-actions-copy"><strong>用户技能目录</strong><small>默认 ~/.dsh/skills，兼容 ~/.agents/skills</small></div>
+          <div class="item-actions"><button type="button" class="primary" id="import-skill">导入目录</button><button type="button" class="secondary" id="open-skill-root">打开目录</button></div>
         </div>
-        <div class="list" id="skill-list" aria-live="polite"></div>
+        <div class="list skill-list" id="skill-list" aria-live="polite"></div>
       </section>
 
       <section id="presets" class="panel" role="tabpanel" aria-labelledby="presets-tab" hidden>

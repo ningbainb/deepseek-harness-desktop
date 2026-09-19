@@ -61,7 +61,11 @@ try {
       cwd: process.cwd(),
       stdio: { stdin: 'ignore', stdout: { maxBytes: 16_384 }, stderr: { maxBytes: 16_384 } },
       graceMs: 1_000,
-      signal: AbortSignal.timeout(15_000),
+      // A fresh hosted Windows runner may spend more than 15 seconds preparing
+      // PowerShell's first-use module cache before Add-Type executes. Keep the
+      // repeated warm probes strict while giving only the first cold probe a
+      // bounded startup allowance.
+      signal: AbortSignal.timeout(index === 0 ? 30_000 : 15_000),
     })
     const outcome = await handle.done
     await handle.waitForExit()
