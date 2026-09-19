@@ -236,7 +236,7 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
                 if (options?.setting !== undefined && !['control-center', 'value-mode'].includes(options.setting)) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting');
                 }
-                if (options?.tab !== undefined && !['plugins', 'market'].includes(options.tab)) {
+                if (options?.tab !== undefined && !['plugins', 'market', 'skills'].includes(options.tab)) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock tab');
                 }
                 if (options?.setting !== undefined && options?.tab !== undefined) {

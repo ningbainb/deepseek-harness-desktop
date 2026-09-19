@@ -20,7 +20,7 @@ import { WebUiSettingsBinder } from './compat-settings-scope.ts'
 import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
-import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry } from './desktop-extension-dock.tsx'
+import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { DockSettingsPage, dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { projectCopy } from './ProjectDialog.tsx'
 import { installBrowserClose, installProjectDialog } from './desktop-interactions.tsx'
@@ -94,6 +94,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
   ctx.effect(() => ctx.locale.register('chatgpt-auth', { zh: chatGptAuthZh, en: chatGptAuthEn }), 'web-ui-settings: ChatGPT dictionaries')
   ctx.effect(() => ctx.locale.register('relay-onboarding', { zh: relayZh, en: relayEn }), 'web-ui-settings: relay dictionaries')
+  if (!dockSetting) ctx.effect(
+    () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins')),
+    'web-ui-settings: unified Desktop management routing',
+  )
 
   // The rc.6 compatibility binder: family plugins read ctx.get('webUiSettings')
   // and fall back to the official settings scope on hosts that expose their

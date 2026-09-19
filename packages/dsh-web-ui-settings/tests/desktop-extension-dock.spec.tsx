@@ -16,6 +16,7 @@ import {
   DesktopCollaborationEntry,
   DesktopExtensionDockEntry,
   calculateDockNudgePosition,
+  installDesktopManagementRouting,
 } from '../src/client/desktop-extension-dock.tsx'
 import { zh } from '../src/client/locales.ts'
 
@@ -34,6 +35,23 @@ afterEach(() => {
 })
 
 describe('Desktop Extension Dock entry', () => {
+  it('opens the same Dock management pages from the main sidebar', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="插件">插件</button><button data-dsh-skill-explorer-entry aria-label="技能中心">技能中心</button></aside>'
+    const dispose = installDesktopManagementRouting(document, t)
+    const plugin = screen.getByRole('button', { name: '插件' })
+    const skill = screen.getByRole('button', { name: '技能中心' })
+    await waitFor(() => expect(plugin.dataset.dshDesktopManagementEntry).toBe('plugins'))
+    expect(skill.dataset.dshDesktopManagementEntry).toBe('skills')
+
+    fireEvent.click(plugin)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'plugins' }))
+    fireEvent.click(skill)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'skills' }))
+    expect(desktop.openDesktopSurface).toHaveBeenCalledTimes(2)
+    dispose()
+    expect(plugin.dataset.dshDesktopManagementEntry).toBeUndefined()
+  })
+
   it('shows a collaboration shortcut only on Desktop and deep-links to the unified page', async () => {
     render(<DesktopCollaborationEntry wide={true} t={t} />)
     const trigger = await screen.findByRole('button', { name: '模型协作' })

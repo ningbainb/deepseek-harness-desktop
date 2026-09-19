@@ -22,6 +22,95 @@ export type DesktopExtensionDockEntryProps = {
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string
 }
 
+type ManagementTab = 'plugins' | 'skills'
+
+/**
+ * Reuse the Runtime's existing Plugins and Skill Center sidebar rows while
+ * making the Extension Dock their single Desktop destination. The original
+ * plugin surfaces remain mounted for ordinary Web hosts and for their APIs.
+ */
+export function installDesktopManagementRouting(
+  ownerDocument: Document,
+  t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string,
+): () => void {
+  let disposed = false
+  let observer: MutationObserver | undefined
+  const managed = new Set<HTMLElement>()
+  const opening = new WeakSet<HTMLElement>()
+
+  const mark = (entry: HTMLElement | null | undefined, tab: ManagementTab): void => {
+    if (entry === null || entry === undefined) return
+    entry.dataset.dshDesktopManagementEntry = tab
+    managed.add(entry)
+  }
+  const scan = (): void => {
+    const sidebar = ownerDocument.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
+    if (sidebar === null) return
+    const plugin = [...sidebar.querySelectorAll<HTMLElement>('button')].find((button) => {
+      if (button.closest('[data-slot="sidebar.footer.action"]') !== null) return false
+      const label = button.getAttribute('aria-label')?.trim() || button.textContent?.trim() || ''
+      return /^(?:插件|Plugins)$/iu.test(label.replace(/\s+/gu, ' '))
+    })
+    mark(plugin, 'plugins')
+    mark(sidebar.querySelector<HTMLElement>('[data-dsh-skill-explorer-entry]'), 'skills')
+  }
+  const clearError = (entry: HTMLElement): void => {
+    entry.removeAttribute('aria-invalid')
+    entry.parentElement?.querySelector('[data-dsh-management-routing-error]')?.remove()
+  }
+  const showError = (entry: HTMLElement, tab: ManagementTab): void => {
+    clearError(entry)
+    entry.setAttribute('aria-invalid', 'true')
+    const message = ownerDocument.createElement('span')
+    message.dataset.dshManagementRoutingError = ''
+    message.className = css.managementRoutingError
+    message.setAttribute('role', 'alert')
+    message.textContent = t(tab === 'plugins' ? 'pluginManagementOpenFailed' : 'skillManagementOpenFailed')
+    entry.insertAdjacentElement('afterend', message)
+  }
+  const onClick = (event: Event): void => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>('[data-dsh-desktop-management-entry]')
+      : null
+    if (target === null || !ownerDocument.contains(target)) return
+    const tab = target.dataset.dshDesktopManagementEntry
+    if (tab !== 'plugins' && tab !== 'skills') return
+    event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+    if (opening.has(target)) return
+    opening.add(target)
+    target.setAttribute('aria-busy', 'true')
+    clearError(target)
+    void openDesktopSurface('extensions', { tab }).then(opened => {
+      if (!opened) showError(target, tab)
+    }).catch(() => showError(target, tab)).finally(() => {
+      opening.delete(target)
+      target.removeAttribute('aria-busy')
+    })
+  }
+
+  void hasCapability('extensions.open').then((available) => {
+    if (disposed || !available) return
+    ownerDocument.addEventListener('click', onClick, true)
+    observer = new MutationObserver(scan)
+    observer.observe(ownerDocument.body, { childList: true, subtree: true })
+    scan()
+  }).catch(() => {})
+
+  return () => {
+    disposed = true
+    observer?.disconnect()
+    ownerDocument.removeEventListener('click', onClick, true)
+    for (const entry of managed) {
+      clearError(entry)
+      delete entry.dataset.dshDesktopManagementEntry
+      entry.removeAttribute('aria-busy')
+    }
+    managed.clear()
+  }
+}
+
 /** Desktop-only shortcut that opens the Smart Control center. */
 export function DesktopSmartControlEntry({ wide, t }: DesktopExtensionDockEntryProps) {
   const [available, setAvailable] = useState(false)

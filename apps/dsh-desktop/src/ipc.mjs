@@ -402,7 +402,7 @@ export function normalizeDesktopDockOpenOptions(value) {
   if (
     keys.some(key => key !== 'setting' && key !== 'tab')
     || (value.setting !== undefined && !['control-center', 'value-mode'].includes(value.setting))
-    || (value.tab !== undefined && !['plugins', 'market'].includes(value.tab))
+    || (value.tab !== undefined && !['plugins', 'market', 'skills'].includes(value.tab))
     || (value.setting !== undefined && value.tab !== undefined)
   ) {
     throw new TypeError('invalid Extension Dock navigation target')

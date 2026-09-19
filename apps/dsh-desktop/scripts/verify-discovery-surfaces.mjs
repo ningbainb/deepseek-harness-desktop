@@ -10,6 +10,9 @@ import { _electron as electron } from 'playwright'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-discovery-surfaces-e2e-'))
 const output = resolve(process.env.DSH_DESKTOP_E2E_SCREENSHOT ?? resolve(temporary, 'discovery-surfaces-preview.png'))
+const dockOutput = process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT)
+  : undefined
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const marketInstallId = process.env.DSH_DESKTOP_E2E_MARKET_INSTALL_ID
 if (marketInstallId !== undefined && !/^[A-Za-z0-9_-]{20}$/u.test(marketInstallId)) {
@@ -157,18 +160,44 @@ try {
   const codex = groups.find(group => /codex/iu.test(group.name ?? ''))
   assert.ok(codex, `OpenAI Codex provider is absent from the model selector: ${JSON.stringify(groups)}`)
   assert.ok(codex.models.length > 0, `OpenAI Codex has no selectable models: ${JSON.stringify(codex)}`)
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  const pluginManagementTrigger = page.getByRole('button', { name: /^(?:插件|Plugins)$/u })
+  const skillManagementTrigger = page.getByRole('button', { name: /^(?:技能中心|Skill Center)$/u })
+  await pluginManagementTrigger.waitFor({ state: 'visible' })
+  await skillManagementTrigger.waitFor({ state: 'visible' })
+  assert.equal(await pluginManagementTrigger.count(), 1, 'Desktop must expose exactly one plugin-management shortcut')
+  assert.equal(await skillManagementTrigger.count(), 1, 'Desktop must expose exactly one skill-management shortcut')
+  assert.equal(await pluginManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'plugins')
+  assert.equal(await skillManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'skills')
+  assert.equal(await page.locator('[data-dsh-skill-explorer-entry]').isVisible(), true)
   await page.screenshot({ path: output })
 
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  const dockTrigger = page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
   const extensionWindowPromise = electronApp.waitForEvent('window', {
     predicate: candidate => candidate.url().includes('extensions.html'),
     timeout: 10_000,
   }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
-  await dockTrigger.click()
+  await pluginManagementTrigger.click()
   extensionWindow = await extensionWindowPromise
-  assert.ok(extensionWindow, 'one-click Extension Dock entry did not open extensions.html')
+  assert.ok(extensionWindow, 'plugin-management shortcut did not open extensions.html')
+  await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
+  assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
+
+  await page.bringToFront()
+  await skillManagementTrigger.click()
+  await extensionWindow.locator('#skills').waitFor({ state: 'visible' })
+  assert.equal(await extensionWindow.locator('#skills-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(
+    electronApp.windows().filter(candidate => candidate.url().includes('extensions.html')).length,
+    1,
+    'management shortcuts must reuse the singleton Extension Dock window',
+  )
+  if (dockOutput) await extensionWindow.screenshot({ path: dockOutput })
+
+  await page.bringToFront()
+  await pluginManagementTrigger.click()
+  await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
+  assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
 
   let installedMarketPlugin
   if (marketInstallId !== undefined) {
@@ -211,6 +240,7 @@ try {
     },
     installedMarketPlugin,
     screenshot: output,
+    dockScreenshot: dockOutput,
   }))
 } catch (error) {
   console.error(JSON.stringify({

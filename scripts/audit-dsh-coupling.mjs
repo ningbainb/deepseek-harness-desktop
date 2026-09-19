@@ -211,7 +211,7 @@ async function main() {
       readFile(AUDIT_JSON_PATH, 'utf8'),
       readFile(AUDIT_MARKDOWN_PATH, 'utf8'),
     ])
-    if (existingJson !== json || existingMarkdown !== markdown) {
+    if (canonicalText(existingJson) !== json || canonicalText(existingMarkdown) !== markdown) {
       throw new Error('DSH coupling audit is stale; run node scripts/audit-dsh-coupling.mjs --write')
     }
     console.log('DSH coupling audit is current')

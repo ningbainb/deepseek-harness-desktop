@@ -25,7 +25,7 @@
           <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
           <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
-          <button type="button" class="tab" id="market-hub-tab" role="tab" aria-controls="market" data-tab="market" data-group="plugins"><span class="tab-title">插件市场</span><small id="sidebar-market-count">--</small></button>
+          <button type="button" class="tab" id="market-hub-tab" role="tab" aria-controls="market" data-tab="market" data-group="plugins"><span class="tab-title">创意工坊</span><small id="sidebar-market-count">--</small></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
           <p class="nav-group-label">桌面体验</p>
@@ -42,7 +42,7 @@
         <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
           <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
-          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">插件市场 <small id="market-count">--</small></button>
+          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">创意工坊 <small id="market-count">--</small></button>
           <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
         </nav>
         <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
@@ -103,7 +103,7 @@
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
         <div class="panel-head">
           <div><h2 id="plugin-heading">插件</h2></div>
-          <p>管理你安装的扩展能力。正常插件保持安静，只在需要操作时提示。</p>
+          <p>统一管理已安装插件的启停、更新、卸载和恢复；创意工坊只负责发现与安装。</p>
         </div>
         <label class="plugin-search" for="plugin-search"><span class="sr-only">搜索已安装插件</span><input type="search" id="plugin-search" placeholder="搜索插件…" autocomplete="off" spellcheck="false"></label>
         <section class="plugin-update-summary" id="plugin-update-summary" hidden><span id="plugin-update-summary-text"></span><button type="button" class="primary" id="update-all-plugins" data-mutation-control>全部更新</button></section>
@@ -134,8 +134,8 @@
         <header class="market-masthead">
           <div class="market-intro">
             <p class="market-kicker">发现扩展</p>
-            <h2>社区插件市场</h2>
-            <p>兼容 dshmarket 使用的社区目录；搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+            <h2>创意工坊</h2>
+            <p>用于发现和安装精选社区插件；安装完成后统一回到「插件」页管理，仍走本机原生事务。</p>
           </div>
           <div class="market-metrics" aria-label="目录状态">
             <div><strong id="market-total">--</strong><span>可安装条目</span></div>
@@ -194,7 +194,7 @@
       <section id="skills" class="panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
         <div class="panel-head">
           <div><h2 id="skill-heading">技能目录</h2></div>
-          <p>遵循官方五级优先顺序扫描。导入后由 DSH watcher 自动刷新，无需重启。</p>
+          <p>统一展示项目与用户技能；用户技能默认写入 <code>~/.dsh/skills</code>，并兼容扫描 <code>~/.agents/skills</code>。</p>
         </div>
         <div class="skill-actions">
           <button type="button" class="primary" id="import-skill">导入技能目录</button>

@@ -612,3 +612,12 @@
     transform: none !important;
   }
 }
+.managementRoutingError {
+  display: block;
+  box-sizing: border-box;
+  max-width: 260px;
+  margin: 4px 10px 8px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+  line-height: 16px;
+}

@@ -4927,7 +4927,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-discovery-surfaces.mjs",
-      "line": 69,
+      "line": 72,
       "operation": "DSH_HOME"
     },
     {
@@ -13435,49 +13435,49 @@
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 103,
+      "line": 107,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 111,
+      "line": 115,
       "operation": "settings.section"
-    },
-    {
-      "category": "slot",
-      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 121,
-      "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "line": 125,
+      "operation": "web-ui.plugin.item"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
+      "line": 129,
       "operation": "model-preferences.onboarding"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 136,
+      "line": 140,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 143,
+      "line": 147,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 150,
+      "line": 154,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 165,
+      "line": 169,
       "operation": "root"
     },
     {

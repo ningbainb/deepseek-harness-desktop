@@ -48,7 +48,9 @@
         "conversation-collaboration-entry",
         "conversation-smart-control-entry",
         "desktop-control-actions-require-approval",
-        "desktop-plugin-center-single-destination"
+        "desktop-plugin-center-single-destination",
+        "conversation-plugin-management-entry",
+        "conversation-skill-management-entry"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -379,10 +381,11 @@
     {
       "id": "skill-discovery",
       "name": "扩展坞与技能中心共享用户技能目录",
-      "uiSelector": "[data-dsh-skill-explorer-entry], [data-dsh-skill-explorer-view]",
+      "uiSelector": "[data-dsh-desktop-management-entry=\"skills\"], #skills",
       "e2eScript": "scripts/verify-skill-discovery.mjs",
       "features": [
         "skill-center-mounted-from-reviewed-direct-bundle",
+        "desktop-skill-center-single-management-destination",
         "extension-dock-and-skill-center-share-dsh-home-skills",
         "user-skill-visible-through-desktop-inventory-and-runtime-route",
         "conversation-skill-menu-supports-dsh4-composer",
@@ -647,6 +650,7 @@
         "plugin-update-refresh-outside-mutation-lock",
         "extension-dock-plugin-market-direct-entry",
         "extension-dock-plugin-market-deep-link-allowlist",
+        "extension-dock-skill-management-deep-link-allowlist",
         "dshmarket-catalog-bridge-with-desktop-owned-mutations",
         "plugin-repair-retry-within-active-operation",
         "plugin-diagnostics-use-loaded-inventory",

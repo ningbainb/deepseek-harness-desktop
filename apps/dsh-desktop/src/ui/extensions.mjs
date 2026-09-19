@@ -1293,7 +1293,7 @@ const searchEntries = [
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
-  ['插件市场', '插件市场 社区 群友作品', 'market-hub-tab'],
+  ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-hub-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
   ['技能', '导入技能 Skill', 'skills-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],

@@ -374,6 +374,7 @@ test('Extension Dock deep links accept only the collaboration settings and plugi
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'market' }), { tab: 'market' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'plugins' }), { tab: 'plugins' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'skills' }), { tab: 'skills' })
   for (const value of [null, 'value-mode', { setting: 'plugins' }, { tab: 'settings' }, { setting: 'value-mode', tab: 'market' }, { setting: 'value-mode', url: 'https://example.com' }]) {
     assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
   }

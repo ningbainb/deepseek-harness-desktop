@@ -9,7 +9,7 @@ export const DESKTOP_CLIENT_API_VERSION = '1.2.0'
 export type DesktopSurface = 'extensions' | 'updates'
 export type DesktopDockSetting = 'control-center' | 'value-mode'
 /** Desktop-managed extension destinations. `plugins` is the installed-plugin center. */
-export type DesktopDockTab = 'plugins' | 'market'
+export type DesktopDockTab = 'plugins' | 'market' | 'skills'
 export type DesktopSurfaceOpenOptions = Readonly<{ setting?: DesktopDockSetting; tab?: DesktopDockTab }>
 export type DesktopAvailability = { available: false; reason: 'unavailable' }
 export type DockDismissReason = 'close' | 'escape' | 'clicked'
@@ -341,7 +341,7 @@ export function createDesktopClient({ globalObject = globalThis }: { globalObjec
         if (options?.setting !== undefined && !['control-center', 'value-mode'].includes(options.setting)) {
           throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting')
         }
-        if (options?.tab !== undefined && !['plugins', 'market'].includes(options.tab)) {
+        if (options?.tab !== undefined && !['plugins', 'market', 'skills'].includes(options.tab)) {
           throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock tab')
         }
         if (options?.setting !== undefined && options?.tab !== undefined) {

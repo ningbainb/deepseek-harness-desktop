@@ -199,10 +199,18 @@ try {
   })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'focused')
   await page.evaluate(() => {
-    document.querySelector('#dsh-particle-focus-probe')?.remove()
+    const probe = document.querySelector('#dsh-particle-focus-probe')
+    if (probe instanceof HTMLElement) probe.blur()
+    probe?.remove()
+    // A removed focused node does not consistently emit focusout in Electron.
+    // Move focus to a real non-editable target so the page-mode controller
+    // receives a deterministic focus transition before asserting normal mode.
+    document.body.tabIndex = -1
     document.body.focus()
+    window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: false }))
   })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'normal')
+  await page.evaluate(() => { document.body.removeAttribute('tabindex') })
 
   await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate(button => button.click())
   const settingsDialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
@@ -305,12 +313,20 @@ try {
   console.log(`verified particle theme canvas, page profiles, multi-window settings ${JSON.stringify({ disableMs, enableMs })}, and frame budget ${JSON.stringify(frameStats)}`)
 } catch (error) {
   console.error('pending particle HTTP', [...pendingHttp.values()].map(item => ({ ...item, ageMs: Date.now() - item.started })))
-  const runtime = electronApp?.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+  const runtime = electronApp?.windows().find(candidate => /^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:)/u.test(candidate.url()))
   if (runtime) {
     console.error('particle failure state', await runtime.evaluate(() => ({
       mode: document.querySelector('canvas[data-dsh-particle-theme]')?.getAttribute('data-dsh-particle-mode'),
       focusTag: document.activeElement?.tagName,
       editable: document.activeElement?.getAttribute('contenteditable'),
+      dialogs: [...document.querySelectorAll('[role="dialog"], dialog')].map(element => ({
+        hidden: element.closest('[hidden]') !== null,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+        width: element.getBoundingClientRect().width,
+        height: element.getBoundingClientRect().height,
+        text: element.textContent?.trim().slice(0, 120),
+      })),
       inputs: [...document.querySelectorAll('textarea, [contenteditable]')].map(element => ({ tag: element.tagName, composer: element.getAttribute('data-composer-input'), editable: element.getAttribute('contenteditable') })),
     })).catch(() => ({})))
     if (screenshot) await runtime.screenshot({ path: screenshot.replace(/\.png$/iu, '-failure.png') }).catch(() => {})

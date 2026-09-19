@@ -27,6 +27,10 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u
 const RELATIVE_ARTIFACT_PATTERN = /^(?![\\/])(?!(?:.*(?:^|[\\/])\.\.(?:[\\/]|$)))[A-Za-z0-9@._/\\-]+$/u
 const PATCH_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 
+function canonicalText(value) {
+  return value.replace(/\r\n/g, '\n')
+}
+
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -450,7 +454,7 @@ async function main() {
   const target = resolve(output ?? RUNTIME_SUPPORT_MATRIX_PATH)
   if (process.argv.includes('--check')) {
     const actual = await readFile(target, 'utf8')
-    if (actual !== content) throw new Error('Supported runtime matrix is stale; run node scripts/generate-runtime-support-matrix.mjs --write')
+    if (canonicalText(actual) !== content) throw new Error('Supported runtime matrix is stale; run node scripts/generate-runtime-support-matrix.mjs --write')
     validateRuntimeSupportMatrix(JSON.parse(actual), { stableOnly: true })
     console.log('Supported runtime matrix is current')
     return

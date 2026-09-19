@@ -7,7 +7,7 @@ export declare const DESKTOP_CLIENT_API_VERSION = "1.2.0";
 export type DesktopSurface = 'extensions' | 'updates';
 export type DesktopDockSetting = 'control-center' | 'value-mode';
 /** Desktop-managed extension destinations. `plugins` is the installed-plugin center. */
-export type DesktopDockTab = 'plugins' | 'market';
+export type DesktopDockTab = 'plugins' | 'market' | 'skills';
 export type DesktopSurfaceOpenOptions = Readonly<{
     setting?: DesktopDockSetting;
     tab?: DesktopDockTab;
