@@ -90,8 +90,8 @@ jobs:
           set -euo pipefail
           version="$(node -p "require('../package.json').version")"
           shasum -a 256 \
-            DeepSeek-Harness-Desktop-${version}-arm64.dmg \
-            DeepSeek-Harness-Desktop-${version}-arm64.zip \
+            "DeepSeek-Harness-Desktop-${version}-arm64.dmg" \
+            "DeepSeek-Harness-Desktop-${version}-arm64.zip" \
             > SHA256SUMS-macos.txt
           shasum -a 256 -c SHA256SUMS-macos.txt
       - uses: actions/upload-artifact@v4
