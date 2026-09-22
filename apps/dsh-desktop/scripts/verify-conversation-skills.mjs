@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
@@ -46,6 +47,9 @@ try {
   await mkdir(skillRoot, { recursive: true })
   await mkdir(workspacePath, { recursive: true })
   await writeFile(resolve(skillRoot, 'SKILL.md'), `---\nname: ${skillName}\ndescription: Conversation skill menu release check\n---\n\n# Instructions\n`, 'utf8')
+  const userData = resolve(temporary, 'user-data')
+  await mkdir(userData, { recursive: true })
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }), 'utf8')
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
@@ -53,7 +57,7 @@ try {
     env: {
       ...process.env,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
-      DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
+      DSH_DESKTOP_USER_DATA: userData,
       DSH_HOME: dshHome,
     },
   })

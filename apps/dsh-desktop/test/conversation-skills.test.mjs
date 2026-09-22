@@ -113,6 +113,7 @@ test('skills surface exposes accessible menu, search, keyboard, and theme rules'
   assert.match(CONVERSATION_SKILLS_SCRIPT, /ArrowUp/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /Escape/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /MutationObserver/u)
+  assert.match(CONVERSATION_SKILLS_SCRIPT, /document\.addEventListener\('click', onOutsideInteraction, true\)/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /listSkills/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="指令"/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="命令"/u)

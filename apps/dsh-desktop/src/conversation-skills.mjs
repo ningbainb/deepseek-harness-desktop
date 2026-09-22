@@ -435,7 +435,7 @@ function installConversationSkillsPage() {
   mount()
   const observer = new MutationObserver(scheduleMount)
   observer.observe(document.body, { childList: true, subtree: true })
-  const onPointerDown = (event) => {
+  const onOutsideInteraction = (event) => {
     if (!state.open) return
     if (state.menu.contains(event.target) || state.button.contains(event.target)) return
     closeMenu()
@@ -464,7 +464,8 @@ function installConversationSkillsPage() {
     closeMenu()
   }
   const onResize = () => positionMenu()
-  document.addEventListener('pointerdown', onPointerDown, true)
+  document.addEventListener('pointerdown', onOutsideInteraction, true)
+  document.addEventListener('click', onOutsideInteraction, true)
   document.addEventListener('keydown', onKeyDown, true)
   document.addEventListener('focusin', onFocusIn, true)
   window.addEventListener('resize', onResize)
@@ -472,7 +473,8 @@ function installConversationSkillsPage() {
   state.refresh = scheduleMount
   state.dispose = () => {
     observer.disconnect()
-    document.removeEventListener('pointerdown', onPointerDown, true)
+    document.removeEventListener('pointerdown', onOutsideInteraction, true)
+    document.removeEventListener('click', onOutsideInteraction, true)
     document.removeEventListener('keydown', onKeyDown, true)
     document.removeEventListener('focusin', onFocusIn, true)
     window.removeEventListener('resize', onResize)
