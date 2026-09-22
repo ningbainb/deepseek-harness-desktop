@@ -213,6 +213,8 @@ test('window chrome script keeps child-window caption areas visually quiet', () 
   assert.match(script, /setWindowChromeTheme/)
   assert.match(script, /Promise\.resolve[\s\S]*?\.catch\(\(\) => \{\}\)/u)
   assert.match(script, /dsh-desktop-modal-layer/)
+  assert.match(script, /bounds\.width < window\.innerWidth \* 0\.7/u)
+  assert.match(script, /bounds\.height < window\.innerHeight \* 0\.7/u)
   assert.doesNotMatch(script, /LOCAL SURFACE|dsh-window-chrome-title|dsh-window-chrome-context/)
 })
 

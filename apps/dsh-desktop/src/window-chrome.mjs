@@ -538,9 +538,12 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         if (getComputedStyle(layer).position === 'fixed') break;
         layer = layer.parentElement;
       }
-      if (getComputedStyle(layer).position === 'fixed' && !layer.classList.contains('dsh-desktop-modal-layer')) {
-        layer.classList.add('dsh-desktop-modal-layer');
-      }
+      if (getComputedStyle(layer).position !== 'fixed' || layer.classList.contains('dsh-desktop-modal-layer')) return;
+      // Only viewport-sized backdrops need a title-bar inset. Compact dialogs
+      // (including the Skills picker) must keep their own height and hit area.
+      const bounds = layer.getBoundingClientRect();
+      if (bounds.width < window.innerWidth * 0.7 || bounds.height < window.innerHeight * 0.7) return;
+      layer.classList.add('dsh-desktop-modal-layer');
     };
     const markViewportRoot = () => (${markWindowChromeViewportRoot.toString()})({
       document, getComputedStyle, chromeHeight: data.chromeHeight,

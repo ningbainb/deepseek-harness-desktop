@@ -499,6 +499,21 @@ try {
   assert.ok(dynamicModal.top >= 31, JSON.stringify(dynamicModal))
   assert.equal(dynamicModal.afterRemoval, false)
   assert.equal(dynamicModal.afterAria, true)
+  const compactDialog = await page.evaluate(async () => {
+    const dialog = document.createElement('section')
+    dialog.setAttribute('role', 'dialog')
+    dialog.style.cssText = 'position:fixed;left:20px;top:80px;width:320px;height:280px'
+    document.body.append(dialog)
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const result = {
+      marked: dialog.classList.contains('dsh-desktop-modal-layer'),
+      bounds: dialog.getBoundingClientRect().toJSON(),
+    }
+    dialog.remove()
+    return result
+  })
+  assert.equal(compactDialog.marked, false, JSON.stringify(compactDialog))
+  assert.ok(compactDialog.bounds.height <= 281, JSON.stringify(compactDialog))
   const nativeWindowState = await electronApp.evaluate(({ app, BrowserWindow, Menu, nativeImage }) => {
     const window = BrowserWindow.getAllWindows()[0]
     const helpMenu = Menu.getApplicationMenu()?.items.find((item) => item.label.includes('Help'))
