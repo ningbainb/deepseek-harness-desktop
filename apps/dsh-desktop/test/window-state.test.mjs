@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -67,6 +67,35 @@ test('window close persists the final geometry before BrowserWindow destruction'
       height: 540,
       maximized: false,
     })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('window state readers never observe a truncated snapshot during queued saves', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-atomic-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  let bounds = { x: 80, y: 60, width: 960, height: 700 }
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  try {
+    const save = attachWindowStatePersistence(window, statePath)
+    await save()
+    const writes = []
+    for (let index = 0; index < 80; index++) {
+      bounds = { ...bounds, width: 960 + index }
+      writes.push(save())
+    }
+    const reads = Array.from({ length: 80 }, async () => {
+      const value = JSON.parse(await readFile(statePath, 'utf8'))
+      assert.equal(value.x, 80)
+      assert.ok(Number.isInteger(value.width) && value.width >= 960 && value.width < 1040)
+    })
+    await Promise.all([...writes, ...reads])
+    assert.deepEqual(await readdir(root), ['window-state.json'])
+    assert.equal(JSON.parse(await readFile(statePath, 'utf8')).width, 1039)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

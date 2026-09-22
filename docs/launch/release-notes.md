@@ -9,6 +9,7 @@
 Agent Team、Browser Use 和 Computer Use 的启停增加插件环境预检、保存与重启进度、失败后原配置恢复。拓展坞可以直接进入插件设置，技能选择器区分最近使用与全部技能，bai 模型组在选择器中标注推荐；其他供应商仍可正常选择。自动更新检查新增离线延期和按失败类型退避，手动检查不受冷却限制；4.x 覆盖安装会在确认应用身份后优先沿用用户选定的原安装目录。
 
 修复打包版冷启动时，性价比模式模型目录读取碰上 Runtime 或设置切换就要求用户手动重试的问题。过期读取现在最多自动重试两次；持续变化、超时或真正的目录失败仍会明确提示并保留手动重试入口。
+主窗口位置与尺寸状态也改为原子写入，避免并发保存和读取时出现半写入文件。
 
 本版继续精确锁定已验证的官方 DSH `0.1.6-alpha.2` 与 dsh-web 0.3.23 固定组件。上游新发布的 `0.1.7-alpha.1` 涉及 Session V4、Profile 设置和 Agent 预设等破坏性迁移，未混入 4.3.0；现有历史会话、项目、Skills、插件和凭据不因本次桌面更新被主动重写。
 
@@ -33,6 +34,7 @@ Desktop 4.3.0 focuses on control and update reliability. The manual terminal can
 Agent Team, Browser Use, and Computer Use changes now preflight the plugin environment and show save, restart, and recovery progress. The Extension Dock links directly to plugin settings; the Skill picker groups recent entries, and the bai provider has a visible recommended label without removing other providers. Automatic update checks defer while offline and back off by failure category, while manual checks remain available. Verified 4.x in-place upgrades prefer the user's existing custom installation directory.
 
 The packaged Value Mode model picker now retries a stale catalog read up to twice when Runtime or settings change during cold startup. Persistent changes, timeouts, and genuine catalog failures still show an actionable error and manual retry.
+Main-window geometry state is now written atomically so concurrent saves and startup reads cannot observe a truncated file.
 
 This release retains the exact reviewed DSH `0.1.6-alpha.2` runtime and dsh-web 0.3.23 source cohort. It does not import the newly released `0.1.7-alpha.1` Session V4, Profile settings, or Agent preset migrations. Existing sessions, projects, Skills, plugins, and credentials are not proactively rewritten by this Desktop release.
 

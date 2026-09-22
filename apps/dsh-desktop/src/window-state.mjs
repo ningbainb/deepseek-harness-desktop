@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 
 const MIN_WIDTH = 720
 const MIN_HEIGHT = 540
@@ -99,7 +100,18 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
   }
   const persist = (content) => {
     if (content === undefined) return latestWrite
-    const operation = writeQueue.then(() => writeFile(path, content))
+    const operation = writeQueue.then(async () => {
+      // Event-driven saves can overlap startup reads and explicit saves. Never
+      // expose a truncated JSON document while replacing the prior bounds.
+      const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
+      await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
+      try {
+        await rename(temporary, path)
+      } catch (error) {
+        await rm(temporary, { force: true }).catch(() => {})
+        throw error
+      }
+    })
     writeQueue = operation.catch(() => {})
     latestWrite = operation
     return operation
