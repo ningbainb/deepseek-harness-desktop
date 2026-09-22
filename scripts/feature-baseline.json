@@ -354,6 +354,7 @@
         "native-browser-cross-session-close-and-history-isolation",
         "native-browser-close-owner-with-legacy-and-keyboard-fallback",
         "incremental-modal-layer-tracking-with-document-lifecycle",
+        "deferred-modal-reveal-gets-caption-inset",
         "compact-dialog-keeps-own-geometry-and-hit-area",
         "native-panel-control-remains-on-sidebar-surface",
         "neutral-compact-native-layout-toggle-cluster",

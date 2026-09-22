@@ -397,7 +397,7 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
     sync()
   })
   observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
-    attributeFilter: ['class', 'style', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
+    attributeFilter: ['class', 'style', 'hidden', 'data-open', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
   window.addEventListener('pagehide', pagehide)
   sync()
   return dispose

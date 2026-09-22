@@ -75,7 +75,7 @@ function chromeObserverFixture() {
     MutationObserver: class {
       constructor(next) { callback = next }
       observe(_target, options) {
-        for (const attribute of ['class', 'style', 'role', 'aria-modal', 'open', 'data-dsh-desktop-theme']) {
+        for (const attribute of ['class', 'style', 'hidden', 'data-open', 'role', 'aria-modal', 'open', 'data-dsh-desktop-theme']) {
           assert.ok(options.attributeFilter.includes(attribute))
         }
       }
@@ -107,6 +107,11 @@ test('window chrome indexes initial and added dialogs without full history queri
   f.mutate([{ type: 'childList', addedNodes: [parent, direct, { nodeType: 3 }] }])
   assert.deepEqual(f.marked.slice(-3), [initial, nested, direct])
   assert.equal(f.state().queries, 1)
+  const markedBeforeReveal = f.marked.length
+  f.mutate([{ type: 'attributes', attributeName: 'hidden', target: f.node(false) }])
+  f.mutate([{ type: 'attributes', attributeName: 'data-open', target: f.node(false) }])
+  assert.equal(f.marked.length, markedBeforeReveal + 6, 'revealed dialog layers are rechecked')
+  assert.equal(f.state().queries, 1, 'revealing a dialog does not rescan the document')
   dispose()
 })
 
