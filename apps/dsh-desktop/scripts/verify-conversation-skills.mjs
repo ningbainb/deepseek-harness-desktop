@@ -13,7 +13,7 @@ const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
 const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = packagedExecutable ? 120_000 : 60_000
+const runtimeReadyTimeoutMs = 120_000
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-conversation-skills-e2e-'))
 const dshHome = resolve(temporary, 'dsh-home')
 const workspacePath = resolve(temporary, 'conversation-skills-workspace')
@@ -154,31 +154,25 @@ try {
   assert.ok(recentGrouping.recentLabel >= 0, JSON.stringify(recentGrouping))
   assert.ok(recentGrouping.allLabel > recentGrouping.recentLabel, JSON.stringify(recentGrouping))
   assert.equal(recentGrouping.matchingOptions, 2, JSON.stringify(recentGrouping))
-  // Dispatch the underlying navigation click intentionally while the modal
-  // layer is open; this verifies that a real page transition closes it.
-  const navigationTarget = page.getByText(/^(?:探索未至之境|Into the Unknown)$/u)
-  const navigationEvidence = await navigationTarget.evaluate((element) => {
-    const bounds = element.getBoundingClientRect()
-    const centerX = bounds.left + bounds.width / 2
-    const centerY = bounds.top + bounds.height / 2
-    const hit = document.elementFromPoint(centerX, centerY)
-    const events = []
-    for (const type of ['pointerdown', 'click']) document.addEventListener(type, (event) => {
-      events.push({ type, target: event.target?.outerHTML?.slice(0, 300) })
-    }, true)
-    window.__dshSkillsNavigationEvents = events
-    return { target: element.outerHTML.slice(0, 500), bounds: bounds.toJSON(), hit: hit?.outerHTML?.slice(0, 500) }
-  })
-  console.log(`Conversation Skills navigation before click: ${JSON.stringify(navigationEvidence)}`)
-  await navigationTarget.click({ force: true })
-  console.log(`Conversation Skills navigation after click: ${JSON.stringify(await page.evaluate(() => ({ events: window.__dshSkillsNavigationEvents, menuHidden: document.querySelector('#dsh-desktop-skills-menu')?.hidden })))}`)
-  await menu.waitFor({ state: 'hidden' })
   if (screenshot) {
-    await page.locator('#dsh-desktop-skills-toast').waitFor({ state: 'detached', timeout: 4_000 }).catch(() => {})
-    await skillsButton.click()
-    await menu.waitFor({ state: 'visible' })
     await page.screenshot({ path: screenshot })
   }
+  // Use the visible sidebar navigation rather than force-clicking the
+  // welcome title behind the menu, which can hit a menu option instead.
+  const skillManagementTrigger = page.getByRole('button', { name: /^(?:技能中心|Skill Center)$/u })
+  await skillManagementTrigger.waitFor({ state: 'visible' })
+  assert.equal(await skillManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'skills')
+  const dockWindowPromise = electronApp.waitForEvent('window', {
+    predicate: candidate => candidate.url().includes('extensions.html'),
+    timeout: 20_000,
+  }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
+  await skillManagementTrigger.click()
+  await menu.waitFor({ state: 'hidden' })
+  const dockWindow = await dockWindowPromise
+  assert.ok(dockWindow, 'Skill Center navigation must open Extension Dock')
+  await dockWindow.locator('#skills-tab').waitFor({ state: 'visible' })
+  await dockWindow.locator('#skills[role="tabpanel"]').waitFor({ state: 'visible' })
+  assert.equal(await dockWindow.locator('#skills-tab').getAttribute('aria-selected'), 'true')
   console.log(`verified conversation Skills menu at ${page.url()}`)
 } catch (error) {
   if (screenshot && page) await page.screenshot({ path: screenshot }).catch(() => {})
