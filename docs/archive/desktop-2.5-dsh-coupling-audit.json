@@ -4954,7 +4954,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-conversation-skills.mjs",
-      "line": 57,
+      "line": 61,
       "operation": "DSH_HOME"
     },
     {
