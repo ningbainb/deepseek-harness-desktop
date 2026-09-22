@@ -6,6 +6,7 @@ import {
   type RelayConnection, type RelayConnectResponse,
   RELAY_KEYS_URL,
   RELAY_REMOVE_PATH,
+  RELAY_REFRESH_PATH,
   RELAY_SIGN_UP_URL,
   RELAY_STATUS_PATH,
   RELAY_WALLET_URL,
@@ -88,6 +89,8 @@ function errorText(code: string, t: (key: RelayLocaleKey) => string): string {
     case 'no-models': return t('errorNoModels')
     case 'credential-save-failed':
     case 'credential-delete-failed': return t('errorCredential')
+    case 'credential-unavailable': return t('errorCredentialUnavailable')
+    case 'not-configured': return t('errorNotConfigured')
     case 'settings-save-failed': return t('errorSettings')
     case 'busy': return t('errorBusy')
     case 'forbidden': return t('errorForbidden')
@@ -112,6 +115,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
   const [connection, setConnection] = useState<RelayConnection>({ phase: 'idle' })
@@ -225,6 +229,19 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
     target?.focus({ preventScroll: true })
   }
 
+  const refresh = (): void => {
+    if (saving || clearing || refreshing || connecting || !status?.configured) return
+    setRefreshing(true)
+    setError(undefined)
+    setNotice(undefined)
+    void postJson<RelayResponse>(RELAY_REFRESH_PATH, {}).then(async () => {
+      await loadStatus()
+      setNotice(t('refreshed'))
+    }).catch(reason => {
+      setError(errorText(reason instanceof RelayClientError ? reason.code : 'request-failed', t))
+    }).finally(() => setRefreshing(false))
+  }
+
   return (
     <section className={css.card} data-relay-onboarding-card="true" data-dock-dirty={apiKey.trim() !== '' ? 'true' : undefined}>
       <header className={css.header}>
@@ -249,6 +266,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
         {configured
           ? <>
               <button type="button" className={css.primary} onClick={continueToModels}>{t('chooseModel')}</button>
+              <button type="button" className={css.secondary} disabled={!canWrite || connecting || saving || clearing || refreshing} onClick={refresh}>{refreshing ? t('refreshing') : t('refreshModels')}</button>
               <button type="button" className={css.secondary} disabled={!canWrite || connecting || saving || clearing} onClick={() => { void connect() }}>{t('reconnect')}</button>
             </>
           : <button type="button" className={css.primaryWide} disabled={!canWrite || connecting || saving || clearing} onClick={() => { void connect() }}>{t('connect')}</button>}

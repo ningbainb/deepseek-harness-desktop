@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
+import { currentAgentWslPermission, type AgentWslPermission } from './agent-wsl-permission.ts'
 
 const BROWSER_PREFIXES = [
   'mcp__playwright-mcp__',
@@ -39,7 +40,12 @@ function stripPrefix(name: string, prefixes: readonly string[]): string | undefi
 }
 
 /** Classify Desktop control tools without inspecting arguments or page/window data. */
-export function controlToolApprovalDecision(name: string): PreToolDecision | undefined {
+export function controlToolApprovalDecision(name: string, wslPermission: AgentWslPermission = 'ask'): PreToolDecision | undefined {
+  if (name === 'desktop_wsl') {
+    if (wslPermission === 'off') return { kind: 'deny', reason: 'Agent WSL 命令已由用户关闭，可在拓展坞的智能操控中调整。' }
+    if (wslPermission === 'allow') return { kind: 'allow' }
+    return { kind: 'ask', reason: 'WSL 命令在 Windows 沙箱之外运行，可能修改本机和 Linux 文件；本次命令需要单独确认。' }
+  }
   const browserName = stripPrefix(name, BROWSER_PREFIXES)
   if (browserName !== undefined) {
     const normalized = name.startsWith('stagehand_') ? name : browserName
@@ -60,7 +66,8 @@ export function controlToolApprovalDecision(name: string): PreToolDecision | und
 /** Require one-shot approval for mutating Browser Use and Computer Use actions. */
 export function installControlToolApproval(ctx: Context): void {
   ctx.on('tools/pre-execute', async (exec: ToolExecution, next) => {
-    const decision = controlToolApprovalDecision(exec.name)
+    const decision = controlToolApprovalDecision(exec.name,
+      exec.name === 'desktop_wsl' ? currentAgentWslPermission() : 'ask')
     return decision ?? next()
   })
 }

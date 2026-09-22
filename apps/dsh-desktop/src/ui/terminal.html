@@ -20,9 +20,18 @@
             <h1>内置终端</h1>
             <span id="terminal-status" class="terminal-status" data-state="starting" role="status" aria-live="polite">正在启动</span>
           </div>
-          <p id="terminal-context" class="terminal-context">PowerShell 会在应用内运行，不会打开外部控制台。</p>
+          <p id="terminal-context" class="terminal-context">Shell 会在应用内运行，不会打开外部控制台。</p>
         </div>
         <div class="terminal-actions">
+          <label class="terminal-shell-choice" for="terminal-shell-choice">Shell
+            <select id="terminal-shell-choice" aria-label="选择终端 Shell">
+              <option value="auto">自动</option>
+              <option value="powershell">Windows PowerShell</option>
+              <option value="pwsh">PowerShell 7</option>
+              <option value="wsl">WSL</option>
+              <option value="cmd">CMD</option>
+            </select>
+          </label>
           <button type="button" id="clear-terminal">清屏</button>
           <button type="button" id="restart-terminal" class="primary">重启会话</button>
           <button type="button" id="close-terminal" aria-label="收起内置终端">收起</button>
@@ -31,7 +40,7 @@
       <section class="terminal-frame" aria-label="本地交互终端">
         <div id="terminal-host" class="terminal-host"></div>
       </section>
-      <footer>当前用户权限执行 · 终端嵌入当前窗口 · 收起面板即结束会话 · Ctrl+Alt+T 展开或收起</footer>
+      <footer>当前用户权限执行 · Shell 选择仅影响内置终端，不改变 Agent 工具环境 · 收起面板即结束会话 · Ctrl+Alt+T 展开或收起</footer>
     </main>
     <script type="module" src="./terminal.mjs"></script>
   </body>

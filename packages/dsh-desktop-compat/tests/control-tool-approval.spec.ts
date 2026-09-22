@@ -23,5 +23,16 @@ describe('Desktop control tool approval policy', () => {
 
   it('does not affect unrelated tools', () => {
     expect(controlToolApprovalDecision('bash')).toBeUndefined()
+    expect(controlToolApprovalDecision('pwsh')).toBeUndefined()
+    expect(controlToolApprovalDecision('desktop_wsl_list')).toBeUndefined()
+  })
+
+  it('requires one-shot approval for every Agent WSL command', () => {
+    expect(controlToolApprovalDecision('desktop_wsl')).toEqual({
+      kind: 'ask',
+      reason: expect.stringContaining('Windows 沙箱之外'),
+    })
+    expect(controlToolApprovalDecision('desktop_wsl', 'off')?.kind).toBe('deny')
+    expect(controlToolApprovalDecision('desktop_wsl', 'allow')).toEqual({ kind: 'allow' })
   })
 })

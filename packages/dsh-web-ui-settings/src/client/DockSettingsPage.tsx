@@ -102,6 +102,7 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
       <h1 className={css.heading}>{t('dockCollaboration')}</h1>
       <p>Agent Team 负责多角色协作，性价比模式负责模型分工与成本控制；两者可独立开启，也可同时使用。</p>
     </div>}
+    {selected === 'models' && <p className={css.modelDiscoveryHint}>bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。</p>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
         {id === 'control-center' && <ControlCenterSettingsCard />}

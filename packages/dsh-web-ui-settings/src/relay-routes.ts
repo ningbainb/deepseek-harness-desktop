@@ -23,6 +23,7 @@ import {
   RELAY_CREDENTIAL_REF,
   RELAY_MAX_MODELS,
   RELAY_PROVIDER_ID,
+  RELAY_REFRESH_PATH,
   RELAY_REMOVE_PATH,
   RELAY_STATUS_PATH,
   type RelayConfigureResponse,
@@ -45,7 +46,7 @@ type SettingsFace = {
   get(ns: typeof LLM_SETTINGS_NAMESPACE): unknown
   mutate(ns: typeof LLM_SETTINGS_NAMESPACE, ops: readonly SettingsPathOp[]): Promise<void>
 }
-type CredentialsFace = Pick<CredentialProvider, 'describe' | 'set' | 'unset'>
+type CredentialsFace = Pick<CredentialProvider, 'describe' | 'resolve' | 'set' | 'unset'>
 
 export interface RelayRouteDeps {
   settings: SettingsFace
@@ -198,27 +199,30 @@ async function relayModels(apiKey: string, fetchImpl: typeof fetch): Promise<Rel
       signal: controller.signal,
     })
   } catch {
+    clearTimeout(timer)
     throw new RelayRouteError('relay-unreachable')
+  }
+  try {
+    if (response.status === 401 || response.status === 403) throw new RelayRouteError('relay-auth')
+    if (response.status === 429) throw new RelayRouteError('relay-rate-limit')
+    if (response.status >= 500) throw new RelayRouteError('relay-server')
+    if (!response.ok) throw new RelayRouteError('relay-http')
+
+    let payload: unknown
+    try {
+      const text = await responseText(response)
+      payload = JSON.parse(text) as unknown
+    } catch (error) {
+      if (error instanceof RelayRouteError) throw error
+      if (controller.signal.aborted) throw new RelayRouteError('relay-unreachable')
+      throw new RelayRouteError('relay-malformed-response')
+    }
+    const models = normalizeRelayModels(payload)
+    if (models.length === 0) throw new RelayRouteError('no-models')
+    return models
   } finally {
     clearTimeout(timer)
   }
-
-  if (response.status === 401 || response.status === 403) throw new RelayRouteError('relay-auth')
-  if (response.status === 429) throw new RelayRouteError('relay-rate-limit')
-  if (response.status >= 500) throw new RelayRouteError('relay-server')
-  if (!response.ok) throw new RelayRouteError('relay-http')
-
-  let payload: unknown
-  try {
-    const text = await responseText(response)
-    payload = JSON.parse(text) as unknown
-  } catch (error) {
-    if (error instanceof RelayRouteError) throw error
-    throw new RelayRouteError('relay-malformed-response')
-  }
-  const models = normalizeRelayModels(payload)
-  if (models.length === 0) throw new RelayRouteError('no-models')
-  return models
 }
 
 function providerMutation(models: readonly RelayModelView[]): SettingsPathOp[] {
@@ -240,7 +244,7 @@ function codeOf(error: unknown): string {
 
 function statusFor(code: string): number {
   if (code === 'relay-auth' || code === 'relay-rate-limit' || code === 'relay-http' || code === 'relay-server' || code === 'relay-unreachable' || code === 'relay-malformed-response' || code === 'relay-response-too-large') return 502
-  if (code === 'credential-save-failed' || code === 'credential-delete-failed' || code === 'settings-save-failed') return 503
+  if (code === 'credential-save-failed' || code === 'credential-delete-failed' || code === 'credential-unavailable' || code === 'settings-save-failed') return 503
   if (code === 'busy') return 409
   return 400
 }
@@ -268,7 +272,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
   const handler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     if (!guard(request, response)) return
     const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
-    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REMOVE_PATH, RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH].includes(pathname)) {
+    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REFRESH_PATH, RELAY_REMOVE_PATH, RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH].includes(pathname)) {
       writeJson(response, 404, { ok: false, code: 'not-found' })
       return
     }
@@ -300,6 +304,23 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
       if (pathname === RELAY_CONFIGURE_PATH) {
         const result = await configure(body.apiKey)
         writeJson(response, 200, result)
+        return
+      }
+
+      if (pathname === RELAY_REFRESH_PATH) {
+        configuring = true
+        const profile = profileFromSettings(deps.settings)
+        if (!managedProfile(profile)) throw new RelayRouteError('not-configured')
+        if (deps.settings.writable === false) throw new RelayRouteError('forbidden')
+        let credential
+        try { credential = await deps.credentials.resolve(RELAY_CREDENTIAL) }
+        catch { throw new RelayRouteError('credential-unavailable') }
+        if (!credential?.value) throw new RelayRouteError('credential-unavailable')
+        const models = await relayModels(credential.value, fetchImpl)
+        const updatedProfile = { ...profile, models: models.map(model => ({ id: model.id, name: model.id })) }
+        try { await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, [{ op: 'set', path: ['providers', RELAY_PROVIDER_ID], value: updatedProfile }]) }
+        catch { throw new RelayRouteError('settings-save-failed') }
+        writeJson(response, 200, { ok: true, modelCount: models.length, models })
         return
       }
 

@@ -53,16 +53,22 @@ describe('model selector lifecycle', () => {
     const state = {
       ...READY_DIRECTORY_STATE,
       current: { provider: 'deepseek', model: 'flash' },
-      groups: [{ id: 'deepseek', name: 'DeepSeek', models: [
+      groups: [
+        { id: 'project-relay', name: 'bai供应商', models: [
+          { id: 'relay', name: 'bai 测试模型' },
+        ] },
+        { id: 'deepseek', name: 'DeepSeek', models: [
         { id: 'flash', name: 'DeepSeek-V41-Flash', description: 'Fast, efficient and economical' },
         { id: 'pro', name: 'DeepSeek-V4-Pro', description: 'Stronger agentic coding and reasoning' },
-      ] }],
+        ] },
+      ],
     }
     const view = render(<ModelSelect {...{ ...props, directory: {
       ...props.directory, getSnapshot: () => state,
     } } as never} />)
     fireEvent.click(view.getByRole('button', { name: 'trigger.aria' }))
     fireEvent.click(view.getByRole('menuitem', { name: /menu.models/ }))
+    expect(view.getByRole('group', { name: 'bai供应商' }).textContent).toContain('menu.recommended')
     expect(view.queryByText('Fast, efficient and economical')).toBeNull()
     expect(view.queryByText('Stronger agentic coding and reasoning')).toBeNull()
     expect(view.getByRole('menuitemradio', { name: 'DeepSeek-V41-Flash' }).getAttribute('aria-checked')).toBe('true')

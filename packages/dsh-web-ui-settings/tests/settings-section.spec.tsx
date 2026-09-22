@@ -75,7 +75,7 @@ describe('Web UI settings section', () => {
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action', 'sidebar.footer.action', 'sidebar.footer.action'])
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'settings.models.footer', 'sidebar.footer.action', 'sidebar.footer.action', 'sidebar.footer.action'])
     expect(register).toHaveBeenCalledTimes(6)
     const [authOptions, AuthComponent] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
@@ -97,9 +97,9 @@ describe('Web UI settings section', () => {
     expect(Component).toBe(WebUIPluginsSection)
     const [relayOptions, RelayComponent] = register.mock.calls[2] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
     expect(relayOptions).toMatchObject({
-      name: 'model-preferences.onboarding',
-      id: 'bai',
-      order: 5,
+      name: 'settings.models.footer',
+      id: 'bai-onboarding',
+      order: -100,
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)

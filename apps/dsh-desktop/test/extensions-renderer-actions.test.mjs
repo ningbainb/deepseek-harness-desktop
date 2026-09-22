@@ -11,6 +11,14 @@ const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/p
 const source = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
 const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
 
+test('installed plugin detail keeps the Runtime-owned configuration bridge', async () => {
+  const preload = await readFile(new URL('../src/preload-extension.cjs', import.meta.url), 'utf8')
+  assert.match(source, /插件自带设置/u)
+  assert.match(source, /data-open-plugin-settings/u)
+  assert.match(source, /window\.dshDesktop\.openPluginSettings/u)
+  assert.match(preload, /extensions:plugin-settings-open/u)
+})
+
 // Run the production handlers with controlled IPC responses. Keeping their
 // actual code here catches renderer errors that markup assertions cannot.
 function section(start, end) {
@@ -42,7 +50,7 @@ test('plugin diagnostics copies the selected cached plugin without leaking unrel
       { name: 'other', version: '9.0.0' },
       { name: 'example', version: '1.0.0', status: 'needs-attention', compatibility: { status: 'unknown' }, advanced: { runtimeRange: '^1.0.0' }, attention: '启动失败', privatePath: 'not-for-copying' },
     ],
-    navigator: { clipboard: { writeText: async value => { copied.push(value) } } },
+    window: { dshDesktop: { copyText: async value => { copied.push(value) } } },
     notify: message => messages.push(message),
     showPluginFailure: async () => assert.fail('copy should not fail'),
   })
@@ -60,7 +68,7 @@ test('plugin diagnostics reports clipboard failures and tolerates a removed sele
   const context = vm.createContext({
     event: { target: { closest: () => ({ dataset: { copyPluginDiagnostics: 'example' } }) } },
     cachedPlugins: [{ name: 'example' }],
-    navigator: { clipboard: { writeText: async () => { throw failure } } },
+    window: { dshDesktop: { copyText: async () => { throw failure } } },
     notify: () => assert.fail('failed copies must not announce success'),
     showPluginFailure: async (error, label) => { errors.push([error, label]) },
   })

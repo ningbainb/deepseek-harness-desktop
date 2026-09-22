@@ -23,8 +23,16 @@ export async function updateDiagnosticsSummary(db, { days = 7, version = '' } = 
       COUNT(DISTINCT json_extract(diagnostic,'$.attempt_id')) AS failedAttempts
       FROM analytics_failure WHERE ${where}`).bind(...bindings).all(),
   ])
+  const counts = headline.results?.[0] ?? {}
+  const failures = Number(counts.failures ?? 0)
+  const classifiedFailures = Number(counts.classifiedFailures ?? 0)
+  const observedInstances = Number(counts.observedInstances ?? 0)
+  const failedAttempts = Number(counts.failedAttempts ?? 0)
   return { schema: 1, rangeDays, from: start, to: end, sourceVersion: version, generatedAt: now.toISOString(),
-    ...headline.results?.[0], groups: groups.results ?? [], recent: recent.results ?? [],
+    failures, classifiedFailures, observedInstances, failedAttempts,
+    legacyFailures: Math.max(0, failures - classifiedFailures),
+    attemptsPerObservedInstance: observedInstances > 0 ? failedAttempts / observedInstances : 0,
+    groups: groups.results ?? [], recent: recent.results ?? [],
     definition: 'Stored failure observations; instances cover clients with diagnostics only. Not installation failure rate. Completion means target Desktop started, not Runtime readiness. Missing post-exit receipts are unknown, not failures.',
   }
 }

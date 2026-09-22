@@ -12,6 +12,7 @@ import {
   RELAY_CREDENTIAL_REF,
   RELAY_PROVIDER_DISPLAY_NAME,
   RELAY_REMOVE_PATH,
+  RELAY_REFRESH_PATH,
   RELAY_STATUS_PATH,
   normalizeRelayModels,
 } from '../src/relay-protocol.ts'
@@ -49,6 +50,7 @@ function fakeCredentials() {
   let value: string | undefined
   const seam = {
     describe: async (_ref: CredentialRef) => ({ configured: value !== undefined, writable: true }),
+    resolve: async (_ref: CredentialRef) => value === undefined ? undefined : { value, source: 'file' },
     set: async (_ref: CredentialRef, next: string): Promise<void> => { value = next },
     unset: async (_ref: CredentialRef): Promise<void> => { value = undefined },
   }
@@ -115,13 +117,41 @@ describe('relay model normalization', () => {
       { id: 'bad\nmodel' },
       { name: 'missing id' },
     ] })).toEqual([
-      { id: 'alpha', name: 'Alpha' },
+      { id: 'alpha', name: 'alpha' },
       { id: 'beta', name: 'beta' },
     ])
   })
 })
 
 describe('relay onboarding routes', () => {
+  it('refreshes models with the stored Key and preserves the old list on fetch failure', async () => {
+    const settings = fakeSettings()
+    const credentials = fakeCredentials()
+    let modelId = 'original'
+    let fail = false
+    const fetchImpl: typeof fetch = async () => fail
+      ? new Response('unavailable', { status: 503 })
+      : new Response(JSON.stringify({ data: [{ id: modelId }] }))
+    const routes = makeRelayRoutes({ settings: settings.seam, credentials: credentials.seam, fetchImpl })
+    try {
+      const configured = await invoke(routes, RELAY_CONFIGURE_PATH, relayRequest(RELAY_CONFIGURE_PATH, { apiKey: 'saved-key' }))
+      expect(configured.status).toBe(200)
+      const profile = (settings.value.providers as Record<string, Record<string, unknown>>)['project-relay']
+      profile.defaultContextWindow = 65_536
+      modelId = 'new-model'
+      const refreshed = await invoke(routes, RELAY_REFRESH_PATH, relayRequest(RELAY_REFRESH_PATH))
+      expect(refreshed.body).toMatchObject({ ok: true, models: [{ id: 'new-model', name: 'new-model' }] })
+      expect(JSON.stringify(refreshed.body)).not.toContain('saved-key')
+      expect((settings.value.providers as Record<string, Record<string, unknown>>)['project-relay'].defaultContextWindow).toBe(65_536)
+      expect(credentials.value()).toBe('saved-key')
+      fail = true
+      const failed = await invoke(routes, RELAY_REFRESH_PATH, relayRequest(RELAY_REFRESH_PATH))
+      expect(failed.status).toBe(502)
+      expect((await invoke(routes, RELAY_STATUS_PATH, relayRequest(RELAY_STATUS_PATH))).body)
+        .toMatchObject({ configured: true, models: [{ id: 'new-model', name: 'new-model' }] })
+    } finally { routes.dispose() }
+  })
+
   it('completes browser authorization through the same credential and provider configuration path', async () => {
     const settings = fakeSettings()
     const credentials = fakeCredentials()
@@ -166,7 +196,7 @@ describe('relay onboarding routes', () => {
     const result = await invoke(routes, RELAY_CONFIGURE_PATH, relayRequest(RELAY_CONFIGURE_PATH, { apiKey: ' user-key ' }))
 
     expect(result.status).toBe(200)
-    expect(result.body).toEqual({ ok: true, modelCount: 1, models: [{ id: 'relay-model', name: 'Relay Model' }] })
+    expect(result.body).toEqual({ ok: true, modelCount: 1, models: [{ id: 'relay-model', name: 'relay-model' }] })
     expect(JSON.stringify(result.body)).not.toContain('user-key')
     expect(credentials.value()).toBe('user-key')
     expect(settings.writes).toHaveLength(1)

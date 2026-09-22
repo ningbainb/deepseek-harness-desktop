@@ -328,6 +328,9 @@ test('builtins mode uses the same Home but a separate profile with no user bundl
     assert.deepEqual(builtins.manifest.dependencies, {})
     assert.deepEqual(builtins.manifest.dsh.profile.bundles, BUILTIN_BUNDLES)
     assert.equal('userField' in builtins.manifest, false)
+    const workspace = await readFile(join(builtins.profileDir, 'pnpm-workspace.yaml'), 'utf8')
+    assert.match(workspace, /nodeLinker:\s*hoisted/u)
+    assert.doesNotMatch(workspace, /nodeLinker:\s*isolated/u)
     assert.deepEqual(JSON.parse(await readFile(join(fullProfileDir, 'package.json'), 'utf8')), original)
   } finally {
     await rm(dshHome, { recursive: true, force: true })

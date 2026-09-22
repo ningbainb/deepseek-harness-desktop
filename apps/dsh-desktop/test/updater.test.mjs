@@ -44,6 +44,8 @@ function createHarness({
   beforeInstall,
   onInstallFailure,
   downloadRouter,
+  scheduleStore,
+  isOnline,
   log,
   getWindow,
   setTimeoutFn = () => ({ unref() {} }),
@@ -71,6 +73,8 @@ function createHarness({
     },
     onInstallFailure,
     downloadRouter,
+    scheduleStore,
+    isOnline,
     setTimeoutFn,
     installPreparationTimeoutMs,
     setIntervalFn: () => ({ unref() {} }),
@@ -386,6 +390,70 @@ test('manual no-update result is visible while automatic errors stay hidden', as
   assert.equal(harness.controller.getStatus().phase, 'error')
   assert.equal(harness.controller.getStatus().visible, false)
   assert.ok(harness.logs.some((line) => line.includes('network unavailable')))
+})
+
+test('persistent automatic cooldown skips background checks while manual checks remain available', async () => {
+  const calls = []
+  const scheduleStore = {
+    shouldCheck: async channel => { calls.push(['shouldCheck', channel]); return false },
+    recordAttempt: async channel => calls.push(['recordAttempt', channel]),
+  }
+  const harness = createHarness({ scheduleStore })
+
+  assert.equal(await harness.controller.check(), false)
+  assert.equal(harness.updater.checks, 0)
+  assert.equal(await harness.controller.check({ manual: true }), true)
+  assert.equal(harness.updater.checks, 1)
+  assert.deepEqual(calls, [
+    ['shouldCheck', 'stable'],
+    ['recordAttempt', 'stable'],
+  ])
+})
+
+test('manual checks do not wait for schedule persistence', async () => {
+  let finishWrite
+  const scheduleStore = {
+    recordAttempt: () => new Promise(resolve => { finishWrite = resolve }),
+  }
+  const harness = createHarness({ scheduleStore })
+
+  assert.equal(await harness.controller.check({ manual: true }), true)
+  assert.equal(harness.updater.checks, 1)
+  finishWrite()
+})
+
+test('offline automatic checks are deferred without publishing an update failure', async () => {
+  const calls = []
+  const scheduleStore = {
+    shouldCheck: async () => true,
+    deferOffline: async channel => calls.push(['deferOffline', channel]),
+    recordAttempt: async channel => calls.push(['recordAttempt', channel]),
+  }
+  const harness = createHarness({ scheduleStore, isOnline: () => false })
+
+  assert.equal(await harness.controller.check(), false)
+  assert.equal(harness.updater.checks, 0)
+  assert.deepEqual(harness.states, [])
+  assert.deepEqual(calls, [['deferOffline', 'stable']])
+  assert.ok(harness.logs.some(line => line.includes('system is offline')))
+})
+
+test('terminal update errors persist only their bounded error category for backoff', async () => {
+  const failures = []
+  const scheduleStore = {
+    shouldCheck: async () => true,
+    recordAttempt: async () => {},
+    recordFailure: async (channel, errorType) => failures.push({ channel, errorType }),
+  }
+  const harness = createHarness({ scheduleStore })
+  const error = new Error('getaddrinfo ENOTFOUND private.example')
+  error.code = 'ENOTFOUND'
+
+  await harness.controller.check()
+  harness.updater.emit('error', error)
+  await tick()
+
+  assert.deepEqual(failures, [{ channel: 'stable', errorType: 'network' }])
 })
 
 test('automatic DNS failure reaches a non-blocking terminal state after shell and runtime readiness', async () => {

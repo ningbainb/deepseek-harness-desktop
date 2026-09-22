@@ -32,6 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  delete (window as unknown as { dshDesktop?: unknown }).dshDesktop
 })
 
 describe('Desktop Extension Dock entry', () => {
@@ -50,6 +51,43 @@ describe('Desktop Extension Dock entry', () => {
     expect(desktop.openDesktopSurface).toHaveBeenCalledTimes(2)
     dispose()
     expect(plugin.dataset.dshDesktopManagementEntry).toBeUndefined()
+  })
+
+  it('keeps Dock as the list entry while reopening one plugin native configuration page', async () => {
+    let request: ((value: { name: string }) => void) | undefined
+    const unsubscribe = vi.fn()
+    ;(window as unknown as { dshDesktop: unknown }).dshDesktop = {
+      onPluginSettingsOpen(listener: (value: { name: string }) => void) {
+        request = listener
+        return unsubscribe
+      },
+    }
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="插件">插件</button></aside>'
+    const nativeEntry = screen.getByRole('button', { name: '插件' })
+    let nativePageOpens = 0
+    nativeEntry.addEventListener('click', () => {
+      nativePageOpens++
+      const card = document.createElement('article')
+      card.dataset.pluginPackage = 'dsh-free-search'
+      const open = document.createElement('button')
+      open.setAttribute('aria-label', '查看 dsh-free-search')
+      open.addEventListener('click', () => {
+        const detail = document.createElement('section')
+        detail.dataset.pluginDetail = 'dsh-free-search'
+        document.body.append(detail)
+      })
+      card.append(open)
+      document.body.append(card)
+    })
+    const dispose = installDesktopManagementRouting(document, t)
+    await waitFor(() => expect(nativeEntry.dataset.dshDesktopManagementEntry).toBe('plugins'))
+
+    request?.({ name: 'dsh-free-search' })
+    await waitFor(() => expect(document.querySelector('[data-plugin-detail="dsh-free-search"]')).not.toBeNull())
+    expect(nativePageOpens).toBe(1)
+    expect(desktop.openDesktopSurface).not.toHaveBeenCalled()
+    dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
   })
 
   it('shows a collaboration shortcut only on Desktop and deep-links to the unified page', async () => {

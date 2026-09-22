@@ -19,6 +19,7 @@ export const TERMINAL_IPC_CHANNELS = Object.freeze({
   WRITE: 'dsh:terminal:write',
   RESIZE: 'dsh:terminal:resize',
   RESTART: 'dsh:terminal:restart',
+  SET_SHELL: 'dsh:terminal:set-shell',
   CLOSE: 'dsh:terminal:close',
   OUTPUT: 'dsh:terminal:output',
   EXITED: 'dsh:terminal:exited',
@@ -47,15 +48,17 @@ function installTerminalNavigationPolicy(webContents) {
   webContents.session?.setPermissionRequestHandler?.((_contents, _permission, callback) => callback(false))
 }
 
-function registerTerminalIpc({ ipcMain, webContents, session, close, onError }) {
+function registerTerminalIpc({ ipcMain, webContents, session, shellPreferences, close, onError }) {
   const handlerChannels = [
     TERMINAL_IPC_CHANNELS.START,
     TERMINAL_IPC_CHANNELS.RESTART,
+    TERMINAL_IPC_CHANNELS.SET_SHELL,
     TERMINAL_IPC_CHANNELS.CLOSE,
   ]
   for (const channel of handlerChannels) ipcMain.removeHandler(channel)
 
   let disposed = false
+  let shellChangePending = false
   const assertSender = (event) => {
     if (disposed || webContents.isDestroyed?.() || event?.sender !== webContents) {
       throw new Error('terminal action is unavailable')
@@ -92,6 +95,28 @@ function registerTerminalIpc({ ipcMain, webContents, session, close, onError }) 
       assertSender(event)
       return session.restart(size)
     })
+    ipcMain.handle(TERMINAL_IPC_CHANNELS.SET_SHELL, async (event, shellId, size) => {
+      assertSender(event)
+      if (shellChangePending) throw new Error('terminal shell change is already pending')
+      shellChangePending = true
+      const previous = session.shellId
+      try {
+        session.setShellId(shellId)
+        await shellPreferences.save(shellId)
+        return await session.restart(size)
+      } catch (error) {
+        if (session.shellId !== previous) {
+          try {
+            session.setShellId(previous)
+            await shellPreferences.save(previous)
+            await session.restart(size)
+          } catch (restoreError) { report(restoreError) }
+        }
+        throw error
+      } finally {
+        shellChangePending = false
+      }
+    })
     ipcMain.handle(TERMINAL_IPC_CHANNELS.CLOSE, async (event) => {
       assertSender(event)
       close()
@@ -124,6 +149,8 @@ export async function createDesktopTerminalPanel({
   theme: rawTheme = 'dark',
   loadPty = () => import('node-pty'),
   sessionFactory = (options) => new DesktopTerminalSession(options),
+  shellId = 'auto',
+  shellPreferences = { save: async () => {} },
   installContextMenu = installEditContextMenu,
   onError = () => {},
   onDidDispose = () => {},
@@ -199,17 +226,17 @@ export async function createDesktopTerminalPanel({
     installTerminalNavigationPolicy(webContents)
     removeContextMenu = installContextMenu({ webContents, Menu })
     session = sessionFactory({
-      cwd, platform, environment, pathEntries, resolvePathEntries, loadPty,
+      cwd, platform, environment, pathEntries, resolvePathEntries, loadPty, shellId,
       emit: (kind, payload) => {
         if (kind === 'output') send(TERMINAL_IPC_CHANNELS.OUTPUT, payload)
         else if (kind === 'exit') send(TERMINAL_IPC_CHANNELS.EXITED, payload)
         else send(TERMINAL_IPC_CHANNELS.ERROR, payload)
       },
     })
-    unregisterIpc = registerTerminalIpc({ ipcMain, webContents, session, close: dispose, onError })
+    unregisterIpc = registerTerminalIpc({ ipcMain, webContents, session, shellPreferences, close: dispose, onError })
     browserWindow.on?.('resize', layout)
     layout()
-    await webContents.loadFile(TERMINAL_HTML_PATH, { query: { theme, embedded: '1' } })
+    await webContents.loadFile(TERMINAL_HTML_PATH, { query: { theme, embedded: '1', platform } })
     if (disposed || browserWindow.isDestroyed?.() || webContents.isDestroyed?.()) throw new Error('terminal parent window closed before the panel loaded')
     view.setVisible?.(true)
     webContents.focus?.()

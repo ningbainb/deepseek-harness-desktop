@@ -55,6 +55,7 @@
 .collaborationIntro { max-width: 740px; margin: 0 auto 10px; }
 .collaborationIntro .heading { margin: 0 0 5px; }
 .collaborationIntro p { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; }
+.modelDiscoveryHint { max-width: 740px; margin: 0 auto 12px; padding: 10px 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 12px; line-height: 1.5; }
 .collaborationCard { margin: 0 0 10px; padding: 10px 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; background: var(--dsw-alias-bg-layer-3); }
 .collaborationCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .collaborationCardHeader h2 { margin: 0; font-size: 16px; }
@@ -81,6 +82,7 @@
 .controlSafety { flex: none; padding: 5px 9px; border-radius: 999px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 11px; font-weight: 650; }
 .controlGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .controlCard { display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-layer-3); }
+.controlShellCard { grid-column: 1 / -1; }
 .controlCard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .controlCard header span { color: var(--dsw-alias-brand-primary); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .controlCard h2 { margin: 2px 0 0; font-size: 17px; }

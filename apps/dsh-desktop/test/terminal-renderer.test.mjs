@@ -28,6 +28,7 @@ function fixture() {
     dshTerminal: {
       resize() {}, write() {}, start: () => start,
       restart: async () => ({ label: 'replacement', cwd: 'workspace' }),
+      setShell: async shellId => ({ label: shellId === 'wsl' ? 'WSL' : 'replacement', cwd: 'workspace', shellId }),
       close: async () => {}, onOutput: () => () => {}, onExit: () => () => {}, onError: () => () => {},
     },
   }
@@ -35,7 +36,9 @@ function fixture() {
     documentElement: { dataset: {} },
     querySelector: selector => {
       if (!elements.has(selector)) elements.set(selector, {
-        dataset: {}, textContent: '', addEventListener(event, handler) { this[event] = handler },
+        dataset: {}, textContent: '', value: 'auto', disabled: false,
+        closest: () => ({ hidden: false }),
+        addEventListener(event, handler) { this[event] = handler },
       })
       return elements.get(selector)
     },
@@ -57,6 +60,19 @@ test('a late initial startup failure does not overwrite a successful renderer re
   assert.equal(f.elements.get('#terminal-status').dataset.state, 'ready')
   assert.match(f.elements.get('#terminal-context').textContent, /replacement/u)
   assert.equal(f.terminal.focused, 1)
+  f.events.get('beforeunload')()
+})
+
+test('renderer switches an allowlisted shell and updates its active choice', async () => {
+  const f = fixture()
+  f.resolveStart({ label: 'PowerShell', cwd: 'workspace', shellId: 'auto' })
+  await f.finished
+  const choice = f.elements.get('#terminal-shell-choice')
+  choice.value = 'wsl'
+  await choice.change()
+  assert.equal(choice.dataset.active, 'wsl')
+  assert.equal(f.elements.get('#terminal-status').dataset.state, 'ready')
+  assert.match(f.elements.get('#terminal-context').textContent, /WSL/u)
   f.events.get('beforeunload')()
 })
 

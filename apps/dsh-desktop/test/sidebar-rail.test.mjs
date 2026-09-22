@@ -33,3 +33,13 @@ test('collapsed footer rail keeps the official footer sizing and centering rules
   assert.match(patch, /data-slot=(?:\\"|")sidebar\.footer\.action(?:\\"|")/u)
   assert.match(patch, /attributeFilter:\s*\[(?:\s|\+)*"class"(?:\s|\+)*,(?:\s|\+)*"style"(?:\s|\+)*,(?:\s|\+)*"data-wide"(?:\s|\+)*,(?:\s|\+)*"data-rail"(?:\s|\+)*\]/u)
 })
+
+test('wide footer destinations stack instead of clipping at intermediate sidebar widths', async () => {
+  const source = await readFile(
+    resolve(ROOT, 'packages/dsh-web-ui-settings/src/client/web-ui-settings.module.css'),
+    'utf8',
+  )
+  assert.match(source, /\.dockEntry\[data-wide='wide'\]\s*\{[^}]*flex-basis:\s*100%/su)
+  assert.match(source, /\.dockEntry\[data-wide='wide'\]\s+\.dockTrigger\s*\{[^}]*width:\s*100%/su)
+  assert.doesNotMatch(source, /\.dockEntry\[data-dsh-extension-dock-entry\]\[data-wide='wide'\]\s*\{/u)
+})

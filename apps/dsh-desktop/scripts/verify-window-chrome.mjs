@@ -171,8 +171,17 @@ try {
       if (!cluster) return undefined
       const style = getComputedStyle(cluster)
       const rect = cluster.getBoundingClientRect()
+      const buttons = [...cluster.querySelectorAll(':scope > button')].map(button => {
+        const buttonRect = button.getBoundingClientRect()
+        return {
+          width: buttonRect.width,
+          height: buttonRect.height,
+          centerDelta: buttonRect.top + buttonRect.height / 2 - (rect.top + rect.height / 2),
+        }
+      })
       return {
-        controls: cluster.querySelectorAll(':scope > button').length,
+        controls: buttons.length,
+        buttons,
         width: rect.width,
         height: rect.height,
         padding: style.padding,
@@ -227,6 +236,9 @@ try {
   assert.equal(state.layoutCluster.borderWidth, '1px')
   assert.equal(state.layoutCluster.outlineStyle, 'none')
   assert.equal(state.layoutCluster.boxShadow, 'none')
+  assert.equal(state.layoutCluster.height, 28)
+  assert.ok(state.layoutCluster.buttons.every(button => button.width === 22 && button.height === 22), JSON.stringify(state.layoutCluster))
+  assert.ok(state.layoutCluster.buttons.every(button => Math.abs(button.centerDelta) <= 0.5), JSON.stringify(state.layoutCluster))
   assert.ok(state.rootBounds && state.rootBounds.top >= 31, `root overlaps title bar: ${JSON.stringify(state.rootBounds)}`)
   assert.ok(state.rootBounds.bottom <= viewportHeight + 1, `root exceeds safe viewport: ${JSON.stringify(state.rootBounds)}`)
   const positionedRootFrames = await page.evaluate(async () => {

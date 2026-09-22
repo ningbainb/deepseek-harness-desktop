@@ -503,7 +503,12 @@ ${DESKTOP_PATCH_END}
 }
 
 export const DESKTOP_PATCH_CONFIG = desktopPatchConfig()
-const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: isolated\nautoInstallPeers: false\n`
+// Keep the Desktop profile aligned with the official DSH profile template.
+// The isolated linker creates a deep Windows reparse-point graph which can
+// become undeletable after an interrupted upgrade; one bad link then blocks
+// DSH's whole profile repair. Compatibility and protected-package admission
+// still run in Desktop staging before this profile is activated.
+const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
 
 /** Identify patch files that carry no loader entries, including legacy `{}` placeholders. */
 export function isSemanticallyEmptyPatch(source) {

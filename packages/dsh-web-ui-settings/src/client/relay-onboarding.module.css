@@ -1,4 +1,5 @@
 .card {
+  order: -100;
   display: grid;
   gap: 12px;
   padding: 14px 16px 16px;

@@ -1,45 +1,45 @@
-# DeepSeek Harness Desktop 4.2.1
+# DeepSeek Harness Desktop 4.3.0
 
 ## 中文
 
 ### 本次亮点
 
-4.2.1 是面向 4.2.0 用户反馈的稳定性补丁，继续精确使用官方 DeepSeek Harness `0.1.6-alpha.2` 与经过来源校验的 dsh-web 0.3.23 组件，不引入新的内核漂移。ChatGPT 登录改为一次点击直接进入浏览器授权；浏览器回调成功后，桌面端会继续等待令牌交换、账户识别和本机凭据提交，只有完整链路成功才显示“已登录”。设备码登录作为同级兜底保留，失败会区分网络、令牌交换、账户、回调状态和凭据存储，但不会显示服务端正文、账号、Token 或授权 URL。
+4.3.0 聚焦桌面端控制与升级可靠性。手动终端现在可选择 Windows PowerShell、PowerShell 7、WSL 或 CMD，并记住选择；Agent 需要 Linux 命令时使用单独的 WSL 工具，而不是偷偷替换官方 PowerShell 执行器。Agent WSL 默认逐条确认，也可由用户关闭，或在明确的高风险确认后始终允许。WSL 不受 Windows DSH 沙箱限制，因此请只对可信工作区启用信任模式。
 
-更新下载窗口现在可以关闭，下载任务仍在后台存活，用户重新打开更新界面即可继续查看进度或安装。主界面的插件、Skills 与模型设置入口统一直达拓展坞对应页面，bai 供应商登录保留置顶的单一主操作。Windows 可执行文件、安装器、快捷方式、任务栏、窗口和托盘，以及 macOS、Linux、应用内拓展坞、官网和文档，统一使用新版浅蓝角色图标。
+Agent Team、Browser Use 和 Computer Use 的启停增加插件环境预检、保存与重启进度、失败后原配置恢复。拓展坞可以直接进入插件设置，技能选择器区分最近使用与全部技能，bai 模型组在选择器中标注推荐；其他供应商仍可正常选择。自动更新检查新增离线延期和按失败类型退避，手动检查不受冷却限制；4.x 覆盖安装会在确认应用身份后优先沿用用户选定的原安装目录。
+
+本版继续精确锁定已验证的官方 DSH `0.1.6-alpha.2` 与 dsh-web 0.3.23 固定组件。上游新发布的 `0.1.7-alpha.1` 涉及 Session V4、Profile 设置和 Agent 预设等破坏性迁移，未混入 4.3.0；现有历史会话、项目、Skills、插件和凭据不因本次桌面更新被主动重写。
 
 ### 验证
 
-ChatGPT 授权控制器覆盖浏览器模式自动选择、设备码回退、回调等待、取消、传输失败恢复、安全错误分类和成功后进入 Codex 模型页。隔离 Electron 探针确认官方授权桥可写，浏览器模式不再停在登录方式选择页，并能到达回调等待；真实用户账号的最终 OAuth 授权仍由用户本人在浏览器中完成。授权等待轮询已降频、禁止重叠，并会在成功、失败、取消或界面卸载时停止。
-
-4.2.0 的历史会话、Workspace、插件事务、桌宠设置、技能目录和迁移回滚边界继续保留。发布门禁包含共享文件一致性、功能基线、单元测试、真实 Windows Electron 回归、打包后检查，以及 GitHub Actions 上的 Windows x64、macOS arm64 Preview 与 Linux x64 Preview 构建。匿名埋点只使用固定的访问、开始、成功、失败和继续结果，不记录账号、凭据、URL、模型 ID、提示词、页面内容、路径或原始错误。
+发布门禁包含共享输出一致性、功能基线、插件与桌面单测、Windows Electron 回归和打包后检查；macOS arm64、Linux x64 由各自 GitHub Actions 原生 Runner 验证。WSL 工具另有真实 Windows 发行版的命令、目录映射、取消和权限测试。任何平台门禁失败都不会创建残缺的正式三端 Release。匿名产品分析只收集固定类别的操作结果，不收集命令、路径、URL、窗口名称、账号、凭据、截图或对话内容。
 
 ### 下载与校验
 
-请从 `desktop-v4.2.1` 对应的 GitHub Release 下载匹配平台的资产，并使用同一 Release 内的 `SHA256SUMS.txt` 核对 SHA-256。Windows x64 安装包按维护者决定不进行代码签名，系统可能显示未知发布者；macOS arm64 与 Linux x64 仍标记为 Preview。三个平台任务全部通过后才会创建公开 Release，不发布残缺的平台集合。
+从 `desktop-v4.3.0` GitHub Release 下载匹配平台的安装包，并用同一 Release 中的 `SHA256SUMS.txt` 核对文件哈希。Windows x64 依维护者决定不签名，系统可能显示未知发布者；macOS arm64 和 Linux x64 仍标记为 Preview。请在覆盖安装前备份重要数据，遇到问题先使用诊断和回滚指引，不要删除 DSH_HOME、Profile 或会话日志。
 
 ### 说明
 
-本项目由 ningbai牛逼 维护，是社区开源桌面端，并非 DeepSeek 官方客户端。4.2.1 不会覆盖已经公开且有用户下载的 4.2.0 Release，而是以独立补丁版本提供可追溯升级和回滚。升级前仍建议备份重要数据；遇到插件、历史会话或登录异常时，请勿删除 `DSH_HOME`、Profile、凭据目录或会话日志，先使用诊断与回滚指引。
+本项目由 ningbai牛逼维护，是社区开源桌面端，并非 DeepSeek 官方客户端。4.3.0 不会覆盖既有 4.2.1 Release；新内核适配将在独立候选验证后另行决定。本版不发布任何 NPM 包。
 
 ## English
 
 ### Highlights
 
-Desktop 4.2.1 is a focused Stable patch for feedback reported against 4.2.0. It keeps the exact official DeepSeek Harness `0.1.6-alpha.2` pin and the source-verified dsh-web 0.3.23 cohort, avoiding another runtime transition. ChatGPT browser sign-in now starts with one click. A successful browser callback is treated only as an intermediate step: Desktop continues through token exchange, account resolution, and local credential commit before it reports the account as signed in. Device-code login remains a first-level fallback. Failures are classified into safe network, token-exchange, account, callback-state, and credential-store guidance without exposing provider response bodies, account data, tokens, or authorization URLs.
+Desktop 4.3.0 focuses on control and update reliability. The manual terminal can select Windows PowerShell, PowerShell 7, WSL, or CMD and remembers that choice. Agents use a separate WSL tool for Linux commands; it does not replace the official PowerShell executor. Agent WSL defaults to per-command approval, can be disabled, and requires an explicit high-risk confirmation before always-allow mode. WSL runs outside the Windows DSH sandbox, so only trusted workspaces should use that mode.
 
-The update window can now be dismissed while the download remains alive in the background; reopening the update surface shows the continuing state. Main-window Plugins, Skills, and model settings open the corresponding Extension Dock management pages, and the promoted bai sign-in route remains a single primary action. One new light-blue character icon is used by the Windows executable, installer, shortcuts, taskbar, windows and tray, by macOS and Linux packages, and by the Dock, website, and project documentation.
+Agent Team, Browser Use, and Computer Use changes now preflight the plugin environment and show save, restart, and recovery progress. The Extension Dock links directly to plugin settings; the Skill picker groups recent entries, and the bai provider has a visible recommended label without removing other providers. Automatic update checks defer while offline and back off by failure category, while manual checks remain available. Verified 4.x in-place upgrades prefer the user's existing custom installation directory.
+
+This release retains the exact reviewed DSH `0.1.6-alpha.2` runtime and dsh-web 0.3.23 source cohort. It does not import the newly released `0.1.7-alpha.1` Session V4, Profile settings, or Agent preset migrations. Existing sessions, projects, Skills, plugins, and credentials are not proactively rewritten by this Desktop release.
 
 ### Verification
 
-The ChatGPT controller is covered for automatic browser-mode selection, device-code fallback, callback waiting, cancellation, rejected transport recovery, safe terminal diagnostics, and navigation to the Codex model picker after success. An isolated real Electron probe confirms that the official authorization bridge is writable, that browser mode no longer stops at the mode selector, and that it reaches callback waiting. A final OAuth exchange with a real ChatGPT account must still be completed by the user in their own browser. Polling is slower, non-overlapping, and stops after success, failure, cancellation, or unmount.
-
-The 4.2.0 safeguards for historical sessions, Workspaces, plugin transactions, pet settings, Skill directories, and migration rollback remain in place. Release gates include shared-output consistency, the machine-readable feature baseline, unit tests, real Windows Electron regression, packaged checks, and Windows x64, macOS arm64 Preview, and Linux x64 Preview jobs on GitHub Actions. Analytics use only fixed viewed, started, succeeded, failed, and continued outcomes and exclude accounts, credentials, URLs, model identifiers, prompts, page content, file paths, and raw errors.
+Release gates cover shared-output consistency, the feature baseline, plugin and Desktop tests, Windows Electron regression, and packaged checks. Native GitHub Actions runners verify macOS arm64 and Linux x64. A real Windows WSL distribution separately checks commands, workspace mapping, cancellation, and permission modes. No incomplete three-platform Stable Release is published. Anonymous analytics use fixed outcome categories and exclude commands, paths, URLs, window names, accounts, credentials, screenshots, and conversation content.
 
 ### Download and verification
 
-Download platform assets from the GitHub Release tagged `desktop-v4.2.1` and verify SHA-256 values with the `SHA256SUMS.txt` file from that same Release. The Windows x64 installer is intentionally unsigned by maintainer decision, so Windows may display an unknown-publisher warning. macOS arm64 and Linux x64 remain Preview targets. The public Release is created only after all three platform jobs succeed, so an incomplete platform set is never published as Stable.
+Download platform assets from the GitHub Release tagged `desktop-v4.3.0` and verify them with the `SHA256SUMS.txt` file from that same Release. Windows x64 is intentionally unsigned and may show an unknown-publisher warning. macOS arm64 and Linux x64 remain Preview. Back up important data before an in-place upgrade. If problems occur, use diagnostics and rollback guidance; do not delete DSH_HOME, the Profile, or Session logs.
 
 ### Notice
 
-This project is a community-maintained open-source Desktop application maintained by ningbai牛逼; it is not an official DeepSeek client. The existing 4.2.0 Release is retained because users have already downloaded it. Version 4.2.1 is a separate patch so updates and rollback remain traceable. Back up important data before upgrading. If plugins, history, or sign-in fail, do not delete `DSH_HOME`, the Profile, credential storage, or Session logs; use the diagnostic and rollback guidance first.
+This is a community-maintained open-source Desktop application maintained by ningbai牛逼, not an official DeepSeek client. Version 4.3.0 does not replace the existing 4.2.1 Release. A later kernel upgrade requires its own isolated candidate review. No NPM package is published as part of this release.

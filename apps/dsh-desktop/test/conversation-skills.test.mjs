@@ -7,6 +7,7 @@ import {
   CONVERSATION_SKILLS_CSS,
   CONVERSATION_SKILLS_SCRIPT,
   filterConversationSkills,
+  groupConversationSkills,
   insertSkillTrigger,
   installConversationSkills,
   normalizeConversationSkills,
@@ -26,6 +27,17 @@ test('skill inventory hides shadowed entries, deduplicates names, and pins recen
   assert.equal(skills[1].recent, false)
   assert.deepEqual(filterConversationSkills(skills, 'browser').map((skill) => skill.name), ['playwright'])
   assert.deepEqual(filterConversationSkills(skills, 'CODE').map((skill) => skill.name), ['code'])
+})
+
+test('recent skills stay duplicated in the complete skills group', () => {
+  const skills = normalizeConversationSkills([
+    { name: 'playwright', source: 'user-agents' },
+    { name: 'code', source: 'user-dsh' },
+  ], ['code'])
+  const groups = groupConversationSkills(skills)
+  assert.deepEqual(groups.map((group) => group.label), ['最近使用', '全部技能'])
+  assert.deepEqual(groups[0].skills.map((skill) => skill.name), ['code'])
+  assert.deepEqual(groups[1].skills.map((skill) => skill.name), ['code', 'playwright'])
 })
 
 test('skill trigger uses a stable natural-language invocation', () => {

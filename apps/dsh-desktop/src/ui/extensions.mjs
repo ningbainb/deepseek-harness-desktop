@@ -348,7 +348,10 @@ function pluginDetailMarkup(plugin) {
   const permissions = plugin.permissions?.length
     ? plugin.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
     : '<li>未声明额外权限</li>'
-  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label><dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
+  const settingsAction = plugin.enabled
+    ? `<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>在主界面的原生插件详情中配置此插件提供的选项。</p></div><button type="button" class="primary" data-open-plugin-settings="${escapeHtml(plugin.name)}">打开插件设置</button></section>`
+    : '<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>启用插件后可打开它提供的详细设置。</p></div></section>'
+  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label>${settingsAction}<dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
 }
 
 const NATIVE_PLUGINS = [
@@ -1148,7 +1151,7 @@ document.querySelector('#developer-copy-environment').addEventListener('click', 
       runtimeVersion: info?.runtimeVersion ?? info?.runtime,
       platform: info?.platform,
     }, null, 2)
-    await navigator.clipboard.writeText(payload)
+    await window.dshDesktop.copyText(payload)
     notify('环境信息已复制')
   } catch (error) {
     await showPluginFailure(error, '复制环境信息失败')
@@ -1506,6 +1509,16 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
     activateTab(document.querySelector('#market-tab'), true)
     return
   }
+  const pluginSettingsButton = event.target.closest('[data-open-plugin-settings]')
+  if (pluginSettingsButton) {
+    try {
+      const result = await window.dshDesktop.openPluginSettings(pluginSettingsButton.dataset.openPluginSettings)
+      if (result?.opened !== true) notify('暂时无法打开插件设置，请返回主界面重试。', true)
+    } catch (error) {
+      notify(error?.message || '暂时无法打开插件设置，请返回主界面重试。', true)
+    }
+    return
+  }
   const restartPluginButton = event.target.closest('[data-restart-plugin]')
   if (restartPluginButton) {
     await extensionOperations.run(async () => {
@@ -1545,7 +1558,7 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
         attention: plugin.attention,
       }
       try {
-        await navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2))
+        await window.dshDesktop.copyText(JSON.stringify(diagnostics, null, 2))
         notify('诊断信息已复制')
       } catch (error) {
         await showPluginFailure(error, '复制诊断信息失败')

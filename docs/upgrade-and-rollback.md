@@ -1,5 +1,11 @@
 # Desktop upgrade and rollback
 
+## 4.2.1 to 4.3.0
+
+4.3.0 keeps the exact DSH `0.1.6-alpha.2` runtime and existing Session format; it does not import the newly released DSH `0.1.7-alpha.1` or run its Session V4 migration. Existing sessions, project files, credentials, Skills, and plugin bytes remain outside direct migration writes. The new terminal Shell choice and Agent WSL permission are Desktop-owned preferences; the Agent WSL tool defaults to per-command approval, and an unreadable permission file fails closed.
+
+For an in-place Windows update, the installer reuses a custom 4.x installation directory only when the registered location has the community application's private marker and executable. Keep the existing Home and installation directory intact. If a startup or plugin check fails, export diagnostics and return to the previous installer using its verified checksum; do not delete Session logs or the Profile. macOS and Linux packages remain Preview and must be verified on their native platform jobs.
+
 ## 4.2.0 to 4.2.1
 
 4.2.1 keeps the same DSH `0.1.6-alpha.2` runtime family and the existing `desktop-v4.2.0` migration record. It does not rerun or rename the 4.2 data migration. The patch changes Desktop UI, authorization bridging, update-window behavior, generated brand assets, and compatibility guards; Session JSONL, Workspace files, credentials, Skills, third-party plugin bytes, and project files remain outside direct migration writes.

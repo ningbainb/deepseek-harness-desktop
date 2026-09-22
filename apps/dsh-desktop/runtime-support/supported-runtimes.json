@@ -12,7 +12,7 @@
       "status": "supported",
       "upstreamVersion": "0.1.6-alpha.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=4.2.1",
+      "desktopRange": "=4.3.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -71,7 +71,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "c54bad458a28fe4a69b6fb34982580885a2026b5f1ad9db1b99247029ecc9e73"
+          "sha256": "68473c29adc7f43d041430390c588a72a75de4be76f1d4d423c46be6e3762498"
         },
         "slots": [
           "conversation.composer.dock",
@@ -80,7 +80,6 @@
           "conversation.input.model",
           "conversation.input.selector.context",
           "conversation.session.header.actions",
-          "model-preferences.onboarding",
           "root",
           "settings.models.footer",
           "settings.section",

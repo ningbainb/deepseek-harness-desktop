@@ -11,6 +11,34 @@ import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
 import { resolveExternalPluginSource } from '../src/external-plugin-source.mjs'
 
+test('Dock-only Agent WSL permission requires explicit confirmation before always-allow', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-agent-shell-ipc-'))
+  const ipcMain = new FakeIpcMain()
+  const decisions = [0, 1]
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    isDockSettingsSender: sender => sender === ipcMain.sender,
+    dialog: { showMessageBox: async () => ({ response: decisions.shift() }) },
+    shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {},
+    projectRoot: dshHome, dshHome,
+    qqBotBinding: new EventEmitter(), pluginRecovery: new EventEmitter(),
+  })
+  try {
+    const get = ipcMain.handlers.get('dock-settings:agent-shell-policy-get')
+    const set = ipcMain.handlers.get('dock-settings:agent-shell-policy-set')
+    assert.deepEqual(await get(), { mode: 'ask', valid: true })
+    await assert.rejects(get({ sender: {} }), error => error.code === DESKTOP_ERROR_CODES.CAPABILITY_DENIED)
+    assert.deepEqual(await set(undefined, 'allow'), { mode: 'ask', valid: true })
+    assert.deepEqual(await set(undefined, 'allow'), { mode: 'allow', valid: true })
+    assert.deepEqual(await set(undefined, 'off'), { mode: 'off', valid: true })
+    await assert.rejects(set(undefined, 'unexpected'), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+  } finally {
+    unregister()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
 class FakeIpcMain {
   handlers = new Map()
   sender = {}
@@ -120,6 +148,52 @@ test('Dock settings IPC accepts only fixed page ids and a close request', async 
     assert.equal(selected.length, 6)
   } finally { unregister() }
 })
+
+test('extension clipboard writes use the authorized main-process bridge and bound payloads', async () => {
+  const ipcMain = new FakeIpcMain()
+  const copied = []
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh',
+    qqBotBinding: new EventEmitter(), pluginRecovery: new EventEmitter(),
+    writeClipboardText: async text => { copied.push(text); return true },
+  })
+  try {
+    const copy = ipcMain.handlers.get('extensions:clipboard-write')
+    assert.equal(await copy(undefined, 'diagnostic text'), true)
+    assert.deepEqual(copied, ['diagnostic text'])
+    await assert.rejects(copy(undefined, ''), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    await assert.rejects(copy(undefined, 'x'.repeat(64 * 1024 + 1)), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    assert.deepEqual(copied, ['diagnostic text'])
+  } finally { unregister() }
+})
+
+test('plugin settings navigation accepts only an installed community package', async () => {
+  const ipcMain = new FakeIpcMain()
+  const opened = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false, binding: false, pending: false })
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: { inventory: async () => [
+      { name: '@deepseek-ai/dsh-base', builtIn: true },
+      { name: 'dsh-free-search', builtIn: false },
+    ] },
+    controller: {}, ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh',
+    qqBotBinding,
+    openPluginSettings: async name => { opened.push(name); return true },
+  })
+  try {
+    const open = ipcMain.handlers.get('extensions:plugin-settings-open')
+    assert.deepEqual(await open(undefined, 'dsh-free-search'), { opened: true })
+    assert.deepEqual(opened, ['dsh-free-search'])
+    await assert.rejects(open(undefined, '@deepseek-ai/dsh-base'), /installed plugin is unavailable/u)
+    await assert.rejects(open(undefined, '../unsafe'), /installed plugin is unavailable/u)
+    assert.deepEqual(opened, ['dsh-free-search'])
+  } finally { unregister() }
+})
 test('extension IPC exposes only renderer-safe QQ Bot state and forwards lifecycle events', async () => {
   const ipcMain = new FakeIpcMain()
   const sent = []
@@ -211,6 +285,88 @@ test('Agent Team switch restarts Runtime and returns the persisted feature state
       ipcMain.handlers.get('dock-settings:agent-team-set')(undefined, 'true'),
       /enabled state must be a boolean/u,
     )
+  } finally { await unregister() }
+})
+
+test('Computer Use switch publishes terminal restart phases and returns persisted state', async () => {
+  const ipcMain = new FakeIpcMain()
+  const progress = []
+  ipcMain.sender = { send: (channel, value) => progress.push([channel, value]) }
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  let enabled = false
+  const controlCenterFeature = {
+    status: async () => ({
+      browser: { enabled: false, provider: 'playwright', state: 'disabled' },
+      computer: { enabled, provider: 'cua-native', state: enabled ? 'ready' : 'disabled' },
+    }),
+    test: async () => ({ state: 'ready', provider: 'cua-native' }),
+    setFeature: async (_kind, next) => { enabled = next },
+    openPermissionSettings: async () => true,
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {},
+    controller: { stop: async () => {}, start: async () => {} },
+    ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh', qqBotBinding,
+    controlCenterFeature,
+    isDockSettingsSender: sender => sender === ipcMain.sender,
+  })
+  try {
+    const result = await ipcMain.handlers.get('dock-settings:computer-use-set')(undefined, true, 'cua-native')
+    assert.equal(result.computer.enabled, true)
+    assert.deepEqual(progress.map(([, value]) => value.phase), ['saving', 'stopping', 'starting', 'succeeded'])
+    assert.ok(progress.every(([channel, value]) => channel === 'dock-settings:control-center-progress' && value.kind === 'computer'))
+  } finally { await unregister() }
+})
+
+test('all three feature switches refuse an unhealthy plugin environment before stopping Runtime', async () => {
+  const ipcMain = new FakeIpcMain()
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  const lifecycle = []
+  const changes = []
+  const reason = '插件环境尚未就绪，请先到拓展坞的「诊断与恢复」修复插件环境，再重试开关。当前运行不会被中断。'
+  const preflightFeatureMutation = async kind => {
+    lifecycle.push(`preflight:${kind}`)
+    throw new Error(reason)
+  }
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {},
+    controller: {
+      stop: async () => { lifecycle.push('stop') },
+      start: async () => { lifecycle.push('start') },
+    },
+    ensureProfile: async () => { lifecycle.push('ensure') },
+    preflightFeatureMutation,
+    isDockSettingsSender: sender => sender === ipcMain.sender,
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh', qqBotBinding,
+    agentTeamFeature: {
+      status: async () => ({ available: true, enabled: false }),
+      setEnabled: async value => { changes.push(['agent-team', value]) },
+    },
+    controlCenterFeature: {
+      status: async () => ({
+        browser: { enabled: false, provider: 'playwright', state: 'disabled' },
+        computer: { enabled: false, provider: 'cua-native', state: 'disabled' },
+      }),
+      test: async (_kind, provider) => ({ state: 'ready', provider }),
+      setFeature: async (...args) => { changes.push(args) },
+      openPermissionSettings: async () => true,
+    },
+  })
+  try {
+    for (const [channel, args] of [
+      ['dock-settings:agent-team-set', [true]],
+      ['dock-settings:browser-use-set', [true, 'playwright']],
+      ['dock-settings:computer-use-set', [true, 'cua-native']],
+    ]) {
+      await assert.rejects(ipcMain.handlers.get(channel)(undefined, ...args), error => error.message === reason)
+    }
+    assert.deepEqual(lifecycle, ['preflight:agent-team', 'preflight:browser', 'preflight:computer'])
+    assert.deepEqual(changes, [])
   } finally { await unregister() }
 })
 

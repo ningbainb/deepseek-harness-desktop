@@ -498,22 +498,22 @@
   border-radius: 9px;
 }
 
-/* The official footer action seat is a single nowrap row. Desktop contributes
-   enough first-class actions to exceed the 256px content width, so reserve a
-   deliberate second row for the primary Extension Dock destination. */
+/* The official footer action seat is a single nowrap row. Stack Desktop's
+   labeled destinations in the wide sidebar so intermediate widths never crop
+   an action or leave only part of its icon visible. */
 :global([data-pane='sidebar'] [class*='footerActions']):has(.dockEntry[data-dsh-extension-dock-entry][data-wide='wide']) {
   flex-wrap: wrap;
   row-gap: 4px;
 }
 
-.dockEntry[data-dsh-extension-dock-entry][data-wide='wide'] {
+.dockEntry[data-wide='wide'] {
   box-sizing: border-box;
   flex-basis: 100%;
   width: 100%;
   justify-content: flex-start;
 }
 
-.dockEntry[data-dsh-extension-dock-entry][data-wide='wide'] .dockTrigger {
+.dockEntry[data-wide='wide'] .dockTrigger {
   width: 100%;
   justify-content: flex-start;
 }

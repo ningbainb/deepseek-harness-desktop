@@ -1,11 +1,11 @@
 # DeepSeek Harness Desktop
 
-> Community-maintained open-source AI coding desktop. Stable 4.2.1 exact-pins public `@deepseek-ai/dsh@0.1.6-alpha.2`; one verified release delivers Windows, macOS, and Linux desktop builds while retaining an independent community application identity.
+> Community-maintained open-source AI coding desktop. Stable 4.3.0 exact-pins public `@deepseek-ai/dsh@0.1.6-alpha.2`; one verified release delivers Windows, macOS, and Linux desktop builds while retaining an independent community application identity.
 
 ## Canonical identity
 
 - Product: DeepSeek Harness Desktop
-- Version: 4.2.1
+- Version: 4.3.0
 - Platforms: Windows 10/11 x64 stable; macOS Apple Silicon arm64 Preview; Linux x64 Preview
 - License: BSD-3-Clause
 - Maintainer: ningbai牛逼
@@ -15,19 +15,19 @@
 
 - Website: https://ningbainb.github.io/deepseek-harness-desktop/
 - Repository: https://github.com/ningbainb/deepseek-harness-desktop
-- Release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.2.1
-- Windows x64: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-4.2.1-x64.exe
-- macOS arm64 Preview DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-4.2.1-arm64.dmg
-- Linux x64 Preview AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-4.2.1-x86_64.AppImage
+- Release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.3.0
+- Windows x64: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-4.3.0-x64.exe
+- macOS arm64 Preview DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-4.3.0-arm64.dmg
+- Linux x64 Preview AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-4.3.0-x86_64.AppImage
 - Checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
 - Privacy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
 
-## 4.2.1 highlights
+## 4.3.0 highlights
 
-- ChatGPT browser login waits for token exchange, account resolution, and local credential commit before reporting success; device-code login remains available.
-- Update progress may be dismissed while the download continues in the background.
-- Plugins, Skills, and model settings use unified Extension Dock management routes.
-- The Desktop application, website, and documentation share the new light-blue character icon.
+- The manual terminal offers PowerShell, PowerShell 7, WSL, and CMD on Windows; Agent WSL is a separate opt-in tool with per-command approval by default.
+- Agent Team, Browser Use, and Computer Use changes preflight the plugin environment and report restart or rollback progress.
+- Automatic update checks defer while offline and back off after classified failures; manual checks remain available.
+- Verified 4.x in-place upgrades retain the user's custom installation directory.
 
 - Browser Use: official Playwright MCP by default, visible isolated sessions, system Chrome/Edge/Chromium discovery, approval-gated actions.
 - Computer Use: bundled Cua Driver Native by default, external MCP fallback, permission discovery, observation/action separation, safe-mode recovery.

@@ -42,16 +42,16 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-### 4.2.1：登录、更新与扩展管理稳定性修复
+### 4.3.0：终端选择、操控开关与更新体验
 
-当前稳定版为 4.2.1，继续精确锁定官方 DSH `0.1.6-alpha.2`，并基于 dsh-web `alpha` 的 0.3.23 固定源码快照同步 Web 能力。本次补丁优先处理 4.2.0 用户反馈，不改写用户会话、项目或第三方插件内容。
+当前桌面版本为 4.3.0，继续精确锁定已验证的官方 DSH `0.1.6-alpha.2` 与 dsh-web `alpha` 0.3.23 固定源码快照；新发布的 DSH `0.1.7-alpha.1` 尚未完成破坏性变更适配，不随本版升级。手动终端新增 PowerShell、PowerShell 7、WSL 与 CMD 选择；Agent 的 WSL 命令使用独立权限，默认逐条确认，绝不替换官方 PowerShell 沙箱。操控开关增加预检、进度与失败恢复；自动更新增加离线退避，手动检查保持可用。
 
-- **ChatGPT 登录闭环**：浏览器授权改为一键直达；只有令牌交换、账户识别和本机凭据提交全部完成后才显示已登录。设备码登录保留为显眼兜底，失败提示不暴露账号、令牌、URL 或服务端正文。
-- **更新体验**：更新下载窗口可以关闭，下载继续在后台进行；完成后仍可从应用内继续安装。
-- **统一入口与界面**：主界面的插件、Skills 与模型入口直达拓展坞对应管理页；bai 登录入口置顶并保持单一主路径；全局应用图标统一为新版浅蓝角色图标。
-- **兼容与性能**：保留 4.2.0 的新版 Session、Workspace、历史会话、插件回滚和设置保存适配；授权等待轮询降频且禁止并发，不增加持续后台负担。
+- **终端与权限**：手动终端可选系统 Shell；Agent 的 WSL 工具单独受关闭、逐次确认、始终允许三档权限控制，默认逐次确认，信任模式需要明确风险确认。
+- **智能操控**：Agent Team、Browser Use 和 Computer Use 的启停先预检插件环境，显示保存、重启和恢复进度；失败时保留并恢复原配置。
+- **更新与安装**：自动检查按网络状态和失败类型退避，手动检查不受冷却限制；4.x 覆盖安装优先复用已验证的用户自定义安装目录。
+- **扩展与模型**：插件设置可从拓展坞直接进入；技能选择按最近使用分组，bai 模型组在选择器中更明显，同时保留其他供应商顺序。
 
-[4.2 上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [4.2.1 发布说明](docs/launch/release-notes.md)
+[4.2 上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [4.3.0 发布说明](docs/launch/release-notes.md)
 
 ### 4.1.0：让 DeepSeek 操作浏览器和电脑
 

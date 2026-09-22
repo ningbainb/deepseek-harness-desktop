@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { PRIMARY_PROVIDER_ID } from '../core/config.ts'
 import {
   catalogFromDirectory,
   modelDisplayName,
@@ -208,8 +209,11 @@ export function ModelSelect(props: ModelSelectProps) {
   )
 
   const renderGroup = (label: string, groupOptions: readonly SortedModelOption[], key: string) => (
-    <section key={key} role="group" aria-label={label} className={styles.group}>
-      <div className={styles.groupTitle}>{label}</div>
+    <section key={key} role="group" aria-label={label} className={`${styles.group} ${key === PRIMARY_PROVIDER_ID ? styles.primaryProviderGroup : ''}`}>
+      <div className={styles.groupTitle}>
+        <span>{label}</span>
+        {key === PRIMARY_PROVIDER_ID && <span className={styles.recommendedBadge}>{t('menu.recommended')}</span>}
+      </div>
       {groupOptions.map(renderOption)}
     </section>
   )

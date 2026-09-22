@@ -9,6 +9,7 @@ export declare const zh: {
     readonly 'menu.effort': "推理强度";
     readonly 'menu.pinned': "置顶模型";
     readonly 'menu.providers': "供应商";
+    readonly 'menu.recommended': "推荐";
     readonly 'action.close': "关闭";
     readonly 'action.reload': "重新加载";
     readonly 'action.back': "返回模型列表";

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { updateDiagnostic } from './update-diagnostics.mjs'
+import { classifyUpdateError, updateDiagnostic } from './update-diagnostics.mjs'
 
 import { emitBestEffort } from './best-effort-events.mjs'
 import {
@@ -80,6 +80,8 @@ export class DesktopUpdateController extends EventEmitter {
     beforeInstall = async () => {},
     onInstallFailure = async () => {},
     downloadRouter,
+    scheduleStore,
+    isOnline = () => true,
     updateChannel = DEFAULT_UPDATE_CHANNEL,
     unavailableReason = undefined,
     installLaunchTimeoutMs = UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
@@ -98,6 +100,8 @@ export class DesktopUpdateController extends EventEmitter {
     this.beforeInstall = beforeInstall
     this.onInstallFailure = onInstallFailure
     this.downloadRouter = downloadRouter
+    this.scheduleStore = scheduleStore
+    this.isOnline = isOnline
     this.updateChannel = normalizeUpdateChannel(updateChannel)
     this.unavailableReason = typeof unavailableReason === 'string' && unavailableReason.length > 0
       ? unavailableReason
@@ -173,6 +177,22 @@ export class DesktopUpdateController extends EventEmitter {
       if (manual) this.#publish({ ...this.status, visible: true })
       return false
     }
+    if (!manual) {
+      const allowed = await this.#schedule('shouldCheck', this.updateChannel)
+      if (allowed === false) {
+        this.#appendDiagnostic('[updater] automatic check deferred by persistent cooldown')
+        return false
+      }
+      let online = true
+      try { online = this.isOnline() !== false } catch { online = true }
+      if (!online) {
+        void this.#schedule('deferOffline', this.updateChannel)
+        this.#appendDiagnostic('[updater] automatic check deferred while system is offline')
+        return false
+      }
+    }
+    // Persistence must not delay an explicit check or the updater's event lifecycle.
+    void this.#schedule('recordAttempt', this.updateChannel)
     this.checking = true
     this.manualCheck = manual
     this.updateAttempt = { attemptId: randomUUID(), sourceVersion: this.currentVersion, channel: this.updateChannel, source: 'github', sourceAttempt: 0 }
@@ -204,12 +224,14 @@ export class DesktopUpdateController extends EventEmitter {
       const manual = this.manualCheck
       this.checking = false
       this.manualCheck = false
+      void this.#schedule('recordSuccess', this.updateChannel)
       this.#appendDiagnostic(`[updater] ignored ${info?.version || 'unknown'} on ${this.updateChannel}: ${decision.reason}`)
       this.#publish({ phase: 'current', visible: manual })
       return
     }
     this.checking = false
     this.manualCheck = false
+    void this.#schedule('recordSuccess', this.updateChannel)
     this.#appendDiagnostic(`[updater] version ${info?.version || 'unknown'} is available`)
     this.downloading = true
     this.updateStage = 'download'
@@ -243,6 +265,7 @@ export class DesktopUpdateController extends EventEmitter {
     const manual = this.manualCheck
     this.checking = false
     this.manualCheck = false
+    void this.#schedule('recordSuccess', this.updateChannel)
     this.#appendDiagnostic(`[updater] ${this.currentVersion} is up to date`)
     this.#publish({ phase: 'current', visible: manual })
   }
@@ -258,6 +281,7 @@ export class DesktopUpdateController extends EventEmitter {
   async #handleDownloaded(info) {
     this.downloading = false
     this.#setProgress(-1)
+    void this.#schedule('recordSuccess', this.updateChannel)
     this.#appendDiagnostic(`[updater] version ${info?.version || 'unknown'} downloaded`)
     this.#publish({
       ...this.status,
@@ -331,6 +355,7 @@ export class DesktopUpdateController extends EventEmitter {
     if (this.installPreparationTimer) this.clearTimeoutFn(this.installPreparationTimer)
     this.installPreparationTimer = undefined
     const shouldShow = forceVisible || recoverInstall || this.manualCheck || this.downloading
+    void this.#schedule('recordFailure', this.updateChannel, classifyUpdateError(error).error_type)
     this.checking = false
     this.manualCheck = false
     this.downloading = false
@@ -407,6 +432,17 @@ export class DesktopUpdateController extends EventEmitter {
       if (result && typeof result.catch === 'function') void result.catch(() => {})
     } catch {
       // Diagnostics are best-effort and never own update lifecycle progress.
+    }
+  }
+
+  async #schedule(method, ...argumentsList) {
+    try {
+      const action = this.scheduleStore?.[method]
+      if (typeof action !== 'function') return undefined
+      return await action.apply(this.scheduleStore, argumentsList)
+    } catch (error) {
+      this.#appendDiagnostic(`[updater] update schedule ${method} failed: ${error instanceof Error ? error.name : 'unknown'}`)
+      return undefined
     }
   }
 

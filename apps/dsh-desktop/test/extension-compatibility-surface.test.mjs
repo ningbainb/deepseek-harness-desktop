@@ -28,6 +28,7 @@ test('Extension Dock separates unified management from Creative Workshop discove
   assert.match(html, /统一管理已安装插件的启停、更新、卸载和恢复/u)
   assert.match(html, /用户技能默认写入 <code>~\/.dsh\/skills<\/code>/u)
   assert.match(html, /兼容扫描 <code>~\/.agents\/skills<\/code>/u)
+  assert.match(html, /class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai<\/small>/u)
 })
 
 test('Extension Dock moves Agent Team into the unified collaboration page', async () => {

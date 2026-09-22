@@ -126,6 +126,7 @@ import { exportStartupDiagnostics } from './startup-diagnostics.mjs'
 import { SettingsWindowStateStore } from './settings-window-state.mjs'
 import { installStarPromptSurface, StarPromptStore } from './star-prompt.mjs'
 import { createDesktopTerminalPanel } from './terminal-window.mjs'
+import { TerminalShellPreferencesStore } from './terminal-shell-preferences.mjs'
 import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
@@ -155,6 +156,7 @@ import {
   verifyRuntimeFileEvidence,
 } from './runtime-support-policy.mjs'
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
+import { DesktopUpdateCheckStore } from './update-check-state.mjs'
 import { parseUpdateMirrors, probeUpdateSource, UpdateDownloadRouter } from './update-mirrors.mjs'
 import { parseUpdateShutdownRequest, writeUpdateShutdownReceipt } from './update-shutdown-receipt.mjs'
 import { UpdateAnalyticsReceiptStore } from './update-analytics-receipt.mjs'
@@ -568,7 +570,7 @@ export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
   const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
-  const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol: electronProtocol, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
+  const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net: electronNet, Notification, protocol: electronProtocol, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
   registerDesktopRuntimeScheme(electronProtocol)
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
   const initialUpdateShutdownRequest = parseUpdateShutdownRequest(process.argv)
@@ -730,7 +732,9 @@ export async function startElectronApp(metadata) {
   let repairRetry = async () => ({ accepted: false })
   const desktopWindowStatePath = join(userData, 'window-state.json')
   const desktopPreferencesPath = join(userData, 'desktop-preferences.json')
+  const terminalShellPreferences = new TerminalShellPreferencesStore(join(userData, 'terminal-shell.json'))
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
+  const updateCheckStatePath = join(userData, 'update-check-state.json')
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
   const lanGatewayStatePath = join(userData, 'lan-gateway-state.json')
   const lanGatewayStore = new DesktopLanGatewayStore(lanGatewayStatePath)
@@ -1012,6 +1016,8 @@ export async function startElectronApp(metadata) {
         Menu,
         cwd: desktopProfileDir,
         resolvePathEntries: resolveTerminalPathEntries,
+        shellId: process.platform === 'win32' ? await terminalShellPreferences.load() : 'auto',
+        shellPreferences: terminalShellPreferences,
         theme,
         onError: (error) => {
           void logStore.append(`[terminal] ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
@@ -2206,6 +2212,19 @@ export async function startElectronApp(metadata) {
     }
   }
   let extensionRuntimeMaintenance = false
+  const preflightFeatureMutation = async (feature) => {
+    const audit = await auditFullProfileIntegrity()
+    const activeProfile = runtimeProvider.profileName
+    if (activeProfile === 'desktop' && runtimeProvider.status?.state === 'ready' && audit.status === 'healthy') return
+    const safeFeature = ['agent-team', 'browser', 'computer'].includes(feature) ? feature : 'unknown'
+    const reason = typeof audit.reasonCode === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/u.test(audit.reasonCode)
+      ? audit.reasonCode
+      : 'UNKNOWN'
+    await logStore.append(`[features] ${safeFeature} switch deferred profile=${activeProfile === 'desktop' ? 'full' : 'fallback'} audit=${audit.status} reason=${reason}`).catch(() => {})
+    const error = new Error('插件环境尚未就绪，请先到拓展坞的「诊断与恢复」修复插件环境，再重试开关。当前运行不会被中断。')
+    error.code = 'FEATURE_MUTATION_REPAIR_REQUIRED'
+    throw error
+  }
   const unregisterExtensionIpc = registerExtensionIpc({
     selectDockSetting: (id) => desktopWindowFactory.selectDockSetting(id),
     ipcMain,
@@ -2217,6 +2236,7 @@ export async function startElectronApp(metadata) {
     pluginManager,
     controller: runtimeProvider,
     ensureProfile,
+    preflightFeatureMutation,
     projectRoot,
     dshHome,
     agentsHome: process.env.DSH_AGENTS_HOME,
@@ -2234,11 +2254,20 @@ export async function startElectronApp(metadata) {
     completeFullAccessPlugin,
     revokeFullUserTrust,
     exportDiagnostics,
+    writeClipboardText: async (text) => { clipboard.writeText(text) },
     openLogs: () => shell.openPath(logsDirectory),
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
     recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
     completeBlockedPluginRecovery,
+    openPluginSettings: async (name) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return false
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      mainWindow.webContents.send('desktop:plugin-settings-open', Object.freeze({ name }))
+      return true
+    },
   })
   let legacyNpmRestoreScheduled = false
   const dispatchDeepLink = async (link) => {
@@ -3046,6 +3075,8 @@ export async function startElectronApp(metadata) {
       ? UNSIGNED_MAC_PREVIEW_REASON
       : undefined,
     updateChannel,
+    scheduleStore: new DesktopUpdateCheckStore({ path: updateCheckStatePath }),
+    isOnline: () => electronNet?.isOnline?.() !== false,
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
     beforeInstall: installPreparation.beforeInstall,

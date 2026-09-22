@@ -10,6 +10,17 @@
 
 实现仅运行在宿主端，使用公开的 `agent/status`、Agent inbox、`followup` 和 `tools/post-execute` SDK 接口。它不会修改 DeepSeek Harness 的文件；上游运行时补齐文档约定的取消行为后，可以直接移除这个包。
 
+## Agent 终端选择
+
+Windows Desktop 的 Agent 保留官方 `pwsh` 工具作为受沙箱策略管理的原生命令入口，
+并提供独立的 `desktop_wsl` 工具供 Agent 按次选择 Linux 终端。WSL 不在 Windows
+沙箱内，默认每条 WSL 命令都必须由用户单独确认；拒绝或无人确认时不会执行。
+用户可在拓展坞的「智能操控 → Agent 命令终端权限」选择关闭、逐条确认或始终允许。
+始终允许须先通过桌面端原生风险确认，切换后不会逐条弹窗；配置损坏时安全关闭。
+工具只接受已安装的普通 Linux 发行版，不会误入 Docker Desktop 等内部发行版；
+多个发行版时须明确指定名称。WSL 命令以前台方式运行，默认最长 60 秒。
+这与用户手动打开的内置终端 Shell 选择相互独立，不会替换官方 `ctx.shell` 执行器。
+
 ## 工具调用参数恢复
 
 部分模型适配器会额外输出一层传输包装，例如

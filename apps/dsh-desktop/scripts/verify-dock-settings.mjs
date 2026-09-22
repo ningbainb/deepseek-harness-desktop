@@ -45,8 +45,22 @@ try {
   const errors = []
   dock.on('pageerror', error => errors.push(error.message))
   await dock.locator('#value-mode-tab').waitFor()
+  const controlEntry = main.getByRole('button', { name: /智能操控|Smart Control/u }).first()
   const collaborationEntry = main.getByRole('button', { name: /模型协作|Model collaboration/u }).first()
+  const dockEntry = main.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first()
+  await controlEntry.waitFor({ timeout: 60_000 })
   await collaborationEntry.waitFor({ timeout: 60_000 })
+  await dockEntry.waitFor({ timeout: 60_000 })
+  const sidebarBounds = await main.locator('[data-pane="sidebar"]').boundingBox()
+  const shortcutBounds = await Promise.all([controlEntry, collaborationEntry, dockEntry].map(entry => entry.boundingBox()))
+  assert.ok(sidebarBounds && shortcutBounds.every(Boolean), 'Desktop sidebar destinations have measurable bounds')
+  for (const entryBounds of shortcutBounds) {
+    assert.ok(entryBounds.x >= sidebarBounds.x - 1, JSON.stringify({ sidebarBounds, shortcutBounds }))
+    assert.ok(entryBounds.x + entryBounds.width <= sidebarBounds.x + sidebarBounds.width + 1, JSON.stringify({ sidebarBounds, shortcutBounds }))
+  }
+  const orderedShortcuts = shortcutBounds.toSorted((left, right) => left.y - right.y)
+  assert.ok(orderedShortcuts.every((entryBounds, index) => index === 0
+    || entryBounds.y >= orderedShortcuts[index - 1].y + orderedShortcuts[index - 1].height - 1), JSON.stringify(shortcutBounds))
   // The isolated first-run fixture can keep its unrelated workspace modal open.
   // Invoke the actual button handler without letting that modal mask hide this navigation contract.
   await collaborationEntry.evaluate(button => button.click())
@@ -62,6 +76,8 @@ try {
   const area = await app.evaluate(({ screen, BrowserWindow }) => screen.getDisplayMatching(BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('/extensions.html'))?.getBounds() ?? { x: 0, y: 0, width: 1, height: 1 }).workArea)
   assert.ok(Math.abs(nativeBounds.bounds.x + nativeBounds.bounds.width / 2 - area.x - area.width / 2) <= 4, 'Dock centered horizontally')
   assert.ok(Math.abs(nativeBounds.bounds.y + nativeBounds.bounds.height / 2 - area.y - area.height / 2) <= 4, 'Dock centered vertically')
+  assert.equal(await dock.locator('#models-tab .bai-nav-badge').textContent(), 'bai', 'Dock model navigation promotes bai without changing its accessible label')
+  assert.equal(await dock.locator('#models-tab .bai-nav-badge').evaluate(element => getComputedStyle(element).whiteSpace), 'nowrap', 'bai navigation badge stays on one line')
   await dock.screenshot({ path: resolve(output, 'dock.png') })
   const externalStubInstalled = await app.evaluate(({ shell }) => {
     globalThis.dockExternalUrl = undefined
@@ -106,7 +122,45 @@ try {
       await settings.keyboard.press('Home')
       await card.getByRole('button', { name: '新建', exact: true }).waitFor()
     }
+    if (id === 'control-center') {
+      const agentShellCard = settings.locator('[data-control-kind="agent-shell"]')
+      const agentShellPermission = agentShellCard.getByRole('combobox', { name: 'Agent WSL 权限' })
+      await agentShellPermission.waitFor({ state: 'visible' })
+      assert.equal(await agentShellPermission.inputValue(), 'ask', 'Agent WSL defaults to per-command approval')
+      await agentShellPermission.selectOption('off')
+      await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'off')
+      await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'off')
+      assert.equal(await agentShellPermission.inputValue(), 'off', 'Agent WSL can be disabled by the user')
+      await agentShellPermission.selectOption('ask')
+      await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'ask')
+      await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'ask')
+      assert.equal(await agentShellPermission.inputValue(), 'ask', 'Agent WSL permission can return to approval mode')
+      const browserCard = settings.locator('[data-control-kind="browser"]')
+      const browserSwitch = browserCard.getByRole('switch', { name: 'Browser Use', exact: true })
+      await browserSwitch.waitFor({ state: 'visible' })
+      assert.equal(await browserSwitch.isEnabled(), true, 'Browser Use switch settles after the initial capability read')
+      await browserSwitch.click()
+      await settings.waitForFunction(() => document.querySelector('[data-control-kind="browser"] [role="switch"]')?.getAttribute('aria-checked') === 'true', undefined, { polling: 250, timeout: 120_000 })
+      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: 10_000 })
+      await browserSwitch.click()
+      await settings.waitForFunction(() => document.querySelector('[data-control-kind="browser"] [role="switch"]')?.getAttribute('aria-checked') === 'false', undefined, { polling: 250, timeout: 120_000 })
+      assert.equal(await browserSwitch.isEnabled(), true, 'Browser Use remains interactive after a full restart cycle')
+      const computerCard = settings.locator('[data-control-kind="computer"]')
+      const computerSwitch = computerCard.getByRole('switch', { name: 'Computer Use', exact: true })
+      await computerSwitch.waitFor({ state: 'visible' })
+      assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use switch settles after the initial capability read')
+      await computerSwitch.click()
+      await settings.waitForFunction(() => document.querySelector('[data-control-kind="computer"] [role="switch"]')?.getAttribute('aria-checked') === 'true', undefined, { polling: 250, timeout: 120_000 })
+      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: 10_000 })
+      assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use switch always leaves the busy state')
+      if (await computerSwitch.getAttribute('aria-checked') === 'true') {
+        await computerSwitch.click()
+        await settings.waitForFunction(() => document.querySelector('[data-control-kind="computer"] [role="switch"]')?.getAttribute('aria-checked') === 'false', undefined, { polling: 250, timeout: 120_000 })
+      }
+      assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use remains interactive after a full restart cycle')
+    }
     if (id === 'models') {
+      await settings.getByText('bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。').waitFor()
       const relay = settings.locator('[data-relay-onboarding-card]')
       assert.equal(await relay.count(), 1, 'combined model page renders one bai onboarding card')
       const preferences = settings.locator('[data-model-preferences-card]')
@@ -271,6 +325,14 @@ try {
   ], 'the combined model destination and all unique destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('#plugin-settings').waitFor({ state: 'visible' })
+  await dock.locator('#plugin-developer-mode').check()
+  await dock.locator('#plugin-developer-tools').waitFor({ state: 'visible' })
+  await dock.locator('#developer-copy-environment').click()
+  await dock.locator('#toast').waitFor({ state: 'visible' })
+  assert.equal((await dock.locator('#toast').textContent())?.trim(), '环境信息已复制')
+  const copiedEnvironment = JSON.parse(await app.evaluate(({ clipboard }) => clipboard.readText()))
+  assert.equal(typeof copiedEnvironment.desktopVersion, 'string', JSON.stringify(copiedEnvironment))
+  assert.equal('profileDirectory' in copiedEnvironment, false, JSON.stringify(copiedEnvironment))
   assert.equal(await (await app.browserWindow(dock)).evaluate(window => window.contentView.children
     .find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getVisible()), false,
   'local Dock panels become interactive only after the settings child view is hidden')

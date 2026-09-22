@@ -16,6 +16,7 @@ import { installTranscriptBalanceGuard } from './transcript-balance.ts'
 import { registerDesktopConversationImportRoute } from './conversation-import-route.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
 import { installControlToolApproval } from './control-tool-approval.ts'
+import { installAgentWslTool } from './agent-wsl-tool.ts'
 
 export const name = 'desktop-compat'
 // The import route resolves the optional log-backed title service through
@@ -30,6 +31,7 @@ export function apply(ctx: Context): void {
   installToolCallArgumentNormalization(ctx)
   installTranscriptBalanceGuard(ctx)
   installControlToolApproval(ctx)
+  installAgentWslTool(ctx)
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
     'dsh-desktop-compat: workspace native-open authority',
@@ -76,6 +78,8 @@ export {
   controlToolApprovalDecision,
   installControlToolApproval,
 } from './control-tool-approval.ts'
+
+export { installAgentWslTool } from './agent-wsl-tool.ts'
 
 export {
   FRIENDLY_CANCELLED_MESSAGE,

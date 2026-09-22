@@ -4,6 +4,7 @@ export declare const inject: string[];
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 export declare function apply(ctx: Context): void;
 export { controlToolApprovalDecision, installControlToolApproval, } from './control-tool-approval.ts';
+export { installAgentWslTool } from './agent-wsl-tool.ts';
 export { FRIENDLY_CANCELLED_MESSAGE, createQueueRecoveryScheduler, normalizeCancellationDecision, recoverQueuedTurns, } from './recovery.ts';
 export { DesktopSkinStateService, DesktopSkinStateStore, SKIN_STATE_END, SKIN_STATE_START, type DesktopSkinStateFace, type SkinLoaderEntry, } from './skin-state.ts';
 export { DESKTOP_COMPAT_PATCHES, validateCompatPatchRegistry, type DesktopCompatPatch, } from './patch-registry.ts';

@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { PRIMARY_PROVIDER_ID } from "../core/config.js";
 import { catalogFromDirectory, modelDisplayName, selectionForModel, sortModelCatalog, } from "./model-projection.js";
 import styles from './model-preferences.module.css';
 import { installModelRefreshBridge } from "./model-refresh.js";
@@ -152,7 +153,7 @@ export function ModelSelect(props) {
         });
     };
     const renderOption = (option) => (_jsxs("button", { type: "button", className: `${styles.option} ${option.current ? styles.optionCurrent : ''}`, role: "menuitemradio", "aria-checked": option.current, title: option.model.name || option.model.id, disabled: option.providerDisabled || busy, onClick: () => chooseModel(option), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: option.model.name || option.model.id }), option.providerDisabled && _jsx("span", { className: styles.description, children: t('status.providerDisabled') })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: option.current && _jsx("span", { className: styles.checkmark }) })] }, `${option.provider}\u0000${option.model.id}`));
-    const renderGroup = (label, groupOptions, key) => (_jsxs("section", { role: "group", "aria-label": label, className: styles.group, children: [_jsx("div", { className: styles.groupTitle, children: label }), groupOptions.map(renderOption)] }, key));
+    const renderGroup = (label, groupOptions, key) => (_jsxs("section", { role: "group", "aria-label": label, className: `${styles.group} ${key === PRIMARY_PROVIDER_ID ? styles.primaryProviderGroup : ''}`, children: [_jsxs("div", { className: styles.groupTitle, children: [_jsx("span", { children: label }), key === PRIMARY_PROVIDER_ID && _jsx("span", { className: styles.recommendedBadge, children: t('menu.recommended') })] }), groupOptions.map(renderOption)] }, key));
     return (_jsxs("div", { className: styles.root, ref: rootRef, onKeyDown: event => {
             if (event.key !== 'Escape' || !open)
                 return;

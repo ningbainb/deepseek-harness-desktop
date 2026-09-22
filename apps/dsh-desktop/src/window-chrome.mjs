@@ -123,14 +123,25 @@ html[data-dsh-desktop-chrome-theme="dark"] {
    state, while replacing the heavy cyan group outline with a compact neutral
    segmented surface and an accessible per-button keyboard focus ring. */
 html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] {
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  align-self: center !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 2px !important;
   box-sizing: border-box !important;
   padding: 2px !important;
+  margin: 0 !important;
   border: 1px solid var(--dsh-desktop-layout-cluster-border) !important;
   border-radius: 9px !important;
   outline: none !important;
   background: var(--dsh-desktop-layout-cluster-bg) !important;
   box-shadow: none !important;
+  line-height: 0 !important;
+  transform: none !important;
 }
 
 html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"]:focus,
@@ -140,9 +151,22 @@ html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"]:focus-with
 }
 
 html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button {
+  display: inline-flex !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
   margin: 0 !important;
   border-radius: 6px !important;
   box-shadow: none !important;
+}
+
+html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button > svg {
+  display: block !important;
+  flex: none !important;
 }
 
 html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button:focus-visible {

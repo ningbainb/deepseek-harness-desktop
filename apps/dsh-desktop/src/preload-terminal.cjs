@@ -14,6 +14,7 @@ const api = Object.freeze({
   write: (data) => ipcRenderer.send('dsh:terminal:write', data),
   resize: (size) => ipcRenderer.send('dsh:terminal:resize', size),
   restart: (size) => ipcRenderer.invoke('dsh:terminal:restart', size),
+  setShell: (shellId, size) => ipcRenderer.invoke('dsh:terminal:set-shell', shellId, size),
   close: () => ipcRenderer.invoke('dsh:terminal:close'),
   onOutput: subscription('dsh:terminal:output', 'terminal output'),
   onExit: subscription('dsh:terminal:exited', 'terminal exit'),

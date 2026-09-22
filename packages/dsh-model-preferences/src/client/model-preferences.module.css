@@ -120,12 +120,29 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 5px 8px 3px;
   background: var(--dsw-specific-menu, var(--dsw-alias-bg-layer-1, #fff));
   color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
+}
+.primaryProviderGroup {
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 7%, transparent);
+}
+.recommendedBadge {
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 34%, transparent);
+  border-radius: 8px;
+  padding: 0 6px;
+  color: var(--dsw-alias-brand-primary, #3370ff);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
 }
 .option {
   display: flex;

@@ -25,6 +25,53 @@ export type DesktopExtensionDockEntryProps = {
 
 type ManagementTab = 'plugins' | 'skills'
 
+type PluginSettingsRequest = Readonly<{ name?: unknown }>
+type PluginSettingsBridge = Readonly<{
+  onPluginSettingsOpen?: (listener: (request: PluginSettingsRequest) => void) => () => void
+}>
+
+function mainBridge(): PluginSettingsBridge | undefined {
+  return (window as unknown as { dshDesktop?: PluginSettingsBridge }).dshDesktop
+}
+
+/**
+ * Re-enter the Runtime-owned plugin manager for the one installed package the
+ * Extension Dock selected. The Dock remains the single list/management entry;
+ * the Runtime page remains the only place third-party slot forms are rendered.
+ */
+export async function openRuntimePluginSettings(
+  ownerDocument: Document,
+  name: string,
+  allowNativeClick: (entry: HTMLElement) => void,
+  wait: (callback: () => void, delay: number) => unknown = globalThis.setTimeout,
+): Promise<boolean> {
+  if (name.length === 0 || name.length > 214) return false
+  const sidebar = ownerDocument.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
+  const entry = sidebar?.querySelector<HTMLElement>('[data-dsh-desktop-management-entry="plugins"]')
+  if (entry === null || entry === undefined) return false
+  allowNativeClick(entry)
+  entry.click()
+  const started = Date.now()
+  return new Promise(resolve => {
+    const inspect = () => {
+      const detail = [...ownerDocument.querySelectorAll<HTMLElement>('[data-plugin-detail]')]
+        .find(item => item.dataset.pluginDetail === name)
+      if (detail !== undefined) { resolve(true); return }
+      const card = [...ownerDocument.querySelectorAll<HTMLElement>('[data-plugin-package]')]
+        .find(item => item.dataset.pluginPackage === name)
+      const button = card?.querySelector<HTMLButtonElement>('button[aria-label]')
+      if (button !== null && button !== undefined) {
+        button.click()
+        resolve(true)
+        return
+      }
+      if (Date.now() - started >= 10_000) { resolve(false); return }
+      wait(inspect, 50)
+    }
+    inspect()
+  })
+}
+
 /**
  * Reuse the Runtime's existing Plugins and Skill Center sidebar rows while
  * making the Extension Dock their single Desktop destination. The original
@@ -38,6 +85,8 @@ export function installDesktopManagementRouting(
   let observer: MutationObserver | undefined
   const managed = new Set<HTMLElement>()
   const opening = new WeakSet<HTMLElement>()
+  const nativeClicks = new WeakSet<HTMLElement>()
+  let unsubscribePluginSettings: (() => void) | undefined
 
   const mark = (entry: HTMLElement | null | undefined, tab: ManagementTab): void => {
     if (entry === null || entry === undefined) return
@@ -76,6 +125,10 @@ export function installDesktopManagementRouting(
     if (target === null || !ownerDocument.contains(target)) return
     const tab = target.dataset.dshDesktopManagementEntry
     if (tab !== 'plugins' && tab !== 'skills') return
+    if (nativeClicks.has(target)) {
+      nativeClicks.delete(target)
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
     event.stopImmediatePropagation()
@@ -97,11 +150,24 @@ export function installDesktopManagementRouting(
     observer = new MutationObserver(scan)
     observer.observe(ownerDocument.body, { childList: true, subtree: true })
     scan()
+    unsubscribePluginSettings = mainBridge()?.onPluginSettingsOpen?.((request) => {
+      const name = typeof request?.name === 'string' ? request.name : ''
+      const entry = ownerDocument.querySelector<HTMLElement>('[data-dsh-desktop-management-entry="plugins"]')
+      if (entry !== null) {
+        entry.setAttribute('aria-busy', 'true')
+        clearError(entry)
+      }
+      void openRuntimePluginSettings(ownerDocument, name, nativeEntry => nativeClicks.add(nativeEntry))
+        .then(opened => { if (!opened && entry !== null) showError(entry, 'plugins') })
+        .catch(() => { if (entry !== null) showError(entry, 'plugins') })
+        .finally(() => entry?.removeAttribute('aria-busy'))
+    })
   }).catch(() => {})
 
   return () => {
     disposed = true
     observer?.disconnect()
+    unsubscribePluginSettings?.()
     ownerDocument.removeEventListener('click', onClick, true)
     for (const entry of managed) {
       clearError(entry)

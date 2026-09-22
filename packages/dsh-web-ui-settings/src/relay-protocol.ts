@@ -19,6 +19,7 @@ export const RELAY_BASE_URL = 'https://api.1521003.xyz/v1'
 export const RELAY_API_PREFIX = '/api/dsh-relay'
 export const RELAY_STATUS_PATH = RELAY_API_PREFIX + '/status'
 export const RELAY_CONFIGURE_PATH = RELAY_API_PREFIX + '/configure'
+export const RELAY_REFRESH_PATH = RELAY_API_PREFIX + '/refresh'
 export const RELAY_REMOVE_PATH = RELAY_API_PREFIX + '/remove'
 export const RELAY_CONNECT_PATH = RELAY_API_PREFIX + '/connect'
 export const RELAY_CONNECT_STATUS_PATH = RELAY_API_PREFIX + '/connect/status'
@@ -70,13 +71,6 @@ export interface RelayErrorResponse {
 
 export type RelayResponse = RelayStatusResponse | RelayConfigureResponse | RelayErrorResponse | RelayConnectResponse
 
-function safeLabel(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') return fallback
-  const trimmed = value.trim()
-  if (trimmed === '' || trimmed.length > 256 || /[\u0000-\u001f\u007f]/u.test(trimmed)) return fallback
-  return trimmed
-}
-
 function safeModelId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const id = value.trim()
@@ -98,13 +92,13 @@ export function normalizeRelayModels(payload: unknown): RelayModelView[] {
   const models: RelayModelView[] = []
   for (const entry of data) {
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) continue
-    const record = entry as { id?: unknown; name?: unknown; display_name?: unknown }
+    const record = entry as { id?: unknown }
     const id = safeModelId(record.id)
     if (id === undefined || seen.has(id)) continue
     seen.add(id)
     models.push({
       id,
-      name: safeLabel(record.name ?? record.display_name, id),
+      name: id,
     })
     if (models.length >= RELAY_MAX_MODELS) break
   }

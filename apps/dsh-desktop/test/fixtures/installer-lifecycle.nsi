@@ -3,11 +3,19 @@ RequestExecutionLevel user
 SilentInstall silent
 Name "DSH isolated installer lifecycle test"
 OutFile "${TEST_OUTPUT}"
-InstallDir "${TEST_INSTALL}"
+InstallDir "${TEST_DEFAULT_INSTALL}"
+!define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
+Var perUserInstallationFolder
+Var hasPerUserInstallation
+Var hasPerMachineInstallation
 !define INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Install"
 !define UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Uninstall"
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
 !insertmacro customHeader
+
+Function .onInit
+  !insertmacro customInit
+FunctionEnd
 
 Function CheckOldUninstallerFixture
   !insertmacro customUnInstallCheck

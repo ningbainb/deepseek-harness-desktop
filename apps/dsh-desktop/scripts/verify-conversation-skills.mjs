@@ -137,6 +137,19 @@ try {
   assert.match(await composerInput.textContent().catch(async () => await composerInput.inputValue()), new RegExp(`使用 ${selectedName} 技能：`, 'u'))
 
   await skillsButton.click()
+  await menu.waitFor({ state: 'visible' })
+  const recentGrouping = await listbox.evaluate((root, recentName) => {
+    const children = [...root.children]
+    const recentLabel = children.findIndex((child) => child.textContent?.trim() === '最近使用')
+    const allLabel = children.findIndex((child) => child.textContent?.trim() === '全部技能')
+    const matchingOptions = children.filter((child) =>
+      child.getAttribute('role') === 'option'
+      && child.querySelector('strong')?.textContent?.trim() === recentName)
+    return { recentLabel, allLabel, matchingOptions: matchingOptions.length }
+  }, selectedName)
+  assert.ok(recentGrouping.recentLabel >= 0, JSON.stringify(recentGrouping))
+  assert.ok(recentGrouping.allLabel > recentGrouping.recentLabel, JSON.stringify(recentGrouping))
+  assert.equal(recentGrouping.matchingOptions, 2, JSON.stringify(recentGrouping))
   // Dispatch the underlying navigation click intentionally while the modal
   // layer is open; this verifies that a real page transition closes it.
   await page.getByText(/^(?:探索未至之境|Into the Unknown)$/u).click({ force: true })

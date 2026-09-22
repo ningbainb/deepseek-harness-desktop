@@ -19,6 +19,13 @@ ipcRenderer.on('dock-settings:agent-team-progress', (_event, progress) => {
   }
 })
 
+const controlProgressListeners = new Set()
+ipcRenderer.on('dock-settings:control-center-progress', (_event, progress) => {
+  for (const listener of [...controlProgressListeners]) {
+    try { listener(progress) } catch {}
+  }
+})
+
 contextBridge.exposeInMainWorld('dshDesktopTransport', Object.freeze({
   openRuntimeStream: (endpoint, payload) => ipcRenderer.invoke('desktop:runtime-stream-open', { endpoint, payload }),
   writeRuntimeStream: (id, value) => ipcRenderer.invoke('desktop:runtime-stream-write', id, value),
@@ -45,8 +52,15 @@ contextBridge.exposeInMainWorld('dshDockSettings', Object.freeze({
     return () => progressListeners.delete(listener)
   },
   getControlCenterState: () => ipcRenderer.invoke('dock-settings:control-center-state'),
+  getAgentShellPolicy: () => ipcRenderer.invoke('dock-settings:agent-shell-policy-get'),
+  setAgentShellPolicy: (mode) => ipcRenderer.invoke('dock-settings:agent-shell-policy-set', mode),
   setBrowserUseEnabled: (enabled, provider) => ipcRenderer.invoke('dock-settings:browser-use-set', enabled, provider),
   setComputerUseEnabled: (enabled, provider) => ipcRenderer.invoke('dock-settings:computer-use-set', enabled, provider),
+  onControlCenterProgress: (listener) => {
+    if (typeof listener !== 'function') throw new TypeError('Smart Control progress listener must be a function')
+    controlProgressListeners.add(listener)
+    return () => controlProgressListeners.delete(listener)
+  },
   testControlProvider: (kind) => ipcRenderer.invoke('dock-settings:control-provider-test', kind),
   openControlPermissionSettings: (kind) => ipcRenderer.invoke('dock-settings:control-permission-open', kind),
 }))

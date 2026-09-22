@@ -11,6 +11,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the 'settings.section'
 // entry) and the ctx.settingsScope Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: imports the official Models footer extension contract.
+import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: imports the model options page's additive onboarding slot.
 import type {} from '@linxin666/dsh-client-ui-model-preferences/client'
@@ -126,10 +128,13 @@ export function apply(ctx: ClientContext): void {
       name: 'web-ui.plugin.item', id: 'relay', order: 1, locale: 'relay-onboarding',
     }, RelayOnboardingCard))
   } else {
-    ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
-      name: 'model-preferences.onboarding',
-      id: 'bai',
-      order: 5,
+    // The official Models page only exposes a footer extension seat. The page
+    // is a flex column, so the card's negative order raises bai into the first
+    // screen without modifying or replacing the upstream package.
+    ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
+      name: 'settings.models.footer',
+      id: 'bai-onboarding',
+      order: -100,
       locale: 'relay-onboarding',
     }, RelayOnboardingCard))
   }
