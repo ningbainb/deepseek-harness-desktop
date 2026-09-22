@@ -156,7 +156,22 @@ try {
   assert.equal(recentGrouping.matchingOptions, 2, JSON.stringify(recentGrouping))
   // Dispatch the underlying navigation click intentionally while the modal
   // layer is open; this verifies that a real page transition closes it.
-  await page.getByText(/^(?:探索未至之境|Into the Unknown)$/u).click({ force: true })
+  const navigationTarget = page.getByText(/^(?:探索未至之境|Into the Unknown)$/u)
+  const navigationEvidence = await navigationTarget.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const centerX = bounds.left + bounds.width / 2
+    const centerY = bounds.top + bounds.height / 2
+    const hit = document.elementFromPoint(centerX, centerY)
+    const events = []
+    for (const type of ['pointerdown', 'click']) document.addEventListener(type, (event) => {
+      events.push({ type, target: event.target?.outerHTML?.slice(0, 300) })
+    }, true)
+    window.__dshSkillsNavigationEvents = events
+    return { target: element.outerHTML.slice(0, 500), bounds: bounds.toJSON(), hit: hit?.outerHTML?.slice(0, 500) }
+  })
+  console.log(`Conversation Skills navigation before click: ${JSON.stringify(navigationEvidence)}`)
+  await navigationTarget.click({ force: true })
+  console.log(`Conversation Skills navigation after click: ${JSON.stringify(await page.evaluate(() => ({ events: window.__dshSkillsNavigationEvents, menuHidden: document.querySelector('#dsh-desktop-skills-menu')?.hidden })))}`)
   await menu.waitFor({ state: 'hidden' })
   if (screenshot) {
     await page.locator('#dsh-desktop-skills-toast').waitFor({ state: 'detached', timeout: 4_000 }).catch(() => {})
