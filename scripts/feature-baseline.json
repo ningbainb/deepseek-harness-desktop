@@ -624,6 +624,7 @@
         "native-remote-model-catalog",
         "shared-bounded-catalog-read",
         "catalog-refresh-on-runtime-and-provider-changes",
+        "bounded-stale-catalog-retry-during-packaged-startup",
         "real-expert-worker-selection-and-timeout-retry",
         "verified-settings-write-before-success",
         "failed-guide-save-preserves-selection",

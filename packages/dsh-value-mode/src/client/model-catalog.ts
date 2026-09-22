@@ -5,6 +5,7 @@ import type { ValueModeModelCatalog } from './ModelPicker.tsx'
 import type { ValueModeLocaleKey } from './locales.ts'
 
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000
+const MAX_CATALOG_REVISION_RETRIES = 2
 
 /** A bounded advisory read, not a replacement for the native selection directory. */
 export function createModelCatalogLoader(ctx: Context, translate: (key: ValueModeLocaleKey) => string) {
@@ -23,7 +24,7 @@ export function createModelCatalogLoader(ctx: Context, translate: (key: ValueMod
   ]
   ctx.effect(() => () => { disposed = true; invalidate(); removers.forEach(remove => remove()) }, 'value-mode: model catalog lifetime')
 
-  return function fetchModels(): Promise<ValueModeModelCatalog> {
+  return function fetchModels(retriesLeft = MAX_CATALOG_REVISION_RETRIES): Promise<ValueModeModelCatalog> {
     if (disposed) return Promise.reject(new Error(translate('catalogUnavailable')))
     if (cached && cached.expires > Date.now()) return Promise.resolve(cached.value)
     if (pending) return pending
@@ -45,6 +46,12 @@ export function createModelCatalogLoader(ctx: Context, translate: (key: ValueMod
       // Short-lived UI reuse only. The Host remains the source of models and permissions.
       cached = { value, expires: Date.now() + 30_000 }
       return value
+    }).catch(error => {
+      // Packaged startup can publish a newer settings document or Runtime
+      // generation while this advisory read is in flight. Read the new catalog
+      // instead of making the user retry a stale request by hand.
+      if (!disposed && started !== revision && retriesLeft > 0) return fetchModels(retriesLeft - 1)
+      throw error
     }).finally(() => {
       clearTimeout(timer)
       if (pending === operation) { pending = undefined; cancel = undefined }

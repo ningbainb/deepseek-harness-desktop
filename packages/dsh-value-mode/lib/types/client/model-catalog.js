@@ -1,4 +1,5 @@
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000;
+const MAX_CATALOG_REVISION_RETRIES = 2;
 /** A bounded advisory read, not a replacement for the native selection directory. */
 export function createModelCatalogLoader(ctx, translate) {
     let revision = 0;
@@ -15,7 +16,7 @@ export function createModelCatalogLoader(ctx, translate) {
         ctx.get('connection').generation.subscribe(invalidate),
     ];
     ctx.effect(() => () => { disposed = true; invalidate(); removers.forEach(remove => remove()); }, 'value-mode: model catalog lifetime');
-    return function fetchModels() {
+    return function fetchModels(retriesLeft = MAX_CATALOG_REVISION_RETRIES) {
         if (disposed)
             return Promise.reject(new Error(translate('catalogUnavailable')));
         if (cached && cached.expires > Date.now())
@@ -42,6 +43,13 @@ export function createModelCatalogLoader(ctx, translate) {
             // Short-lived UI reuse only. The Host remains the source of models and permissions.
             cached = { value, expires: Date.now() + 30_000 };
             return value;
+        }).catch(error => {
+            // Packaged startup can publish a newer settings document or Runtime
+            // generation while this advisory read is in flight. Read the new catalog
+            // instead of making the user retry a stale request by hand.
+            if (!disposed && started !== revision && retriesLeft > 0)
+                return fetchModels(retriesLeft - 1);
+            throw error;
         }).finally(() => {
             clearTimeout(timer);
             if (pending === operation) {

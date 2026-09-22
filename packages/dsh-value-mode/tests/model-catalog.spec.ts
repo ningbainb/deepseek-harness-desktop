@@ -55,17 +55,32 @@ it('bounds a hanging read, permits retry and ignores the late obsolete result', 
   expect(vi.getTimerCount()).toBe(0)
 })
 
-it('rejects an old runtime result and releases subscriptions on disposal', async () => {
+it('retries an in-flight read when the runtime generation changes, then releases subscriptions', async () => {
   const request = vi.fn().mockImplementationOnce(() => new Promise(() => {})).mockResolvedValue(result('new-host'))
   const f = fixture(request)
-  const old = expect(f.load()).rejects.toThrow(zh.catalogChanged)
+  const read = f.load()
   await Promise.resolve()
   f.listeners.get('generation')!()
-  await old
+  expect((await read).groups[0].id).toBe('new-host')
+  expect(f.request).toHaveBeenCalledTimes(2)
   expect((await f.load()).groups[0].id).toBe('new-host')
   disposers.splice(0).forEach(dispose => dispose())
   expect(f.listeners.size).toBe(0)
   await expect(f.load()).rejects.toThrow(zh.catalogUnavailable)
+})
+
+it('bounds repeated startup invalidations and leaves explicit retry available', async () => {
+  const request = vi.fn().mockImplementation(() => new Promise(() => {}))
+  const f = fixture(request)
+  const staleRead = expect(f.load()).rejects.toThrow(zh.catalogChanged)
+  for (let count = 1; count <= 3; count++) {
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(count))
+    f.listeners.get('settings/document-updated')!()
+  }
+  await staleRead
+  expect(f.request).toHaveBeenCalledTimes(3)
+  request.mockResolvedValue(result('manual-retry'))
+  expect((await f.load()).groups[0].id).toBe('manual-retry')
 })
 
 it('preserves provider-local failures and retries whole-request failures', async () => {
