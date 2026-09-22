@@ -10,8 +10,8 @@ export function renderSponsorQr() {
 }
 
 // Bump the once-per-release claim key so the community prompt is shown again
-// for the 4.2.1 release, while remaining idempotent thereafter.
-export const STAR_PROMPT_VERSION = '4.2.1'
+// for the 4.3.0 release, while remaining idempotent thereafter.
+export const STAR_PROMPT_VERSION = '4.3.0'
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {
