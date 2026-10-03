@@ -50,12 +50,28 @@ test('legacy panels retain the original strict hidden-container wait and budget'
   assert.deepEqual(calls, [{ state: 'hidden', timeout: 30_000 }])
 })
 
-test('rc2 panels cannot bypass content waits with a false aria-hidden claim', async () => {
+test('rc2 panels cannot bypass content waits with a false aria-hidden claim', async context => {
   const calls = []
+  let elapsed = 0
+  context.mock.method(Date, 'now', () => elapsed)
   const panel = { locator: () => ({ count: async () => 1, all: async () => [{ waitFor: async options => calls.push(options) }] }),
+    page: () => ({ waitForTimeout: async duration => { elapsed += duration } }),
     evaluate: async inspect => inspect(fixture({ left: 600, visibility: 'visible' })) }
   await assert.rejects(waitForNativeSidebarCollapsed(panel), /must be hidden, beyond the frame and non-interactive/u)
   assert.equal(calls.length, 1)
   assert.equal(calls[0].state, 'hidden')
   assert.ok(calls[0].timeout > 0 && calls[0].timeout <= 30_000)
+  assert.equal(elapsed, 30_000)
+})
+
+test('rc2 panels wait for translated content and inherited visibility to settle within the same budget', async context => {
+  let elapsed = 0
+  context.mock.method(Date, 'now', () => elapsed)
+  const panel = {
+    locator: () => ({ count: async () => 1, all: async () => [{ waitFor: async () => {} }] }),
+    page: () => ({ waitForTimeout: async duration => { elapsed += duration } }),
+    evaluate: async inspect => inspect(elapsed >= 200 ? fixture() : fixture({ left: 600, visibility: 'visible' })),
+  }
+  await waitForNativeSidebarCollapsed(panel)
+  assert.equal(elapsed, 200)
 })
