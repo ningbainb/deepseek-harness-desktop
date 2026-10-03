@@ -14,6 +14,15 @@
  */
 
 /** Settings namespaces the dsh-web-ui family plugins register. */
+export const PROFILE_SETTINGS_NAMESPACE_ALIASES: Readonly<Record<string, string>> = {
+  'describe-image': 'web-ui-describe-image',
+  'community-plugins': 'web-ui-community-plugins',
+  'ui-community-plugins': 'web-ui-community-plugins',
+  'desktop-launcher': 'web-ui-desktop-launcher',
+  'remote-web-ui': 'web-ui-remote-web-ui',
+  'ui-skin-center': 'web-ui-skin-center',
+}
+
 export const FAMILY_NAMESPACES = [
   'llm-pi-ai',
   'dsh-ssh',
@@ -32,6 +41,7 @@ export const FAMILY_NAMESPACES = [
   'desktop-launcher',
   'community-plugins',
   'ui-community-plugins',
+  ...Object.values(PROFILE_SETTINGS_NAMESPACE_ALIASES),
 ] as const
 
 /**

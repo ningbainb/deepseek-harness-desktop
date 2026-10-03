@@ -32,7 +32,7 @@ overrides:
   '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-web-ui-settings': workspace:*
   '@linxin666/dsh-web-all>@linxin666/dsh-doctor': file:./vendor/dsh-web-alpha-0.3.23/linxin666-dsh-doctor-0.3.23.tgz
   '@linxin666/dsh-web-all>@linxin666/dsh-i18n': 0.4.4
-  '@linxin666/dsh-web-all>@linxin666/dsh-liangshen': workspace:*
+  '@linxin666/dsh-web-all>@linxin666/dsh-liangshen': 0.4.4
   '@linxin666/dsh-web-all>@linxin666/dsh-pet': 0.4.4
   '@linxin666/dsh-web-all>@linxin666/dsh-remote-web-ui': workspace:*
   '@linxin666/dsh-web-all>@linxin666/dsh-session-archive': 0.4.4
@@ -404,8 +404,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dsh-desktop-repair
       '@linxin666/dsh-liangshen':
-        specifier: workspace:*
-        version: link:../../packages/dsh-liangshen
+        specifier: 0.4.4
+        version: 0.4.4(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))
       '@linxin666/dsh-live-stats':
         specifier: workspace:*
         version: link:../../packages/dsh-live-stats
@@ -5904,6 +5904,12 @@ packages:
 
   '@linxin666/dsh-i18n@0.4.4':
     resolution: {integrity: sha512-tuAOEBe/fmUr6VlLO4h/u8I0O4zYsu6VOfeIBZL+N1/QGsfMer9PUyBJriQ0mz3eYgCDN5SFZe4Vg/CCCpP1mA==}
+    peerDependencies:
+      '@deepseek-ai/dsh': '>=0.2.0-rc.1'
+
+  '@linxin666/dsh-liangshen@0.4.4':
+    resolution: {integrity: sha512-bu3aV+bOcmyXcOGe08u70L+voHnvrMximj1avFPxo6n+nRnnCcLPp3xXf87xlg54lth5/tbuhgl/sas0hgSjFg==}
+    engines: {node: ^22.19.0 || >=24.0.0}
     peerDependencies:
       '@deepseek-ai/dsh': '>=0.2.0-rc.1'
 
@@ -15618,6 +15624,11 @@ snapshots:
     dependencies:
       '@deepseek-ai/dsh': 0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e)
 
+  '@linxin666/dsh-liangshen@0.4.4(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))':
+    dependencies:
+      '@deepseek-ai/dsh': 0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e)
+      '@deepseek-ai/schemastery': 3.18.4
+
   '@linxin666/dsh-pet@0.4.4(patch_hash=7d0ee24473f7b4212d34ae1fbf27b8892fd671851117b36d9f12a1cf9bd3f7b5)(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@deepseek-ai/dsh': 0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e)
@@ -15658,7 +15669,7 @@ snapshots:
       '@linxin666/dsh-client-ui-task-board': link:packages/dsh-task-board
       '@linxin666/dsh-client-ui-web-ui-settings': link:packages/dsh-web-ui-settings
       '@linxin666/dsh-i18n': 0.4.4(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))
-      '@linxin666/dsh-liangshen': link:packages/dsh-liangshen
+      '@linxin666/dsh-liangshen': 0.4.4(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))
       '@linxin666/dsh-pet': 0.4.4(patch_hash=7d0ee24473f7b4212d34ae1fbf27b8892fd671851117b36d9f12a1cf9bd3f7b5)(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@linxin666/dsh-remote-web-ui': link:packages/dsh-remote-web-ui
       '@linxin666/dsh-session-archive': 0.4.4(@deepseek-ai/dsh@0.2.0-rc.2(09ab2f9580aeae2970f62bf855aa555e))(react@18.3.1)

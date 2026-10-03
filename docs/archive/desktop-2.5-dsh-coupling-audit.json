@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "desktopVersion": "5.0.0",
   "upstreamVersion": "0.2.0-rc.2",
-  "lockfileSha256": "53e6bfa2a3830e6e398d374213aab85b6e498e9572feb1bc77328704faeaacf1",
+  "lockfileSha256": "43f9b27a9bf67d16241fca44f3cb67268cc69e4c8ad7b5cefb49c48ed0c8e2ed",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -7852,14 +7852,26 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
-      "line": 28,
+      "line": 7,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 30,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
-      "line": 29,
+      "line": 31,
       "operation": "resolveDshCliPath"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+      "line": 65,
+      "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
@@ -13438,7 +13450,7 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
-      "line": 31,
+      "line": 33,
       "operation": "start"
     },
     {

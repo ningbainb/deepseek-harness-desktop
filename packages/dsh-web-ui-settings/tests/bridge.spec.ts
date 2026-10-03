@@ -63,6 +63,40 @@ const userYaml = (): string => [
 ].join('\n')
 
 describe('bridge describe', () => {
+  it('preserves legacy forms and directs revision-fenced writes to the rc.2 profile entry', async () => {
+    const { seam, writes } = fakeSettings({
+      'web-ui-remote-web-ui': { value: { enabled: true }, revision: 7 },
+      'web-ui-skin-center': { value: { 'skin-background': { backgroundOpacity: 0.5 } }, revision: 2 },
+    })
+    const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' })
+    const described = await handlers.describe()
+    expect(described.ok && described.value.namespaces.map(view => view.ns)).toEqual([
+      'remote-web-ui', 'ui-skin-center', 'web-ui-remote-web-ui', 'web-ui-skin-center',
+    ])
+    const result = await handlers.mutate({ ns: 'remote-web-ui', expectedRevision: 7,
+      ops: [{ op: 'set', path: ['enabled'], value: false }] })
+    expect(writes).toEqual([{ ns: 'web-ui-remote-web-ui', expectedRevision: 7,
+      ops: [{ op: 'set', path: ['enabled'], value: false }] }])
+    expect(result.ok && result.value).toMatchObject({ ns: 'remote-web-ui', value: { enabled: false }, revision: 8 })
+    const restricted = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider,
+      readSettingsYaml: () => 'web_settings_namespaces: [dsh-ssh]' })
+    expect(await restricted.mutate({ ns: 'remote-web-ui', ops: [] })).toMatchObject({ ok: false, code: 'settings-not-exposed' })
+    expect(writes).toHaveLength(1)
+  })
+
+  it('does not redirect a separately registered legacy namespace to a different profile entry', async () => {
+    const { seam, writes } = fakeSettings({
+      'remote-web-ui': { value: { enabled: true }, revision: 1 },
+      'web-ui-remote-web-ui': { value: { enabled: true }, revision: 4 },
+    })
+    const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' })
+    expect(await handlers.mutate({ ns: 'remote-web-ui', expectedRevision: 1,
+      ops: [{ op: 'set', path: ['enabled'], value: false }] })).toMatchObject({ ok: true })
+    expect(writes[0]?.ns).toBe('remote-web-ui')
+    const described = await handlers.describe()
+    expect(described.ok && described.value.namespaces.find(view => view.ns === 'web-ui-remote-web-ui')?.value).toEqual({ enabled: true })
+  })
+
   it('serves the built-in family allowlist when the user configured none', async () => {
     const { seam } = fakeSettings({
       'ui-task-board': { value: { enabled: true }, revision: 1 },

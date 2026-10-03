@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 The dsh web UI plugin group for the DSH settings page: it adds a first-level settings section that hosts the enable switches and configuration forms of the family plugins.
 
+On DSH 0.2.0-rc.2, the local compatibility bridge retains legacy settings namespace aliases alongside the current profile-entry forms. Alias writes use the official schema, secret redaction, revision checks and persistence, and remain subject to the user's allowlist; a separately registered legacy form is never redirected to another entry.
+
 ## What it is
 
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.

@@ -220,7 +220,41 @@ try {
   await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
   await sessionRow.dispatchEvent('click')
   await page.locator('[data-composer-card="true"]').waitFor({ state: 'visible' })
-  await page.locator('[class*="_toggleCluster"]:visible, [data-sidebar-right-panel] [data-dockkit-strip-chrome]:visible').first().waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+  const starPrompt = page.locator('#dsh-desktop-star-prompt')
+  const introContinueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
+  const introDialog = page.getByRole('dialog').filter({ has: introContinueButton })
+  if (await introDialog.isVisible()) {
+    assert.equal(await page.locator('#dsh-desktop-star-prompt[data-open="true"]').count(), 0)
+    await assertDialogUsesSafeViewport(introDialog)
+    await introDialog.getByRole('button', { name: /^(?:继续|Continue)$/u }).click()
+    await introDialog.waitFor({ state: 'hidden' })
+  }
+  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
+  const starDialog = starPrompt.getByRole('dialog')
+  await assertDialogUsesSafeViewport(starDialog)
+  await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
+  await starPrompt.waitFor({ state: 'hidden' })
+  const sidebarExpand = page.locator('[data-sidebar-right-expand]:visible')
+  if (await sidebarExpand.count()) await sidebarExpand.click()
+  try {
+    await page.locator('[class*="_toggleCluster"]:visible, [data-sidebar-right-panel] [data-dockkit-strip-chrome]:visible').first().waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+  } catch (error) {
+    console.error('native layout controls', JSON.stringify(await page.evaluate(() =>
+      [...document.querySelectorAll('[data-sidebar-right-panel] button, [data-sidebar-right-expand]')].map(button => ({
+        label: button.getAttribute('aria-label'),
+        bounds: button.getBoundingClientRect().toJSON(),
+        ancestors: (() => {
+          const ancestors = []
+          for (let element = button.parentElement; element && ancestors.length < 4; element = element.parentElement) {
+            ancestors.push({ className: element.className, attributes: [...element.attributes]
+              .filter(attribute => attribute.name.startsWith('data-')).map(attribute => [attribute.name, attribute.value]) })
+          }
+          return ancestors
+        })(),
+      })))))
+    if (screenshot) await page.screenshot({ path: screenshot })
+    throw error
+  }
   const state = await page.evaluate(() => ({
     chromeCount: document.querySelectorAll('#dsh-desktop-window-chrome').length,
     chromeText: document.querySelector('#dsh-desktop-window-chrome')?.textContent,
@@ -522,7 +556,7 @@ try {
   })
   await page.waitForFunction(() => document.documentElement.dataset.dshDesktopChromeTheme === 'dark')
   assert.equal(await page.locator('#dsh-desktop-window-chrome').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(7, 17, 23)')
-  const assertDialogUsesSafeViewport = async (dialog) => {
+  async function assertDialogUsesSafeViewport(dialog) {
     await dialog.waitFor({ state: 'visible' })
     const handle = await dialog.elementHandle()
     if (handle) {
@@ -569,26 +603,6 @@ try {
     assert.match(String(state.layerClass), /dsh-desktop-modal-layer/u)
     assert.ok(Number(state.layerTop) >= 31, `modal layer starts under the title bar: ${JSON.stringify(state)}`)
   }
-  const starPrompt = page.locator('#dsh-desktop-star-prompt')
-  const introContinueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
-  const introDialog = page.getByRole('dialog').filter({ has: introContinueButton })
-  // Existing disclosures own the modal surface before optional community prompts.
-  // Preserve both viewport assertions while following their non-overlapping order.
-  if (await introDialog.isVisible()) {
-    assert.equal(await page.locator('#dsh-desktop-star-prompt[data-open="true"]').count(), 0)
-    await assertDialogUsesSafeViewport(introDialog)
-    await introDialog.getByRole('button', { name: /^(?:继续|Continue)$/u }).click()
-    await introDialog.waitFor({ state: 'hidden' })
-  }
-  // This fresh 3.4.0 profile receives the prompt after its display delay.
-  // Wait for it after the introductory dialog has released the modal surface.
-  await page.locator('#dsh-desktop-star-prompt[data-open="true"]').waitFor({ state: 'visible', timeout: 10_000 })
-  const starDialog = starPrompt.getByRole('dialog')
-  await assertDialogUsesSafeViewport(starDialog)
-  await starDialog.getByRole('button', { name: '先继续使用', exact: true }).click()
-  // data-open changes before the 360 ms fade finishes. Wait for the actual
-  // root to hide so its outgoing dialog cannot be mistaken for Settings.
-  await starPrompt.waitFor({ state: 'hidden' })
   const settingsDialog = await openNativeSettings(page)
   await assertDialogUsesSafeViewport(settingsDialog)
   const dynamicModal = await page.evaluate(async () => {

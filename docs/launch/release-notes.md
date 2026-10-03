@@ -8,6 +8,8 @@
 
 ### 历史与配置保全修复
 
+梁神模式使用公开 NPM 的 `0.4.4`，直接接入官方 rc.2 预设注册表，保留工具目录、提示词与会话创建验证；旧预设文件不会被覆盖。设置兼容桥保留历史命名空间别名，读取与保存仍使用官方配置 schema、版本检查及密钥脱敏，不扩大用户白名单。
+
 修复大会话重新打开、A→B→A 切换或重启时，历史首帧超过桌面私有管道物理帧上限导致的加载失败。采用经过身份握手的分片与完整重组，保留 512 KiB 物理帧限制，单逻辑消息预算为 32 MiB；不会为了显示历史而截断消息或工具结果。超出预算仍明确失败，不伪装为成功。修复日志只记录安全错误码和数字，不写入会话内容或密钥。
 
 启动重建托管 Patch 时保留官方 SDK 原地保存的模型、个人偏好及用户插入项，不再按注释边界整块删除用户配置。歧义或损坏的 Patch 拒绝自动重建，原数据交由现有备份与修复流程保全。恢复 4.4.0 品牌图标，并恢复新版官方模型页中的 bai 优先排序，保留原供应商能力扩展。
@@ -45,6 +47,8 @@ Windows x64 安装包名为 DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe。下�
 This release updates the official NPM Runtime to 0.2.0-rc.2 and carries Desktop features onto its new APIs. Old API compatibility is not guaranteed; conversations, model configuration, and user plugin data remain covered by migration and rollback. Builtin adaptations include session recovery, community plugins, plugin management, pets, and Skin Center. Skin Center uses the new state API, keeps 15 offline skins, and migrates supported legacy selections. The Desktop launcher now injects the new settings service so browser plugins can boot. The upgrade transaction backs up and clears both Windows uninstall registry views before moving the old installation, then restores files and registry entries on failure. Startup retires only plugin links whose old packaged targets no longer exist and saves the prior manifest. The Windows first-launch grace period is now 180 seconds.
 
 ### History and configuration preservation
+
+LiangShen uses public NPM version `0.4.4` and the official rc.2 preset registry. Tests retain the active tool catalog, prompt and real session-creation checks without overwriting legacy preset files. The settings bridge retains legacy namespace aliases; reads and writes still use official schemas, revision checks and secret redaction, without expanding the user's allowlist.
 
 Large conversations can reopen after switching A to B to A or restarting without truncating messages or tool results. Authenticated fragmentation preserves the 512 KiB physical frame limit and uses a 32 MiB logical message budget. Oversized messages fail explicitly. Diagnostic logs contain safe error codes and numbers, not conversation content or secrets.
 

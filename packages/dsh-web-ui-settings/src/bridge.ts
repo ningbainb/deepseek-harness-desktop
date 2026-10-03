@@ -17,7 +17,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { SettingsNamespace, SettingsDescriptor, SettingsPathOp, SettingsForms } from '@deepseek-ai/dsh-settings'
 import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { composeAllowlist, extractWebSettingsNamespaces } from './allowlist.ts'
+import { composeAllowlist, extractWebSettingsNamespaces, PROFILE_SETTINGS_NAMESPACE_ALIASES } from './allowlist.ts'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from './protocol.ts'
 import type { BridgeDescribeResult, BridgeMutateRequest, BridgeMutateResult, BridgeNamespaceView } from './protocol.ts'
 
@@ -228,13 +228,22 @@ export interface BridgeHandlers {
  * @returns the handlers.
  */
 export function makeBridgeHandlers(deps: BridgeDeps): BridgeHandlers {
+  const describe = (): SettingsDescriptor[] => {
+    const descriptors = deps.settings.describe({ redactSecrets: true })
+    const legacy = Object.entries(PROFILE_SETTINGS_NAMESPACE_ALIASES).flatMap(([alias, current]) => {
+      if (descriptors.some(descriptor => String(descriptor.ns) === alias)) return []
+      const descriptor = descriptors.find(candidate => String(candidate.ns) === current)
+      return descriptor === undefined ? [] : [{ ...descriptor, ns: alias as SettingsNamespace }]
+    })
+    return [...descriptors, ...legacy]
+  }
   const allowlisted = (descriptors: readonly SettingsDescriptor[]): string[] => {
     const registered = descriptors.map(descriptor => String(descriptor.ns))
     return composeAllowlist(extractWebSettingsNamespaces(deps.readSettingsYaml()), registered)
   }
   return {
     async describe() {
-      const descriptors = deps.settings.describe({ redactSecrets: true })
+      const descriptors = describe()
       const namespaces = allowlisted(descriptors)
         .map(ns => descriptors.find(descriptor => String(descriptor.ns) === ns))
         .filter((descriptor): descriptor is SettingsDescriptor => descriptor !== undefined)
@@ -250,17 +259,20 @@ export function makeBridgeHandlers(deps: BridgeDeps): BridgeHandlers {
         return { ok: false, code: 'settings-rejected', message: 'malformed bridge settings request' }
       }
       const { ns } = body
-      const descriptors = deps.settings.describe({ redactSecrets: true })
+      const descriptors = describe()
       if (!allowlisted(descriptors).includes(ns)) {
         return { ok: false, code: 'settings-not-exposed', message: 'settings namespace "' + ns + '" is not exposed to configuration clients' }
       }
       const expectedRevision = typeof body.expectedRevision === 'number' ? body.expectedRevision : undefined
+      const currentDescriptors = deps.settings.describe({ redactSecrets: true })
+      const target = currentDescriptors.some(descriptor => String(descriptor.ns) === ns)
+        ? ns : PROFILE_SETTINGS_NAMESPACE_ALIASES[ns] ?? ns
       try {
-        await deps.settings.mutate(ns as SettingsNamespace, body.ops as SettingsPathOp[], expectedRevision)
+        await deps.settings.mutate(target as SettingsNamespace, body.ops as SettingsPathOp[], expectedRevision)
       } catch (error) {
         return failureOf(error)
       }
-      const descriptor = deps.settings.describe({ redactSecrets: true }).find(candidate => String(candidate.ns) === ns)
+      const descriptor = describe().find(candidate => String(candidate.ns) === ns)
       if (descriptor === undefined) {
         return { ok: false, code: 'internal', message: 'settings namespace "' + ns + '" was disposed after the mutate' }
       }

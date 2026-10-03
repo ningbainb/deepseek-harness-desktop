@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { copyFile, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -371,7 +371,7 @@ test('controller uses typed duplex for every IPC endpoint without invoking legac
 })
 
 test('Windows packaged controller preserves the private graceful shutdown channel and process-tree fallback after launcher materialization', { skip: process.platform !== 'win32' }, async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-controller-stop-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-controller-stop-')))
   try {
     for (const layout of ['app.asar', 'app.asar.unpacked']) {
       const appRoot = join(root, layout)

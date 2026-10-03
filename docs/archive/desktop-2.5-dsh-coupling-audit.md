@@ -4,7 +4,7 @@ Authoritative Desktop version: 5.0.0.
 
 Stable DSH package version: 0.2.0-rc.2.
 
-Lockfile SHA-256: `53e6bfa2a3830e6e398d374213aab85b6e498e9572feb1bc77328704faeaacf1`.
+Lockfile SHA-256: `43f9b27a9bf67d16241fca44f3cb67268cc69e4c8ad7b5cefb49c48ed0c8e2ed`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -1063,8 +1063,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 67 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 7 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 7 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 28 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 29 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 7 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 30 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 31 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 65 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/test/desktop-v42-migration.test.mjs | 7 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/desktop-v42-migration.test.mjs | 105 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/desktop-v42-migration.test.mjs | 106 | profileDir |
@@ -1994,7 +1996,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/agent-team-runtime.test.mjs | 38 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 28 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 73 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 31 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 33 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/install-recovery.test.mjs | 24 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 413 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 423 | stop |

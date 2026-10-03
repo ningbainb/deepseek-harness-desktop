@@ -230,7 +230,7 @@
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "0.2.0-rc.2",
     "@deepseek-ai/dsh-ptc-runtime-node": "0.2.0-rc.2",
     "@deepseek-ai/dsh-workflow-ptc": "0.2.0-rc.2",
-    "@linxin666/dsh-liangshen": "workspace:*",
+    "@linxin666/dsh-liangshen": "0.4.4",
     "@linxin666/dsh-ssh": "workspace:*",
     "@linxin666/dsh-web-all": "0.4.4"
   },

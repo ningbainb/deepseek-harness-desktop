@@ -26,6 +26,7 @@
       "patchId": "ui-web-ui-settings",
       "features": [
         "latest-settings-write-wins-with-revision-fence",
+        "rc2-profile-settings-legacy-alias-read-write-without-scope-expansion",
         "chatgpt-login-polls-until-terminal-state",
         "cancelled-login-response-isolation",
         "same-field-draft-preserved-during-save",
@@ -281,7 +282,9 @@
         "official-sdk-persona-prefix-suffix",
         "legacy-owned-preset-auto-refresh",
         "official-agent-preset-registry-declaration",
-        "bootstrap-persona-retained-and-workspace-restored"
+        "bootstrap-persona-retained-and-workspace-restored",
+        "published-rc2-liangshen-tool-catalog-and-minimal-prompt",
+        "declarative-preset-overrides-stale-legacy-without-overwriting-user-files"
       ],
       "patchId": "liangshen",
       "requiredInAggregate": true,

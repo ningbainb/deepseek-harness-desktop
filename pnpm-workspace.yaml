@@ -52,7 +52,7 @@ overrides:
   '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-web-ui-settings': 'workspace:*'
   '@linxin666/dsh-web-all>@linxin666/dsh-doctor': 'file:./vendor/dsh-web-alpha-0.3.23/linxin666-dsh-doctor-0.3.23.tgz'
   '@linxin666/dsh-web-all>@linxin666/dsh-i18n': '0.4.4'
-  '@linxin666/dsh-web-all>@linxin666/dsh-liangshen': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-liangshen': '0.4.4'
   '@linxin666/dsh-web-all>@linxin666/dsh-pet': '0.4.4'
   '@linxin666/dsh-web-all>@linxin666/dsh-remote-web-ui': 'workspace:*'
   '@linxin666/dsh-web-all>@linxin666/dsh-session-archive': '0.4.4'

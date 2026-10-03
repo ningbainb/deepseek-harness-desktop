@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { BoundedLogStore } from '../src/log-store.mjs'
-import { ensureDesktopProfile, resolveDshCliPath } from '../src/profile.mjs'
+import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from '../src/profile.mjs'
 import { DshRuntimeController } from '../src/runtime-controller.mjs'
 
 // Actual official Host and preset composition, isolated Home, no model request.
@@ -14,6 +14,7 @@ test('upgraded custom presets mount and create sessions through the official run
   let controller
   try {
     const ids = ['liangshen', 'value-mode']
+    const legacyPresetFiles = new Map()
     for (const id of ids) {
       const sourceDir = new URL(`../../../packages/dsh-${id}/presets/${id}/`, import.meta.url)
       const target = join(root, '.agent-presets', id)
@@ -21,6 +22,7 @@ test('upgraded custom presets mount and create sessions through the official run
       const agentFile = join(target, 'agent.cordis.yml')
       const source = await readFile(agentFile, 'utf8')
       await writeFile(agentFile, source.replace('prefix:', 'text:'))
+      legacyPresetFiles.set(id, await readFile(agentFile, 'utf8'))
     }
     const sentinel = join(root, 'sessions', 'existing-history.txt')
     await mkdir(join(root, 'sessions'), { recursive: true })
@@ -55,15 +57,20 @@ test('upgraded custom presets mount and create sessions through the official run
       assert.equal(typeof created.sessionId, 'string')
       const synced = await readFile(join(root, '.agent-presets', id, 'agent.cordis.yml'), 'utf8')
       if (id === 'liangshen') {
-        assert.match(synced, /^- id: tool-catalog$/mu, 'upstream 0.3.23 preset must replace the old tool bootstrap')
-        assert.match(synced, /^- id: minimal-prompt$/mu)
-        assert.doesNotMatch(synced, /^- id: tool-bootstrap$/mu)
-        await assert.rejects(readFile(join(root, '.agent-presets', id, 'tool-bootstrap.mjs')), { code: 'ENOENT' })
-        assert.ok((await readFile(join(root, '.agent-presets', id, 'tool-catalog.mjs'))).length > 100)
+        const declared = await rpc('agentPresets/read', { agentPreset: id })
+        assert.equal(declared.agentPreset, id)
+        assert.match(declared.content, /^- id: tool-catalog$/mu, 'the active published rc.2 preset must replace the old tool bootstrap')
+        assert.match(declared.content, /^- id: minimal-prompt$/mu)
+        assert.doesNotMatch(declared.content, /^- id: tool-bootstrap$/mu)
+        const published = resolveRuntimePackages().get('@linxin666/dsh-liangshen')
+        assert.ok((await readFile(join(published, 'presets', id, 'tool-catalog.mjs'))).length > 100)
+        assert.equal(synced, legacyPresetFiles.get(id), 'the declarative preset must not overwrite legacy user files')
+        assert.deepEqual(await readFile(join(root, '.agent-presets', id, 'tool-bootstrap.mjs')),
+          await readFile(new URL(`../../../packages/dsh-${id}/presets/${id}/tool-bootstrap.mjs`, import.meta.url)))
       } else {
         assert.match(synced, /prefix: You are a helpful software engineer assistant\./u)
       }
-      console.log(`PASS official runtime ${id}: legacy preset refreshed, session created`)
+      console.log(`PASS official runtime ${id}: active preset verified, session created, legacy data preserved`)
     }
     assert.equal(await readFile(sentinel, 'utf8'), 'existing-history-must-not-change')
   } catch (error) {

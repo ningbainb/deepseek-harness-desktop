@@ -693,25 +693,26 @@
     {
       "name": "@linxin666/dsh-liangshen",
       "selection": {
-        "version": "0.1.15",
-        "source": "workspace",
-        "path": "packages/dsh-liangshen"
+        "version": "0.4.4",
+        "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
-        "latest": "0.3.20",
-        "checkedAt": "2026-09-12T06:50:36.661Z",
+        "latest": "0.4.4",
+        "checkedAt": "2026-10-03",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-liangshen"
       },
-      "reason": "Use the Desktop workspace preset package with new persona configuration; retain preset validation and UI entry.",
+      "reason": "Use the published rc.2-compatible declarative preset and composer lever; validate its actual active composition while preserving legacy user files.",
       "desktopContracts": [
-        "existing 4.1 Liangshen preset is refreshed to the 0.3.23 tool-catalog composition",
-        "upgraded preset composes and creates a session through the official Runtime"
+        "existing Liangshen identities select the current tool-catalog and minimal-prompt declaration rather than a stale legacy bootstrap",
+        "upgraded preset composes and creates a session through the official Runtime",
+        "declarative activation retains legacy preset file bytes"
       ],
       "validation": {
         "automatedChecks": [
           "apps/dsh-desktop/test/profile.test.mjs",
-          "apps/dsh-desktop/test/custom-presets-runtime.test.mjs"
+          "apps/dsh-desktop/test/custom-presets-runtime.test.mjs",
+          "apps/dsh-desktop/test/sdk-contracts.test.mjs"
         ],
         "desktopAcceptance": [
           "Activate the preset and start a conversation."

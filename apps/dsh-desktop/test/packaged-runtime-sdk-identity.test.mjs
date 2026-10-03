@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -79,7 +79,7 @@ test('electron-builder unpacks the complete local source graph and launcher mani
 })
 
 test('physical packaged launcher and profile/HMR/config-editor/plugin-manager share canonical URL and module objects', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-sdk-identity-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-sdk-identity-')))
   try {
     const fixture = await createPackagedFixture(root)
     const identity = await verifyPackagedRuntimeSdkIdentity(fixture.resources, {
