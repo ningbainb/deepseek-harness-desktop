@@ -34,7 +34,7 @@ Join the community to discuss:
 
 **DeepSeek Harness Desktop** is a community-maintained, open-source AI coding desktop client.
 
-DeepSeek has not yet released a standalone official Desktop product. This project already combines the public official **DSH Runtime, Web UI, and the Desktop boundaries visible in the official repository** into an installable Windows application, then adds community plugins, Skills, task automation, Git, remote development, and desktop integration. It is not an official DeepSeek client and does not reuse or overwrite a future official Desktop identity, data directory, protocol, or update feed.
+DeepSeek has not yet released a standalone official Desktop product. This project combines the public official **DSH Runtime, Web UI, and the Desktop boundaries visible in the official repository** into Windows, macOS and Linux desktop applications, then adds community plugins, Skills, task automation, Git, remote development, and desktop integration. It is not an official DeepSeek client and does not reuse or overwrite a future official Desktop identity, data directory, protocol, or update feed.
 
 Supports **Windows 10 / 11 x64**, with **macOS Apple Silicon arm64 Preview** and **Linux x64 Preview** builds. It is released under the **BSD-3-Clause** license.
 
@@ -73,7 +73,7 @@ These are isolated 5.0.0 Windows runtime captures, not macOS or Linux acceptance
 - **Transactional 3.5/4.0 migration** preserves sessions and long context, workspaces, models, credential references, Skills, plugins, themes, pet settings, and collaboration settings, with backup and rollback.
 - **Privacy-bounded metrics** use only fixed outcome vocabularies and exclude URLs, domains, window names, screenshots, prompts, tool arguments, paths, and credentials.
 
-[Smart Control guide](docs/smart-control.md) · [Full 4.1.0 release notes](docs/launch/release-notes.md)
+[Smart Control guide](docs/smart-control.md) · [4.1.0 release record](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.1.0)
 
 ![DeepSeek Harness Desktop 4.1.0 Smart Control Center](docs/screenshots/desktop-4.1.0/control-center.png)
 
@@ -100,7 +100,7 @@ The screenshots below are isolated 5.0.0 Windows runtime captures, not macOS/Lin
 
 The session sidebar opens the existing Extension Dock window directly on Model Collaboration. Agent Team handles multi-role coordination, while Value Mode separates controller and worker models. They remain independent and may be enabled separately or together.
 
-![DeepSeek Harness Desktop 4.0.0 Model Collaboration page](docs/screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
+![DeepSeek Harness Desktop 5.0.0 Windows Model Collaboration page](docs/screenshots/desktop-5.0.0/collaboration.png)
 
 ### Skills: one directory model across the conversation and Skill Center
 
@@ -406,7 +406,7 @@ This project actively participates in and supports the [LINUX DO community](http
 ---
 
 <p align="center">
-  <b>Make DeepSeek Harness a Windows AI coding workspace you can use every day.</b>
+  <b>Make DeepSeek Harness an AI coding workspace you can use every day on Windows, macOS and Linux.</b>
 </p>
 
 <p align="center">

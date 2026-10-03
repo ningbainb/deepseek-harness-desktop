@@ -34,7 +34,7 @@ QQ 群：**1105158177**
 
 **DeepSeek Harness Desktop** 是社区维护的开源 AI 编程桌面客户端。
 
-DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公开的官方 **DSH Runtime、Web UI 与官方仓库中的 Desktop 能力边界** 融合为可安装的 Windows 应用，并在独立社区宿主中补齐插件、Skills、任务自动化、Git、远程开发和桌面体验。它不是 DeepSeek 官方客户端，也不使用或覆盖未来官方 Desktop 的应用身份、数据目录与更新源。
+DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的官方 **DSH Runtime、Web UI 与官方仓库中的 Desktop 能力边界** 融合为 Windows、macOS 与 Linux 桌面应用，并在独立社区宿主中补齐插件、Skills、任务自动化、Git、远程开发和桌面体验。它不是 DeepSeek 官方客户端，也不使用或覆盖未来官方 Desktop 的应用身份、数据目录与更新源。
 
 支持 **Windows 10 / 11 x64**；同时提供 **macOS Apple Silicon arm64 Preview** 与 **Linux x64 Preview**。项目采用 **BSD-3-Clause** 许可证。
 
@@ -73,7 +73,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 - **3.5/4.0 数据事务继承**：会话与长上下文、Workspace、模型、凭据引用、Skills、插件、皮肤、桌宠与协作设置在修改前备份，失败回滚，原始 Session 日志不被无备份改写。
 - **埋点保持克制**：新增的操控事件仅使用固定结果词表，不采集 URL、域名、窗口名称、截图、Prompt、工具参数、路径或凭据，详见 [隐私政策](PRIVACY.md)。
 
-[智能操控使用指南](docs/smart-control.md) · [完整 4.1.0 发布说明](docs/launch/release-notes.md)
+[智能操控使用指南](docs/smart-control.md) · [4.1.0 发布记录](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.1.0)
 
 ![DeepSeek Harness Desktop 4.1.0 智能操控中心](docs/screenshots/desktop-4.1.0/control-center.png)
 
@@ -403,7 +403,7 @@ DeepSeek Harness Desktop 默认尽可能将用户数据和运行环境保留在�
 ---
 
 <p align="center">
-  <b>让 DeepSeek Harness 在 Windows 上真正成为一个可以每天使用的 AI 编程桌面工作台。</b>
+  <b>让 DeepSeek Harness 成为 Windows、macOS 与 Linux 上可以每天使用的 AI 编程桌面工作台。</b>
 </p>
 
 <p align="center">

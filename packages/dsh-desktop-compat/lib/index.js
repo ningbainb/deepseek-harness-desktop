@@ -1279,6 +1279,37 @@ async function refreshBlankSessionCheckpoints(services, signal) {
 	return result;
 }
 //#endregion
+//#region src/session-title-checkpoint.ts
+function createSessionTitleCheckpointWriter(services, signal) {
+	const pending = /* @__PURE__ */ new WeakMap();
+	return (session) => {
+		const write = (pending.get(session) ?? Promise.resolve()).catch(() => void 0).then(async () => {
+			if (signal.aborted || services.sessions.get(session.id) !== session) return;
+			await services.sessions.flush(session);
+			if (signal.aborted || services.sessions.get(session.id) !== session) return;
+			await services.cache.write(session);
+		});
+		pending.set(session, write);
+		return write;
+	};
+}
+function installSessionTitleCheckpoint(ctx) {
+	ctx.inject(["sessions", "sessionProjectionCache"], (checkpointCtx) => {
+		const controller = new AbortController();
+		checkpointCtx.effect(() => () => controller.abort(), "dsh-desktop-compat: title checkpoint");
+		const write = createSessionTitleCheckpointWriter({
+			sessions: checkpointCtx.sessions,
+			cache: checkpointCtx.sessionProjectionCache
+		}, controller.signal);
+		checkpointCtx.on("session/event", (session, event) => {
+			if (event.type !== "session/title") return;
+			write(session).catch(() => {
+				if (!controller.signal.aborted) checkpointCtx.logger.warn("[dsh-session-checkpoint] unavailable=title-write");
+			});
+		});
+	});
+}
+//#endregion
 //#region src/agent-wsl-permission.ts
 /** Missing settings retain the original per-call approval. Corrupt settings fail closed. */
 function parseAgentWslPermission(raw) {
@@ -1707,6 +1738,16 @@ function validateCompatPatchRegistry(entries, options = {}) {
 }
 const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
 	{
+		id: "live-session-title-checkpoint",
+		appliesTo: ["0.2.0-rc.2"],
+		upstreamReference: "@deepseek-ai/dsh-session session/event and SessionStore.flush; @deepseek-ai/dsh-session-projection-cache write",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/session-title-checkpoint.spec.ts"],
+		reason: "Flush the authoritative log before serializing title checkpoints so a cold sidebar can retain an acknowledged rename.",
+		removeWhen: "Upstream title changes reliably refresh durable listing checkpoints without a creation/write-behind race.",
+		lastVerified: "2026-10-03"
+	},
+	{
 		id: "cold-blank-session-checkpoint",
 		appliesTo: ["0.2.0-rc.2"],
 		upstreamReference: "@deepseek-ai/dsh-session-projection-cache 0.2.0-rc.2 cachedSnapshot zero-I/O listing and coldSnapshot durable log replay",
@@ -1831,6 +1872,7 @@ function apply(ctx) {
 	installToolCallArgumentNormalization(ctx);
 	installTranscriptBalanceGuard(ctx);
 	installSessionCheckpointRecovery(ctx);
+	installSessionTitleCheckpoint(ctx);
 	installControlToolApproval(ctx);
 	installAgentWslTool(ctx);
 	ctx.effect(() => registerDesktopWorkspaceFileOpenRoute(ctx), "dsh-desktop-compat: workspace native-open authority");

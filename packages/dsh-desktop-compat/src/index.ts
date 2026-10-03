@@ -16,6 +16,7 @@ import { installTranscriptBalanceGuard } from './transcript-balance.ts'
 import { registerDesktopConversationImportRoute } from './conversation-import-route.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
 import { installSessionCheckpointRecovery } from './session-checkpoint-recovery.ts'
+import { installSessionTitleCheckpoint } from './session-title-checkpoint.ts'
 import { installControlToolApproval } from './control-tool-approval.ts'
 import { installAgentWslTool } from './agent-wsl-tool.ts'
 
@@ -32,6 +33,7 @@ export function apply(ctx: Context): void {
   installToolCallArgumentNormalization(ctx)
   installTranscriptBalanceGuard(ctx)
   installSessionCheckpointRecovery(ctx)
+  installSessionTitleCheckpoint(ctx)
   installControlToolApproval(ctx)
   installAgentWslTool(ctx)
   ctx.effect(

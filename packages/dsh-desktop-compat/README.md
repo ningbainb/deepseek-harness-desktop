@@ -10,6 +10,8 @@ The package preserves the existing queue-first interaction. If DSH rc.6 becomes 
 
 The implementation is host-only and uses public `agent/status`, agent inbox, `followup`, and `tools/post-execute` SDK contracts. It does not patch files in DeepSeek Harness and can be removed after the upstream runtime implements the documented cancellation behavior.
 
+Desktop 5.0 persists acknowledged session title changes through the official `session/event`, `sessions.flush` and projection-cache `write` APIs. Writes are serialized per live session and the authoritative log is flushed before taking a checkpoint. Detached sessions and shutdown do not schedule new writes; failures emit a fixed diagnostic without titles, paths or content. This does not rewrite historical logs or patch official packages.
+
 ## Agent terminal choice
 
 On Windows Desktop, the Agent keeps the official sandbox-managed `pwsh` tool

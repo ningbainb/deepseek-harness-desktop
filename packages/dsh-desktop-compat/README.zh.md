@@ -10,6 +10,8 @@
 
 实现仅运行在宿主端，使用公开的 `agent/status`、Agent inbox、`followup` 和 `tools/post-execute` SDK 接口。它不会修改 DeepSeek Harness 的文件；上游运行时补齐文档约定的取消行为后，可以直接移除这个包。
 
+Desktop 5.0 通过官方 `session/event`、`sessions.flush` 与投影缓存 `write` 接口持久化已确认的会话标题。每个活跃会话的写入串行执行，先落盘权威日志，再生成检查点。已卸载的会话与关闭阶段不安排新写入；失败仅输出固定诊断，不包含标题、路径或内容。这不会改写历史日志或修改官方包。
+
 ## Agent 终端选择
 
 Windows Desktop 的 Agent 保留官方 `pwsh` 工具作为受沙箱策略管理的原生命令入口，

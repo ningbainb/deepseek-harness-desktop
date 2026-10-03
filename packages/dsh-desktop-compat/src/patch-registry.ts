@@ -215,6 +215,16 @@ export function validateCompatPatchRegistry(
 
 export const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
   {
+    id: 'live-session-title-checkpoint',
+    appliesTo: ['0.2.0-rc.2'],
+    upstreamReference: '@deepseek-ai/dsh-session session/event and SessionStore.flush; @deepseek-ai/dsh-session-projection-cache write',
+    owner: 'desktop-platform',
+    tests: ['packages/dsh-desktop-compat/tests/session-title-checkpoint.spec.ts'],
+    reason: 'Flush the authoritative log before serializing title checkpoints so a cold sidebar can retain an acknowledged rename.',
+    removeWhen: 'Upstream title changes reliably refresh durable listing checkpoints without a creation/write-behind race.',
+    lastVerified: '2026-10-03',
+  },
+  {
     id: 'cold-blank-session-checkpoint',
     appliesTo: ['0.2.0-rc.2'],
     upstreamReference: '@deepseek-ai/dsh-session-projection-cache 0.2.0-rc.2 cachedSnapshot zero-I/O listing and coldSnapshot durable log replay',

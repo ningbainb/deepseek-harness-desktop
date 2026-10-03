@@ -611,6 +611,7 @@
         "cold-checkpoint-refresh-waits-for-official-session-metadata-registration",
         "checkpoint-recovery-bounded-concurrency-and-cancellation",
         "checkpoint-recovery-preserves-live-sessions-and-original-log-bytes",
+        "live-session-title-checkpoint-serialized-after-official-log-flush",
         "concurrent-legacy-recovery-preserves-single-backup",
         "legacy-recovery-rejects-concurrently-changed-source",
         "legacy-recovery-bounded-byte-batching-preserves-validation",

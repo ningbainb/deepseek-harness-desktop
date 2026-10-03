@@ -894,6 +894,24 @@
       "controlled": true
     },
     {
+      "path": "packages/dsh-desktop-compat/src/session-title-checkpoint.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "compatibility-patch",
+      "controlled": true
+    },
+    {
+      "path": "packages/dsh-desktop-compat/src/session-title-checkpoint.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session-projection-cache",
+      "line": 3,
+      "typeOnly": true,
+      "classification": "compatibility-patch",
+      "controlled": true
+    },
+    {
       "path": "packages/dsh-desktop-compat/src/tool-call-normalization.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-llm",
@@ -1006,6 +1024,15 @@
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-llm",
       "line": 4,
+      "typeOnly": false,
+      "classification": "compatibility-patch",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-desktop-compat/tests/session-title-checkpoint.spec.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 1,
       "typeOnly": false,
       "classification": "compatibility-patch",
       "controlled": false
@@ -4900,7 +4927,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-desktop-compat/src/index.ts",
-      "line": 27,
+      "line": 28,
       "operation": "sessions"
     },
     {
@@ -14003,6 +14030,18 @@
       "category": "session",
       "path": "packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts",
       "line": 58,
+      "operation": "get"
+    },
+    {
+      "category": "session",
+      "path": "packages/dsh-desktop-compat/src/session-title-checkpoint.ts",
+      "line": 16,
+      "operation": "get"
+    },
+    {
+      "category": "session",
+      "path": "packages/dsh-desktop-compat/src/session-title-checkpoint.ts",
+      "line": 18,
       "operation": "get"
     },
     {

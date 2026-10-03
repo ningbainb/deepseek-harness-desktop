@@ -14,7 +14,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | --- | ---: |
 | public-stable | 312 |
 | public-experimental | 181 |
-| compatibility-patch | 45 |
+| compatibility-patch | 48 |
 | private-high-risk | 0 |
 
 ## Direct imports, dynamic imports, and requires
@@ -119,6 +119,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 3 | static-import | @deepseek-ai/dsh-session | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/session-recovery.ts | 1 | static-import | @deepseek-ai/dsh-session-format-catalog | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/session-recovery.ts | 3 | static-import | @deepseek-ai/dsh-session-persistence | yes | compatibility-patch | yes |
+| packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 1 | static-import | @deepseek-ai/dsh-session | yes | compatibility-patch | yes |
+| packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 3 | static-import | @deepseek-ai/dsh-session-projection-cache | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/tool-call-normalization.ts | 1 | static-import | @deepseek-ai/dsh-llm | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/tool-call-normalization.ts | 3 | static-import | @deepseek-ai/dsh-llm/brand | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/tool-call-normalization.ts | 4 | static-import | @deepseek-ai/dsh-tools | no | compatibility-patch | yes |
@@ -132,6 +134,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-desktop-compat/tests/legacy-subagent-recovery.spec.ts | 8 | static-import | @deepseek-ai/dsh-session | no | compatibility-patch | no |
 | packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts | 1 | static-import | @deepseek-ai/dsh-session | no | compatibility-patch | no |
 | packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts | 4 | static-import | @deepseek-ai/dsh-llm | no | compatibility-patch | no |
+| packages/dsh-desktop-compat/tests/session-title-checkpoint.spec.ts | 1 | static-import | @deepseek-ai/dsh-session | no | compatibility-patch | no |
 | packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | compatibility-patch | no |
 | packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts | 4 | static-import | @deepseek-ai/dsh-llm | yes | compatibility-patch | no |
 | packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts | 5 | static-import | @deepseek-ai/dsh-tools | no | compatibility-patch | no |
@@ -571,7 +574,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-aionui-panel/src/index.ts | 29 | subprocess |
 | host-service | packages/dsh-chat-artifacts/src/client/index.ts | 28 | locale |
 | host-service | packages/dsh-chat-artifacts/src/index.ts | 51 | tools |
-| host-service | packages/dsh-desktop-compat/src/index.ts | 27 | sessions |
+| host-service | packages/dsh-desktop-compat/src/index.ts | 28 | sessions |
 | host-service | packages/dsh-git-graph/src/client/index.ts | 83 | locale |
 | host-service | packages/dsh-git-graph/src/index.ts | 27 | subprocess |
 | host-service | packages/dsh-git-graph/src/invariant.ts | 17 | invariants |
@@ -2089,6 +2092,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | session | packages/dsh-desktop-compat/src/conversation-import-route.ts | 285 | get |
 | session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 49 | get |
 | session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 58 | get |
+| session | packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 16 | get |
+| session | packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 18 | get |
 | session | packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts | 82 | get |
 | session | packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts | 155 | get |
 | session | packages/dsh-live-stats/tests/projection.spec.ts | 32 | create |
