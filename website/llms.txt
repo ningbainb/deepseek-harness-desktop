@@ -13,7 +13,7 @@
 
 ## Official links
 
-- Product website: https://ningbainb.github.io/deepseek-harness-desktop/
+- Product website: https://1521003.xyz/
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
@@ -21,7 +21,7 @@
 - v4.0.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.0.0
 - SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
-- Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
+- Privacy policy: https://1521003.xyz/privacy.html
 
 ## Local 5.0.0 candidate, not published
 

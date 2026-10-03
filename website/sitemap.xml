@@ -2,35 +2,35 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc>
-    <lastmod>2026-09-15</lastmod>
+    <loc>https://1521003.xyz/</loc>
+    <lastmod>2026-10-03</lastmod>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-4.1.0-control-center.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 4.0 模型协作与 Agent Team</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.0.0-control-center.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.0.0 Windows 智能操控中心</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-4.0.0-skills.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 4.0 会话 Skills 与技能中心</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.0.0-skills.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.0.0 Windows 会话 Skills 与技能中心</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-4.0.0-bai-models.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 4.0 bai 模型接入</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.0.0-bai-models.webp</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.0.0 Windows bai 模型接入</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-value-mode-setup.webp</image:loc>
+      <image:loc>https://1521003.xyz/assets/desktop-3.2.0-value-mode-setup.webp</image:loc>
       <image:title>DeepSeek Harness Desktop 3.2.0 性价比模式三步配置与专家主控</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-usage-dashboard.webp</image:loc>
+      <image:loc>https://1521003.xyz/assets/desktop-3.2.0-usage-dashboard.webp</image:loc>
       <image:title>DeepSeek Harness Desktop 3.2.0 大模型用量与滚动 1 秒峰值看板</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://ningbainb.github.io/deepseek-harness-desktop/assets/desktop-3.2.0-project-import-preview.webp</image:loc>
+      <image:loc>https://1521003.xyz/assets/desktop-3.2.0-project-import-preview.webp</image:loc>
       <image:title>DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 会话导入预览</image:title>
     </image:image>
   </url>
   <url>
-    <loc>https://ningbainb.github.io/deepseek-harness-desktop/privacy.html</loc>
-    <lastmod>2026-09-15</lastmod>
+    <loc>https://1521003.xyz/privacy.html</loc>
+    <lastmod>2026-10-03</lastmod>
   </url>
 </urlset>

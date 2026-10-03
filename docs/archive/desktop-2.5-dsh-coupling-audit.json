@@ -4857,12 +4857,6 @@
   "seams": [
     {
       "category": "host-service",
-      "path": "apps/dsh-desktop/scripts/bai-host-probe.mjs",
-      "line": 10,
-      "operation": "credentials"
-    },
-    {
-      "category": "host-service",
       "path": "apps/dsh-desktop/scripts/history-host-probe.mjs",
       "line": 66,
       "operation": "string"
@@ -5074,7 +5068,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/bai-host-probe.mjs",
-      "line": 13,
+      "line": 15,
       "operation": "DSH_HOME"
     },
     {

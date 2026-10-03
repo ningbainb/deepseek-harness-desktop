@@ -34,6 +34,14 @@ try {
     env: { ...process.env, DSH_DESKTOP_USER_DATA: userData, DSH_HOME: dshHome, DSH_AGENTS_HOME: join(temporary, 'agents'),
       DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1' } })
   application.process().stderr?.on('data', chunk => process.stderr.write(chunk))
+  const fixtureLocale = process.env.DSH_DESKTOP_E2E_BAI_LOCALE
+  if (fixtureLocale) {
+    assert.ok(['zh-CN', 'en-US'].includes(fixtureLocale))
+    await application.context().addInitScript(locale => {
+      Object.defineProperty(navigator, 'language', { configurable: true, get: () => locale })
+      Object.defineProperty(navigator, 'languages', { configurable: true, get: () => [locale] })
+    }, fixtureLocale)
+  }
   await application.evaluate(async ({ shell }) => {
     globalThis.baiBrowserLinks = []
     shell.openExternal = async target => { globalThis.baiBrowserLinks.push(target) }
@@ -45,6 +53,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   assert.ok(page, 'isolated runtime becomes ready')
+  evidence.locale = await page.evaluate(() => navigator.language)
   page.on('pageerror', error => console.error(error.message))
   await page.locator('[data-dsh-relay-access-root]').waitFor({ state: 'attached', timeout: 120_000 })
   const status = await page.evaluate(async () => {
@@ -101,7 +110,7 @@ try {
   await editor.fill('bai-first-turn-fixture')
   await editor.press('Enter')
   await dialog.waitFor({ state: 'visible', timeout: 60_000 })
-  await page.waitForFunction(() => document.querySelector('[data-dsh-relay-access-root] [role="dialog"]')?.textContent?.includes('暂未登录'), undefined, { timeout: 30_000 })
+  await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).waitFor({ state: 'visible', timeout: 30_000 })
   const retainedDraft = await editor.evaluate(element => 'value' in element ? element.value : element.textContent)
   assert.equal(retainedDraft, 'bai-first-turn-fixture')
@@ -110,13 +119,10 @@ try {
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).click()
   await dialog.getByRole('button', { name: /关闭|Close/u }).click()
   const probe = async (operation, body = {}) => page.evaluate(async ({ operation, body }) => {
-    const response = await fetch('/api/isolated-bai/' + operation, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const prefix = ['metrics', 'revoke'].includes(operation) ? '/api/isolated-bai/' : '/api/dsh-relay/'
+    const response = await fetch(prefix + operation, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     return { status: response.status, body: await response.json() }
   }, { operation, body })
-  await page.route('**/api/dsh-relay/status', async route => {
-    const result = await probe('status')
-    await route.fulfill({ status: result.status, json: result.body })
-  })
   const configured = await probe('configure', { apiKey: 'synthetic-bai-initial-key' })
   assert.equal(configured.status, 200, JSON.stringify(configured.body))
   assert.deepEqual((await probe('metrics')).body.default, { provider: 'project-relay', model: 'deepseek-flash' })
@@ -141,12 +147,13 @@ try {
   await writeFile(catalogPath, JSON.stringify({ body: { data: [{ id: 'bai-fixture-one', name: 'Bai Fixture One Updated' }, { id: 'bai-fixture-two', name: 'Bai Fixture Two' }] } }))
   assert.equal((await probe('refresh')).status, 200, 'recover the model catalog before independently testing inference HTTP 401')
   assert.equal((await probe('status')).body.configured, true, 'catalog authentication recovered without removing the retained Key')
-  assert.equal(await page.evaluate(async () => (await (await fetch('/api/dsh-relay/status', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()).configured), true, 'the send guard reads the same isolated route state as catalog recovery')
+  assert.equal(await page.evaluate(async () => (await (await fetch('/api/dsh-relay/status', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json()).configured), true, 'the send guard reads the same production route state as catalog recovery')
   await editor.fill('bai-runtime-invalid-key-fixture')
   await editor.press('Enter')
   await dialog.waitFor({ state: 'visible', timeout: 60_000 })
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).waitFor({ state: 'visible', timeout: 30_000 })
-  await page.getByText(/API 密钥无效|Invalid API key/u).first().waitFor({ state: 'visible', timeout: 30_000 })
+  await page.getByText(/^(?:API 密钥无效|Invalid API key|AUTH)$/u).first().waitFor({ state: 'visible', timeout: 30_000 })
+  await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
   const rejectedCalls = (await probe('metrics')).body
   assert.equal(rejectedCalls.inferenceRequests, 2, 'the prompt and official first-prompt title both use locally simulated HTTP 401, no real provider traffic')
   assert.equal(rejectedCalls.inferenceCalls.filter(call => call.maxTokens === 64).length, 1, 'exactly one official title request')
@@ -156,7 +163,6 @@ try {
   await dialog.getByRole('button', { name: /关闭|Close/u }).click()
   evidence.runtimeAuth = { mockedHttp401: true, loginOpened: true, credentialRetained: true }
   assert.equal((await probe('revoke')).status, 200, 'simulate logout through the official credential service, retaining the catalog')
-  await page.unroute('**/api/dsh-relay/status')
   const signedOut = await page.evaluate(async () => (await fetch('/api/dsh-relay/status', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json())
   assert.equal(signedOut.configured, false)
   assert.equal(signedOut.credentialConfigured, false)

@@ -68,7 +68,7 @@ After a one-time native confirmation, the single primary Runtime runs with `dang
 
 Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. The primary invocation contains exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
-## Using Desktop 4.1
+## Using Desktop 5.0.0
 
 1. Use the conversation sidebar's Smart Control entry to configure Browser Use or Computer Use, run a safe provider test, and inspect platform permissions. Both capabilities remain off until explicitly enabled. Open the Extension Dock to connect a model or configure Value Mode; existing plugin, import, backup, and repair entries remain available.
 2. Use Add workspace to open Create project, enter a name, and click the source-folder area to open the system folder picker. Choose workspace uses the shared dialog to connect a directory; an already connected directory opens its existing workspace.
@@ -78,19 +78,19 @@ Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, 
 
 Model-directory recovery events are coalesced for 30 seconds, so reopening the model selector, a parent-render callback identity change, or briefly switching window focus does not repeatedly reload the same data. In the Extension Dock, community-catalog and plugin-version reads run independently from plugin mutation transactions: cached catalog reads return immediately for five minutes, concurrent requests join one operation, and explicit refresh still revalidates the source. Update, market, and registry diagnostics are probed in parallel under independent timeouts, so one slow endpoint does not add its full wait to the other two. A slow or unavailable catalog therefore does not disable unrelated Dock controls.
 
-The built-in QQ Bot integration is pinned to `@tencent-connect/dsh-qqbot@0.5.0`. Desktop also packages the matching DSH 0.1.6 user-approval service, allowing QQ conversations to answer supported approval prompts while preserving the existing encrypted credential store, profile isolation, and transactional bind or unbind rollback.
+The built-in QQ Bot integration is pinned to `@tencent-connect/dsh-qqbot@0.5.0`. Desktop also packages the matching DSH 0.2.0-rc.2 user-approval service, allowing QQ conversations to answer supported approval prompts while preserving the existing encrypted credential store, profile isolation, and transactional bind or unbind rollback.
 
-![DeepSeek Harness Desktop 4.1.0 Smart Control Center](screenshots/desktop-4.1.0/control-center.png)
+![DeepSeek Harness Desktop 5.0.0 Windows control-center](screenshots/desktop-5.0.0/control-center.png)
 
-![DeepSeek Harness Desktop 4.0.0 model collaboration](screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
+![DeepSeek Harness Desktop 5.0.0 Windows collaboration](screenshots/desktop-5.0.0/collaboration.png)
 
-![DeepSeek Harness Desktop 4.0.0 conversation Skills menu](screenshots/desktop-4.0.0-rc.3/conversation-skills.png)
+![DeepSeek Harness Desktop 5.0.0 Windows skills](screenshots/desktop-5.0.0/skills.png)
 
-![DeepSeek Harness Desktop 4.0.0 bai model access](screenshots/desktop-4.0.0-rc.3/bai-models.png)
+![DeepSeek Harness Desktop 5.0.0 Windows bai-models](screenshots/desktop-5.0.0/bai-models.png)
 
 ## Model collaboration, usage, and import
 
-These capabilities remain available in 4.1. The screenshots below are historical 3.2.0 captures; current Smart Control, collaboration, Skills, and model navigation are represented by the accepted 4.1.0 and 4.0.0 captures above.
+These capabilities remain available in 5.0.0. The screenshots below are historical 3.2.0 captures; current Smart Control, collaboration, Skills and model navigation are represented by isolated 5.0.0 Windows runtime captures above, not macOS/Linux captures or production installation acceptance.
 
 ![DeepSeek Harness Desktop 3.2.0 main workspace and AI coding entry points](screenshots/3.2.0-workspace.webp)
 

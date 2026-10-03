@@ -13,4 +13,4 @@ Allow: /
 User-agent: ClaudeBot
 Allow: /
 
-Sitemap: https://ningbainb.github.io/deepseek-harness-desktop/sitemap.xml
+Sitemap: https://1521003.xyz/sitemap.xml

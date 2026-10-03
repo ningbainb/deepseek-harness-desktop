@@ -40,7 +40,7 @@ Supports **Windows 10 / 11 x64**, with **macOS Apple Silicon arm64 Preview** and
 
 Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git operations require system Git.
 
-[Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
+[Product Site](https://1521003.xyz/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
 ### 5.0.0: reliable upgrades, one version across three platforms
 
@@ -77,7 +77,7 @@ These are isolated 5.0.0 Windows runtime captures, not macOS or Linux acceptance
 
 ![DeepSeek Harness Desktop 4.1.0 Smart Control Center](docs/screenshots/desktop-4.1.0/control-center.png)
 
-![DeepSeek Harness Desktop 4.0.0 model collaboration](docs/screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
+![DeepSeek Harness Desktop 5.0.0 Windows model collaboration](docs/screenshots/desktop-5.0.0/collaboration.png)
 
 ![DeepSeek Harness Desktop 4.0.0 conversation Skills and desktop entry points](docs/screenshots/desktop-4.0.0-rc.3/conversation-skills.png)
 
@@ -94,7 +94,7 @@ These are isolated 5.0.0 Windows runtime captures, not macOS or Linux acceptance
 
 ## Model collaboration, Skills, and model access
 
-The screenshots below come from the real final-candidate Electron acceptance environment for 4.0.0.
+The screenshots below are isolated 5.0.0 Windows runtime captures, not macOS/Linux screenshots or production installation acceptance.
 
 ### Model collaboration: Agent Team and Value Mode in one place
 
@@ -106,15 +106,15 @@ The session sidebar opens the existing Extension Dock window directly on Model C
 
 Desktop 4 scans project `.dsh/skills`, user DSH Skills, and user Agents Skills through one discovery contract. The composer can search and insert the same skills shown by Skill Center, including their source and scope.
 
-![DeepSeek Harness Desktop 4.0.0 conversation Skills menu](docs/screenshots/desktop-4.0.0-rc.3/conversation-skills.png)
+![DeepSeek Harness Desktop 5.0.0 Windows conversation Skills menu](docs/screenshots/desktop-5.0.0/skills.png)
 
 ### bai provider: consistently promoted in model entry points
 
 The chat picker, model settings, and collaboration controller/worker pickers share one ordering rule: user-pinned models first, then bai, followed by the existing provider order.
 
-![DeepSeek Harness Desktop 4.0.0 bai model access](docs/screenshots/desktop-4.0.0-rc.3/bai-models.png)
+![DeepSeek Harness Desktop 5.0.0 Windows bai model access](docs/screenshots/desktop-5.0.0/bai-models.png)
 
-See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [4.1 release notes](docs/launch/release-notes.md) for the implementation boundaries.
+See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [5.0.0 release notes](docs/launch/release-notes.md) for the implementation boundaries.
 
 ## Why DeepSeek Harness Desktop
 

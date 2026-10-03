@@ -40,7 +40,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 安装包已包含 Node.js 与 DSH；Windows 同时内置 Git，macOS 与 Linux 的 Git 操作需要系统安装 Git。
 
-[产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
+[产品介绍](https://1521003.xyz/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
 ### 5.0.0：稳定升级，三端同版
 
@@ -90,27 +90,27 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 ## 模型协作、Skills 与模型接入
 
-以下实机截图展示 4.1 智能操控，以及持续提供的模型协作、Skills 与模型接入。
+以下为 5.0.0 Windows 隔离运行截图，展示模型协作、Skills 与模型接入；不代表 macOS/Linux 的实际界面或正式安装验收。
 
 ### 模型协作：Agent Team 与性价比模式放在同一处
 
 会话侧栏的“模型协作”会直接打开唯一的拓展坞窗口并进入协作页。Agent Team 负责多角色协作，性价比模式负责主控与执行模型分工；两者互不排斥，可独立开启或同时使用。
 
-![DeepSeek Harness Desktop 4.0.0 模型协作页面](docs/screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
+![DeepSeek Harness Desktop 5.0.0 Windows 模型协作页面](docs/screenshots/desktop-5.0.0/collaboration.png)
 
 ### Skills：会话菜单与技能中心使用同一目录
 
 4.0 统一扫描项目 `.dsh/skills`、用户 DSH Skills 与用户 Agents Skills。会话输入框可搜索并插入技能，技能中心显示相同来源及作用域，不再出现“侧栏能看到、技能中心看不到”的路径分裂。
 
-![DeepSeek Harness Desktop 4.0.0 会话 Skills 菜单](docs/screenshots/desktop-4.0.0-rc.3/conversation-skills.png)
+![DeepSeek Harness Desktop 5.0.0 Windows 会话 Skills 菜单](docs/screenshots/desktop-5.0.0/skills.png)
 
 ### bai 供应商：在模型入口中统一优先显示
 
 聊天模型、模型设置以及协作页的主控与执行模型选择器共用排序规则：用户手动置顶优先，其次是 bai 供应商，再保留其余供应商的既有顺序。
 
-![DeepSeek Harness Desktop 4.0.0 bai 模型接入](docs/screenshots/desktop-4.0.0-rc.3/bai-models.png)
+![DeepSeek Harness Desktop 5.0.0 Windows bai 模型接入](docs/screenshots/desktop-5.0.0/bai-models.png)
 
-详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [4.1 发布说明](docs/launch/release-notes.md)。
+详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [5.0.0 发布说明](docs/launch/release-notes.md)。
 
 
 ## 为什么选择 DeepSeek Harness Desktop

@@ -564,7 +564,6 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Category | File | Line | Operation or identity |
 | --- | --- | ---: | --- |
-| host-service | apps/dsh-desktop/scripts/bai-host-probe.mjs | 10 | credentials |
 | host-service | apps/dsh-desktop/scripts/history-host-probe.mjs | 66 | string |
 | host-service | apps/dsh-desktop/src/runtime-provider.mjs | 283 | host-service.register |
 | host-service | apps/dsh-desktop/test/runtime-provider.test.mjs | 176 | task-board |
@@ -600,7 +599,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-value-mode/src/index.ts | 47 | llm |
 | host-service | packages/dsh-web-ui-settings/src/client/index.ts | 94 | remote |
 | host-service | packages/skins/skin-center/src/client/index.ts | 66 | remote |
-| profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 13 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 15 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-all-surfaces.mjs | 157 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-qqbot-qr-3.3.0.mjs | 12 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-startup.mjs | 41 | DSH_HOME |

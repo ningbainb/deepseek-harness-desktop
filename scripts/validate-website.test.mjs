@@ -69,6 +69,22 @@ test('website exposes canonical SEO and structured data markers', async () => {
   assert.deepEqual(errors, [])
 })
 
+test('website rejects the retired Pages canonical domain and stale social screenshots', async () => {
+  const retired = websiteHtml.replaceAll('https://1521003.xyz/', 'https://ningbainb.github.io/deepseek-harness-desktop/')
+  const retiredErrors = await collectWebsiteErrors(retired, expectedWebsiteVersion)
+  assert.ok(retiredErrors.some(error => error.includes('canonical URL')))
+  assert.ok(retiredErrors.some(error => error.includes('structured data identity')))
+  assert.ok(retiredErrors.some(error => error.includes('og:image')))
+  const stale = websiteHtml.replaceAll(`https://1521003.xyz/assets/desktop-${expectedWebsiteVersion}-`, 'https://1521003.xyz/assets/desktop-4.0.0-')
+  const staleErrors = await collectWebsiteErrors(stale, expectedWebsiteVersion)
+  assert.ok(staleErrors.some(error => error.includes('structured data screenshots')))
+  assert.ok(staleErrors.some(error => error.includes('twitter:image')))
+})
+
+test('website custom-domain file matches the canonical public host', async () => {
+  assert.equal((await readFile(resolve(import.meta.dirname, '..', 'website', 'CNAME'), 'utf8')).trim(), '1521003.xyz')
+})
+
 test('website validation rejects stale presentation versions', async () => {
   const html = websiteHtml
     .replace(/<title>[^<]*<\/title>/iu, '<title>DeepSeek Harness Desktop 2.2.0</title>')
@@ -125,9 +141,9 @@ test('sumInstallerDownloads totals only Windows x64 installer assets', () => {
 })
 
 test('website discovery files identify the canonical release', () => {
-  const sitemap = '<url><loc>https://ningbainb.github.io/deepseek-harness-desktop/</loc><loc>https://ningbainb.github.io/deepseek-harness-desktop/privacy.html</loc><lastmod>2026-08-16</lastmod></url>'
-  const robots = 'User-agent: OAI-SearchBot\nAllow: /\nSitemap: https://ningbainb.github.io/deepseek-harness-desktop/sitemap.xml'
-  const llms = 'https://ningbainb.github.io/deepseek-harness-desktop/ https://ningbainb.github.io/deepseek-harness-desktop/privacy.html https://github.com/ningbainb/deepseek-harness-desktop Setup-0.1.8-x64.exe'
+  const sitemap = '<url><loc>https://1521003.xyz/</loc><loc>https://1521003.xyz/privacy.html</loc><lastmod>2026-08-16</lastmod></url>'
+  const robots = 'User-agent: OAI-SearchBot\nAllow: /\nSitemap: https://1521003.xyz/sitemap.xml'
+  const llms = 'https://1521003.xyz/ https://1521003.xyz/privacy.html https://github.com/ningbainb/deepseek-harness-desktop Setup-0.1.8-x64.exe'
   const key = 'f99946a1f6864579a8d2f96040502784'
   assert.deepEqual(collectDiscoveryErrors(sitemap, robots, llms, key, '0.1.8'), [])
 })

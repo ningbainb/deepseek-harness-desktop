@@ -10,10 +10,11 @@ const siteScriptPath = path.join(websiteRoot, 'script.js')
 const sitemapPath = path.join(websiteRoot, 'sitemap.xml')
 const robotsPath = path.join(websiteRoot, 'robots.txt')
 const llmsPath = path.join(websiteRoot, 'llms.txt')
+const cnamePath = path.join(websiteRoot, 'CNAME')
 const indexNowKey = 'f99946a1f6864579a8d2f96040502784'
 const indexNowKeyPath = path.join(websiteRoot, `${indexNowKey}.txt`)
 const desktopPackagePath = path.join(root, 'apps', 'dsh-desktop', 'package.json')
-const canonicalUrl = 'https://ningbainb.github.io/deepseek-harness-desktop/'
+const canonicalUrl = 'https://1521003.xyz/'
 
 function collectAttributeValues(html, attribute) {
   const pattern = new RegExp(`\\b${attribute}\\s*=\\s*["']([^"']+)["']`, 'gi')
@@ -37,10 +38,10 @@ export async function collectWebsiteErrors(html, expectedVersion) {
     ['download link', /\bclass=["'][^"']*\bdownload-link\b[^"']*["']/i],
     ['release page link', /\bclass=["'][^"']*\brelease-page-link\b[^"']*["']/i],
     ['checksum link', /\bclass=["'][^"']*\bchecksum-link\b[^"']*["']/i],
-    ['canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/["']/i],
+    ['canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/1521003\.xyz\/["']/i],
     ['robots index directive', /<meta\b[^>]*\bname=["']robots["'][^>]*\bcontent=["'][^"']*\bindex\b/i],
     ['Google site verification', /<meta\b[^>]*\bname=["']google-site-verification["'][^>]*\bcontent=["']QMzFv4LC5XXFJJf5L3_yoCaHIr2MVIxUm9S5qG9MiwE["']/i],
-    ['Open Graph URL', /<meta\b[^>]*\bproperty=["']og:url["'][^>]*\bcontent=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/["']/i],
+    ['Open Graph URL', /<meta\b[^>]*\bproperty=["']og:url["'][^>]*\bcontent=["']https:\/\/1521003\.xyz\/["']/i],
     ['Twitter summary card', /<meta\b[^>]*\bname=["']twitter:card["'][^>]*\bcontent=["']summary_large_image["']/i],
     ['structured data', /<script\b[^>]*\btype=["']application\/ld\+json["']/i],
     ['FAQ section', /\bid=["']faq["']/i],
@@ -72,6 +73,14 @@ export async function collectWebsiteErrors(html, expectedVersion) {
     try {
       const structuredData = JSON.parse(structuredDataMatch[1])
       const graph = structuredData['@graph'] || []
+      for (const item of graph) {
+        if (typeof item['@id'] !== 'string' || !item['@id'].startsWith(canonicalUrl)) {
+          errors.push('structured data identity must use the canonical domain')
+        }
+        if (item.url !== undefined && item.url !== canonicalUrl) {
+          errors.push('structured data URL must use the canonical homepage')
+        }
+      }
       const types = graph.map(item => item['@type'])
       for (const type of ['WebSite', 'SoftwareApplication', 'FAQPage']) {
         if (!types.includes(type)) errors.push(`structured data is missing ${type}`)
@@ -79,6 +88,20 @@ export async function collectWebsiteErrors(html, expectedVersion) {
       const software = graph.find(item => item['@type'] === 'SoftwareApplication')
       if (expectedVersion && software?.softwareVersion !== expectedVersion) {
         errors.push(`structured data softwareVersion must be ${expectedVersion}`)
+      }
+      if (expectedVersion) {
+        const imagePrefix = `${canonicalUrl}assets/desktop-${expectedVersion}-`
+        const images = [software?.image, ...(software?.screenshot || [])]
+        if (images.length < 2 || images.some(value => typeof value !== 'string' || !value.startsWith(imagePrefix))) {
+          errors.push(`structured data screenshots must identify ${expectedVersion} on the canonical domain`)
+        }
+        for (const image of images.filter(value => typeof value === 'string' && value.startsWith(imagePrefix))) {
+          try {
+            await access(path.join(websiteRoot, new URL(image).pathname))
+          } catch {
+            errors.push(`structured data screenshot asset is missing: ${image}`)
+          }
+        }
       }
       const faq = graph.find(item => item['@type'] === 'FAQPage')
       for (const entity of faq?.mainEntity || []) {
@@ -109,6 +132,12 @@ export async function collectWebsiteErrors(html, expectedVersion) {
     ]
     for (const [label, pattern] of presentationMarkers) {
       if (!pattern.test(html)) errors.push(`${label} must identify ${expectedVersion}`)
+    }
+    const socialImagePrefix = `${canonicalUrl}assets/desktop-${expectedVersion}-`
+    for (const name of ['og:image', 'twitter:image']) {
+      const tag = [...html.matchAll(/<meta\b[^>]*>/gi)].find(match => match[0].includes(`"${name}"`))?.[0]
+      const image = tag?.match(/\bcontent=["']([^"']+)["']/i)?.[1]
+      if (!image?.startsWith(socialImagePrefix)) errors.push(`${name} must identify ${expectedVersion} on the canonical domain`)
     }
   }
 
@@ -153,7 +182,7 @@ export async function collectWebsiteErrors(html, expectedVersion) {
 export function collectPrivacyErrors(html) {
   const errors = []
   const requiredMarkers = [
-    ['privacy canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/ningbainb\.github\.io\/deepseek-harness-desktop\/privacy\.html["']/i],
+    ['privacy canonical URL', /<link\b[^>]*\brel=["']canonical["'][^>]*\bhref=["']https:\/\/1521003\.xyz\/privacy\.html["']/i],
     ['community release anonymous analytics disclosure', /正式社区包默认进行匿名产品分析/u],
     ['anonymous retention actor disclosure', /稳定匿名安装哈希/u],
     ['country-only and no-IP boundary', /国家级代码，不保存 IP/u],
@@ -226,7 +255,7 @@ export function resolveWebsiteVersion(candidateVersion, publishedVersion) {
 }
 
 export async function validateWebsite() {
-  const [html, privacy, siteScript, sitemap, robots, llms, keyFile, desktopPackage] = await Promise.all([
+  const [html, privacy, siteScript, sitemap, robots, llms, keyFile, desktopPackage, cname] = await Promise.all([
     readFile(htmlPath, 'utf8'),
     readFile(privacyPath, 'utf8'),
     readFile(siteScriptPath, 'utf8'),
@@ -235,6 +264,7 @@ export async function validateWebsite() {
     readFile(llmsPath, 'utf8'),
     readFile(indexNowKeyPath, 'utf8'),
     readFile(desktopPackagePath, 'utf8'),
+    readFile(cnamePath, 'utf8'),
   ])
   const candidateVersion = JSON.parse(desktopPackage).version
   const publishedVersion = /<html\b[^>]*\bdata-release-version=["'](\d+\.\d+\.\d+)["']/iu.exec(html)?.[1]
@@ -247,6 +277,7 @@ export async function validateWebsite() {
     ...collectWebsiteScriptErrors(siteScript),
     ...collectDiscoveryErrors(sitemap, robots, llms, keyFile, version),
   ]
+  if (cname.trim() !== new URL(canonicalUrl).hostname) errors.push('CNAME must identify the canonical domain')
   if (errors.length > 0) {
     throw new Error(`website validation failed:\n- ${errors.join('\n- ')}`)
   }
