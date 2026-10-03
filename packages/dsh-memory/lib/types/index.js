@@ -7,7 +7,7 @@ import { extractCurrentUserQuery } from "./core/query.js";
 import { createMemoryTool } from "./tools.js";
 import { makeMemoryRoutes } from "./routes.js";
 export const name = 'memory';
-export const inject = ['systemPrompt', 'sessions', 'userScope', 'tools'];
+export const inject = ['systemPrompt', 'sessions', 'sessionQuery', 'userScope', 'tools'];
 export * from "./core/config.js";
 export * from "./core/schema.js";
 export * from "./core/rank.js";
@@ -69,6 +69,8 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     };
     const hydrate = async (entry) => {
         try {
+            const snapshot = await ctx.sessionQuery.readSession(entry.session.id);
+            entry.events = snapshot.events;
             const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
             if (memoryContext !== undefined)
                 await service.preload(memoryContext);
@@ -89,7 +91,7 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
         }
         if (scope === undefined)
             return;
-        const entry = { session, scope: copyScope(scope) };
+        const entry = { session, scope: copyScope(scope), events: [] };
         sessionsById.set(sessionId, entry);
         if (key !== undefined)
             sessionScopes.set(key, entry);
@@ -107,10 +109,17 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
         if (key !== undefined && sessionScopes.get(key)?.session === session)
             sessionScopes.delete(key);
     });
-    ctx.on('session/event', function (session) {
+    ctx.on('session/event', function (session, event) {
         const entry = sessionsById.get(String(session.id));
-        if (entry !== undefined)
+        if (entry !== undefined) {
+            entry.events = [...entry.events, event];
             void hydrate(entry);
+        }
+    });
+    ctx.on('agent/created', async ({ agent }) => {
+        const entry = sessionsById.get(String(agent.session.id));
+        if (entry !== undefined)
+            await hydrate(entry);
     });
     // Sessions already live when the plugin is mounted are registered for
     // ownership. Prompt injection still requires an actual scoped carrier key.
@@ -131,6 +140,7 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     ctx.effect(() => ctx.tools.register(createMemoryTool(service, {
         enabled: () => currentConfig().enabled,
         contextForSession,
+        eventsForSession: async (session) => (await ctx.sessionQuery.readSession(session.id)).events,
     })), 'memory: model tool');
     ctx.inject(['webServer'], webCtx => {
         const routes = makeMemoryRoutes({
@@ -155,7 +165,10 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
             const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
             if (memoryContext === undefined)
                 return '';
-            return service.prepare(memoryContext, extractCurrentUserQuery(entry.session), currentConfig().enabled);
+            return service.prepare(memoryContext, extractCurrentUserQuery({
+                header: entry.session.header,
+                events: entry.events,
+            }), currentConfig().enabled);
         }
         catch {
             return '';

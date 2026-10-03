@@ -41,7 +41,16 @@ const largeHistoryContent = `${largeHistoryStart}${'h'.repeat(5 * 1024 * 1024)}$
 const largeToolStart = 'LARGE-TOOL-BEGIN'
 const largeToolEnd = 'LARGE-TOOL-END'
 const largeToolContent = `${largeToolStart}${'t'.repeat(5 * 1024 * 1024)}${largeToolEnd}`
+const historyContextTail = 'DSH_HISTORY_CONTEXT_TAIL_4_0'
+const largeFinalText = `${finalText}\n${'历史上下文'.repeat(40_000)}\n${historyContextTail}`
+const contextProbePrompt = 'Verify that the previous history context is still available.'
+const contextRetainedText = 'Previous history context remained available after restart.'
+const sessionTitle = `Agent fixture ${randomUUID()}`
+const largeHistoryBytes = Buffer.byteLength(JSON.stringify({ type: 'duplex-output', value: largeFinalText }))
+assert.ok(largeHistoryBytes > 512 * 1024, `large history fixture is too small: ${largeHistoryBytes}`)
 const requests = []
+let contextProbeDetected = false
+let contextProbeSawHistory = false
 let app
 
 async function readRequest(request) {
@@ -52,6 +61,13 @@ async function readRequest(request) {
 
 function sendChunk(response, payload) {
   response.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+function sendText(response, content) {
+  for (let offset = 0; offset < content.length; offset += 16_384) {
+    sendChunk(response, completionChunk({ content: content.slice(offset, offset + 16_384) }))
+  }
+  sendChunk(response, completionChunk({ finishReason: 'stop' }))
 }
 
 function completionChunk({ content, finishReason }) {
@@ -106,10 +122,18 @@ const server = createServer(async (request, response) => {
   })
   const tools = Array.isArray(body.tools) ? body.tools : []
   if (tools.length === 0) {
-    sendChunk(response, completionChunk({ content: 'Agent workspace verification' }))
-    sendChunk(response, completionChunk({ finishReason: 'stop' }))
+    sendText(response, 'Agent workspace verification')
   } else {
     assert.ok(tools.some(tool => tool.function?.name === 'pwsh'), 'Agent request did not expose the pwsh tool')
+    const serializedMessages = JSON.stringify(body.messages ?? [])
+    const isContextProbe = serializedMessages.includes(contextProbePrompt)
+    if (isContextProbe) {
+      contextProbeDetected = true
+      contextProbeSawHistory = serializedMessages.includes(historyContextTail)
+      sendText(response, contextRetainedText)
+      response.end('data: [DONE]\n\n')
+      return
+    }
     const hasToolResult = body.messages?.some(message => message.role === 'tool') === true
     if (!hasToolResult) {
       const escapedMarkerPath = markerPath.replaceAll("'", "''")
@@ -120,7 +144,9 @@ const server = createServer(async (request, response) => {
       sendChunk(response, toolCallChunk({ argumentsJson }))
       sendChunk(response, toolCallChunk({ finishReason: 'tool_calls' }))
     } else {
-      sendChunk(response, completionChunk({ content: finalText }))
+      for (let offset = 0; offset < largeFinalText.length; offset += 16_384) {
+        sendChunk(response, completionChunk({ content: largeFinalText.slice(offset, offset + 16_384) }))
+      }
       sendChunk(response, completionChunk({ content: '\n\n' }))
       for (let offset = 0; offset < largeHistoryContent.length; offset += 192 * 1024) {
         sendChunk(response, completionChunk({ content: largeHistoryContent.slice(offset, offset + 192 * 1024) }))
@@ -164,7 +190,7 @@ async function rpc(page, method, payload) {
 }
 
 async function dismissStartup(page) {
-  for (let attempt = 0; attempt < 16; attempt += 1) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     await page.waitForTimeout(250)
     const starPrompt = page.locator('#dsh-desktop-star-prompt')
     if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
@@ -174,7 +200,16 @@ async function dismissStartup(page) {
     const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
     const introDialog = page.getByRole('dialog').filter({ has: continueButton })
     if (await introDialog.isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
+      const buttons = await continueButton.all()
+      const enabled = []
+      for (const button of buttons) {
+        if (await button.isVisible().catch(() => false) && await button.isEnabled().catch(() => false)) {
+          enabled.push(button)
+        }
+      }
+      if (enabled.length > 0) {
+        await enabled.at(-1).click({ force: true, timeout: 2_000 }).catch(() => {})
+      }
       continue
     }
     if (attempt >= 7) break
@@ -281,7 +316,7 @@ try {
   app = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args: packagedExecutable === undefined ? [mainEntry] : [],
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -298,7 +333,7 @@ try {
   const rendererErrors = []
   page.on('pageerror', error => rendererErrors.push(error.message))
   await page.waitForURL(/^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/)/u, { timeout: 120_000 })
-  await page.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', { state: 'attached', timeout: 120_000 })
+  await page.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
   await dismissStartup(page)
 
   const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
@@ -327,6 +362,7 @@ try {
   ).first()
   await composer.waitFor({ state: 'visible', timeout: 30_000 })
   await composer.fill(`Create ${markerPath} and report completion.`)
+  const requestCountBeforePrompt = requests.length
   const promptRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt')
   await page.getByRole('button', { name: '发送消息', exact: true }).click()
   const prompted = await promptRequest
@@ -372,7 +408,7 @@ try {
   app = await electron.launch({
     executablePath: reopenExecutable ?? electronPath,
     args: reopenExecutable === undefined ? [mainEntry] : [],
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -389,7 +425,7 @@ try {
   const reopenedRendererErrors = []
   reopenedPage.on('pageerror', error => reopenedRendererErrors.push(error.message))
   await reopenedPage.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
-  await reopenedPage.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', { state: 'attached', timeout: 120_000 })
+  await reopenedPage.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
   await dismissStartup(reopenedPage)
   const reopenedAlternateSessionId = await createSessionInWorkspace(reopenedPage, workspaceId)
   assert.notEqual(reopenedAlternateSessionId, sessionId,
@@ -404,6 +440,23 @@ try {
   const restartedSnapshotBytes = await assertLargeSnapshotObserved(reopenedPage)
   const historyFailure = reopenedPage.getByText(/历史加载失败|history load failed|runtime carrier Error/iu)
   assert.equal(await historyFailure.count(), 0, 'completed session must reopen after a full Desktop restart')
+  assert.deepEqual(reopenedRendererErrors, [])
+
+  const reopenedComposer = reopenedPage.locator(
+    '[data-composer-card] textarea:not([disabled]), [data-composer-card] [data-composer-input][contenteditable="true"]:not([aria-disabled="true"])',
+  ).first()
+  await reopenedComposer.waitFor({ state: 'visible', timeout: 30_000 })
+  await reopenedComposer.fill(contextProbePrompt)
+  await reopenedPage.getByRole('button', { name: '发送消息', exact: true }).click()
+  const contextProbeDeadline = Date.now() + 60_000
+  while (!contextProbeDetected && Date.now() < contextProbeDeadline) {
+    await reopenedPage.waitForTimeout(250)
+  }
+  assert.equal(contextProbeDetected, true, 'the fixture server did not detect the context probe')
+  assert.equal(contextProbeSawHistory, true, 'the model request lost the pre-restart history context')
+  await reopenedPage.getByRole('paragraph').filter({ hasText: contextRetainedText }).last()
+    .waitFor({ state: 'visible', timeout: 60_000 })
+  assert.equal(await historyFailure.count(), 0, 'post-restart prompting must not trigger a history load failure')
   assert.deepEqual(reopenedRendererErrors, [])
 
   console.log(JSON.stringify({
@@ -424,6 +477,8 @@ try {
     largeHistoryContentMatchedBeforeSwitchAfterSwitchAndAfterRestart: true,
     sameWindowSessionSwitchCycles: 3,
     newSessionReenteredBeforeFirstMessage: true,
+    largeHistoryBytes,
+    contextRetainedAfterRestart: true,
     crossVersionReopen: reopenExecutable !== packagedExecutable,
     toolNames: agentRequests[0].tools.map(tool => tool.function?.name).filter(Boolean),
     titleRequests: titleRequests.length,
@@ -442,6 +497,8 @@ try {
   console.error(JSON.stringify({
     failure: error instanceof Error ? error.message : String(error),
     requestCount: requests.length,
+    contextProbeDetected,
+    contextProbeSawHistory,
     requestSummary: requests.map(request => ({
       model: request.model,
       toolNames: request.tools?.map(tool => tool.function?.name).filter(Boolean),

@@ -58,6 +58,7 @@
   config:
     shellTools: [bash]
     commonTools: [str_replace_editor]
+    compactionTools: [read]
     messageSources: [user]
     anchorGate: true
     maxBootstrapSteps: 4

@@ -1282,8 +1282,9 @@ async function loadUpdateDiagnostics(days = diagnosticDays) {
     const data = await response.json()
     if (requestId !== diagnosticRequest) return
     const stages = { check: '检查更新', download: '下载安装包', verify: '校验文件', prepare: '退出旧进程', install: '启动安装器', unknown: '旧数据或未知阶段' }
-    status.textContent = 'UTC ' + data.from + ' 至 ' + data.to + '：保留失败记录 ' + formatCount(data.failures) + '，含诊断 ' + formatCount(data.classifiedFailures) + '，失败尝试 ' + formatCount(data.failedAttempts) + '，可去重安装实例 ' + formatCount(data.observedInstances) + '。仅覆盖已上报诊断的版本，不是安装失败率；退出后没有回执的结果仍为未知。'
-    renderBars('update-diagnostics-bars', data.groups, (row) => (stages[row.stage] || row.stage) + ' · ' + row.errorType + ' · ' + row.errorCode + ' · ' + row.sourceVersion + ' → ' + row.targetVersion)
+    const averageAttempts = Number(data.attemptsPerObservedInstance)
+    status.textContent = 'UTC ' + data.from + ' 至 ' + data.to + '：受影响安装实例 ' + formatCount(data.observedInstances) + '，分类失败尝试 ' + formatCount(data.failedAttempts) + '（平均 ' + (Number.isFinite(averageAttempts) ? averageAttempts.toFixed(2) : '--') + ' 次/实例），旧版或未分类记录 ' + formatCount(data.legacyFailures) + '，总保留记录 ' + formatCount(data.failures) + '。实例数只覆盖带匿名诊断的失败，不是安装失败率；退出后没有回执的结果仍为未知。'
+    renderBars('update-diagnostics-bars', data.groups, (row) => (stages[row.stage] || row.stage) + ' · ' + row.errorType + ' · ' + row.errorCode + ' · ' + row.sourceVersion + ' → ' + row.targetVersion + (Number(row.observedInstances) > 0 ? ' · ' + formatCount(row.observedInstances) + ' 实例' : ''))
     element('update-diagnostics-recent').textContent = JSON.stringify(data.recent, null, 2)
   } catch {
     if (requestId !== diagnosticRequest) return

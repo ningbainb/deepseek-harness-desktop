@@ -124,7 +124,8 @@ export function createMemoryTool(service, options) {
                 return { success: false, operation: args.operation, items: [], errorCode: 'access-denied' };
             }
             if (args.operation === 'search') {
-                const result = await service.search(context, extractCurrentUserQuery(session));
+                const events = await options.eventsForSession?.(session) ?? [];
+                const result = await service.search(context, extractCurrentUserQuery({ header: session.header, events }));
                 if (!result.ok)
                     return { success: false, operation: args.operation, items: [], errorCode: result.warning.code };
                 return {

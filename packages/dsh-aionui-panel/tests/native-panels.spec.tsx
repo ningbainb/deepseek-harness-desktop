@@ -30,7 +30,7 @@ it('binds default ownership to optional SDK service lifetime, including late ava
 it('uses the native tab section without leaking tools into hidden, stale or mismatched sessions', () => {
   const host = document.createElement('div'); document.body.append(host)
   const renderer = createRoot(host)
-  const snapshot = { current: 's1', byId: { s1: { cwd: '/a' } } }
+  const snapshot = { byId: { s1: { id: 's1', cwd: '/a', retainedBy: { mainView: 1 } } } }
   const state = { root: '/a' }
   const store = { getSnapshot: () => state, subscribe: () => () => {} }
   const controller = new AbortController()
@@ -46,11 +46,11 @@ it('uses the native tab section without leaking tools into hidden, stale or mism
     expect(host.querySelector('[data-section="changes"]')).not.toBeNull()
     act(() => host.querySelector('button')!.click())
     expect(insertPath).toHaveBeenCalledWith('s1', 'readme.md')
-    snapshot.current = 's2'
+    snapshot.byId.s1.retainedBy.mainView = 0
     render()
     expect(host.querySelector('button')).toBeNull()
     expect(host.querySelector('[role="status"]')).not.toBeNull()
-    snapshot.current = 's1'; state.root = '/b'
+    snapshot.byId.s1.retainedBy.mainView = 1; state.root = '/b'
     render()
     expect(host.querySelector('button')).toBeNull()
     state.root = '/a'; tab.visible = false
@@ -87,7 +87,7 @@ it('registers both page definitions and bodies under matching official seat keys
 
 it('opens original Files or native Git, falling back only if the service, type or current workspace is unavailable', () => {
   const openTab = vi.fn()
-  const snapshot = { current: 's1', byId: { s1: { cwd: '/a' } } }
+  const snapshot = { byId: { s1: { id: 's1', cwd: '/a', retainedBy: { mainView: 1 } } } }
   let registered = true
   let available = true
   const ctx = {
@@ -105,6 +105,6 @@ it('opens original Files or native Git, falling back only if the service, type o
   available = true; registered = true
   openTab.mockImplementation(() => { throw new Error('seat not bound') })
   expect(openNativePanel(ctx as never, 'files')).toBe(false)
-  snapshot.current = ''
+  snapshot.byId.s1.retainedBy.mainView = 0
   expect(openNativePanel(ctx as never, 'files')).toBe(false)
 })

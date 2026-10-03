@@ -2,6 +2,7 @@ import {
   CHATGPT_AUTH_BRIDGE_PREFIX,
   type ChatGptAuthResult,
   type ChatGptAuthState,
+  type ChatGptLoginMode,
 } from '../chatgpt-auth-protocol.ts'
 
 function isState(value: unknown): value is ChatGptAuthState {
@@ -46,7 +47,10 @@ async function invoke(path: string, body: Record<string, unknown> = {}): Promise
 
 export const chatGptAuthClient = {
   state: () => invoke('/state'),
-  begin: (method?: string) => invoke('/begin', method === undefined ? {} : { method }),
+  begin: (loginMode?: ChatGptLoginMode, method?: string) => invoke('/begin', {
+    ...method === undefined ? {} : { method },
+    ...loginMode === undefined ? {} : { loginMode },
+  }),
   answer: (promptId: string, answer: string) => invoke('/answer', { promptId, answer }),
   cancel: () => invoke('/cancel'),
   logout: () => invoke('/logout'),

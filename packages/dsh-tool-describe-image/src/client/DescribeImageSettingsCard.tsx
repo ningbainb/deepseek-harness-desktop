@@ -109,7 +109,7 @@ export type DescribeImageSettingsCardProps =
  * @returns the card.
  */
 export function DescribeImageSettingsCard(props: DescribeImageSettingsCardProps) {
-  const state = props.useDescribeImageSettingsCard(snapshot => snapshot)
+  const state = props.useDescribeImageSettingsCard((snapshot: DescribeImageSettingsCardState) => snapshot)
   const disabled = !state.writable
   const fieldProps = {
     overriddenLabel: t('settings.overridden'),

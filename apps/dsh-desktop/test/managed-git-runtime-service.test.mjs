@@ -372,7 +372,7 @@ test('system Git bypasses confirmation, download, and managed PATH injection', a
   }
 })
 
-test('managed Git PATH helper is immutable, priority-first, and Windows-case-insensitive', () => {
+test('managed Git PATH helper is immutable, priority-first, and Windows-case-insensitive', { skip: process.platform !== 'win32' }, () => {
   const existing = ['C:\\runtime-bin', 'C:\\Users\\Alice\\AppData\\Local\\DSH\\managed-git\\current\\CMD', 'D:\\tools']
   const result = prependManagedGitPathEntry('C:\\Users\\Alice\\AppData\\Local\\DSH\\managed-git\\current\\cmd\\git.exe', existing)
   assert.deepEqual(result, [

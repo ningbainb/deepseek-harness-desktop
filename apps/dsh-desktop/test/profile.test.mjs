@@ -42,6 +42,172 @@ import {
   setAgentTeamProfileEnabled,
 } from '../src/profile.mjs'
 
+test('published rc.2 Web aggregate cannot silently remove Desktop-only profile rows', () => {
+  const legacy = '@linxin666/dsh-web-ui-all'
+  const alpha = '@linxin666/dsh-web-all'
+  const roots = resolveRuntimePackages([legacy, alpha])
+  const patchRows = (packageName) => parse(readFileSync(join(roots.get(packageName), 'cordis.patch.yml'), 'utf8'))
+  const insertIds = rows => rows.flatMap(row => (row.insert ?? []).map(insert => insert.id))
+  const legacyIds = new Set(insertIds(patchRows(legacy)))
+  const alphaIds = new Set(insertIds(patchRows(alpha)))
+  const desktopOnly = [
+    'user-scope',
+    'ui-model-preferences',
+    'personal-prompt',
+    'memory',
+    'web-ui-mode-switcher',
+    'live-stats',
+    'web-ui-dsh-aionui-panel',
+    'web-ui-chat-recovery',
+    'web-ui-desktop-launcher',
+    'web-ui-describe-image',
+    'chat-artifacts',
+    'particle-theme',
+    'ui-web-ui-compat',
+  ]
+  const legacyAliases = {
+    'ui-web-ui-settings': 'desktop-web-ui-settings',
+    'ui-dsh-aionui-panel': 'web-ui-dsh-aionui-panel',
+    'ui-mode-switcher': 'web-ui-mode-switcher',
+    'ui-chat-recovery': 'web-ui-chat-recovery',
+    'desktop-launcher': 'web-ui-desktop-launcher',
+    'describe-image': 'web-ui-describe-image',
+    liangshen: 'web-ui-liangshen',
+    'remote-web-ui': 'web-ui-remote-web-ui',
+    'ui-plugin-manager': 'web-ui-plugin-manager',
+    'ui-community-plugins': 'web-ui-community-plugins',
+    'ui-skin-center': 'web-ui-skin-center',
+  }
+  assert.equal(legacyIds.size, 23)
+  assert.equal(BUILTIN_BUNDLES.filter(name => name === legacy || name === alpha).length, 1,
+    'the two aggregate patches reuse loader IDs and must not be mounted together')
+  const active = BUILTIN_BUNDLES.includes(alpha) ? alpha : legacy
+  const managedIds = insertIds(parse(DESKTOP_PATCH_CONFIG))
+  const activeIds = insertIds(patchRows(active))
+  const managedOverrides = parse(DESKTOP_PATCH_CONFIG)
+  assert.equal(managedOverrides.find(row => row.id === 'web-ui-settings')?.disabled, true,
+    'the upstream folded settings client must not duplicate the Desktop settings root')
+  assert.ok(managedIds.includes('desktop-web-ui-settings'), 'Desktop mounts its settings document as a direct client entry')
+  for (const [upstreamId, desktopId, packageName] of [
+    ['web-ui-task-board', 'ui-task-board', '@linxin666/dsh-client-ui-task-board'],
+    ['web-ui-git-graph', 'ui-git-graph', '@linxin666/dsh-client-ui-git-graph'],
+    ['web-ui-pet', 'pet', '@linxin666/dsh-pet'],
+    ['web-ui-ssh', 'ssh', '@linxin666/dsh-ssh'],
+  ]) {
+    assert.equal(managedOverrides.find(row => row.id === upstreamId)?.disabled, true,
+      `${upstreamId} must not mix an upstream client with Desktop-only Host routes`)
+    assert.equal(managedOverrides.flatMap(row => row.insert ?? []).find(row => row.id === desktopId)?.name,
+      packageName, `${desktopId} preserves the 4.1 loader ID and user disable override`)
+  }
+  assert.equal(managedOverrides.find(row => row.id === 'web-ui-ssh')?.disabled, true,
+    'the upstream five-tab SSH client must not replace the Desktop six-tab client')
+  for (const id of ['web-ui-liangshen']) {
+    assert.equal(patchRows(alpha).find(row => row.id === id)?.disabled, true, `${id} must be opt-in upstream`)
+    assert.equal(managedOverrides.find(row => row.id === id)?.disabled, false,
+      `${id} was enabled in 4.1 and must remain available after upgrade`)
+  }
+  for (const id of desktopOnly) {
+    assert.equal(activeIds.filter(row => row === id).length + managedIds.filter(row => row === id).length, 1,
+      `Desktop-owned row ${id} must survive the aggregate switch exactly once`)
+  }
+  if (active === alpha) {
+    for (const originalId of legacyIds) {
+      const id = legacyAliases[originalId] ?? originalId
+      assert.equal(activeIds.filter(row => row === id).length + managedIds.filter(row => row === id).length, 1,
+        `Legacy feature ${originalId} remains mounted exactly once as ${id}`)
+    }
+    assert.equal(managedOverrides.flatMap(row => row.insert ?? []).find(row => row.id === 'web-ui-describe-image')?.name,
+      '@linxin666/dsh-tool-describe-image')
+    const patch = parse(DESKTOP_PATCH_CONFIG)
+    for (const [id, directBundle] of [
+      ['web-ui-model-capabilities', '@linxin666/dsh-client-ui-model-capabilities'],
+      ['web-ui-usage', '@linxin666/dsh-usage'],
+      ['web-ui-session-archive', '@linxin666/dsh-session-archive'],
+    ]) {
+      assert.ok(BUILTIN_BUNDLES.includes(directBundle), `${directBundle} retains the 4.1 entry`)
+      assert.equal(patch.find(row => row.id === id)?.disabled, true,
+        `${id} must not mount a duplicate host plugin before its saved state migrates`)
+    }
+    assert.equal(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies['@linxin666/dsh-session-archive'],
+      '0.4.4',
+      'the direct archive entry must use the rc.2-compatible settings section')
+  }
+})
+
+test('4.4 loader aliases preserve saved config and disable choices across repeated refreshes', () => {
+  for (const [previous, current] of [
+    ['ui-web-ui-settings', 'desktop-web-ui-settings'],
+    ['ui-dsh-aionui-panel', 'web-ui-dsh-aionui-panel'],
+    ['ui-mode-switcher', 'web-ui-mode-switcher'],
+    ['ui-chat-recovery', 'web-ui-chat-recovery'],
+    ['desktop-launcher', 'web-ui-desktop-launcher'],
+    ['describe-image', 'web-ui-describe-image'],
+    ['liangshen', 'web-ui-liangshen'],
+    ['remote-web-ui', 'web-ui-remote-web-ui'],
+    ['ui-plugin-manager', 'web-ui-plugin-manager'],
+    ['ui-community-plugins', 'web-ui-community-plugins'],
+    ['ui-skin-center', 'web-ui-skin-center'],
+  ]) {
+    const saved = `- id: ${previous}\n  disabled: true\n  config:\n    retainedOption: preserved\n`
+    const merged = mergeDesktopPatch(saved)
+    const rows = parse(merged)
+    const override = rows.findLast(row => row.id === current)
+    assert.equal(override?.disabled, true, previous)
+    assert.deepEqual(override?.config, { retainedOption: 'preserved' }, previous)
+    assert.deepEqual(rows.filter(row => row.id === previous), previous === 'ui-plugin-manager'
+      ? [{ id: 'ui-plugin-manager', name: '@deepseek-ai/dsh-client-ui-plugin-manager' }]
+      : [], previous)
+    assert.equal(mergeDesktopPatch(merged), merged, previous)
+  }
+})
+
+test('candidate native plugin-manager mounts migrate to the existing official entry without losing options', () => {
+  for (const sibling of ['', "    - id: retained-community\n      name: '@community/retained'\n"]) {
+    const source = "- insert:\n    - id: ui-plugin-manager-native-desktop\n      name: '@deepseek-ai/dsh-client-ui-plugin-manager'\n      disabled: true\n      config:\n        preserved: !!js process.env.DSH_RETAINED_OPTION\n" + sibling
+    const merged = mergeDesktopPatch(source)
+    const rows = parse(merged)
+    assert.equal(rows.some(row => row.insert?.some(entry => entry.id === 'ui-plugin-manager-native-desktop')), false)
+    const override = rows.findLast(row => row.id === 'ui-plugin-manager')
+    assert.equal(override.name, '@deepseek-ai/dsh-client-ui-plugin-manager')
+    assert.equal(override.disabled, true)
+    assert.equal(override.config.preserved, 'process.env.DSH_RETAINED_OPTION')
+    assert.match(merged, /preserved: !!js process\.env\.DSH_RETAINED_OPTION/u)
+    assert.equal(rows.some(row => row.insert?.some(entry => entry.id === 'retained-community')), Boolean(sibling))
+    assert.equal(mergeDesktopPatch(merged), merged)
+  }
+})
+
+test('4.1 user disable overrides for reused aggregate row IDs remain later than Desktop defaults', () => {
+  const existing = '- id: web-ui-liangshen\n  disabled: true\n- id: web-ui-ssh\n  disabled: true\n- id: ui-task-board\n  disabled: true\n- id: ui-git-graph\n  disabled: true\n- id: pet\n  disabled: true\n'
+  const rows = parse(mergeDesktopPatch(existing))
+  for (const id of ['web-ui-liangshen']) {
+    assert.deepEqual(rows.filter(row => row.id === id).map(row => row.disabled), [false, true])
+  }
+  assert.deepEqual(rows.filter(row => row.id === 'web-ui-ssh').map(row => row.disabled), [true])
+  assert.deepEqual(rows.filter(row => row.id === 'ssh').map(row => row.disabled), [true])
+  for (const id of ['ui-task-board', 'ui-git-graph', 'pet']) {
+    const mountedAt = rows.findIndex(row => row.insert?.some(insert => insert.id === id))
+    const disabledAt = rows.findIndex(row => row.id === id && row.disabled === true)
+    assert.ok(mountedAt >= 0 && disabledAt > mountedAt, `${id} must retain the 4.1 user disable override`)
+  }
+})
+
+test('4.1 SSH enable and config move to the preserved Desktop SSH row without re-enabling the upstream client', () => {
+  const rows = parse(mergeDesktopPatch('- id: web-ui-ssh\n  disabled: false\n  config:\n    announceToAgent: false\n'))
+  assert.deepEqual(rows.filter(row => row.id === 'web-ui-ssh').map(row => row.disabled), [true])
+  assert.deepEqual(rows.filter(row => row.id === 'ssh' && row.disabled === false).map(row => row.config), [
+    { announceToAgent: false },
+  ])
+})
+
+
+test('Chat Recovery registers a stable rc.2 turn-tail list entry', () => {
+  const root = resolveRuntimePackages().get('@linxin666/dsh-chat-recovery')
+  const client = readFileSync(join(root, 'lib/client.js'), 'utf8')
+  assert.match(client,
+    /ctx\.slots\.register\(\{\s*name: "conversation\.chat\.turnTail",\s*id: "chat-recovery"/u)
+})
+
 test('Desktop aggregate ships the current conversation navigator build', async () => {
   const root = resolveRuntimePackages(['@linxin666/dsh-web-ui-all']).get('@linxin666/dsh-web-ui-all')
   const shipped = readFileSync(join(root, 'lib/client.js'), 'utf8').replaceAll('\r\n', '\n')
@@ -218,6 +384,9 @@ test('builtins mode uses the same Home but a separate profile with no user bundl
     assert.deepEqual(builtins.manifest.dependencies, {})
     assert.deepEqual(builtins.manifest.dsh.profile.bundles, BUILTIN_BUNDLES)
     assert.equal('userField' in builtins.manifest, false)
+    const workspace = await readFile(join(builtins.profileDir, 'pnpm-workspace.yaml'), 'utf8')
+    assert.match(workspace, /nodeLinker:\s*hoisted/u)
+    assert.doesNotMatch(workspace, /nodeLinker:\s*isolated/u)
     assert.deepEqual(JSON.parse(await readFile(join(fullProfileDir, 'package.json'), 'utf8')), original)
   } finally {
     await rm(dshHome, { recursive: true, force: true })
@@ -947,7 +1116,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
 
     await writeFile(join(dshHome, 'cordis.patch.yml'), '# legacy placeholder\n{}\n')
     await writeFile(join(profileDir, 'cordis.patch.yml'), '{}\n')
-    await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome, packageRoots: resolveRuntimePackages() })
 
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), '[]\n')
     const profilePatch = await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')
@@ -965,7 +1134,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
     assert.equal(composed.status, 0, composed.stderr)
 
     await writeFile(join(dshHome, 'cordis.patch.yml'), 'plugin: retained\n')
-    await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome, packageRoots: resolveRuntimePackages() })
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), 'plugin: retained\n')
   } finally {
     await rm(root, { recursive: true, force: true })
@@ -975,7 +1144,7 @@ test('profile bootstrap repairs semantically empty patch documents without repla
 test('profile bootstrap leaves a missing root patch absent when the pinned runtime succeeds without it', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-missing-root-patch-'))
   try {
-    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    await ensureDesktopProfile({ dshHome: root, packageRoots: resolveRuntimePackages() })
     await assert.rejects(
       readFile(join(root, 'cordis.patch.yml'), 'utf8'),
       (error) => error?.code === 'ENOENT',
@@ -1086,28 +1255,38 @@ test('runtime resolver finds every bundled and desktop support package', async (
     '@deepseek-ai/dsh-host-webserver',
     '@deepseek-ai/dsh-llm',
     '@deepseek-ai/dsh-llm-deepseek',
-    '@deepseek-ai/dsh-ptc-runtime',
     '@deepseek-ai/dsh-session',
     '@deepseek-ai/dsh-session-persistence',
     '@deepseek-ai/dsh-workspace',
   ])
+  assert.equal(DSH_BOOT_RUNTIME_PACKAGES.includes('@deepseek-ai/dsh-ptc-runtime'), true)
 
-  const aggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'package.json'), 'utf8'))
-  const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'cordis.patch.yml'), 'utf8')
+  const aggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-all'), 'package.json'), 'utf8'))
+  const liangshen = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-liangshen'), 'package.json'), 'utf8'))
+  const rollbackAggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'package.json'), 'utf8'))
+  const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-all'), 'cordis.patch.yml'), 'utf8')
+  assert.equal(aggregate.version, '0.4.4')
+  assert.equal(liangshen.version, '0.1.15', 'the active Liangshen row uses the Desktop rc.2 preset adaptation')
+  assert.match(resolved.get('@linxin666/dsh-liangshen'), /packages[\\/]dsh-liangshen$/u)
+  assert.equal(rollbackAggregate.version, '0.1.15', 'the retained Desktop compatibility client must use the workspace build')
+  assert.match(resolved.get('@linxin666/dsh-web-ui-all'), /packages[\\/]dsh-web-ui-all$/u)
   assert.match(
-    aggregatePatch,
-    /- id: ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u,
-    'the published aggregate must mount the Desktop-owned mode switcher',
+    DESKTOP_PATCH_CONFIG,
+    /- id: web-ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u,
+    'the Desktop profile must mount the Desktop-owned mode switcher',
   )
   assert.match(
     aggregatePatch,
-    /- id: ui-community-plugins\s+name: '@linxin666\/dsh-client-ui-community-plugins'/u,
+    /- id: web-ui-community-plugins\s+name: '@linxin666\/dsh-client-ui-community-plugins'/u,
     'the aggregate keeps the community plugin index available',
   )
   assert.deepEqual(DESKTOP_RUNTIME_OVERRIDE_PACKAGES, [
     '@linxin666/dsh-client-ui-web-ui-settings',
+    '@linxin666/dsh-liangshen',
     '@linxin666/dsh-live-stats',
     '@linxin666/dsh-remote-web-ui',
+    '@linxin666/dsh-skins',
+    '@linxin666/dsh-web-ui-all',
   ])
   assert.deepEqual(DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES, [
     '@linxin666/dsh-client-ui-aionui-panel',
@@ -1154,12 +1333,17 @@ test('runtime resolver finds every bundled and desktop support package', async (
     assert.equal(manifest.version, /^\d+\.\d+\.\d+/.test(declaredVersion ?? '') ? declaredVersion : aggregate.version, `${packageName} did not resolve from the aggregate release`)
   }
   const reviewedPublicVersions = {
+    '@linxin666/dsh-chat-recovery': '0.3.5',
     '@linxin666/dsh-pet': '0.4.4',
     '@linxin666/dsh-client-ui-skin-center': '0.4.4',
+    '@linxin666/dsh-client-ui-model-capabilities': '0.4.4',
     '@linxin666/dsh-client-ui-plugin-manager': '0.4.4',
     '@linxin666/dsh-client-ui-skill-explorer': '0.4.4',
     '@linxin666/dsh-desktop-launcher': '0.3.13',
   }
+  const skinManifest = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-skins'), 'package.json'), 'utf8'))
+  assert.equal(skinManifest.version, '0.1.15')
+  assert.match(resolved.get('@linxin666/dsh-skins'), /packages[\\/]dsh-skins$/u)
   assert.deepEqual(DESKTOP_PUBLISHED_OVERRIDE_PACKAGES, Object.keys(reviewedPublicVersions).toSorted())
   for (const [name, version] of Object.entries(reviewedPublicVersions)) {
     const manifest = JSON.parse(readFileSync(join(resolved.get(name), 'package.json'), 'utf8'))
@@ -1235,17 +1419,17 @@ test('desktop runtime launcher composes the isolated desktop profile', async () 
     )
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /- id: ui-task-board/)
-    assert.equal(result.stdout.match(/- id: ui-mode-switcher/gu)?.length, 1)
-    assert.match(result.stdout, /- id: ui-plugin-manager/)
-    assert.equal(result.stdout.match(/- id: ui-plugin-manager-native-desktop/gu)?.length, 1)
-    assert.match(result.stdout, /- id: ui-plugin-manager-native-desktop\s*\n\s*name: ["']@deepseek-ai\/dsh-client-ui-plugin-manager["']/u)
-    assert.match(result.stdout, /- id: ui-plugin-manager\s*\n\s*name: ["']@linxin666\/dsh-client-ui-plugin-manager["']/u)
+    assert.equal(result.stdout.match(/- id: web-ui-mode-switcher/gu)?.length, 1)
+    assert.match(result.stdout, /- id: web-ui-plugin-manager/)
+    assert.equal(result.stdout.match(/name: ["']@deepseek-ai\/dsh-client-ui-plugin-manager["']/gu)?.length, 1)
+    assert.match(result.stdout, /- id: ui-plugin-manager\s*\n\s*name: ["']@deepseek-ai\/dsh-client-ui-plugin-manager["']/u)
+    assert.match(result.stdout, /- id: web-ui-plugin-manager\s*\n\s*name: ["']@linxin666\/dsh-web-all\/plugin-manager["']/u)
     assert.match(result.stdout, /- id: ui-skill-explorer/)
     assert.match(result.stdout, /- id: better-sidebar/)
     assert.doesNotMatch(result.stdout, /- id: web-ui-better-sidebar/u)
-    assert.match(result.stdout, /- id: ui-skin-center/)
+    assert.match(result.stdout, /- id: web-ui-skin-center/)
     assert.match(result.stdout, /- id: pet/)
-    assert.match(result.stdout, /- id: remote-web-ui/)
+    assert.match(result.stdout, /- id: web-ui-remote-web-ui/)
     assert.match(result.stdout, /- id: live-stats/)
     assert.match(result.stdout, /directory-picker-desktop-host/)
     assert.match(result.stdout, /dsh-host-directory-picker-browse/)

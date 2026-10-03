@@ -13,7 +13,8 @@ Value Mode (性价比模式) V2 plugin for DeepSeek Harness (DSH): uses an exper
   - **Saver (更省)**: Prefer direct controller work; delegate only when a task is clearly split or benefits from parallelism.
   - **Balanced (智能平衡 - Default)**: Delegate complex design, difficult issues, and important changes as needed, then review centrally.
   - **Powerful (更强)**: Delegate parallel subtasks proactively while the controller owns review and risk decisions.
-- `subagent` and `subagent_fork` entry points are capped at depth 1; worker agents complete bounded tasks and do not delegate again or call the expert.
+- Normal mode keeps `subagent` and `subagent_fork` at depth 1. When Agent Team is enabled, the official Team Profile switches delegation to `spawn_teammate` and the shared task board. Worker agents complete bounded tasks and do not delegate again or call the expert.
+- Workflow execution uses the official `0.2.0-rc.2` PTC Runtime with its sandbox, cancellation and cleanup contracts.
 - `consult_expert` and `ManualExpertToggle` remain compatibility exports, but are no longer used as the primary route or registered as duplicate visible buttons.
 - V2 Session-Scoped Overrides: Supports tuning strategy or expert controller for the active session without mutating global defaults.
 - V2 Call Analytics: Real-time tracking of expert-controller and subagent-worker calls, token usage, and worker call share.

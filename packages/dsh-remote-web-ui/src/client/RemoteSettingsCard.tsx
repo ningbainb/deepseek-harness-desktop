@@ -129,7 +129,7 @@ export type RemoteSettingsCardProps =
  */
 export function RemoteSettingsCard(props: RemoteSettingsCardProps) {
   const { t } = props
-  const state = props.useRemoteSettingsCard(snapshot => snapshot)
+  const state = props.useRemoteSettingsCard((snapshot: RemoteSettingsCardState) => snapshot)
   const disabled = !state.writable
   const fieldProps = {
     overriddenLabel: t('settings.overridden'),

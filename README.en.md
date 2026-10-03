@@ -1,5 +1,7 @@
 # DeepSeek Harness Desktop
 
+<p align="center"><img src="docs/brand/app-icon.png" width="160" alt="DeepSeek Harness Desktop application icon"></p>
+
 [中文](README.md) | English
 
 > **Maintained by ningbai牛逼**: If DeepSeek Harness Desktop helps you, consider [supporting ningbai牛逼 on Afdian](https://www.ifdian.net/a/ningbai). Your support helps fund servers, testing, and continued maintenance.
@@ -7,8 +9,6 @@
 > Scan to support the project:
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="Afdian sponsorship QR code"></a>
-
-![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
 ## DeepSeek Harness Desktop Community
 
@@ -32,25 +32,50 @@ Join the community to discuss:
 
 ---
 
-**DeepSeek Harness Desktop** is a community-maintained, open-source Windows AI coding client.
+**DeepSeek Harness Desktop** is a community-maintained, open-source AI coding desktop client.
 
 DeepSeek has not yet released a standalone official Desktop product. This project already combines the public official **DSH Runtime, Web UI, and the Desktop boundaries visible in the official repository** into an installable Windows application, then adds community plugins, Skills, task automation, Git, remote development, and desktop integration. It is not an official DeepSeek client and does not reuse or overwrite a future official Desktop identity, data directory, protocol, or update feed.
 
-Supports **Windows 10 / 11 x64** and is released under the **BSD-3-Clause** license.
+Supports **Windows 10 / 11 x64**, with **macOS Apple Silicon arm64 Preview** and **Linux x64 Preview** builds. It is released under the **BSD-3-Clause** license.
 
-The installer includes the main runtime components, so you do not need to separately configure Node.js, Git, or DSH.
+Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git operations require system Git.
 
 [Product Site](https://ningbainb.github.io/deepseek-harness-desktop/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
-### 4.0.0: stable release
+### 5.0.0: reliable upgrades, one version across three platforms
 
-The current public stable release is 4.0.0 and has completed the standard-edition release gates.
+5.0.0 pins the official NPM DSH `0.2.0-rc.2` and uses the public `dsh-web-all@0.4.4` carrier with Desktop-owned adaptations, without changing official source. Windows x64, macOS arm64 and Linux x64 target the same release. Release acceptance is still in progress: every native platform test, package and asset check must pass before publication. The actual GitHub Release and its SHA-256 checksums are authoritative.
 
-- **Official Desktop capabilities integrated early**: exact-pinned public DSH 0.1.5-rc.2 Runtime and split SDK packages are integrated against the official repository's Desktop boundaries, while the community app keeps an independent identity and update path.
-- **Reliable upgrades from 3.5**: legacy plugins are discovered read-only and restored by exact version; broken history projections degrade without blocking transcripts; pet settings, repeated local `.tgz` installs, and Git marketplace failure categories are fixed.
-- **Discoverable model collaboration**: the session sidebar links directly to one collaboration page for Agent Team and Value Mode; bai is consistently promoted in related model pickers.
-- **Unified Skills and desktop behavior**: Skill Center and the conversation skill menu share the same DSH Home; expanding the bottom panel no longer starts a terminal implicitly, and window controls plus hidden-console behavior have regression coverage.
-- **More useful, still minimal metrics**: fixed-result events cover Skills, Agent Team, and local-LAN outcomes, while conversation-import entry and plugin operations retain coarse signals. No conversations, prompts, file contents, paths, model names, token counts, or credentials are collected. See the [privacy policy](PRIVACY.md).
+- **Reliable conversations**: authenticated fragmentation carries long histories and tool results across A-to-B-to-A navigation and restart. Limits fail explicitly; history is neither silently truncated nor automatically uploaded.
+- **Protected upgrades**: overlay installation uses transactional backup and rollback. Old and newly added providers, plugin configuration and user disable choices survive Profile refresh; plugin detail options, Skills and usage navigation remain available.
+- **Simpler model access**: bai authorization prefers `deepseek-flash` from the real directory and refreshes that directory periodically. Missing authorization or rejected keys offer browser sign-in, without automatic top-ups, paid calls or message retries. Independent third-party APIs remain supported.
+- **Preserved workbench**: Task Board, Git, file delivery, model collaboration, pets, 15 skins, SSH and remote access remain available, alongside the restored 4.4.0 branding icon.
+- **Clear terminal and control boundaries**: PowerShell, PowerShell 7, WSL and CMD remain selectable. Agent WSL requires separate approval; Browser Use and Computer Use default off and restore configuration after failed transitions.
+- **Three platforms and privacy**: native Runners validate each platform independently. Packages are unsigned and macOS is unnotarized. Official packages include anonymous usage metrics, never conversations, code, paths, screenshots or credentials; development and test builds remain disconnected.
+
+[Upstream sync ledger](docs/upstream-web-sync.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md) · [5.0.0 release notes](docs/launch/release-notes.md)
+
+These are isolated 5.0.0 Windows runtime captures, not macOS or Linux acceptance. Dock configuration images combine the real window and embedded WebContents captures without injecting user data.
+
+| Main window | Extension Dock plugins |
+| --- | --- |
+| ![5.0.0 Windows main window](docs/screenshots/desktop-5.0.0/main.png) | ![5.0.0 Windows plugin center](docs/screenshots/desktop-5.0.0/plugins.png) |
+| Model access and bai authorization | Skills and shared discovery |
+| ![5.0.0 Windows model access](docs/screenshots/desktop-5.0.0/bai-models.png) | ![5.0.0 Windows Skills](docs/screenshots/desktop-5.0.0/skills.png) |
+
+### 4.1.0: let DeepSeek control the browser and computer
+
+4.1.0 introduced Smart Control. Windows x64 is stable; macOS arm64 and Linux x64 are Preview builds. One GitHub Release is created only after all three platform jobs pass.
+
+- **Browser Use** defaults to the official Playwright MCP in a visible, isolated system-browser session and discovers Chrome, Edge, or Chromium. Clicks, typing, uploads, and downloads remain approval-gated.
+- **Computer Use** defaults to the bundled Cua Driver Native provider, with an external MCP fallback. Observation is separated from per-action approval, and repeated native startup failure recovers through safe mode.
+- **Breaking DSH 0.1.6 compatibility** exact-pins `@deepseek-ai/dsh@0.1.6-alpha.1` and adapts Agent, Session, PTC, Workflow, Sandbox, and Agent Team contracts.
+- **Transactional 3.5/4.0 migration** preserves sessions and long context, workspaces, models, credential references, Skills, plugins, themes, pet settings, and collaboration settings, with backup and rollback.
+- **Privacy-bounded metrics** use only fixed outcome vocabularies and exclude URLs, domains, window names, screenshots, prompts, tool arguments, paths, and credentials.
+
+[Smart Control guide](docs/smart-control.md) · [Full 4.1.0 release notes](docs/launch/release-notes.md)
+
+![DeepSeek Harness Desktop 4.1.0 Smart Control Center](docs/screenshots/desktop-4.1.0/control-center.png)
 
 ![DeepSeek Harness Desktop 4.0.0 model collaboration](docs/screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
 
@@ -89,7 +114,7 @@ The chat picker, model settings, and collaboration controller/worker pickers sha
 
 ![DeepSeek Harness Desktop 4.0.0 bai model access](docs/screenshots/desktop-4.0.0-rc.3/bai-models.png)
 
-See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [4.0 release notes](docs/launch/release-notes.md) for the implementation boundaries.
+See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [4.1 release notes](docs/launch/release-notes.md) for the implementation boundaries.
 
 ## Why DeepSeek Harness Desktop
 

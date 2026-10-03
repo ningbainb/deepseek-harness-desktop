@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { AutomaticRepairRunner } from '../src/automatic-repair-runner.mjs'
+
+const FIXTURE_HOME = resolve('test-fixtures', 'repair-home')
+const FIXTURE_PROFILE = join(FIXTURE_HOME, 'profiles', 'desktop')
+const FIXTURE_INCIDENTS = resolve('test-fixtures', 'repair-incidents')
+const FIXTURE_STAGING = resolve('test-fixtures', 'repair-staging')
 
 function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, status: 'verified' } } = {}) {
   const calls = []
   const writeJobInputs = []
   const incident = { fingerprint: 'a'.repeat(64) }
   const incidentStore = {
-    incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint,
+    incidentDirectory: () => join(FIXTURE_INCIDENTS, incident.fingerprint),
     async claim(input) { calls.push(['claim', input]); return { claimed: true, incident } },
     async transition(fingerprint, state, detail) { calls.push(['transition', state, detail]) },
     async recordModelAttempt(fingerprint, attempt) { calls.push(['model', attempt.outcome]) },
@@ -19,11 +25,11 @@ function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, s
     async stage() {
       calls.push(['stage'])
       this.phase = 'staged'
-      return { workspace: 'C:\\incident\\staging', roots: [{ id: 'profile', kind: 'profile', relativePath: 'profile' }] }
+      return { workspace: FIXTURE_STAGING, roots: [{ id: 'profile', kind: 'profile', relativePath: 'profile' }] }
     },
     async verify(check) {
       calls.push(['verify-transaction'])
-      const result = await check({ workspace: 'C:\\incident\\staging', changedFiles: [{ path: 'profile/cordis.patch.yml' }] })
+      const result = await check({ workspace: FIXTURE_STAGING, changedFiles: [{ path: 'profile/cordis.patch.yml' }] })
       if (result?.ok === false) throw new Error('candidate verification failed')
       this.phase = 'verified'
     },
@@ -35,18 +41,18 @@ function fixture({ modelStatus = 'candidate-ready', verification = { ok: true, s
     incidentStore,
     desktopVersion: '3.0.2',
     runtimeVersion: '0.1.1-rc.1',
-    profileDir: 'C:\\home\\profiles\\desktop',
+    profileDir: FIXTURE_PROFILE,
     builtInBundles: ['@builtin/core'],
     resolveRoots: async () => ({
-      roots: [{ id: 'profile', kind: 'profile', path: 'C:\\home\\profiles\\desktop' }],
+      roots: [{ id: 'profile', kind: 'profile', path: FIXTURE_PROFILE }],
       bundles: [{ name: '@user/plugin', version: '1.0.0', enabled: true }],
     }),
     createTransaction: async () => transaction,
     writeJob: async (input) => {
       writeJobInputs.push(input)
       return {
-      jobPath: 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint + '\\job.json',
-      resultPath: 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint + '\\result.json',
+      jobPath: join(FIXTURE_INCIDENTS, incident.fingerprint, 'job.json'),
+      resultPath: join(FIXTURE_INCIDENTS, incident.fingerprint, 'result.json'),
       }
     },
     repairRuntime: {
@@ -144,7 +150,7 @@ test('an unresolvable profile manifest records a dedicated incident instead of e
   const calls = []
   const incident = { fingerprint: 'b'.repeat(64) }
   const incidentStore = {
-    incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\' + incident.fingerprint,
+    incidentDirectory: () => join(FIXTURE_INCIDENTS, incident.fingerprint),
     async claim(input) { calls.push(['claim', input]); return { claimed: true, incident } },
     async transition(fingerprint, state, detail) { calls.push(['transition', state, detail]) },
   }
@@ -152,7 +158,7 @@ test('an unresolvable profile manifest records a dedicated incident instead of e
     incidentStore,
     desktopVersion: '3.0.9',
     runtimeVersion: '0.1.1-rc.1',
-    profileDir: 'C:\\home\\profiles\\desktop',
+    profileDir: FIXTURE_PROFILE,
     builtInBundles: ['@builtin/core'],
     resolveRoots: async () => {
       throw new Error('repair profile manifest is unreadable')
@@ -174,13 +180,13 @@ test('an unresolvable profile manifest records a dedicated incident instead of e
 test('a claimed-but-unwritable incident store still reports the unresolved profile deterministically', async () => {
   const runner = new AutomaticRepairRunner({
     incidentStore: {
-      incidentDirectory: () => 'C:\\user-data\\repair-agent\\incidents\\x',
+      incidentDirectory: () => join(FIXTURE_INCIDENTS, 'x'),
       async claim() { throw new Error('incident directory is not writable') },
       transition: async () => {},
     },
     desktopVersion: '3.0.9',
     runtimeVersion: '0.1.1-rc.1',
-    profileDir: 'C:\\home\\profiles\\desktop',
+    profileDir: FIXTURE_PROFILE,
     builtInBundles: [],
     resolveRoots: async () => { throw new Error('unreadable manifest') },
     createTransaction: async () => ({}),

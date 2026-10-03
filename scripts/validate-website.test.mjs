@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
-import { collectDiscoveryErrors, collectPrivacyErrors, collectWebsiteErrors, collectWebsiteScriptErrors } from './validate-website.mjs'
-import { sumInstallerDownloads } from '../website/release-stats.mjs'
+import { collectDiscoveryErrors, collectPrivacyErrors, collectWebsiteErrors, collectWebsiteScriptErrors, resolveWebsiteVersion } from './validate-website.mjs'
+import { resolvePlatformDownloads, sumInstallerDownloads } from '../website/release-stats.mjs'
 
 const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
 const privacyPath = resolve(import.meta.dirname, '..', 'website', 'privacy.html')
@@ -14,7 +14,33 @@ const desktopPackage = JSON.parse(await readFile(desktopPackagePath, 'utf8'))
 const desktopVersion = desktopPackage.version
 const websiteHtml = await readFile(websitePath, 'utf8')
 const publishedVersion = /<html\b[^>]*\bdata-release-version=["'](\d+\.\d+\.\d+)["']/iu.exec(websiteHtml)?.[1]
-const expectedWebsiteVersion = desktopVersion.includes('-') ? publishedVersion : desktopVersion
+const expectedWebsiteVersion = resolveWebsiteVersion(desktopVersion, publishedVersion)
+
+test('each platform resolves only its same-version installer and never another platform or blockmap', () => {
+  const names = ['DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe', 'DeepSeek-Harness-Desktop-5.0.0-arm64.dmg', 'DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage']
+  const release = { tag_name: 'desktop-v5.0.0', html_url: 'https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0',
+    assets: names.map(name => ({ name, browser_download_url: `https://example.com/${name}` })) }
+  assert.deepEqual(resolvePlatformDownloads(release), {
+    'windows-x64': release.assets[0].browser_download_url,
+    'macos-arm64': release.assets[1].browser_download_url,
+    'linux-x64': release.assets[2].browser_download_url,
+  })
+  release.assets = [release.assets[0], { name: 'DeepSeek-Harness-Desktop-4.4.0-arm64.dmg', browser_download_url: 'https://example.com/stale.dmg' },
+    { name: 'DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage.blockmap', browser_download_url: 'https://example.com/intermediate' }]
+  assert.deepEqual(resolvePlatformDownloads(release), {
+    'windows-x64': release.assets[0].browser_download_url,
+    'macos-arm64': release.html_url,
+    'linux-x64': release.html_url,
+  })
+  assert.deepEqual(resolvePlatformDownloads({ ...release, assets: null }), Object.fromEntries(['windows-x64', 'macos-arm64', 'linux-x64'].map(platform => [platform, release.html_url])))
+})
+
+test('unreleased desktop candidates keep the public site on the last published installer', () => {
+  assert.equal(resolveWebsiteVersion('4.2.0', '4.1.0'), '4.1.0')
+  assert.equal(resolveWebsiteVersion('4.2.0-rc.1', '4.1.0'), '4.1.0')
+  assert.throws(() => resolveWebsiteVersion('4.1.0', '4.2.0'), /newer than desktop/u)
+  assert.throws(() => resolveWebsiteVersion('4.2.0', undefined), /data-release-version/u)
+})
 
 test('privacy page states anonymous retention analytics and user-confirmed diagnostics boundaries', async () => {
   const html = await readFile(privacyPath, 'utf8')

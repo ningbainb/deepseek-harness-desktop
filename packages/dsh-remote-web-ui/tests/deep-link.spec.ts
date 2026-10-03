@@ -107,7 +107,11 @@ describe('runPairBootFlow', () => {
             list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-7' }] }) },
           }
         }
-        if (name === 'uiWorkspace') return { openWorkspace: async (id: string) => { opened.push(id) } }
+        if (name === 'uiWorkspace') {
+          return {
+            openWorkspace: async (workspaceId: string) => { opened.push(workspaceId) },
+          }
+        }
         return undefined
       },
     }
@@ -127,7 +131,11 @@ describe('runPairBootFlow', () => {
             list: { getSnapshot: () => ({ items }) },
           }
         }
-        if (name === 'uiWorkspace') return { openWorkspace: async (id: string) => { opened.push(id) } }
+        if (name === 'uiWorkspace') {
+          return {
+            openWorkspace: async (workspaceId: string) => { opened.push(workspaceId) },
+          }
+        }
         return undefined
       },
     }

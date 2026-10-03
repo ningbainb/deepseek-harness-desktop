@@ -88,17 +88,18 @@ jobs:
         working-directory: apps/dsh-desktop/dist
         run: |
           set -euo pipefail
+          version="$(node -p "require('../package.json').version")"
           shasum -a 256 \
-            DeepSeek-Harness-Desktop-4.0.0-arm64.dmg \
-            DeepSeek-Harness-Desktop-4.0.0-arm64.zip \
+            "DeepSeek-Harness-Desktop-${version}-arm64.dmg" \
+            "DeepSeek-Harness-Desktop-${version}-arm64.zip" \
             > SHA256SUMS-macos.txt
           shasum -a 256 -c SHA256SUMS-macos.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: DeepSeek-Harness-Desktop-4.0.0-macos-arm64-preview
+          name: DeepSeek-Harness-Desktop-macos-arm64-preview
           if-no-files-found: error
           retention-days: 14
           path: |
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-arm64.dmg
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-arm64.zip
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.dmg
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.zip
             apps/dsh-desktop/dist/SHA256SUMS-macos.txt

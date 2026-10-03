@@ -27,6 +27,7 @@ import {
   RUNTIME_PIPE_TOKEN_ENV,
 } from './runtime-pipe.mjs'
 import { mergeDesktopPipeCookies } from './runtime-cookie.mjs'
+import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { consumeRuntimeShutdownControl, listenRuntimeShutdownControl } from './runtime-shutdown-control.mjs'
 import { createRuntimeEventStreamDrain } from './runtime-stream-drain.mjs'
 import { createRuntimeStartupTiming } from './runtime-startup-timing.mjs'
@@ -122,11 +123,15 @@ function createDesktopPipeFetch(ctx, accountCallbackOrigin) {
     headers.set('cookie', mergeDesktopPipeCookies(browserCookie, sourceCookie))
     const request = new Request(sourceRequest, { headers })
     const url = new URL(request.url)
+    const localPath = desktopLocalPath(url.pathname)
+    const redirected = localPath !== url.pathname
+    if (redirected) url.pathname = localPath
+    const localRequest = redirected ? new Request(url, request) : request
     const route = ctx.webServer.match(url.pathname)
-    if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(request)
-    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return api.fetch(request)
-    if (url.pathname === '/plugins' || url.pathname.startsWith('/plugins/')) return ctx.clientModules.fetchBundle(request)
-    if (route !== undefined) return ctx.webServer.fetch(request)
+    if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(localRequest)
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return api.fetch(localRequest)
+    if (url.pathname === '/plugins' || url.pathname.startsWith('/plugins/')) return ctx.clientModules.fetchBundle(localRequest)
+    if (route !== undefined) return ctx.webServer.fetch(localRequest)
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('method not allowed', { status: 405 })
 
     const requested = url.pathname === '/' ? indexPath : safeFrontendPath(dist, url.pathname)

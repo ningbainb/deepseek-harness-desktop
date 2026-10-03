@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
 const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = packagedExecutable ? 120_000 : 60_000
+const runtimeReadyTimeoutMs = 120_000
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-conversation-skills-e2e-'))
 const dshHome = resolve(temporary, 'dsh-home')
 const agentsHome = resolve(temporary, 'agents-home')
@@ -52,6 +53,9 @@ try {
   await mkdir(workspacePath, { recursive: true })
   await writeFile(resolve(skillRoot, 'SKILL.md'), `---\nname: ${skillName}\ndescription: Conversation skill menu release check\n---\n\n# Instructions\n`, 'utf8')
   await writeFile(resolve(sharedSkillRoot, 'SKILL.md'), `---\nname: ${sharedSkillName}\ndescription: Isolated shared skill menu release check\n---\n\n# Instructions\n`, 'utf8')
+  const userData = resolve(temporary, 'user-data')
+  await mkdir(userData, { recursive: true })
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }), 'utf8')
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
@@ -59,7 +63,7 @@ try {
     env: {
       ...process.env,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
-      DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
+      DSH_DESKTOP_USER_DATA: userData,
       DSH_HOME: dshHome,
       DSH_AGENTS_HOME: agentsHome,
     },
@@ -90,7 +94,7 @@ try {
   await newSession.waitFor({ state: 'attached', timeout: 20_000 })
   await newSession.dispatchEvent('click')
   await page.locator('[data-composer-card="true"] [role="textbox"][contenteditable]:not([contenteditable="false"])').waitFor({ state: 'visible' })
-  const commandButton = page.getByRole('button', { name: /^(?:指令|命令|Commands|添加文件或调用指令|Add files or run commands)$/u })
+  const commandButton = page.getByRole('button', { name: /^(?:指令|命令|Commands|添加文件或调用指令|Add files or invoke commands|添加文件或运行命令|Add files or run commands)$/u })
   const skillsButton = page.getByRole('button', { name: '技能库' })
   await skillsButton.waitFor({ state: 'visible' })
   const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
@@ -157,9 +161,12 @@ try {
 
   await skillsButton.click()
   await search.fill('')
+  const optionCount = await listbox.getByRole('option').count()
+  assert.ok(optionCount >= 1)
+  const keyboardSelection = optionCount > 1 ? 1 : 0
   await page.keyboard.press('ArrowDown')
-  assert.equal(await listbox.getByRole('option').nth(1).getAttribute('aria-selected'), 'true')
-  const selectedName = (await listbox.getByRole('option').nth(1).locator('strong').textContent())?.trim()
+  assert.equal(await listbox.getByRole('option').nth(keyboardSelection).getAttribute('aria-selected'), 'true')
+  const selectedName = (await listbox.getByRole('option').nth(keyboardSelection).locator('strong').textContent())?.trim()
   assert.ok(selectedName)
   await page.keyboard.press('Enter')
   await menu.waitFor({ state: 'hidden' })
@@ -183,12 +190,39 @@ try {
   await page.getByText(/^(?:探索未至之境|Into the Unknown)$/u).dispatchEvent('click')
   await menu.waitFor({ state: 'hidden' })
   assert.equal(await skillsButton.getAttribute('aria-expanded'), 'false')
+  await skillsButton.click()
+  await menu.waitFor({ state: 'visible' })
+  const recentGrouping = await listbox.evaluate((root, recentName) => {
+    const children = [...root.children]
+    const recentLabel = children.findIndex((child) => child.textContent?.trim() === '最近使用')
+    const allLabel = children.findIndex((child) => child.textContent?.trim() === '全部技能')
+    const matchingOptions = children.filter((child) =>
+      child.getAttribute('role') === 'option'
+      && child.querySelector('strong')?.textContent?.trim() === recentName)
+    return { recentLabel, allLabel, matchingOptions: matchingOptions.length }
+  }, selectedName)
+  assert.ok(recentGrouping.recentLabel >= 0, JSON.stringify(recentGrouping))
+  assert.ok(recentGrouping.allLabel > recentGrouping.recentLabel, JSON.stringify(recentGrouping))
+  assert.equal(recentGrouping.matchingOptions, 2, JSON.stringify(recentGrouping))
   if (screenshot) {
-    await page.locator('#dsh-desktop-skills-toast').waitFor({ state: 'detached', timeout: 4_000 }).catch(() => {})
-    await skillsButton.click()
-    await menu.waitFor({ state: 'visible' })
     await page.screenshot({ path: screenshot })
   }
+  // Use the visible sidebar navigation rather than force-clicking the
+  // welcome title behind the menu, which can hit a menu option instead.
+  const skillManagementTrigger = page.getByRole('button', { name: /^(?:技能中心|Skill Center)$/u })
+  await skillManagementTrigger.waitFor({ state: 'visible' })
+  assert.equal(await skillManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'skills')
+  const dockWindowPromise = electronApp.waitForEvent('window', {
+    predicate: candidate => candidate.url().includes('extensions.html'),
+    timeout: 20_000,
+  }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
+  await skillManagementTrigger.click()
+  await menu.waitFor({ state: 'hidden' })
+  const dockWindow = await dockWindowPromise
+  assert.ok(dockWindow, 'Skill Center navigation must open Extension Dock')
+  await dockWindow.locator('#skills-tab').waitFor({ state: 'visible' })
+  await dockWindow.locator('#skills[role="tabpanel"]').waitFor({ state: 'visible' })
+  assert.equal(await dockWindow.locator('#skills-tab').getAttribute('aria-selected'), 'true')
   console.log(`verified conversation Skills menu at ${page.url()}`)
   verified = true
 } catch (error) {

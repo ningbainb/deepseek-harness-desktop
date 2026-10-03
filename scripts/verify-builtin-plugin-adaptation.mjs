@@ -65,7 +65,7 @@ export function collectAdaptationState() {
     const path = realpathSync(roots.get(name))
     return [name, { root: path, ...readJson(join(path, 'package.json')) }]
   }))
-  const aggregateRoot = roots.get('@linxin666/dsh-web-ui-all')
+  const aggregateRoot = roots.get('@linxin666/dsh-web-all')
   const aggregatePatch = parse(readFileSync(join(aggregateRoot, 'cordis.patch.yml'), 'utf8'))
   return {
     repoRoot: realpathSync(root),
@@ -86,6 +86,7 @@ export function collectAdaptationState() {
 export function validateBuiltinPluginAdaptation(manifest, state, io = {}) {
   const errors = []
   const readText = io.readText ?? (path => readFileSync(path, 'utf8'))
+  const readBytes = io.readBytes ?? readFileSync
   const pathExists = io.exists ?? existsSync
   const realpath = io.realpath ?? realpathSync
   const atRoot = path => join(state.repoRoot, path)
@@ -125,6 +126,17 @@ export function validateBuiltinPluginAdaptation(manifest, state, io = {}) {
     } else if (selection?.source === 'npm') {
       check(contained(atRoot('node_modules'), observed.root), `${name}: expected an installed npm package, resolved a different source`)
       check(state.lockPackages.includes(`${name}@${observed.version}`), `${name}: resolved npm version is absent from lockfile`)
+    } else if (selection?.source === 'vendor') {
+      const source = typeof selection.path === 'string' ? atRoot(selection.path) : ''
+      const validSource = source && contained(atRoot('vendor'), source) && selection.path.endsWith('.tgz')
+      check(validSource,
+        `${name}: vendor source must be a tarball under vendor/`)
+      check(contained(atRoot('node_modules'), observed.root), `${name}: vendored package is not installed under node_modules`)
+      check(state.lockPackages.includes(`${name}@file:${selection.path}`), `${name}: vendored tarball is absent from lockfile`)
+      if (validSource && pathExists(source)) {
+        const hash = createHash('sha256').update(readBytes(source)).digest('hex')
+        check(hash === selection.sha256, `${name}: vendored tarball hash changed`)
+      } else if (validSource) errors.push(`${name}: vendored tarball is missing`)
     } else errors.push(`${name}: unsupported source ${selection?.source}`)
 
     const key = `${name}@${observed.version}`

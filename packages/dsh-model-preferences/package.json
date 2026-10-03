@@ -37,7 +37,7 @@
   },
   "scripts": {
     "build": "tsc -b && tsdown",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --force --pretty false",
     "test": "vitest run",
     "prepare": "tsdown"
   },
@@ -83,7 +83,8 @@
     "schemastery": "^3.18.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2"
   },
   "files": [
     "lib/**/*.js",

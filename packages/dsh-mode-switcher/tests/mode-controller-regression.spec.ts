@@ -10,9 +10,9 @@ function createDeps(blank = false): ModeSwitcherDeps & { state: { current: strin
     state,
     sessions: {
       list: { getSnapshot: () => state },
+      current: () => state.current,
       open: vi.fn((id: string) => { state.current = id }),
       refresh: vi.fn(async () => {}),
-      clear: vi.fn(() => { state.current = undefined }),
       noteAgentPreset: vi.fn(),
     },
     workspaces: {
@@ -60,7 +60,6 @@ describe('ModeSwitcherController regressions', () => {
     expect(result).toBe('new')
     expect(deps.api.sessions.create).toHaveBeenCalledWith({ workspaceId: 'workspace', agentPreset: 'value-mode' })
     expect(deps.api.agentPresets.select).not.toHaveBeenCalled()
-    expect(deps.sessions.clear).toHaveBeenCalledOnce()
     expect(deps.sessions.open).toHaveBeenCalledWith('new')
   })
 

@@ -13,13 +13,14 @@ import { parseStartupTimings } from './startup-metrics.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { SECONDARY_WINDOW_PARTITION } from '../src/electron-app.mjs'
+import { DEFAULT_STARTUP_TIMEOUT_MS } from '../src/runtime-controller.mjs'
 import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
 const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = packagedExecutable || process.env.CI ? 120_000 : 60_000
+const runtimeReadyTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-window-chrome-e2e-'))
 const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
@@ -219,6 +220,7 @@ try {
   await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
   await sessionRow.dispatchEvent('click')
   await page.locator('[data-composer-card="true"]').waitFor({ state: 'visible' })
+  await page.locator('[class*="_toggleCluster"]:visible, [data-sidebar-right-panel] [data-dockkit-strip-chrome]:visible').first().waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
   const state = await page.evaluate(() => ({
     chromeCount: document.querySelectorAll('#dsh-desktop-window-chrome').length,
     chromeText: document.querySelector('#dsh-desktop-window-chrome')?.textContent,
@@ -256,12 +258,22 @@ try {
       }
     }),
     layoutCluster: (() => {
-      const cluster = document.querySelector('[class*="_toggleCluster"], [data-sidebar-right-panel] [data-dockkit-strip-chrome]')
+      const cluster = [...document.querySelectorAll('[class*="_toggleCluster"], [data-sidebar-right-panel] [data-dockkit-strip-chrome]')]
+        .find(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
       if (!cluster) return undefined
       const style = getComputedStyle(cluster)
       const rect = cluster.getBoundingClientRect()
+      const buttons = [...cluster.querySelectorAll(':scope > button')].map(button => {
+        const buttonRect = button.getBoundingClientRect()
+        return {
+          width: buttonRect.width,
+          height: buttonRect.height,
+          centerDelta: buttonRect.top + buttonRect.height / 2 - (rect.top + rect.height / 2),
+        }
+      })
       return {
-        controls: cluster.querySelectorAll(':scope > button').length,
+        controls: buttons.length,
+        buttons,
         width: rect.width,
         height: rect.height,
         padding: style.padding,
@@ -340,6 +352,9 @@ try {
   assert.equal(state.layoutCluster.borderWidth, '1px')
   assert.equal(state.layoutCluster.outlineStyle, 'none')
   assert.equal(state.layoutCluster.boxShadow, 'none')
+  assert.equal(state.layoutCluster.height, 28)
+  assert.ok(state.layoutCluster.buttons.every(button => button.width === 22 && button.height === 22), JSON.stringify(state.layoutCluster))
+  assert.ok(state.layoutCluster.buttons.every(button => Math.abs(button.centerDelta) <= 0.5), JSON.stringify(state.layoutCluster))
   assert.ok(state.rootBounds && state.rootBounds.top >= 31, `root overlaps title bar: ${JSON.stringify(state.rootBounds)}`)
   assert.ok(state.rootBounds.bottom <= viewportHeight + 1, `root exceeds safe viewport: ${JSON.stringify(state.rootBounds)}`)
   const positionedRootFrames = await page.evaluate(async () => {
@@ -604,6 +619,21 @@ try {
   assert.ok(dynamicModal.top >= 31, JSON.stringify(dynamicModal))
   assert.equal(dynamicModal.afterRemoval, false)
   assert.equal(dynamicModal.afterAria, true)
+  const compactDialog = await page.evaluate(async () => {
+    const dialog = document.createElement('section')
+    dialog.setAttribute('role', 'dialog')
+    dialog.style.cssText = 'position:fixed;left:20px;top:80px;width:320px;height:280px'
+    document.body.append(dialog)
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const result = {
+      marked: dialog.classList.contains('dsh-desktop-modal-layer'),
+      bounds: dialog.getBoundingClientRect().toJSON(),
+    }
+    dialog.remove()
+    return result
+  })
+  assert.equal(compactDialog.marked, false, JSON.stringify(compactDialog))
+  assert.ok(compactDialog.bounds.height <= 281, JSON.stringify(compactDialog))
   const nativeWindowState = await electronApp.evaluate(({ app, BrowserWindow, Menu, nativeImage }) => {
     const window = BrowserWindow.getAllWindows()[0]
     const helpMenu = Menu.getApplicationMenu()?.items.find((item) => item.label.includes('Help'))

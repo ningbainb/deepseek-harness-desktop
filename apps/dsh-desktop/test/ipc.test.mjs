@@ -370,11 +370,15 @@ test('desktop repair status degrades to unavailable when the incident store cann
   }
 })
 
-test('Extension Dock deep links accept only the collaboration page allowlist', () => {
+test('Extension Dock deep links accept only the collaboration settings and plugin-center tab allowlists', () => {
   assert.deepEqual(normalizeDesktopDockOpenOptions(undefined), {})
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'models' }), { setting: 'models' })
-  for (const value of [null, 'value-mode', { setting: 'plugins' }, { setting: 'value-mode', url: 'https://example.com' }]) {
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'usage' }), { setting: 'usage' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'market' }), { tab: 'market' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'plugins' }), { tab: 'plugins' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'skills' }), { tab: 'skills' })
+  for (const value of [null, 'value-mode', { setting: 'plugins' }, { tab: 'settings' }, { setting: 'value-mode', tab: 'market' }, { setting: 'value-mode', url: 'https://example.com' }]) {
     assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
   }
 })
@@ -537,6 +541,7 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   )
   assert.equal(await handlers.get('desktop:settings-opened')({ sender }), true)
   await handlers.get('desktop:update-check')({ sender })
+  assert.equal(await handlers.get('desktop:update-dismiss')({ sender }), false)
   assert.deepEqual(await handlers.get('desktop:update-channel-get')({ sender }), {
     channel: 'stable',
     noAutomaticDowngrade: true,

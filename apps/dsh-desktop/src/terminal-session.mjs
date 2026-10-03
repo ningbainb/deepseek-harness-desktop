@@ -6,6 +6,12 @@ const DEFAULT_TERMINAL_SIZE = Object.freeze({ cols: 80, rows: 24 })
 const MAX_TERMINAL_INPUT_LENGTH = 65_536
 const MAX_TERMINAL_OUTPUT_LENGTH = 65_536
 const MAX_PATH_ENTRIES = 64
+export const TERMINAL_SHELL_IDS = Object.freeze(['auto', 'powershell', 'pwsh', 'wsl', 'cmd'])
+
+export function normalizeTerminalShellId(value) {
+  if (!TERMINAL_SHELL_IDS.includes(value)) throw new TypeError('terminal shell selection is invalid')
+  return value
+}
 
 function terminalPath(environment) {
   const key = Object.keys(environment).find((name) => name.toLowerCase() === 'path')
@@ -52,7 +58,9 @@ export function resolveDesktopTerminalShell({
   platform = process.platform,
   environment = process.env,
   exists = existsSync,
+  shellId = 'auto',
 } = {}) {
+  normalizeTerminalShellId(shellId)
   if (typeof exists !== 'function') throw new TypeError('terminal shell existence probe must be a function')
   if (platform === 'win32') {
     const candidates = []
@@ -63,7 +71,16 @@ export function resolveDesktopTerminalShell({
       }
     }
     for (const executable of candidates) {
-      if (exists(executable)) return Object.freeze({ executable, args: ['-NoLogo'], label: 'PowerShell 7' })
+      if (exists(executable) && (shellId === 'auto' || shellId === 'pwsh')) return Object.freeze({ executable, args: ['-NoLogo'], label: 'PowerShell 7', shellId })
+    }
+    if (shellId === 'pwsh') throw new Error('PowerShell 7 is not installed')
+    if (shellId === 'wsl' || shellId === 'cmd') {
+      const name = shellId === 'wsl' ? 'wsl.exe' : 'cmd.exe'
+      const executable = typeof environment.SystemRoot === 'string' && environment.SystemRoot.length > 0
+        ? win32.join(environment.SystemRoot, 'System32', name)
+        : name
+      if (executable !== name && !exists(executable)) throw new Error(`${name} is unavailable`)
+      return Object.freeze({ executable, args: shellId === 'cmd' ? ['/Q'] : [], label: shellId === 'wsl' ? 'WSL' : 'Command Prompt', shellId })
     }
     if (typeof environment.SystemRoot === 'string' && environment.SystemRoot.length > 0) {
       const executable = win32.join(
@@ -73,15 +90,18 @@ export function resolveDesktopTerminalShell({
         'v1.0',
         'powershell.exe',
       )
-      if (exists(executable)) return Object.freeze({ executable, args: ['-NoLogo'], label: 'Windows PowerShell' })
+      if (exists(executable)) return Object.freeze({ executable, args: ['-NoLogo'], label: 'Windows PowerShell', shellId })
     }
-    return Object.freeze({ executable: 'powershell.exe', args: ['-NoLogo'], label: 'Windows PowerShell' })
+    if (shellId === 'powershell') throw new Error('Windows PowerShell is unavailable')
+    return Object.freeze({ executable: 'powershell.exe', args: ['-NoLogo'], label: 'Windows PowerShell', shellId })
   }
+
+  if (shellId !== 'auto') throw new Error('Selected terminal shell is only available on Windows')
 
   const configured = typeof environment.SHELL === 'string' && posix.isAbsolute(environment.SHELL)
     ? environment.SHELL
     : platform === 'darwin' ? '/bin/zsh' : '/bin/bash'
-  return Object.freeze({ executable: configured, args: [], label: configured.split('/').at(-1) || 'Shell' })
+  return Object.freeze({ executable: configured, args: [], label: configured.split('/').at(-1) || 'Shell', shellId })
 }
 
 export function createTerminalEnvironment({
@@ -140,6 +160,7 @@ function resolvePtySpawn(module) {
 export class DesktopTerminalSession {
   #cwd
   #platform
+  #shellId
   #environment
   #pathEntries
   #resolvePathEntries
@@ -158,6 +179,7 @@ export class DesktopTerminalSession {
   constructor({
     cwd,
     platform = process.platform,
+    shellId = 'auto',
     environment = process.env,
     pathEntries = [],
     resolvePathEntries,
@@ -167,6 +189,7 @@ export class DesktopTerminalSession {
   } = {}) {
     this.#cwd = assertWorkingDirectory(cwd, platform)
     this.#platform = platform
+    this.#shellId = normalizeTerminalShellId(shellId)
     this.#environment = environment
     this.#pathEntries = normalizedPathEntries(pathEntries)
     if (resolvePathEntries !== undefined && typeof resolvePathEntries !== 'function') throw new TypeError('terminal PATH resolver must be a function')
@@ -180,6 +203,13 @@ export class DesktopTerminalSession {
   }
 
   get active() { return this.#pty !== undefined }
+  get shellId() { return this.#shellId }
+
+  setShellId(value) {
+    const shellId = normalizeTerminalShellId(value)
+    resolveDesktopTerminalShell({ platform: this.#platform, environment: this.#environment, exists: this.#exists, shellId })
+    this.#shellId = shellId
+  }
 
   async start(size = DEFAULT_TERMINAL_SIZE) {
     if (this.#disposed) throw new Error('terminal session is disposed')
@@ -204,6 +234,7 @@ export class DesktopTerminalSession {
           platform: this.#platform,
           environment: this.#environment,
           exists: this.#exists,
+          shellId: this.#shellId,
         })),
         this.#resolvePathEntries ? this.#resolvePathEntries() : this.#pathEntries,
       ])
@@ -229,7 +260,7 @@ export class DesktopTerminalSession {
         throw new TypeError('node-pty returned an invalid terminal process')
       }
       this.#pty = pty
-      this.#info = Object.freeze({ label: shell.label, cwd: this.#cwd })
+      this.#info = Object.freeze({ label: shell.label, cwd: this.#cwd, shellId: this.#shellId })
       this.#dataSubscription = pty.onData?.((data) => {
         if (this.#pty !== pty || this.#generation !== generation || typeof data !== 'string') return
         for (let offset = 0; offset < data.length; offset += MAX_TERMINAL_OUTPUT_LENGTH) {

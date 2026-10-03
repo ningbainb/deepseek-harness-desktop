@@ -61,7 +61,7 @@ export type ParticleThemeSettingsCardProps =
 
 export function ParticleThemeSettingsCard(props: ParticleThemeSettingsCardProps) {
   const { t } = props
-  const state = props.useParticleThemeSettingsCard(snapshot => snapshot)
+  const state = props.useParticleThemeSettingsCard((snapshot: ParticleThemeSettingsCardState) => snapshot)
   const common = {
     overriddenLabel: t('settings.overridden'),
     resetLabel: t('settings.reset'),

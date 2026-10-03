@@ -32,7 +32,21 @@
         "conversation-collaboration-entry",
         "desktop-usage-footer-opens-official-dock-settings-with-visible-failure",
         "desktop-plugin-detail-native-row-configuration-entry",
-        "real-plugin-owned-configuration-form-and-save-full-release-gate"
+        "real-plugin-owned-configuration-form-and-save-full-release-gate",
+        "chatgpt-browser-mode-one-click",
+        "chatgpt-login-safe-terminal-diagnostics",
+        "chatgpt-login-to-model-picker",
+        "chatgpt-login-privacy-safe-funnel",
+        "conversation-smart-control-entry",
+        "conversation-extension-dock-brand-entry",
+        "wide-sidebar-extension-dock-label",
+        "desktop-control-actions-require-approval",
+        "desktop-plugin-center-single-destination",
+        "conversation-plugin-management-entry",
+        "conversation-skill-management-entry",
+        "rc2-public-skill-panel-marker-routes-to-retained-dock",
+        "rc2-skill-entry-preserves-owned-legacy-marker-and-cleans-it-up",
+        "rc2-loader-form-namespace-mapping-preserves-config-entries"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -76,7 +90,9 @@
       "package": "@ningbainb/dsh-personal-prompt",
       "path": "packages/dsh-personal-prompt",
       "description": "本机个性化 Prompt Profile 管理与请求上下文注入",
-      "features": ["atomic-profile-save-checks-official-sdk-acceptance"],
+      "features": [
+        "atomic-profile-save-checks-official-sdk-acceptance"
+      ],
       "patchId": "personal-prompt",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -108,6 +124,9 @@
       "path": "packages/dsh-aionui-panel",
       "description": "AionUI 桌面多端管理侧边面板",
       "patchId": "ui-dsh-aionui-panel",
+      "features": [
+        "aionui-render-failure-isolation"
+      ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
       "requiredInDesktop": false
@@ -167,7 +186,8 @@
         "settings-save-always-settles",
         "failed-save-preserves-draft",
         "spritesheet-readback-canvas-preserves-frame-counts-without-performance-warnings",
-        "installed-0.4.4-frames2d-readback-canvas-retains-image-fallback"
+        "installed-0.4.4-frames2d-readback-canvas-retains-image-fallback",
+        "pet-settings-no-unbounded-batch-mutation"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -225,7 +245,8 @@
       "id": "ssh",
       "features": [
         "host-isolated-transfer-browser",
-        "active-transfer-target-lock"
+        "active-transfer-target-lock",
+        "desktop-ssh-client-host-pair-preserved"
       ],
       "package": "@linxin666/dsh-ssh",
       "path": "packages/dsh-ssh",
@@ -233,7 +254,7 @@
       "patchId": "ssh",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
-      "requiredInDesktop": false
+      "requiredInDesktop": true
     },
     {
       "id": "describe-image",
@@ -288,6 +309,24 @@
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
       "requiredInDesktop": false
+    },
+    {
+      "id": "web-all-alpha-source",
+      "package": "@linxin666/dsh-web-all",
+      "path": "vendor/dsh-web-alpha-0.3.23",
+      "description": "保全已审阅的 alpha 来源与哈希；运行载具使用公开 rc.2 适配包并保留桌面差异行",
+      "features": [
+        "upstream-alpha-source-provenance",
+        "published-rc2-carrier-with-desktop-profile-overrides",
+        "desktop-only-rows-preserved",
+        "desktop-task-board-git-graph-and-pet-client-host-pairs-preserved",
+        "desktop-ssh-client-host-pair-preserved",
+        "optional-plugin-failure-isolation"
+      ],
+      "patchId": "web-ui-compat",
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
     }
   ],
   "desktopBuiltins": [
@@ -296,6 +335,7 @@
     "@deepseek-ai/dsh-web-app",
     "@linxin666/dsh-value-mode",
     "dsh-better-sidebar",
+    "@linxin666/dsh-web-all",
     "@linxin666/dsh-web-ui-all",
     "@linxin666/dsh-client-ui-skill-explorer",
     "@tencent-connect/dsh-qqbot",
@@ -353,6 +393,8 @@
         "native-browser-close-owner-with-legacy-and-keyboard-fallback",
         "incremental-modal-layer-tracking-with-document-lifecycle",
         "application-root-and-frame-never-promoted-to-modal-stacking",
+        "compact-dialog-observer-settles-without-rewriting-absent-classes",
+        "active-settings-gestures-preserve-modal-classification-without-layout-reads",
         "optional-prompt-remains-clickable-after-native-dialog-dismissal",
         "native-portalled-settings-menus-remain-clickable-above-adapted-dialogs",
         "native-panel-control-remains-on-sidebar-surface",
@@ -360,7 +402,10 @@
         "rc2-native-dockkit-layout-cluster-styles-with-legacy-fallback",
         "compatibility-panels-retain-handlers-tabs-and-terminal-lifetime",
         "bottom-panel-measures-current-frame-in-empty-conversations",
-        "tools-menu-has-no-panel-layout-duplicates"
+        "tools-menu-has-no-panel-layout-duplicates",
+        "atomic-main-window-state-saves-preserve-readable-snapshots",
+        "deferred-modal-reveal-gets-caption-inset",
+        "compact-dialog-keeps-own-geometry-and-hit-area"
       ]
     },
     {
@@ -379,8 +424,8 @@
     {
       "id": "settings-window",
       "features": [
-          "dom-ready-settings-adaptation",
-          "rc2-native-settings-title-drag-handle-with-legacy-slot-fallback",
+        "dom-ready-settings-adaptation",
+        "rc2-native-settings-title-drag-handle-with-legacy-slot-fallback",
         "one-controller-per-document",
         "navigation-and-disposal-cancel-stale-mounts"
       ],
@@ -390,21 +435,23 @@
     {
       "id": "skill-discovery",
       "name": "扩展坞与技能中心共享用户技能目录",
-      "uiSelector": "[data-dsh-skill-explorer-entry], [data-dsh-skill-explorer-view]",
+      "uiSelector": "[data-dsh-desktop-management-entry=\"skills\"], #skills",
       "e2eScript": "scripts/verify-skill-discovery.mjs",
       "features": [
         "skill-center-mounted-from-reviewed-direct-bundle",
         "extension-dock-and-skill-center-share-dsh-home-skills",
-          "conversation-skills-mount-on-rc2-plus-and-legacy-command-controls",
-          "native-plus-command-menu-preserves-commands-and-opens-shared-skills",
-          "native-slash-and-desktop-skill-inventory-share-isolated-roots",
+        "conversation-skills-mount-on-rc2-plus-and-legacy-command-controls",
+        "native-plus-command-menu-preserves-commands-and-opens-shared-skills",
+        "native-slash-and-desktop-skill-inventory-share-isolated-roots",
         "conversation-skills-rebind-live-rich-editor",
         "conversation-skills-close-on-native-captured-and-programmatic-navigation",
         "user-skill-visible-through-desktop-inventory-and-runtime-route",
         "conversation-skill-menu-supports-dsh4-composer",
         "anonymous-conversation-skill-funnel-metrics",
         "conversation-import-surface-metric",
-        "legacy-session-context-summary-opt-in-with-original-data-preserved"
+        "legacy-session-context-summary-opt-in-with-original-data-preserved",
+        "desktop-skill-center-single-management-destination",
+        "recent-skills-remain-in-complete-skill-list"
       ]
     },
     {
@@ -497,7 +544,9 @@
         "quit-invalidates-pending-runtime-presentation",
         "private-runtime-graceful-shutdown-with-force-fallback",
         "bounded-shutdown-waits-for-inflight-http-responses",
-        "quit-cancel-does-not-revive-stale-navigation"
+        "quit-cancel-does-not-revive-stale-navigation",
+        "official-hoisted-pnpm-linker-validated-with-local-fixtures",
+        "windows-reparse-chain-avoided-by-official-linker-layout"
       ]
     },
     {
@@ -574,7 +623,11 @@
         "runtime-stream-handlers-remain-until-renderer-exit",
         "expected-runtime-stop-http-response-does-not-report-503",
         "late-preparation-cannot-own-next-install-attempt",
-        "historical-3.3-profile-bundle-preservation"
+        "historical-3.3-profile-bundle-preservation",
+        "upgrade-reuses-verified-custom-install-directory",
+        "persistent-automatic-update-check-backoff",
+        "offline-update-check-deferred-without-failure",
+        "update-diagnostics-instance-first-summary"
       ]
     },
     {
@@ -595,6 +648,12 @@
         "terminal-single-ipc-owner",
         "sidebar-terminal-entry-prefers-desktop",
         "terminal-open-is-idempotent",
+        "terminal-shell-choice-persisted-and-allowlisted",
+        "agent-pwsh-and-wsl-per-call-choice",
+        "agent-wsl-one-shot-approval-and-distro-validation",
+        "agent-wsl-user-controlled-off-ask-allow-policy",
+        "agent-wsl-real-distribution-acceptance",
+        "windows-build-and-test-dependencies-on-e-drive",
         "web-and-agent-terminal-pty-preserved"
       ]
     },
@@ -651,7 +710,8 @@
         "real-expert-worker-selection-and-timeout-retry",
         "verified-settings-write-before-success",
         "failed-guide-save-preserves-selection",
-        "bai-first-in-collaboration-pickers"
+        "bai-first-in-collaboration-pickers",
+        "bounded-stale-catalog-retry-during-packaged-startup"
       ]
     },
     {
@@ -711,9 +771,33 @@
         "plugin-repair-retry-within-active-operation",
         "plugin-diagnostics-use-loaded-inventory",
         "collaboration-deep-link-single-window",
-        "collaboration-unified-page"
+        "collaboration-unified-page",
+        "bai-acquisition-single-primary-path",
+        "bai-acquisition-privacy-safe-funnel",
+        "bai-onboarding-first-screen-in-native-model-settings",
+        "bai-recommended-in-dock-navigation-and-model-picker",
+        "bai-discovered-model-id-is-display-name",
+        "bai-model-refresh-preserves-existing-list-on-failure",
+        "unique-sidebar-destinations-fit-default-window",
+        "wide-sidebar-destinations-stack-without-clipping",
+        "single-source-cross-platform-app-icon",
+        "background-update-dismiss-persists",
+        "extension-dock-plugin-market-single-hub-entry",
+        "extension-dock-plugin-market-deep-link-allowlist",
+        "extension-dock-skill-management-deep-link-allowlist",
+        "dshmarket-catalog-bridge-with-desktop-owned-mutations",
+        "plugin-diagnostics-native-clipboard-write",
+        "plugin-native-settings-bridge",
+        "smart-control-deep-link-single-window",
+        "browser-use-visible-isolated-session",
+        "computer-use-safe-mode-after-repeated-native-failure",
+        "control-provider-errors-are-sanitized",
+        "control-toggle-bounded-terminal-state",
+        "feature-switch-preflight-keeps-runtime-alive-when-profile-needs-repair",
+        "layout-toggle-cluster-aligned"
       ],
       "settings": [
+        "control-center",
         "value-mode",
         "personal-prompt",
         "memory",
@@ -920,7 +1004,10 @@
         "native-plugin-forms-preserve-inject-store-locale-and-nested-slot-lifecycle",
         "dock-plugin-roster-refreshes-on-runtime-generation-with-draft-protection",
         "declarative-palette-sync-and-reset",
-        "theme-only-update-clears-stale-palette-without-losing-drafts"
+        "theme-only-update-clears-stale-palette-without-losing-drafts",
+        "describe-image-direct-form-and-legacy-disable-state",
+        "private-remote-channel-mirror",
+        "persisted-skin-selection-sync-without-preview-leak"
       ],
       "e2eScript": "scripts/verify-native-plugin-pages.mjs"
     },
@@ -945,7 +1032,9 @@
         "carrier-neutral-web-route-adapter-with-explicit-exit-condition",
         "pipe-websocket-duplex-frame-and-close-lifecycle",
         "independent-community-home-two-phase-health-commit",
-        "migration-source-retained-and-automation-suspended"
+        "migration-source-retained-and-automation-suspended",
+        "bounded-fragmented-stream-values",
+        "large-history-snapshot-reassembly"
       ],
       "e2eScript": "scripts/verify-runtime-pipe.mjs"
     }

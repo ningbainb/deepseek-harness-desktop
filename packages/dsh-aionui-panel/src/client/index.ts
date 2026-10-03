@@ -34,6 +34,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { openNativePreview } from './native-preview.ts'
 import { bindNativePanelOwnership, openNativePanel, registerNativePanels } from './native-panels.tsx'
 import { openNativeBrowser, registerNativeBrowser, registerNativeSidebarReturn } from './native-browser.tsx'
+import { currentMainSessionId } from './session-selection.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {

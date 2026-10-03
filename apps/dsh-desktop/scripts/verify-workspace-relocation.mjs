@@ -62,7 +62,7 @@ async function launch() {
   const instance = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args: packagedExecutable === undefined ? [mainEntry] : [],
-    cwd: appDir,
+    cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: userData,
@@ -78,8 +78,8 @@ async function launch() {
   page.on('pageerror', error => rendererErrors.push(error.message))
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
-    await page.waitForSelector('style[data-plugin="@linxin666/dsh-web-ui-all"]', {
-      state: 'attached',
+    await page.waitForSelector('[data-dsh-frame]', {
+      state: 'visible',
       timeout: runtimeReadyTimeoutMs,
     })
     await dismissStartup(page)

@@ -11,6 +11,7 @@ import { type AgentRegistry } from '@deepseek-ai/dsh-agent';
 import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-model';
 import { type SessionStore } from '@deepseek-ai/dsh-session';
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence';
+import type { SessionQueryEngine } from '@deepseek-ai/dsh-session-query';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 export interface DesktopScheduledTask {
     prompt: string;
@@ -74,6 +75,7 @@ export interface DesktopTaskBoardHostScheduleRunnerOptions {
      * slot rather than creating a second agent transcript.
      */
     sessionPersistence?: SessionPersistence;
+    sessionQuery: SessionQueryEngine;
     now?: () => number;
     createSessionId?: (executionKey: string) => string;
 }

@@ -4,10 +4,9 @@
  * selects this section.
  */
 
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { getDockEntryState, openDesktopSurface } from '@linxin666/dsh-desktop-client'
-import { isDockSetting } from './DockSettingsPage.tsx'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { RepairStatusCard } from './RepairStatusCard.tsx'
 import type { WebUIPluginsKey } from './locales.ts'
@@ -24,12 +23,14 @@ export type WebUIPluginsSectionProps =
   PropsRuntime<'settings.section'>
   & PropsLocale<'web-ui-plugins'>
   & PropsRenderSlots<'web-ui.plugin.item'>
-  & { getPluginIds?: () => string[] }
 
 /** Render the family plugin cards under a static settings heading. */
 export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode {
   const { t, renderSlot } = props
-  const [desktop, setDesktop] = useState(false)
+  // Keep the family list hidden while capability detection settles. Rendering
+  // it for one frame in Desktop caused the same duplicated plugin UI users
+  // were sent away from to flash before the Plugin Center banner appeared.
+  const [desktop, setDesktop] = useState<boolean | null>(null)
   const [openError, setOpenError] = useState(false)
   useEffect(() => {
     let active = true
@@ -38,15 +39,15 @@ export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode 
   }, [])
   const handleOpenDock = (): void => {
     setOpenError(false)
-    void openDesktopSurface('extensions').then(result => {
+    void openDesktopSurface('extensions', { tab: 'plugins' }).then(result => {
       if (!result) setOpenError(true)
     }).catch(() => setOpenError(true))
   }
 
   return (
     <div className={css.section}>
-      <h2 className={css.heading} title={t('title')}>{t('title')}</h2>
-      <p className={css.lede} title={t('description')}>{t('description')}</p>
+      <h2 className={css.heading} title={t(desktop ? 'desktopPluginCenterTitle' : 'title')}>{t(desktop ? 'desktopPluginCenterTitle' : 'title')}</h2>
+      <p className={css.lede} title={t(desktop ? 'desktopPluginCenterDescription' : 'description')}>{t(desktop ? 'desktopPluginCenterDescription' : 'description')}</p>
       {desktop && (
         <div className={css.dockBanner} data-testid="desktop-dock-banner">
           <div className={css.dockBannerIcon} aria-hidden="true">
@@ -71,17 +72,18 @@ export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode 
         </div>
       )}
       {openError && <p role="alert">{t('dockOpenFailed')}</p>}
-      <SafePluginBoundary pluginName="repair-status-card">
-        <RepairStatusCard t={t} />
-      </SafePluginBoundary>
-      <ul className={css.subcards}>
-        <SafePluginBoundary pluginName="web-ui-plugin-items">
-          {desktop && props.getPluginIds
-            ? props.getPluginIds().filter(id => !isDockSetting(id)).map(id =>
-              <Fragment key={id}>{renderSlot('web-ui.plugin.item', {}, { only: id })}</Fragment>)
-            : renderSlot('web-ui.plugin.item', {})}
-        </SafePluginBoundary>
-      </ul>
+      {desktop === true
+        ? <p className={css.desktopRuntimeNotice}>{t('desktopPluginCenterNotice')}</p>
+        : desktop === false ? <>
+          <SafePluginBoundary pluginName="repair-status-card">
+            <RepairStatusCard t={t} />
+          </SafePluginBoundary>
+          <ul className={css.subcards}>
+            <SafePluginBoundary pluginName="web-ui-plugin-items">
+              {renderSlot('web-ui.plugin.item', {})}
+            </SafePluginBoundary>
+          </ul>
+        </> : null}
     </div>
   )
 }

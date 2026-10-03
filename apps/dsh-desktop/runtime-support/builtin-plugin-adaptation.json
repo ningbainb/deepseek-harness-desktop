@@ -15,7 +15,7 @@
       "@deepseek-ai/dsh-web-app",
       "@linxin666/dsh-value-mode",
       "dsh-better-sidebar",
-      "@linxin666/dsh-web-ui-all",
+      "@linxin666/dsh-web-all",
       "@linxin666/dsh-client-ui-skill-explorer",
       "@linxin666/dsh-client-ui-model-capabilities",
       "@linxin666/dsh-usage",
@@ -25,101 +25,86 @@
     ],
     "dependencyOnly": [
       "@linxin666/dsh-client-ui-mode-switcher",
-      "@linxin666/dsh-particle-theme"
+      "@linxin666/dsh-particle-theme",
+      "@linxin666/dsh-web-ui-all"
     ],
     "repairBundle": "@linxin666/dsh-desktop-repair",
     "aggregateEntries": [
       {
-        "id": "ui-web-ui-compat",
-        "name": "@linxin666/dsh-web-ui-all"
+        "id": "web-ui-compat",
+        "name": "@linxin666/dsh-web-all"
       },
       {
-        "id": "ui-web-ui-settings",
-        "name": "@linxin666/dsh-client-ui-web-ui-settings"
+        "id": "web-ui-settings",
+        "name": "@linxin666/dsh-web-all/settings"
       },
       {
-        "id": "user-scope",
-        "name": "@ningbainb/dsh-user-scope"
+        "id": "web-ui-plugin-manager",
+        "name": "@linxin666/dsh-web-all/plugin-manager"
       },
       {
-        "id": "ui-model-preferences",
-        "name": "@linxin666/dsh-client-ui-model-preferences"
+        "id": "web-ui-market",
+        "name": "@linxin666/dsh-web-all/market"
       },
       {
-        "id": "personal-prompt",
-        "name": "@ningbainb/dsh-personal-prompt"
+        "id": "web-ui-task-board",
+        "name": "@linxin666/dsh-web-all/task-board"
       },
       {
-        "id": "memory",
-        "name": "@ningbainb/dsh-memory"
+        "id": "web-ui-git-graph",
+        "name": "@linxin666/dsh-web-all/git-graph"
       },
       {
-        "id": "ui-dsh-aionui-panel",
-        "name": "@linxin666/dsh-client-ui-aionui-panel"
+        "id": "web-ui-remote-web-ui",
+        "name": "@linxin666/dsh-web-all/remote-web-ui"
       },
       {
-        "id": "ui-task-board",
-        "name": "@linxin666/dsh-client-ui-task-board"
+        "id": "web-ui-update",
+        "name": "@linxin666/dsh-web-all/update"
       },
       {
-        "id": "ui-git-graph",
-        "name": "@linxin666/dsh-client-ui-git-graph"
+        "id": "web-ui-ssh",
+        "name": "@linxin666/dsh-web-all/ssh"
       },
       {
-        "id": "ui-mode-switcher",
-        "name": "@linxin666/dsh-client-ui-mode-switcher"
+        "id": "web-ui-liangshen",
+        "name": "@linxin666/dsh-web-all/liangshen"
       },
       {
-        "id": "pet",
-        "name": "@linxin666/dsh-pet"
+        "id": "web-ui-skill-explorer",
+        "name": "@linxin666/dsh-web-all/skill-explorer"
       },
       {
-        "id": "particle-theme",
-        "name": "@linxin666/dsh-particle-theme"
+        "id": "web-ui-usage",
+        "name": "@linxin666/dsh-web-all/usage"
       },
       {
-        "id": "remote-web-ui",
-        "name": "@linxin666/dsh-remote-web-ui"
+        "id": "web-ui-session-archive",
+        "name": "@linxin666/dsh-web-all/session-archive"
       },
       {
-        "id": "live-stats",
-        "name": "@linxin666/dsh-live-stats"
+        "id": "web-ui-model-capabilities",
+        "name": "@linxin666/dsh-web-all/model-capabilities"
       },
       {
-        "id": "ssh",
-        "name": "@linxin666/dsh-ssh"
+        "id": "web-ui-i18n",
+        "name": "@linxin666/dsh-i18n"
       },
       {
-        "id": "describe-image",
-        "name": "@linxin666/dsh-tool-describe-image"
-      },
-      {
-        "id": "chat-artifacts",
-        "name": "@ningbainb/dsh-chat-artifacts"
-      },
-      {
-        "id": "liangshen",
-        "name": "@linxin666/dsh-liangshen"
-      },
-      {
-        "id": "ui-skin-center",
-        "name": "@linxin666/dsh-client-ui-skin-center"
-      },
-      {
-        "id": "ui-community-plugins",
+        "id": "web-ui-community-plugins",
         "name": "@linxin666/dsh-client-ui-community-plugins"
       },
       {
-        "id": "ui-plugin-manager",
-        "name": "@linxin666/dsh-client-ui-plugin-manager"
+        "id": "web-ui-pet",
+        "name": "@linxin666/dsh-pet"
       },
       {
-        "id": "ui-chat-recovery",
-        "name": "@linxin666/dsh-chat-recovery"
+        "id": "web-ui-preset-center",
+        "name": "@linxin666/dsh-client-ui-preset-center"
       },
       {
-        "id": "desktop-launcher",
-        "name": "@linxin666/dsh-desktop-launcher"
+        "id": "web-ui-skin-center",
+        "name": "@linxin666/dsh-client-ui-skin-center"
       }
     ]
   },
@@ -720,11 +705,13 @@
       },
       "reason": "Use the Desktop workspace preset package with new persona configuration; retain preset validation and UI entry.",
       "desktopContracts": [
-        "persona.config.prefix accepted by the official SDK"
+        "existing 4.1 Liangshen preset is refreshed to the 0.3.23 tool-catalog composition",
+        "upgraded preset composes and creates a session through the official Runtime"
       ],
       "validation": {
         "automatedChecks": [
-          "apps/dsh-desktop/test/profile.test.mjs"
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/custom-presets-runtime.test.mjs"
         ],
         "desktopAcceptance": [
           "Activate the preset and start a conversation."
@@ -1249,6 +1236,255 @@
         ],
         "desktopAcceptance": [
           "Change model reasoning through Desktop model preferences and verify the next request."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-browser-use",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-browser-use"
+      },
+      "reason": "Use the official Browser Use service from the exact pinned Runtime graph; Desktop owns only opt-in configuration, provider discovery, and safe navigation.",
+      "desktopContracts": [
+        "Disabled by default with a visible isolated browser session",
+        "Observation tools may run directly while mutating actions require approval"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs",
+          "packages/dsh-desktop-compat/tests/control-tool-approval.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Open a controlled local page, inspect it, click, type, cancel, and verify browser cleanup."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-computer-use",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-computer-use"
+      },
+      "reason": "Use the official Computer Use service while Desktop retains platform permission guidance, explicit activation, and repeated-crash safe mode.",
+      "desktopContracts": [
+        "Disabled by default and platform availability is reported honestly",
+        "Input actions require approval and native startup loops are interrupted"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs",
+          "packages/dsh-desktop-compat/tests/control-tool-approval.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Inspect a dedicated test window and verify permission denial, cancellation, stale element rejection, and provider recovery."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-chrome-devtools-mcp"
+      },
+      "reason": "Keep the official Chrome DevTools MCP as an advanced diagnostic provider using Desktop-selected local Chromium and no arbitrary command input.",
+      "desktopContracts": [
+        "Advanced opt-in provider",
+        "Visible isolated launch remains the default mode"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Select the diagnostic provider and verify an isolated local browser launch."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-playwright-mcp"
+      },
+      "reason": "Use the official Playwright MCP as Desktop's default Browser Use provider with a system Chromium executable and an isolated visible session.",
+      "desktopContracts": [
+        "Default Browser Use provider",
+        "No bundled Chromium download"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Navigate and interact with a controlled local page, then verify process cleanup."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-browser-use-runtime",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-runtime"
+      },
+      "reason": "Retain the exact official shared Browser Use runtime required by the selected providers; it is dependency-only and has no Desktop UI mount.",
+      "desktopContracts": [
+        "Exact provider runtime identity",
+        "Session-owned browser cleanup"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "scripts/runtime-graph-check.mjs"
+        ],
+        "desktopAcceptance": [
+          "Verify Browser Use exits without leaving its isolated browser session running."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-stagehand-native"
+      },
+      "reason": "Expose Stagehand only as an advanced provider with a separate model and secret environment reference; it never reuses or persists the DeepSeek route credentials.",
+      "desktopContracts": [
+        "Separate model credential boundary",
+        "No secret value crosses the preload API"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Verify missing Stagehand credentials report unavailable without preventing Runtime startup."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-mcp"
+      },
+      "reason": "Keep the official external Cua Driver MCP as a process-isolated fallback and accept only an operator-configured command with fixed no-shell arguments.",
+      "desktopContracts": [
+        "Process-isolated fallback",
+        "Fixed mcp argument without shell execution"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Verify an unavailable external driver reports a bounded failure and leaves the current Runtime usable."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
+      "selection": {
+        "version": "0.2.0-rc.2",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.6-alpha.1",
+        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-native"
+      },
+      "reason": "Use the official native provider as the default Computer Use backend while retaining platform optional dependencies and Desktop safe-mode suspension after repeated startup failure.",
+      "desktopContracts": [
+        "Packaged architecture-specific optional dependency",
+        "Repeated startup failure preserves configuration but disables effective activation"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/control-center.test.mjs",
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Probe permissions and observation tools without sending mouse or keyboard input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-web-all",
+      "selection": {
+        "version": "0.4.4",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.3.23",
+        "checkedAt": "2026-09-18T00:49:19.000Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-web-all/latest"
+      },
+      "reason": "Use the publicly published 0.4.4 carrier for the official 0.2.0-rc.2 Runtime. Keep the archived alpha cohort provenance and preserve Desktop-only loaders and user configuration through the Profile patch.",
+      "desktopContracts": [
+        "One aggregate owns each shared web-ui loader ID",
+        "Nine Desktop-only loader rows and saved disable overrides survive",
+        "Optional plugin failure cannot remove the main chat surface"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "scripts/verify-upstream-web-cohort.mjs",
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/runtime-integration.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Upgrade a disposable 4.1 profile, reopen its sessions and verify every preserved Desktop surface."
         ],
         "results": []
       }

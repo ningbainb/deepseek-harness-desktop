@@ -67,6 +67,51 @@ test('modal stacking never promotes the application root or frame and clears a s
   assert.equal(root.classes.size, 0)
 })
 
+test('compact fixed dialogs keep their native placement while full viewport overlays are promoted', () => {
+  const document = { body: {}, documentElement: {}, defaultView: { innerWidth: 1000, innerHeight: 800 } }
+  const classes = new Set(['dsh-desktop-modal-layer'])
+  let removals = 0
+  let bounds = { width: 600, height: 700 }
+  const dialog = {
+    parentElement: document.body,
+    getBoundingClientRect: () => bounds,
+    classList: { contains: name => classes.has(name), add: name => classes.add(name), remove: name => { removals++; classes.delete(name) } },
+  }
+  const mark = () => markWindowChromeModalLayer({ dialog, document, getComputedStyle: () => ({ position: 'fixed' }) })
+  assert.equal(mark(), false)
+  assert.equal(classes.size, 0)
+  for (let attempt = 0; attempt < 20; attempt++) assert.equal(mark(), false)
+  assert.equal(removals, 1, 'an absent modal class must not be rewritten and trigger another observer pass')
+  bounds = { width: 900, height: 400 }
+  assert.equal(mark(), false)
+  assert.equal(classes.size, 0)
+  assert.equal(removals, 1)
+  bounds = { width: 1000, height: 800 }
+  assert.equal(mark(), true)
+  assert.deepEqual([...classes], ['dsh-desktop-modal-layer'])
+})
+
+test('active settings gestures retain modal classification without observer layout reads', () => {
+  const document = { body: {}, documentElement: {}, defaultView: { innerWidth: 1000, innerHeight: 800 } }
+  const classes = new Set(['dsh-desktop-modal-layer'])
+  let dragging = true
+  let reads = 0
+  const layer = {
+    parentElement: document.body,
+    hasAttribute: () => false,
+    classList: { contains: name => classes.has(name), add: name => classes.add(name), remove: name => classes.delete(name) },
+    getBoundingClientRect: () => { reads++; return { width: 1000, height: 800 } },
+  }
+  const dialog = { parentElement: layer, hasAttribute: name => name === 'data-dsh-settings-dragging' && dragging }
+  const mark = () => markWindowChromeModalLayer({ dialog, document, getComputedStyle: element => ({ position: element === layer ? 'fixed' : 'relative' }) })
+  for (let attempt = 0; attempt < 120; attempt++) assert.equal(mark(), true)
+  assert.equal(reads, 0)
+  assert.deepEqual([...classes], ['dsh-desktop-modal-layer'])
+  dragging = false
+  assert.equal(mark(), true)
+  assert.equal(reads, 1, 'normal geometry classification resumes when the gesture ends')
+})
+
 test('positioned roots retain their caption inset through consecutive document mutations', () => {
   for (const position of ['fixed', 'absolute']) {
     const f = viewportRootFixture(position)
@@ -103,7 +148,7 @@ function chromeObserverFixture() {
     MutationObserver: class {
       constructor(next) { callback = next }
       observe(_target, options) {
-        for (const attribute of ['class', 'style', 'role', 'aria-modal', 'open', 'data-dsh-desktop-theme']) {
+        for (const attribute of ['class', 'style', 'hidden', 'data-open', 'role', 'aria-modal', 'open', 'data-dsh-desktop-theme']) {
           assert.ok(options.attributeFilter.includes(attribute))
         }
       }
@@ -135,6 +180,11 @@ test('window chrome indexes initial and added dialogs without full history queri
   f.mutate([{ type: 'childList', addedNodes: [parent, direct, { nodeType: 3 }] }])
   assert.deepEqual(f.marked.slice(-3), [initial, nested, direct])
   assert.equal(f.state().queries, 1)
+  const markedBeforeReveal = f.marked.length
+  f.mutate([{ type: 'attributes', attributeName: 'hidden', target: f.node(false) }])
+  f.mutate([{ type: 'attributes', attributeName: 'data-open', target: f.node(false) }])
+  assert.equal(f.marked.length, markedBeforeReveal + 6, 'revealed dialog layers are rechecked')
+  assert.equal(f.state().queries, 1, 'revealing a dialog does not rescan the document')
   dispose()
 })
 
@@ -218,6 +268,9 @@ test('window chrome uses a native overlay with a compact caption area', () => {
   assert.doesNotMatch(WINDOW_CHROME_CSS, /\[data-dockkit-strip-chrome\][^{]*\{[^}]*display:\s*none/su)
   assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-layout-cluster-bg/)
   assert.match(WINDOW_CHROME_CSS, /button:focus-visible/)
+  assert.match(WINDOW_CHROME_CSS, /height: 28px !important/)
+  assert.match(WINDOW_CHROME_CSS, /align-items: center !important/)
+  assert.match(WINDOW_CHROME_CSS, /transform: none !important/)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /\[class\*="_toggleCluster"\][^{]*\{[^}]*display:\s*none/su)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /backdrop-filter: blur\(26px\)/)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /dsh-desktop-window-chrome::before/)
@@ -253,6 +306,8 @@ test('window chrome script keeps child-window caption areas visually quiet', () 
   assert.match(script, /setWindowChromeTheme/)
   assert.match(script, /Promise\.resolve[\s\S]*?\.catch\(\(\) => \{\}\)/u)
   assert.match(script, /dsh-desktop-modal-layer/)
+  assert.match(script, /bounds\.width < viewport\.innerWidth \* 0\.7/u)
+  assert.match(script, /bounds\.height < viewport\.innerHeight \* 0\.7/u)
   assert.doesNotMatch(script, /LOCAL SURFACE|dsh-window-chrome-title|dsh-window-chrome-context/)
 })
 

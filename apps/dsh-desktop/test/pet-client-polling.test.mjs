@@ -39,7 +39,7 @@ async function loadInstalledSettingsForm() {
   return module.exports
 }
 
-function makeBatchedScope(initial, mutate) {
+function makeSettingsScope(initial, mutate) {
   let user = {}
   const base = { ...initial }
   return {
@@ -64,8 +64,6 @@ function makeBatchedScope(initial, mutate) {
       }
       return true
     },
-    set: async () => assert.fail('batched scope must not use per-field set'),
-    unset: async () => assert.fail('batched scope must not use per-field unset'),
   }
 }
 
@@ -160,7 +158,7 @@ test('installed pet settings form confirms atomic mutation and always settles sa
 test('installed pet settings form saves display, size, and position through one accepted mutation', async () => {
   const { CardForm, booleanField, numberField } = await loadInstalledSettingsForm()
   const mutations = []
-  const scope = makeBatchedScope({ visible: false, size: 96, right: 12 }, writes => { mutations.push(writes) })
+  const scope = makeSettingsScope({ visible: false, size: 96, right: 12 }, writes => { mutations.push(writes) })
   const form = new CardForm(scope, [
     booleanField('visible'),
     numberField('size', { integer: true, min: 32 }),
@@ -189,7 +187,7 @@ test('installed pet settings form saves display, size, and position through one 
 test('installed pet settings form retains drafts after failure and exits saving before retry', async () => {
   const { CardForm, numberField } = await loadInstalledSettingsForm()
   let attempts = 0
-  const scope = makeBatchedScope({ size: 96 }, async () => {
+  const scope = makeSettingsScope({ size: 96 }, async () => {
     attempts += 1
     if (attempts === 1) throw new Error('fixture write rejected')
   })

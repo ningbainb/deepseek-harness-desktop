@@ -6,7 +6,7 @@
  * registration and its section component's child-slot render contract.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import * as desktop from '@linxin666/dsh-desktop-client'
 
@@ -27,7 +27,13 @@ import { ChatGptAuthSection } from '../src/client/ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from '../src/client/WebUIPluginsCard.tsx'
 import { RelayOnboardingCard } from '../src/client/RelayOnboardingCard.tsx'
 import { CommunityPluginsSettingsCard } from '../src/client/CommunityPluginsSettingsCard.tsx'
-import { DesktopCollaborationEntry, DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
+import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry } from '../src/client/desktop-extension-dock.tsx'
+
+function ownedEffect(callback: () => unknown): unknown {
+  const dispose = callback()
+  if (typeof dispose === 'function') onTestFinished(() => { dispose() })
+  return dispose
+}
 
 afterEach(() => {
   cleanup()
@@ -37,19 +43,21 @@ afterEach(() => {
 })
 
 describe('Web UI settings section', () => {
-  it('moves the five forms to the Desktop Dock while preserving other plugin cards', async () => {
+  it('uses the Desktop Plugin Center as the only Desktop plugin-management destination', async () => {
     vi.spyOn(desktop, 'getDockEntryState').mockResolvedValue({ available: true, showNudge: false })
+    vi.spyOn(desktop, 'openDesktopSurface').mockResolvedValue(true)
     const renderSlot = vi.fn((_slot, _owner, options) => <li>{options?.only ?? 'all cards'}</li>)
     render(<WebUIPluginsSection {...{
       t: (key: string) => key,
       close: () => {},
-      getPluginIds: () => ['value-mode', 'memory', 'personal-prompt', 'particle-theme', 'describe-image', 'task-board'],
       renderSlot,
     } as Parameters<typeof WebUIPluginsSection>[0]} />)
-    await waitFor(() => expect(screen.getByText('task-board')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('desktopPluginCenterTitle')).toBeTruthy())
     expect(screen.queryByText('all cards')).toBeNull()
-    expect(screen.queryByText('memory')).toBeNull()
+    expect(renderSlot).not.toHaveBeenCalled()
     expect(screen.getByTestId('desktop-dock-banner')).toBeTruthy()
+    screen.getByRole('button', { name: 'dockBannerAction' }).click()
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'plugins' }))
   })
   it('registers a list-style rc.7 settings.section and declares the family child slot', () => {
     const register = vi.fn(() => () => {})
@@ -57,7 +65,7 @@ describe('Web UI settings section', () => {
     const localeRegister = vi.fn(() => () => {})
     const bind = vi.fn(() => (key: string) => key === 'title' ? 'Web UI Plugins' : key)
     const ctx = {
-      effect: (callback: () => unknown) => callback(),
+      effect: ownedEffect,
       inject: vi.fn(),
       locale: { register: localeRegister, bind },
       slots: { inject, register, entriesOfSlot: () => [], subscribe: () => () => {} },
@@ -71,8 +79,8 @@ describe('Web UI settings section', () => {
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('community-plugins', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(6)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'settings.section', 'settings.models.footer', 'sidebar.footer.action', 'sidebar.footer.action', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(7)
     expect(register.mock.calls[0]).toEqual([expect.objectContaining({ name: 'web-ui.plugin.item', id: 'community-plugins', inject: expect.any(Function) }), CommunityPluginsSettingsCard])
     const [authOptions, AuthComponent] = register.mock.calls[1] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
@@ -94,16 +102,19 @@ describe('Web UI settings section', () => {
     expect(Component).toBe(WebUIPluginsSection)
     const [relayOptions, RelayComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
     expect(relayOptions).toMatchObject({
-      name: 'model-preferences.onboarding',
-      id: 'bai',
-      order: 5,
+      name: 'settings.models.footer',
+      id: 'bai-onboarding',
+      order: -100,
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)
-    const [collaborationOptions, CollaborationComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopCollaborationEntry]
+    const [controlOptions, ControlComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopSmartControlEntry]
+    expect(controlOptions).toMatchObject({ name: 'sidebar.footer.action', id: 'desktop-smart-control', order: 98 })
+    expect(ControlComponent).toBe(DesktopSmartControlEntry)
+    const [collaborationOptions, CollaborationComponent] = register.mock.calls[5] as unknown as [Record<string, unknown>, typeof DesktopCollaborationEntry]
     expect(collaborationOptions).toMatchObject({ name: 'sidebar.footer.action', id: 'desktop-model-collaboration', order: 99 })
     expect(CollaborationComponent).toBe(DesktopCollaborationEntry)
-    const [dockOptions, DockComponent] = register.mock.calls[5] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [dockOptions, DockComponent] = register.mock.calls[6] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',
@@ -119,17 +130,17 @@ describe('Web UI settings section', () => {
     const register = vi.fn((_entry: unknown, _component?: unknown) => () => {})
     const inject = vi.fn((_name: string, callback: () => unknown) => callback())
     const ctx = {
-      effect: (callback: () => unknown) => callback(),
+      effect: ownedEffect,
       inject: vi.fn(),
       locale: { register: vi.fn(() => () => {}), bind: vi.fn(() => (key: string) => key) },
       slots: { inject, register, entriesOfSlot: () => [], subscribe: () => () => {} },
     }
     apply(ctx as never)
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'web-ui.plugin.item', 'sidebar.footer.action', 'sidebar.footer.action', 'root'])
-    expect(register).toHaveBeenCalledTimes(6)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'web-ui.plugin.item', 'sidebar.footer.action', 'sidebar.footer.action', 'sidebar.footer.action', 'root'])
+    expect(register).toHaveBeenCalledTimes(7)
     expect(register.mock.calls[2]![0]).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', order: 1 })
     expect(register.mock.calls[2]![1]).toBe(RelayOnboardingCard)
-    const dockChildren = (register.mock.calls[5]![0] as { children: Record<string, unknown> }).children
+    const dockChildren = (register.mock.calls[6]![0] as { children: Record<string, unknown> }).children
     expect(dockChildren).toEqual({
       'web-ui.plugin.item': { kind: 'list', scope: 'root' },
       'desktop-dock.settings.section': { kind: 'list', scope: 'root' },
@@ -139,7 +150,8 @@ describe('Web UI settings section', () => {
     expect(dockChildren).not.toHaveProperty('plugins.row.config')
   })
 
-  it('renders the declared web-ui.plugin.item child slot under the static section heading', () => {
+  it('renders the declared web-ui.plugin.item child slot on non-Desktop hosts', async () => {
+    vi.spyOn(desktop, 'getDockEntryState').mockResolvedValue({ available: false, reason: 'unavailable' })
     const renderSlot = vi.fn(() => <li data-testid="family-card">Task board settings</li>)
     const props = {
       close: () => {},
@@ -155,7 +167,7 @@ describe('Web UI settings section', () => {
 
     expect(screen.getByRole('heading', { name: 'Web UI Plugins' })).toBeTruthy()
     expect(screen.getByText('Family configuration')).toBeTruthy()
-    expect(screen.getByTestId('family-card')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('family-card')).toBeTruthy())
     expect(renderSlot).toHaveBeenCalledWith('web-ui.plugin.item', {})
   })
 })

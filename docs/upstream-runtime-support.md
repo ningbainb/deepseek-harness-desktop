@@ -2,6 +2,8 @@
 
 Desktop Stable pins an exact DSH runtime graph. `apps/dsh-desktop/package.json` and `pnpm-lock.yaml` remain the package-byte authority; the files in `apps/dsh-desktop/runtime-support/` are derived, machine-readable evidence and never promote a candidate by themselves.
 
+Desktop 4.3.0 Stable pins DSH `0.1.6-alpha.2` and a source-verified `dsh-web` alpha 0.3.23 cohort at commit `29fd16ae968fb617323be179915f480b289a3886`. Every later runtime change must return to the candidate workflow; a package version alone never promotes itself. The source cohort and Desktop-only exceptions are tracked in [the sync ledger](upstream-web-sync.md).
+
 ## Stable matrix
 
 `known-good.json` records exact package, peer, provider-capability, client-slot, compatibility-patch, and packaged-runtime evidence. `supported-runtimes.source.json` is the reviewed metadata input, and `supported-runtimes.json` is its atomic, validated derivative. Matrix entry statuses are `known-good`, `supported`, `candidate`, and `blocked`.

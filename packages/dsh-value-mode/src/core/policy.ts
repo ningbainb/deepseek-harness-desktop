@@ -14,7 +14,7 @@ export function buildSystemPromptGuidance(
   if (options.role === 'subagent') {
     return (
       '[性价比模式·副模型子代理] 你是专家主控模型派发的执行代理，只完成当前明确的单项任务。' +
-      '不要再次派发子代理，不要调用 subagent、subagent_fork 或 consult_expert；不要越界修改无关内容。' +
+      '不要再次派发子代理或 teammate，不要调用 subagent、subagent_fork、spawn_teammate 或 consult_expert；不要越界修改无关内容。' +
       '优先给出可验证的结果、证据、风险和下一步建议，由专家主控负责最终汇总与交付。'
     )
   }

@@ -1,8 +1,32 @@
-# Desktop 3.5.0 upgrade and rollback
+# Desktop upgrade and rollback
 
-Desktop 4 starts the DSH 1.1.5 Runtime from the community-owned `DSH_HOME` or `~/.dsh-community` and `profiles/desktop`. Before community plugins load, Desktop builds an immutable Runtime baseline from its own installation and audits the existing Profile locally. A safe 3.4-era managed-link drift is repaired silently; an unprovable dependency environment is left intact and routed to the focused plugin repair surface. A fresh install uses the same isolated Home with the built-in plugin set.
+## 4.2.1 to 4.3.0
 
-On the first eligible upgrade from community Desktop 3.3, 3.4, or 3.5, the migration copies app-owned content from `~/.dsh` into `~/.dsh-community`, excludes generated package state, rebuilds the Desktop profile, and commits only after Runtime health succeeds. It never deletes or rewrites the source Home. A pre-existing target without community ownership evidence is refused rather than merged. This keeps prior Desktop conversations, sessions, settings, tasks, skins, prompts, Memory, and plugin configuration while allowing the official Desktop to own `~/.dsh` independently.
+4.3.0 keeps the exact DSH `0.1.6-alpha.2` runtime and existing Session format; it does not import the newly released DSH `0.1.7-alpha.1` or run its Session V4 migration. Existing sessions, project files, credentials, Skills, and plugin bytes remain outside direct migration writes. The new terminal Shell choice and Agent WSL permission are Desktop-owned preferences; the Agent WSL tool defaults to per-command approval, and an unreadable permission file fails closed.
+
+For an in-place Windows update, the installer reuses a custom 4.x installation directory only when the registered location has the community application's private marker and executable. Keep the existing Home and installation directory intact. If a startup or plugin check fails, export diagnostics and return to the previous installer using its verified checksum; do not delete Session logs or the Profile. macOS and Linux packages remain Preview and must be verified on their native platform jobs.
+
+## 4.2.0 to 4.2.1
+
+4.2.1 keeps the same DSH `0.1.6-alpha.2` runtime family and the existing `desktop-v4.2.0` migration record. It does not rerun or rename the 4.2 data migration. The patch changes Desktop UI, authorization bridging, update-window behavior, generated brand assets, and compatibility guards; Session JSONL, Workspace files, credentials, Skills, third-party plugin bytes, and project files remain outside direct migration writes.
+
+If ChatGPT browser authorization reports success in the browser but Desktop does not show “signed in”, keep the Desktop open and use the displayed local diagnostic category. Token exchange, account resolution, and local credential commit happen after the browser callback. Retry with device-code login when browser callback delivery is unavailable; do not copy credentials into project files or delete the credential store.
+
+## 4.1.x to 4.2.0
+
+Desktop 4.2.0 pins `@deepseek-ai/dsh@0.1.6-alpha.2` and the reviewed `dsh-web` alpha-source 0.3.23 cohort. On the first start, the Desktop-owned migration prepares a versioned backup of the profile manifest, lockfile, patch files, settings and skin selection before changing those files. It records a source fingerprint and commits only after a healthy Runtime start. Repeated starts are idempotent; an interrupted or failed start restores the backed-up Desktop-owned files. Session JSONL, Workspace files, credentials, Skills, third-party plugin bytes and user project files are not rewritten by this migration.
+
+The alpha Web aggregate is not mounted beside the old aggregate. Its Task Board, Git Graph and Pet clients are disabled in the Desktop profile because they do not share the currently pinned Desktop Host/data contracts. Their existing `ui-task-board`, `ui-git-graph` and `pet` loader IDs and complete Desktop client/Host pairs remain active, so existing disabled overrides are not silently reversed. The other pinned upstream components are admitted individually; an optional plugin failure must not block the conversation UI. See the [upstream sync ledger](upstream-web-sync.md) for the exact exceptions and validation state.
+
+If 4.2 startup fails, retain the entire `DSH_HOME` and the versioned migration backup. Use the in-app repair/rollback flow or reinstall the previous Desktop build; do not delete the profile, `node_modules`, or Session logs. A released 4.1 profile remains readable by its matching 4.1 installer. Every 4.2 release must pass an isolated overlay and packaged-app check before a public download is advertised.
+
+## Earlier 4.1.0 migration
+
+Desktop 4.1 starts the exact-reviewed `@deepseek-ai/dsh@0.1.6-alpha.1` Runtime from the community-owned `DSH_HOME` or `~/.dsh-community` and `profiles/desktop`. Before community plugins load, Desktop builds an immutable Runtime baseline from its own installation and audits the existing Profile locally. A safe managed-link drift is repaired silently; an unprovable dependency environment is left intact and routed to the focused plugin repair surface. A fresh install uses the same isolated Home with the built-in plugin set.
+
+On the first eligible upgrade from community Desktop 3.5 or 4.0, Desktop creates a versioned backup and migration fingerprint before staging the 4.1 Profile. It preserves Sessions and long context, workspaces, provider settings, credential references, Skills, plugin dependencies and enablement, skins, pet settings, Agent Team, and Value Mode. Exact legacy official DeepSeek endpoints are migrated; custom API endpoints are left unchanged. Removed E2B settings are retained in the backup but are not loaded into the 4.1 Runtime. The migration commits only after Runtime health succeeds, is idempotent on later starts, and restores the old Profile on failure. Original Session logs are never rewritten without a backup.
+
+Large historical context continues through the chunked Desktop pipe rather than one oversized IPC frame. Upgrade acceptance reopens old and newly created sessions after a complete app restart and verifies that the model can continue with the restored context.
 
 Plugin dependency changes are prepared under `.plugin-transactions` on the same volume. Registry and package work happens while the Runtime remains available. Only a validated staged graph can enter the short stop, atomic activation, managed-link repair, restart, health, and commit sequence. Any failure before the durable commit restores the prior manifest, lockfile, and physical dependency tree. An interrupted transaction is completed or rolled back from its journal at the next launch.
 

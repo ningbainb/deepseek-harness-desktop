@@ -22,7 +22,26 @@ export async function openDockSetting(app, mainPage, id) {
   await useChineseFixtureLocale(app)
   let dock = app.windows().find(page => page.url().includes('/extensions.html'))
   if (!dock) {
-    await mainPage.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first().evaluate(button => button.click())
+    const dockEntry = mainPage.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first()
+    const entryReady = await dockEntry.waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false)
+    if (entryReady) {
+      await dockEntry.evaluate(button => button.click())
+    } else {
+      // Late packaged regressions can reload the Runtime after a settings test,
+      // leaving plugin-owned sidebar actions temporarily unmounted. The setting
+      // fixture is not a sidebar-discovery assertion, so use the same allowlisted
+      // preload bridge as the Tools menu while the dedicated discovery E2E keeps
+      // validating the visible entry.
+      const opened = await mainPage.evaluate(async () => {
+        const bridge = window.dshDesktop
+        if (typeof bridge?.openExtensionDock !== 'function') return false
+        const result = await bridge.openExtensionDock()
+        return result?.opened === true
+      })
+      if (!opened) throw new Error('Extension Dock entry and Desktop bridge are both unavailable')
+    }
     for (let attempt = 0; attempt < 120; attempt++) {
       dock = app.windows().find(page => page.url().includes('/extensions.html'))
       if (dock) break

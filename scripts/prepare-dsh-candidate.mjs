@@ -15,7 +15,7 @@ export function validateCandidateVersion(value) {
 }
 
 const PATCHED_DEPENDENCIES_LINE = /^(?<prefix>patchedDependencies:\s*\{)(?<entries>.*)(?<suffix>\}\s*)$/mu
-const PATCHED_DEPENDENCY_ENTRY = /\s*'(?<name>[^']+)'\s*:\s*(?<path>[^,}]+?)\s*(?:,|$)/gu
+const PATCHED_DEPENDENCY_ENTRY = /\s*(?:'(?<quotedName>[^']+)'|(?<bareName>[^,\s:{}]+))\s*:\s*(?<path>[^,}]+?)\s*(?:,|$)/gu
 
 function dshPatchVersion(specifier) {
   if (!specifier.startsWith('@deepseek-ai/dsh')) return undefined
@@ -42,7 +42,7 @@ export function prepareCandidateWorkspaceText(workspaceText, candidateVersion) {
   for (const entry of match.groups.entries.matchAll(PATCHED_DEPENDENCY_ENTRY)) {
     const gap = match.groups.entries.slice(consumed, entry.index)
     if (gap.trim().length > 0) throw new Error('candidate patchedDependencies uses an unsupported layout')
-    entries.push({ name: entry.groups.name, path: entry.groups.path.trim() })
+    entries.push({ name: entry.groups.quotedName ?? entry.groups.bareName, path: entry.groups.path.trim() })
     consumed = entry.index + entry[0].length
   }
   if (match.groups.entries.slice(consumed).trim().length > 0) {
@@ -157,7 +157,13 @@ export async function createCandidateInstallPlan({
       throw new TypeError('candidate package manifest reader is required for workspace planning')
     }
     const names = collectWorkspaceDshPackages(workspaceManifests)
-    const results = await mapWithConcurrency(names, 6, async (name) => {
+    // pnpm is a Node CLI on Windows. Spawning several copies through the same
+    // Node 24 executable can trip a libuv async-handle assertion while child
+    // processes exit. Registry discovery is not latency critical, so keep the
+    // Windows path serial and retain bounded concurrency elsewhere.
+    const nodeMajor = Number.parseInt(process.versions.node.split('.')[0], 10)
+    const registryConcurrency = process.platform === 'win32' && nodeMajor >= 24 ? 1 : 6
+    const results = await mapWithConcurrency(names, registryConcurrency, async (name) => {
       if (name === manifest.name) return manifest
       return viewPackageManifest(name, version)
     })
@@ -171,8 +177,12 @@ export async function createCandidateInstallPlan({
       workspacePackages.push({ name, version, spec: `${name}@${version}` })
     }
     const candidateRanges = collectDependencyRanges([manifest, ...results.filter(Boolean)])
+    const workspaceRanges = collectDependencyRanges(workspaceManifests)
     for (const name of collectWorkspaceCompanionPackages(workspaceManifests)) {
-      const ranges = [...(candidateRanges.get(name) ?? [])].sort()
+      // Some platform helpers are intentionally versioned independently of
+      // DSH (for example node-addon-system). Keep an exact reviewed workspace
+      // version when the Candidate graph does not declare that companion.
+      const ranges = [...(candidateRanges.get(name) ?? workspaceRanges.get(name) ?? [])].sort()
       if (ranges.length === 0) {
         unresolvedCompanionPackages.push(name)
         continue
@@ -236,7 +246,10 @@ function run(command, args, { cwd = REPOSITORY_ROOT, capture = false } = {}) {
     child.once('error', reject)
     child.once('exit', (code) => {
       if (code === 0) resolvePromise(capture ? stdout : undefined)
-      else reject(new Error(`${command} exited with code ${String(code)}${stderr ? `: ${stderr.slice(-2_000)}` : ''}`))
+      else {
+        const diagnostic = stderr || stdout
+        reject(new Error(`${command} exited with code ${String(code)}${diagnostic ? `: ${diagnostic.slice(-2_000)}` : ''}`))
+      }
     })
   })
 }
@@ -267,7 +280,7 @@ async function viewOptionalPackageManifest(name, version) {
   try {
     return await viewJson(`${name}@${version}`)
   } catch (error) {
-    if (/E404|404 Not Found|No match found/u.test(String(error?.message ?? error))) return null
+    if (/E404|404 Not Found|No match(?:ing)? (?:version )?found|ERR_PNPM_PACKAGE_NOT_FOUND/u.test(String(error?.message ?? error))) return null
     throw error
   }
 }

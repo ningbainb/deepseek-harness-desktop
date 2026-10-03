@@ -58,7 +58,7 @@
     "prepare": "tsdown",
     "watch": "tsdown --watch",
     "test": "vitest run",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --force --pretty false"
   },
   "peerDependencies": {
     "react": "^18.2.0"

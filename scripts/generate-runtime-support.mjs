@@ -22,10 +22,14 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
 }
 
+function canonicalText(value) {
+  return value.replace(/\r\n/g, '\n')
+}
+
 // Repository text files may be materialized as CRLF on Windows. Hash their
 // canonical LF form so committed evidence is stable across checkouts.
 export function textSha256(value) {
-  return sha256(value.replace(/\r\n/g, '\n'))
+  return sha256(canonicalText(value))
 }
 
 function exactVersion(value, label) {
@@ -207,7 +211,7 @@ export async function checkRuntimeSupport({ root = REPOSITORY_ROOT, outputPath =
   const expected = renderRuntimeSupportManifest(await createRuntimeSupportManifest(root, {
     supportStatus: stable ? parsed.supportStatus : 'known-good',
   }))
-  return { current: actual === expected && stable, expected, actual }
+  return { current: canonicalText(actual) === expected && stable, expected, actual }
 }
 
 async function main() {
@@ -225,7 +229,7 @@ async function main() {
       throw new Error('Known Good check may only use known-good or supported status')
     }
     const actual = await readFile(KNOWN_GOOD_PATH, 'utf8')
-    if (actual !== content) throw new Error('Known Good runtime manifest is stale; run pnpm runtime-support:write')
+    if (canonicalText(actual) !== content) throw new Error('Known Good runtime manifest is stale; run pnpm runtime-support:write')
     console.log('Known Good runtime manifest is current')
     return
   }

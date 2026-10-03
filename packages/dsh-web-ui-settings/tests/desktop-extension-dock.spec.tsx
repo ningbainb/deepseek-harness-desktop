@@ -16,6 +16,7 @@ import {
   DesktopCollaborationEntry,
   DesktopExtensionDockEntry,
   calculateDockNudgePosition,
+  installDesktopManagementRouting,
 } from '../src/client/desktop-extension-dock.tsx'
 import { zh } from '../src/client/locales.ts'
 
@@ -31,9 +32,78 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  delete (window as unknown as { dshDesktop?: unknown }).dshDesktop
 })
 
 describe('Desktop Extension Dock entry', () => {
+  it('routes the current public skill-explorer entry without removing its native marker', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="技能中心"><span data-dsh-panel-entry="skill-explorer">技能中心</span></button></aside>'
+    const dispose = installDesktopManagementRouting(document, t)
+    const skill = screen.getByRole('button', { name: '技能中心' })
+    await waitFor(() => expect(skill.dataset.dshDesktopManagementEntry).toBe('skills'))
+    expect(skill.hasAttribute('data-dsh-skill-explorer-entry')).toBe(true)
+    fireEvent.click(skill)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'skills' }))
+    expect(skill.querySelector('[data-dsh-panel-entry="skill-explorer"]')).not.toBeNull()
+    dispose()
+    expect(skill.dataset.dshDesktopManagementEntry).toBeUndefined()
+    expect(skill.hasAttribute('data-dsh-skill-explorer-entry')).toBe(false)
+  })
+
+  it('opens the same Dock management pages from the main sidebar', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="插件">插件</button><button data-dsh-skill-explorer-entry aria-label="技能中心">技能中心</button></aside>'
+    const dispose = installDesktopManagementRouting(document, t)
+    const plugin = screen.getByRole('button', { name: '插件' })
+    const skill = screen.getByRole('button', { name: '技能中心' })
+    await waitFor(() => expect(plugin.dataset.dshDesktopManagementEntry).toBe('plugins'))
+    expect(skill.dataset.dshDesktopManagementEntry).toBe('skills')
+
+    fireEvent.click(plugin)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'plugins' }))
+    fireEvent.click(skill)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'skills' }))
+    expect(desktop.openDesktopSurface).toHaveBeenCalledTimes(2)
+    dispose()
+    expect(plugin.dataset.dshDesktopManagementEntry).toBeUndefined()
+  })
+
+  it('keeps Dock as the list entry while reopening one plugin native configuration page', async () => {
+    let request: ((value: { name: string }) => void) | undefined
+    const unsubscribe = vi.fn()
+    ;(window as unknown as { dshDesktop: unknown }).dshDesktop = {
+      onPluginSettingsOpen(listener: (value: { name: string }) => void) {
+        request = listener
+        return unsubscribe
+      },
+    }
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="插件">插件</button></aside>'
+    const nativeEntry = screen.getByRole('button', { name: '插件' })
+    let nativePageOpens = 0
+    nativeEntry.addEventListener('click', () => {
+      nativePageOpens++
+      const card = document.createElement('article')
+      card.dataset.pluginPackage = 'dsh-free-search'
+      const open = document.createElement('button')
+      open.setAttribute('aria-label', '查看 dsh-free-search')
+      open.addEventListener('click', () => {
+        const detail = document.createElement('section')
+        detail.dataset.pluginDetail = 'dsh-free-search'
+        document.body.append(detail)
+      })
+      card.append(open)
+      document.body.append(card)
+    })
+    const dispose = installDesktopManagementRouting(document, t)
+    await waitFor(() => expect(nativeEntry.dataset.dshDesktopManagementEntry).toBe('plugins'))
+
+    request?.({ name: 'dsh-free-search' })
+    await waitFor(() => expect(document.querySelector('[data-plugin-detail="dsh-free-search"]')).not.toBeNull())
+    expect(nativePageOpens).toBe(1)
+    expect(desktop.openDesktopSurface).not.toHaveBeenCalled()
+    dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
   it('shows a collaboration shortcut only on Desktop and deep-links to the unified page', async () => {
     render(<DesktopCollaborationEntry wide={true} t={t} />)
     const trigger = await screen.findByRole('button', { name: '模型协作' })
@@ -58,6 +128,25 @@ describe('Desktop Extension Dock entry', () => {
     render(<DesktopExtensionDockEntry wide={true} t={t} />)
     await waitFor(() => expect(desktop.getDockEntryState).toHaveBeenCalledTimes(1))
     expect(screen.queryByRole('button', { name: '打开拓展坞' })).toBeNull()
+  })
+
+  it('shows the shared brand icon and full label without clipping in the wide sidebar', async () => {
+    const { container } = render(<DesktopExtensionDockEntry wide={true} t={t} />)
+    const trigger = await screen.findByRole('button', { name: '打开拓展坞' })
+    expect(trigger.textContent).toContain('打开拓展坞')
+    expect(trigger.parentElement?.hasAttribute('data-dsh-extension-dock-entry')).toBe(true)
+    const icon = container.querySelector('img[aria-hidden="true"]')
+    expect(icon?.getAttribute('src')).toMatch(/^data:image\/png;base64,/u)
+    expect(icon?.getAttribute('width')).toBe('20')
+  })
+
+  it('keeps the brand icon inside the collapsed sidebar safe area', async () => {
+    const { container } = render(<DesktopExtensionDockEntry wide={false} t={t} />)
+    const trigger = await screen.findByRole('button', { name: '打开拓展坞' })
+    expect(trigger.textContent).toBe('')
+    const icon = container.querySelector('img[aria-hidden="true"]')
+    expect(icon?.getAttribute('width')).toBe('22')
+    expect(trigger.getAttribute('title')).toBe('打开拓展坞')
   })
 
   it('shows the exact lightweight first-three-launch message and closes without blocking', async () => {

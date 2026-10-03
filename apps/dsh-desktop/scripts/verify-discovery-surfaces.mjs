@@ -10,6 +10,15 @@ import { _electron as electron } from 'playwright'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-discovery-surfaces-e2e-'))
 const output = resolve(process.env.DSH_DESKTOP_E2E_SCREENSHOT ?? resolve(temporary, 'discovery-surfaces-preview.png'))
+const dockOutput = process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_DOCK_SCREENSHOT)
+  : undefined
+const pluginDockOutput = process.env.DSH_DESKTOP_E2E_PLUGIN_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_PLUGIN_SCREENSHOT)
+  : undefined
+const skillDockOutput = process.env.DSH_DESKTOP_E2E_SKILL_SCREENSHOT
+  ? resolve(process.env.DSH_DESKTOP_E2E_SKILL_SCREENSHOT)
+  : dockOutput
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const marketInstallId = process.env.DSH_DESKTOP_E2E_MARKET_INSTALL_ID
 if (marketInstallId !== undefined && !/^[A-Za-z0-9_-]{20}$/u.test(marketInstallId)) {
@@ -44,7 +53,10 @@ async function dismissFirstRunSurfaces(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
     await page.waitForTimeout(250)
     if (await introDialog.isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
+      const action = continueButton.last()
+      if (await action.isEnabled().catch(() => false)) {
+        await action.click({ force: true, timeout: 2_000 }).catch(() => {})
+      }
       continue
     }
     if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
@@ -104,6 +116,38 @@ try {
     `ChatGPT OAuth is absent from the authorization bridge: ${JSON.stringify(chatGptAuth)}`,
   )
 
+  const chatGptBrowserProbe = await page.evaluate(async () => {
+    const post = async (path, body = {}) => {
+      const response = await fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      return { status: response.status, result: await response.json() }
+    }
+
+    let snapshot = await post('/api/dsh-chatgpt-auth/begin', { loginMode: 'browser' })
+    const deadline = Date.now() + 15_000
+    while (
+      Date.now() < deadline
+      && snapshot.result?.value?.phase !== 'failed'
+      && snapshot.result?.value?.notice?.url === undefined
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+      snapshot = await post('/api/dsh-chatgpt-auth/state')
+    }
+    await post('/api/dsh-chatgpt-auth/cancel')
+    return snapshot
+  })
+  assert.equal(chatGptBrowserProbe.status, 200, JSON.stringify(chatGptBrowserProbe))
+  assert.equal(chatGptBrowserProbe.result?.ok, true, JSON.stringify(chatGptBrowserProbe))
+  assert.notEqual(chatGptBrowserProbe.result?.value?.phase, 'failed', JSON.stringify(chatGptBrowserProbe))
+  assert.ok(chatGptBrowserProbe.result?.value?.notice?.url, JSON.stringify(chatGptBrowserProbe))
+  assert.notEqual(chatGptBrowserProbe.result?.value?.prompt?.kind, 'select', JSON.stringify(chatGptBrowserProbe))
+
   const nudge = page.getByText(/插件、技能和桌面核心功能在这里|Plugins, skills, and core Desktop features are here/u)
   await nudge.waitFor({ state: 'visible' })
   const nudgeGeometry = await nudge.locator('..').evaluate((element) => {
@@ -157,18 +201,91 @@ try {
   const codex = groups.find(group => /codex/iu.test(group.name ?? ''))
   assert.ok(codex, `OpenAI Codex provider is absent from the model selector: ${JSON.stringify(groups)}`)
   assert.ok(codex.models.length > 0, `OpenAI Codex has no selectable models: ${JSON.stringify(codex)}`)
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  const pluginManagementTrigger = page.getByRole('button', { name: /^(?:插件|Plugins)$/u })
+  const skillManagementTrigger = page.getByRole('button', { name: /^(?:技能中心|Skill Center)$/u })
+  await pluginManagementTrigger.waitFor({ state: 'visible' })
+  await skillManagementTrigger.waitFor({ state: 'visible' })
+  assert.equal(await pluginManagementTrigger.count(), 1, 'Desktop must expose exactly one plugin-management shortcut')
+  assert.equal(await skillManagementTrigger.count(), 1, 'Desktop must expose exactly one skill-management shortcut')
+  assert.equal(await pluginManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'plugins')
+  assert.equal(await skillManagementTrigger.getAttribute('data-dsh-desktop-management-entry'), 'skills')
+  assert.equal(await page.locator('[data-dsh-skill-explorer-entry]').isVisible(), true)
+  const dockEntryTrigger = page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
+  await dockEntryTrigger.waitFor({ state: 'visible' })
+  const dockEntryGeometry = await dockEntryTrigger.evaluate((button) => {
+    const bounds = button.getBoundingClientRect()
+    const icon = button.querySelector('img')?.getBoundingClientRect()
+    const ancestry = []
+    let current = button.parentElement
+    for (let depth = 0; current !== null && depth < 5; depth += 1, current = current.parentElement) {
+      const rect = current.getBoundingClientRect()
+      const style = getComputedStyle(current)
+      ancestry.push({
+        tag: current.tagName,
+        className: current.className,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        overflow: style.overflow,
+        display: style.display,
+        flexWrap: style.flexWrap,
+      })
+    }
+    return {
+      wide: button.parentElement?.getAttribute('data-wide'),
+      text: button.textContent?.trim(),
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      icon: icon === undefined ? undefined : { left: icon.left, right: icon.right, top: icon.top, bottom: icon.bottom },
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      ancestry,
+    }
+  })
+  assert.equal(dockEntryGeometry.wide, 'wide', JSON.stringify(dockEntryGeometry))
+  assert.match(dockEntryGeometry.text ?? '', /打开拓展坞|Open Extension Dock/u)
+  const footerActions = dockEntryGeometry.ancestry.find(ancestor => /footerActions/u.test(String(ancestor.className)))
+  assert.ok(footerActions, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.left >= footerActions.left, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.right <= footerActions.right, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon.left >= dockEntryGeometry.left, JSON.stringify(dockEntryGeometry))
+  assert.ok(dockEntryGeometry.icon.right <= dockEntryGeometry.right, JSON.stringify(dockEntryGeometry))
   await page.screenshot({ path: output })
 
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  const dockTrigger = page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
   const extensionWindowPromise = electronApp.waitForEvent('window', {
     predicate: candidate => candidate.url().includes('extensions.html'),
     timeout: 10_000,
   }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
-  await dockTrigger.click()
+  await pluginManagementTrigger.click()
   extensionWindow = await extensionWindowPromise
-  assert.ok(extensionWindow, 'one-click Extension Dock entry did not open extensions.html')
+  assert.ok(extensionWindow, 'plugin-management shortcut did not open extensions.html')
+  await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
+  await extensionWindow.waitForFunction(() => document.querySelector('#plugins-hub-tab')?.getAttribute('aria-selected') === 'true')
+  assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
+  if (pluginDockOutput) await extensionWindow.screenshot({ path: pluginDockOutput })
+
+  await page.bringToFront()
+  await skillManagementTrigger.click()
+  await extensionWindow.locator('#skills').waitFor({ state: 'visible' })
+  await extensionWindow.waitForFunction(() => document.querySelector('#skills-tab')?.getAttribute('aria-selected') === 'true')
+  assert.equal(await extensionWindow.locator('#skills-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(
+    electronApp.windows().filter(candidate => candidate.url().includes('extensions.html')).length,
+    1,
+    'management shortcuts must reuse the singleton Extension Dock window',
+  )
+  if (skillDockOutput) await extensionWindow.screenshot({ path: skillDockOutput })
+
+  await page.bringToFront()
+  await pluginManagementTrigger.click()
+  await extensionWindow.locator('#plugins').waitFor({ state: 'visible' })
+  assert.equal(await extensionWindow.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true')
 
   let installedMarketPlugin
   if (marketInstallId !== undefined) {
@@ -202,15 +319,20 @@ try {
 
   console.log(JSON.stringify({
     nudgeGeometry,
+    dockEntryGeometry,
     codexProvider: codex.name,
     codexModels: codex.models,
     chatGptAuth: {
       available: chatGptAuth.result.value.available,
       writable: chatGptAuth.result.value.writable,
       methods: chatGptAuth.result.value.methods.map(method => method.id),
+      browserModeReachedCallbackWait: chatGptBrowserProbe.result.value.notice?.url !== undefined,
+      browserModePromptKind: chatGptBrowserProbe.result.value.prompt?.kind,
     },
     installedMarketPlugin,
     screenshot: output,
+    dockScreenshot: skillDockOutput,
+    pluginDockScreenshot: pluginDockOutput,
   }))
 } catch (error) {
   console.error(JSON.stringify({

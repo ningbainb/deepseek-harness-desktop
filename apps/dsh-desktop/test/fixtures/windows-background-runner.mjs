@@ -1,5 +1,6 @@
 // Exercise the real official Windows Job runner under Electron's GUI subsystem.
 import { createRequire } from 'node:module'
+import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
@@ -27,6 +28,8 @@ using System.Runtime.InteropServices;
 public static class DshConsoleProbe {
   [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
   [DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList([Out] uint[] processes, uint size);
+  [DllImport("kernel32.dll")] public static extern bool FreeConsole();
+  [DllImport("kernel32.dll")] public static extern bool AllocConsole();
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
 }
@@ -54,7 +57,11 @@ try {
       env: probeAssemblyUsed ? { DSH_CONSOLE_PROBE_ASSEMBLY: process.env.DSH_CONSOLE_PROBE_ASSEMBLY } : {},
       stdio: { stdin: 'ignore', stdout: { maxBytes: 16_384 }, stderr: { maxBytes: 16_384 } },
       graceMs: 1_000,
-      signal: AbortSignal.timeout(15_000),
+      // A fresh hosted Windows runner may spend more than 15 seconds preparing
+      // PowerShell's first-use module cache before Add-Type executes. Keep the
+      // repeated warm probes strict while giving only the first cold probe a
+      // bounded startup allowance.
+      signal: AbortSignal.timeout(index === 0 ? 30_000 : 15_000),
     })
     const outcome = await handle.done
     await handle.waitForExit()

@@ -381,6 +381,7 @@ function repositoryCommit() {
 }
 
 function releaseArtifactEvidence() {
+  if (SOURCE_ONLY) return undefined
   const manifestPath = resolve(APP_DIR, 'dist', 'release-manifest.json')
   if (!existsSync(manifestPath)) return undefined
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))

@@ -8,6 +8,7 @@ import {
   CONVERSATION_SKILLS_CSS,
   CONVERSATION_SKILLS_SCRIPT,
   filterConversationSkills,
+  groupConversationSkills,
   insertSkillTrigger,
   installConversationSkills,
   normalizeConversationSkills,
@@ -99,6 +100,17 @@ test('outside navigation closes skills even when the native document consumes po
   }
 })
 
+test('recent skills stay duplicated in the complete skills group', () => {
+  const skills = normalizeConversationSkills([
+    { name: 'playwright', source: 'user-agents' },
+    { name: 'code', source: 'user-dsh' },
+  ], ['code'])
+  const groups = groupConversationSkills(skills)
+  assert.deepEqual(groups.map((group) => group.label), ['最近使用', '全部技能'])
+  assert.deepEqual(groups[0].skills.map((skill) => skill.name), ['code'])
+  assert.deepEqual(groups[1].skills.map((skill) => skill.name), ['code', 'playwright'])
+})
+
 test('skill trigger uses a stable natural-language invocation', () => {
   assert.equal(buildSkillTrigger('playwright'), '使用 playwright 技能：')
   assert.throws(() => buildSkillTrigger('  '), /skill name/u)
@@ -172,10 +184,14 @@ test('skills surface exposes accessible menu, search, keyboard, and theme rules'
   assert.match(CONVERSATION_SKILLS_SCRIPT, /ArrowUp/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /Escape/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /MutationObserver/u)
+  assert.match(CONVERSATION_SKILLS_SCRIPT, /window\.addEventListener\('click', onOutsideInteraction, true\)/u)
+  assert.match(CONVERSATION_SKILLS_SCRIPT, /window\.removeEventListener\('click', onOutsideInteraction, true\)/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /listSkills/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="指令"/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="命令"/u)
   assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="Commands"/u)
+  assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="添加文件或运行命令"/u)
+  assert.match(CONVERSATION_SKILLS_SCRIPT, /aria-label="Add files or run commands"/u)
   assert.doesNotMatch(CONVERSATION_SKILLS_SCRIPT, /innerHTML\s*=/u)
 })
 

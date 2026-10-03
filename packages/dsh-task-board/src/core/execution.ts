@@ -30,6 +30,12 @@ export interface SessionsExecutionFace {
     /** DSH 1.1.5 keeps transcript events beside, rather than inside, the Session snapshot. */
     eventSource?: SessionEventSourceFace
   } | undefined
+  /** Own a background Session generation through prompt settlement on 0.1.6+. */
+  acquire?(id: string): {
+    binding: NonNullable<ReturnType<SessionsExecutionFace['binding']>>
+    ready: Promise<unknown>
+    release(): void
+  }
 }
 
 /** The narrow workspaces face the service needs. */
@@ -123,10 +129,15 @@ export class ExecutionService {
     execution: ExecutionRecord,
     onEvent: (event: ExecutionEvent) => void,
   ): Promise<void> {
+    let release: (() => void) | undefined
+    let watching = false
     try {
       const { sessionId, workspaceId } = await this.connectSession()
       onEvent({ kind: 'started', taskId: task.id, executionId: execution.id, sessionId, workspaceId })
-      const binding = this.bindingOf(sessionId)
+      const owned = this.env.sessions.acquire?.(sessionId)
+      release = owned?.release
+      if (owned !== undefined) await owned.ready
+      const binding = owned?.binding ?? this.bindingOf(sessionId)
       if (binding === undefined) {
         onEvent({ kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'failed', error: 'execution session is not ready' })
         return
@@ -146,12 +157,15 @@ export class ExecutionService {
         })
         return
       }
-      this.watchForSettlement(binding, task.id, execution.id, onEvent, baseline)
+      this.watchForSettlement(binding, task.id, execution.id, onEvent, baseline, release)
+      watching = true
     } catch (error) {
       onEvent({
         kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'failed',
         error: messageOf(error),
       })
+    } finally {
+      if (!watching) release?.()
     }
   }
 
@@ -266,6 +280,7 @@ export class ExecutionService {
     executionId: string,
     onEvent: (event: ExecutionEvent) => void,
     baseline: number,
+    release?: () => void,
   ): void {
     const driver = binding.session
     let settled = false
@@ -278,11 +293,13 @@ export class ExecutionService {
       settled = true
       unsubscribeSession()
       unsubscribeEvents()
-      onEvent({
-        kind: 'settled', taskId, executionId,
-        outcome: snapshot.lastAgentError !== null ? 'failed' : 'succeeded',
-        error: snapshot.lastAgentError ?? undefined,
-      })
+      try {
+        onEvent({
+          kind: 'settled', taskId, executionId,
+          outcome: snapshot.lastAgentError !== null ? 'failed' : 'succeeded',
+          error: snapshot.lastAgentError ?? undefined,
+        })
+      } finally { release?.() }
     }
     unsubscribeSession = driver.subscribe(check)
     unsubscribeEvents = binding.eventSource?.subscribe(check) ?? (() => {})

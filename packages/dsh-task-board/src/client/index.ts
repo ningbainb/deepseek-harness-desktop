@@ -25,7 +25,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface Context merge (ctx.settingsScope).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { BoardController } from '../core/controller.ts'
-import { ExecutionService } from '../core/execution.ts'
+import { ExecutionService, type ExecutionHistoryEvent } from '../core/execution.ts'
 import { InMemoryEvidenceStore } from '../core/evidence.ts'
 import { SchedulerService } from '../core/scheduler.ts'
 import { LocalStorageTaskStore } from '../core/store.ts'
@@ -42,6 +42,7 @@ import { EvidenceReviewService } from '../core/review.ts'
 import { mountSidebarEntry } from './sidebar-entry.ts'
 import { TaskBoardSettingsCard, TaskBoardSettingsCardController, type TaskBoardSettings } from './TaskBoardSettingsCard.tsx'
 import { en, zh, type TaskBoardKey } from './locales.ts'
+import { mainSessionId } from './main-session.ts'
 
 /** Locale namespace this plugin owns. */
 const NS = 'task-board'
@@ -143,6 +144,7 @@ export function apply(ctx: ClientContext): void {
     void (async () => {
       const sessions = ctx.sessions
       const workspaces = ctx.workspaces
+      const ownedSessions = new Set<{ release(): void }>()
 
       // HostTaskStore v3 is authoritative when reachable. Its Host half does
       // the copy-first v2 migration; the old v2/local path remains the safe
@@ -162,6 +164,21 @@ export function apply(ctx: ClientContext): void {
         sessions: {
           list: sessions.list,
           binding: id => sessions.binding(id as SessionId),
+          acquire: id => {
+            const reference = sessions.retain(id as SessionId, { source: 'taskBoard' })
+            ownedSessions.add(reference)
+            let released = false
+            return {
+              binding: reference.binding,
+              ready: reference.ready,
+              release: () => {
+                if (released) return
+                released = true
+                ownedSessions.delete(reference)
+                reference.release()
+              },
+            }
+          },
         },
         workspaces: {
           // DSH 1.1.5 moved Session creation out of the Workspace Controller.
@@ -177,14 +194,14 @@ export function apply(ctx: ClientContext): void {
               return { items: snapshot.items, recentWorkspaceId }
             },
           },
-          connectWorkspace: id => sessions.create({ workspaceId: id as WorkspaceId }),
+          connectWorkspace: id => ctx.uiWorkspace.connectWorkspace(id as WorkspaceId),
         },
         history: {
           loadTail: async sessionId => {
             const binding = sessions.binding(sessionId as SessionId)
             if (binding === undefined) return undefined
             return {
-              events: binding.eventSource.getSnapshot().entries.map(entry => entry.event),
+              events: binding.eventSource.getSnapshot().entries.map((entry: { event: ExecutionHistoryEvent }) => entry.event),
             }
           },
         },
@@ -237,6 +254,10 @@ export function apply(ctx: ClientContext): void {
       scheduler.start()
 
       const disposers: Array<() => void> = []
+      disposers.push(() => {
+        for (const reference of ownedSessions) reference.release()
+        ownedSessions.clear()
+      })
       const openSessionFromDeepLink = async (sessionId: string): Promise<void> => {
         const refresh = (sessions as typeof sessions & { refresh?: () => Promise<void> }).refresh
         // Keep the SessionRuntime receiver when the optional compatibility

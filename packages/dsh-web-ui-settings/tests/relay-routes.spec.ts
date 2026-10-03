@@ -123,17 +123,47 @@ describe('relay model normalization', () => {
     expect(normalizeRelayModels({ data: [
       { id: 'alpha', name: 'Alpha' },
       { id: 'alpha', name: 'duplicate' },
-      { id: 'beta' },
+      { id: 'beta', name: 'bad\nname' },
+      { id: 'gamma', name: 'x'.repeat(257) },
       { id: 'bad\nmodel' },
       { name: 'missing id' },
     ] })).toEqual([
       { id: 'alpha', name: 'Alpha' },
       { id: 'beta', name: 'beta' },
+      { id: 'gamma', name: 'gamma' },
     ])
   })
 })
 
 describe('relay onboarding routes', () => {
+  it('refreshes models with the stored Key and preserves the old list on fetch failure', async () => {
+    const settings = fakeSettings()
+    const credentials = fakeCredentials()
+    let modelId = 'original'
+    let fail = false
+    const fetchImpl: typeof fetch = async () => fail
+      ? new Response('unavailable', { status: 503 })
+      : new Response(JSON.stringify({ data: [{ id: modelId }] }))
+    const routes = makeRelayRoutes({ settings: settings.seam, credentials: credentials.seam, fetchImpl })
+    try {
+      const configured = await invoke(routes, RELAY_CONFIGURE_PATH, relayRequest(RELAY_CONFIGURE_PATH, { apiKey: 'saved-key' }))
+      expect(configured.status).toBe(200)
+      const profile = (settings.value.providers as Record<string, Record<string, unknown>>)['project-relay']
+      profile.defaultContextWindow = 65_536
+      modelId = 'new-model'
+      const refreshed = await invoke(routes, RELAY_REFRESH_PATH, relayRequest(RELAY_REFRESH_PATH))
+      expect(refreshed.body).toMatchObject({ ok: true, models: [{ id: 'new-model', name: 'new-model' }] })
+      expect(JSON.stringify(refreshed.body)).not.toContain('saved-key')
+      expect((settings.value.providers as Record<string, Record<string, unknown>>)['project-relay'].defaultContextWindow).toBe(65_536)
+      expect(credentials.value()).toBe('saved-key')
+      fail = true
+      const failed = await invoke(routes, RELAY_REFRESH_PATH, relayRequest(RELAY_REFRESH_PATH))
+      expect(failed.status).toBe(502)
+      expect((await invoke(routes, RELAY_STATUS_PATH, relayRequest(RELAY_STATUS_PATH))).body)
+        .toMatchObject({ configured: true, models: [{ id: 'new-model', name: 'new-model' }] })
+    } finally { routes.dispose() }
+  })
+
   it('completes browser authorization through the same credential and provider configuration path', async () => {
     const settings = fakeSettings()
     const credentials = fakeCredentials()

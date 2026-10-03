@@ -85,6 +85,25 @@
   color: var(--dsw-alias-state-error-primary, #ef4444);
 }
 
+.success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #10a37f 36%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, #10a37f 9%, transparent);
+}
+
+.success p,
+.browserGuide {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #9ca3af);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .notice,
 .prompt {
   display: flex;
@@ -263,6 +282,11 @@
 }
 
 @media (max-width: 520px) {
+  .success {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .answerRow {
     align-items: stretch;
     flex-direction: column;

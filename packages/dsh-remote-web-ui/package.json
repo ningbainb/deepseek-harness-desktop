@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -b && tsdown",
     "test": "vitest run",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --force --pretty false",
     "prepare": "tsdown --config tsdown.prepare.config.ts"
   },
   "main": "lib/index.js",
@@ -108,7 +108,8 @@
     "react-dom": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "@deepseek-ai/dsh-client-ui-session": "0.2.0-rc.2"
   },
   "repository": {
     "type": "git",

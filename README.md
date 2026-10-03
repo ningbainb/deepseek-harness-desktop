@@ -1,5 +1,7 @@
 # DeepSeek Harness Desktop
 
+<p align="center"><img src="docs/brand/app-icon.png" width="160" alt="DeepSeek Harness Desktop 应用图标"></p>
+
 中文 | [English](README.en.md)
 
 > **项目由 ningbai牛逼 维护**：如果 DeepSeek Harness Desktop 对你有帮助，欢迎在[爱发电支持 ningbai牛逼](https://www.ifdian.net/a/ningbai)。你的支持将用于服务器、测试环境和后续维护。
@@ -7,8 +9,6 @@
 > 扫码支持：
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="爱发电赞助二维码"></a>
-
-![DeepSeek Harness Desktop](docs/dsh-web-ui-banner.png)
 
 ## DeepSeek Harness Desktop 用户交流群
 
@@ -32,29 +32,50 @@ QQ 群：**1105158177**
 
 ---
 
-**DeepSeek Harness Desktop** 是社区维护的开源 Windows AI 编程桌面客户端。
+**DeepSeek Harness Desktop** 是社区维护的开源 AI 编程桌面客户端。
 
 DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公开的官方 **DSH Runtime、Web UI 与官方仓库中的 Desktop 能力边界** 融合为可安装的 Windows 应用，并在独立社区宿主中补齐插件、Skills、任务自动化、Git、远程开发和桌面体验。它不是 DeepSeek 官方客户端，也不使用或覆盖未来官方 Desktop 的应用身份、数据目录与更新源。
 
-支持 **Windows 10 / 11 x64**，采用 **BSD-3-Clause** 许可证。
+支持 **Windows 10 / 11 x64**；同时提供 **macOS Apple Silicon arm64 Preview** 与 **Linux x64 Preview**。项目采用 **BSD-3-Clause** 许可证。
 
-安装包已包含主要运行组件，无需另外配置 Node.js、Git 或单独安装 DSH。
+安装包已包含 Node.js 与 DSH；Windows 同时内置 Git，macOS 与 Linux 的 Git 操作需要系统安装 Git。
 
 [产品介绍](https://ningbainb.github.io/deepseek-harness-desktop/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-### 4.0.0：正式版
+### 5.0.0：稳定升级，三端同版
 
-当前公开稳定版为 4.0.0，已完成普通版正式发布门禁。
+5.0.0 锁定官方 NPM DSH `0.2.0-rc.2`，使用公开 `dsh-web-all@0.4.4` 与 Desktop 专有适配，不修改官方源码。发布目标为 Windows x64、macOS arm64、Linux x64 同版发行；当前仍处于发布验收，三端原生测试、打包与资产校验全部通过才发布。以实际 GitHub Release 和同目录 SHA-256 为准。
 
-- **官方 Desktop 能力已融合**：精确锁定公开的官方 DSH 0.1.5-rc.2 Runtime 与拆分 SDK，并对照官方仓库 Desktop 边界完成生命周期、窗口、协议、更新和数据隔离适配；社区应用身份保持独立。
-- **3.5 覆盖升级更可靠**：旧插件清单只读扫描并按精确版本恢复；历史会话投影异常降级而不阻断正文；宠物设置保存、本地 `.tgz` 重复安装和 Git 市场失败分类已修复。
-- **模型协作更容易找到**：会话左侧栏新增固定入口，Agent Team 与性价比模式合并到同一页面且可独立开启；bai 供应商在相关模型选择器中统一置顶。
-- **Skills 与桌面交互统一**：技能中心和会话技能菜单指向同一 DSH Home；底部面板不再隐式启动终端，窗口控件和隐藏控制台行为完成回归。
-- **埋点更有用也更克制**：增加 Skills、Agent Team 和局域网访问的固定结果事件，并保留会话导入入口与插件操作的粗粒度信号；仍不采集对话、Prompt、文件内容、路径、模型名、Token 或密钥，详见 [隐私政策](PRIVACY.md)。
+- **会话更可靠**：认证分片承载长历史与工具结果，覆盖 A→B→A 切换及重启恢复；超限明确报错，不静默截断，也不自动上传旧会话。
+- **升级保护数据**：覆盖安装使用事务备份与失败回滚；保全 Profile 中新旧模型、插件配置及用户开关，恢复插件详情配置、Skills 与用量统计入口。
+- **模型接入更省步骤**：bai 登录后优先选择真实目录中的 `deepseek-flash`，定期更新目录；缺少授权或密钥失效时引导浏览器登录，不自动充值、付费或重发消息。第三方 API 仍可独立接入。
+- **工作台完整保留**：任务看板、Git、文件交付、模型协作、桌宠、15 套皮肤、SSH 与远程访问继续提供；恢复 4.4.0 品牌图标。
+- **终端与操控边界清楚**：保留 PowerShell、PowerShell 7、WSL、CMD 选择；Agent WSL 独立审批，Browser Use 和 Computer Use 默认关闭，启停失败恢复原配置。
+- **三端与隐私**：统一版本，分别使用原生 Runner 验收；安装包不签名，macOS 不公证。官方包包含匿名使用统计，不采集会话、代码、路径、截图或凭据，开发与测试版本默认断开。
 
-![DeepSeek Harness Desktop 4.0.0 模型协作](docs/screenshots/desktop-4.0.0-rc.3/model-collaboration.png)
+[上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [5.0.0 发布说明](docs/launch/release-notes.md)
 
-![DeepSeek Harness Desktop 4.0.0 会话 Skills 与桌面入口](docs/screenshots/desktop-4.0.0-rc.3/conversation-skills.png)
+以下为 5.0.0 Windows 隔离运行界面，不代表 macOS 或 Linux 已验收；扩展坞配置页由真实窗口与内嵌 WebContents 采集合成，无注入用户数据。
+
+| 主界面 | 扩展坞插件中心 |
+| --- | --- |
+| ![5.0.0 Windows 主界面](docs/screenshots/desktop-5.0.0/main.png) | ![5.0.0 Windows 插件中心](docs/screenshots/desktop-5.0.0/plugins.png) |
+| 模型接入与 bai 授权 | Skills 与统一发现 |
+| ![5.0.0 Windows 模型接入](docs/screenshots/desktop-5.0.0/bai-models.png) | ![5.0.0 Windows Skills](docs/screenshots/desktop-5.0.0/skills.png) |
+
+### 4.1.0：让 DeepSeek 操作浏览器和电脑
+
+4.1.0 引入智能操控。Windows x64 为正式版，macOS arm64 与 Linux x64 为 Preview；三端全部通过后才会进入同一个 GitHub Release。
+
+- **Browser Use**：默认使用官方 Playwright MCP，在可见、隔离的系统浏览器会话中执行；自动发现 Chrome、Edge 或 Chromium，点击、输入、上传和下载仍需审批。
+- **Computer Use**：默认使用随包安装的 Cua Driver Native，外置 MCP 可作为隔离回退；截图和窗口枚举可观察，鼠标键盘操作逐次确认，连续启动失败自动进入安全模式。
+- **DSH 0.1.6 破坏性更新适配**：精确锁定 `@deepseek-ai/dsh@0.1.6-alpha.1`，完成 Agent、Session、PTC、Workflow、Sandbox 与 Agent Team 新契约迁移。
+- **3.5/4.0 数据事务继承**：会话与长上下文、Workspace、模型、凭据引用、Skills、插件、皮肤、桌宠与协作设置在修改前备份，失败回滚，原始 Session 日志不被无备份改写。
+- **埋点保持克制**：新增的操控事件仅使用固定结果词表，不采集 URL、域名、窗口名称、截图、Prompt、工具参数、路径或凭据，详见 [隐私政策](PRIVACY.md)。
+
+[智能操控使用指南](docs/smart-control.md) · [完整 4.1.0 发布说明](docs/launch/release-notes.md)
+
+![DeepSeek Harness Desktop 4.1.0 智能操控中心](docs/screenshots/desktop-4.1.0/control-center.png)
 
 ### 持续提供的核心能力
 
@@ -69,7 +90,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 ## 模型协作、Skills 与模型接入
 
-以下截图来自 4.0.0 最终候选的真实 Electron 验收环境。
+以下实机截图展示 4.1 智能操控，以及持续提供的模型协作、Skills 与模型接入。
 
 ### 模型协作：Agent Team 与性价比模式放在同一处
 
@@ -89,7 +110,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目已经把公�
 
 ![DeepSeek Harness Desktop 4.0.0 bai 模型接入](docs/screenshots/desktop-4.0.0-rc.3/bai-models.png)
 
-详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [4.0 发布说明](docs/launch/release-notes.md)。
+详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [4.1 发布说明](docs/launch/release-notes.md)。
 
 
 ## 为什么选择 DeepSeek Harness Desktop

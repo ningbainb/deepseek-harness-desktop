@@ -102,7 +102,7 @@ export type PetSettingsCardProps =
  */
 export function PetSettingsCard(props: PetSettingsCardProps) {
   const { t } = props
-  const state = props.usePetSettingsCard(snapshot => snapshot)
+  const state = props.usePetSettingsCard((snapshot: PetSettingsCardState) => snapshot)
   const disabled = !state.writable
   const fieldProps = {
     overriddenLabel: t('settings.overridden'),

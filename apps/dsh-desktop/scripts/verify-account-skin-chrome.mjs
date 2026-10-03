@@ -134,7 +134,7 @@ try {
   }
   assert.ok(baiSettings, 'bai recommendation opens existing provider setup view')
   await baiSettings.locator('[data-dsh-dock-settings="models"] [data-relay-onboarding-card="true"]').waitFor({ timeout: 60_000 })
-  await baiSettings.getByRole('button', { name: /^(?:登录并连接 bai|Sign in and connect bai)$/u }).waitFor({ timeout: 30_000 })
+  await baiSettings.getByRole('button', { name: /^(?:登录或注册，自动连接 bai|Sign in or register and connect bai)$/u }).waitFor({ timeout: 30_000 })
   evidence.baiSetupReady = true
   await baiSettings.screenshot({ path: join(temporary, 'bai-provider-setup.png') })
   await dock.close()

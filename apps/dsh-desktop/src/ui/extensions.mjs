@@ -40,6 +40,7 @@ const nativePluginGrid = document.querySelector('#native-plugin-grid')
 const nativeResultState = document.querySelector('#native-result-state')
 const skillCount = document.querySelector('#skill-count')
 const marketCount = document.querySelector('#market-count')
+const marketBridge = document.querySelector('#market-bridge')
 const marketTotal = document.querySelector('#market-total')
 const marketUpdated = document.querySelector('#market-updated')
 const marketQuery = document.querySelector('#market-query')
@@ -350,7 +351,10 @@ function pluginDetailMarkup(plugin) {
   const permissions = plugin.permissions?.length
     ? plugin.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
     : '<li>未声明额外权限</li>'
-  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label><dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
+  const settingsAction = plugin.enabled
+    ? `<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>在主界面的原生插件详情中配置此插件提供的选项。</p></div><button type="button" class="primary" data-open-plugin-settings="${escapeHtml(plugin.name)}">打开插件设置</button></section>`
+    : '<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>启用插件后可打开它提供的详细设置。</p></div></section>'
+  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label>${settingsAction}<dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
 }
 
 const NATIVE_PLUGINS = [
@@ -653,7 +657,14 @@ function renderNativePlugins(installedPlugins = cachedInstalledPlugins) {
 
 function skillMarkup(skill) {
   const shadow = skill.shadowed ? '<span class="badge shadowed">SHADOWED</span>' : ''
-  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(skill.name)}</span>${shadow}</div><p class="description">${escapeHtml(skill.description)}</p></div><button type="button" class="item-action" data-open-skill="${escapeHtml(skill.id)}">${escapeHtml(skill.source)}</button></article>`
+  const sourceLabels = {
+    'project-dsh': '项目 · .dsh',
+    'project-agents': '项目 · .agents',
+    'user-dsh': '用户 · .dsh',
+    'user-agents': '用户 · .agents',
+  }
+  const source = sourceLabels[skill.source] ?? skill.source
+  return `<article class="item"><div><div class="name-row"><span class="name">${escapeHtml(skill.name)}</span>${shadow}</div><p class="description">${escapeHtml(skill.description)}</p></div><button type="button" class="item-action skill-source" data-open-skill="${escapeHtml(skill.id)}" title="打开 ${escapeHtml(skill.source)} 技能目录">${escapeHtml(source)}</button></article>`
 }
 
 function communityPluginMarkup(plugin) {
@@ -754,6 +765,9 @@ function refreshMarket({ force = false } = {}) {
       const catalog = await window.dshDesktop.listCommunityMarket(force)
       marketCatalog = catalog
       marketPage = 1
+      marketBridge.textContent = catalog.bridge?.provider === 'dshmarket' && catalog.bridge?.installation === 'desktop-managed'
+        ? '已接入 dshmarket 兼容目录；安装、卸载和回滚由 Desktop 安全事务接管。'
+        : '社区目录已接入；安装、卸载和回滚由 Desktop 安全事务接管。'
       marketCount.textContent = compactNumber.format(catalog.count)
       marketTotal.textContent = compactNumber.format(catalog.count)
       marketUpdated.textContent = catalog.updated ?? '--'
@@ -775,6 +789,7 @@ function refreshMarket({ force = false } = {}) {
       }
       marketCatalog = undefined
       marketView = undefined
+      marketBridge.textContent = '市场目录暂时不可用；不会影响已安装插件。'
       marketCount.textContent = '--'
       marketTotal.textContent = '--'
       marketUpdated.textContent = '--'
@@ -1210,14 +1225,14 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
 let activeSettingsTab
 let activeSettingsPlugin
 const groupTitles = {
-  plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能'], qqbot: ['扩展能力', 'QQ 机器人'],
+  plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能中心'], qqbot: ['扩展能力', 'QQ 机器人'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
 function activateTab(tab, focus = false, settingOverride, plugin) {
@@ -1266,8 +1281,15 @@ function activateTab(tab, focus = false, settingOverride, plugin) {
     }
   })
   for (const item of tabs) {
-    const active = item.closest('.settings-sidebar')
-      ? item.dataset.group === tab.dataset.group
+    const sidebarItem = item.closest('.settings-sidebar')
+    const exactSidebarDestination = sidebarItem && tabs.some((candidate) => {
+      if (!candidate.closest('.settings-sidebar')) return false
+      return candidate.dataset.tab === tab.dataset.tab && (candidate.dataset.setting ?? '') === (tab.dataset.setting ?? '')
+    })
+    const active = sidebarItem
+      ? (exactSidebarDestination
+          ? item.dataset.tab === tab.dataset.tab && (item.dataset.setting ?? '') === (tab.dataset.setting ?? '')
+          : item.dataset.group === tab.dataset.group)
       : item.dataset.tab === tab.dataset.tab
     item.classList.toggle('active', active)
     item.setAttribute('aria-selected', String(active))
@@ -1299,14 +1321,15 @@ const searchEntries = [
   ['模型与能力', '模型目录 图片输入 推理档位 供应商 bai 中转站 登录 账号 充值 API Key 启用 停用 模型接入', 'models-tab'],
   ['用量与余额', '统计 token 额度 套餐 费用 供应商', 'usage-tab'],
   ['会话管理', '聊天历史 搜索 归档 恢复 清理', 'sessions-tab'],
+  ['智能操控', 'Browser Use Computer Use 浏览器 电脑 Playwright Cua', 'control-center-tab'],
   ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
   ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
-  ['发现插件', '插件市场 社区 群友作品', 'market-tab'],
+  ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
-  ['技能', '导入技能 Skill', 'skills-tab'],
+  ['技能中心', '导入技能 Skill', 'skills-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
   ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
   ['环境预设', '备份 导入 导出 Preset', 'presets-tab'],
@@ -1369,9 +1392,11 @@ document.querySelectorAll('.native-chip').forEach((chip) => {
 })
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
-  if (['value-mode', 'models', 'usage'].includes(payload?.setting)) {
+  if (['control-center', 'value-mode', 'models', 'usage'].includes(payload?.setting)) {
     const tab = tabs.find((item) => item.dataset.setting === payload.setting)
+      ?? tabs.find((item) => item.dataset.tab === 'dock-settings')
     if (tab) activateTab(tab)
+    document.querySelector(`[data-setting="${payload.setting}"]`)?.click()
     return
   }
   const tab = tabs.find((item) => item.dataset.tab === payload?.tab)
@@ -1515,6 +1540,16 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
   }
   if (event.target.closest('[data-open-discover]')) {
     activateTab(document.querySelector('#market-tab'), true)
+    return
+  }
+  const pluginSettingsButton = event.target.closest('[data-open-plugin-settings]')
+  if (pluginSettingsButton) {
+    try {
+      const result = await window.dshDesktop.openPluginSettings(pluginSettingsButton.dataset.openPluginSettings)
+      if (result?.opened !== true) notify('暂时无法打开插件设置，请返回主界面重试。', true)
+    } catch (error) {
+      notify(error?.message || '暂时无法打开插件设置，请返回主界面重试。', true)
+    }
     return
   }
   const restartPluginButton = event.target.closest('[data-restart-plugin]')
@@ -2070,6 +2105,7 @@ try {
     if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
   }
 } catch { /* first visit opens model collaboration */ }
+renderNativePlugins()
 activateTab(initialTab, false, initialSetting)
 await refresh()
 void refreshMarket()

@@ -6,6 +6,7 @@ import {
   DesktopTerminalSession,
   createTerminalEnvironment,
   normalizeTerminalInput,
+  normalizeTerminalShellId,
   normalizeTerminalSize,
   resolveDesktopTerminalShell,
 } from '../src/terminal-session.mjs'
@@ -54,6 +55,7 @@ test('Windows shell selection is fixed and never renderer-selected', () => {
     executable: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
     args: ['-NoLogo'],
     label: 'PowerShell 7',
+    shellId: 'auto',
   })
 
   const fallback = resolveDesktopTerminalShell({
@@ -62,6 +64,13 @@ test('Windows shell selection is fixed and never renderer-selected', () => {
     exists: (path) => existing.has(path),
   })
   assert.equal(fallback.executable, 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
+  const wsl = resolveDesktopTerminalShell({
+    platform: 'win32', shellId: 'wsl', environment: { SystemRoot: 'C:\\Windows' },
+    exists: path => path === 'C:\\Windows\\System32\\wsl.exe',
+  })
+  assert.deepEqual(wsl, { executable: 'C:\\Windows\\System32\\wsl.exe', args: [], label: 'WSL', shellId: 'wsl' })
+  assert.throws(() => normalizeTerminalShellId('C:\\bad.exe'), /invalid/u)
+  assert.throws(() => resolveDesktopTerminalShell({ platform: 'win32', shellId: 'wsl', environment: { SystemRoot: 'C:\\Windows' }, exists: () => false }), /unavailable/u)
 })
 
 test('terminal environment prepends only main-process path entries without mutating process state', () => {
@@ -76,6 +85,24 @@ test('terminal environment prepends only main-process path entries without mutat
   assert.equal(result.COLORTERM, 'truecolor')
   assert.equal('ELECTRON_RUN_AS_NODE' in result, false)
   assert.equal(source.ELECTRON_RUN_AS_NODE, '1')
+})
+
+test('changing the shell restarts the PTY with the allowlisted WSL executable', async () => {
+  const spawns = []
+  const session = new DesktopTerminalSession({
+    cwd: 'C:\\workspace', platform: 'win32', environment: { SystemRoot: 'C:\\Windows' },
+    exists: path => path === 'C:\\Windows\\System32\\wsl.exe',
+    loadPty: async () => ({ spawn: (...args) => { spawns.push(args); return new FakePty() } }),
+  })
+  try {
+    await session.start()
+    session.setShellId('wsl')
+    const result = await session.restart()
+    assert.equal(result.shellId, 'wsl')
+    assert.deepEqual(spawns[1].slice(0, 2), ['C:\\Windows\\System32\\wsl.exe', []])
+    assert.throws(() => session.setShellId('arbitrary.exe'), /invalid/u)
+    assert.equal(session.shellId, 'wsl')
+  } finally { session.dispose() }
 })
 
 test('PTY session owns one shell, contains events, and is fully reclaimed', async () => {

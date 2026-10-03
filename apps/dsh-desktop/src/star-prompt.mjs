@@ -9,9 +9,7 @@ export function renderSponsorQr() {
   return sponsorQr ??= renderQrDataUrl(AFDIAN_SPONSOR_URL, { width: 288, margin: 4, errorCorrectionLevel: 'M', color: { dark: '#10131aff', light: '#ffffffff' } }).catch(error => { sponsorQr = undefined; throw error })
 }
 
-// Bump the once-per-release claim key so the community prompt is shown again
-// for the 4.0 release, while remaining idempotent thereafter.
-export const STAR_PROMPT_VERSION = '4.0.0'
+export const STAR_PROMPT_VERSION = '5.0.0'
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {

@@ -21,9 +21,17 @@ const SECTIONS = [
 
 type Listener = (payload: any, next: () => Promise<any>) => Promise<any>
 
+let nextSessionId = 0
+const sessionEvents = new Map<string, unknown[]>()
+
 function register(customConfig: Record<string, unknown> = {}): Map<string, { listener: Listener, options: any }> {
   const listeners = new Map<string, { listener: Listener, options: any }>()
   const ctx = {
+    sessionQuery: {
+      async readSession(id: string) {
+        return { events: sessionEvents.get(id) ?? [] }
+      },
+    },
     on(event: string, callback: Listener, options?: any) {
       listeners.set(event, { listener: callback, options })
     },
@@ -39,7 +47,9 @@ function listener(listeners: Map<string, { listener: Listener, options: any }>, 
 }
 
 function session(events: unknown[] = [], cwd: string | null | undefined = '/workspace') {
-  return { snapshotEvents: () => events, header: cwd === null ? {} : { cwd } }
+  const id = `session-${nextSessionId += 1}`
+  sessionEvents.set(id, events)
+  return { id, header: cwd === null ? {} : { cwd } }
 }
 
 function agentOf(events: unknown[] = [], cwd?: string) {
@@ -92,7 +102,7 @@ function turnEndEvent(turn = 1) {
 }
 
 describe('anchored-tool-bootstrap', () => {
-  test('reads events through the current Session snapshot contract', async () => {
+  test('reads events through the asynchronous SessionQuery contract', async () => {
     const currentSession = session()
     const result = await listener(register(), 'system-prompt/assemble')(
       undefined,

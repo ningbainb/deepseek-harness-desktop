@@ -210,7 +210,7 @@ describe('any-file drop formatting', () => {
     )
   })
 
-  it('closes ImageBitmap decoders and clears the canvas after compression', async () => {
+  it('closes ImageBitmap decoders and clears the reduced-size canvas after compression', async () => {
     const close = vi.fn()
     const bitmap = { width: 2304, height: 2304, close } as unknown as ImageBitmap
     vi.stubGlobal('createImageBitmap', vi.fn(async () => bitmap))
@@ -235,7 +235,7 @@ describe('any-file drop formatting', () => {
     expect(result).not.toBeNull()
     expect(result.type).toBe('image/jpeg')
     expect(canvas.getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true })
-    expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 2048, 2048)
+    expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 1280, 1280)
     expect(close).toHaveBeenCalledTimes(1)
     expect(canvas).toMatchObject({ width: 0, height: 0 })
   })

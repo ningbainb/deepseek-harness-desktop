@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { isAbsolute } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import test, { describe } from 'node:test'
 
 import { DesktopSurfaceRegistry } from '../src/desktop-surfaces.mjs'
@@ -163,8 +163,8 @@ describe('IPC best-effort failures are recorded, not swallowed', () => {
 })
 
 describe('repair verifier failures are recorded', () => {
-  const command = { executable: 'C:\\Windows\\System32\\cmd.exe', args: ['/c', 'exit 0'], cwd: '.' }
-  const workspace = 'C:\\repair-workspace'
+  const command = { executable: process.execPath, args: ['--version'], cwd: '.' }
+  const workspace = resolve('repair-workspace')
 
   test('a spawn failure is logged instead of vanishing into ok:false', async () => {
     const logLines = []

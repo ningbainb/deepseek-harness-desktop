@@ -193,6 +193,13 @@ try {
     (context ?? '').toLowerCase().includes(expectedProfileCwd.toLowerCase()),
     `terminal context does not identify the Desktop Profile cwd: ${context}`,
   )
+  if (process.platform === 'win32') {
+    await terminal.locator('#terminal-shell-choice').selectOption('powershell')
+    await terminal.waitForFunction(() => document.querySelector('#terminal-context')?.textContent?.includes('Windows PowerShell'), undefined, { timeout: 20_000 })
+    await terminal.locator('#terminal-status[data-state="ready"]').waitFor({ timeout: 20_000 })
+    assert.equal(await terminal.locator('#terminal-shell-choice').inputValue(), 'powershell')
+    assert.match(await terminal.locator('#terminal-context').textContent() ?? '', /Windows PowerShell/u)
+  }
   await Promise.all([
     terminal.waitForEvent('close'),
     terminal.getByRole('button', { name: '收起内置终端', exact: true }).click(),
@@ -200,6 +207,17 @@ try {
   await startup.waitForTimeout(300)
   assert.equal(electronApp.windows().some((page) => page.url().includes('/ui/terminal.html')), false)
   assert.equal(startup.isClosed(), false)
+  if (process.platform === 'win32') {
+    await startup.evaluate(() => window.dshDesktop.toolAction('terminal-open'))
+    const reopened = electronApp.windows().find(page => page.url().includes('/ui/terminal.html'))
+    assert.ok(reopened)
+    await reopened.locator('#terminal-status[data-state="ready"]').waitFor({ timeout: 20_000 })
+    assert.equal(await reopened.locator('#terminal-shell-choice').inputValue(), 'powershell')
+    await Promise.all([
+      reopened.waitForEvent('close'),
+      reopened.getByRole('button', { name: '收起内置终端', exact: true }).click(),
+    ])
+  }
   if (!packagedExecutable) {
     // Real renderer check: a slow main-process PATH resolver must not hold
     // loadFile/visibility hostage, and closing during that wait creates no PTY.

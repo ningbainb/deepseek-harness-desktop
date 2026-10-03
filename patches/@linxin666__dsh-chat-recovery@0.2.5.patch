@@ -124,6 +124,13 @@ index 446e7e9777545143b54fcd5bb3f1218c64850771..483a325993dafdc6d7aca0e8c2d86e49
  					}
  				}
  				supervisor.review();
+@@ -933,5 +968,6 @@ window.__ModuleLoader__.load({
+ 			ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+ 				name: "conversation.chat.turnTail",
++				id: "chat-recovery-turn-actions",
+ 				select: (owner) => owner,
+ 				locale: NS,
+ 				inject: () => ({
 diff --git a/lib/types/client/RetryDock.d.ts b/lib/types/client/RetryDock.d.ts
 index 1b6ebe9815fe2c8eeb525882251aefe42ade47ec..ea5aeadc399b90f8a1fb9b992d1b9545ef6be5af 100644
 --- a/lib/types/client/RetryDock.d.ts

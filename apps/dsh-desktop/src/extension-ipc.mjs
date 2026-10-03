@@ -11,11 +11,14 @@ import { desktopDeepLink } from './distribution-identity.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
+import { normalizeFeatureEvent } from './feature-telemetry.mjs'
+import { AgentShellPermissionStore, AGENT_SHELL_PERMISSION_MODES } from './agent-shell-permission.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
 const PROFILE_RESET_BACKUP_LIMIT = 3
 const PROFILE_RESET_SCAN_ENTRY_LIMIT = 50_000
 const PROFILE_RESET_FREE_SPACE_RESERVE = 64 * 1024 * 1024
+const CLIPBOARD_TEXT_LIMIT = 64 * 1024
 
 async function profileResetAvailableBytes(path) {
   let cursor = path
@@ -154,6 +157,7 @@ const CHANNELS = [
   'extensions:plugin-install-batch',
   'extensions:plugin-update',
   'extensions:plugin-remove',
+  'extensions:plugin-settings-open',
   'extensions:plugin-enable',
   'extensions:recovery-state',
   'extensions:recovery-restore-all',
@@ -162,6 +166,7 @@ const CHANNELS = [
   'extensions:legacy-plugin-restore-git',
   'extensions:full-user-trust-revoke',
   'extensions:diagnostics-export',
+  'extensions:clipboard-write',
   'extensions:network-diagnostics',
   'extensions:community-open',
   'extensions:market-list',
@@ -179,6 +184,14 @@ const CHANNELS = [
   'extensions:qqbot-unbind',
   'dock-settings:agent-team-status',
   'dock-settings:agent-team-set',
+  'dock-settings:bai-acquisition-event',
+  'dock-settings:control-center-state',
+  'dock-settings:browser-use-set',
+  'dock-settings:computer-use-set',
+  'dock-settings:control-provider-test',
+  'dock-settings:control-permission-open',
+  'dock-settings:agent-shell-policy-get',
+  'dock-settings:agent-shell-policy-set',
   'extensions:preset-export',
   'extensions:preset-select',
   'extensions:preset-import',
@@ -198,6 +211,7 @@ export function registerExtensionIpc({
   pluginManager,
   controller,
   ensureProfile,
+  preflightFeatureMutation = async () => {},
   projectRoot,
   dshHome,
   agentsHome,
@@ -205,6 +219,15 @@ export function registerExtensionIpc({
   agentTeamFeature = Object.freeze({
     status: async () => Object.freeze({ available: false, enabled: false }),
     setEnabled: async () => { throw new Error('Agent Team is unavailable') },
+  }),
+  controlCenterFeature = Object.freeze({
+    status: async () => Object.freeze({
+      browser: { enabled: false, provider: 'playwright', state: 'unavailable', browsers: [] },
+      computer: { enabled: false, provider: 'cua-native', state: 'unavailable' },
+    }),
+    setFeature: async () => { throw new Error('Smart Control is unavailable') },
+    test: async () => { throw new Error('Smart Control is unavailable') },
+    openPermissionSettings: async () => false,
   }),
   pluginRecovery,
   legacyPluginRecovery,
@@ -222,11 +245,13 @@ export function registerExtensionIpc({
   completeFullAccessPlugin = async () => {},
   revokeFullUserTrust = async () => { throw new Error('full-user trust revocation is unavailable') },
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
+  writeClipboardText = async () => { throw new Error('clipboard write is unavailable') },
   openLogs = async () => { throw new Error('runtime logs are unavailable') },
   trackProductOperation = (_detail, operation) => operation(),
   recordFeatureEvent = () => false,
   onRuntimeMaintenanceChange = () => {},
   completeBlockedPluginRecovery = async () => Object.freeze({ resolved: false }),
+  openPluginSettings = async () => { throw new Error('plugin settings navigation is unavailable') },
   quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
   getProfileResetAvailableBytes = profileResetAvailableBytes,
 }) {
@@ -245,14 +270,27 @@ export function registerExtensionIpc({
   if (typeof onRuntimeMaintenanceChange !== 'function') {
     throw new TypeError('runtime maintenance callback must be a function')
   }
+  if (typeof preflightFeatureMutation !== 'function') {
+    throw new TypeError('feature mutation preflight callback must be a function')
+  }
   if (typeof completeBlockedPluginRecovery !== 'function') {
     throw new TypeError('blocked plugin recovery completion callback must be a function')
+  }
+  if (typeof openPluginSettings !== 'function') {
+    throw new TypeError('plugin settings navigation callback must be a function')
   }
   if (typeof agentTeamFeature?.status !== 'function' || typeof agentTeamFeature?.setEnabled !== 'function') {
     throw new TypeError('Agent Team feature controller is invalid')
   }
+  if (
+    typeof controlCenterFeature?.status !== 'function'
+    || typeof controlCenterFeature?.setFeature !== 'function'
+    || typeof controlCenterFeature?.test !== 'function'
+    || typeof controlCenterFeature?.openPermissionSettings !== 'function'
+  ) throw new TypeError('Smart Control feature controller is invalid')
   for (const channel of CHANNELS) ipcMain.removeHandler(channel)
   let skillPaths = new Map()
+  const agentShellPermission = new AgentShellPermissionStore({ dshHome })
   let pluginMutationQueue = Promise.resolve()
   let acceptingPluginMutations = true
   let pendingPluginMutations = 0
@@ -722,6 +760,12 @@ export function registerExtensionIpc({
     return revokeFullUserTrust()
   })
   handleExtension('extensions:diagnostics-export', () => exportDiagnostics())
+  handleExtension('extensions:clipboard-write', (_event, text) => {
+    if (typeof text !== 'string' || text.length === 0 || text.length > CLIPBOARD_TEXT_LIMIT) {
+      throw new TypeError('clipboard text must be a non-empty bounded string')
+    }
+    return writeClipboardText(text)
+  })
   handleExtension('extensions:network-diagnostics', (_event, ...args) => {
     if (args.length !== 0) throw new TypeError('network diagnostics do not accept arguments')
     if (typeof networkDiagnostics?.run !== 'function') throw new Error('network diagnostics are unavailable')
@@ -986,6 +1030,7 @@ export function registerExtensionIpc({
         if (previous.enabled === enabled) return previous
         const result = await mutation().run({
           label: 'Agent Team setting change',
+          prepare: () => preflightFeatureMutation('agent-team'),
           onRuntimeEvent: phase => {
             if (isDockSettingsSender(event?.sender)) {
               event.sender.send?.('dock-settings:agent-team-progress', {
@@ -1012,9 +1057,114 @@ export function registerExtensionIpc({
     })
   }
   handleDockSettings('dock-settings:agent-team-status', () => agentTeamFeature.status())
+  handleDockSettings('dock-settings:bai-acquisition-event', (_event, value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('invalid bai acquisition event')
+    return recordFeatureEvent(normalizeFeatureEvent({ feature: 'bai-connect', ...value }))
+  })
+  handleExtension('extensions:plugin-settings-open', async (_event, name) => {
+    if (typeof name !== 'string' || name.length === 0 || name.length > 214) {
+      throw new TypeError('invalid installed plugin name')
+    }
+    const plugins = await pluginManager.inventory()
+    const plugin = plugins.find((item) => item?.name === name && item?.builtIn !== true)
+    if (!plugin) throw new TypeError('installed plugin is unavailable')
+    const opened = await openPluginSettings(name)
+    return Object.freeze({ opened: opened === true })
+  })
   handleDockSettings('dock-settings:agent-team-set', (event, enabled) => {
     event.sender.send?.('dock-settings:agent-team-progress', { phase: 'saving' })
     return setAgentTeamEnabled(event, enabled)
+  })
+  handleDockSettings('dock-settings:control-center-state', () => controlCenterFeature.status())
+  handleDockSettings('dock-settings:agent-shell-policy-get', () => agentShellPermission.status())
+  handleDockSettings('dock-settings:agent-shell-policy-set', async (_event, mode) => {
+    if (!AGENT_SHELL_PERMISSION_MODES.includes(mode)) throw new TypeError('unknown Agent shell permission mode')
+    const previous = await agentShellPermission.status()
+    if (previous.mode === mode && previous.valid) return previous
+    if (mode === 'allow') {
+      if (typeof dialog?.showMessageBox !== 'function') throw new Error('Agent shell permission confirmation is unavailable')
+      const result = await dialog.showMessageBox(getWindow(), {
+        type: 'warning',
+        title: '允许 Agent 使用 WSL',
+        message: '信任模式下，Agent 的 WSL 命令不再逐条询问。',
+        detail: 'WSL 不受 DeepSeek Harness 的 Windows 沙箱限制，可访问 Linux 与本机文件。只在你信任当前 Agent 和工作区时启用；随时可改回逐条确认或关闭。',
+        buttons: ['取消', '我了解风险，始终允许'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+      if (result?.response !== 1) return previous
+    }
+    try {
+      return await agentShellPermission.setMode(mode)
+    } catch {
+      throw new Error('Agent 终端权限保存失败，请检查本机配置目录的写入权限后重试。')
+    }
+  })
+  const setControlFeature = (event, kind, enabled, provider) => {
+    if (!['browser', 'computer'].includes(kind)) throw new TypeError('unknown control feature')
+    if (typeof enabled !== 'boolean' || typeof provider !== 'string') throw new TypeError('invalid control feature request')
+    const publish = (phase, details = {}) => {
+      if (!event?.sender?.isDestroyed?.()) {
+        event.sender.send?.('dock-settings:control-center-progress', { kind, phase, ...details })
+      }
+    }
+    publish('saving')
+    return enqueuePluginMutation(async () => {
+      try {
+        const previous = await controlCenterFeature.status()
+        const previousFeature = previous[kind]
+        if (enabled) {
+          const probe = await controlCenterFeature.test(kind, provider)
+          if (!['ready', 'permission-required'].includes(probe?.state)) {
+            throw new Error(probe?.message ?? 'The selected control provider is unavailable')
+          }
+        }
+        const result = await mutation().run({
+          label: `${kind} control setting change`,
+          prepare: () => preflightFeatureMutation(kind),
+          apply: async () => {
+            await controlCenterFeature.setFeature(kind, enabled, provider)
+            return {
+              transactions: [Object.freeze({
+                rollback: () => controlCenterFeature.setFeature(kind, previousFeature.enabled, previousFeature.provider),
+                commit: async () => true,
+              })],
+            }
+          },
+          finalize: () => controlCenterFeature.status(),
+          onRuntimeEvent: (phase) => publish(phase),
+        })
+        try { recordFeatureEvent({ feature: kind === 'browser' ? 'browser-use' : 'computer-use', outcome: 'succeeded', detail: enabled ? 'enable' : 'disable' }) } catch {}
+        try { recordFeatureEvent({ feature: 'control-provider', outcome: 'selected', detail: provider }) } catch {}
+        publish('succeeded')
+        return result
+      } catch (error) {
+        try { recordFeatureEvent({ feature: kind === 'browser' ? 'browser-use' : 'computer-use', outcome: 'failed', detail: enabled ? 'enable' : 'disable' }) } catch {}
+        publish('failed')
+        throw error
+      }
+    })
+  }
+  handleDockSettings('dock-settings:browser-use-set', (event, enabled, provider) => setControlFeature(event, 'browser', enabled, provider))
+  handleDockSettings('dock-settings:computer-use-set', (event, enabled, provider) => setControlFeature(event, 'computer', enabled, provider))
+  handleDockSettings('dock-settings:control-provider-test', async (_event, kind) => {
+    if (!['browser', 'computer'].includes(kind)) throw new TypeError('unknown control provider kind')
+    try {
+      const result = await controlCenterFeature.test(kind)
+      try { recordFeatureEvent({ feature: kind === 'browser' ? 'browser-use' : 'computer-use', outcome: result?.state === 'ready' ? 'succeeded' : 'failed', detail: 'probe' }) } catch {}
+      if (typeof result?.provider === 'string') try { recordFeatureEvent({ feature: 'control-provider', outcome: 'tested', detail: result.provider }) } catch {}
+      return result
+    } catch (error) {
+      try { recordFeatureEvent({ feature: kind === 'browser' ? 'browser-use' : 'computer-use', outcome: 'failed', detail: 'probe' }) } catch {}
+      throw error
+    }
+  })
+  handleDockSettings('dock-settings:control-permission-open', async (_event, kind) => {
+    if (!['browser', 'computer'].includes(kind)) throw new TypeError('unknown control permission kind')
+    const opened = await controlCenterFeature.openPermissionSettings(kind)
+    try { recordFeatureEvent({ feature: 'control-permission', outcome: opened ? 'opened' : 'unavailable', detail: kind }) } catch {}
+    return opened
   })
   handleExtension('extensions:runtime-restart', () => enqueuePluginMutation(async () => {
     await controller.stop()

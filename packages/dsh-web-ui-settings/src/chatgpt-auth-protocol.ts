@@ -4,6 +4,9 @@ export const CHATGPT_AUTH_BRIDGE_PREFIX = '/api/dsh-chatgpt-auth'
 /** Stable authorization progress states rendered by the settings card. */
 export type ChatGptAuthPhase = 'idle' | 'starting' | 'awaiting-user' | 'authorized' | 'cancelled' | 'failed'
 
+/** Official OpenAI Codex login choices projected as stable Desktop actions. */
+export type ChatGptLoginMode = 'browser' | 'device_code'
+
 /** One value-free authorization method exposed by the official provider flow. */
 export interface ChatGptAuthMethodView {
   id: string
@@ -56,4 +59,10 @@ export type ChatGptAuthResult =
 export interface ChatGptAuthAnswerRequest {
   promptId: string
   answer: string
+}
+
+/** Optional preference used to answer only the official first login-mode prompt. */
+export interface ChatGptAuthBeginRequest {
+  method?: string
+  loginMode?: ChatGptLoginMode
 }

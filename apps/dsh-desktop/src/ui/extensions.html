@@ -16,7 +16,8 @@
         <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
           <p class="nav-group-label">AI 设置</p>
-          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="model-catalog"><span class="tab-title">模型与能力</span></button>
+          <button type="button" class="tab" id="control-center-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="control-center" data-group="ai"><span class="tab-title">智能操控</span></button>
+          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="model-catalog"><span class="tab-title">模型与能力</span><small class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai</small></button>
           <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="ai"><span class="tab-title">模型协作</span></button>
           <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="personal"><span class="tab-title">个人偏好</span></button>
           <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="vision"><span class="tab-title">图像理解</span></button>
@@ -41,7 +42,7 @@
         <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
           <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
-          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">发现 <small id="market-count">--</small></button>
+          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">创意工坊 <small id="market-count">--</small></button>
           <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
         </nav>
         <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
@@ -101,8 +102,8 @@
       </section>
       <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
         <div class="panel-head">
-          <div><h2 id="plugin-heading">插件</h2></div>
-          <p>管理你安装的扩展能力。正常插件保持安静，只在需要操作时提示。</p>
+          <div><h2 id="plugin-heading">已安装插件</h2></div>
+          <p>统一管理已安装插件的启停、更新、卸载和恢复；创意工坊只负责发现与安装。</p>
         </div>
         <label class="plugin-search" for="plugin-search"><span class="sr-only">搜索已安装插件</span><input type="search" id="plugin-search" placeholder="搜索插件…" autocomplete="off" spellcheck="false"></label>
         <section class="plugin-update-summary" id="plugin-update-summary" hidden><span id="plugin-update-summary-text"></span><button type="button" class="primary" id="update-all-plugins" data-mutation-control>全部更新</button></section>
@@ -133,14 +134,15 @@
         <header class="market-masthead">
           <div class="market-intro">
             <p class="market-kicker">发现扩展</p>
-            <h2>社区插件市场</h2>
-            <p>直接浏览社区公开目录。搜索和筛选由扩展坞完成，安装仍走本机原生事务。</p>
+            <h2>创意工坊</h2>
+            <p>用于发现和安装精选社区插件；安装完成后统一回到「插件」页管理，仍走本机原生事务。</p>
           </div>
           <div class="market-metrics" aria-label="目录状态">
             <div><strong id="market-total">--</strong><span>可安装条目</span></div>
             <div><strong id="market-updated">--</strong><span>目录更新</span></div>
           </div>
         </header>
+        <p class="market-bridge" id="market-bridge" role="status">正在确认市场目录兼容状态</p>
         <section class="community-feature" aria-labelledby="community-feature-heading">
           <div class="feature-heading">
             <div>
@@ -189,16 +191,16 @@
         </details>
       </section>
 
-      <section id="skills" class="panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
+      <section id="skills" class="panel skills-panel" role="tabpanel" aria-labelledby="skills-tab" hidden>
         <div class="panel-head">
           <div><h2 id="skill-heading">技能目录</h2></div>
-          <p>遵循官方五级优先顺序扫描。导入后由 DSH watcher 自动刷新，无需重启。</p>
+          <p>统一展示项目与用户技能；用户技能默认写入 <code>~/.dsh/skills</code>，并兼容扫描 <code>~/.agents/skills</code>。</p>
         </div>
         <div class="skill-actions">
-          <button type="button" class="primary" id="import-skill">导入技能目录</button>
-          <button type="button" class="secondary" id="open-skill-root">打开用户技能目录</button>
+          <div class="skill-actions-copy"><strong>用户技能目录</strong><small>默认 ~/.dsh/skills，兼容 ~/.agents/skills</small></div>
+          <div class="item-actions"><button type="button" class="primary" id="import-skill">导入目录</button><button type="button" class="secondary" id="open-skill-root">打开目录</button></div>
         </div>
-        <div class="list" id="skill-list" aria-live="polite"></div>
+        <div class="list skill-list" id="skill-list" aria-live="polite"></div>
       </section>
 
       <section id="presets" class="panel" role="tabpanel" aria-labelledby="presets-tab" hidden>

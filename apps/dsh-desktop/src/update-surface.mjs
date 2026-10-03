@@ -353,8 +353,18 @@ export function createUpdateSurfaceScript() {
     const install = button('重启并安装', 'install', true);
 
     let currentPhase = 'idle';
-    const hide = () => { root.hidden = true; };
-    const show = () => { root.hidden = false; close.focus(); };
+    let restoreFocus = null;
+    const hide = () => {
+      root.hidden = true;
+      void api.dismissUpdate?.().catch(() => {});
+      if (restoreFocus?.isConnected) restoreFocus.focus();
+      restoreFocus = null;
+    };
+    const show = () => {
+      if (root.hidden && document.activeElement instanceof HTMLElement) restoreFocus = document.activeElement;
+      root.hidden = false;
+      close.focus();
+    };
     const renderChannel = (value = {}) => {
       const selected = value.channel === 'beta' ? 'beta' : 'stable';
       channel.value = selected;

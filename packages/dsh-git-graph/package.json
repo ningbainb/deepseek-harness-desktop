@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -b && tsdown",
     "test": "vitest run",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --force --pretty false",
     "prepare": "tsdown --config tsdown.prepare.config.ts"
   },
   "main": "lib/index.js",

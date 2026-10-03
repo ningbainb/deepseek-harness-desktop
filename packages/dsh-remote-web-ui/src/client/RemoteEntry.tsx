@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ISessions, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PairingPhase } from '../pairing.ts'
 import { createDesktopClient, type DesktopAvailability, type LocalLanGatewayStatus } from '@linxin666/dsh-desktop-client'
@@ -52,11 +53,9 @@ function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
 const EMPTY_SESSION_LIST = {
   ids: [],
   byId: {},
-  current: undefined,
   phase: 'ready',
   subagentsByParent: {},
   jobsBySession: {},
-  currentAddress: undefined,
 } as const
 const EMPTY_WORKSPACE_LIST = {
   items: [],

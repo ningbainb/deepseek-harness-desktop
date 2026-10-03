@@ -984,7 +984,7 @@ function textFromEvent(event) {
 /** Return only direct user text after the latest turn/start boundary. */
 function extractCurrentUserQuery(session) {
 	if (session.header.origin === "subagent") return "";
-	const events = session.snapshotEvents();
+	const events = session.events;
 	let start = -1;
 	for (let index = 0; index < events.length; index += 1) if (events[index]?.type === "turn/start") start = index;
 	if (start < 0) return "";
@@ -1191,7 +1191,11 @@ function createMemoryTool(service, options) {
 				errorCode: "access-denied"
 			};
 			if (args.operation === "search") {
-				const result = await service.search(context, extractCurrentUserQuery(session));
+				const events = await options.eventsForSession?.(session) ?? [];
+				const result = await service.search(context, extractCurrentUserQuery({
+					header: session.header,
+					events
+				}));
 				if (!result.ok) return {
 					success: false,
 					operation: args.operation,
@@ -1533,6 +1537,7 @@ const name = "memory";
 const inject = [
 	"systemPrompt",
 	"sessions",
+	"sessionQuery",
 	"userScope",
 	"tools"
 ];
@@ -1584,6 +1589,7 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	};
 	const hydrate = async (entry) => {
 		try {
+			entry.events = (await ctx.sessionQuery.readSession(entry.session.id)).events;
 			const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
 			if (memoryContext !== void 0) await service.preload(memoryContext);
 		} catch {}
@@ -1599,7 +1605,8 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		if (scope === void 0) return;
 		const entry = {
 			session,
-			scope: copyScope(scope)
+			scope: copyScope(scope),
+			events: []
 		};
 		sessionsById.set(sessionId, entry);
 		if (key !== void 0) sessionScopes.set(key, entry);
@@ -1614,9 +1621,16 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		const key = carrierKeyOf(this);
 		if (key !== void 0 && sessionScopes.get(key)?.session === session) sessionScopes.delete(key);
 	});
-	ctx.on("session/event", function(session) {
+	ctx.on("session/event", function(session, event) {
 		const entry = sessionsById.get(String(session.id));
-		if (entry !== void 0) hydrate(entry);
+		if (entry !== void 0) {
+			entry.events = [...entry.events, event];
+			hydrate(entry);
+		}
+	});
+	ctx.on("agent/created", async ({ agent }) => {
+		const entry = sessionsById.get(String(agent.session.id));
+		if (entry !== void 0) await hydrate(entry);
 	});
 	for (const session of ctx.sessions.list()) rememberSession(void 0, session);
 	ctx.effect(() => {
@@ -1633,7 +1647,8 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	}, "memory: system prompt contribution");
 	ctx.effect(() => ctx.tools.register(createMemoryTool(service, {
 		enabled: () => currentConfig().enabled,
-		contextForSession
+		contextForSession,
+		eventsForSession: async (session) => (await ctx.sessionQuery.readSession(session.id)).events
 	})), "memory: model tool");
 	ctx.inject(["webServer"], (webCtx) => {
 		const disposers = makeMemoryRoutes({
@@ -1654,7 +1669,10 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 			if (entry === void 0) return "";
 			const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
 			if (memoryContext === void 0) return "";
-			return service.prepare(memoryContext, extractCurrentUserQuery(entry.session), currentConfig().enabled);
+			return service.prepare(memoryContext, extractCurrentUserQuery({
+				header: entry.session.header,
+				events: entry.events
+			}), currentConfig().enabled);
 		} catch {
 			return "";
 		}

@@ -9,6 +9,8 @@ import {
 
 test('desktop package ownership is unified and protected', () => {
   assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get('@deepseek-ai/dsh').ownership, PACKAGE_OWNERSHIP.DESKTOP_RUNTIME)
+  assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get('@deepseek-ai/dsh-ptc-runtime').ownership, PACKAGE_OWNERSHIP.DESKTOP_RUNTIME)
+  assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.isProtected('@deepseek-ai/dsh-ptc-runtime'), true)
   assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get('@linxin666/dsh-web-ui-all').ownership, PACKAGE_OWNERSHIP.BUILTIN_PLUGIN)
   assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get('schemastery').ownership, PACKAGE_OWNERSHIP.SHARED_SAFE)
   assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.isProtected('@deepseek-ai/dsh-agent'), true)

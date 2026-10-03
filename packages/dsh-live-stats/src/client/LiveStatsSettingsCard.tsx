@@ -96,7 +96,7 @@ export type LiveStatsSettingsCardProps =
  */
 export function LiveStatsSettingsCard(props: LiveStatsSettingsCardProps) {
   const { t } = props
-  const state = props.useLiveStatsSettingsCard(snapshot => snapshot)
+  const state = props.useLiveStatsSettingsCard((snapshot: LiveStatsSettingsCardState) => snapshot)
   const disabled = !state.writable
   const fieldProps = {
     overriddenLabel: t('settings.overridden'),

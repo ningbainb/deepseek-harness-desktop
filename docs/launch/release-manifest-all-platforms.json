@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "version": "4.1.0",
+  "tag": "desktop-v4.1.0",
+  "commit": "dce96de527c47a44cbc483db2f0aad3c501e29f8",
+  "checksumAsset": {
+    "file": "SHA256SUMS.txt",
+    "sha256": "33c17f001906def21ad2eb2d271e221b7b6ffff70e9a4d66864986c04743f12b"
+  },
+  "windowsBuildManifest": "release-manifest.json",
+  "note": "The Windows build manifest was created before the shared three-platform SHA256SUMS.txt replaced its build-local checksum file. Use checksumAsset and the five file hashes below for public downloads.",
+  "files": [
+    {
+      "file": "DeepSeek-Harness-Desktop-Setup-4.1.0-x64.exe",
+      "platform": "windows-x64",
+      "status": "stable",
+      "signature": "unsigned",
+      "size": 226539951,
+      "sha256": "87fa8428f27fb76796ecea089d97104232733b28f7f7b60917c8609be71033cc"
+    },
+    {
+      "file": "DeepSeek-Harness-Desktop-4.1.0-arm64.dmg",
+      "platform": "macos-arm64",
+      "status": "preview",
+      "signature": "unsigned-unnotarized",
+      "size": 236440795,
+      "sha256": "156d453e8fd535987b0f72f6db26564576436765867443f78c7bf99dee6ca411"
+    },
+    {
+      "file": "DeepSeek-Harness-Desktop-4.1.0-arm64.zip",
+      "platform": "macos-arm64",
+      "status": "preview",
+      "signature": "unsigned-unnotarized",
+      "size": 244745511,
+      "sha256": "38895f7dcdfe830c757858626fab44d44a58c502b51ef3c6bac1b40a0a18d99e"
+    },
+    {
+      "file": "DeepSeek-Harness-Desktop-4.1.0-x86_64.AppImage",
+      "platform": "linux-x64",
+      "status": "preview",
+      "signature": "unsigned",
+      "size": 238943978,
+      "sha256": "864ae7619eda03bcb4c6b6073bc55d78376e45cab12ba71eaf256936b6e325ed"
+    },
+    {
+      "file": "DeepSeek-Harness-Desktop-4.1.0-amd64.deb",
+      "platform": "linux-x64",
+      "status": "preview",
+      "signature": "unsigned",
+      "size": 189473652,
+      "sha256": "4bca6475d0b040b7e3087e1ae320a1c575271cf13bedcb5c83cf97925eb0d062"
+    }
+  ]
+}

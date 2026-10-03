@@ -30,8 +30,8 @@
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'anchored-tool-bootstrap'
 
-/** Prompt assembly and the tool registry must exist before this filter runs. */
-export const inject = ['systemPrompt', 'tools']
+/** Prompt assembly, the tool registry and durable history reads must exist. */
+export const inject = ['systemPrompt', 'tools', 'sessionQuery']
 
 /**
  * The current SDK splits the scoped persona into prefix and suffix sections.
@@ -142,21 +142,25 @@ const promotionBySession = new WeakMap()
 /** Live agents observed by the assemble/pre-step listeners, keyed by session. */
 const agentBySession = new WeakMap()
 
+function newState(next = 0, afterCompaction = false) {
+  return {
+    next,
+    promoted: false,
+    toolCalled: false,
+    responded: false,
+    anchored: false,
+    turnEnded: false,
+    steps: 0,
+    deferredSteps: 0,
+    presentationApplied: false,
+    afterCompaction,
+  }
+}
+
 function stateFor(session) {
   let state = promotionBySession.get(session)
   if (state === undefined) {
-    state = {
-      next: 0,
-      promoted: false,
-      toolCalled: false,
-      responded: false,
-      anchored: false,
-      turnEnded: false,
-      steps: 0,
-      deferredSteps: 0,
-      presentationApplied: false,
-      afterCompaction: false,
-    }
+    state = newState()
     promotionBySession.set(session, state)
   }
   return state
@@ -192,9 +196,9 @@ function decidePromotion(state, config) {
   return false
 }
 
-/** Scan newly appended session events and update promotion state. */
-function scanEvents(state, session) {
-  const events = session.snapshotEvents()
+/** Scan newly appended durable session events and update promotion state. */
+async function scanEvents(state, session, sessionQuery) {
+  const events = (await sessionQuery.readSession(session.id)).events
   for (; state.next < events.length; state.next += 1) {
     const event = events[state.next]
     if (event === undefined) continue
@@ -212,13 +216,13 @@ function scanEvents(state, session) {
 }
 
 /** Update one agent's promotion state and apply its post-promotion presentation. */
-function refresh(agent, policy) {
+async function refresh(agent, policy, sessionQuery) {
   const session = agent?.session
   if (session === undefined) return undefined
   const state = stateFor(session)
   agentBySession.set(session, agent)
   if (!state.promoted) {
-    scanEvents(state, session)
+    await scanEvents(state, session, sessionQuery)
     if (decidePromotion(state, policy)) state.promoted = true
   }
   if (state.promoted) applyPresentation(agent, state, policy)
@@ -272,25 +276,18 @@ export function apply(ctx, config) {
   // native calls that step already planned. By `step/end` the tool-call and
   // reasoning events are durable, so the NEXT prompt assembly already sees
   // Code Mode with its generated SDK section.
-  ctx.on('session/event', (session, event) => {
+  ctx.on('session/event', async (session, event) => {
     if (event.type === 'compaction/end') {
-      const state = stateFor(session)
-      state.next = session.snapshotEvents().length
-      state.promoted = false
-      state.toolCalled = false
-      state.responded = false
-      state.anchored = false
-      state.turnEnded = false
-      state.steps = 0
-      state.deferredSteps = 0
-      state.presentationApplied = false
-      state.afterCompaction = true
+      const events = (await ctx.sessionQuery.readSession(session.id)).events
+      const agent = agentBySession.get(session)
+      if (agent?.ctx?.tools !== undefined) agent.ctx.tools.presentAs('native')
+      promotionBySession.set(session, newState(events.length, true))
       return
     }
     if (event.type !== 'step/end' && event.type !== 'turn/end') return
     const state = stateFor(session)
     if (!state.promoted) {
-      scanEvents(state, session)
+      await scanEvents(state, session, ctx.sessionQuery)
       if (decidePromotion(state, policy)) state.promoted = true
     }
     if (state.promoted) {
@@ -307,20 +304,21 @@ export function apply(ctx, config) {
     const assembled = await next()
     const agent = context.agent
     if (agent === undefined) return assembled
-    const state = refresh(agent, policy)
+    const state = await refresh(agent, policy, ctx.sessionQuery)
     if (state.promoted) return withWorkspaceLine(assembled, agent)
 
     const available = new Set(assembled.tools.map(tool => tool.name))
     const selectedShells = shellTools.filter(toolName => available.has(toolName))
-    const missingCommon = commonTools.filter(toolName => !available.has(toolName))
-    if (selectedShells.length !== 1 || missingCommon.length > 0) {
+    const requiredTools = [...commonTools, ...(state.afterCompaction ? compactionTools : [])]
+    const missingRequired = requiredTools.filter(toolName => !available.has(toolName))
+    if (selectedShells.length !== 1 || missingRequired.length > 0) {
       throw new Error(
-        `${name}: expected exactly one bootstrap shell and every common tool; `
-        + `shells=${JSON.stringify(selectedShells)}, missing=${JSON.stringify(missingCommon)}`,
+        `${name}: expected exactly one bootstrap shell and every required tool; `
+        + `shells=${JSON.stringify(selectedShells)}, missing=${JSON.stringify(missingRequired)}`,
       )
     }
 
-    const bootstrap = new Set([...selectedShells, ...commonTools, ...(state.afterCompaction ? compactionTools : [])])
+    const bootstrap = new Set([...selectedShells, ...requiredTools])
     return {
       ...assembled,
       tools: assembled.tools.filter(tool => bootstrap.has(tool.name)),
@@ -337,7 +335,7 @@ export function apply(ctx, config) {
     const decision = await next()
     const agent = payload.agent
     if (agent === undefined || decision.kind !== 'enter') return decision
-    const state = refresh(agent, policy)
+    const state = await refresh(agent, policy, ctx.sessionQuery)
     if (state === undefined) return decision
 
     if (!state.promoted) {

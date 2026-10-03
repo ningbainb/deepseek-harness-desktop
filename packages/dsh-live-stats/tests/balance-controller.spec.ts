@@ -62,8 +62,11 @@ describe('balance model selection lifecycle', () => {
       return { getSnapshot: () => value, subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
         set: (next: T) => { value = next; for (const fn of listeners) fn() }, listeners }
     }
-    const row = (id: string) => ({ id, retainedBy: { mainView: 1 } })
-    const list = store({ byId: { a: row('a') } })
+    const selected = (id: string) => ({ byId: {
+      a: { id: 'a', retainedBy: id === 'a' ? { mainView: 1 } : {} },
+      b: { id: 'b', retainedBy: id === 'b' ? { mainView: 1 } : {} },
+    } })
+    const list = store(selected('a'))
     const a = store({ current: { provider: 'official', model: 'a' } })
     const b = store({ current: { provider: 'relay', model: 'b' } })
     const controller = { setSelection: vi.fn() }
@@ -72,7 +75,7 @@ describe('balance model selection lifecycle', () => {
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'official', model: 'a' })
     a.set({ current: { provider: 'relay', model: 'pro' } })
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'relay', model: 'pro' })
-    list.set({ byId: { b: row('b') } })
+    list.set(selected('b'))
     expect(a.listeners.size).toBe(0)
     expect(controller.setSelection).toHaveBeenLastCalledWith({ provider: 'relay', model: 'b' })
     dispose(); await Promise.resolve()

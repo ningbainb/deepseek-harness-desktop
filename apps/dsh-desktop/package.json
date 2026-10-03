@@ -81,7 +81,10 @@
     "release:signing:check": "node src/release-manifest.mjs --assert-signing",
     "release:signatures:verify": "node src/release-manifest.mjs --verify-signatures --directory dist",
     "release:manifest:write": "node src/release-manifest.mjs --write --directory dist",
-    "release:manifest:verify": "node src/release-manifest.mjs --verify --directory dist"
+    "release:manifest:verify": "node src/release-manifest.mjs --verify --directory dist",
+    "capture:all-surfaces": "node scripts/capture-all-surfaces.mjs",
+    "brand:icons:write": "node scripts/generate-app-icons.mjs",
+    "brand:icons:check": "node scripts/generate-app-icons.mjs --check"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -216,7 +219,20 @@
     "ssh2": "1.17.0",
     "ws": "8.21.3",
     "yaml": "2.9.0",
-    "zustand": "4.4.7"
+    "zustand": "4.4.7",
+    "@deepseek-ai/dsh-browser-use": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-computer-use": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-ptc-runtime-node": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-workflow-ptc": "0.2.0-rc.2",
+    "@linxin666/dsh-liangshen": "workspace:*",
+    "@linxin666/dsh-ssh": "workspace:*",
+    "@linxin666/dsh-web-all": "0.4.4"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-session-projection": "0.2.0-rc.2",

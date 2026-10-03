@@ -10,6 +10,20 @@ The package preserves the existing queue-first interaction. If DSH rc.6 becomes 
 
 The implementation is host-only and uses public `agent/status`, agent inbox, `followup`, and `tools/post-execute` SDK contracts. It does not patch files in DeepSeek Harness and can be removed after the upstream runtime implements the documented cancellation behavior.
 
+## Agent terminal choice
+
+On Windows Desktop, the Agent keeps the official sandbox-managed `pwsh` tool
+and gains a separate `desktop_wsl` tool for per-call Linux shell selection.
+WSL is outside the Windows sandbox, so the default is one-shot approval for
+every command; unavailable approval fails closed. The user can choose Off,
+Ask, or Always Allow in Extension Dock > Smart Control > Agent Shell Permission.
+Always Allow requires a native Desktop risk confirmation before persistence;
+invalid settings disable WSL commands. Only installed user
+Linux distributions are accepted; Docker Desktop's internal distributions are
+excluded. Multiple distributions require an explicit name. WSL commands run
+in the foreground with a 60-second limit. This does not change the user's
+embedded terminal preference or replace the official `ctx.shell` provider.
+
 ## Tool-call argument recovery
 
 Some model adapters can emit an extra transport envelope such as

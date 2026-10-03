@@ -33,7 +33,7 @@
   "scripts": {
     "build": "tsc -b && tsdown",
     "prepare": "tsdown",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --force --pretty false",
     "test": "vitest run",
     "watch": "tsdown --watch"
   },

@@ -401,10 +401,15 @@ export function normalizeDesktopDockOpenOptions(value) {
     throw new TypeError('invalid Extension Dock navigation options')
   }
   const keys = Object.keys(value)
-  if (keys.some(key => key !== 'setting') || (value.setting !== undefined && !['value-mode', 'models', 'usage'].includes(value.setting))) {
-    throw new TypeError('invalid Extension Dock setting')
+  if (
+    keys.some(key => key !== 'setting' && key !== 'tab')
+    || (value.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage'].includes(value.setting))
+    || (value.tab !== undefined && !['plugins', 'market', 'skills'].includes(value.tab))
+    || (value.setting !== undefined && value.tab !== undefined)
+  ) {
+    throw new TypeError('invalid Extension Dock navigation target')
   }
-  return Object.freeze(value.setting === undefined ? {} : { setting: value.setting })
+  return Object.freeze(value.setting !== undefined ? { setting: value.setting } : value.tab !== undefined ? { tab: value.tab } : {})
 }
 
 /** Narrow clone-safe projection of the optional Desktop-owned LAN listener. */
@@ -537,6 +542,7 @@ export function registerDesktopIpc({
     'desktop:update-channel-get',
     'desktop:update-channel-set',
     'desktop:update-check',
+    'desktop:update-dismiss',
     'desktop:update-install',
     'desktop:plugin-install-request',
     'desktop:settings-window-bounds-get',
@@ -663,6 +669,7 @@ export function registerDesktopIpc({
     try { onUpdateCheck() } catch (error) { logDiagnostic('ipc', 'update-check', error) }
     return getUpdateController?.()?.check?.({ manual: true })
   })
+  handle('desktop:update-dismiss', main, () => getUpdateController?.()?.dismiss?.() === true)
   handle('desktop:update-install', main, () => getUpdateController?.()?.install?.())
   handle('desktop:plugin-install-request', main, async (_event, _surface, rawSource) => {
     // A web panel may only hand over a remote npm/git/HTTPS reference — the

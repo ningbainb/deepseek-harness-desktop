@@ -37,11 +37,90 @@ overrides:
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-git-graph': 'link:./packages/dsh-git-graph'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-remote-web-ui': 'link:./packages/dsh-remote-web-ui'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-tool-describe-image': 'link:./packages/dsh-tool-describe-image'
+  # The registry published a different 0.3.23 build from the reviewed alpha
+  # source. Keep this complete source cohort together, while the 4.1 profile
+  # remains mounted until the Desktop-only rows and saved state migrate.
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-community-plugins': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-git-graph': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-market': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-model-capabilities': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-plugin-manager': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-preset-center': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-skill-explorer': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-skin-center': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-task-board': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-client-ui-web-ui-settings': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-doctor': 'file:./vendor/dsh-web-alpha-0.3.23/linxin666-dsh-doctor-0.3.23.tgz'
+  '@linxin666/dsh-web-all>@linxin666/dsh-i18n': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-liangshen': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-pet': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-remote-web-ui': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-session-archive': '0.4.4'
+  '@linxin666/dsh-web-all>@linxin666/dsh-ssh': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-tool-describe-image': 'workspace:*'
+  '@linxin666/dsh-web-all>@linxin666/dsh-usage': '0.4.4'
 
 # Published DSH packages still import these modules from lib/index.js
 # still listed only as devDependencies. Extend the effective manifests so a
 # strict pnpm install and the packaged Desktop both retain those modules.
 packageExtensions:
+  # Verified against the published alpha.2 tarballs and the upstream dsh-web
+  # alpha branch: these emitted imports are absent from their NPM manifests.
+  '@deepseek-ai/dsh-client-store@0.1.6-alpha.2':
+    dependencies:
+      immer: '^10.1.1'
+      zustand: '~4.4.7'
+  '@deepseek-ai/dsh-client-ui-primitives@0.1.6-alpha.2':
+    dependencies:
+      '@shikijs/langs': '^4.3.1'
+      anser: '^2.3.5'
+      clsx: '^2.0.0'
+      diff: '^9.0.0'
+      katex: '^0.16.47'
+      mdast-util-from-markdown: '^2.0.3'
+      mdast-util-gfm: '^3.1.0'
+      mdast-util-math: '^3.0.0'
+      micromark-core-commonmark: '^2.0.3'
+      micromark-extension-gfm: '^3.0.0'
+      micromark-extension-math: '^3.1.0'
+      micromark-factory-space: '^2.0.1'
+      micromark-util-character: '^2.1.1'
+      micromark-util-classify-character: '^2.0.1'
+      micromark-util-sanitize-uri: '^2.0.1'
+      micromark-util-symbol: '^2.0.1'
+      micromark-util-types: '^2.0.2'
+      shiki: '^4.3.1'
+      simple-icons: '16.31.0'
+  '@deepseek-ai/dsh-cmdline@0.1.6-alpha.1':
+    dependencies:
+      commander: '^15.0.0'
+  '@deepseek-ai/dsh-client-store@0.1.6-alpha.1':
+    dependencies:
+      immer: '^10.1.1'
+      zustand: '~4.4.7'
+  '@deepseek-ai/dsh-client-ui-primitives@0.1.6-alpha.1':
+    dependencies:
+      '@shikijs/langs': '^4.3.1'
+      anser: '^2.3.5'
+      clsx: '^2.0.0'
+      diff: '^9.0.0'
+      katex: '^0.16.47'
+      mdast-util-from-markdown: '^2.0.3'
+      mdast-util-gfm: '^3.1.0'
+      mdast-util-math: '^3.0.0'
+      micromark-core-commonmark: '^2.0.3'
+      micromark-extension-gfm: '^3.0.0'
+      micromark-extension-math: '^3.1.0'
+      micromark-factory-space: '^2.0.1'
+      micromark-util-character: '^2.1.1'
+      micromark-util-classify-character: '^2.0.1'
+      micromark-util-sanitize-uri: '^2.0.1'
+      micromark-util-symbol: '^2.0.1'
+      micromark-util-types: '^2.0.2'
+      shiki: '^4.3.1'
+    peerDependencies:
+      react: '^18.2.0'
+      react-dom: '^18.2.0'
   '@deepseek-ai/dsh-client-store@0.1.5-rc.1':
     dependencies:
       immer: '^10.1.1'

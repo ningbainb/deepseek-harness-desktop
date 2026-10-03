@@ -18,13 +18,17 @@ test('Extension Dock presents declared Desktop compatibility requirements and ru
   assert.match(source, /保留安装状态，请移除或改用后续经验证版本/u)
 })
 
-test('Extension Dock exposes only installed discover and settings as plugin top-level areas', async () => {
+test('Extension Dock separates unified management from Creative Workshop discovery', async () => {
   const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
   const group = /<nav class="page-tabs" data-tab-group="plugins"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? ''
   assert.match(group, />已安装 /u)
-  assert.match(group, />发现 /u)
+  assert.match(group, />创意工坊 /u)
   assert.match(group, />设置</u)
   assert.doesNotMatch(group, />内置能力 /u)
+  assert.match(html, /统一管理已安装插件的启停、更新、卸载和恢复/u)
+  assert.match(html, /用户技能默认写入 <code>~\/.dsh\/skills<\/code>/u)
+  assert.match(html, /兼容扫描 <code>~\/.agents\/skills<\/code>/u)
+  assert.match(html, /class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai<\/small>/u)
 })
 
 test('Extension Dock moves Agent Team into the unified collaboration page', async () => {
@@ -39,6 +43,15 @@ test('Extension Dock moves Agent Team into the unified collaboration page', asyn
   assert.match(collaboration, /setAgentTeamEnabled\(target\)/u)
   assert.match(collaboration, /共享任务板/u)
   assert.match(collaboration, /会话、草稿和项目文件不会被删除/u)
+})
+
+test('Extension Dock renders built-in capabilities before the async inventory refresh', async () => {
+  const script = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
+  const initialRender = script.lastIndexOf('renderNativePlugins()')
+  const initialRefresh = script.lastIndexOf('await refresh()')
+
+  assert.ok(initialRender >= 0, 'built-in capabilities have an eager initial render')
+  assert.ok(initialRender < initialRefresh, 'the eager render does not depend on Runtime inventory availability')
 })
 
 test('Extension Dock keeps healthy plugin state quiet and technical fields inside advanced information', async () => {

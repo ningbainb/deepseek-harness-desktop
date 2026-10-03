@@ -28,16 +28,16 @@ function nativeFixture(blank = false) {
     clear: vi.fn(() => { state.current = undefined }),
     open: vi.fn((id: string) => { state.current = id }),
   }
+  const uiWorkspace = { openSession: vi.fn((id: string) => {
+    state.byId.old.retainedBy = {}
+    state.byId[id].retainedBy = { mainView: 1 }
+    state.current = id
+  }) }
   const get = vi.fn((name: string) => {
     if (name === 'remote.agentPresets') return remote.agentPresets
     if (name === 'remote.session') return remote.session
     throw new Error(`modern branch must not read ${name}`)
   })
-  const uiWorkspace = { openSession: vi.fn((id: string) => {
-    state.byId.old.retainedBy.mainView = 0
-    state.byId[id].retainedBy = { mainView: 1 }
-    state.current = id
-  }) }
   const ctx = { get, sessions, uiWorkspace,
     workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'workspace', path: 'C:/project' }] }) } },
   } as unknown as Context
@@ -104,7 +104,7 @@ describe('official mode Runtime adapter', () => {
     const legacy = { ...f.ctx, sessions, get: (name: string) => name === 'connection' ? { api } : undefined } as unknown as Context
     const deps = modeSwitcherDependencies(legacy)
     expect(deps.api).toBe(api)
-    expect(deps.sessions).toBe(sessions)
+    expect(deps.sessions.open).toBe(sessions.open)
     expect(deps.api.settings?.update).toBe(api.settings.update)
   })
 })

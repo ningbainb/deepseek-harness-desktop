@@ -48,12 +48,14 @@
 .content { max-width: 740px; margin: 0 auto; min-width: 0; }
 .content[hidden] { display: none; }
 .content > * { list-style: none; min-width: 0; }
+.page[data-dsh-dock-settings='appearance'] .content :global([class*='cardHeaderStatic']) { box-sizing: border-box; }
 .content input, .content textarea, .content select { max-width: 100%; box-sizing: border-box; }
 .breadcrumb { margin: 0 auto 9px; max-width: 740px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
 .heading { max-width: 740px; margin: 0 auto 16px; font-size: 21px; font-weight: 650; letter-spacing: -.3px; }
 .collaborationIntro { max-width: 740px; margin: 0 auto 10px; }
 .collaborationIntro .heading { margin: 0 0 5px; }
 .collaborationIntro p { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 13px; }
+.modelDiscoveryHint { max-width: 740px; margin: 0 auto 12px; padding: 10px 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 9px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 12px; line-height: 1.5; }
 .collaborationCard { margin: 0 0 10px; padding: 10px 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; background: var(--dsw-alias-bg-layer-3); }
 .collaborationCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .collaborationCardHeader h2 { margin: 0; font-size: 16px; }
@@ -72,6 +74,32 @@
 .collaborationError button { border: 1px solid currentColor; border-radius: 6px; color: inherit; background: transparent; cursor: pointer; }
 .collaborationAdvice { display: flex; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: 10px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 12px; }
 .collaborationAdvice strong { flex: none; color: var(--dsw-alias-label-primary); }
+.controlCenter { max-width: 900px; margin: 0 auto; }
+.controlHero { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 16px; padding: 20px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, var(--dsw-alias-border-l2)); border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 11%, var(--dsw-alias-bg-layer-3)), var(--dsw-alias-bg-layer-3)); }
+.controlHero h1 { margin: 4px 0 8px; font-size: 24px; line-height: 1.2; letter-spacing: -.4px; }
+.controlHero p { max-width: 680px; margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; }
+.controlKicker { color: var(--dsw-alias-brand-primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.controlSafety { flex: none; padding: 5px 9px; border-radius: 999px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 11px; font-weight: 650; }
+.controlGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.controlCard { display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 14px; background: var(--dsw-alias-bg-layer-3); }
+.controlShellCard { grid-column: 1 / -1; }
+.controlCard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.controlCard header span { color: var(--dsw-alias-brand-primary); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.controlCard h2 { margin: 2px 0 0; font-size: 17px; }
+.controlCard header strong { padding: 3px 7px; border-radius: 6px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 11px; white-space: nowrap; }
+.controlCard header strong[data-state='ready'] { color: #087443; background: color-mix(in srgb, #12b76a 12%, transparent); }
+.controlCard header strong[data-state='permission-required'] { color: #9a6700; background: color-mix(in srgb, #f4b740 14%, transparent); }
+.controlCard > p { min-height: 58px; margin: 12px 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.controlCard label { display: grid; gap: 5px; color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 600; }
+.controlCard select { width: 100%; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); font: inherit; }
+.controlCard > small { min-height: 34px; margin-top: 9px; color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.controlActions { display: flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 12px; }
+.controlActions > button:not(.switch) { padding: 6px 9px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); font: inherit; font-size: 11px; cursor: pointer; }
+.controlActions .switch { margin-left: auto; }
+.controlBoundary { display: flex; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 10px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); font-size: 12px; }
+.controlBoundary strong { flex: none; color: var(--dsw-alias-label-primary); }
+.controlMessage { margin: 10px 0 0; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.controlWarning { color: var(--dsw-alias-status-warning, #9a6700); }
 .tabs { display: flex; gap: 4px; max-width: 740px; margin: 0 auto 22px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--dsw-alias-bg-layer-2); border: 1px solid var(--dsw-alias-border-l2); }
 .tabs button { flex: 1; padding: 7px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; cursor: pointer; }
 .tabs button[aria-selected='true'] { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); border-color: var(--dsw-alias-border-l2); font-weight: 600; box-shadow: 0 1px 2px #00000008; }
@@ -84,6 +112,8 @@
 .page :global([data-dock-save-bar]) { position: sticky; bottom: -28px; z-index: 2; margin-top: 16px; padding: 12px 0; background: var(--dsw-alias-bg-layer-1); border-top: 1px solid var(--dsw-alias-border-l2); }
 @media (max-width: 540px) {
   .page { padding: 12px; }
+  .controlHero { padding: 15px; }
+  .controlGrid { grid-template-columns: 1fr; }
   .collaborationCardHeader { align-items: flex-start; }
   .collaborationControl { flex-direction: column-reverse; align-items: flex-end; }
 }

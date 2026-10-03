@@ -65,6 +65,13 @@ function fixture({
     sessionPersistence: {
       list: async () => persisted ? [{ header: { id: 'task-board-session-1' } }] : [],
     } as never,
+    sessionQuery: {
+      readSession: async () => ({
+        session: { id: 'task-board-session-1' },
+        inheritedEventCount: 0,
+        events: session.events,
+      }),
+    } as never,
     workspaceRegistry: {
       get: () => workspace
         ? { path: 'C:\\workspace', status: async () => workspaceStatus }

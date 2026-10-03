@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
+import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import electronPath from 'electron'
@@ -201,10 +202,18 @@ try {
   })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'focused')
   await page.evaluate(() => {
-    document.querySelector('#dsh-particle-focus-probe')?.remove()
+    const probe = document.querySelector('#dsh-particle-focus-probe')
+    if (probe instanceof HTMLElement) probe.blur()
+    probe?.remove()
+    // A removed focused node does not consistently emit focusout in Electron.
+    // Move focus to a real non-editable target so the page-mode controller
+    // receives a deterministic focus transition before asserting normal mode.
+    document.body.tabIndex = -1
     document.body.focus()
+    window.dispatchEvent(new CustomEvent('dsh:window-motion', { detail: false }))
   })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'normal')
+  await page.evaluate(() => { document.body.removeAttribute('tabindex') })
 
   const settingsDialog = await openNativeSettings(page)
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'dialog')
@@ -246,10 +255,15 @@ try {
   // Real browser requests: a stalled decorative read must not accumulate on
   // every tick, nor block unrelated settings reads across Runtime views.
   const petReadCounts = [0, 0]
+  const petReadPaths = [[], []]
   const petPages = [page, dockPage]
   const petHandlers = petPages.map((_petPage, index) => request => {
     const url = new URL(request.url())
-    if (url.protocol === 'dsh-runtime:' && url.hostname === 'app' && url.pathname === '/api/pet/state') petReadCounts[index] += 1
+    if (url.protocol === 'dsh-runtime:' && url.hostname === 'app'
+      && desktopLocalPath(url.pathname) === '/api/pet/state') {
+      petReadCounts[index] += 1
+      petReadPaths[index].push(url.pathname)
+    }
   })
   try {
     for (let index = 0; index < petPages.length; index += 1) {
@@ -258,9 +272,10 @@ try {
     }
     await writeFile(runtimeFetchGate, 'stall-pet')
     await page.waitForTimeout(6500)
-    assert.deepEqual(petReadCounts, [1, 1], 'Each visible Runtime view must keep one stalled pet read, not one per tick')
+    assert.deepEqual(petReadCounts, [1, 1], `Each visible Runtime view must keep one stalled pet read, not one per tick: ${JSON.stringify(petReadPaths)}`)
     assert.equal(await readParticleEnabled(), true, 'Settings remain readable while pet reads are held')
-    const recovered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/pet/state' && response.ok(), { timeout: 10_000 })
+    const recovered = page.waitForResponse(response =>
+      desktopLocalPath(new URL(response.url()).pathname) === '/api/pet/state' && response.ok(), { timeout: 10_000 })
     await writeFile(runtimeFetchGate, 'open')
     await recovered
   } finally {
@@ -301,12 +316,20 @@ try {
   primaryFailure = error
   console.error(error)
   console.error('pending particle HTTP', [...pendingHttp.values()].map(item => ({ ...item, ageMs: Date.now() - item.started })))
-  const runtime = electronApp?.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+  const runtime = electronApp?.windows().find(candidate => /^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:)/u.test(candidate.url()))
   if (runtime) {
     console.error('particle failure state', await runtime.evaluate(() => ({
       mode: document.querySelector('canvas[data-dsh-particle-theme]')?.getAttribute('data-dsh-particle-mode'),
       focusTag: document.activeElement?.tagName,
       editable: document.activeElement?.getAttribute('contenteditable'),
+      dialogs: [...document.querySelectorAll('[role="dialog"], dialog')].map(element => ({
+        hidden: element.closest('[hidden]') !== null,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+        width: element.getBoundingClientRect().width,
+        height: element.getBoundingClientRect().height,
+        text: element.textContent?.trim().slice(0, 120),
+      })),
       inputs: [...document.querySelectorAll('textarea, [contenteditable]')].map(element => ({ tag: element.tagName, composer: element.getAttribute('data-composer-input'), editable: element.getAttribute('contenteditable') })),
     })).catch(() => ({})))
     if (screenshot) await runtime.screenshot({ path: screenshot.replace(/\.png$/iu, '-failure.png') }).catch(() => {})

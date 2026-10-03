@@ -29,6 +29,8 @@ jobs:
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - name: Feature preservation baseline check
         run: pnpm feature-baseline:check
+      - name: Windows installer lifecycle gate
+        run: pnpm --filter @linxin666/dsh-desktop test:installer-lifecycle:e2e
       - name: Desktop core regression E2E gate
         # Only the maintainer-approved 3.4.0 DPI position assertion is accepted.
         # The test still runs; every other failure and version stays blocking.

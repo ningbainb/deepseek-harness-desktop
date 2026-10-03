@@ -79,7 +79,7 @@ export type TaskBoardSettingsCardProps =
  */
 export function TaskBoardSettingsCard(props: TaskBoardSettingsCardProps) {
   const { t } = props
-  const state = props.useTaskBoardSettingsCard(snapshot => snapshot)
+  const state = props.useTaskBoardSettingsCard((snapshot: TaskBoardSettingsCardState) => snapshot)
   const disabled = !state.writable
   const fieldProps = {
     overriddenLabel: t('settings.overridden'),

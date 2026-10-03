@@ -119,6 +119,28 @@ test('Candidate Matrix plans every workspace DSH SDK package and exposes retired
   assert.deepEqual(plan.unresolvedCompanionPackages, [])
 })
 
+test('Candidate Matrix retains independently versioned DeepSeek platform companions', async () => {
+  const plan = await createCandidateInstallPlan({
+    candidateVersion: '0.1.6-alpha.1',
+    viewManifest: async () => ({
+      name: '@deepseek-ai/dsh',
+      version: '0.1.6-alpha.1',
+    }),
+    resolvePeerVersion: async (_name, range) => range,
+    workspaceManifests: [{
+      dependencies: { '@deepseek-ai/node-addon-system': '0.1.2' },
+    }],
+    viewPackageManifest: async (name, version) => ({ name, version }),
+  })
+  assert.deepEqual(plan.companionPackages, [{
+    name: '@deepseek-ai/node-addon-system',
+    ranges: ['0.1.2'],
+    version: '0.1.2',
+    spec: '@deepseek-ai/node-addon-system@0.1.2',
+  }])
+  assert.deepEqual(plan.unresolvedCompanionPackages, [])
+})
+
 test('Candidate preparation removes only DSH patches for other exact releases', () => {
   const workspace = [
     "patchedDependencies: { '@deepseek-ai/dsh-client-store@0.1.5-rc.1': patches/store.patch, '@deepseek-ai/dsh-llm-pi-ai@0.1.5-rc.2': patches/llm.patch, '@linxin666/dsh-pet@0.2.5': patches/pet.patch }",
@@ -132,6 +154,13 @@ test('Candidate preparation removes only DSH patches for other exact releases', 
   assert.match(result.text, /dsh-llm-pi-ai@0\.1\.5-rc\.2/u)
   assert.match(result.text, /@linxin666\/dsh-pet@0\.2\.5/u)
   assert.match(result.text, /allowBuilds:\n  esbuild: true/u)
+})
+
+test('Candidate preparation preserves unquoted community patch keys', () => {
+  const workspace = "patchedDependencies: { '@deepseek-ai/dsh-client-store@0.1.5-rc.1': patches/store.patch, dsh-better-sidebar@0.14.0: patches/sidebar.patch }\n"
+  const result = prepareCandidateWorkspaceText(workspace, '0.1.6-alpha.1')
+  assert.deepEqual(result.removedPatchSpecifiers, ['@deepseek-ai/dsh-client-store@0.1.5-rc.1'])
+  assert.match(result.text, /'dsh-better-sidebar@0\.14\.0': patches\/sidebar\.patch/u)
 })
 
 test('Candidate preparation leaves workspaces without patch declarations unchanged', () => {

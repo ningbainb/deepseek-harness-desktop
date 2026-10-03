@@ -13,14 +13,11 @@ export function modeSwitcherDependencies(ctx: Context): ModeSwitcherDeps {
     && typeof presets.select === 'function' && session && typeof session.create === 'function') {
     return {
       sessions: {
-        list: { getSnapshot: () => {
-          const { byId } = ctx.sessions.list.getSnapshot()
-          const current = Object.values(byId).find(row => Object.entries(row.retainedBy)
-            .some(([source, count]) => source === 'mainView' && count > 0))?.id
-          return { current, byId }
-        } },
-        open: id => ctx.uiWorkspace.openSession(id as SessionId),
-        clear: () => {},
+        list: ctx.sessions.list,
+        current: () => Object.values(ctx.sessions.list.getSnapshot().byId)
+          .find(row => Object.entries(row.retainedBy ?? {})
+            .some(([source, count]) => source === 'mainView' && count > 0))?.id,
+        open: id => ctx.uiWorkspace.openSession(id as Parameters<typeof ctx.uiWorkspace.openSession>[0]),
         refresh: () => ctx.sessions.refresh(),
       },
       workspaces: ctx.workspaces,
@@ -55,5 +52,8 @@ export function modeSwitcherDependencies(ctx: Context): ModeSwitcherDeps {
     || typeof sessions.noteAgentPreset !== 'function') {
     throw new Error('mode switcher requires a supported session and agent-preset API')
   }
-  return { sessions, workspaces: ctx.workspaces, api }
+  return { sessions: {
+    ...sessions,
+    current: () => (sessions.list.getSnapshot() as { current?: string }).current,
+  }, workspaces: ctx.workspaces, api }
 }

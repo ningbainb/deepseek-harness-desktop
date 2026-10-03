@@ -26,6 +26,12 @@
 
 ### 下载与校验
 
+5.0.0 采用同一版本的 Windows x64、macOS arm64、Linux x64 原生构建。三端门禁与安装资产校验全部成功后，才创建同一个正式 GitHub Release；本地验证不能代表其他平台通过。macOS 和 Linux 的平台能力边界见各自文档。三端均未签名，macOS 未公证；macOS/Linux 需要系统 Git，Linux 需要图形会话及可用沙箱。
+
+bai 模型接入使用浏览器授权，登录后优先选择接口实际返回的 `deepseek-flash`，否则选择首个可用模型，并定期更新目录。未登录或供应商拒绝密钥时显示重新登录入口；不自动充值、付费或重新发送。第三方 API 配置继续独立可用。手动终端、Agent WSL 独立审批、智能操控的预检与失败恢复，以及后台更新退避均保留。
+
+官方安装包包含匿名活跃、留存与固定功能结果统计；不采集会话、Prompt、代码、路径、截图、模型密钥或账号凭据。源码、开发与测试版本默认不连接统计服务，诊断导出仍需用户主动操作。
+
 Windows x64 安装包名为 DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe。下载后请按同一发布目录内的 SHA256SUMS.txt 核对 SHA-256；文件大小与哈希以最终构建产物为准。
 
 ### 说明
@@ -57,6 +63,12 @@ Balance and quota queries use Desktop's Host-only compatibility reads over the c
 Release validation covers the machine readable feature baseline, builtin plugin adaptation, compiled installer lifecycle, Profile preservation, Desktop regression, package integrity, and an isolated startup check. The results recorded for this build define the verified scope. Isolated tests alone do not establish successful overlay installation on every user machine.
 
 ### Download and verification
+
+5.0.0 uses one version for native Windows x64, macOS arm64 and Linux x64 builds. One formal GitHub Release is created only after all three platform gates and installation assets pass verification; local checks do not establish other platforms' results. Platform capability boundaries remain documented separately. All packages are unsigned and macOS is unnotarized; macOS/Linux require system Git, and Linux requires a graphical session and a working sandbox.
+
+bai model access uses browser authorization, then prefers `deepseek-flash` actually returned by the directory, otherwise the first available model, with periodic directory refresh. Missing authorization or a rejected key offers sign-in again without automatic top-ups, paid inference or message retries. Independent third-party APIs remain supported. Selectable manual terminals, separately approved Agent WSL, Smart Control preflight and rollback, and background update backoff remain available.
+
+Official packages include anonymous activity, retention and fixed feature-outcome statistics, never conversations, Prompts, code, paths, screenshots, model keys or account credentials. Source, development and test builds remain disconnected by default; diagnostic export still requires a user action.
 
 The Windows x64 installer is named DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe. Compare its SHA-256 value with SHA256SUMS.txt from the same release directory. The final build artifact determines the exact size and checksum.
 

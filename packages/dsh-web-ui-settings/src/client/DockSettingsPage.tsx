@@ -3,10 +3,11 @@ import type { DesktopPalette } from './desktop-appearance.ts'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { AgentTeamSettingsCard } from './AgentTeamSettingsCard.tsx'
+import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
 import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
 
-export const DOCK_SETTINGS = ['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options'] as const
+export const DOCK_SETTINGS = ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
 export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions' } as const
@@ -65,6 +66,27 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
       window.removeEventListener('dsh:dock-palette', syncPalette)
     }
   }, [])
+  useEffect(() => {
+    if (selected !== 'describe-image') return
+    const section = document.getElementById('dock-form-describe-image')
+    if (!section) return
+    let opened = false
+    const reveal = () => {
+      if (opened) return
+      const button = section.querySelector('li button[aria-expanded="false"]')
+      if (!(button instanceof HTMLButtonElement)) return
+      opened = true
+      observer.disconnect()
+      button.click()
+    }
+    // The upstream alpha card deliberately starts collapsed in the ordinary
+    // plugin list. The dedicated Desktop page has already selected this one
+    // card, so reveal it once without changing the upstream plugin package.
+    const observer = new MutationObserver(reveal)
+    observer.observe(section, { childList: true, subtree: true })
+    reveal()
+    return () => observer.disconnect()
+  }, [selected])
   const personal = selected === 'personal-prompt' || selected === 'memory'
   const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions', 'plugin-options': 'dockPluginOptions' } as const
   const sectionTitle = sectionTitles[selected as keyof typeof sectionTitles]
@@ -74,7 +96,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
   } as CSSProperties : undefined
   return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
+    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -91,10 +113,12 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
       <h1 className={css.heading}>{t('dockCollaboration')}</h1>
       <p>Agent Team 负责多角色协作，性价比模式负责模型分工与成本控制；两者可独立开启，也可同时使用。</p>
     </div>}
+    {selected === 'models' && <p className={css.modelDiscoveryHint}>bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。</p>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
+        {id === 'control-center' && <ControlCenterSettingsCard />}
         {id === 'value-mode' && <AgentTeamSettingsCard />}
-        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : sectionFor(id)
+        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'control-center' ? null : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
             {id === 'appearance'
               ? renderSlot('settings.section', { close: () => {} }, { only: 'skin-center', fallback: renderSlot('web-ui.plugin.item', {}, { only: 'skins', fallback: <p role="status">{t('dockSettingUnavailable')}</p> }) })

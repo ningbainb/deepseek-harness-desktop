@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
+import { resolve } from 'node:path'
 import test from 'node:test'
 
 import { RepairVerifier } from '../src/repair-verifier.mjs'
@@ -122,8 +123,8 @@ test('repair command children receive only allowlisted environment variables', a
   }
 
   const outcome = await runRegisteredRepairCommand(
-    { executable: 'C:/node.exe', args: ['cli.mjs'], cwd: 'packages/example' },
-    'C:/incident/staging',
+    { executable: process.execPath, args: ['cli.mjs'], cwd: 'packages/example' },
+    resolve('incident', 'staging'),
     { spawnProcess: fakeSpawn, timeoutMs: 1000 },
   )
 

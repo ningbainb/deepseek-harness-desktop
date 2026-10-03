@@ -17,7 +17,7 @@ function portable(path) {
   return path.replaceAll('\\', '/')
 }
 
-async function createIsolatedProfile(pluginDirectory) {
+async function createHoistedProfile(pluginDirectory) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-isolated-linker-'))
   const fixtures = join(root, 'fixtures')
   const profileDir = join(root, 'profile')
@@ -34,7 +34,7 @@ async function createIsolatedProfile(pluginDirectory) {
       [pluginManifest.name]: `file:${portable(pluginRoot)}`,
     },
   }, null, 2)}\n`)
-  await writeFile(join(profileDir, 'pnpm-workspace.yaml'), 'packages:\n  - .\n\nnodeLinker: isolated\nautoInstallPeers: false\n')
+  await writeFile(join(profileDir, 'pnpm-workspace.yaml'), 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')
   await runPnpm({
     pnpmCli: resolvePnpmCliPath(),
     profileDir,
@@ -52,8 +52,8 @@ async function createIsolatedProfile(pluginDirectory) {
   return { root, profileDir, pluginManifest, policy, baseline }
 }
 
-test('real pnpm isolated linker keeps a compatible local plugin behind the protected Runtime link', async () => {
-  const value = await createIsolatedProfile('good')
+test('real pnpm official hoisted linker keeps a compatible local plugin behind the protected Runtime link', async () => {
+  const value = await createHoistedProfile('good')
   try {
     const result = await validateProtectedRuntimeGraph(value)
     assert.equal(result.valid, true)
@@ -68,9 +68,9 @@ test('real pnpm isolated linker keeps a compatible local plugin behind the prote
   }
 })
 
-test('real pnpm isolated linker exposes direct and transitive protected Runtime conflicts', async () => {
+test('real pnpm official hoisted linker exposes direct and transitive protected Runtime conflicts', async () => {
   for (const directory of ['direct-runtime-conflict', 'transitive-runtime-conflict']) {
-    const value = await createIsolatedProfile(directory)
+    const value = await createHoistedProfile(directory)
     try {
       await assert.rejects(
         validateProtectedRuntimeGraph(value),

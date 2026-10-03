@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { createServer } from 'node:net'
 import { test } from 'node:test'
 
 import {
@@ -55,6 +57,12 @@ test('runtime pipe authenticates, chunks bodies, and preserves response metadata
 test('runtime pipe transports cancellation-aware logical streams', async (t) => {
   const identity = createRuntimePipeIdentity()
   let hostCancelled = false
+  const largeHistory = {
+    type: 'snapshot',
+    records: [{ sequence: 1, message: `历史上下文-${'测试中文'.repeat(180_000)}` }],
+    projections: { values: {} },
+  }
+  assert.ok(Buffer.byteLength(JSON.stringify({ type: 'stream-item', value: largeHistory })) > 512 * 1024)
   const server = await createRuntimePipeServer({
     identity,
     runtimeVersion: '0.1.5-rc.2',
@@ -64,7 +72,7 @@ test('runtime pipe transports cancellation-aware logical streams', async (t) => 
       assert.equal(endpoint, 'session/observe')
       assert.deepEqual(payload, { sessionId: 'session-1' })
       try {
-        yield { sequence: 1 }
+        yield largeHistory
         await new Promise((resolve, reject) => {
           signal.addEventListener('abort', () => reject(signal.reason), { once: true })
         })
@@ -78,7 +86,7 @@ test('runtime pipe transports cancellation-aware logical streams', async (t) => 
   const controller = new AbortController()
   const client = new RuntimePipeClient(identity)
   const stream = client.openStream('session/observe', { sessionId: 'session-1' }, controller.signal)
-  assert.deepEqual((await stream.next()).value, { sequence: 1 })
+  assert.deepEqual((await stream.next()).value, largeHistory)
   controller.abort(new Error('test cancellation'))
   await assert.rejects(stream.next(), /test cancellation|cancelled|disconnected/u)
   const deadline = Date.now() + 1_000
@@ -251,4 +259,88 @@ test('duplex cancel interrupts an uncompleted large open without waiting for ack
   const source = new RuntimePipeClient(identity).openDuplex('session/follow', { value: 'x'.repeat(5 * 1024 * 1024) })
   source.cancel(new Error('large open cancelled'))
   await assert.rejects(source[Symbol.asyncIterator]().next(), /large open cancelled/u)
+})
+
+test('runtime pipe fragments oversized duplex input and output without losing UTF-8 context', async (t) => {
+  const identity = createRuntimePipeIdentity()
+  const context = `context-start-${'上下文识别'.repeat(160_000)}-context-end`
+  assert.ok(Buffer.byteLength(JSON.stringify({ type: 'duplex-input', value: context })) > 512 * 1024)
+  const server = await createRuntimePipeServer({
+    identity,
+    runtimeVersion: '0.1.5-rc.2',
+    profile: 'desktop',
+    fetch: async () => new Response('ok'),
+    openStream: async function * () {},
+    openDuplex: async function * (_endpoint, _payload, input) {
+      for await (const value of input) yield { restored: value }
+    },
+  })
+  t.after(() => server.close())
+  const client = new RuntimePipeClient(identity)
+  const duplex = client.openDuplex('session/follow', { sessionId: 'large-context' })
+  await duplex.write(context)
+  await duplex.close()
+  const values = []
+  for await (const value of duplex) values.push(value)
+  assert.deepEqual(values, [{ restored: context }])
+})
+
+test('runtime pipe rejects an interrupted fragmented stream without yielding partial history', async (t) => {
+  const identity = createRuntimePipeIdentity()
+  const logical = Buffer.from(JSON.stringify({
+    type: 'stream-item',
+    value: { type: 'snapshot', records: [{ message: '不应该出现的部分历史'.repeat(80_000) }] },
+  }))
+  const rawServer = createServer((socket) => {
+    let buffered = Buffer.alloc(0)
+    let accepted = false
+    socket.on('data', (chunk) => {
+      buffered = Buffer.concat([buffered, chunk])
+      for (;;) {
+        const newline = buffered.indexOf(10)
+        if (newline === -1) return
+        const frame = JSON.parse(buffered.subarray(0, newline).toString('utf8'))
+        buffered = buffered.subarray(newline + 1)
+        if (frame.type === 'hello') {
+          socket.write(`${JSON.stringify({
+            type: 'hello',
+            protocolVersion: RUNTIME_PIPE_PROTOCOL_VERSION,
+            runtimeVersion: '0.1.5-rc.2',
+            profile: 'desktop',
+            generation: identity.generation,
+          })}\n`)
+          continue
+        }
+        if (frame.type === 'stream-open' && !accepted) {
+          accepted = true
+          const id = '0123456789abcdef0123456789abcdef'
+          const chunkBytes = 192 * 1024
+          socket.write(`${JSON.stringify({
+            type: 'message-start',
+            id,
+            bytes: logical.length,
+            count: Math.ceil(logical.length / chunkBytes),
+            sha256: createHash('sha256').update(logical).digest('hex'),
+          })}\n`)
+          socket.end(`${JSON.stringify({
+            type: 'message-chunk',
+            id,
+            index: 0,
+            body: logical.subarray(0, chunkBytes).toString('base64'),
+          })}\n`)
+        }
+      }
+    })
+  })
+  await new Promise((resolve, reject) => {
+    rawServer.once('error', reject)
+    rawServer.listen(identity.address, resolve)
+  })
+  t.after(() => new Promise((resolve, reject) => rawServer.close(error => error ? reject(error) : resolve())))
+
+  const stream = new RuntimePipeClient(identity).openStream('session/observe', { sessionId: 'interrupted' })
+  await assert.rejects(stream.next(), error => {
+    assert.equal(error.code, 'transport/message-truncated')
+    return true
+  })
 })

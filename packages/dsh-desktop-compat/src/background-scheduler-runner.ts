@@ -14,6 +14,7 @@ import type { AgentDefaultModelConfig } from '@deepseek-ai/dsh-agent-default-mod
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent, type SessionStore, type TurnEndReason } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
+import type { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import type { WorkspaceId, WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 
 export interface DesktopScheduledTask {
@@ -86,6 +87,7 @@ export interface DesktopTaskBoardHostScheduleRunnerOptions {
    * slot rather than creating a second agent transcript.
    */
   sessionPersistence?: SessionPersistence
+  sessionQuery: SessionQueryEngine
   now?: () => number
   createSessionId?: (executionKey: string) => string
 }
@@ -309,7 +311,8 @@ export function createDesktopTaskBoardHostScheduleRunner(
         // This recovery run owns the same SessionId, so never enqueue the
         // prompt a second time. SessionPersistence cold recovery supplies the
         // terminal boundary if the old process stopped mid-turn.
-        const promptAlreadyAccepted = persisted && hasScheduledPrompt(agent.session.snapshotEvents(), prompt)
+        const promptAlreadyAccepted = persisted
+          && hasScheduledPrompt((await options.sessionQuery.readSession(agent.session.id)).events, prompt)
         if (!promptAlreadyAccepted) {
           agent.followup(createUserMessage({
             content: [{ type: 'text', text: prompt }],
@@ -318,7 +321,10 @@ export function createDesktopTaskBoardHostScheduleRunner(
           await agent.whenIdle()
         }
         await options.sessions.flush(agent.session)
-        const reason = terminalReason(agent.session.snapshotEvents(), promptAlreadyAccepted ? 0 : firstSequence)
+        const reason = terminalReason(
+          (await options.sessionQuery.readSession(agent.session.id)).events,
+          promptAlreadyAccepted ? 0 : firstSequence,
+        )
         const outcome = terminalOutcome(reason)
         const error = outcome === 'failed'
           ? reason?.kind === 'error'

@@ -13,7 +13,7 @@ const LEGACY_CREDENTIAL_VALUE = 'fixture-old-api-key-do-not-log'
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u
 
-export const DIRECT_START_FIXTURE_VERSIONS = Object.freeze(['2.3', '2.4', '2.5', '2.6', '2.7', '3.0.1', '3.3.0', '3.4.0'])
+export const DIRECT_START_FIXTURE_VERSIONS = Object.freeze(['2.3', '2.4', '2.5', '2.6', '2.7', '3.0.1', '3.3.0', '3.4.0', '4.1.0'])
 export const DIRECT_START_FIXTURE_ROOT = resolve(SCRIPT_DIRECTORY, '..', 'test', 'fixtures', 'direct-start')
 
 function isRecord(value) {
@@ -227,9 +227,14 @@ export async function verifyPackagedDirectStart(layout, result) {
     throw new Error(`packaged direct-start ${layout.version} did not retain and attempt every enabled test bundle`)
   }
   for (const name of layout.expectedLegacyBundles ?? []) {
-    if (!manifest.dsh?.profile?.bundles?.includes(name)) {
-      throw new Error(`packaged direct-start ${layout.version} dropped an enabled legacy bundle: ${name}`)
+    if (manifest.dsh?.profile?.bundles?.includes(name)) continue
+    if (name === '@linxin666/dsh-web-ui-all') {
+      const replacementEnabled = manifest.dsh?.profile?.bundles?.includes('@linxin666/dsh-web-all')
+      const rollbackCarrierRetained = typeof manifest.dependencies?.[name] === 'string'
+        && manifest.dependencies[name].length > 0
+      if (replacementEnabled && rollbackCarrierRetained) continue
     }
+    throw new Error(`packaged direct-start ${layout.version} dropped an enabled legacy bundle: ${name}`)
   }
   return Object.freeze({
     version: layout.version,

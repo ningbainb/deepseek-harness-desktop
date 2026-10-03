@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import {
@@ -9,6 +10,10 @@ import {
   RUNTIME_PROVIDER_ERROR_CODES,
   RuntimeProviderError,
 } from '../src/runtime-provider.mjs'
+
+const TEST_DSH_HOME = resolve('test-fixtures', 'dsh-home')
+const TEST_PROFILE_DIR = join(TEST_DSH_HOME, 'profiles', 'desktop')
+const TEST_BUILTINS_PROFILE_DIR = join(TEST_DSH_HOME, 'profiles', 'desktop-builtins')
 
 class FakeController extends EventEmitter {
   constructor() {
@@ -45,9 +50,9 @@ function createProvider(overrides = {}) {
     controller,
     ensureProfile: overrides.ensureProfile ?? (async () => {
       profileCalls.push('ensure')
-      return { changed: false, profileDir: 'C:\\dsh-home\\profiles\\desktop' }
+      return { changed: false, profileDir: TEST_PROFILE_DIR }
     }),
-    dshHome: 'C:\\dsh-home',
+    dshHome: TEST_DSH_HOME,
     profileName: 'desktop',
     upstreamVersion: '0.1.0-rc.7',
     desktopVersion: '2.5.0',
@@ -119,15 +124,15 @@ test('provider preserves current lifecycle results, status, and status subscript
 test('profile methods expose only normalized Desktop-owned paths', async () => {
   const { profileCalls, provider } = createProvider()
   assert.deepEqual(provider.resolveProfilePaths(), {
-    homeDir: 'C:\\dsh-home',
+    homeDir: TEST_DSH_HOME,
     profileName: 'desktop',
-    profileDir: 'C:\\dsh-home\\profiles\\desktop',
-    manifestPath: 'C:\\dsh-home\\profiles\\desktop\\package.json',
-    lockfilePath: 'C:\\dsh-home\\profiles\\desktop\\pnpm-lock.yaml',
-    stateDir: 'C:\\dsh-home\\profiles\\desktop\\state',
-    skillsDir: 'C:\\dsh-home\\skills',
+    profileDir: TEST_PROFILE_DIR,
+    manifestPath: join(TEST_PROFILE_DIR, 'package.json'),
+    lockfilePath: join(TEST_PROFILE_DIR, 'pnpm-lock.yaml'),
+    stateDir: join(TEST_PROFILE_DIR, 'state'),
+    skillsDir: join(TEST_DSH_HOME, 'skills'),
   })
-  assert.equal((await provider.ensureProfile()).profileDir, 'C:\\dsh-home\\profiles\\desktop')
+  assert.equal((await provider.ensureProfile()).profileDir, TEST_PROFILE_DIR)
   assert.deepEqual(profileCalls, ['ensure'])
 })
 
@@ -214,7 +219,7 @@ test('active provider switches profiles without changing Home and forwards only 
     controller: builtinsController,
     profileName: 'desktop-builtins',
     upstreamVersion: '0.1.0-rc.8',
-    ensureProfile: async () => ({ profileDir: 'C:\\dsh-home\\profiles\\desktop-builtins' }),
+    ensureProfile: async () => ({ profileDir: TEST_BUILTINS_PROFILE_DIR }),
   }).provider
   const active = new ActiveRuntimeProvider({ providers: [full, builtins], activeProfileName: 'desktop' })
   const statuses = []
@@ -225,10 +230,10 @@ test('active provider switches profiles without changing Home and forwards only 
   active.activate('desktop-builtins')
   await active.start()
 
-  assert.equal(active.dshHome, 'C:\\dsh-home')
+  assert.equal(active.dshHome, TEST_DSH_HOME)
   assert.equal(active.profileName, 'desktop-builtins')
   assert.equal(active.probe().upstreamVersion, '0.1.0-rc.8')
-  assert.equal(active.resolveProfilePaths().profileDir, 'C:\\dsh-home\\profiles\\desktop-builtins')
+  assert.equal(active.resolveProfilePaths().profileDir, TEST_BUILTINS_PROFILE_DIR)
   assert.deepEqual(statuses, [
     ['desktop', 'ready'],
     ['desktop', 'stopped'],
@@ -239,7 +244,7 @@ test('active provider switches profiles without changing Home and forwards only 
 
 test('active provider refuses profiles from another Home', () => {
   const full = createProvider().provider
-  const foreign = createProvider({ dshHome: 'D:\\foreign', profileName: 'desktop-builtins' }).provider
+  const foreign = createProvider({ dshHome: resolve('test-fixtures', 'foreign-dsh-home'), profileName: 'desktop-builtins' }).provider
   assert.throws(
     () => new ActiveRuntimeProvider({ providers: [full, foreign], activeProfileName: 'desktop' }),
     /same DSH Home/u,

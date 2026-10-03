@@ -14,8 +14,8 @@ Ubuntu 22.04 and 24.04 pass real GitHub Actions packaging, sandbox, and Xvfb sta
 ## AppImage
 
 ```bash
-chmod +x DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
-./DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
+chmod +x DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage
+./DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage
 ```
 
 If FUSE 2 is unavailable, install the distribution's compatibility package or use the AppImage extraction mode. Do not use untrusted third-party installation scripts.
@@ -23,7 +23,7 @@ If FUSE 2 is unavailable, install the distribution's compatibility package or us
 ## deb
 
 ```bash
-sudo apt install ./DeepSeek-Harness-Desktop-4.0.0-amd64.deb
+sudo apt install ./DeepSeek-Harness-Desktop-5.0.0-amd64.deb
 ```
 
 Uninstall with:

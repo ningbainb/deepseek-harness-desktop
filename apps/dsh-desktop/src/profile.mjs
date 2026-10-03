@@ -17,6 +17,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
+import { ControlCenterStore, createDefaultControlCenterConfiguration } from './control-center.mjs'
 import { mergeQqBotPatch, readQqBotPatchEnabled, reconcileManagedPatch } from './extensions/qqbot.mjs'
 
 export const BUILTIN_BUNDLES = Object.freeze([
@@ -25,7 +26,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-web-app',
   '@linxin666/dsh-value-mode',
   'dsh-better-sidebar',
-  '@linxin666/dsh-web-ui-all',
+  '@linxin666/dsh-web-all',
   // The Desktop pins a newer Skill Center than the aggregate release. Mount
   // it directly so the profile cannot silently keep only the dependency
   // bytes while omitting its host routes and browser entry.
@@ -46,6 +47,17 @@ export const AGENT_TEAM_RUNTIME_PACKAGES = Object.freeze([
 ].toSorted())
 
 export const DESKTOP_REPAIR_BUNDLE = '@linxin666/dsh-desktop-repair'
+
+export const CONTROL_CENTER_RUNTIME_PACKAGES = Object.freeze([
+  '@deepseek-ai/dsh-browser-use',
+  '@deepseek-ai/dsh-computer-use',
+  '@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp',
+  '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp',
+  '@deepseek-ai/dsh-experimental-browser-use-runtime',
+  '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+  '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp',
+  '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native',
+].toSorted())
 
 // Packages expanded by @linxin666/dsh-web-ui-all. Older desktop profiles
 // listed some of these as top-level bundles as well, which makes Cordis
@@ -150,6 +162,7 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   ...AGENT_TEAM_RUNTIME_PACKAGES,
+  ...CONTROL_CENTER_RUNTIME_PACKAGES,
   '@linxin666/dsh-desktop-pipe-webserver',
   '@linxin666/dsh-client-ui-model-capabilities',
   '@linxin666/dsh-usage',
@@ -179,6 +192,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-ssh',
   '@linxin666/dsh-tool-describe-image',
   '@linxin666/dsh-value-mode',
+  '@linxin666/dsh-web-all',
   '@linxin666/dsh-web-ui-all',
   '@tencent-connect/dsh-qqbot',
   '@ningbainb/dsh-chat-artifacts',
@@ -190,7 +204,6 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
 export const DESKTOP_SUPPORT_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-deepseek-account',
   '@deepseek-ai/dsh-llm-deepseek',
-  '@deepseek-ai/dsh-ptc-runtime',
   '@deepseek-ai/dsh-agent',
   '@deepseek-ai/dsh-agent-default-model',
   '@deepseek-ai/dsh-client-ui-directory-picker-browse',
@@ -224,6 +237,7 @@ function isRetiredManagedPackage(packageName) {
 export const DEPENDENCY_ONLY_BUNDLES = Object.freeze([
   '@linxin666/dsh-client-ui-mode-switcher',
   '@linxin666/dsh-particle-theme',
+  '@linxin666/dsh-web-ui-all',
 ].toSorted())
 
 // Compatibility dependencies for supported community plugins whose published
@@ -239,15 +253,20 @@ export const DESKTOP_PLUGIN_COMPAT_PACKAGES = Object.freeze([
 // aggregate's dependency tree so fresh and packaged profiles use them.
 export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-web-ui-settings',
+  '@linxin666/dsh-liangshen',
   '@linxin666/dsh-live-stats',
   '@linxin666/dsh-remote-web-ui',
+  '@linxin666/dsh-skins',
+  '@linxin666/dsh-web-ui-all',
 ].toSorted())
 
 // Reviewed public releases override the older aggregate carrier. Keep these
 // direct so development and packaged profiles resolve the same patched builds.
 export const DESKTOP_PUBLISHED_OVERRIDE_PACKAGES = Object.freeze([
+  '@linxin666/dsh-chat-recovery',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-client-ui-skin-center',
+  '@linxin666/dsh-client-ui-model-capabilities',
   '@linxin666/dsh-client-ui-plugin-manager',
   '@linxin666/dsh-client-ui-skill-explorer',
   '@linxin666/dsh-desktop-launcher',
@@ -280,7 +299,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   DESKTOP_REPAIR_BUNDLE,
 ].toSorted())
 
-// DSH 0.1.5 exposes these runtime modules as peers. Keep them explicit so the
+// DSH 0.1.6 exposes these runtime modules as peers. Keep them explicit so the
 // packaged host is hermetic instead of resolving through a developer machine.
 export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/cordis-plugin-group',
@@ -321,6 +340,8 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-jobs',
   '@deepseek-ai/dsh-launch-environment',
   '@deepseek-ai/dsh-output-retention',
+  '@deepseek-ai/dsh-ptc-runtime',
+  '@deepseek-ai/dsh-ptc-runtime-node',
   '@deepseek-ai/dsh-sandbox',
   '@deepseek-ai/dsh-sandbox-policy',
   '@deepseek-ai/dsh-scope',
@@ -340,6 +361,7 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-util-time',
   '@deepseek-ai/dsh-util-workspace-path',
   '@deepseek-ai/dsh-workflow',
+  '@deepseek-ai/dsh-workflow-ptc',
   '@deepseek-ai/dsh-web',
   '@deepseek-ai/dsh-web-app',
 ].toSorted())
@@ -375,13 +397,98 @@ const LEGACY_DESKTOP_PATCH_CONFIG = `- id: directory-picker
     - id: directory-picker-desktop-client
       name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
 `
-export const DESKTOP_PATCH_CONFIG = `${DESKTOP_PATCH_START}
+function yamlString(value) {
+  return `'${String(value).replaceAll("'", "''")}'`
+}
+
+export function renderControlCenterPatch(configuration = createDefaultControlCenterConfiguration()) {
+  const browser = configuration.browser ?? {}
+  const computer = configuration.computer ?? {}
+  const browserPackage = {
+    playwright: '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp',
+    'chrome-devtools': '@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp',
+    stagehand: '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',
+  }[browser.provider] ?? '@deepseek-ai/dsh-experimental-browser-use-playwright-mcp'
+  const computerPackage = computer.provider === 'cua-mcp'
+    ? '@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp'
+    : '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native'
+  const browserConfig = browserPackage.endsWith('stagehand-native')
+    ? `\n      config:\n        mode: launch\n        headless: false${browser.executablePath ? `\n        executablePath: ${yamlString(browser.executablePath)}` : ''}\n        model:\n          modelName: ${yamlString(configuration.stagehand?.modelName ?? '')}\n          apiKey: !!js process.env.DSH_STAGEHAND_MODEL_API_KEY`
+    : `\n      config:\n        mode: launch\n        headless: false${browser.executablePath ? `\n        executablePath: ${yamlString(browser.executablePath)}` : ''}`
+  const computerConfig = computerPackage.endsWith('cua-driver-mcp')
+    ? `\n      config:\n        command: ${yamlString(computer.command ?? '')}\n        args: [mcp]`
+    : ''
+  return `- insert:\n    - id: desktop-browser-use\n      name: '@deepseek-ai/dsh-browser-use'\n    - id: desktop-browser-provider\n      name: '${browserPackage}'\n      disabled: ${browser.enabled === true ? 'false' : 'true'}${browserConfig}\n    - id: desktop-computer-use\n      name: '@deepseek-ai/dsh-computer-use'\n    - id: desktop-computer-provider\n      name: '${computerPackage}'\n      disabled: ${computer.enabled === true ? 'false' : 'true'}${computerConfig}\n`
+}
+
+function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration()) {
+  return `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- id: web-ui-settings
+  disabled: true
+- id: web-ui-task-board
+  disabled: true
+- id: web-ui-git-graph
+  disabled: true
+- id: web-ui-pet
+  disabled: true
+- id: web-ui-ssh
+  disabled: true
+- insert:
+    - id: desktop-web-ui-settings
+      name: '@linxin666/dsh-client-ui-web-ui-settings'
+    - id: ui-task-board
+      name: '@linxin666/dsh-client-ui-task-board'
+    - id: ui-git-graph
+      name: '@linxin666/dsh-client-ui-git-graph'
+    - id: pet
+      name: '@linxin666/dsh-pet'
+    - id: ssh
+      name: '@linxin666/dsh-ssh'
+    - id: user-scope
+      name: '@ningbainb/dsh-user-scope'
+    - id: ui-model-preferences
+      name: '@linxin666/dsh-client-ui-model-preferences'
+    - id: personal-prompt
+      name: '@ningbainb/dsh-personal-prompt'
+    - id: memory
+      name: '@ningbainb/dsh-memory'
+    - id: web-ui-mode-switcher
+      name: '@linxin666/dsh-client-ui-mode-switcher'
+    - id: live-stats
+      name: '@linxin666/dsh-live-stats'
+    - id: web-ui-dsh-aionui-panel
+      name: '@linxin666/dsh-client-ui-aionui-panel'
+    - id: web-ui-chat-recovery
+      name: '@linxin666/dsh-chat-recovery'
+    - id: web-ui-desktop-launcher
+      name: '@linxin666/dsh-desktop-launcher'
+    - id: web-ui-describe-image
+      name: '@linxin666/dsh-tool-describe-image'
+    - id: chat-artifacts
+      name: '@ningbainb/dsh-chat-artifacts'
+    - id: particle-theme
+      name: '@linxin666/dsh-particle-theme'
+    - id: ui-web-ui-compat
+      name: '@linxin666/dsh-web-ui-all'
+- id: web-ui-model-capabilities
+  disabled: true
+- id: web-ui-usage
+  disabled: true
+- id: web-ui-session-archive
+  disabled: true
+# Preserve 4.1's SSH Host and six-tab client through its direct bundle. The
+# upstream five-tab SSH client has a different interaction and storage shape.
+# Image-tool and Liangshen use their alpha-compatible upstream clients.
+- id: web-ui-describe-image
+  disabled: false
+- id: web-ui-liangshen
+  disabled: false
 - id: web-startup
   name: '@linxin666/dsh-remote-web-ui/startup'
+- id: ui-plugin-manager
+  name: '@deepseek-ai/dsh-client-ui-plugin-manager'
 - insert:
-    - id: ui-plugin-manager-native-desktop
-      name: '@deepseek-ai/dsh-client-ui-plugin-manager'
     - id: authorization
       name: '@deepseek-ai/dsh-authorization'
 - id: llm-pi-ai
@@ -404,9 +511,18 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
         initialDelayMs: 750
         maxDelayMs: 15000
         jitterRatio: 0.15
+${renderControlCenterPatch(controlCenterConfiguration).trimEnd()}
 ${DESKTOP_PATCH_END}
 `
-const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: isolated\nautoInstallPeers: false\n`
+}
+
+export const DESKTOP_PATCH_CONFIG = desktopPatchConfig()
+// Keep the Desktop profile aligned with the official DSH profile template.
+// The isolated linker creates a deep Windows reparse-point graph which can
+// become undeletable after an interrupted upgrade; one bad link then blocks
+// DSH's whole profile repair. Compatibility and protected-package admission
+// still run in Desktop staging before this profile is activated.
+const WORKSPACE_CONFIG = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
 
 /** Identify patch files that carry no loader entries, including legacy `{}` placeholders. */
 export function isSemanticallyEmptyPatch(source) {
@@ -951,12 +1067,76 @@ async function migrateLegacySkinState({ profilePatch, homePatch, dshHome, profil
   }
 }
 
-export function mergeDesktopPatch(existing = '') {
-  let userPatch = String(existing)
+function migrateNativePluginManagerRows(source) {
+  if (!source.includes('ui-plugin-manager-native-desktop')) return source
+  const lines = source.split(/\r?\n/u)
+  const overrides = []
+  for (let index = 0; index < lines.length; index++) {
+    const match = /^([ \t]*)-[ \t]+id:[ \t]*['"]?ui-plugin-manager-native-desktop['"]?[ \t]*$/u.exec(lines[index])
+    if (!match) continue
+    const indentation = match[1].length
+    let end = index + 1
+    while (end < lines.length && (lines[end].trim() === '' || lineIndentation(lines[end]) > indentation)) end++
+    const block = lines.slice(index, end)
+    if (!block.some(line => /^[ \t]+name:[ \t]*['"]?@deepseek-ai\/dsh-client-ui-plugin-manager['"]?[ \t]*$/u.test(line))) continue
+    const override = ['- id: ui-plugin-manager', ...block.slice(1).map(line => line.slice(Math.min(indentation, lineIndentation(line))))].join('\n')
+    overrides.push(override.trimEnd())
+    lines.splice(index, end - index)
+    index--
+  }
+  for (let index = 0; index < lines.length; index++) {
+    if (!/^-[ \t]+insert:[ \t]*$/u.test(lines[index])) continue
+    const next = lines.slice(index + 1).find(line => line.trim() && !line.trimStart().startsWith('#'))
+    if (!next || !/^[ \t]+-[ \t]+\S/u.test(next)) lines[index] = '- insert: []'
+  }
+  return [...lines, ...overrides].join('\n')
+}
+
+export function mergeDesktopPatch(existing = '', controlCenterConfiguration = createDefaultControlCenterConfiguration()) {
+  let userPatch = migrateNativePluginManagerRows(String(existing))
   if (!userPatch.includes(DESKTOP_PATCH_START) && userPatch.startsWith(LEGACY_DESKTOP_PATCH_CONFIG)) {
     userPatch = userPatch.slice(LEGACY_DESKTOP_PATCH_CONFIG.length)
   }
-  const { managed, remainder } = reconcileManagedPatch(userPatch, DESKTOP_PATCH_CONFIG, DESKTOP_PATCH_START, DESKTOP_PATCH_END)
+  const aliases = {
+    'ui-web-ui-settings': 'desktop-web-ui-settings',
+    'ui-dsh-aionui-panel': 'web-ui-dsh-aionui-panel',
+    'ui-mode-switcher': 'web-ui-mode-switcher',
+    'ui-chat-recovery': 'web-ui-chat-recovery',
+    'desktop-launcher': 'web-ui-desktop-launcher',
+    'describe-image': 'web-ui-describe-image',
+    liangshen: 'web-ui-liangshen',
+    'remote-web-ui': 'web-ui-remote-web-ui',
+    'ui-plugin-manager': 'web-ui-plugin-manager',
+    'ui-community-plugins': 'web-ui-community-plugins',
+    'ui-skin-center': 'web-ui-skin-center',
+  }
+  userPatch = userPatch.replace(
+    /^([ \t]*-[ \t]*id:[ \t]*)(['"]?)([a-z0-9-]+)\2([ \t]*(?:#.*)?)$/gmu,
+    (row, prefix, quote, id, suffix, offset) => {
+      if (id === 'ui-plugin-manager') {
+        const tail = userPatch.slice(offset + row.length)
+        const rowEnd = tail.search(/^[ \t]*- (?:id:|insert:)|^# ---/mu)
+        const body = rowEnd === -1 ? tail : tail.slice(0, rowEnd)
+        if (/^[ \t]+name:[ \t]*['"]@deepseek-ai\/dsh-client-ui-plugin-manager['"]/mu.test(body)) return row
+      }
+      return aliases[id] ? `${prefix}${quote}${aliases[id]}${quote}${suffix}` : row
+    },
+  )
+  const managedStart = userPatch.indexOf(DESKTOP_PATCH_START)
+  const managedEnd = userPatch.indexOf(DESKTOP_PATCH_END, managedStart)
+  userPatch = userPatch.replace(
+    /^(-[ \t]*id:[ \t]*)(['"]?)web-ui-ssh\2([ \t]*(?:#.*)?)$/gmu,
+    (row, prefix, quote, suffix, offset) => {
+      if (offset > managedStart && managedStart !== -1 && offset < managedEnd) {
+        const tail = userPatch.slice(offset + row.length)
+        const rowEnd = tail.search(/^(?:- |# --- end dsh-desktop managed)/mu)
+        const value = parse(row + (rowEnd === -1 ? tail : tail.slice(0, rowEnd)))?.[0]
+        if (value?.disabled === true && Object.keys(value).every(key => key === 'id' || key === 'disabled')) return row
+      }
+      return `${prefix}${quote}ssh${quote}${suffix}`
+    },
+  )
+  const { managed, remainder } = reconcileManagedPatch(userPatch, desktopPatchConfig(controlCenterConfiguration), DESKTOP_PATCH_START, DESKTOP_PATCH_END)
   const suffix = remainder.trim()
   return suffix ? `${managed.trimEnd()}\n\n${suffix}\n` : managed
 }
@@ -1272,7 +1452,10 @@ export async function ensureDesktopProfile({
   if (mode !== 'repair') {
     try {
       const qqBotEnabled = readQqBotPatchEnabled(existingPatch) ?? false
-      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch), qqBotEnabled)
+      const controlCenterConfiguration = mode === 'full'
+        ? await new ControlCenterStore({ path: join(dshHome, 'desktop-control-center.json') }).profileConfiguration()
+        : createDefaultControlCenterConfiguration()
+      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch, controlCenterConfiguration), qqBotEnabled)
     } catch (error) {
       throw profileBootstrapError('desktop profile patch is invalid', error)
     }
@@ -1382,11 +1565,11 @@ export function resolveRuntimePackages(
   const anchors = [initialAnchor]
   const resolved = new Map()
 
-  // Resolve the published aggregate first and prefer its dependency tree for
+  // Resolve the pinned alpha source aggregate first and prefer its dependency tree for
   // every package that it owns. In a workspace checkout, resolving all names
   // from this source file first would silently select older local packages
   // instead of the release pinned by the desktop application.
-  const aggregateName = '@linxin666/dsh-web-ui-all'
+  const aggregateName = '@linxin666/dsh-web-all'
   if (pending.has(aggregateName)) {
     const aggregateRoot = resolvePackageRoot(aggregateName, anchors)
     if (aggregateRoot !== undefined) {

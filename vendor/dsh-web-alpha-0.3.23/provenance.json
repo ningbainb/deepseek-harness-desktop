@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/zhu1090093659/dsh-web.git",
+    "branch": "alpha",
+    "commit": "29fd16ae968fb617323be179915f480b289a3886",
+    "version": "0.3.23",
+    "minimumDsh": ">=0.1.6-alpha.2",
+    "aggregatePatchSha256": "76eb3fd8be6caaddc822b747311ab06616b766026791929b7255d8c600459901"
+  },
+  "build": {
+    "node": "24.19.0",
+    "pnpm": "11.19.0",
+    "npm": "10.9.2",
+    "install": "pnpm install --frozen-lockfile --ignore-scripts",
+    "pack": "pnpm --filter '@linxin666/*' -r --workspace-concurrency=1 pack; build and repack source packages whose advertised entrypoints were absent",
+    "normalize": "node scripts/repack-upstream-web-cohort.mjs --input RAW --output NORMALIZED"
+  },
+  "artifacts": {
+    "linxin666-dsh-client-ui-community-plugins-0.3.23.tgz": "447d133c00e69dd70c9d0614d7ebbcb672087a25cc6d6aa5c599566c940b9bde",
+    "linxin666-dsh-client-ui-git-graph-0.3.23.tgz": "7f348e773cfeb1d538ab3914d92aac2656965178b600542dbed8dae863e10564",
+    "linxin666-dsh-client-ui-market-0.3.23.tgz": "bca4a2366095419bc1b7c81fb443faba01deecb373303e5665f5a030aa289b94",
+    "linxin666-dsh-client-ui-model-capabilities-0.3.23.tgz": "60b97cdd5e6b21a2d91c36659c97cae48433f35e76741a00f268a80daf43e2f7",
+    "linxin666-dsh-client-ui-plugin-manager-0.3.23.tgz": "0de93d7d8c1be038441611506cdfb382492d1b93dba5d366d2e9ad3a2a558450",
+    "linxin666-dsh-client-ui-preset-center-0.3.23.tgz": "a51873969b0cd3b0508d08660966499582f3d823b12e528abcb73e9003a39220",
+    "linxin666-dsh-client-ui-session-id-0.3.23.tgz": "cd7761feed3b9a292d41c8b78c59f020ccbc6a9039ff233aad3405bb0ded39b0",
+    "linxin666-dsh-client-ui-skill-explorer-0.3.23.tgz": "d6f61338a253d150e5a6e630980effd380b3f5dcf16634d969f619708150b2cf",
+    "linxin666-dsh-client-ui-skin-center-0.3.23.tgz": "45d3266f0330428c5358bdc78ed2323c927f5927f7d26618ed2055ca665746a5",
+    "linxin666-dsh-client-ui-task-board-0.3.23.tgz": "e8144a11f1770d6f454172c9a58d9f05af334741a64f61fa42e20ca327ce6a95",
+    "linxin666-dsh-client-ui-web-ui-settings-0.3.23.tgz": "f491e2d09a667bf5b953685302193d341b3d3abbf279fad0130f4c8538a6e1ad",
+    "linxin666-dsh-doctor-0.3.23.tgz": "de5c0e79033ca9ac8ceb2d82efc33f70e18b5ab0bbca60f8db0f78707ca28478",
+    "linxin666-dsh-i18n-0.3.23.tgz": "050f0f46c4d09a6a0c83214f9857b433cf83a42d2df5931b2c50e45e11239089",
+    "linxin666-dsh-liangshen-0.3.23.tgz": "19416177f57a4f24dc84ffcd2ff15bcd1b8cef708eba379cb083f731270da5f0",
+    "linxin666-dsh-pet-0.3.23.tgz": "dbe6c70a237f0f59cba1e84f7ab16151ce1e83be96da5fcf3052aea317540941",
+    "linxin666-dsh-remote-web-ui-0.3.23.tgz": "62aa329ca7ccc92b3e266befc93fae61b8f822e8c491356aeba1b31541ba9e7b",
+    "linxin666-dsh-session-archive-0.3.23.tgz": "2690601babf8a71adde8f8b63887d4b6aa25e4484fd8ca52c5b877b1b598a61c",
+    "linxin666-dsh-ssh-0.3.23.tgz": "8559c2d1c11a67f73c2eb7ef95e9f030be8e6f03e6434cf606299b04558d3e89",
+    "linxin666-dsh-tool-describe-image-0.3.23.tgz": "74c69d675f8fa6d4407aa1186df3317117036ecde2d5499f66bd70c003a158bc",
+    "linxin666-dsh-usage-0.3.23.tgz": "05858aee4cacc988bd7147a9ca2adfa0073be17193875385e4e11668ba963f28",
+    "linxin666-dsh-web-all-0.3.23.tgz": "7450204b33bdafb42029b10c38662eb0f32abb0563006de8c0db29967e668c72"
+  }
+}

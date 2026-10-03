@@ -201,9 +201,9 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     await verifyEventsReady(controller)
     stage = 'community-launcher-live-config'
     for (const enabled of [false, true, false]) {
-      const community = await updateSettings(controller, diagnostics, 'ui-community-plugins', { enabled })
+      const community = await updateSettings(controller, diagnostics, 'web-ui-community-plugins', { enabled })
       assert.equal(community.value.enabled, enabled)
-      const launcher = await updateSettings(controller, diagnostics, 'desktop-launcher', { enabled })
+      const launcher = await updateSettings(controller, diagnostics, 'web-ui-desktop-launcher', { enabled })
       assert.equal(launcher.value.enabled, enabled)
       const shutdownRoute = await controller.fetch('http://dsh.internal/api/dsh-desktop-launcher/shutdown')
       assert.equal(shutdownRoute.status, enabled ? 405 : 404, 'Launcher route availability must follow the accepted live setting without invoking shutdown')
@@ -211,8 +211,8 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     const saved = await readFile(profilePatch, 'utf8')
     assert.deepEqual(persistedSettingsConfig(saved, 'agent-default-model'), nextSelection)
     assert.equal(persistedSettingsConfig(saved, 'llm-pi-ai').providers[providerId].baseURL, baseURL)
-    assert.equal(persistedSettingsConfig(saved, 'ui-community-plugins').enabled, false)
-    assert.equal(persistedSettingsConfig(saved, 'desktop-launcher').enabled, false)
+    assert.equal(persistedSettingsConfig(saved, 'web-ui-community-plugins').enabled, false)
+    assert.equal(persistedSettingsConfig(saved, 'web-ui-desktop-launcher').enabled, false)
     assert.equal(await readFile(rootIncludePath, 'utf8'), rootInclude)
     stage = 'restart'
     assert.equal(await controller.restart(), controllerModule.DESKTOP_PIPE_RUNTIME_URL)
@@ -223,10 +223,10 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     assert.equal(restartedProvider.baseURL, baseURL)
     assert.deepEqual(restartedProvider.models.map(model => model.id), ['reload-model-a', 'reload-model-b'])
     assert.deepEqual(persistedSettingsConfig(await readFile(profilePatch, 'utf8'), 'agent-default-model'), nextSelection)
-    assert.equal(settingsNamespace(restarted, 'ui-community-plugins').value.enabled, false)
-    assert.equal(settingsNamespace(restarted, 'desktop-launcher').value.enabled, false)
+    assert.equal(settingsNamespace(restarted, 'web-ui-community-plugins').value.enabled, false)
+    assert.equal(settingsNamespace(restarted, 'web-ui-desktop-launcher').value.enabled, false)
     assert.equal((await controller.fetch('http://dsh.internal/api/dsh-desktop-launcher/shutdown')).status, 404)
-    for (const ns of ['ui-community-plugins', 'desktop-launcher']) {
+    for (const ns of ['web-ui-community-plugins', 'web-ui-desktop-launcher']) {
       assert.equal((await updateSettings(controller, diagnostics, ns, { enabled: true })).value.enabled, true)
     }
     assert.equal((await controller.fetch('http://dsh.internal/api/dsh-desktop-launcher/shutdown')).status, 405)
@@ -252,7 +252,7 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     assert.deepEqual(settingsNamespace(repaired, 'llm-pi-ai').value.providers[providerId], restartedProvider)
     assert.deepEqual(settingsNamespace(repaired, 'agent-default-model').value, nextSelection)
     assert.deepEqual(persistedSettingsConfig(await readFile(profilePatch, 'utf8'), 'llm-pi-ai'), persistedSettingsConfig(patchBeforeRepair, 'llm-pi-ai'))
-    for (const ns of ['ui-community-plugins', 'desktop-launcher']) assert.equal(settingsNamespace(repaired, ns).value.enabled, true)
+    for (const ns of ['web-ui-community-plugins', 'web-ui-desktop-launcher']) assert.equal(settingsNamespace(repaired, ns).value.enabled, true)
     assertNoRootIncludeReloadErrors(diagnostics)
     assert.deepEqual(providerRequests, [], 'Configuration verification must not request model inference or catalog endpoints')
     return {

@@ -11,6 +11,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the 'settings.section'
 // entry) and the ctx.settingsScope Context merge.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: imports the official Models footer extension contract.
+import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 // Type-only: imports the model options page's additive onboarding slot.
@@ -21,7 +23,7 @@ import { WebUiSettingsBinder } from './compat-settings-scope.ts'
 import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
-import { DesktopCollaborationEntry, DesktopExtensionDockEntry } from './desktop-extension-dock.tsx'
+import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { DockSettingsOutlet, mirrorDockSlot } from './dock-slot-mirror.tsx'
 import { projectCopy } from './ProjectDialog.tsx'
@@ -126,6 +128,10 @@ export function apply(ctx: ClientContext): void {
   if (!dockSetting) ctx.inject(['sessions'], scope => {
     scope.effect(() => installRelayAuthFailures(scope.sessions, document), 'web-ui-settings: bai runtime authorization failures')
   })
+  if (!dockSetting) ctx.effect(
+    () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins')),
+    'web-ui-settings: unified Desktop management routing',
+  )
 
   // The rc.6 compatibility binder: family plugins read ctx.get('webUiSettings')
   // and fall back to the official settings scope on hosts that expose their
@@ -153,7 +159,6 @@ export function apply(ctx: ClientContext): void {
     label: () => ctx.locale.bind('web-ui-plugins')('title'),
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
-    inject: () => ({ getPluginIds: () => ctx.slots.entriesOfSlot('web-ui.plugin.item').flatMap(entry => entry.options.id ? [entry.options.id] : []) }),
   }, WebUIPluginsSection))
 
   if (dockSetting) {
@@ -161,10 +166,13 @@ export function apply(ctx: ClientContext): void {
       name: 'web-ui.plugin.item', id: 'relay', order: 1, locale: 'relay-onboarding',
     }, RelayOnboardingCard))
   } else {
-    ctx.slots.inject('model-preferences.onboarding', () => ctx.slots.register({
-      name: 'model-preferences.onboarding',
-      id: 'bai',
-      order: 5,
+    // The official Models page only exposes a footer extension seat. The page
+    // is a flex column, so the card's negative order raises bai into the first
+    // screen without modifying or replacing the upstream package.
+    ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
+      name: 'settings.models.footer',
+      id: 'bai-onboarding',
+      order: -100,
       locale: 'relay-onboarding',
     }, RelayOnboardingCard))
   }
@@ -172,6 +180,13 @@ export function apply(ctx: ClientContext): void {
   // The highest ordered footer action sits immediately before Settings.
   // Ordinary Web hosts receive no button because the component requires the
   // narrow Desktop `extensions.open` capability before rendering.
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+    name: 'sidebar.footer.action',
+    id: 'desktop-smart-control',
+    order: 98,
+    locale: 'web-ui-plugins',
+  }, DesktopSmartControlEntry))
+
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'desktop-model-collaboration',

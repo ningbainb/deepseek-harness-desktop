@@ -18,6 +18,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/u
 const CI_STATUSES = new Set(['passed', 'failed', 'not-recorded'])
 const SAFE_SCRIPT_NAMES = new Set(['preinstall', 'install', 'postinstall', 'prepare', 'prepublishOnly'])
 
+function canonicalText(value) {
+  return value.replace(/\r\n/g, '\n')
+}
+
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -291,7 +295,7 @@ async function main() {
     return
   }
   if (process.argv.includes('--check')) {
-    if (await readFile(output, 'utf8') !== content) throw new Error('Community plugin quality report is stale; run node scripts/generate-community-plugin-quality-report.mjs --write')
+    if (canonicalText(await readFile(output, 'utf8')) !== content) throw new Error('Community plugin quality report is stale; run node scripts/generate-community-plugin-quality-report.mjs --write')
     console.log('Community plugin quality report is current')
     return
   }

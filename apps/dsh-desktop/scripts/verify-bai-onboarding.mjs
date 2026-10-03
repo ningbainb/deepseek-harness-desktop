@@ -140,6 +140,8 @@ try {
   assert.equal(failedRefresh.sync.error, 'relay-auth')
   await page.unroute('**/api/dsh-relay/status')
   await writeFile(catalogPath, JSON.stringify({ body: { data: [{ id: 'bai-fixture-one', name: 'Bai Fixture One Updated' }, { id: 'bai-fixture-two', name: 'Bai Fixture Two' }] } }))
+  assert.equal((await probe('refresh')).status, 200, 'recover the model catalog before independently testing inference HTTP 401')
+  assert.equal((await probe('status')).body.configured, true, 'catalog authentication recovered without removing the retained Key')
   await editor.fill('bai-runtime-invalid-key-fixture')
   await editor.press('Enter')
   await dialog.waitFor({ state: 'visible', timeout: 60_000 })

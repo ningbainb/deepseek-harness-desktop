@@ -122,11 +122,11 @@ jobs:
           sha256sum -c SHA256SUMS-linux.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: DeepSeek-Harness-Desktop-4.0.0-linux-x64-preview-${{ matrix.os }}
+          name: DeepSeek-Harness-Desktop-linux-x64-preview-${{ matrix.os }}
           if-no-files-found: error
           retention-days: 14
           path: |
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-4.0.0-amd64.deb
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-x86_64.AppImage
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-amd64.deb
             apps/dsh-desktop/dist/SHA256SUMS-linux.txt
             apps/dsh-desktop/dist/runtime-prune-report.json

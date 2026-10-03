@@ -8,6 +8,8 @@ const context = document.querySelector('#terminal-context')
 const restartButton = document.querySelector('#restart-terminal')
 const clearButton = document.querySelector('#clear-terminal')
 const closeButton = document.querySelector('#close-terminal')
+const shellChoice = document.querySelector('#terminal-shell-choice')
+if (query.get('platform') !== 'win32') shellChoice.closest('label').hidden = true
 const Terminal = window.Terminal
 const FitAddon = window.FitAddon?.FitAddon
 
@@ -95,6 +97,7 @@ window.addEventListener('resize', scheduleResize)
 restartButton.addEventListener('click', async () => {
   const current = ++operation
   restartButton.disabled = true
+  shellChoice.disabled = true
   try {
     terminal.options.disableStdin = true
     terminal.write('\r\n\x1b[90m[Desktop 正在重启终端会话]\x1b[0m\r\n')
@@ -107,7 +110,37 @@ restartButton.addEventListener('click', async () => {
   } catch {
     if (current === operation) setState('error', '终端启动失败')
   } finally {
-    if (!disposed && current === operation) restartButton.disabled = false
+    if (!disposed && current === operation) {
+      restartButton.disabled = false
+      shellChoice.disabled = false
+    }
+  }
+})
+
+shellChoice.addEventListener('change', async () => {
+  const current = ++operation
+  const selected = shellChoice.value
+  const previous = shellChoice.dataset.active || 'auto'
+  shellChoice.disabled = true
+  restartButton.disabled = true
+  setState('starting', '正在切换 Shell')
+  try {
+    const info = await window.dshTerminal.setShell(selected, size())
+    if (disposed || current !== operation) return
+    shellChoice.dataset.active = info.shellId
+    context.textContent = `${info.label} · ${info.cwd}`
+    terminal.options.disableStdin = false
+    setState('ready', '运行中')
+    terminal.focus()
+  } catch {
+    if (disposed || current !== operation) return
+    shellChoice.value = previous
+    setState('error', 'Shell 切换失败，请确认已安装对应环境')
+  } finally {
+    if (!disposed && current === operation) {
+      shellChoice.disabled = false
+      restartButton.disabled = false
+    }
   }
 })
 
@@ -142,6 +175,8 @@ try {
   if (!disposed && initialOperation === operation) {
     terminal.options.disableStdin = false
     context.textContent = `${info.label} · ${info.cwd}`
+    shellChoice.value = info.shellId || 'auto'
+    shellChoice.dataset.active = shellChoice.value
     setState('ready', '运行中')
     terminal.focus()
   }

@@ -1,0 +1,251 @@
+name: Desktop Three-Platform Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - desktop-v*
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-three-platform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      publish: ${{ steps.meta.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./apps/dsh-desktop/package.json').version")"
+          publish=false
+          if [[ "${GITHUB_REF}" == refs/tags/desktop-v* ]]; then
+            tag_version="${GITHUB_REF_NAME#desktop-v}"
+            test "$tag_version" = "$version"
+            publish=true
+          fi
+          printf 'version=%s\npublish=%s\n' "$version" "$publish" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: metadata
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      REQUIRE_SIGNING: 'false'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - run: pnpm verify
+      - run: pnpm feature-baseline:check
+      - run: pnpm desktop:regression:e2e
+      - name: Configure anonymous product metrics
+        shell: pwsh
+        env:
+          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
+        run: |
+          $endpoint = [Uri]::new(([string]$env:DSH_TELEMETRY_ENDPOINT).Trim())
+          if ($endpoint.Scheme -ne 'https' -or $endpoint.AbsolutePath -ne '/v1/events' -or $endpoint.Query -or $endpoint.Fragment -or $endpoint.UserInfo) {
+            throw 'DSH_TELEMETRY_ENDPOINT must be a credential-free HTTPS URL ending exactly in /v1/events.'
+          }
+          @{ endpoint = $endpoint.AbsoluteUri; officialBuild = $true } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM apps/dsh-desktop/build/telemetry-config.json
+      - run: pnpm --filter @linxin666/dsh-desktop pack:win
+      - name: Verify production Setup on the disposable Windows Runner
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release'
+          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+          gh release download desktop-v4.3.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-4.3.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+      - name: Run packaged Windows regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          pnpm --filter @linxin666/dsh-desktop test:direct-start-matrix:e2e
+          pnpm --filter @linxin666/dsh-desktop test:fresh-relaunch:e2e
+          pnpm --filter @linxin666/dsh-desktop test:directory-picker:e2e
+          pnpm --filter @linxin666/dsh-desktop test:terminal:e2e
+          pnpm --filter @linxin666/dsh-desktop test:window-chrome:e2e
+          pnpm --filter @linxin666/dsh-desktop test:profile-reset:e2e
+          pnpm --filter @linxin666/dsh-desktop test:update-shutdown:e2e
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full
+      - run: pnpm --filter @linxin666/dsh-desktop pack:verify
+      - run: pnpm --filter @linxin666/dsh-desktop pack:smoke
+      - run: pnpm --filter @linxin666/dsh-desktop release:signatures:verify
+      - run: pnpm --filter @linxin666/dsh-desktop release:manifest:verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ needs.metadata.outputs.version }}-windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
+            apps/dsh-desktop/dist/latest.yml
+            apps/dsh-desktop/dist/SHA256SUMS.txt
+            apps/dsh-desktop/dist/release-manifest.json
+
+  macos:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      REQUIRE_SIGNING: 'false'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(uname -m)" = arm64
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - run: pnpm verify
+      - run: pnpm feature-baseline:check
+      - name: Configure anonymous product metrics
+        env:
+          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises'
+          const endpoint = new URL(process.env.DSH_TELEMETRY_ENDPOINT)
+          if (endpoint.protocol !== 'https:' || endpoint.pathname !== '/v1/events' || endpoint.search || endpoint.hash || endpoint.username || endpoint.password) throw new Error('Invalid telemetry endpoint')
+          await writeFile('apps/dsh-desktop/build/telemetry-config.json', JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2) + '\n')
+          NODE
+      - run: pnpm --filter @linxin666/dsh-desktop pack:mac
+      - run: pnpm --filter @linxin666/dsh-desktop pack:verify:mac
+      - run: pnpm --filter @linxin666/dsh-desktop pack:smoke:mac
+      - name: Verify unsigned Preview and checksums
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          set -euo pipefail
+          if codesign -dv --verbose=4 'mac-arm64/DeepSeek Harness Desktop.app' 2>&1 | grep -q '^Authority=Developer ID Application'; then exit 1; fi
+          shasum -a 256 DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip > SHA256SUMS-macos.txt
+          shasum -a 256 -c SHA256SUMS-macos.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ needs.metadata.outputs.version }}-macos-arm64-preview
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.dmg
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.zip
+            apps/dsh-desktop/dist/SHA256SUMS-macos.txt
+
+  linux:
+    needs: metadata
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      REQUIRE_SIGNING: 'false'
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(uname -m)" = x86_64
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - run: pnpm verify
+      - run: pnpm feature-baseline:check
+      - name: Configure anonymous product metrics
+        env:
+          DSH_TELEMETRY_ENDPOINT: ${{ vars.DSH_TELEMETRY_ENDPOINT }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises'
+          const endpoint = new URL(process.env.DSH_TELEMETRY_ENDPOINT)
+          if (endpoint.protocol !== 'https:' || endpoint.pathname !== '/v1/events' || endpoint.search || endpoint.hash || endpoint.username || endpoint.password) throw new Error('Invalid telemetry endpoint')
+          await writeFile('apps/dsh-desktop/build/telemetry-config.json', JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2) + '\n')
+          NODE
+      - run: pnpm --filter @linxin666/dsh-desktop pack:linux
+      - run: pnpm --filter @linxin666/dsh-desktop pack:verify:linux
+      - run: pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux
+      - name: Run packaged Linux smoke
+        run: |
+          sudo chown root:root apps/dsh-desktop/dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 apps/dsh-desktop/dist/linux-unpacked/chrome-sandbox
+          xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux
+      - name: Verify archives and checksums
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          set -euo pipefail
+          chmod +x DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage
+          ./DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage --appimage-extract AppRun >/dev/null
+          test -x squashfs-root/AppRun
+          dpkg-deb --info DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb >/dev/null
+          sha256sum DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb > SHA256SUMS-linux.txt
+          sha256sum -c SHA256SUMS-linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ needs.metadata.outputs.version }}-linux-x64-preview
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-x86_64.AppImage
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-amd64.deb
+            apps/dsh-desktop/dist/SHA256SUMS-linux.txt
+
+  publish:
+    needs: [metadata, windows, macos, linux]
+    if: needs.metadata.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-${{ needs.metadata.outputs.version }}-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify complete asset set and write combined checksums
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          test -f DeepSeek-Harness-Desktop-Setup-${{ needs.metadata.outputs.version }}-x64.exe
+          test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg
+          test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip
+          test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage
+          test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb
+          sha256sum -c SHA256SUMS.txt
+          sha256sum -c SHA256SUMS-macos.txt
+          sha256sum -c SHA256SUMS-linux.txt
+          cp SHA256SUMS.txt SHA256SUMS-windows.txt
+          sha256sum DeepSeek-Harness-Desktop-Setup-${{ needs.metadata.outputs.version }}-x64.exe DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Bind public manifest to the combined checksum receipt
+        run: node scripts/finalize-three-platform-receipts.mjs release-assets ${{ needs.metadata.outputs.version }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: DeepSeek Harness Desktop ${{ needs.metadata.outputs.version }}
+          body_path: docs/launch/release-notes.md
+          prerelease: false
+          overwrite_files: false
+          files: release-assets/*

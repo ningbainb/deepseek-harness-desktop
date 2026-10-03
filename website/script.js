@@ -1,4 +1,4 @@
-import { sumInstallerDownloads } from './release-stats.mjs'
+import { resolvePlatformDownloads, sumInstallerDownloads } from './release-stats.mjs'
 
 const releaseApi = 'https://api.github.com/repos/ningbainb/deepseek-harness-desktop/releases/latest'
 const releasesApi = 'https://api.github.com/repos/ningbainb/deepseek-harness-desktop/releases?per_page=100'
@@ -80,6 +80,9 @@ async function hydrateLatestRelease() {
     const version = String(release.tag_name || '').replace(/^desktop-v/, 'v')
     document.documentElement.dataset.releaseVersion = version.replace(/^v/u, '')
     setLinks('.download-link', installer.browser_download_url)
+    for (const [platform, download] of Object.entries(resolvePlatformDownloads(release))) {
+      setLinks(`[data-platform="${platform}"]`, download)
+    }
     const terminalAction = document.querySelector('#terminal-action')
     if (terminalAction) {
       terminalAction.dataset.downloadHref = installer.browser_download_url

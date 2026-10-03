@@ -96,7 +96,8 @@
     "react-dom": "^18.3.1",
     "tsdown": "0.22.2",
     "typescript": "~5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "@deepseek-ai/dsh-client-ui-session": "0.2.0-rc.2"
   },
   "files": [
     "lib/**/*.js",

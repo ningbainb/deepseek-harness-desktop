@@ -1,5 +1,5 @@
 diff --git a/lib/client-editor.js b/lib/client-editor.js
-index 11cb963d54054e847a5b83d8b8222da13fc9630a..4dcb860e45c8b101146de143c022127cec7d3ec5 100644
+index 11cb963d54054e847a5b83d8b8222da13fc9630a..a433e39398874527d31505b251c25d9cf3a7f8a1 100644
 --- a/lib/client-editor.js
 +++ b/lib/client-editor.js
 @@ -33599,11 +33599,10 @@ globalThis.__dshChunks__["editor"] = (require) => {
@@ -29,7 +29,7 @@ index 11cb963d54054e847a5b83d8b8222da13fc9630a..4dcb860e45c8b101146de143c022127c
  	/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  	const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
 diff --git a/lib/client-registry.js b/lib/client-registry.js
-index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fdab087780b 100644
+index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..f69200cd2a544f51e5aa678ce26d5e036e24235a 100644
 --- a/lib/client-registry.js
 +++ b/lib/client-registry.js
 @@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
@@ -84,7 +84,55 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  		];
  		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
-@@ -6583,7 +6591,7 @@ window.__ModuleLoader__.load({
+@@ -2208,8 +2216,16 @@ window.__ModuleLoader__.load({
+ 		function selectProducedFiles(owner) {
+ 			const record = owner;
+ 			if (record === null || typeof record !== "object") return null;
+-			if (!Array.isArray(record.nodes) || typeof record.seq !== "number") return null;
+-			const paths = producedForClosing(record.nodes, record.seq);
++			if (typeof record.seq !== "number") return null;
++			const produced = record.turn?.data?.get?.("deliverables")?.produced;
++			if (!Array.isArray(produced)) return null;
++			const paths = [];
++			const seen = /* @__PURE__ */ new Set();
++			for (const item of produced) {
++				if (typeof item?.path !== "string" || item.seq > record.seq || seen.has(item.path)) continue;
++				seen.add(item.path);
++				paths.push(item.path);
++			}
+ 			return paths.length === 0 ? null : paths;
+ 		}
+ 		/**
+@@ -2487,7 +2503,10 @@ window.__ModuleLoader__.load({
+ 		}
+ 		/** The intercepted produced-files row (visual twin of the deliverables chips). */
+ 		function SidebarProducedFiles(props) {
+-			const { matched, openInSidebar } = props;
++			const { openInSidebar, enabled } = props;
++			if (!enabled()) return null;
++			const matched = selectProducedFiles(props);
++			if (matched === null) return null;
+ 			const shown = matched.slice(0, 6);
+ 			const hidden = matched.length - shown.length;
+ 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+@@ -2534,14 +2553,10 @@ window.__ModuleLoader__.load({
+ 		function registerTurnTailInterception(ctx, store) {
+ 			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+ 				name: "conversation.chat.turnTail",
+-				select: (owner) => {
+-					if (store.getSuspended()) return null;
+-					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+-					return selectProducedFiles(owner);
+-				},
++				id: "dsh-better-sidebar-produced-files",
+ 				priority: -1,
+ 				registrant: "dsh-better-sidebar",
+-				inject: (sessionId) => ({ openInSidebar: (path) => {
++				inject: (sessionId) => ({ enabled: () => !store.getSuspended() && store.getPrefs().tabsEnabled["editor"] !== false, openInSidebar: (path) => {
+ 					openSidebarFile(ctx, store, sessionId, path);
+ 				} })
+ 			}, SidebarProducedFiles));
+@@ -6583,7 +6598,7 @@ window.__ModuleLoader__.load({
  					title: () => t("terminal"),
  					icon: (size) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(IconTerminalOutline16, { size }),
  					order: 40,
@@ -93,7 +141,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  					settings: { toggles: [
  						{
  							key: "agentTerminalTools",
-@@ -7384,11 +7392,12 @@ window.__ModuleLoader__.load({
+@@ -7384,11 +7399,12 @@ window.__ModuleLoader__.load({
  		function parseDesktopEnv() {
  			if (cached !== void 0) return cached;
  			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
@@ -110,7 +158,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  			cached = {
  				desktop,
  				mode,
-@@ -7796,7 +7805,7 @@ window.__ModuleLoader__.load({
+@@ -7796,7 +7812,7 @@ window.__ModuleLoader__.load({
  				let observer;
  				const locate = () => {
  					if (disposed) return;
@@ -119,7 +167,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  					if (col === void 0) {
  						if (centerColRef.current !== null) {
  							centerColRef.current = null;
-@@ -9921,6 +9930,35 @@ window.__ModuleLoader__.load({
+@@ -9921,6 +9937,35 @@ window.__ModuleLoader__.load({
  			"locale",
  			"modules"
  		];
@@ -155,7 +203,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  		/**
  		* Error boundary over the sidebar tree (root scope): a render error in the
  		* sidebar SHELL itself must never blank the page silently — the shared
-@@ -9933,6 +9971,7 @@ window.__ModuleLoader__.load({
+@@ -9933,6 +9978,7 @@ window.__ModuleLoader__.load({
  		* @param ctx - the client cordis context (slots, sessions).
  		*/
  		function apply(ctx) {
@@ -164,7 +212,7 @@ index bbc5eb1c5bc9ba6ed8b41fcfe340c5d1c063c318..dfcd6e2289ccdb32408167ba9a6e8fda
  			ctx.effect(() => {
  				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
 diff --git a/lib/client.js b/lib/client.js
-index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2e7e7be6c 100644
+index 70226f68ea5fcb478844c8366afe621665eeb907..68c2235bd2d9a5748c4c4fe7c269867855412c1f 100644
 --- a/lib/client.js
 +++ b/lib/client.js
 @@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
@@ -219,7 +267,55 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  		];
  		/** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
  		const CHUNK_URL = (name) => `/sidebar/bundle/${name}.js`;
-@@ -6583,7 +6591,7 @@ window.__ModuleLoader__.load({
+@@ -2208,8 +2216,16 @@ window.__ModuleLoader__.load({
+ 		function selectProducedFiles(owner) {
+ 			const record = owner;
+ 			if (record === null || typeof record !== "object") return null;
+-			if (!Array.isArray(record.nodes) || typeof record.seq !== "number") return null;
+-			const paths = producedForClosing(record.nodes, record.seq);
++			if (typeof record.seq !== "number") return null;
++			const produced = record.turn?.data?.get?.("deliverables")?.produced;
++			if (!Array.isArray(produced)) return null;
++			const paths = [];
++			const seen = /* @__PURE__ */ new Set();
++			for (const item of produced) {
++				if (typeof item?.path !== "string" || item.seq > record.seq || seen.has(item.path)) continue;
++				seen.add(item.path);
++				paths.push(item.path);
++			}
+ 			return paths.length === 0 ? null : paths;
+ 		}
+ 		/**
+@@ -2487,7 +2503,10 @@ window.__ModuleLoader__.load({
+ 		}
+ 		/** The intercepted produced-files row (visual twin of the deliverables chips). */
+ 		function SidebarProducedFiles(props) {
+-			const { matched, openInSidebar } = props;
++			const { openInSidebar, enabled } = props;
++			if (!enabled()) return null;
++			const matched = selectProducedFiles(props);
++			if (matched === null) return null;
+ 			const shown = matched.slice(0, 6);
+ 			const hidden = matched.length - shown.length;
+ 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+@@ -2534,14 +2553,10 @@ window.__ModuleLoader__.load({
+ 		function registerTurnTailInterception(ctx, store) {
+ 			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+ 				name: "conversation.chat.turnTail",
+-				select: (owner) => {
+-					if (store.getSuspended()) return null;
+-					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+-					return selectProducedFiles(owner);
+-				},
++				id: "dsh-better-sidebar-produced-files",
+ 				priority: -1,
+ 				registrant: "dsh-better-sidebar",
+-				inject: (sessionId) => ({ openInSidebar: (path) => {
++				inject: (sessionId) => ({ enabled: () => !store.getSuspended() && store.getPrefs().tabsEnabled["editor"] !== false, openInSidebar: (path) => {
+ 					openSidebarFile(ctx, store, sessionId, path);
+ 				} })
+ 			}, SidebarProducedFiles));
+@@ -6583,7 +6598,7 @@ window.__ModuleLoader__.load({
  					title: () => t("terminal"),
  					icon: (size) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(IconTerminalOutline16, { size }),
  					order: 40,
@@ -228,7 +324,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  					settings: { toggles: [
  						{
  							key: "agentTerminalTools",
-@@ -7384,11 +7392,12 @@ window.__ModuleLoader__.load({
+@@ -7384,11 +7399,12 @@ window.__ModuleLoader__.load({
  		function parseDesktopEnv() {
  			if (cached !== void 0) return cached;
  			const params = new URLSearchParams(window.location.search.replace(/^\?/, ""));
@@ -245,7 +341,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  			cached = {
  				desktop,
  				mode,
-@@ -7796,7 +7805,7 @@ window.__ModuleLoader__.load({
+@@ -7796,7 +7812,7 @@ window.__ModuleLoader__.load({
  				let observer;
  				const locate = () => {
  					if (disposed) return;
@@ -254,7 +350,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  					if (col === void 0) {
  						if (centerColRef.current !== null) {
  							centerColRef.current = null;
-@@ -9921,6 +9930,35 @@ window.__ModuleLoader__.load({
+@@ -9921,6 +9937,35 @@ window.__ModuleLoader__.load({
  			"locale",
  			"modules"
  		];
@@ -290,7 +386,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  		/**
  		* Error boundary over the sidebar tree (root scope): a render error in the
  		* sidebar SHELL itself must never blank the page silently — the shared
-@@ -9933,6 +9971,7 @@ window.__ModuleLoader__.load({
+@@ -9933,6 +9978,7 @@ window.__ModuleLoader__.load({
  		* @param ctx - the client cordis context (slots, sessions).
  		*/
  		function apply(ctx) {
@@ -299,7 +395,7 @@ index 70226f68ea5fcb478844c8366afe621665eeb907..d1f0d6f73335263ef51fcd758da434f2
  			ctx.effect(() => {
  				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
 diff --git a/lib/index.js b/lib/index.js
-index 83aaac8d178f437ed3ba1f5d901687bb4e5eecc9..3ccd67f90d6f54e4ce0ab66959ab3ef9e264739d 100644
+index 83aaac8d178f437ed3ba1f5d901687bb4e5eecc9..e5184d3cfb7a2c0b7a9b5b98378c206fd9ff6a97 100644
 --- a/lib/index.js
 +++ b/lib/index.js
 @@ -6,7 +6,7 @@ import z from "schemastery";
@@ -330,7 +426,7 @@ index 83aaac8d178f437ed3ba1f5d901687bb4e5eecc9..3ccd67f90d6f54e4ce0ab66959ab3ef9
  		const viewOf = () => {
  			const descriptor = sctx.settings.describe({ redactSecrets: true }).find((candidate) => candidate.ns === ns);
 diff --git a/lib/types/client/chunk-loader.d.ts b/lib/types/client/chunk-loader.d.ts
-index ac54aab163c72247afb52e962e386c0c8449fcd2..808de2eb4ee9bd3d4322a5763ed04fbef5c9fbae 100644
+index ac54aab163c72247afb52e962e386c0c8449fcd2..0d4ab1b2801f03ef0a84e18b5d29a6ac2134024a 100644
 --- a/lib/types/client/chunk-loader.d.ts
 +++ b/lib/types/client/chunk-loader.d.ts
 @@ -57,11 +57,10 @@ export type ChunkExports = Record<string, unknown>;
@@ -350,7 +446,7 @@ index ac54aab163c72247afb52e962e386c0c8449fcd2..808de2eb4ee9bd3d4322a5763ed04fbe
  export declare const CHUNK_EXTERNALS: readonly string[];
  /**
 diff --git a/lib/types/client/desktop-env.d.ts b/lib/types/client/desktop-env.d.ts
-index eebd7c2fffe354690443b595238492e4c70b9a6c..9a2eccdcf13aaddff93ed2a994a6047f0aca85ec 100644
+index eebd7c2fffe354690443b595238492e4c70b9a6c..7bb6238748da9332a4f6e3d67773d2416080c0ed 100644
 --- a/lib/types/client/desktop-env.d.ts
 +++ b/lib/types/client/desktop-env.d.ts
 @@ -1,11 +1,11 @@
@@ -372,7 +468,7 @@ index eebd7c2fffe354690443b595238492e4c70b9a6c..9a2eccdcf13aaddff93ed2a994a6047f
   * Geometry facts the sidebar adapts to (from the Electron runtime):
   * - win32 `advanced` mode draws the window controls in a 32px overlay strip
 diff --git a/package.json b/package.json
-index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..3015363b47e04bc0785f793bf58d03d9a6d5346e 100644
+index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..ec9ea239555b539ba20bb8882482b0c28cdf5c25 100644
 --- a/package.json
 +++ b/package.json
 @@ -45,9 +45,10 @@
@@ -405,7 +501,7 @@ index 5b4e0c9955c826edd4554de3cfad6a0ed5b96010..3015363b47e04bc0785f793bf58d03d9
      "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.8",
      "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.8",
 diff --git a/src/client/Sidebar.tsx b/src/client/Sidebar.tsx
-index 887e3a34c0e38168faae55fdda33014841667e49..537318740bdc6732ecbbdcc4e660bbe1c85b840d 100644
+index 887e3a34c0e38168faae55fdda33014841667e49..efd28c55e31f4481df976e91f1d2d6a7436ff142 100644
 --- a/src/client/Sidebar.tsx
 +++ b/src/client/Sidebar.tsx
 @@ -435,8 +435,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
@@ -422,7 +518,7 @@ index 887e3a34c0e38168faae55fdda33014841667e49..537318740bdc6732ecbbdcc4e660bbe1
          if (centerColRef.current !== null) {
            centerColRef.current = null
 diff --git a/src/client/builtins/tabs.tsx b/src/client/builtins/tabs.tsx
-index c30007e71c0ef1c78f95801deb33d127074a357d..03683648e9b24e3822aaa969734907d394b8a569 100644
+index c30007e71c0ef1c78f95801deb33d127074a357d..f77ce463031dd663abc9d92250909ee3dd26e475 100644
 --- a/src/client/builtins/tabs.tsx
 +++ b/src/client/builtins/tabs.tsx
 @@ -170,7 +170,12 @@ export function builtinTabs(ctx: Context, options: BuiltinTabOptions = {}): read
@@ -440,7 +536,7 @@ index c30007e71c0ef1c78f95801deb33d127074a357d..03683648e9b24e3822aaa969734907d3
        // bottom-panel first-expansion auto-terminal switch, and the custom
        // font family/size rows render under this card in the Side card
 diff --git a/src/client/chunk-loader.ts b/src/client/chunk-loader.ts
-index 30f0a9afa1297470ae7ed106137f1ee2a03e6152..b33f97065a9bbf2c82b663b91837e4caf0973f63 100644
+index 30f0a9afa1297470ae7ed106137f1ee2a03e6152..51aed142d7b5f95d2d5f4e779adfd35d47ad334b 100644
 --- a/src/client/chunk-loader.ts
 +++ b/src/client/chunk-loader.ts
 @@ -62,11 +62,10 @@ type ChunkFactory = (require: (spec: string) => unknown) => ChunkExports
@@ -468,7 +564,7 @@ index 30f0a9afa1297470ae7ed106137f1ee2a03e6152..b33f97065a9bbf2c82b663b91837e4ca
  
  /** Chunk script endpoint served by the plugin host half (src/bundle-route.ts). */
 diff --git a/src/client/desktop-env.ts b/src/client/desktop-env.ts
-index 751f67f25f84af74036238ead6e309045b3b15eb..6ab1df59dfc9a855881df979dd9cd090df63c4b2 100644
+index 751f67f25f84af74036238ead6e309045b3b15eb..eab0b0bb82392c8418a127b4afc47a46fc286263 100644
 --- a/src/client/desktop-env.ts
 +++ b/src/client/desktop-env.ts
 @@ -1,11 +1,11 @@
@@ -521,7 +617,7 @@ index 751f67f25f84af74036238ead6e309045b3b15eb..6ab1df59dfc9a855881df979dd9cd090
    cached = {
      desktop,
 diff --git a/src/client/index.tsx b/src/client/index.tsx
-index c87fbd16ec7565826faa0409ebb26b06142246ea..726a7c5ab4182dc730fce2d18a1a6e2585b746b8 100644
+index c87fbd16ec7565826faa0409ebb26b06142246ea..b1eff046fc2382ea6d1dd4c62986e911de43617e 100644
 --- a/src/client/index.tsx
 +++ b/src/client/index.tsx
 @@ -34,6 +34,44 @@ import './layout.css'
@@ -578,7 +674,7 @@ index c87fbd16ec7565826faa0409ebb26b06142246ea..726a7c5ab4182dc730fce2d18a1a6e25
    // the module-level t()/isZh() resolve the Host-backed language preference
    // (and switch live — the Sidebar root subscribes to it), and register the
 diff --git a/src/client/service.ts b/src/client/service.ts
-index 13f193479b7a04855df413b7aaf8865c399f4fe0..b8b9caf36a8acee8337b094f8441b159b8963de3 100644
+index 13f193479b7a04855df413b7aaf8865c399f4fe0..5a8010813c09058f62dfe1cfedc81db3365dc1a3 100644
 --- a/src/client/service.ts
 +++ b/src/client/service.ts
 @@ -602,6 +602,20 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
@@ -603,7 +699,7 @@ index 13f193479b7a04855df413b7aaf8865c399f4fe0..b8b9caf36a8acee8337b094f8441b159
      if (descriptor === undefined) return
      // A scope targets another session: the open lands in THAT session's
 diff --git a/src/config.ts b/src/config.ts
-index 5baa59053f9a799af3f68eb0facacdfbc0f5a5de..a047dbbbb1b97ede512260beb12965a96213f588 100644
+index 5baa59053f9a799af3f68eb0facacdfbc0f5a5de..dcf75f6261e126767cea9b417e586ae4c2145563 100644
 --- a/src/config.ts
 +++ b/src/config.ts
 @@ -117,7 +117,7 @@ export const PrefsSchema: z<SidebarPrefs> = z.object({
@@ -616,7 +712,7 @@ index 5baa59053f9a799af3f68eb0facacdfbc0f5a5de..a047dbbbb1b97ede512260beb12965a9
    terminalFontSize: z.number().step(1).min(TERMINAL_FONT_SIZE_MIN).max(TERMINAL_FONT_SIZE_MAX).default(TERMINAL_FONT_SIZE_DEFAULT),
    interceptOpenPath: z.boolean().default(true),
 diff --git a/src/index.ts b/src/index.ts
-index baeb387e4e68d4e879ebf49f2c105d8c4b112f30..d1beeb168a3dd8bd4e1bda1aee4b40931ff5142e 100644
+index baeb387e4e68d4e879ebf49f2c105d8c4b112f30..86bccacf6d02f533966ed627a268b0d7085bfc6e 100644
 --- a/src/index.ts
 +++ b/src/index.ts
 @@ -35,7 +35,7 @@ import { extractFrameAncestors } from './browser-probe.ts'
@@ -638,7 +734,7 @@ index baeb387e4e68d4e879ebf49f2c105d8c4b112f30..d1beeb168a3dd8bd4e1bda1aee4b4093
      // generic is not inferred here; the real service resolves it from the
      // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
 diff --git a/src/prefs-shared.ts b/src/prefs-shared.ts
-index a9f5514801a361010df8ed4fa6aad0e51570448b..d6ca377220b282705c2b31764f3fc23bcc6328cc 100644
+index a9f5514801a361010df8ed4fa6aad0e51570448b..30e765facdb91fadd094895f4f25fdc638df9920 100644
 --- a/src/prefs-shared.ts
 +++ b/src/prefs-shared.ts
 @@ -199,7 +199,7 @@ export const SIDEBAR_PREFS_DEFAULTS: SidebarPrefs = {

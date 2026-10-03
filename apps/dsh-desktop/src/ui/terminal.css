@@ -61,6 +61,8 @@ body {
 .terminal-status[data-state="exited"] { color: #e8ad66; border-color: rgba(232, 173, 102, 0.28); }
 .terminal-status[data-state="error"] { color: #ef8d8d; border-color: rgba(239, 141, 141, 0.28); }
 .terminal-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.terminal-shell-choice { display: flex; align-items: center; gap: 6px; color: var(--terminal-muted); font-size: 11px; }
+.terminal-shell-choice select { max-width: 150px; padding: 6px 8px; border: 1px solid var(--terminal-line); border-radius: 7px; color: var(--terminal-text); background: var(--terminal-bg); }
 
 .terminal-frame {
   min-height: 0;

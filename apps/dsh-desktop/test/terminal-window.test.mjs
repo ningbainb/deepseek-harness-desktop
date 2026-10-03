@@ -75,6 +75,8 @@ test('terminal is a sandboxed child panel and never creates a BrowserWindow', as
   const ipcMain = createIpcMain()
   const calls = []
   const session = {
+    shellId: 'auto',
+    setShellId: (shellId) => { session.shellId = shellId; calls.push(['set-shell', shellId]) },
     start: async (size) => { calls.push(['start', size]); return { label: 'PowerShell 7', cwd: 'C:\\workspace' } },
     write: (data) => calls.push(['write', data]),
     resize: (size) => calls.push(['resize', size]),
@@ -88,6 +90,7 @@ test('terminal is a sandboxed child panel and never creates a BrowserWindow', as
     ipcMain,
     cwd: 'C:\\workspace',
     theme: 'dark',
+    shellPreferences: { save: async shellId => { calls.push(['save-shell', shellId]) } },
     sessionFactory: ({ emit }) => {
       session.emit = emit
       return session
@@ -111,7 +114,7 @@ test('terminal is a sandboxed child panel and never creates a BrowserWindow', as
   assert.equal(preferences.webviewTag, false)
   assert.match(preferences.preload, /preload-terminal\.cjs$/u)
   assert.match(webContents.loadedFile, /ui[\\/]terminal\.html$/u)
-  assert.deepEqual(webContents.loadOptions.query, { theme: 'dark', embedded: '1' })
+  assert.deepEqual(webContents.loadOptions.query, { theme: 'dark', embedded: '1', platform: process.platform })
   assert.deepEqual(view.visible, [false, true])
   assert.deepEqual(view.bounds.at(-1), { x: 0, y: 280, width: 1000, height: 420 })
   assert.deepEqual(webContents.windowOpenHandler(), { action: 'deny' })
@@ -136,6 +139,11 @@ test('terminal is a sandboxed child panel and never creates a BrowserWindow', as
     ['write', 'git --version\r'],
     ['resize', { cols: 120, rows: 40 }],
   ])
+  assert.deepEqual(
+    await ipcMain.handlers.get(TERMINAL_IPC_CHANNELS.SET_SHELL)({ sender }, 'wsl', { cols: 120, rows: 40 }),
+    { label: 'PowerShell 7', cwd: 'C:\\workspace' },
+  )
+  assert.deepEqual(calls.slice(3, 6), [['set-shell', 'wsl'], ['save-shell', 'wsl'], ['restart', { cols: 120, rows: 40 }]])
 
   session.emit('output', 'git version 2.55.0\r\n')
   session.emit('exit', { exitCode: 0, signal: 0 })
@@ -271,7 +279,7 @@ test('renderer loss reclaims the shell and IPC ownership without affecting a lat
     assert.equal(ipcMain.handlers.size, 0)
     const second = await createDesktopTerminalPanel(options)
     first.dispose()
-    assert.equal(ipcMain.handlers.size, 3)
+    assert.equal(ipcMain.handlers.size, 4)
     assert.equal(second.disposed, false)
     second.dispose()
   }

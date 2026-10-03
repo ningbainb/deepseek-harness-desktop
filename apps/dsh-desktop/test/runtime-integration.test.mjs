@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { chromium } from 'playwright'
 import afterPack from '../scripts/after-pack.cjs'
@@ -150,7 +151,7 @@ test('direct startup keeps full profile materialization inside the coordinator-o
 
 test('runtime transport telemetry shares the Electron startup scope', async () => {
   const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
-  assert.match(source, /\n  const runtimeTransport = desktopRuntimeHost === undefined \? 'pipe' : 'http'\n  const createPrimaryRuntimeController/u)
+  assert.match(source, /\r?\n  const runtimeTransport = desktopRuntimeHost === undefined \? 'pipe' : 'http'\r?\n  const createPrimaryRuntimeController/u)
   assert.match(source, /productMetrics\.observeRuntimeStatus\(status, runtimeTransport\)/u)
 })
 
@@ -219,10 +220,13 @@ test('rapid direct-start states serialize local startup-page navigations', async
 })
 
 test('desktop local surfaces use canonical file URLs with encoded query values', () => {
-  const url = desktopLocalSurfaceUrl('D:\\DeepSeek Harness\\startup.html', {
+  const localPath = resolve('DeepSeek Harness', 'startup.html')
+  const url = desktopLocalSurfaceUrl(localPath, {
     query: { directState: 'starting full', omitted: undefined },
   })
-  assert.equal(url, 'file:///D:/DeepSeek%20Harness/startup.html?directState=starting+full')
+  const expected = new URL(pathToFileURL(localPath))
+  expected.searchParams.set('directState', 'starting full')
+  assert.equal(url, expected.href)
   assert.equal(url.includes('\\'), false)
 })
 

@@ -33,9 +33,12 @@ import {
 } from './local-lan-gateway.mjs'
 import { createDesktopIngress, registerDesktopProtocolClient } from './desktop-ingress.mjs'
 import { CommunityHomeMigration } from './community-home-migration.mjs'
+import { DesktopV41Migration } from './desktop-v41-migration.mjs'
+import { DesktopV42Migration } from './desktop-v42-migration.mjs'
 import { LegacyPluginRecovery } from './legacy-plugin-recovery.mjs'
 import { createRuntimePresentationGuard } from './runtime-presentation.mjs'
 import { createDesktopInstallPreparation } from './install-preparation.mjs'
+import { ControlCenterStore } from './control-center.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
 import { createCommunityMarketService } from './extensions/community-market.mjs'
 import {
@@ -123,6 +126,7 @@ import { exportStartupDiagnostics } from './startup-diagnostics.mjs'
 import { SettingsWindowStateStore } from './settings-window-state.mjs'
 import { installStarPromptSurface, STAR_PROMPT_VERSION, StarPromptStore } from './star-prompt.mjs'
 import { createDesktopTerminalPanel } from './terminal-window.mjs'
+import { TerminalShellPreferencesStore } from './terminal-shell-preferences.mjs'
 import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
 import { normalizeProductContext } from './telemetry-events.mjs'
@@ -152,6 +156,7 @@ import {
   verifyRuntimeFileEvidence,
 } from './runtime-support-policy.mjs'
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
+import { DesktopUpdateCheckStore } from './update-check-state.mjs'
 import { parseUpdateMirrors, probeUpdateSource, UpdateDownloadRouter } from './update-mirrors.mjs'
 import { parseUpdateShutdownRequest, writeUpdateShutdownReceipt } from './update-shutdown-receipt.mjs'
 import { UpdateAnalyticsReceiptStore } from './update-analytics-receipt.mjs'
@@ -167,6 +172,8 @@ import {
 } from './tray-lifecycle.mjs'
 import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
+import { syncPersistedSkinToMain } from './desktop-skin-sync.mjs'
+import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
 import { attachWindowStatePersistence, loadWindowStateForRestore } from './window-state.mjs'
@@ -577,7 +584,7 @@ export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
   const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
   const electron = await import('electron')
-  const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol: electronProtocol, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
+  const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net: electronNet, Notification, protocol: electronProtocol, safeStorage, screen, session: electronSession, shell, Tray, WebContentsView } = electron
   registerDesktopRuntimeScheme(electronProtocol)
   if (process.env.DSH_DESKTOP_USER_DATA) app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA)
   const initialUpdateShutdownRequest = parseUpdateShutdownRequest(process.argv)
@@ -672,6 +679,10 @@ export async function startElectronApp(metadata) {
       await logStore.append(`[migration] community-home preparation failed: ${error instanceof Error ? error.name : 'unknown'}`)
     }
   }
+  const desktopV41Migration = new DesktopV41Migration({ dshHome, desktopVersion })
+  let desktopV41MigrationResult
+  const desktopV42Migration = new DesktopV42Migration({ dshHome, desktopVersion })
+  let desktopV42MigrationResult
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -735,7 +746,9 @@ export async function startElectronApp(metadata) {
   let repairRetry = async () => ({ accepted: false })
   const desktopWindowStatePath = join(userData, 'window-state.json')
   const desktopPreferencesPath = join(userData, 'desktop-preferences.json')
+  const terminalShellPreferences = new TerminalShellPreferencesStore(join(userData, 'terminal-shell.json'))
   const updateChannelPreferencesPath = join(userData, 'update-channel-preferences.json')
+  const updateCheckStatePath = join(userData, 'update-check-state.json')
   const settingsWindowStatePath = join(userData, 'settings-window-state.json')
   const lanGatewayStatePath = join(userData, 'lan-gateway-state.json')
   const lanGatewayStore = new DesktopLanGatewayStore(lanGatewayStatePath)
@@ -1018,6 +1031,8 @@ export async function startElectronApp(metadata) {
         Menu,
         cwd: desktopProfileDir,
         resolvePathEntries: resolveTerminalPathEntries,
+        shellId: process.platform === 'win32' ? await terminalShellPreferences.load() : 'auto',
+        shellPreferences: terminalShellPreferences,
         theme,
         onError: (error) => {
           void logStore.append(`[terminal] ${error instanceof Error ? error.name : 'unknown'}`).catch(() => {})
@@ -1232,6 +1247,16 @@ export async function startElectronApp(metadata) {
     const profileStartedAt = performance.now()
     try {
       const repair = async () => {
+        if (mode === 'full') {
+          desktopV41MigrationResult = await desktopV41Migration.prepare()
+          await logStore.append(
+            `[migration] desktop-v4.1 state=${desktopV41MigrationResult.state}`
+            + ` endpoint=${desktopV41MigrationResult.officialEndpointMigrated === true}`
+            + ` e2b=${desktopV41MigrationResult.e2bRetired === true}`,
+          )
+          desktopV42MigrationResult = await desktopV42Migration.prepare()
+          await logStore.append(`[migration] desktop-v4.2 state=${desktopV42MigrationResult.state}`)
+        }
         const result = await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode })
         if (mode === 'full') {
           await setQqBotProfileEnabled({ profileDir: desktopProfileDir, enabled: Boolean(qqBotCredentials) })
@@ -1643,9 +1668,10 @@ export async function startElectronApp(metadata) {
   const runtimeProtocolLifecycle = await installDesktopRuntimeProtocol({
     protocol: mainWindow.webContents.session.protocol,
     getProvider: () => runtimeProvider,
+    afterFetch: (request, response) => syncPersistedSkinToMain({ request, response, mainWindow }),
     beforeFetch: process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE
       ? async (request) => {
-          const pathname = new URL(request.url).pathname
+          const pathname = desktopLocalPath(new URL(request.url).pathname)
           let action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
           while (pathname === '/api/session/modelCatalog' && action === 'stall') {
             await new Promise(resolve => setTimeout(resolve, 50))
@@ -1732,6 +1758,24 @@ export async function startElectronApp(metadata) {
     }),
     setEnabled: (enabled) => setAgentTeamProfileEnabled({ profileDir: desktopProfileDir, enabled }),
   })
+  const controlCenterStore = new ControlCenterStore({ path: join(dshHome, 'desktop-control-center.json') })
+  const controlCenterFeature = Object.freeze({
+    status: () => controlCenterStore.status({ packageRoots: runtimePackages }),
+    setFeature: (kind, enabled, provider) => controlCenterStore.setFeature(kind, enabled, provider),
+    test: (kind, provider) => controlCenterStore.probe(kind, provider, { packageRoots: runtimePackages }),
+    openPermissionSettings: async (kind) => {
+      if (kind !== 'computer') return false
+      if (process.platform === 'darwin') {
+        await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')
+        return true
+      }
+      if (process.platform === 'win32') {
+        await shell.openExternal('ms-settings:privacy')
+        return true
+      }
+      return false
+    },
+  })
 
   const persistUpdateChannel = (channel) => {
     const operation = updateChannelWriteQueue.then(async () => {
@@ -1793,6 +1837,8 @@ export async function startElectronApp(metadata) {
 
   let sessionRecoverySkippedCount = 0
   let sessionRecoveryRecoveredCount = 0
+  let nativeComputerProviderFailureObserved = false
+  let nativeComputerProviderRecoveryActive = false
   const observeSessionRecoveryLine = (entry) => {
     const line = String(entry?.line ?? '')
     const skipped = /\[dsh-session-recovery\]\s+skipped=(\d+)\s+kind=corrupt-zstd-header(?:\s|$)/u.exec(line)
@@ -1812,7 +1858,12 @@ export async function startElectronApp(metadata) {
   }
   runtimeProvider.on('line', observeSessionRecoveryLine)
   runtimeProvider.on('line', (entry) => {
-    const metric = parseValueModeRuntimeTelemetryLine(String(entry?.line ?? ''))
+    const line = String(entry?.line ?? '')
+    if (
+      /(?:cua-driver-native|computer-use-cua-driver-native)/iu.test(line)
+      && /(?:error|failed|failure|crash|exception)/iu.test(line)
+    ) nativeComputerProviderFailureObserved = true
+    const metric = parseValueModeRuntimeTelemetryLine(line)
     if (metric?.event === 'cost_mode_route') productMetrics.recordCostModeRoute(metric)
     else if (metric) productMetrics.recordValueModeCall(metric.outcome, metric.role)
   })
@@ -2190,6 +2241,19 @@ export async function startElectronApp(metadata) {
     }
   }
   let extensionRuntimeMaintenance = false
+  const preflightFeatureMutation = async (feature) => {
+    const audit = await auditFullProfileIntegrity()
+    const activeProfile = runtimeProvider.profileName
+    if (activeProfile === 'desktop' && runtimeProvider.status?.state === 'ready' && audit.status === 'healthy') return
+    const safeFeature = ['agent-team', 'browser', 'computer'].includes(feature) ? feature : 'unknown'
+    const reason = typeof audit.reasonCode === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/u.test(audit.reasonCode)
+      ? audit.reasonCode
+      : 'UNKNOWN'
+    await logStore.append(`[features] ${safeFeature} switch deferred profile=${activeProfile === 'desktop' ? 'full' : 'fallback'} audit=${audit.status} reason=${reason}`).catch(() => {})
+    const error = new Error('插件环境尚未就绪，请先到拓展坞的「诊断与恢复」修复插件环境，再重试开关。当前运行不会被中断。')
+    error.code = 'FEATURE_MUTATION_REPAIR_REQUIRED'
+    throw error
+  }
   const unregisterExtensionIpc = registerExtensionIpc({
     selectDockSetting: (id, plugin) => desktopWindowFactory.selectDockSetting(id, plugin),
     ipcMain,
@@ -2201,11 +2265,13 @@ export async function startElectronApp(metadata) {
     pluginManager,
     controller: runtimeProvider,
     ensureProfile,
+    preflightFeatureMutation,
     projectRoot,
     dshHome,
     agentsHome: process.env.DSH_AGENTS_HOME,
     qqBotBinding,
     agentTeamFeature,
+    controlCenterFeature,
     pluginRecovery,
     presetService,
     migrationService,
@@ -2217,11 +2283,20 @@ export async function startElectronApp(metadata) {
     completeFullAccessPlugin,
     revokeFullUserTrust,
     exportDiagnostics,
+    writeClipboardText: async (text) => { clipboard.writeText(text) },
     openLogs: () => shell.openPath(logsDirectory),
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
     recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
     completeBlockedPluginRecovery,
+    openPluginSettings: async (name) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return false
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      mainWindow.webContents.send('desktop:plugin-settings-open', Object.freeze({ name }))
+      return true
+    },
   })
   let legacyNpmRestoreScheduled = false
   const dispatchDeepLink = async (link) => {
@@ -2321,8 +2396,24 @@ export async function startElectronApp(metadata) {
       void loadStartup().catch(() => {})
     }
   }
+  const recoverFromNativeComputerProviderFailure = (status) => {
+    if (status.state !== 'crashed' || !nativeComputerProviderFailureObserved || nativeComputerProviderRecoveryActive) return
+    nativeComputerProviderFailureObserved = false
+    nativeComputerProviderRecoveryActive = true
+    void controlCenterStore.recordComputerProviderFailure().then(async (result) => {
+      if (!result.suspended) return
+      await logStore.append('[control-center] native computer provider suspended after repeated startup failure')
+      await ensureDesktopProfile({ dshHome, packageRoots: runtimePackages, mode: 'full' })
+      await runtimeProvider.recover()
+    }).catch(error => logStore.append(
+      `[control-center] safe-mode recovery failed: ${error instanceof Error ? error.message : String(error)}`,
+    )).finally(() => {
+      nativeComputerProviderRecoveryActive = false
+    })
+  }
   runtimeProvider.on('status', (status) => {
     productMetrics.observeRuntimeStatus(status, runtimeTransport)
+    recoverFromNativeComputerProviderFailure(status)
     if (!runtimePresentation.active) {
       deepLinkRouter.setReady(false)
       return
@@ -2332,6 +2423,7 @@ export async function startElectronApp(metadata) {
     if (status.state === 'starting') {
       sessionRecoverySkippedCount = 0
       sessionRecoveryRecoveredCount = 0
+      nativeComputerProviderFailureObserved = false
     }
     if (!mainWindow || mainWindow.isDestroyed()) return
     if (status.state === 'ready' && status.url) {
@@ -2703,6 +2795,14 @@ export async function startElectronApp(metadata) {
       }
       if (state === 'rolling-back') await showDirectStartupState('repairing')
       if (state === 'ready-full') {
+        if (desktopV42MigrationResult?.state === 'PREPARED') {
+          desktopV42MigrationResult = await desktopV42Migration.commitHealthy()
+          await logStore.append('[migration] desktop-v4.2 committed after full Runtime health verification')
+        }
+        if (desktopV41MigrationResult?.state === 'PREPARED') {
+          desktopV41MigrationResult = await desktopV41Migration.commitHealthy()
+          await logStore.append('[migration] desktop-v4.1 committed after full Runtime health verification')
+        }
         if (
           communityHomeMigration !== undefined
           && typeof communityHomeMigrationResult?.transactionId === 'string'
@@ -2738,6 +2838,18 @@ export async function startElectronApp(metadata) {
         }
       }
       if (state === 'ready-builtins') {
+        if (desktopV42MigrationResult?.state === 'PREPARED') {
+          desktopV42MigrationResult = await desktopV42Migration.rollback('full-runtime-unavailable').catch(async (error) => {
+            await logStore.append(`[migration] desktop-v4.2 rollback failed: ${error instanceof Error ? error.name : 'unknown'}`)
+            return desktopV42MigrationResult
+          })
+        }
+        if (desktopV41MigrationResult?.state === 'PREPARED') {
+          desktopV41MigrationResult = await desktopV41Migration.rollback('full-runtime-unavailable').catch(async (error) => {
+            await logStore.append(`[migration] desktop-v4.1 rollback failed: ${error instanceof Error ? error.name : 'unknown'}`)
+            return desktopV41MigrationResult
+          })
+        }
         const fallbackReason = builtinsRollbackFailed ? 'rollback-failed' : builtinsFallbackDetail
         await showDirectStartupState(state, { reason: fallbackReason })
         productMetrics.recordBuiltinsFallbackReady({
@@ -2980,12 +3092,17 @@ export async function startElectronApp(metadata) {
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
     getWindow: () => mainWindow,
-    currentVersion: app.getVersion(),
+    // In development Electron reports its own framework version here. Use the
+    // already resolved Desktop manifest version so the update surface and
+    // channel policy see the same product version in every environment.
+    currentVersion: desktopVersion,
     enabled: Boolean(autoUpdater),
     unavailableReason: updateAvailability.reason === UNSIGNED_MAC_PREVIEW_REASON
       ? UNSIGNED_MAC_PREVIEW_REASON
       : undefined,
     updateChannel,
+    scheduleStore: new DesktopUpdateCheckStore({ path: updateCheckStatePath }),
+    isOnline: () => electronNet?.isOnline?.() !== false,
     downloadRouter: updateDownloadRouter,
     log: (line) => void logStore.append(line),
     beforeInstall: installPreparation.beforeInstall,

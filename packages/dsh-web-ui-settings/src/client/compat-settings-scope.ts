@@ -314,9 +314,12 @@ export interface WebUiSettingsBinderFace {
 
 /** The 0.2 Host form directory is keyed by profile entry id. */
 const PROFILE_ENTRY_BY_NAMESPACE: Readonly<Record<string, string>> = {
-  'community-plugins': 'ui-community-plugins',
+  'describe-image': 'web-ui-describe-image',
+  'community-plugins': 'web-ui-community-plugins',
+  'desktop-launcher': 'web-ui-desktop-launcher',
+  'remote-web-ui': 'web-ui-remote-web-ui',
   'task-board': 'ui-task-board',
-  'skin-background': 'ui-skin-center',
+  'skin-background': 'web-ui-skin-center',
   'value-mode': 'ui-value-mode',
   'model-preferences': 'ui-model-preferences',
 }

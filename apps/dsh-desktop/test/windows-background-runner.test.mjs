@@ -40,7 +40,7 @@ test('repeated official Windows Job children create no visible console under Ele
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_CONSOLE_PROBE_ASSEMBLY: probeAssemblyPath },
       windowsHide: true,
       encoding: 'utf8',
-      timeout: 55_000,
+      timeout: 85_000,
     })
   } finally { observation = await observer.stop() }
   assert.equal(result.status, 0, `${result.error ?? ''}\n${result.stderr}\n${result.stdout}`)

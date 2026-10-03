@@ -343,6 +343,13 @@ function failureDiagnostic(error, operation, endpoint) {
   }
 }
 
+function reportSafeFailure(error) {
+  if (error?.code !== 'ERR_DSH_RUNTIME_PIPE_MESSAGE_TOO_LARGE') return
+  const actualBytes = Number.isSafeInteger(error.actualBytes) ? error.actualBytes : 'unknown'
+  const limitBytes = Number.isSafeInteger(error.limitBytes) ? error.limitBytes : 'unknown'
+  console.error(`dsh desktop pipe: frame-too-large bytes=${actualBytes} limit=${limitBytes}`)
+}
+
 async function sendResponse(socket, response) {
   await writeFrame(socket, {
     type: 'response-start',
@@ -488,6 +495,7 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
           if (typeof onFailure === 'function') onFailure(diagnostic)
           else process.stderr.write(`[runtime-pipe] ${JSON.stringify(diagnostic)}\n`)
         } catch {}
+        reportSafeFailure(error)
         if (!socket.destroyed) {
           await writeFrame(socket, {
             type: 'error',

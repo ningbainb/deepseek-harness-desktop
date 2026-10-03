@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
 import test from 'node:test'
 
 import { createDesktopIngress, desktopDeepLinkFrom, registerDesktopProtocolClient } from '../src/desktop-ingress.mjs'
@@ -90,14 +91,15 @@ test('desktop ingress queues initial links and preset files until dispatchers ar
   const mainWindow = createMainWindow()
   const links = []
   const presets = []
+  const firstPreset = resolve('first.dshpreset')
   const ingress = createDesktopIngress({
     app,
-    initialCommandLine: ['desktop.exe', 'dsh://task/start', 'C:\\tmp\\first.dshpreset'],
+    initialCommandLine: ['desktop.exe', 'dsh://task/start', firstPreset],
     getMainWindow: () => mainWindow,
   })
 
   assert.equal(ingress.launchDetail, 'deep-link')
-  assert.deepEqual(ingress.pendingPresetFiles, ['C:\\tmp\\first.dshpreset'])
+  assert.deepEqual(ingress.pendingPresetFiles, [firstPreset])
   ingress.setDispatchers({
     deepLink: (link) => { links.push(link.href) },
     presetFile: async (path) => { presets.push(path) },
@@ -105,7 +107,7 @@ test('desktop ingress queues initial links and preset files until dispatchers ar
   ingress.deepLinkRouter.setReady(true)
   await ingress.deepLinkRouter.idle()
   assert.deepEqual(links, ['dsh://task/start'])
-  assert.deepEqual(presets, ['C:\\tmp\\first.dshpreset'])
+  assert.deepEqual(presets, [firstPreset])
   assert.deepEqual(ingress.pendingPresetFiles, [])
 })
 
@@ -140,8 +142,8 @@ test('open-url and open-file always prevent default and enforce bounded queues',
   let urlPrevented = 0
   let filePrevented = 0
   const urlResult = app.emit('open-url', { preventDefault: () => { urlPrevented += 1 } }, 'dsh://extensions')
-  const firstFile = app.emit('open-file', { preventDefault: () => { filePrevented += 1 } }, 'C:\\tmp\\one.dshpreset')
-  const secondFile = app.emit('open-file', { preventDefault: () => { filePrevented += 1 } }, 'C:\\tmp\\two.dshpreset')
+  const firstFile = app.emit('open-file', { preventDefault: () => { filePrevented += 1 } }, resolve('one.dshpreset'))
+  const secondFile = app.emit('open-file', { preventDefault: () => { filePrevented += 1 } }, resolve('two.dshpreset'))
   assert.equal(urlResult.accepted, true)
   assert.equal(firstFile.accepted, true)
   assert.equal(secondFile.reason, 'queue-full')

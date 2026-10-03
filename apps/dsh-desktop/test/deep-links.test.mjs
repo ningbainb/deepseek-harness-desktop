@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { resolve } from 'node:path'
 import test from 'node:test'
 
 import { DeepLinkRouter, normalizeDeepLink, presetFileFrom } from '../src/deep-links.mjs'
@@ -65,7 +66,8 @@ test('deep link routing queues until ready, deduplicates, and dispatches each ro
 })
 
 test('preset file arguments accept only absolute .dshpreset files', () => {
-  assert.equal(presetFileFrom(['desktop.exe', 'C:\\Users\\person\\portable.dshpreset']), 'C:\\Users\\person\\portable.dshpreset')
+  const preset = resolve('portable.dshpreset')
+  assert.equal(presetFileFrom(['desktop.exe', preset]), preset)
   assert.equal(presetFileFrom(['desktop.exe', '.\\portable.dshpreset']), undefined)
-  assert.equal(presetFileFrom(['desktop.exe', 'C:\\Users\\person\\portable.txt']), undefined)
+  assert.equal(presetFileFrom(['desktop.exe', resolve('portable.txt')]), undefined)
 })

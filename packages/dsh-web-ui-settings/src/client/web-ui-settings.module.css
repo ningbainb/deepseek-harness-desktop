@@ -174,6 +174,16 @@
   border-color: var(--dsw-alias-brand-primary);
 }
 
+.desktopRuntimeNotice {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, transparent);
+  color: var(--dsw-alias-label-tertiary);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-3) 88%, transparent);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .repairCard {
   margin: 2px 0 12px;
   overflow: hidden;
@@ -447,6 +457,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  overflow: visible;
 }
 
 .dockEntry[data-wide='rail'] {
@@ -461,6 +473,7 @@
 }
 
 .dockTrigger {
+  box-sizing: border-box;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -474,6 +487,7 @@
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  overflow: visible;
 }
 
 .dockEntry[data-wide='wide'] .dockTrigger {
@@ -484,10 +498,42 @@
   border-radius: 9px;
 }
 
+/* The official footer action seat is a single nowrap row. Stack Desktop's
+   labeled destinations in the wide sidebar so intermediate widths never crop
+   an action or leave only part of its icon visible. */
+:global([data-pane='sidebar'] [class*='footerActions']):has(.dockEntry[data-dsh-extension-dock-entry][data-wide='wide']) {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.dockEntry[data-wide='wide'] {
+  box-sizing: border-box;
+  flex-basis: 100%;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.dockEntry[data-wide='wide'] .dockTrigger {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .dockTriggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
   line-height: 1;
+}
+
+.dockBrandIcon {
+  display: block;
+  flex: none;
+  max-width: 22px;
+  max-height: 22px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .dockTrigger:hover:not(:disabled) {
@@ -601,4 +647,13 @@
     animation: none;
     transform: none !important;
   }
+}
+.managementRoutingError {
+  display: block;
+  box-sizing: border-box;
+  max-width: 260px;
+  margin: 4px 10px 8px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+  line-height: 16px;
 }

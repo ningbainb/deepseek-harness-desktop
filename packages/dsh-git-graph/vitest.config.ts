@@ -8,7 +8,9 @@ export default defineConfig({
     // Real git subprocesses can exceed Vitest's 5s default under a busy
     // Windows workspace test run, even though the same assertions are fast
     // in isolation.
-    testTimeout: 15_000,
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
+    fileParallelism: false,
     pool: 'forks',
     // @deepseek-ai SDK packages ship browser bundles (CSS imports included);
     // keep them vite-transformed instead of node-externalized.

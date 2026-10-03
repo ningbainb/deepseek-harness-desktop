@@ -31,94 +31,23 @@ if ([string]::IsNullOrWhiteSpace($UpgradeTransactionScript)) {
 }
 
 try {
-  if (-not ('DshInstaller.ProcessPath' -as [type])) {
-    Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-
-namespace DshInstaller
-{
-    public static class ProcessPath
-    {
-        private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr OpenProcess(
-            uint processAccess,
-            bool inheritHandle,
-            uint processId);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool QueryFullProcessImageName(
-            IntPtr process,
-            uint flags,
-            StringBuilder executablePath,
-            ref uint size);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr handle);
-
-        [DllImport("kernel32.dll", EntryPoint = "GetLongPathNameW", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetLongPathName(
-            string shortPath,
-            StringBuilder longPath,
-            uint bufferLength);
-
-        public static string Canonicalize(string path)
-        {
-            if (String.IsNullOrWhiteSpace(path))
-            {
-                return path;
-            }
-
-            string fullPath;
-            try
-            {
-                fullPath = System.IO.Path.GetFullPath(path);
-            }
-            catch
-            {
-                return path;
-            }
-
-            StringBuilder longPath = new StringBuilder(32768);
-            uint size = GetLongPathName(fullPath, longPath, (uint) longPath.Capacity);
-            if (size == 0 || size >= longPath.Capacity)
-            {
-                return fullPath;
-            }
-            return longPath.ToString();
-        }
-
-        public static string TryGet(uint processId)
-        {
-            IntPtr process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
-            if (process == IntPtr.Zero)
-            {
-                return null;
-            }
-
-            try
-            {
-                StringBuilder executablePath = new StringBuilder(32768);
-                uint size = (uint) executablePath.Capacity;
-                if (!QueryFullProcessImageName(process, 0, executablePath, ref size))
-                {
-                    return null;
-                }
-                return executablePath.ToString();
-            }
-            finally
-            {
-                CloseHandle(process);
-            }
-        }
+  function Get-CanonicalPath([string] $path) {
+    if ([string]::IsNullOrWhiteSpace($path)) {
+      return $path
     }
-}
-'@
+    try {
+      $fullPath = [System.IO.Path]::GetFullPath($path)
+    } catch {
+      return $path
+    }
+    try {
+      # Get-Item resolves the existing filesystem entry without a temporary
+      # compiler. This keeps Unicode TEMP/user paths safe on Windows PowerShell
+      # 5.1 and also normalizes aliases exposed by registry install locations.
+      return (Get-Item -LiteralPath $fullPath -Force -ErrorAction Stop).FullName
+    } catch {
+      return $fullPath
+    }
   }
 
   $comparison = [System.StringComparison]::OrdinalIgnoreCase
@@ -138,7 +67,7 @@ namespace DshInstaller
       } else {
         [System.IO.Path]::GetFullPath($path).TrimEnd([char[]]@('\', '/'))
       }
-      $canonicalPath = [DshInstaller.ProcessPath]::Canonicalize($fullPath).TrimEnd([char[]]@('\', '/'))
+      $canonicalPath = (Get-CanonicalPath $fullPath).TrimEnd([char[]]@('\', '/'))
       $volumeRoot = [System.IO.Path]::GetPathRoot($canonicalPath).TrimEnd([char[]]@('\', '/'))
       if (-not [string]::IsNullOrWhiteSpace($canonicalPath) -and $canonicalPath -ne $volumeRoot) {
         [void] $installRoots.Add($canonicalPath)
@@ -197,8 +126,8 @@ namespace DshInstaller
     foreach ($variant in @(
       $root,
       $installItem.FullName,
-      [DshInstaller.ProcessPath]::Canonicalize($root),
-      [DshInstaller.ProcessPath]::Canonicalize($installItem.FullName)
+      (Get-CanonicalPath $root),
+      (Get-CanonicalPath $installItem.FullName)
     )) {
       if (-not [string]::IsNullOrWhiteSpace($variant)) {
         [void] $rootVariants.Add($variant.TrimEnd([char[]]@('\', '/')))
@@ -210,7 +139,7 @@ namespace DshInstaller
     if ([string]::IsNullOrWhiteSpace($path)) {
       return $null
     }
-    $pathVariants = @($path, [DshInstaller.ProcessPath]::Canonicalize($path))
+    $pathVariants = @($path, (Get-CanonicalPath $path))
     foreach ($pathVariant in $pathVariants) {
       if ([string]::IsNullOrWhiteSpace($pathVariant)) {
         continue
@@ -230,12 +159,12 @@ namespace DshInstaller
   }
 
   function Get-DirectInstallProcesses {
-    @(foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
-      $processId = [uint32] $process.Id
+    @(foreach ($process in (Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
+      $processId = [uint32] $process.ProcessId
       if ($excludedProcessIds.Contains($processId)) {
         continue
       }
-      $path = [DshInstaller.ProcessPath]::TryGet($processId)
+      $path = [string] $process.ExecutablePath
       $ownership = Get-Ownership $path
       if (-not $ownership) {
         continue
@@ -327,8 +256,8 @@ namespace DshInstaller
         }
         continue
       }
-      # TryGet can fail on elevated processes; the WMI executable path is a fallback
-      # so such processes are still reported instead of failing the file copy later.
+      # The second WMI pass includes command lines and catches product-name or
+      # attributed descendants not already owned by an exact executable path.
       $ownership = Get-Ownership $cim.ExecutablePath
       if ($ownership) {
         [pscustomobject]@{
@@ -527,6 +456,15 @@ namespace DshInstaller
     }
   }
 
+  # A fresh or already-removed installation has no executable mapping to stop.
+  # Do not enumerate unrelated system processes in that case: some hardened CI
+  # hosts expose pseudo executable paths that Win32 rejects during
+  # canonicalization. The transaction helper still retires any stale registry
+  # identity before the new files are written.
+  if ($existingRoots.Count -eq 0) {
+    Complete-Preflight
+  }
+
   $targets = @(Get-InstallProcesses)
   if ($targets.Count -eq 0) {
     Complete-Preflight
@@ -670,5 +608,8 @@ namespace DshInstaller
   exit 32
 } catch {
   Write-Output "preflight-error: $($_.Exception.Message)"
+  Write-Output "preflight-error-type: $($_.Exception.GetType().FullName)"
+  Write-Output "preflight-error-id: $($_.FullyQualifiedErrorId)"
+  Write-Output "preflight-error-stack: $($_.ScriptStackTrace -replace '[\r\n]+', ' | ')"
   exit 33
 }

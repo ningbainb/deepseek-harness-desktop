@@ -18,7 +18,9 @@ test('DSH coupling audit classifies every import and required seam category', as
   assert.match(audit.upstreamVersion, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u)
   assert.match(audit.lockfileSha256, /^[a-f0-9]{64}$/u)
   assert.equal(audit.imports.length > 0, true)
-  assert.equal(audit.seams.some((item) => item.path.startsWith('.cache/') || item.path.startsWith('.patch-work/')), false)
+  assert.equal(audit.seams.some((item) => (
+    item.path.startsWith('.cache/') || item.path.startsWith('.patch-work/') || item.path.startsWith('.pnpm_patches/')
+  )), false)
   assert.equal(audit.imports.every((item) => [
     'public-stable',
     'public-experimental',

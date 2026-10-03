@@ -216,7 +216,8 @@ async function* controlFrames(
       const queue = legacy.queues?.[sessionId]
       const jobs = legacy.jobs?.[sessionId]
       const projections = frame.value.projections[sessionId as keyof typeof frame.value.projections]
-      if (queue !== undefined) yield { type: 'session/queue', sessionId, items: queue }
+      // 0.1.6 removed queue data from the Host-wide control stream. Pending
+      // occurrences are owned by session.follow; never invent an empty queue.
       if (jobs !== undefined) yield { type: 'session/jobs', sessionId, jobs }
       if (projections !== undefined) {
         for (const projection of projectionFrames(sessionId, projections)) yield projection

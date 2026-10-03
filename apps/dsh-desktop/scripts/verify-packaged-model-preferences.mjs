@@ -116,8 +116,14 @@ async function openSettings(page) {
     const text = (await card.innerText().catch(() => '')).replaceAll(/\s+/gu, ' ').trim()
     throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
   }
-  const relay = card.locator('[data-relay-onboarding-card="true"]')
-  await relay.getByRole('heading', { name: '推荐：使用 bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  const relay = settings.locator('[data-relay-onboarding-card="true"]')
+  await relay.getByRole('heading', { name: '推荐：登录 bai，自动同步可用模型', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  const [relayBounds, baiBounds] = await Promise.all([relay.boundingBox(), baiProvider.boundingBox()])
+  assert.ok(relayBounds && baiBounds && relayBounds.y < baiBounds.y, 'bai onboarding is visible before the provider list')
+  if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {
+    await mkdir(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS, { recursive: true })
+    await settings.screenshot({ path: join(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS, 'main-settings-models.png') })
+  }
   return { settings, card }
 }
 
@@ -219,7 +225,7 @@ async function readComposerSelector(page) {
   const seat = page.locator('[data-slot="conversation.input.model"]')
   const trigger = seat.locator('button').first()
   await trigger.waitFor({ state: 'visible', timeout: 30_000 })
-  await trigger.click({ force: true })
+  await trigger.click({ timeout: 30_000 })
   const menu = page.locator('[role="menu"][aria-label="模型选择器"]')
   await menu.waitFor({ state: 'visible', timeout: 30_000 })
   await menu.getByRole('menuitem', { name: /^模型/u }).click()
@@ -242,6 +248,7 @@ async function readComposerSelector(page) {
     label: section.getAttribute('aria-label')
       || section.querySelector('[class*="providerTitle"] span')?.textContent?.trim()
       || section.querySelector('[class*="providerTitle"]')?.textContent?.trim() || '',
+    recommended: section.textContent?.includes('推荐') === true,
     buttons: [...section.querySelectorAll('button')].map((button) => ({
       text: button.textContent?.trim() || '',
       disabled: button.disabled,
@@ -278,6 +285,7 @@ function assertComposerProjection(sections, expectedPins) {
   assert.ok(pinned.buttons[0]?.text.startsWith(expectedPins[0]), JSON.stringify(pinned))
   assert.ok(pinned.buttons[1]?.text.startsWith(expectedPins[1]), JSON.stringify(pinned))
   assert.deepEqual(sections.map((section) => section.label).slice(0, 4), ['置顶模型', 'bai供应商', 'openai-codex', 'DeepSeek'])
+  assert.equal(sections.find((section) => section.label === 'bai供应商')?.recommended, true, 'bai is visibly recommended in the model picker')
   const deepseek = sections.find((section) => section.label === 'DeepSeek')
   assert.ok(deepseek, JSON.stringify(sections))
   assert.equal(deepseek.buttons.length, 1, JSON.stringify(deepseek))

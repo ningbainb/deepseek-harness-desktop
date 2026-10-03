@@ -14,8 +14,8 @@ Ubuntu 22.04/24.04 已通过 GitHub Actions 中的真实打包、沙箱和 Xvfb 
 ## AppImage
 
 ```bash
-chmod +x DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
-./DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
+chmod +x DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage
+./DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage
 ```
 
 如果系统没有 FUSE 2，可以先使用发行版的软件包管理器安装对应兼容包，或使用 AppImage 的解包运行方式。不要使用来源不明的第三方安装脚本。
@@ -23,7 +23,7 @@ chmod +x DeepSeek-Harness-Desktop-4.0.0-x86_64.AppImage
 ## deb
 
 ```bash
-sudo apt install ./DeepSeek-Harness-Desktop-4.0.0-amd64.deb
+sudo apt install ./DeepSeek-Harness-Desktop-5.0.0-amd64.deb
 ```
 
 卸载：

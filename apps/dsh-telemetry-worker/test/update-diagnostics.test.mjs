@@ -23,6 +23,7 @@ test('schema 6 stores one diagnostic per failed attempt without extra rows or in
     const summary = await updateDiagnosticsSummary(wrapper, { days: 90, version: '3.3.0' }, now)
     assert.equal(summary.rangeDays, 30); assert.equal(summary.failures, 1); assert.equal(summary.failedAttempts, 1)
     assert.equal(summary.observedInstances, 1); assert.equal(summary.groups[0].stage, 'check')
+    assert.equal(summary.legacyFailures, 0); assert.equal(summary.attemptsPerObservedInstance, 1)
     assert.equal(summary.recent[0].targetVersion, 'unknown')
     assert.doesNotMatch(JSON.stringify(summary), /installation_actor|aaaaaaaa/u)
     assert.equal((await updateDiagnosticsSummary(wrapper, { days: 7, version: '3.2.0' }, now)).failures, 0)

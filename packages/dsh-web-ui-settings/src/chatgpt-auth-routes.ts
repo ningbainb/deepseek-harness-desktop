@@ -2,7 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { createBridgeRouteGuard, type BridgeAccess } from './bridge.ts'
 import { ChatGptAuthError, type ChatGptAuthorizationController } from './chatgpt-auth.ts'
-import { CHATGPT_AUTH_BRIDGE_PREFIX, type ChatGptAuthResult } from './chatgpt-auth-protocol.ts'
+import {
+  CHATGPT_AUTH_BRIDGE_PREFIX,
+  type ChatGptAuthBeginRequest,
+  type ChatGptAuthResult,
+} from './chatgpt-auth-protocol.ts'
 
 const MAX_AUTH_BODY_BYTES = 8 * 1024
 
@@ -77,12 +81,18 @@ export function makeChatGptAuthRoutes(
       handler: async (req, res) => {
         if (!guard(req, res)) return
         const body = await readJsonBody(req)
-        if (!isRecord(body) || (body.method !== undefined && typeof body.method !== 'string')) {
+        if (!isRecord(body)
+          || (body.method !== undefined && typeof body.method !== 'string')
+          || (body.loginMode !== undefined && body.loginMode !== 'browser' && body.loginMode !== 'device_code')) {
           malformed(res)
           return
         }
+        const request = body as ChatGptAuthBeginRequest
         try {
-          writeJson(res, 200, { ok: true, value: await controller.begin(body.method) } satisfies ChatGptAuthResult)
+          writeJson(res, 200, {
+            ok: true,
+            value: await controller.begin(request.method, request.loginMode),
+          } satisfies ChatGptAuthResult)
         } catch (error) {
           writeJson(res, 200, failure(error))
         }

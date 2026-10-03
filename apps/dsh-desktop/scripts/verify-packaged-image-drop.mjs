@@ -111,10 +111,15 @@ async function openCreatedSession(page, sessionId) {
   }
 
   // Blank Host-created sessions are intentionally omitted from history. Use
-  // the real Desktop entry to create and activate the blank composer instead.
-  const newSession = page.getByRole('button', { name: '新建会话', exact: true }).last()
+  // the workspace-scoped Desktop entry to create and activate the blank
+  // composer instead. Its accessible name includes the workspace name, so an
+  // exact generic label is not a stable locator in the packaged UI.
+  const newSession = page
+    .locator('button[aria-label*="中新建会话"], button[aria-label^="New session in"]')
+    .first()
+  await group.hover()
   await newSession.waitFor({ state: 'visible', timeout: 30_000 })
-  await newSession.click({ force: true })
+  await newSession.click()
 }
 
 async function fixturePayload() {
@@ -415,11 +420,11 @@ try {
   if (sourceOnly) {
     const deadline = Date.now() + runtimeReadyTimeoutMs
     while (Date.now() < deadline) {
-      const runtimePage = activeApplication.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
+      const runtimePage = activeApplication.windows().find(candidate => /^dsh-runtime:\/\/app\//u.test(candidate.url()))
       if (runtimePage) { page = runtimePage; break }
       await wait(100)
     }
-    assert.match(page.url(), /^http:\/\/127\.0\.0\.1:/u, 'source Runtime window must be ready')
+    assert.match(page.url(), /^dsh-runtime:\/\/app\//u, 'source Runtime window must be ready')
   }
   const rendererErrors = []
   const rendererConsole = []
@@ -546,12 +551,20 @@ try {
   assert.equal(finalState.createdUrls, finalState.revokedUrls)
   assert.equal(finalState.inputDisabled, false)
 
-  const firstIdle = groupIdle[0].totalWorkingSetBytes
-  const lastIdle = groupIdle.at(-1).totalWorkingSetBytes
-  const allowedRetainedGrowthBytes = Math.max(retainedGrowthFloorBytes, Math.round(firstIdle * 0.1))
+  // Working set includes Chromium's shared/discardable image-decode pages. On
+  // Windows runners those pages can stay resident after ImageBitmap.close()
+  // even though they are no longer privately committed to the renderer. Use
+  // private bytes for the retained-memory gate, while continuing to report
+  // working set so release diagnostics still expose residency changes.
+  const firstIdlePrivateBytes = groupIdle[0].totalPrivateBytes
+  const lastIdlePrivateBytes = groupIdle.at(-1).totalPrivateBytes
+  const allowedRetainedPrivateGrowthBytes = Math.max(
+    retainedGrowthFloorBytes,
+    Math.round(firstIdlePrivateBytes * 0.1),
+  )
   assert.ok(
-    lastIdle - firstIdle <= allowedRetainedGrowthBytes,
-    `working set kept growing across image-drop groups: ${JSON.stringify({ groupIdle, allowedRetainedGrowthBytes })}`,
+    lastIdlePrivateBytes - firstIdlePrivateBytes <= allowedRetainedPrivateGrowthBytes,
+    `private memory kept growing across image-drop groups: ${JSON.stringify({ groupIdle, allowedRetainedPrivateGrowthBytes })}`,
   )
   const seriousConsole = rendererConsole.filter(line => !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line))
   assert.deepEqual(rendererErrors, [])
@@ -579,8 +592,10 @@ try {
       electronWorkingSetPeakBytes: Math.max(...activityMemory.map(sample => sample.totalWorkingSetBytes)),
       electronPrivatePeakBytes: Math.max(...activityMemory.map(sample => sample.totalPrivateBytes)),
       groupIdle,
-      allowedRetainedGrowthBytes,
-      observedRetainedGrowthBytes: lastIdle - firstIdle,
+      allowedRetainedPrivateGrowthBytes,
+      observedRetainedPrivateGrowthBytes: lastIdlePrivateBytes - firstIdlePrivateBytes,
+      observedWorkingSetGrowthBytes:
+        groupIdle.at(-1).totalWorkingSetBytes - groupIdle[0].totalWorkingSetBytes,
       completeProcessTree: treeSamples,
     },
   }, null, 2))

@@ -8,6 +8,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -81,7 +82,7 @@ try {
   await firstPrompt.waitFor({ state: 'visible', timeout: 10_000 })
   assert.equal(await firstPage.locator('#root').evaluate(root => root.classList.contains('dsh-desktop-modal-layer')), false,
     'native dialogs must not promote the conversation application root into a modal overlay')
-  await firstPrompt.getByText('4.0.0 · 社区支持', { exact: true }).waitFor({ state: 'visible' })
+  await firstPrompt.getByText(`${STAR_PROMPT_VERSION} · 社区支持`, { exact: true }).waitFor({ state: 'visible' })
   await firstPage.getByRole('button', { name: '去 GitHub 点个 Star' }).waitFor({ state: 'visible' })
   await firstPrompt.getByRole('button', { name: '在爱发电支持我' }).waitFor({ state: 'visible' })
   assert.equal(await firstPrompt.locator('.dsh-star-sponsor-link').getAttribute('href'), 'https://afdian.com/a/ningbai')
@@ -99,8 +100,8 @@ try {
   await firstPrompt.waitFor({ state: 'hidden' })
 
   const claimedState = JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8'))
-  if (!claimedState.shownVersions?.includes('4.0.0')) {
-    throw new Error(`4.0.0 Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
+  if (!claimedState.shownVersions?.includes(STAR_PROMPT_VERSION)) {
+    throw new Error(`${STAR_PROMPT_VERSION} Star prompt did not persist its once-per-release claim: ${JSON.stringify(claimedState)}`)
   }
   if (!claimedState.shownVersions?.includes('3.4.0')) throw new Error('upgrade discarded the previous release claim')
 
@@ -110,7 +111,7 @@ try {
   const thirdPage = await waitForHarnessPage(electronApp)
   await thirdPage.waitForTimeout(1_600)
   if (await thirdPage.locator('#dsh-desktop-star-prompt[data-open="true"]').isVisible()) {
-    throw new Error('the 4.0.0 Star prompt appeared more than once for the same user profile')
+    throw new Error(`the ${STAR_PROMPT_VERSION} Star prompt appeared more than once for the same user profile`)
   }
 
   await electronApp.close()

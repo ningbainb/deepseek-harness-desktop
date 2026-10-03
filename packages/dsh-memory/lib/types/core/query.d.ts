@@ -1,4 +1,7 @@
-import type { Session } from '@deepseek-ai/dsh-session';
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session';
 /** Return only direct user text after the latest turn/start boundary. */
-export declare function extractCurrentUserQuery(session: Pick<Session, 'snapshotEvents' | 'header'>): string;
+export declare function extractCurrentUserQuery(session: {
+    header: SessionHeader;
+    events: readonly SessionEvent[];
+}): string;
 //# sourceMappingURL=query.d.ts.map

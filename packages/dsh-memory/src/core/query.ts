@@ -1,4 +1,4 @@
-import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   MAX_MEMORY_QUERY_LENGTH,
 } from './schema.ts'
@@ -19,9 +19,9 @@ function textFromEvent(event: SessionEvent): string {
 }
 
 /** Return only direct user text after the latest turn/start boundary. */
-export function extractCurrentUserQuery(session: Pick<Session, 'snapshotEvents' | 'header'>): string {
+export function extractCurrentUserQuery(session: { header: SessionHeader; events: readonly SessionEvent[] }): string {
   if (session.header.origin === 'subagent') return ''
-  const events = session.snapshotEvents()
+  const events = session.events
   let start = -1
   for (let index = 0; index < events.length; index += 1) {
     if (events[index]?.type === 'turn/start') start = index

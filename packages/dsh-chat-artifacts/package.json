@@ -42,7 +42,7 @@
     "prepare": "tsdown",
     "bundle": "tsdown",
     "watch": "tsdown --watch",
-    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.vitest.json --pretty false",
+    "typecheck": "tsc -b --force --pretty false && tsc -p tsconfig.vitest.json --pretty false",
     "test": "vitest run",
     "test:watch": "vitest"
   },

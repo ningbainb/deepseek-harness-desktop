@@ -39,6 +39,15 @@ export function filterConversationSkills(skills, query) {
   return skills.filter((skill) => `${skill.name}\n${skill.description}\n${skill.source}`.toLocaleLowerCase().includes(needle))
 }
 
+export function groupConversationSkills(skills) {
+  const recent = skills.filter((skill) => skill.recent)
+  if (recent.length === 0) return [{ label: '技能', skills }]
+  return [
+    { label: '最近使用', skills: recent },
+    { label: '全部技能', skills },
+  ]
+}
+
 export function normalizeSkillDiagnostics(value) {
   if (!Array.isArray(value)) return []
   return value
@@ -228,41 +237,36 @@ function installConversationSkillsPage() {
     if (state.diagnostics.length > 0) {
       state.status.textContent = `有 ${state.diagnostics.length} 个技能未载入：${state.diagnostics[0]}`
     }
-    let recentGroupAdded = false
-    let allGroupAdded = false
-    for (const [index, skill] of state.filtered.entries()) {
-      if (skill.recent && !recentGroupAdded) {
-        state.list.append(groupLabel('最近使用'))
-        recentGroupAdded = true
+    let optionIndex = 0
+    for (const group of groupConversationSkills(state.filtered)) {
+      state.list.append(groupLabel(group.label))
+      for (const skill of group.skills) {
+        const currentIndex = optionIndex++
+        const option = document.createElement('button')
+        option.type = 'button'
+        option.className = 'dsh-desktop-skills-option'
+        option.id = `dsh-desktop-skill-option-${currentIndex}`
+        option.setAttribute('role', 'option')
+        option.setAttribute('aria-selected', 'false')
+        option.tabIndex = -1
+        const copy = document.createElement('span')
+        copy.className = 'dsh-desktop-skills-copy'
+        const name = document.createElement('strong')
+        name.textContent = skill.name
+        copy.append(name)
+        if (skill.description) {
+          const description = document.createElement('small')
+          description.textContent = skill.description
+          copy.append(description)
+        }
+        const source = document.createElement('span')
+        source.className = 'dsh-desktop-skills-source'
+        source.textContent = sourceLabel(skill.source)
+        option.append(copy, source)
+        option.addEventListener('pointermove', () => setActive(currentIndex))
+        option.addEventListener('click', () => selectSkill(skill))
+        state.list.append(option)
       }
-      if (!skill.recent && !allGroupAdded) {
-        state.list.append(groupLabel(recentGroupAdded ? '全部技能' : '技能'))
-        allGroupAdded = true
-      }
-      const option = document.createElement('button')
-      option.type = 'button'
-      option.className = 'dsh-desktop-skills-option'
-      option.id = `dsh-desktop-skill-option-${index}`
-      option.setAttribute('role', 'option')
-      option.setAttribute('aria-selected', 'false')
-      option.tabIndex = -1
-      const copy = document.createElement('span')
-      copy.className = 'dsh-desktop-skills-copy'
-      const name = document.createElement('strong')
-      name.textContent = skill.name
-      copy.append(name)
-      if (skill.description) {
-        const description = document.createElement('small')
-        description.textContent = skill.description
-        copy.append(description)
-      }
-      const source = document.createElement('span')
-      source.className = 'dsh-desktop-skills-source'
-      source.textContent = sourceLabel(skill.source)
-      option.append(copy, source)
-      option.addEventListener('pointermove', () => setActive(index))
-      option.addEventListener('click', () => selectSkill(skill))
-      state.list.append(option)
     }
     setActive(0)
     positionMenu()
@@ -402,6 +406,8 @@ function installConversationSkillsPage() {
       'button[aria-label="命令"]',
       'button[aria-label="Commands"]',
       'button[aria-label="添加文件或调用指令"]',
+      'button[aria-label="Add files or invoke commands"]',
+      'button[aria-label="添加文件或运行命令"]',
       'button[aria-label="Add files or run commands"]',
     ].join(','))
     const textarea = composer?.querySelector('textarea, [role="textbox"][contenteditable]:not([contenteditable="false"])')
@@ -429,7 +435,7 @@ function installConversationSkillsPage() {
   mount()
   const observer = new MutationObserver(scheduleMount)
   observer.observe(document.body, { childList: true, subtree: true })
-  const onPointerDown = (event) => {
+  const onOutsideInteraction = (event) => {
     if (!state.open) return
     if (state.menu.contains(event.target) || state.button.contains(event.target)) return
     closeMenu()
@@ -458,8 +464,8 @@ function installConversationSkillsPage() {
     closeMenu()
   }
   const onResize = () => positionMenu()
-  window.addEventListener('pointerdown', onPointerDown, true)
-  window.addEventListener('click', onPointerDown, true)
+  window.addEventListener('pointerdown', onOutsideInteraction, true)
+  window.addEventListener('click', onOutsideInteraction, true)
   document.addEventListener('keydown', onKeyDown, true)
   document.addEventListener('focusin', onFocusIn, true)
   window.addEventListener('resize', onResize)
@@ -467,8 +473,8 @@ function installConversationSkillsPage() {
   state.refresh = scheduleMount
   state.dispose = () => {
     observer.disconnect()
-    window.removeEventListener('pointerdown', onPointerDown, true)
-    window.removeEventListener('click', onPointerDown, true)
+    window.removeEventListener('pointerdown', onOutsideInteraction, true)
+    window.removeEventListener('click', onOutsideInteraction, true)
     document.removeEventListener('keydown', onKeyDown, true)
     document.removeEventListener('focusin', onFocusIn, true)
     window.removeEventListener('resize', onResize)
@@ -712,6 +718,7 @@ export const CONVERSATION_SKILLS_SCRIPT = `(() => {
 ${buildSkillTrigger.toString()}
 ${normalizeConversationSkills.toString()}
 ${filterConversationSkills.toString()}
+${groupConversationSkills.toString()}
 ${normalizeSkillDiagnostics.toString()}
 ${setNativeInputValue.toString()}
 ${insertSkillTrigger.toString()}

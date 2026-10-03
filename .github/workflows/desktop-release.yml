@@ -3,7 +3,6 @@ name: Desktop Release
 on:
   push:
     tags:
-      - desktop-v*
       - desktop-beta-v*
 
 permissions:

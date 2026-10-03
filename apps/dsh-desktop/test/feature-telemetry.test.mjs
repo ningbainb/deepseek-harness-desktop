@@ -19,10 +19,18 @@ test('feature bridge accepts only fixed fields and telemetry failure cannot brea
   assert.deepEqual(normalizeFeatureEvent({ feature: 'skill', outcome: 'succeeded', detail: 'conversation-insert' }), {
     feature: 'skill', outcome: 'succeeded', detail: 'conversation-insert',
   })
+  assert.deepEqual(normalizeFeatureEvent({ feature: 'bai-connect', outcome: 'started', detail: 'browser' }), {
+    feature: 'bai-connect', outcome: 'started', detail: 'browser',
+  })
+  assert.deepEqual(normalizeFeatureEvent({ feature: 'chatgpt-login', outcome: 'failed', detail: 'device-code' }), {
+    feature: 'chatgpt-login', outcome: 'failed', detail: 'device-code',
+  })
   for (const bad of [{ ...event, filename: 'private.txt' }, { ...event, detail: 'private.txt' }, { ...event, feature: 'constructor' }, { ...event, error: 'secret' }]) assert.throws(() => normalizeFeatureEvent(bad))
   assert.throws(() => normalizeFeatureEvent({ feature: 'agent-team', outcome: 'succeeded', detail: '@private/team' }))
   assert.throws(() => normalizeFeatureEvent({ feature: 'local-lan', outcome: 'failed', detail: '192.168.1.8' }))
   assert.throws(() => normalizeFeatureEvent({ feature: 'skill', outcome: 'failed', detail: 'private-skill-name' }))
+  assert.throws(() => normalizeFeatureEvent({ feature: 'bai-connect', outcome: 'started', detail: 'account@example.com' }))
+  assert.throws(() => normalizeFeatureEvent({ feature: 'chatgpt-login', outcome: 'failed', detail: 'token_exchange_failed: private' }))
   const recorder = new ProductMetricsRecorder({ client: { record() { throw Error('offline') } } })
   assert.equal(recorder.recordFeatureEvent(event), false)
 })

@@ -16,6 +16,8 @@ import { installTranscriptBalanceGuard } from './transcript-balance.ts'
 import { registerDesktopConversationImportRoute } from './conversation-import-route.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
 import { installSessionCheckpointRecovery } from './session-checkpoint-recovery.ts'
+import { installControlToolApproval } from './control-tool-approval.ts'
+import { installAgentWslTool } from './agent-wsl-tool.ts'
 
 export const name = 'desktop-compat'
 // The import route resolves the optional log-backed title service through
@@ -30,6 +32,8 @@ export function apply(ctx: Context): void {
   installToolCallArgumentNormalization(ctx)
   installTranscriptBalanceGuard(ctx)
   installSessionCheckpointRecovery(ctx)
+  installControlToolApproval(ctx)
+  installAgentWslTool(ctx)
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
     'dsh-desktop-compat: workspace native-open authority',
@@ -44,12 +48,13 @@ export function apply(ctx: Context): void {
   // minimize-to-tray/background-automation mode, so ordinary DSH Web and
   // Desktop's default quit behavior retain the browser-side scheduler.
   if (process.env.DSH_DESKTOP_BACKGROUND_AUTOMATION === '1') {
-    ctx.inject(['agents', 'agentDefaultModel', 'sessions', 'sessionPersistence', 'workspaceRegistry'], (schedulerCtx) => {
+    ctx.inject(['agents', 'agentDefaultModel', 'sessions', 'sessionPersistence', 'sessionQuery', 'workspaceRegistry'], (schedulerCtx) => {
       const runner = createDesktopTaskBoardHostScheduleRunner({
         agents: schedulerCtx.agents,
         defaultModel: schedulerCtx.agentDefaultModel,
         sessions: schedulerCtx.sessions,
         sessionPersistence: schedulerCtx.sessionPersistence,
+        sessionQuery: schedulerCtx.sessionQuery,
         workspaceRegistry: schedulerCtx.workspaceRegistry,
       })
       return schedulerCtx.provide('taskBoardHostScheduleRunner', runner)
@@ -70,6 +75,13 @@ export function apply(ctx: Context): void {
     return normalizeCancellationDecision(exec, result, decision)
   })
 }
+
+export {
+  controlToolApprovalDecision,
+  installControlToolApproval,
+} from './control-tool-approval.ts'
+
+export { installAgentWslTool } from './agent-wsl-tool.ts'
 
 export {
   FRIENDLY_CANCELLED_MESSAGE,

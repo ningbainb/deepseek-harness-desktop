@@ -12,6 +12,7 @@ Var DshInstallerDetail
 Var DshInstallerLogAvailable
 Var DshLegacyInstallDetected
 Var DshLegacyInstallDirectory
+Var DshCurrentInstallDirectory
 
 ; Local-only diagnostics. No credentials/sessions are read or uploaded.
 Function WriteInstallerDiagnostic
@@ -57,13 +58,25 @@ Function RetireLegacyInstallerIdentity
 legacy_identity_retire_done:
 FunctionEnd
 
-; Community Desktop 3.x used an appId-derived GUID that could also be selected by
-; the official Desktop release. Adopt that installation only when our private
-; shutdown marker proves ownership, then retire only its registry identities after
-; the new community-owned transaction commits.
+; Reuse a verified 4.x custom install location before trying the legacy 3.x
+; identity. The 3.x appId-derived GUID could also belong to the official
+; release, so adopt it only when our private shutdown marker proves ownership.
 !macro customInit
   StrCpy $DshLegacyInstallDetected "0"
   StrCpy $DshLegacyInstallDirectory ""
+  StrCpy $DshCurrentInstallDirectory ""
+  ; A 4.x upgrade must reuse the user's chosen directory. Only adopt a
+  ; registered location when both our private marker and executable exist.
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  StrCmp $DshCurrentInstallDirectory "" current_identity_done
+  IfFileExists "$DshCurrentInstallDirectory\resources\update-shutdown-v1" 0 current_identity_done
+  IfFileExists "$DshCurrentInstallDirectory\${APP_EXECUTABLE_FILENAME}" 0 current_identity_done
+  StrCpy $INSTDIR $DshCurrentInstallDirectory
+  StrCpy $perUserInstallationFolder $DshCurrentInstallDirectory
+  StrCpy $hasPerUserInstallation "1"
+  StrCpy $hasPerMachineInstallation "0"
+  Goto legacy_identity_done
+current_identity_done:
   ReadRegStr $DshLegacyInstallDirectory HKCU "${DSH_LEGACY_INSTALL_REGISTRY_KEY}" InstallLocation
   StrCmp $DshLegacyInstallDirectory "" legacy_identity_done
   IfFileExists "$DshLegacyInstallDirectory\resources\update-shutdown-v1" 0 legacy_identity_done
