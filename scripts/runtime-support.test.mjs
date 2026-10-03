@@ -40,6 +40,7 @@ test('Known Good manifest derives exact runtime, integrity, capabilities, and pa
     'cancellation-presentation',
     'cold-blank-session-checkpoint',
     'desktop-skin-profile-isolation',
+    'live-session-title-checkpoint',
     'queued-turn-continuation',
     'session-startup-corruption',
     'tool-call-arguments-envelope',

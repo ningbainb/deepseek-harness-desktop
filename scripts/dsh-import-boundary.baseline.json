@@ -82,6 +82,7 @@
     "packages/dsh-desktop-compat/tests/legacy-subagent-recovery.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-session-format-catalog": 1,
     "packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 1,
     "packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
+    "packages/dsh-desktop-compat/tests/session-title-checkpoint.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
     "packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-llm": 2,
     "packages/dsh-desktop-compat/tests/tool-call-normalization.spec.ts\u0000static-import\u0000@deepseek-ai/dsh-tools": 1,
     "packages/dsh-git-graph/src/client/chips/BranchChip.tsx\u0000static-import\u0000@deepseek-ai/dsh-client-ui-primitives": 1,

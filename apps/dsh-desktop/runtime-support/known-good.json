@@ -89,11 +89,12 @@
   },
   "compatPatches": {
     "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-    "sha256": "66ce4782698ad5c9759ea38b22589271e2adf20306bc8b2c90b705f17dca20a9",
+    "sha256": "7fd3b66cce08746f723e3541e6b7e8ee14702afad32aa5376f4f5d49520dcb26",
     "ids": [
       "cancellation-presentation",
       "cold-blank-session-checkpoint",
       "desktop-skin-profile-isolation",
+      "live-session-title-checkpoint",
       "queued-turn-continuation",
       "session-startup-corruption",
       "tool-call-arguments-envelope",
