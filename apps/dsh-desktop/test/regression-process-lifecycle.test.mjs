@@ -24,7 +24,7 @@ test('complete release regression includes the real original plugin configuratio
   assert.doesNotMatch(verifier, /force: true/u)
 })
 
-async function regressionFixture({ collectFailures, acceptedIssues = [], errorWithoutResult = false, successfulOnly = false }) {
+async function regressionFixture({ collectFailures, acceptedIssues = [], errorWithoutResult = false, successfulOnly = false, packaged = false, preparationFails = false }) {
   const source = await readFile(new URL('../scripts/run-regression-e2e.mjs', import.meta.url), 'utf8')
   const start = source.indexOf('async function main() {')
   const end = source.indexOf('main().catch(', start)
@@ -33,7 +33,14 @@ async function regressionFixture({ collectFailures, acceptedIssues = [], errorWi
   const executed = []
   const receipts = []
   const output = []
-  const processFixture = { exit: code => { throw new Error(`exit ${code}`) }, exitCode: 0 }
+  const processFixture = { env: packaged ? { DSH_DESKTOP_E2E_EXECUTABLE: 'fixture-packaged.exe' } : {}, exit: code => { throw new Error(`exit ${code}`) }, exitCode: 0 }
+  const preparations = []
+  const prepareSourceSkins = async () => {
+    assert.deepEqual(executed, [], 'source preparation must finish before any suite launches')
+    preparations.push('source-skins')
+    if (preparationFails) throw new Error('source skin preparation failed')
+    return ['fixture-skin']
+  }
   const runSuite = async suite => {
     executed.push(suite.name)
     const status = !successfulOnly && suite.name.startsWith('failed') ? 'failed' : 'passed'
@@ -41,13 +48,32 @@ async function regressionFixture({ collectFailures, acceptedIssues = [], errorWi
     if (status === 'failed') throw Object.assign(new Error(suite.name), errorWithoutResult ? {} : { suiteResult: result })
     return result
   }
-  const main = new Function('IS_FULL', 'CORE_SUITES', 'PACKAGED_SUITES', 'COLLECT_FAILURES', 'runSuite', 'writeReceipt', 'acceptedIssues', 'process', 'console', 'setTimeout', `${source.slice(start, end)}; return main`)(
+  const main = new Function('IS_FULL', 'CORE_SUITES', 'PACKAGED_SUITES', 'COLLECT_FAILURES', 'runSuite', 'writeReceipt', 'acceptedIssues', 'process', 'console', 'setTimeout', 'prepareSourceSkins', `${source.slice(start, end)}; return main`)(
     true, suites.slice(0, 2), suites.slice(2), collectFailures, runSuite,
     receipt => receipts.push(structuredClone(receipt)), acceptedIssues, processFixture,
-    { log: message => output.push(message), error: message => output.push(message) }, callback => callback(),
+    { log: message => output.push(message), error: message => output.push(message) }, callback => callback(), prepareSourceSkins,
   )
-  return { main, executed, receipts, output, processFixture }
+  return { main, executed, receipts, output, processFixture, preparations }
 }
+
+test('source preparation completes once before regression while packaged assets remain untouched', async () => {
+  const source = await regressionFixture({ collectFailures: true, successfulOnly: true })
+  await source.main()
+  assert.deepEqual(source.preparations, ['source-skins'])
+  assert.equal(source.executed.length, 3)
+  const packaged = await regressionFixture({ collectFailures: true, successfulOnly: true, packaged: true })
+  await packaged.main()
+  assert.deepEqual(packaged.preparations, [])
+  assert.equal(packaged.executed.length, 3)
+})
+
+test('failed source preparation blocks every suite without a passing checkpoint', async () => {
+  const fixture = await regressionFixture({ collectFailures: true, preparationFails: true })
+  await assert.rejects(fixture.main(), /source skin preparation failed/u)
+  assert.deepEqual(fixture.executed, [])
+  assert.deepEqual(fixture.receipts, [])
+  assert.ok(fixture.output.every(message => !message.includes('[ALL PASSED]')))
+})
 
 test('the default regression gate still fails fast without authorizing later suites', async () => {
   const fixture = await regressionFixture({ collectFailures: false })
