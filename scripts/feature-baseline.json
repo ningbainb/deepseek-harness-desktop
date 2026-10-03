@@ -428,6 +428,7 @@
       "id": "settings-window",
       "features": [
         "dom-ready-settings-adaptation",
+        "settings-controller-remounts-every-document-without-navigation-details",
         "rc2-native-settings-title-drag-handle-with-legacy-slot-fallback",
         "reloaded-native-settings-retain-ordinary-pointer-entries",
         "one-controller-per-document",
@@ -859,6 +860,7 @@
         "home-workspace-selector",
         "existing-workspace-selection",
         "anonymous-project-outcome-metrics",
+        "coarse-linux-operating-system-metrics",
         "automated-runs-excluded-from-production-metrics"
       ]
     },

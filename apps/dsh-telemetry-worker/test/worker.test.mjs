@@ -4,6 +4,8 @@ import test from 'node:test'
 
 import worker from '../src/index.mjs'
 import { __test as dashboardTest } from '../src/admin-dashboard.mjs'
+import { ProductTelemetryClient } from '../../dsh-desktop/src/telemetry-client.mjs'
+import { normalizeProductContext } from '../../dsh-desktop/src/telemetry-events.mjs'
 
 const VALID_EVENT = Object.freeze({
   name: 'runtime_start_result',
@@ -239,6 +241,41 @@ test('accepts the macos operating system family and still rejects unknown ones',
     events: [{ ...VALID_EVENT, os: 'macos-27' }],
   }), enabledEnvironment())
   assert.equal(rejected.status, 400)
+})
+
+test('native platform telemetry reaches ingestion without leaking kernel details', async () => {
+  for (const [platform, osRelease, expected] of [['win32', '10.0.22631', 'windows-11'], ['darwin', '24.6.0', 'macos'], ['linux', '6.8.0-private-host', 'linux']]) {
+    const database = new FakeDatabase()
+    const payloads = []
+    const client = new ProductTelemetryClient({
+      endpoint: 'https://telemetry.example/v1/events',
+      context: normalizeProductContext({ version: '5.0.0', platform, osRelease, locale: 'en-US' }),
+      actorProvider: () => ({ installationActor: 'c'.repeat(64), dailyActor: 'a'.repeat(64), monthlyActor: 'b'.repeat(64) }),
+      fetchImpl: async (_url, init) => {
+        const payload = JSON.parse(init.body)
+        payloads.push(payload)
+        return worker.fetch(requestFor(payload), enabledEnvironment(database))
+      },
+    })
+    try {
+      assert.equal(client.record('app_launch', { outcome: 'started', detail: 'normal', bucket: 'none' }), true)
+      assert.equal(await client.flush(), true)
+      assert.equal(client.record('cost_mode_enter', { params: { config_status: 'configured', source: 'settings' } }), true)
+      assert.equal(await client.flush(), true)
+      assert.deepEqual(payloads.map(payload => payload.schema), [4, 5])
+      assert.ok(payloads.every(payload => payload.events[0].os === expected))
+      assert.ok(database.points.every(point => point.blobs.includes(expected)))
+      assert.equal(database.points.length, 2)
+      assert.equal(JSON.stringify(payloads).includes(osRelease), false)
+      assert.equal(JSON.stringify(database.points).includes(osRelease), false)
+    } finally {
+      await client.shutdown()
+    }
+  }
+  for (const os of ['linux-private-host', 'ubuntu-22.04', 'linux-6.8.0']) {
+    const rejected = await worker.fetch(requestFor({ schema: 4, events: [{ ...VALID_SCHEMA_3_LAUNCH, os }] }), enabledEnvironment())
+    assert.equal(rejected.status, 400)
+  }
 })
 
 test('accepts Value Mode lifecycle and route events without model identity', async () => {

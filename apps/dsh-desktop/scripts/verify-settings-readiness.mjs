@@ -54,6 +54,17 @@ try {
     nativeReady: true,
     playwrightReadyOverrideInstalled: false,
   })
+  await app.evaluate(async () => {
+    let timer
+    try {
+      await Promise.race([
+        globalThis.settingsReadinessFixture.pendingReady(),
+        new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('slow-resource request did not start')), 5000) }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  })
   assert.equal(await page.evaluate(() => document.readyState), 'interactive')
   await page.locator('#open').click()
   await page.locator('[role="dialog"]').waitFor()

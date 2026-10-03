@@ -107,6 +107,38 @@ test('DOM readiness uses the main frame and load completion does not reinstall a
   dispose()
 })
 
+test('each DOM-ready document mounts its controller even without a navigation notification', async () => {
+  const { calls, webContents } = fixture()
+  const dispose = installSettingsWindow({ browserWindow: { webContents } })
+  for (let document = 0; document < 4; document += 1) {
+    webContents.emit('dom-ready')
+    await settled()
+    webContents.emit('did-finish-load')
+    await settled()
+    assert.equal(calls.filter(call => call === 'frame').length, document + 1)
+  }
+  dispose()
+})
+
+test('new DOM readiness cancels old CSS completion without relying on navigation details', async () => {
+  const { calls, webContents } = fixture()
+  const completions = []
+  webContents.insertCSS = () => new Promise(resolve => { completions.push(resolve) })
+  const dispose = installSettingsWindow({ browserWindow: { webContents } })
+  webContents.emit('dom-ready')
+  webContents.emit('dom-ready')
+  completions[0]()
+  await settled()
+  assert.deepEqual(calls, [])
+  completions[1]()
+  await settled()
+  assert.deepEqual(calls, ['frame'])
+  webContents.emit('did-finish-load')
+  await settled()
+  assert.deepEqual(calls, ['frame'])
+  dispose()
+})
+
 test('navigation cancels stale CSS completion before it can mount into the next document', async () => {
   const { calls, webContents } = fixture()
   let completeCss

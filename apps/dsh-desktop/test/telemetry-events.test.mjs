@@ -66,13 +66,20 @@ test('classifies macOS as its own coarse operating system family', () => {
     osRelease: undefined,
     locale: 'en-US',
   }).os, 'macos')
-  // 其余非 Windows 平台的既有归类保持不变（当前没有对应发布目标）
   assert.equal(normalizeProductContext({
     version: '3.0.1',
-    platform: 'linux',
+    platform: 'freebsd',
     osRelease: '6.8.0',
     locale: 'en-US',
   }).os, 'windows-other')
+})
+
+test('classifies Linux without exposing its kernel release or distribution', () => {
+  for (const osRelease of ['6.8.0', '6.11.0-private-host', undefined]) {
+    assert.deepEqual(normalizeProductContext({ version: '5.0.0', platform: 'linux', osRelease, locale: 'en-US' }), {
+      appVersion: '5.0.0', channel: 'stable', os: 'linux', language: 'en',
+    })
+  }
 })
 
 test('creates exact fixed-shape events and rejects content-like fields', () => {

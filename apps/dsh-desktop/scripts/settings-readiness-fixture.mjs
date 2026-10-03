@@ -24,9 +24,13 @@ async function run() {
   const { installSettingsWindow } = await import('../src/settings-window.mjs')
   reportStage('settings-imported')
   let pendingImage
+  let resourceRequested
+  const pendingReady = new Promise(resolve => { resourceRequested = resolve })
   const server = createServer((request, response) => {
     if (request.url === '/pending-image') {
       pendingImage = response
+      reportStage('pending-resource-requested')
+      resourceRequested()
       return
     }
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
@@ -76,6 +80,7 @@ async function run() {
       playwrightReadyOverrideInstalled: Object.hasOwn(globalThis, '__playwright_run'),
     }),
     pending: () => Boolean(pendingImage),
+    pendingReady: () => pendingReady,
     release: () => {
       pendingImage?.writeHead(200, { 'content-type': 'image/gif' })
       pendingImage?.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64'))

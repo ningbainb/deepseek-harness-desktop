@@ -22,7 +22,7 @@ export function validCostParams(name, p) {
 export function validCostEvent(e) {
   return exactKeys(e, ['name', 'appVersion', 'channel', 'os', 'language', 'dailyActor', 'monthlyActor', 'installationActor', 'params', 'timestamp', 'eventId'])
     && typeof e.appVersion === 'string' && VERSION.test(e.appVersion)
-    && ['stable', 'prerelease'].includes(e.channel) && ['windows-10', 'windows-11', 'windows-other', 'macos'].includes(e.os)
+    && ['stable', 'prerelease'].includes(e.channel) && ['windows-10', 'windows-11', 'windows-other', 'macos', 'linux'].includes(e.os)
     && ['zh', 'en', 'other'].includes(e.language) && [e.dailyActor, e.monthlyActor, e.installationActor].every(a => typeof a === 'string' && ACTOR.test(a))
     && typeof e.timestamp === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(e.timestamp) && Number.isFinite(Date.parse(e.timestamp))
     && typeof e.eventId === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(e.eventId) && validCostParams(e.name, e.params)

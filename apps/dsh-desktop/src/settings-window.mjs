@@ -350,15 +350,19 @@ export function installSettingsWindow({ browserWindow, onError = () => {} }) {
         if (retry && !current.applied) apply()
       })
   }
+  const documentReady = () => {
+    state = createState()
+    apply()
+  }
   // Settings can already be used while images or other resources are pending.
   // Keep the load event as a fallback, not a second controller installation.
   webContents.on('did-start-navigation', navigation)
-  webContents.on('dom-ready', apply)
+  webContents.on('dom-ready', documentReady)
   webContents.on('did-finish-load', apply)
   return () => {
     disposed = true
     webContents.removeListener('did-start-navigation', navigation)
-    webContents.removeListener('dom-ready', apply)
+    webContents.removeListener('dom-ready', documentReady)
     webContents.removeListener('did-finish-load', apply)
   }
 }
