@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -427,6 +427,26 @@ try {
   }, null, 2))
 } catch (error) {
   failure = error
+  const evidenceDirectory = resolve(process.env.DSH_DESKTOP_SKIN_SCREENSHOTS ?? join(appDir, '../../.tmp/release-qa/skin-center'))
+  try {
+    await mkdir(evidenceDirectory, { recursive: true })
+    const page = activeApp?.windows().find(candidate => /^dsh-runtime:\/\/app\//u.test(candidate.url()))
+    if (page) {
+      const state = await page.evaluate(() => ({
+        viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio },
+        activeSkin: document.documentElement.getAttribute('data-dsh-skin'),
+        buttons: [...document.querySelectorAll('button')].slice(0, 100).map(button => ({
+          label: button.getAttribute('aria-label')?.slice(0, 120), text: button.textContent?.trim().slice(0, 120),
+          visible: button.getClientRects().length > 0,
+        })),
+      }))
+      await writeFile(join(evidenceDirectory, 'failure-state.json'), JSON.stringify(state, null, 2))
+      await page.screenshot({ path: join(evidenceDirectory, 'failure.png') })
+    }
+    console.error(`Skin Center failure evidence: ${evidenceDirectory}`)
+  } catch (diagnosticError) {
+    console.error(`Skin Center diagnostic capture failed: ${diagnosticError.message}`)
+  }
   throw error
 } finally {
   const cleanupFailures = []
