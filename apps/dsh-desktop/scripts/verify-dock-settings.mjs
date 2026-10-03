@@ -10,6 +10,7 @@ import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
 const packaged = process.argv.includes('--packaged') || Boolean(process.env.DSH_DESKTOP_E2E_EXECUTABLE)
 const executablePath = packaged
   ? resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE ?? resolve(appDir, 'dist/win-unpacked/DeepSeek Harness Desktop.exe'))
@@ -51,7 +52,7 @@ try {
     })
   })
   const main = await app.firstWindow()
-  await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
+  await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
   let dock
   for (let attempt = 0; attempt < 120; attempt++) {
     dock = app.windows().find(page => page.url().includes('/extensions.html'))
@@ -148,10 +149,12 @@ try {
       await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'off')
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'off')
       assert.equal(await agentShellPermission.inputValue(), 'off', 'Agent WSL can be disabled by the user')
+      assert.deepEqual(JSON.parse(await readFile(resolve(temporary, 'dsh-home/desktop-agent-shell.json'), 'utf8')), { version: 1, mode: 'off' }, 'disabled Agent WSL permission is persisted on disk')
       await agentShellPermission.selectOption('ask')
       await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'ask')
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'ask')
       assert.equal(await agentShellPermission.inputValue(), 'ask', 'Agent WSL permission can return to approval mode')
+      assert.deepEqual(JSON.parse(await readFile(resolve(temporary, 'dsh-home/desktop-agent-shell.json'), 'utf8')), { version: 1, mode: 'ask' }, 'restored Agent WSL approval is persisted on disk')
       const browserCard = settings.locator('[data-control-kind="browser"]')
       const browserSwitch = browserCard.getByRole('switch', { name: 'Browser Use', exact: true })
       await browserSwitch.waitFor({ state: 'visible' })

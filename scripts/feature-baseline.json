@@ -796,6 +796,7 @@
         "computer-use-safe-mode-after-repeated-native-failure",
         "control-provider-errors-are-sanitized",
         "control-toggle-bounded-terminal-state",
+        "agent-shell-policy-official-atomic-write-with-windows-retry-and-restart-persistence",
         "feature-switch-preflight-keeps-runtime-alive-when-profile-needs-repair",
         "layout-toggle-cluster-aligned"
       ],

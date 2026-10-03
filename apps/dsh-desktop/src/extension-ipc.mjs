@@ -1097,8 +1097,9 @@ export function registerExtensionIpc({
     }
     try {
       return await agentShellPermission.setMode(mode)
-    } catch {
-      throw new Error('Agent 终端权限保存失败，请检查本机配置目录的写入权限后重试。')
+    } catch (error) {
+      const code = ['EACCES', 'EPERM', 'EBUSY', 'ENOSPC', 'ENOENT', 'ENOTDIR', 'EISDIR'].includes(error?.code) ? error.code : 'UNKNOWN'
+      throw new Error(`Agent 终端权限保存失败（${code}），请检查本机配置目录的写入权限后重试。`)
     }
   })
   const setControlFeature = (event, kind, enabled, provider) => {

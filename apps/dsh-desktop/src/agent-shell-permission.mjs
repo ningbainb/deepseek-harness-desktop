@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
 
 export const AGENT_SHELL_PERMISSION_FILE = 'desktop-agent-shell.json'
 export const AGENT_SHELL_PERMISSION_MODES = Object.freeze(['off', 'ask', 'allow'])
@@ -42,13 +42,14 @@ export class AgentShellPermissionStore {
   async setMode(mode) {
     if (!AGENT_SHELL_PERMISSION_MODES.includes(mode)) throw new TypeError('unknown Agent shell permission mode')
     const operation = this.#writeQueue.then(async () => {
-      const temporary = join(dirname(this.#path), `.desktop-agent-shell-${randomUUID()}.tmp`)
-      try {
-        await writeFile(temporary, `${JSON.stringify({ version: 1, mode })}\n`, { encoding: 'utf8', flag: 'wx' })
-        await rename(temporary, this.#path)
-      } catch (error) {
-        await rm(temporary, { force: true }).catch(() => {})
-        throw error
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await writeFileAtomic(this.#path, `${JSON.stringify({ version: 1, mode })}\n`, { mode: 0o600, dirMode: 0o700 })
+          break
+        } catch (error) {
+          if (process.platform !== 'win32' || !['EACCES', 'EBUSY', 'EPERM'].includes(error?.code) || attempt >= 4) throw error
+          await new Promise(resolve => setTimeout(resolve, 50 + Math.floor(Math.random() * 150)))
+        }
       }
       return this.status()
     })

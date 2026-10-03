@@ -34,6 +34,17 @@ test('Dock-only Agent WSL permission requires explicit confirmation before alway
     assert.deepEqual(await set(undefined, 'allow'), { mode: 'allow', valid: true })
     assert.deepEqual(await set(undefined, 'off'), { mode: 'off', valid: true })
     await assert.rejects(set(undefined, 'unexpected'), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    const permissionPath = join(dshHome, 'desktop-agent-shell.json')
+    await rm(permissionPath)
+    await mkdir(permissionPath)
+    await assert.rejects(set(undefined, 'ask'), error => {
+      assert.match(error.message, /Agent 终端权限保存失败（(?:EACCES|EPERM|EBUSY|EISDIR|UNKNOWN)）/u)
+      assert.equal(error.message.includes(dshHome), false)
+      return true
+    })
+    assert.deepEqual(await get(), { mode: 'off', valid: false })
+    await rm(permissionPath, { recursive: true })
+    assert.deepEqual(await set(undefined, 'off'), { mode: 'off', valid: true })
   } finally {
     unregister()
     await rm(dshHome, { recursive: true, force: true })

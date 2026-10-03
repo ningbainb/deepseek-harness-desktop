@@ -22,6 +22,8 @@
 
 ### 验证
 
+Agent WSL 权限使用官方 SDK 原子写入，保留用户选择与重启恢复，并对 Windows 临时文件占用进行有界重试。保存失败继续明确报错，诊断只显示安全错误码，不包含本机路径。
+
 退出时先等待插件事务并安全停止 Runtime，再销毁窗口；停止失败时保留窗口与传输入口，不让仍在恢复的应用变成无界面的后台进程。
 
 余额与配额查询通过桌面 Host 侧兼容配置读取，使用当前 Profile 的实时设置并保留原有凭据引用；服务商密钥不发送给界面，也不扫描其他用户数据目录。
@@ -63,6 +65,8 @@ Skin Center now owns and releases the exact stylesheet nodes created by each act
 The native right preview accounts for the new bounded column tracks and reserves at least 360 pixels for conversation. Smaller windows temporarily cap sidebar width and larger windows restore the original width without rewriting user preferences. Collapsing the native sidebar releases its space while the explicit Edit / Compatibility Preview remains available, avoiding squeezed input or a lost editing entry.
 
 ### Verification
+
+Agent WSL permissions use official SDK atomic writes, preserving user choices across restart with bounded retries for transient Windows file interference. Failed saves remain explicit; diagnostics expose safe error codes without local paths.
 
 Quit drains plugin transactions and safely stops the Runtime before destroying windows. A failed stop retains windows and transport access instead of leaving a recovering application headless.
 
