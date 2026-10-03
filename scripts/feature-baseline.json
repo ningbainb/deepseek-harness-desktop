@@ -1005,6 +1005,7 @@
       "uiSelector": "[data-dsh-dock-settings]",
       "features": [
         "native-skin-center-preserves-fifteen-offline-skins",
+        "source-regression-prepares-hash-verified-offline-skins-before-runtime-start",
         "models-use-official-provider-card-slots",
         "usage-and-session-sections-in-unprivileged-dock",
         "dock-native-pages-use-owned-alias-slots-without-redeclaring-official-slots",

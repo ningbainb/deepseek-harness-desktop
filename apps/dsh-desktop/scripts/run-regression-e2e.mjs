@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { acceptedReleaseIssue } from './release-known-issues.mjs'
+import { prepareSourceSkins } from './prepare-source-skins.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const IS_FULL = process.argv.includes('--full')
@@ -436,6 +437,10 @@ function writeReceipt({ startedAt, finishedAt, status, suites, failure, terminal
 }
 
 async function main() {
+  if (!process.env.DSH_DESKTOP_E2E_EXECUTABLE) {
+    const restored = await prepareSourceSkins()
+    console.log(`Verified source Skin Center assets: restored ${restored.length} offline skins`)
+  }
   const suitesToRun = IS_FULL
     ? [...CORE_SUITES, ...PACKAGED_SUITES]
     : CORE_SUITES
