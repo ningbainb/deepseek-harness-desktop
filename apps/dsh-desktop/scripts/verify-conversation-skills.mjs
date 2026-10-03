@@ -70,6 +70,14 @@ try {
   })
   electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
   electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
+  const fixtureLocale = process.env.DSH_DESKTOP_E2E_SKILLS_LOCALE
+  if (fixtureLocale) {
+    assert.ok(['zh-CN', 'en-US'].includes(fixtureLocale))
+    await electronApp.context().addInitScript(locale => {
+      Object.defineProperty(navigator, 'language', { configurable: true, get: () => locale })
+      Object.defineProperty(navigator, 'languages', { configurable: true, get: () => [locale] })
+    }, fixtureLocale)
+  }
   page = await electronApp.firstWindow()
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
@@ -181,7 +189,7 @@ try {
       globalThis.__skillNavigationEvents.push({ type, target: event.target?.outerHTML?.slice(0, 350), x: event.clientX, y: event.clientY })
     }, true)
   })
-  await page.getByRole('button', { name: /^(?:新建会话|New session)$/u }).filter({ hasText: /新会话|New session/u }).click()
+  await page.getByRole('button', { name: /^(?:新建会话|New session)$/u }).filter({ hasText: /新会话|New Session/u }).click()
   await menu.waitFor({ state: 'hidden' })
   assert.equal(await skillsButton.getAttribute('aria-expanded'), 'false')
   assert.ok(await page.evaluate(() => globalThis.__skillNavigationEvents.some(event => event.type === 'click' && !event.target?.includes('dsh-desktop-skills'))), 'ordinary native navigation must receive its pointer click')

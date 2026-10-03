@@ -54,7 +54,7 @@ jobs:
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - run: pnpm feature-baseline:check
-      - run: pnpm desktop:regression:e2e
+      - run: pnpm desktop:regression:e2e --collect-failures
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -90,7 +90,7 @@ jobs:
           pnpm --filter @linxin666/dsh-desktop test:window-chrome:e2e
           pnpm --filter @linxin666/dsh-desktop test:profile-reset:e2e
           pnpm --filter @linxin666/dsh-desktop test:update-shutdown:e2e
-          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke
       - run: pnpm --filter @linxin666/dsh-desktop release:signatures:verify
