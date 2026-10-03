@@ -1266,8 +1266,10 @@ test('runtime resolver finds every bundled and desktop support package', async (
   const rollbackAggregate = JSON.parse(readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'package.json'), 'utf8'))
   const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-all'), 'cordis.patch.yml'), 'utf8')
   assert.equal(aggregate.version, '0.4.4')
-  assert.equal(liangshen.version, '0.1.15', 'the active Liangshen row uses the Desktop rc.2 preset adaptation')
-  assert.match(resolved.get('@linxin666/dsh-liangshen'), /packages[\\/]dsh-liangshen$/u)
+  assert.equal(liangshen.version, '0.4.4', 'the active Liangshen row uses the published rc.2 preset registry contract')
+  assert.match(resolved.get('@linxin666/dsh-liangshen'), /node_modules[\\/]@linxin666[\\/]dsh-liangshen$/u)
+  assert.equal(liangshen.dsh.engines.dsh, '>=0.2.0-rc.1')
+  assert.equal(liangshen.dsh.bundle.patch, './cordis.patch.yml')
   assert.equal(rollbackAggregate.version, '0.1.15', 'the retained Desktop compatibility client must use the workspace build')
   assert.match(resolved.get('@linxin666/dsh-web-ui-all'), /packages[\\/]dsh-web-ui-all$/u)
   assert.match(

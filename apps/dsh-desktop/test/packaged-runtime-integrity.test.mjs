@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -23,7 +23,7 @@ async function createIntegrityFixture(root, layout) {
 
 for (const layout of ['nested', 'hoisted']) {
   test(`packaged integrity verifies the actual telemetry-owned ${layout} dependency and rejects its missing machine identifier`, async () => {
-    const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-integrity-'))
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-integrity-')))
     try {
       const fixture = await createIntegrityFixture(root, layout)
       assert.deepEqual(await verifyPackagedRuntimeCriticalFiles(fixture.modulesRoot), [fixture.machineIdFile])
@@ -51,6 +51,25 @@ test('packaged integrity rejects a missing telemetry dependency rather than acce
     const fixture = await createIntegrityFixture(root, 'nested')
     await rm(join(fixture.resourcesRoot, 'package.json'))
     await assert.rejects(verifyPackagedRuntimeCriticalFiles(fixture.modulesRoot), { code: 'MODULE_NOT_FOUND' })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('packaged integrity canonicalizes an aliased payload root without accepting escaped dependencies', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-packaged-integrity-alias-')))
+  try {
+    const fixture = await createIntegrityFixture(root, 'nested')
+    const alias = join(root, 'payload-alias')
+    await symlink(join(root, 'app.asar.unpacked'), alias, process.platform === 'win32' ? 'junction' : 'dir')
+    assert.deepEqual(await verifyPackagedRuntimeCriticalFiles(join(alias, 'node_modules')), [fixture.machineIdFile])
+    const externalResources = join(root, 'external-resources')
+    await mkdir(externalResources, { recursive: true })
+    await rm(fixture.resourcesRoot, { recursive: true })
+    await symlink(externalResources, fixture.resourcesRoot, process.platform === 'win32' ? 'junction' : 'dir')
+    const escaped = await createIntegrityFixture(root, 'nested')
+    await assert.rejects(verifyPackagedRuntimeCriticalFiles(join(alias, 'node_modules')), /resolves outside the payload/u)
+    assert.equal(await realpath(escaped.resourcesRoot), externalResources)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

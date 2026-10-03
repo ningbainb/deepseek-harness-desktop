@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { copyFile, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -377,7 +377,10 @@ test('Windows packaged controller preserves the private graceful shutdown channe
       const appRoot = join(root, layout)
       const sourceRoot = join(appRoot, 'src')
       await mkdir(sourceRoot, { recursive: true })
-      await symlink(fileURLToPath(new URL('../node_modules', import.meta.url)), join(appRoot, 'node_modules'), 'junction')
+      const scopeRoot = join(appRoot, 'node_modules', '@linxin666')
+      await mkdir(scopeRoot, { recursive: true })
+      const compatRoot = dirname(desktopRequire.resolve('@linxin666/dsh-desktop-compat/package.json'))
+      await symlink(compatRoot, join(scopeRoot, 'dsh-desktop-compat'), 'junction')
       for (const name of ['runtime-controller.mjs', 'best-effort-events.mjs', 'runtime-shutdown-control.mjs', 'startup-phase.mjs', 'runtime-pipe.mjs', 'runtime-pipe-framing.mjs']) {
         await copyFile(new URL(`../src/${name}`, import.meta.url), join(sourceRoot, name))
       }

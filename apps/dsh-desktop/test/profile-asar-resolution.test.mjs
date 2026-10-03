@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { resolvePackageRoot } from '../src/profile.mjs'
 
 test('Packaged resolution starts at the physical SDK tree rather than a virtual ASAR identity', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-profile-asar-resolution-'))
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'dsh-profile-asar-resolution-')))
   try {
     const root = join(home, 'resources', 'app.asar.unpacked', 'node_modules', 'desktop-test-package')
     await mkdir(root, { recursive: true })
