@@ -172,7 +172,7 @@ import {
 } from './tray-lifecycle.mjs'
 import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from './user-plugin-archive.mjs'
 import { applyWindowChrome, decorateDesktopRuntimeUrl, getWindowChromeTheme, installWindowChrome, setWindowChromeTheme } from './window-chrome.mjs'
-import { syncPersistedSkinToMain } from './desktop-skin-sync.mjs'
+import { preparePersistedSkinRequest, syncPersistedSkinToMain } from './desktop-skin-sync.mjs'
 import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { installConversationPolish } from './conversation-polish.mjs'
 import { installConversationSkills } from './conversation-skills.mjs'
@@ -1669,33 +1669,33 @@ export async function startElectronApp(metadata) {
     protocol: mainWindow.webContents.session.protocol,
     getProvider: () => runtimeProvider,
     afterFetch: (request, response) => syncPersistedSkinToMain({ request, response, mainWindow }),
-    beforeFetch: process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE
-      ? async (request) => {
-          const pathname = desktopLocalPath(new URL(request.url).pathname)
-          let action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
-          while (pathname === '/api/session/modelCatalog' && action === 'stall') {
-            await new Promise(resolve => setTimeout(resolve, 50))
-            action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
-          }
-          while (pathname === '/api/pet/state' && action === 'stall-pet') {
-            await new Promise(resolve => setTimeout(resolve, 50))
-            action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
-          }
-          if (pathname === '/api/session/create' && action === 'reject-session-create') {
-            const payload = await request.clone().json()
-            return Response.json({
-              type: 'server-response',
-              rpcId: payload.rpcId,
-              method: payload.method,
-              result: { ok: false, error: { code: 'gateway/internal', message: 'mode-switch-create-failure-fixture', details: {} } },
-            })
-          }
-          if (pathname === '/api/session/uploadFileBinary' && action === 'reject-next-upload') {
-            await writeFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'open')
-            return new Response('isolated upload retry fixture', { status: 503 })
-          }
-        }
-      : undefined,
+    beforeFetch: async (request) => {
+      await preparePersistedSkinRequest(request)
+      if (!process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE) return
+      const pathname = desktopLocalPath(new URL(request.url).pathname)
+      let action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
+      while (pathname === '/api/session/modelCatalog' && action === 'stall') {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
+      }
+      while (pathname === '/api/pet/state' && action === 'stall-pet') {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        action = (await readFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'utf8').catch(() => 'open')).trim()
+      }
+      if (pathname === '/api/session/create' && action === 'reject-session-create') {
+        const payload = await request.clone().json()
+        return Response.json({
+          type: 'server-response',
+          rpcId: payload.rpcId,
+          method: payload.method,
+          result: { ok: false, error: { code: 'gateway/internal', message: 'mode-switch-create-failure-fixture', details: {} } },
+        })
+      }
+      if (pathname === '/api/session/uploadFileBinary' && action === 'reject-next-upload') {
+        await writeFile(process.env.DSH_DESKTOP_E2E_RUNTIME_FETCH_GATE, 'open')
+        return new Response('isolated upload retry fixture', { status: 503 })
+      }
+    },
   })
   const unregisterRuntimeStreamIpc = registerDesktopRuntimeStreamIpc({
     ipcMain,

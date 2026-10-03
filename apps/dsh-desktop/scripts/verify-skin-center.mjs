@@ -11,6 +11,7 @@ import { _electron as electron } from 'playwright'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
+import { visualViewportExtentForDomRect } from './viewport-coordinate-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -23,7 +24,8 @@ if (packagedExecutable !== undefined && !existsSync(packagedExecutable)) {
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-skin-center-e2e-'))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
-const runtimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
+const defaultRuntimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
+const runtimeReadyTimeoutMs = Math.max(defaultRuntimeReadyTimeoutMs, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || defaultRuntimeReadyTimeoutMs)
 const relaunchScaleFactors = [1, 1.25, 1.5, 1.25, 1]
 let activeApp
 let failure
@@ -240,8 +242,8 @@ function assertBlueFantasy(state) {
   assert.equal(Math.round(state.layoutViewport.height), state.viewport.height)
   assert.equal(state.backgroundMedia.left, 0)
   assert.equal(state.backgroundMedia.top, 0)
-  assert.equal(state.backgroundMedia.width, state.layoutViewport.width)
-  assert.equal(state.backgroundMedia.height, state.layoutViewport.height)
+  assert.equal(state.backgroundMedia.width, visualViewportExtentForDomRect(state.layoutViewport.width, state.devicePixelRatio))
+  assert.equal(state.backgroundMedia.height, visualViewportExtentForDomRect(state.layoutViewport.height, state.devicePixelRatio))
   assert.equal(state.backgroundMedia.visibility, 'visible')
   assert.equal(state.backgroundMedia.opacity, '1')
   assert.equal(state.backgroundMedia.objectFit, 'cover')
@@ -389,7 +391,12 @@ try {
     await waitForBlueFantasyMedia(current.page)
     const center = await openSkinCenter(current.page)
     const visual = await visualState(current.page, center.dialog)
-    assertBlueFantasy(visual)
+    try {
+      assertBlueFantasy(visual)
+    } catch (error) {
+      console.error('skin relaunch visual diagnostic', JSON.stringify({ requestedScale, visual, expectedWindowState }))
+      throw error
+    }
     assertGeometry(visual)
     assert.ok(Math.abs(visual.devicePixelRatio - requestedScale) <= 0.05, JSON.stringify({ requestedScale, actual: visual.devicePixelRatio }))
     if (viewportByScale.has(requestedScale)) {

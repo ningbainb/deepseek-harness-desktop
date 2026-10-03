@@ -42,6 +42,8 @@ jobs:
       REQUIRE_SIGNING: 'false'
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       DSH_DESKTOP_UPDATE_CHANNEL: stable
+      DSH_DESKTOP_SETTINGS_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/native-settings
+      DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
@@ -104,6 +106,21 @@ jobs:
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
             apps/dsh-desktop/dist/latest.yml
+            apps/dsh-desktop/dist/SHA256SUMS.txt
+            apps/dsh-desktop/dist/release-manifest.json
+
+      - name: Preserve failed Windows candidate diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-debug-${{ needs.metadata.outputs.version }}-windows-x64
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .tmp/release-qa/**
+            .tmp/interaction-qa/**
+            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
             apps/dsh-desktop/dist/SHA256SUMS.txt
             apps/dsh-desktop/dist/release-manifest.json
 

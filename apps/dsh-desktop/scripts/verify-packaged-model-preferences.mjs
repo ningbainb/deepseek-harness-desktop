@@ -12,6 +12,7 @@ import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
+const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
 const sourceMode = process.env.DSH_DESKTOP_E2E_SOURCE === '1'
 const appPath = sourceMode
   ? electronPath
@@ -81,8 +82,8 @@ async function launch() {
     if (/style-src 'self'/u.test(message.text())) return
     errors.push(`console:${message.text()}`)
   })
-  await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
-  await page.waitForSelector('#dsh-desktop-window-chrome', { timeout: 120_000 })
+  await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
+  await page.waitForSelector('#dsh-desktop-window-chrome', { timeout: startupTimeout })
   await dismissStartup(page)
   return { instance, page, errors }
 }
@@ -117,7 +118,7 @@ async function openSettings(page) {
     throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
   }
   const relay = settings.locator('[data-relay-onboarding-card="true"]')
-  await relay.getByRole('heading', { name: '推荐：登录 bai，自动同步可用模型', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  await relay.getByRole('heading', { name: '推荐：使用 bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   const [relayBounds, baiBounds] = await Promise.all([relay.boundingBox(), baiProvider.boundingBox()])
   assert.ok(relayBounds && baiBounds && relayBounds.y < baiBounds.y, 'bai onboarding is visible before the provider list')
   if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {

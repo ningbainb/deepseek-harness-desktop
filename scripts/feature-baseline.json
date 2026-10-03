@@ -429,6 +429,7 @@
       "features": [
         "dom-ready-settings-adaptation",
         "rc2-native-settings-title-drag-handle-with-legacy-slot-fallback",
+        "reloaded-native-settings-retain-ordinary-pointer-entries",
         "one-controller-per-document",
         "navigation-and-disposal-cancel-stale-mounts"
       ],
@@ -1012,7 +1013,10 @@
         "theme-only-update-clears-stale-palette-without-losing-drafts",
         "describe-image-direct-form-and-legacy-disable-state",
         "private-remote-channel-mirror",
-        "persisted-skin-selection-sync-without-preview-leak"
+        "persisted-skin-selection-sync-without-preview-leak",
+        "background-only-skin-saves-preserve-live-preview",
+        "explicit-skin-sync-captures-bounded-body-before-runtime-consumption",
+        "same-id-skin-apply-commits-preview"
       ],
       "e2eScript": "scripts/verify-native-plugin-pages.mjs"
     },

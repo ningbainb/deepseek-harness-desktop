@@ -16,7 +16,7 @@
 
 旧会话可选手动转为上下文摘要；这是备用续聊方式，不是无损历史恢复的前提。操作前保留原文件、检查敏感内容，由用户决定是否发送给模型；应用不自动上传历史或调用收费模型。
 
-皮肤中心按每次激活实际创建的样式节点管理释放，避免反复试穿、退出试穿或恢复默认后残留旧皮肤样式；加载失败与超时的未提交样式也会清理，保留原有跨窗口同步、用户选择持久化及关闭后的写入保护。
+皮肤中心按每次激活实际创建的样式节点管理释放，避免反复试穿、退出试穿或恢复默认后残留旧皮肤样式；加载失败与超时的未提交样式也会清理。背景透明度与模糊保存不覆盖正在试穿的皮肤，跨窗口仅同步成功确认的显式应用或恢复默认，保留用户选择持久化及关闭后的写入保护。
 
 原生右侧预览按新版有界列宽计算可用空间，保留至少 360 像素的对话区域；窗口缩小时临时限制侧栏宽度，放大后恢复原宽度，不改写用户偏好。收起原生侧栏释放占用空间，显式“编辑 / 兼容预览”继续可用，避免同时挤压输入框或丢失编辑入口。
 
@@ -60,7 +60,7 @@ Startup now preserves SDK-saved model and personal-preference settings inside ma
 
 Optional manual context summaries remain a fallback, not a prerequisite for lossless history recovery. Keep original files, review sensitive content, and choose whether to send it to a model; the application does not automatically upload history or request paid inference.
 
-Skin Center now owns and releases the exact stylesheet nodes created by each activation, preventing stale styles after repeated previews, preview exit or stock restoration. Failed and timed-out loads release uncommitted nodes while retaining cross-window synchronization, persisted user selection and shutdown write protection.
+Skin Center owns and releases the exact stylesheet nodes created by each activation, preventing stale styles after repeated previews, preview exit or stock restoration. Failed and timed-out loads release uncommitted nodes. Saving background opacity or blur preserves the live skin preview; cross-window synchronization mirrors only successfully confirmed explicit Apply or Restore actions, retaining persisted user selection and shutdown write protection.
 
 The native right preview accounts for the new bounded column tracks and reserves at least 360 pixels for conversation. Smaller windows temporarily cap sidebar width and larger windows restore the original width without rewriting user preferences. Collapsing the native sidebar releases its space while the explicit Edit / Compatibility Preview remains available, avoiding squeezed input or a lost editing entry.
 

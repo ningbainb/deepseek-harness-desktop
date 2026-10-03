@@ -5440,7 +5440,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs",
-      "line": 40,
+      "line": 42,
       "operation": "DSH_HOME"
     },
     {
@@ -5470,7 +5470,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs",
-      "line": 68,
+      "line": 69,
       "operation": "DSH_HOME"
     },
     {
@@ -5770,7 +5770,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-skin-center.mjs",
-      "line": 63,
+      "line": 65,
       "operation": "DSH_HOME"
     },
     {

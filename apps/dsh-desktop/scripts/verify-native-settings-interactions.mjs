@@ -10,6 +10,7 @@ import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
+const startupTimeout = Math.max(120000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120000)
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-native-settings-interactions-'))
 const home = join(temporary, 'dsh-home')
 const userData = join(temporary, 'user-data')
@@ -21,6 +22,7 @@ await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schem
 await writeFile(join(home, 'cordis.patch.yml'), '- id: ui-settings-account\n  config:\n    step: done\n    completion: skipped\n')
 let app
 let page
+const rendererErrors = []
 
 async function waitForSavedLinkOpening(expected) {
   const deadline = Date.now() + 15000
@@ -41,16 +43,41 @@ try {
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0' } })
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
-  await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120000 })
+  page.on('pageerror', error => rendererErrors.push(error.message))
+  await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
   await page.reload()
   await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: 60000 })
   const openSettings = async () => {
     await page.getByRole('button', { name: '账号菜单', exact: true }).click()
     await page.getByRole('menuitem', { name: /^设置/u }).click()
     const dialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
-    await dialog.waitFor()
+    try {
+      await dialog.waitFor()
+    } catch (error) {
+      console.error('native settings opening diagnostic', JSON.stringify(await page.evaluate(() => ({
+        url: location.href,
+        controller: Boolean(window.__dshDesktopSettingsWindowController),
+        bridge: typeof window.dshDesktop?.getSettingsWindowBounds,
+        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(element => ({
+          className: element.className, text: element.textContent?.slice(0, 1200), visible: element.getBoundingClientRect().width > 0,
+          modal: element.getAttribute('data-shortcut-modal'), titleId: element.getAttribute('aria-labelledby'),
+          navigation: element.querySelector(':scope > nav')?.outerHTML?.slice(0, 2000),
+        })),
+      }))))
+      console.error('native settings renderer errors', JSON.stringify(rendererErrors))
+      throw error
+    }
     return dialog
   }
+  for (let reload = 0; reload < 3; reload += 1) {
+    const reloadedSettings = await openSettings()
+    await reloadedSettings.getByRole('button', { name: '应用内侧边栏', exact: true }).waitFor()
+    await page.keyboard.press('Escape')
+    await reloadedSettings.waitFor({ state: 'hidden' })
+    await page.reload()
+    await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: 60000 })
+  }
+  console.log('PASS native settings remain adapted across three document reloads')
   const dialog = await openSettings()
   await dialog.getByRole('button', { name: '应用内侧边栏', exact: true }).click()
   const browserChoice = page.getByRole('menuitem', { name: '默认浏览器', exact: true })

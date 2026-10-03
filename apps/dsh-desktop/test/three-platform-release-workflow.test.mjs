@@ -24,7 +24,7 @@ test('packaged Windows regression stops when any native validation command fails
 
 test('publication verifies each native checksum receipt before generating the combined receipt', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
-  const publication = workflow.slice(workflow.indexOf('  publish:'))
+  const publication = workflow.slice(workflow.lastIndexOf('  publish:'))
   const combined = publication.indexOf(' > SHA256SUMS.txt')
 
   assert.ok(combined > 0)
@@ -44,4 +44,17 @@ test('Windows release runs physical Setup acceptance and a checksum-pinned previ
   assert.match(workflow, /gh release download desktop-v4\.3\.0[^\n]*--pattern SHA256SUMS\.txt/u)
   assert.match(workflow, /node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/u)
   assert.ok(workflow.indexOf('verify-release-installer.mjs') > workflow.indexOf('pack:win'))
+})
+
+test('failed Windows candidates retain diagnostics without entering the publication artifact set', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  const diagnostics = workflow.slice(workflow.indexOf('      - name: Preserve failed Windows candidate diagnostics'), workflow.indexOf('  macos:'))
+  assert.match(diagnostics, /if: failure\(\)/u)
+  assert.match(diagnostics, /include-hidden-files: true/u)
+  assert.match(diagnostics, /name: desktop-debug-\$\{\{ needs\.metadata\.outputs\.version \}\}-windows-x64/u)
+  assert.match(diagnostics, /\.tmp\/release-qa\/\*\*/u)
+  assert.match(diagnostics, /DeepSeek-Harness-Desktop-Setup-\*\.exe/u)
+  const publication = workflow.slice(workflow.lastIndexOf('  publish:'))
+  assert.match(publication, /pattern: desktop-\$\{\{ needs\.metadata\.outputs\.version \}\}-\*/u)
+  assert.doesNotMatch(publication, /desktop-debug/u)
 })
