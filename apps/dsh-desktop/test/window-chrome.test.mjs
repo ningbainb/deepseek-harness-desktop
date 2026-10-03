@@ -279,6 +279,13 @@ test('window chrome uses a native overlay with a compact caption area', () => {
   assert.match(WINDOW_CHROME_CSS, /-webkit-app-region: no-drag/)
 })
 
+test('native push sidebar fits its reserved track without constraining the closed animation or floating panels', () => {
+  const rule = WINDOW_CHROME_CSS.match(/html\[data-dsh-desktop-window-chrome="true"\] \[data-sidebar-right-panel="push"\]\[data-sidebar-right-open\] \{([^}]+)\}/u)?.[1]
+  assert.ok(rule)
+  assert.match(rule, /max-width:\s*100% !important/u)
+  assert.doesNotMatch(rule, /(?:^|[;\n])\s*(?:width|min-width|transform|visibility|position):/u)
+})
+
 test('native sidebar fullscreen reserves the caption without rewriting docked tab geometry', () => {
   const rule = WINDOW_CHROME_CSS.match(/html\[data-dsh-desktop-window-chrome="true"\] \[data-sidebar-right-panel="fullscreen"\] \{([^}]+)\}/u)?.[1]
   assert.ok(rule)

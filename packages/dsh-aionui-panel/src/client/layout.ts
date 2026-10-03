@@ -23,6 +23,7 @@ import {
   DEFAULT_PREVIEW_REGION_PX, DEFAULT_WORKSPACE_PANEL_PX,
   MAX_PREVIEW_REGION_PX, MAX_WORKSPACE_PANEL_PX,
   MIN_PREVIEW_PANEL_PX, MIN_WORKSPACE_PANEL_PX,
+  MIN_CHAT_PANEL_PX,
   KEY_EXPLORER_WIDTH, KEY_PREVIEW_WIDTH,
   clampExplorerWidth, clampPreviewWidth,
 } from './store.ts'
@@ -78,7 +79,9 @@ export function parseGridTracks(input: string): string[] {
 /** Extract a px width from one track (0 for fr/minmax/non-px tracks). */
 export function trackPx(track: string): number {
   const match = /^(-?[\d.]+)px$/.exec(track.trim())
-  return match === null ? 0 : Number(match[1])
+  if (match !== null) return Number(match[1])
+  const bounded = /^minmax\(\s*0(?:px)?\s*,\s*([\d.]+)px\s*\)$/.exec(track.trim())
+  return bounded === null ? 0 : Number(bounded[1])
 }
 
 /** One drag handle's geometry (hit zone + visual line) — pure CSS in the module. */
@@ -104,6 +107,8 @@ export class PanelLayoutController {
   private nativeOwner = false
   private nativeWasOpen = false
   private nativeAvailable = false
+  private refreshNativeLayout: (() => void) | null = null
+  private nativePreferredTrack = '0px'
 
   constructor(private readonly layout: LayoutStore, private readonly activateExplorer?: () => void) {}
 
@@ -126,8 +131,13 @@ export class PanelLayoutController {
       if (frame === null) return
       this.attach(frame)
     }
-    this.waitObserver = new MutationObserver(() => { tryAttach() })
-    this.waitObserver.observe(document.body, { childList: true, subtree: true })
+    this.waitObserver = new MutationObserver(records => {
+      tryAttach()
+      if (records.some(record => record.type === 'attributes' && record.target instanceof HTMLElement
+        && record.target.matches('[data-sidebar-right-panel]'))) this.refreshNativeLayout?.()
+    })
+    this.waitObserver.observe(document.body, { childList: true, subtree: true, attributes: true,
+      attributeFilter: ['data-sidebar-right-open', 'aria-hidden'] })
     tryAttach()
   }
 
@@ -186,6 +196,7 @@ export class PanelLayoutController {
       if (tracks.length >= 2 && tracks.length <= 3) {
         // The shell's own write (3 tracks) — remember it and re-append ours.
         this.shellTracks = tracks
+        if (trackPx(tracks[2] ?? '0px') > 0) this.nativePreferredTrack = tracks[2]
         measure()
         this.applyGrid()
         return
@@ -203,7 +214,7 @@ export class PanelLayoutController {
       if (this.frame === null) return
       this.frameWidth = this.frame.getBoundingClientRect().width
       const sidebar = this.shellTracks.length >= 1 ? trackPx(this.shellTracks[0]) : 0
-      const details = this.shellTracks.length >= 3 ? trackPx(this.shellTracks[2]) : 0
+      const details = this.shellTracks.length >= 3 ? trackPx(this.nativeSidebarTrack()) : 0
       const available = Math.max(0, this.frameWidth - sidebar - details)
       const state = this.layout.getSnapshot()
       if (Math.abs(state.availableWidth - available) > 0.5) {
@@ -211,10 +222,11 @@ export class PanelLayoutController {
       }
       // A native dock temporarily borrows space; it must not permanently
       // shrink the hidden editor/tree preferences when the window resizes.
-      if (!this.nativeOwner && !(trackPx(this.shellTracks[2] ?? '') > 0 && this.activateExplorer)) {
+      if (!this.nativeOwner && !(this.nativeSidebarOpen() && this.activateExplorer)) {
         this.layout.shrinkToFit(this.layout.getSnapshot())
       }
     }
+    this.refreshNativeLayout = () => { measure(); this.applyGrid() }
     this.sizeObserver = new ResizeObserver(() => {
       measure()
       this.applyGrid()
@@ -240,6 +252,7 @@ export class PanelLayoutController {
         this.shellTracks = tracks.slice(0, 3)
       }
     }
+    if (trackPx(this.shellTracks[2] ?? '0px') > 0) this.nativePreferredTrack = this.shellTracks[2]
     measure()
     this.applyGrid()
   }
@@ -370,6 +383,24 @@ export class PanelLayoutController {
     void frame.offsetWidth
   }
 
+  private nativeSidebarOpen(): boolean {
+    const panel = this.frame?.querySelector('[data-sidebar-right-panel]')
+    return panel ? panel.hasAttribute('data-sidebar-right-open') : trackPx(this.shellTracks[2] ?? '0px') > 0
+  }
+
+  private nativeSidebarTrack(): string {
+    const current = this.shellTracks[2] ?? '0px'
+    if (!this.nativeAvailable || this.frameWidth <= 0) return current
+    if (!this.nativeSidebarOpen()) return '0px'
+    let track = trackPx(current) > 0 ? current : this.nativePreferredTrack
+    if (trackPx(track) <= 0) {
+      const width = this.frame?.querySelector('[data-sidebar-right-panel]')?.getBoundingClientRect().width ?? 0
+      if (width > 0) track = this.nativePreferredTrack = `${Math.round(width)}px`
+    }
+    const maximum = Math.max(0, this.frameWidth - trackPx(this.shellTracks[0] ?? '0px') - MIN_CHAT_PANEL_PX)
+    return trackPx(track) > maximum ? `minmax(0px, ${Math.floor(maximum)}px)` : track
+  }
+
   /** Re-write the frame grid and reposition handles + floating button. */
   private applyGrid(): void {
     const frame = this.frame
@@ -380,7 +411,7 @@ export class PanelLayoutController {
     // the shell's own 3-track grid.
     if (this.shellTracks.length !== 3) return
     const state = this.layout.getSnapshot()
-    const nativeDockOpen = trackPx(this.shellTracks[2]) > 0 && !!this.activateExplorer
+    const nativeDockOpen = this.nativeSidebarOpen() && !!this.activateExplorer
     if (nativeDockOpen && !this.nativeWasOpen) this.nativeOwner = true
     this.nativeWasOpen = nativeDockOpen
     const yieldToNative = nativeDockOpen || this.nativeOwner
@@ -389,7 +420,7 @@ export class PanelLayoutController {
 
     // Five tracks: shell sidebar, center, shell details, preview, explorer.
     frame.style.gridTemplateColumns =
-      `${this.shellTracks[0]} minmax(0, 1fr) ${this.shellTracks[2]} ${Math.round(preview)}px ${Math.round(explorer)}px`
+      `${this.shellTracks[0]} minmax(0, 1fr) ${this.nativeSidebarTrack()} ${Math.round(preview)}px ${Math.round(explorer)}px`
 
     // Column contents follow the tracks (both columns always mounted).
     if (this.explorerCol !== null) {
@@ -429,6 +460,7 @@ export class PanelLayoutController {
   }
 
   private detach(): void {
+    this.refreshNativeLayout = null
     this.styleObserver?.disconnect()
     this.sizeObserver?.disconnect()
     for (const dispose of this.disposers.splice(0)) dispose()
@@ -440,9 +472,12 @@ export class PanelLayoutController {
     if (this.instantTimer !== undefined) clearTimeout(this.instantTimer)
     this.frame?.removeAttribute('data-aionui-instant')
     if (this.frame && this.shellTracks.length === 3 && parseGridTracks(this.frame.style.gridTemplateColumns).length === 5) {
-      this.frame.style.gridTemplateColumns = this.shellTracks.join(' ')
+      const tracks = [...this.shellTracks]
+      if (this.nativeAvailable && this.nativeSidebarOpen() && trackPx(tracks[2]) <= 0) tracks[2] = this.nativePreferredTrack
+      this.frame.style.gridTemplateColumns = tracks.join(' ')
     }
     if (frameElement === this.frame) frameElement = null
+    this.nativePreferredTrack = '0px'
     this.frame = null
     this.previewCol = null; this.explorerCol = null
     this.explorerHandle = null; this.previewHandle = null; this.floatingButton = null

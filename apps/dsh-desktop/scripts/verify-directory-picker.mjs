@@ -276,6 +276,8 @@ try {
   assert.equal(await page.locator('[aria-label="待发送文件"]').count(), 1)
   await page.locator('[data-composer-seat]').screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/file-attachments.png') })
   // The native sidebar is the single normal tool entry surface.
+  const expandLeftSidebar = page.getByRole('button', { name: /^(打开侧边栏|Open sidebar)$/iu })
+  if (await expandLeftSidebar.count()) await expandLeftSidebar.click()
   await nativeReturn.click()
   const nativeDock = page.locator('[data-sidebar-right-panel]')
   const nativeStart = nativeDock.getByRole('tab').filter({ hasText: /^开始$/u })
@@ -294,9 +296,13 @@ try {
     const composer = document.querySelector('[data-composer-seat]')
     const explorer = document.querySelector('[data-aionui-explorer-col]')
     const native = document.querySelector('[data-sidebar-right-panel][data-sidebar-right-open]')
+    const conversation = document.querySelector('[data-pane="conversation"]')
+    const nativeBounds = native?.getBoundingClientRect()
+    const conversationBounds = conversation?.getBoundingClientRect()
     return composer?.getBoundingClientRect().width >= 350
       && explorer?.getAttribute('data-aionui-visible') === 'false'
       && native && getComputedStyle(native).transform === 'none'
+      && nativeBounds && conversationBounds && nativeBounds.left >= conversationBounds.right - 1
   }, undefined, { polling: 100 })
   const nativeBounds = await nativePreview.boundingBox()
   const conversationBounds = await page.locator('[data-pane="conversation"]').boundingBox()

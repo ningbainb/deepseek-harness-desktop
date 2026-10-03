@@ -43,7 +43,11 @@ export async function waitForNativeSidebarCollapsed(panel) {
     return
   }
   for (const surface of await surfaces.all()) await surface.waitFor({ state: 'hidden', timeout: Math.max(1, deadline - Date.now()) })
-  const inspection = await panel.evaluate(inspectNativeSidebarCollapse)
+  let inspection = await panel.evaluate(inspectNativeSidebarCollapse)
+  while (!inspection.collapsed && Date.now() < deadline) {
+    await panel.page().waitForTimeout(100)
+    inspection = await panel.evaluate(inspectNativeSidebarCollapse)
+  }
   assert.equal(inspection.collapsed, true, `native dock must be hidden, beyond the frame and non-interactive: ${JSON.stringify(inspection)}`)
   console.log('PASS native sidebar collapse geometry', JSON.stringify(inspection))
 }

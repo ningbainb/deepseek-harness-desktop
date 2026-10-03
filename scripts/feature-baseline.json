@@ -873,6 +873,7 @@
         "explicit-compatibility-editor",
         "preserve-dirty-editor-on-preview-switch",
         "native-dock-space-handoff-preserves-preferences",
+        "rc2-native-minmax-track-clamp-preserves-360px-chat-and-sidebar-preference",
         "native-toolbar-workbench-clearance",
         "native-git-and-file-tools-tabs",
         "native-guide-is-single-tool-entry-owner",

@@ -45,6 +45,60 @@ it('gives an available native sidebar the initial layout without opening tabs or
   expect(shell.hasAttribute('data-aionui-instant')).toBe(false)
 })
 
+it('caps rc2 native minmax tracks while preserving chat space and the original sidebar preference', async () => {
+  let remeasure = () => {}
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { remeasure = callback }
+    observe() {}
+    disconnect() {}
+  })
+  let width = 1024
+  const shell = document.createElement('div')
+  shell.dataset.dshFrame = ''
+  const original = '280px minmax(0px, 1fr) minmax(0px, 461px)'
+  shell.style.gridTemplateColumns = original
+  shell.getBoundingClientRect = () => ({ width, height: 768 } as DOMRect)
+  document.body.append(shell)
+  const native = document.createElement('div')
+  native.dataset.sidebarRightPanel = 'push'
+  native.dataset.sidebarRightOpen = ''
+  shell.append(native)
+  const store = createLayoutStore()
+  store.update(previous => ({ ...previous, root: '/native-minmax', explorerWidth: 400, previewWidth: 1000 }))
+  const layout = new PanelLayoutController(store, vi.fn())
+  layout.setNativeAvailable(true)
+  layout.mount()
+  try {
+    expect(shell.style.gridTemplateColumns).toBe('280px minmax(0, 1fr) minmax(0px, 384px) 0px 0px')
+    expect(store.getSnapshot().availableWidth).toBe(360)
+    expect(store.getSnapshot()).toMatchObject({ explorerWidth: 400, previewWidth: 1000 })
+    native.removeAttribute('data-sidebar-right-open')
+    native.setAttribute('aria-hidden', 'true')
+    await vi.waitFor(() => expect(shell.style.gridTemplateColumns).toBe('280px minmax(0, 1fr) 0px 0px 0px'))
+    expect(store.getSnapshot().availableWidth).toBe(744)
+    expect(shell.querySelector<HTMLElement>('[data-aionui-explorer-col]')!.dataset.aionuiVisible).toBe('false')
+    shell.style.gridTemplateColumns = '280px minmax(0px, 1fr) minmax(0px, 0px)'
+    await vi.waitFor(() => expect(shell.style.gridTemplateColumns).toBe('280px minmax(0, 1fr) 0px 0px 0px'))
+    width = 1400
+    remeasure()
+    layout.activateCompatibility()
+    expect(shell.querySelector<HTMLElement>('[data-aionui-explorer-col]')!.dataset.aionuiVisible).toBe('true')
+    native.setAttribute('data-sidebar-right-open', '')
+    native.setAttribute('aria-hidden', 'false')
+    await vi.waitFor(() => expect(shell.style.gridTemplateColumns).toBe('280px minmax(0, 1fr) minmax(0px, 461px) 0px 0px'))
+    expect(shell.querySelector<HTMLElement>('[data-aionui-explorer-col]')!.dataset.aionuiVisible).toBe('false')
+    width = 1400
+    remeasure()
+    expect(shell.style.gridTemplateColumns).toBe('280px minmax(0, 1fr) minmax(0px, 461px) 0px 0px')
+    expect(store.getSnapshot().availableWidth).toBe(659)
+    width = 1024
+    remeasure()
+    expect(store.getSnapshot().availableWidth).toBe(360)
+    expect(store.getSnapshot()).toMatchObject({ explorerWidth: 400, previewWidth: 1000 })
+  } finally { layout.dispose() }
+  expect(shell.style.gridTemplateColumns).toBe(original)
+})
+
 it('restores compatibility when the optional native service disappears', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const shell = document.createElement('div')

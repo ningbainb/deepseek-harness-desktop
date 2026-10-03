@@ -18,6 +18,8 @@
 
 皮肤中心按每次激活实际创建的样式节点管理释放，避免反复试穿、退出试穿或恢复默认后残留旧皮肤样式；加载失败与超时的未提交样式也会清理，保留原有跨窗口同步、用户选择持久化及关闭后的写入保护。
 
+原生右侧预览按新版有界列宽计算可用空间，保留至少 360 像素的对话区域；窗口缩小时临时限制侧栏宽度，放大后恢复原宽度，不改写用户偏好。收起原生侧栏释放占用空间，显式“编辑 / 兼容预览”继续可用，避免同时挤压输入框或丢失编辑入口。
+
 ### 验证
 
 退出时先等待插件事务并安全停止 Runtime，再销毁窗口；停止失败时保留窗口与传输入口，不让仍在恢复的应用变成无界面的后台进程。
@@ -57,6 +59,8 @@ Startup now preserves SDK-saved model and personal-preference settings inside ma
 Optional manual context summaries remain a fallback, not a prerequisite for lossless history recovery. Keep original files, review sensitive content, and choose whether to send it to a model; the application does not automatically upload history or request paid inference.
 
 Skin Center now owns and releases the exact stylesheet nodes created by each activation, preventing stale styles after repeated previews, preview exit or stock restoration. Failed and timed-out loads release uncommitted nodes while retaining cross-window synchronization, persisted user selection and shutdown write protection.
+
+The native right preview accounts for the new bounded column tracks and reserves at least 360 pixels for conversation. Smaller windows temporarily cap sidebar width and larger windows restore the original width without rewriting user preferences. Collapsing the native sidebar releases its space while the explicit Edit / Compatibility Preview remains available, avoiding squeezed input or a lost editing entry.
 
 ### Verification
 

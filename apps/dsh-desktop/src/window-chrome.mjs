@@ -79,6 +79,10 @@ html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
 
 /* Native Sidebar fullscreen is viewport-fixed, outside the padded root flow.
    Reserve the same caption area without overriding native tab placement. */
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel="push"][data-sidebar-right-open] {
+  max-width: 100% !important;
+}
+
 html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel="fullscreen"] {
   top: var(--dsh-desktop-window-chrome-height) !important;
   height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
