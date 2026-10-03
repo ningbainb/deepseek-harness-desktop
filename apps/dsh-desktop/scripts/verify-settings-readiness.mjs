@@ -31,9 +31,10 @@ try {
     args: [join(import.meta.dirname, 'settings-readiness-fixture.mjs'), `--user-data-dir=${temporary}`],
     env: { ...process.env, DSH_SETTINGS_FIXTURE_HOME: temporary } })
   console.log('settings readiness bootstrap completed', JSON.stringify({ elapsedMs: Date.now() - launchStartedAt, timeoutMs: DEFAULT_STARTUP_TIMEOUT_MS }))
-  page = await app.firstWindow({ timeout: 5000 })
+  app.process().stderr.on('data', data => process.stderr.write(data))
+  page = await app.firstWindow({ timeout: DEFAULT_STARTUP_TIMEOUT_MS })
   page.setDefaultTimeout(5000)
-  page.setDefaultNavigationTimeout(5000)
+  page.setDefaultNavigationTimeout(DEFAULT_STARTUP_TIMEOUT_MS)
   assert.equal(page.url(), 'about:blank', 'the bootstrap target must not start the slow-resource document')
   const fixtureUrl = await app.evaluate(async () => {
     await globalThis.settingsReadinessFixtureReady
@@ -44,6 +45,7 @@ try {
     app.evaluate(() => { globalThis.settingsReadinessFixture.openWindow() }),
   ])
   await page.waitForLoadState('domcontentloaded')
+  console.log('settings readiness document ready', JSON.stringify(await app.evaluate(() => globalThis.settingsReadinessFixture.diagnostics())))
   assert.deepEqual(await app.evaluate(() => globalThis.settingsReadinessFixture.isolation()), {
     initialUserDataIsIsolated: true,
     userDataIsIsolated: true,
@@ -69,12 +71,13 @@ try {
   console.log('Settings adaptation is usable before slow resources complete, with one controller after load')
 } catch (error) {
   failure = error
+  console.error('settings readiness main state', await app?.evaluate(() => globalThis.settingsReadinessFixture?.diagnostics()).catch(diagnosticError => ({ error: diagnosticError.message })))
   console.error('settings readiness state', await page?.evaluate(() => ({
     documentState: document.readyState,
     dialogCount: document.querySelectorAll('[role="dialog"]').length,
     adaptedCount: document.querySelectorAll('.dsh-desktop-settings-window').length,
     controller: Boolean(window.__dshDesktopSettingsWindowController),
-  })).catch(() => undefined))
+  })).catch(diagnosticError => ({ error: diagnosticError.message })))
   throw error
 } finally {
   const cleanupFailures = []

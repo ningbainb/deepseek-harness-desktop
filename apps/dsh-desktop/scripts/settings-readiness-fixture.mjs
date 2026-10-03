@@ -6,7 +6,11 @@ const initialUserDataIsIsolated = app.getPath('userData') === process.env.DSH_SE
 app.setPath('userData', process.env.DSH_SETTINGS_FIXTURE_HOME)
 app.setPath('sessionData', process.env.DSH_SETTINGS_FIXTURE_HOME)
 const startedAt = Date.now()
-const reportStage = stage => console.error(`[settings-readiness] ${stage}=${Date.now() - startedAt}ms`)
+const stages = []
+const reportStage = stage => {
+  stages.push({ stage, elapsedMs: Date.now() - startedAt })
+  console.error(`[settings-readiness] ${stage}=${Date.now() - startedAt}ms`)
+}
 reportStage('entry')
 async function run() {
   await app.whenReady()
@@ -45,6 +49,14 @@ async function run() {
   let opened = false
   globalThis.settingsReadinessFixture = {
     url: () => url,
+    diagnostics: () => ({
+      stages,
+      url: window.webContents.getURL(),
+      loading: window.webContents.isLoading(),
+      mainFrameLoading: window.webContents.isLoadingMainFrame(),
+      destroyed: window.isDestroyed(),
+      pendingImage: Boolean(pendingImage),
+    }),
     openWindow: () => {
       if (opened) throw new Error('settings fixture window already opened')
       opened = true
