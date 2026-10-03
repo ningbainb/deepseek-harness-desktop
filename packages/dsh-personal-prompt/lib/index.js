@@ -1,5 +1,5 @@
 import { carrierKeyOf } from "@deepseek-ai/dsh-scope";
-import z from "schemastery";
+import z from "@deepseek-ai/schemastery";
 //#region src/core/config.ts
 const PERSONAL_PROMPT_SETTINGS_NAMESPACE = "personal-prompt";
 const DEFAULT_PERSONAL_PROMPT = {
@@ -220,10 +220,10 @@ const profileSchema = z.object({
 	updatedAt: z.number().default(0)
 });
 const Config = z.object({
-	version: z.number().step(1).default(1),
-	enabled: z.boolean().default(false),
-	activeProfileId: z.string().min(1).max(128),
-	profiles: z.array(profileSchema).default([])
+	version: z.number().step(1).default(1).volatile(),
+	enabled: z.boolean().default(false).volatile(),
+	activeProfileId: z.string().min(1).max(128).volatile(),
+	profiles: z.array(profileSchema).default([]).volatile()
 });
 const DEFAULT_CONFIG = {
 	version: 1,
@@ -269,7 +269,7 @@ function promptContext(assemblyScope, sessions, registry) {
 }
 /** Register the owner-safe Personal Prompt section and variable. */
 function apply(ctx, initialConfig = DEFAULT_CONFIG) {
-	let source = () => initialConfig;
+	const source = () => normalizePersonalPrompt(Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key, typeof field === "object" && field !== null && "get" in field && typeof field.get === "function" ? field.get() : field])));
 	let workspaceRegistry;
 	const sessionScopes = /* @__PURE__ */ new Map();
 	const userScope = ctx.userScope;
@@ -306,17 +306,6 @@ function apply(ctx, initialConfig = DEFAULT_CONFIG) {
 			return;
 		}
 	};
-	ctx.inject(["settings"], (settingsCtx) => {
-		settingsCtx.settings.installSection(ctx, PERSONAL_PROMPT_SETTINGS_NAMESPACE, Config, initialConfig, {
-			setSource: (next) => {
-				source = next;
-			},
-			onChange: () => {},
-			validate: (value) => {
-				assertPersonalPrompt(value);
-			}
-		});
-	});
 	ctx.effect(() => {
 		const disposeSection = ctx.systemPrompt.section({
 			name: PERSONAL_PROMPT_SECTION_NAME,

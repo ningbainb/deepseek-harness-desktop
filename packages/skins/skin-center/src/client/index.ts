@@ -8,7 +8,9 @@
  * ledger — no services, no events, no model access.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -61,7 +63,7 @@ declare module '@deepseek-ai/cordis' {
 
 
 /** Required services: slots + locale (plugin card), theme (preview toggle), and settingsScope + its transport (background scrim). */
-export const inject = ['slots', 'locale', 'theme', 'settingsScope', 'connection', 'remote']
+export const inject = ['slots', 'locale', 'theme', 'configForms', 'connection', 'remote']
 
 /**
  * Register the skin-center dictionaries, the body scope attribute, and the
@@ -82,7 +84,7 @@ export function apply(ctx: ClientContext): void {
   const controller = new TryOnController()
   // Background occluder over the shared skin-background namespace. The scope
   // is bound to this plugin's fiber, so it is torn down with the card.
-  const binder = ctx.get('webUiSettings') ?? ctx.settingsScope
+  const binder = ctx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace === SKIN_BACKGROUND_NS ? 'ui-skin-center' : spec.namespace) }
   const backgroundScope = binder.bind<{ backgroundOpacity?: number }>({ namespace: SKIN_BACKGROUND_NS })
   const background = new BackgroundController(backgroundScope)
   const injected = (): SkinCenterInjected => ({
@@ -102,6 +104,14 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
     name: 'web-ui.plugin.item',
     id: 'skins',
+    order: 110,
+    locale: NS,
+    inject: injected,
+  }, SkinCenter))
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'skin-center',
     order: 110,
     locale: NS,
     inject: injected,

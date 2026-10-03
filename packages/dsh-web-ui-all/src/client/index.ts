@@ -16,7 +16,9 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import './sidebar-rail.module.css'
+import './dock-entry.module.css'
 import { installTurnNavigator } from './turn-navigator.ts'
+import { mountDockEntry } from './dock-entry.ts'
 
 /** Column shims: element selector → attribute to stamp. */
 const COLUMN_SHIMS: ReadonlyArray<readonly [selector: string, attribute: string]> = [
@@ -168,4 +170,7 @@ export function apply(ctx: Context): void {
 
   // Conversation turn navigator: floating ↑ ↓ ⤓ buttons in the chat pane.
   ctx.effect(() => installTurnNavigator(), 'dsh-web-ui-all: turn navigator')
+
+  // Desktop Extension Dock entry: sidebar button that opens the Dock window.
+  ctx.effect(() => mountDockEntry(), 'dsh-web-ui-all: dock entry')
 }

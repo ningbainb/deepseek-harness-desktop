@@ -254,7 +254,7 @@ test('/compact maps no-op, success, retryable failure, cancellation, and usage e
     compactError = new ManualCompactionError('summary', 'injected summary failure')
     assert.deepEqual(await invoke(), {
       kind: 'error',
-      text: 'Compaction could not produce a useful summary. The conversation is unchanged; the attempt is recorded in the session log.',
+      text: 'Compaction could not produce a useful summary. The attempt is recorded in the session log.',
     })
 
     compactError = undefined

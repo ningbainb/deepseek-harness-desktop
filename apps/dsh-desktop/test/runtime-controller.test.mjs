@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
+import { copyFile, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import {
   DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV,
@@ -25,8 +27,10 @@ import {
   redactDshReadyUrlToken,
   terminateChildProcessTree,
   resolveDesktopRuntimeHost,
+  runtimeEntryPath,
   validateLoopbackUrl,
 } from '../src/runtime-controller.mjs'
+import { listenRuntimeShutdownControl, RUNTIME_SHUTDOWN_CONTROL_ENV } from '../src/runtime-shutdown-control.mjs'
 
 const desktopRequire = createRequire(new URL('../package.json', import.meta.url))
 
@@ -105,7 +109,7 @@ test('Windows shutdown terminates the complete runtime process tree', async () =
 })
 
 test('default startup budget tolerates first-run Windows scanning', () => {
-  assert.equal(DEFAULT_STARTUP_TIMEOUT_MS, 120_000)
+  assert.equal(DEFAULT_STARTUP_TIMEOUT_MS, 180_000)
   const controller = new DshRuntimeController({
     cliPath: 'dsh-bin.js',
     cwd: process.cwd(),
@@ -331,6 +335,110 @@ test('desktop launcher receives the exact official DSH installation anchor', () 
   }), /official DSH CLI path/u)
 })
 
+test('official runtime starts the physical unpacked launcher across packaged path formats', () => {
+  const cliPath = '/opt/resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh/lib/bin.js'
+  for (const [launcherPath, expected] of [
+    ['/opt/resources/app.asar/src/runtime-launcher.mjs', '/opt/resources/app.asar.unpacked/src/runtime-launcher.mjs'],
+    ['C:\\Program Files\\Desktop\\resources\\app.asar\\src\\runtime-launcher.mjs', 'C:\\Program Files\\Desktop\\resources\\app.asar.unpacked\\src\\runtime-launcher.mjs'],
+    ['C:/Program Files/Desktop/resources/APP.ASAR/src/runtime-launcher.mjs', 'C:/Program Files/Desktop/resources/app.asar.unpacked/src/runtime-launcher.mjs'],
+    ['/opt/resources/app.asar.unpacked/src/runtime-launcher.mjs', '/opt/resources/app.asar.unpacked/src/runtime-launcher.mjs'],
+    ['/opt/app.asar.backup/src/runtime-launcher.mjs', '/opt/app.asar.backup/src/runtime-launcher.mjs'],
+    ['/opt/desktop/src/runtime-launcher.mjs', '/opt/desktop/src/runtime-launcher.mjs'],
+  ]) {
+    assert.equal(runtimeEntryPath(cliPath, launcherPath), expected)
+  }
+  assert.equal(runtimeEntryPath(cliPath), fileURLToPath(new URL('../src/runtime-launcher.mjs', import.meta.url)))
+  assert.equal(runtimeEntryPath('C:\\runtime\\@deepseek-ai\\dsh\\lib\\bin.js'), runtimeEntryPath(cliPath))
+  assert.equal(runtimeEntryPath('/opt/custom/bin.js', '/opt/resources/app.asar/src/runtime-launcher.mjs'), '/opt/custom/bin.js')
+})
+
+test('controller uses typed duplex for every IPC endpoint without invoking legacy openStream', () => {
+  const controller = new DshRuntimeController({ cliPath: 'dsh-bin.js', cwd: process.cwd(), dshHome: '/isolated-home' })
+  const source = { write: async () => {}, close: async () => {}, cancel: () => {}, async *[Symbol.asyncIterator]() {} }
+  const calls = []
+  const payload = { sessionId: 'session-1' }
+  const signal = new AbortController().signal
+  const endpoints = ['websocket', 'events', 'sessions/send', 'terminal/connect', 'remote/connect']
+  assert.throws(() => controller.openDuplex('events', payload, signal), /runtime pipe is not ready/u)
+  controller.status = { ...controller.status, state: 'ready' }
+  assert.throws(() => controller.openDuplex('events', payload, signal), /runtime pipe is not ready/u)
+  controller.pipeClient = {
+    openDuplex: (...args) => { calls.push(args); return source },
+    openStream: () => { throw new Error('typed IPC must not use legacy stream-open') },
+  }
+  for (const endpoint of endpoints) assert.equal(controller.openDuplex(endpoint, payload, signal), source)
+  assert.deepEqual(calls, endpoints.map(endpoint => [endpoint, payload, signal]))
+})
+
+test('Windows packaged controller preserves the private graceful shutdown channel and process-tree fallback after launcher materialization', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-controller-stop-'))
+  try {
+    for (const layout of ['app.asar', 'app.asar.unpacked']) {
+      const appRoot = join(root, layout)
+      const sourceRoot = join(appRoot, 'src')
+      await mkdir(sourceRoot, { recursive: true })
+      await symlink(fileURLToPath(new URL('../node_modules', import.meta.url)), join(appRoot, 'node_modules'), 'junction')
+      for (const name of ['runtime-controller.mjs', 'best-effort-events.mjs', 'runtime-shutdown-control.mjs', 'startup-phase.mjs', 'runtime-pipe.mjs', 'runtime-pipe-framing.mjs']) {
+        await copyFile(new URL(`../src/${name}`, import.meta.url), join(sourceRoot, name))
+      }
+      const packaged = await import(pathToFileURL(join(sourceRoot, 'runtime-controller.mjs')).href)
+      const cliPath = join(root, 'app.asar.unpacked', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+      const launcherPath = join(root, 'app.asar.unpacked', 'src', 'runtime-launcher.mjs')
+      assert.equal(packaged.runtimeEntryPath(cliPath), launcherPath)
+      for (const available of [true, false]) {
+        const child = new FakeChild()
+        const logs = []
+        let environment
+        let cleanupCalls = 0
+        let fallbackCalls = 0
+        let dispose = () => {}
+        const controller = new packaged.DshRuntimeController({
+          cliPath,
+          cwd: process.cwd(),
+          dshHome: join(root, 'home'),
+          platform: 'win32',
+          probeReady: async () => {},
+          logStore: { append: async line => logs.push(line) },
+          spawnProcess: (_executable, args, options) => {
+            environment = options.env
+            const script = Buffer.from(args.at(-1), 'base64').toString('utf16le')
+            assert.ok(script.includes(launcherPath))
+            assert.equal(script.includes(join(root, 'app.asar', 'src', 'runtime-launcher.mjs')), false)
+            assert.equal(args.join(' ').includes(environment[RUNTIME_SHUTDOWN_CONTROL_ENV]), false)
+            return child
+          },
+          terminateProcessTree: async target => { fallbackCalls += 1; target.kill() },
+        })
+        try {
+          const ready = controller.start()
+          const control = JSON.parse(environment[RUNTIME_SHUTDOWN_CONTROL_ENV])
+          assert.match(control.path, /^\\\\\.\\pipe\\dsh-stop-[a-f0-9]{32}$/u)
+          assert.match(control.token, /^[a-f0-9]{64}$/u)
+          child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+          await ready
+          if (available) dispose = await listenRuntimeShutdownControl(control, () => {
+            cleanupCalls += 1
+            setTimeout(() => child.kill(), 20)
+          })
+          await controller.stop()
+          assert.equal(controller.status.state, 'stopped')
+          assert.equal(cleanupCalls, available ? 1 : 0)
+          assert.equal(fallbackCalls, available ? 0 : 1)
+          assert.ok(logs.some(line => line.includes(available ? 'graceful shutdown acknowledged' : 'process-tree fallback')))
+          assert.equal(JSON.stringify(logs).includes(control.token), false)
+          assert.equal(JSON.stringify(controller.status).includes(control.token), false)
+        } finally {
+          dispose()
+          if (child.exitCode === null) child.kill()
+          await controller.stop()
+        }
+      }
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('HTTP readiness probe accepts the 1.1.5 launch-token cookie exchange', async () => {
   let options
   await probeHttpReady('http://127.0.0.1:43125/?token=launch-token', {
@@ -397,7 +505,7 @@ test('controller reaches ready state from streamed output and stops cleanly', as
   assert.deepEqual(readyPorts, [43_125])
   assert.equal(
     childEnvironment.DSH_SKINS_DIR,
-    join('C:\\isolated-home', 'profiles', profileName, 'node_modules', '@linxin666'),
+    join('C:\\isolated-home', 'skins'),
   )
   assert.equal(childEnvironment.QQBOT_APPID, 'desktop-app')
   assert.equal(childEnvironment.QQBOT_SECRET, 'runtime-only')

@@ -56,8 +56,8 @@ describe('ValueMode Client Plugin & Locales', () => {
           registeredSlots[descriptor.name] = { descriptor, component }
         }),
       },
-      settingsScope: {
-        bind: vi.fn().mockReturnValue({
+      configForms: {
+        get: vi.fn().mockReturnValue({
           getSnapshot: () => ({ value: { enabled: false } }),
           set: vi.fn(),
         }),
@@ -68,7 +68,7 @@ describe('ValueMode Client Plugin & Locales', () => {
     expect(inject).toContain('slots')
     expect(inject).toContain('locale')
     expect(inject).toContain('connection')
-    expect(inject).toContain('settingsScope')
+    expect(inject).toContain('configForms')
     expect(inject).toContain('remote.session')
 
     apply(mockCtx)
@@ -99,8 +99,8 @@ describe('ValueMode Client Plugin & Locales', () => {
           registeredSlots[descriptor.name] = { descriptor, component }
         }),
       },
-      settingsScope: {
-        bind: vi.fn().mockReturnValue({
+      configForms: {
+        get: vi.fn().mockReturnValue({
           getSnapshot: () => ({ value: { enabled: false } }),
           set: vi.fn(),
         }),
@@ -134,8 +134,8 @@ describe('ValueMode Client Plugin & Locales', () => {
           registeredSlots[descriptor.name] = { descriptor, component }
         }),
       },
-      settingsScope: {
-        bind: vi.fn().mockReturnValue({
+      configForms: {
+        get: vi.fn().mockReturnValue({
           getSnapshot: () => ({ value: { enabled: false } }),
           set: vi.fn(),
         }),

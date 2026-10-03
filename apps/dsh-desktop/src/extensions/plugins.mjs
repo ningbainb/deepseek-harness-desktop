@@ -15,7 +15,15 @@ import { assertExternalPluginDescriptor } from '../external-plugin-source.mjs'
 import { assessPluginCompatibility } from './plugin-compatibility.mjs'
 import { PluginRegistry } from './plugin-registry.mjs'
 
-const PROTECTED_PACKAGES = new Set(DESKTOP_RUNTIME_PACKAGE_POLICY.names)
+// The official Runtime adds packages to the isolated profile as its dependency
+// graph evolves. Treat the whole official SDK scope as managed so a new peer
+// is neither exported as a community plugin nor removed by plugin repair.
+const PROTECTED_PACKAGES = Object.freeze({
+  has(name) {
+    return DESKTOP_RUNTIME_PACKAGE_POLICY.owns(name)
+      || (typeof name === 'string' && name.startsWith('@deepseek-ai/'))
+  },
+})
 const MAX_PNPM_PATH_ENTRIES = 64
 const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i

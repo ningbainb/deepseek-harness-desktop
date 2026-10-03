@@ -4,7 +4,11 @@
  * projection inside the official Models page and a preference-aware composer seat.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+type SettingsScopeSpec<T> = {
+    namespace: string;
+    decode?: (section: unknown) => T | undefined;
+};
 import { type ModelPreferencesLocaleKey } from './locales.ts';
 export * from './locales.ts';
 export { ModelPreferencesCard } from './ModelPreferencesCard.tsx';

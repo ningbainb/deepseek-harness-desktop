@@ -27,6 +27,11 @@ patchFrom:
   - ../dsh-chat-artifacts
   - ../dsh-liangshen
   - ../dsh-skins
+externalRows:
+  - ui-community-plugins @linxin666/dsh-client-ui-community-plugins 0.4.4
+  - ui-plugin-manager @linxin666/dsh-client-ui-plugin-manager 0.4.4
+  - ui-chat-recovery @linxin666/dsh-chat-recovery 0.3.5
+  - desktop-launcher @linxin666/dsh-desktop-launcher 0.3.13
 self:
   - ui-web-ui-compat
 deps:

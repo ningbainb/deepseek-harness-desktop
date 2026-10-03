@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { IconChevronDownOutline14, IconDataOutline16, IconLoadingOutline16, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
+import { IconChevronDownOutlineRegular, IconDataOutlineMedium, IconLoadingOutlineMedium, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
 import { ARTIFACT_KINDS, artifactSourceFromMeta, isArtifactRecord, } from "../core/types.js";
 import css from './artifact.module.css';
 import { ArtifactCard } from "./ArtifactCard.js";
@@ -7,7 +7,7 @@ function isSettled(block) {
     return 'kind' in block && block.kind === 'tool-result';
 }
 function callArgs(block) {
-    return isSettled(block) ? block.call?.argsRaw ?? '' : block.argsRaw;
+    return isSettled(block) ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : '';
 }
 function pendingArgs(raw) {
     try {
@@ -46,15 +46,15 @@ function kindLabel(t, kind) {
 }
 function StatusIcon({ state }) {
     if (state === 'running')
-        return _jsx(IconLoadingOutline16, { className: css.statusIcon });
+        return _jsx(IconLoadingOutlineMedium, { className: css.statusIcon });
     if (state === 'error')
         return _jsx(StateDot, { state: "error" });
     if (state === 'stopped')
         return _jsx(StateDot, { state: "warning" });
-    return _jsx(IconDataOutline16, { className: css.statusIcon });
+    return _jsx(IconDataOutlineMedium, { className: css.statusIcon });
 }
 function FallbackRow({ state, title, summary, t, source }) {
-    return (_jsxs("section", { className: css.fallback, "data-artifact-state": state, children: [_jsxs("div", { className: css.fallbackHeader, children: [_jsxs("div", { className: css.heading, children: [_jsx(StatusIcon, { state: state }), _jsxs("div", { className: css.headingText, children: [_jsx("div", { className: css.title, children: title }), _jsx("div", { className: css.meta, children: summary })] })] }), _jsx(IconChevronDownOutline14, { className: css.fallbackChevron })] }), source !== undefined ? (_jsxs("details", { className: css.fallbackSource, children: [_jsx("summary", { children: t('card.viewSource') }), _jsx("pre", { className: css.source, children: _jsx("code", { children: source }) })] })) : null] }));
+    return (_jsxs("section", { className: css.fallback, "data-artifact-state": state, children: [_jsxs("div", { className: css.fallbackHeader, children: [_jsxs("div", { className: css.heading, children: [_jsx(StatusIcon, { state: state }), _jsxs("div", { className: css.headingText, children: [_jsx("div", { className: css.title, children: title }), _jsx("div", { className: css.meta, children: summary })] })] }), _jsx(IconChevronDownOutlineRegular, { className: css.fallbackChevron })] }), source !== undefined ? (_jsxs("details", { className: css.fallbackSource, children: [_jsx("summary", { children: t('card.viewSource') }), _jsx("pre", { className: css.source, children: _jsx("code", { children: source }) })] })) : null] }));
 }
 /** Keyed Tool renderer for render_artifact, including pending and replay fallback states. */
 export function ArtifactToolRow({ block, t }) {

@@ -98,6 +98,20 @@ test('repository import scan excludes generated cache and patch construction scr
   }
 })
 
+test('SDK persistence adapters do not permit imports from adjacent application modules', () => {
+  const specifier = `${'@deepseek-ai/'}dsh-client-ui-settings/client`
+  const adapters = [
+    'apps/dsh-desktop/src/atomic-write-adapter.mjs',
+    'packages/dsh-model-preferences/src/client/persist-config.ts',
+    'packages/dsh-personal-prompt/src/client/persist-config.ts',
+  ]
+  const entries = adapters.map(path => ({ path, kind: 'static-import', specifier, line: 1, typeOnly: true }))
+  const baseline = createBoundaryBaseline([])
+  assert.deepEqual(compareImportBoundary(entries, baseline), [])
+  const adjacent = entries.map(entry => ({ ...entry, path: `${entry.path}.uncontrolled.ts` }))
+  assert.equal(compareImportBoundary(adjacent, baseline).length, adjacent.length)
+})
+
 test('repository matches the committed direct-import baseline', async () => {
   assert.deepEqual(await checkImportBoundary(), [])
 })

@@ -17,11 +17,19 @@
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Latest Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-4.0.0-x64.exe
+- Planned Windows x64 installer (available only after a verified public release): https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe
 - v4.0.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v4.0.0
 - SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/release-manifest.json
 - Privacy policy: https://ningbainb.github.io/deepseek-harness-desktop/privacy.html
+
+## Local 5.0.0 candidate, not published
+
+- This checkout targets Desktop 5.0.0 and official NPM Runtime 0.2.0-rc.2. It is undergoing local isolated acceptance, not a verified public release.
+- Large histories use authenticated fragmentation and complete reassembly without truncating messages or tool output. A logical message exceeding 32 MiB fails explicitly.
+- Configuration preservation, Skin Center stylesheet ownership and 4.4.0 branding are included. Dock, third-party model integration and Skills remain available.
+- Optional manual context summaries require user review; history is not uploaded automatically and no paid model is called automatically.
+- Historical 4.0.0 screenshots and release links below are retained as version-labelled evidence. Confirm the actual GitHub Release before downloading; installer size and SHA-256 must come from that exact artifact.
 
 ## What is new in 4.0.0
 

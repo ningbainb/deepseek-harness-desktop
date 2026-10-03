@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { BaiModelAccess } from './BaiModelAccess.tsx'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   DEFAULT_MODEL_PREFERENCES,
@@ -14,6 +15,7 @@ import {
   type ModelPreferencesConfig,
 } from '../core/config.ts'
 import styles from './model-preferences.module.css'
+import { persistModelPreferencesConfig } from './persist-config.ts'
 
 export interface ModelPreferenceCatalog {
   groups: readonly ModelProviderGroup[]
@@ -121,13 +123,8 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
     setSaved(false)
     setSaveError(null)
     try {
-      // SettingsScope exposes field-level writes and serializes them with the
-      // Host revision fence. Keep the order deterministic and do not write
-      // provider credentials or any official model setting here.
-      await settingsScope.set('pinnedModels', next.pinnedModels)
-      await settingsScope.set('providerOrder', next.providerOrder)
-      await settingsScope.set('disabledProviders', next.disabledProviders)
-      await settingsScope.set('recentModels', next.recentModels)
+      const accepted = await persistModelPreferencesConfig(settingsScope, next, settingsSnapshot.revision)
+      if (!accepted) throw new Error(t('settings.conflict'))
       setDraft(normalizeModelPreferences(next))
       setDirty(false)
       setConflict(false)
@@ -253,6 +250,7 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
       </section>
 
       <footer className={styles.footer}>
+        <BaiModelAccess t={t} className={styles.secondaryButton} compact={false} />
         <button type="button" className={styles.secondaryButton} disabled={saving} onClick={() => { const next = { ...DEFAULT_MODEL_PREFERENCES }; edit(next); void persist(next) }}>{t('settings.reset')}</button>
         <button type="button" className={styles.primaryButton} disabled={!dirty || saving || !settingsSnapshot.writable} onClick={() => void persist(draft)}>{saving ? t('status.selecting') : t('settings.save')}</button>
       </footer>

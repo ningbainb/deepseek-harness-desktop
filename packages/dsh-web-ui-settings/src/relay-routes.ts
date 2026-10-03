@@ -10,8 +10,8 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
+import { credentialKeyScope, credentialRef } from '@deepseek-ai/dsh-credentials'
+import type { RedactedSecret, SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { createBridgeRouteGuard, type BridgeAccess } from './bridge.ts'
 import { RelayConnectionController } from './relay-connect.ts'
@@ -23,7 +23,11 @@ import {
   RELAY_CREDENTIAL_REF,
   RELAY_MAX_MODELS,
   RELAY_PROVIDER_ID,
+  RELAY_PENDING_MODEL_ID,
+  RELAY_PREFERRED_MODEL_ID,
   RELAY_REMOVE_PATH,
+  RELAY_REFRESH_PATH,
+  RELAY_REFRESH_INTERVAL_MS,
   RELAY_STATUS_PATH,
   type RelayConfigureResponse,
   type RelayModelView,
@@ -42,15 +46,23 @@ const RELAY_CREDENTIAL = credentialRef(RELAY_CREDENTIAL_REF)
 
 type SettingsFace = {
   writable?: boolean
-  get(ns: typeof LLM_SETTINGS_NAMESPACE): unknown
+  describe(options?: { redactSecrets?: boolean }): Array<{ ns: string; value: unknown; base?: unknown; user?: unknown; secrets?: RedactedSecret[] }>
   mutate(ns: typeof LLM_SETTINGS_NAMESPACE, ops: readonly SettingsPathOp[]): Promise<void>
 }
-type CredentialsFace = Pick<CredentialProvider, 'describe' | 'set' | 'unset'>
+type CredentialsFace = Pick<CredentialProvider, 'describe' | 'set' | 'unset' | 'resolve'>
+  & Partial<Pick<CredentialProvider, 'listRecords'>>
+
+export interface RelayDefaultModel {
+  currentSelection(): { provider?: string; model?: string }
+  saveSelection(selection: { provider: string; model: string }): Promise<void>
+}
 
 export interface RelayRouteDeps {
   settings: SettingsFace
   credentials: CredentialsFace
   fetchImpl?: typeof fetch
+  defaultModel?: RelayDefaultModel
+  officialAccount?: { getState(): Promise<{ status: 'signed-out' | 'credential-stored' }> }
 }
 
 class RelayRouteError extends Error {
@@ -105,7 +117,7 @@ function normalizedApiKey(value: unknown): string {
 
 function profileFromSettings(settings: SettingsFace): RecordLike | undefined {
   try {
-    const value = settings.get(LLM_SETTINGS_NAMESPACE)
+    const value = settings.describe({ redactSecrets: true }).find(entry => entry.ns === LLM_SETTINGS_NAMESPACE)?.value
     if (!isRecord(value) || !isRecord(value.providers)) return undefined
     const profile = value.providers[RELAY_PROVIDER_ID]
     return isRecord(profile) ? profile : undefined
@@ -198,27 +210,73 @@ async function relayModels(apiKey: string, fetchImpl: typeof fetch): Promise<Rel
       signal: controller.signal,
     })
   } catch {
+    clearTimeout(timer)
     throw new RelayRouteError('relay-unreachable')
+  }
+  try {
+    if (response.status === 401 || response.status === 403) throw new RelayRouteError('relay-auth')
+    if (response.status === 429) throw new RelayRouteError('relay-rate-limit')
+    if (response.status >= 500) throw new RelayRouteError('relay-server')
+    if (!response.ok) throw new RelayRouteError('relay-http')
+
+    let payload: unknown
+    try {
+      const text = await responseText(response)
+      payload = JSON.parse(text) as unknown
+    } catch (error) {
+      if (error instanceof RelayRouteError) throw error
+      throw new RelayRouteError(controller.signal.aborted ? 'relay-unreachable' : 'relay-malformed-response')
+    }
+    const models = normalizeRelayModels(payload)
+    if (models.length === 0) throw new RelayRouteError('no-models')
+    return models
   } finally {
     clearTimeout(timer)
   }
+}
 
-  if (response.status === 401 || response.status === 403) throw new RelayRouteError('relay-auth')
-  if (response.status === 429) throw new RelayRouteError('relay-rate-limit')
-  if (response.status >= 500) throw new RelayRouteError('relay-server')
-  if (!response.ok) throw new RelayRouteError('relay-http')
-
-  let payload: unknown
+async function isFirstRun(deps: RelayRouteDeps): Promise<boolean> {
   try {
-    const text = await responseText(response)
-    payload = JSON.parse(text) as unknown
-  } catch (error) {
-    if (error instanceof RelayRouteError) throw error
-    throw new RelayRouteError('relay-malformed-response')
-  }
-  const models = normalizeRelayModels(payload)
-  if (models.length === 0) throw new RelayRouteError('no-models')
-  return models
+    const entries = deps.settings.describe({ redactSecrets: true })
+    const savedDefault = entries.find(entry => entry.ns === 'agent-default-model')?.user
+    const pendingDefault = (selection: { provider?: unknown; model?: unknown } | undefined) => selection?.provider === RELAY_PROVIDER_ID && selection.model === RELAY_PENDING_MODEL_ID
+    if (isRecord(savedDefault) && (savedDefault.provider || savedDefault.model) && !pendingDefault(savedDefault)) return false
+    const selection = deps.defaultModel?.currentSelection()
+    const untouchedOfficialDefault = selection?.provider === 'deepseek-official' && selection.model === 'deepseek-flash'
+    if (!untouchedOfficialDefault && !pendingDefault(selection) && (selection?.provider?.trim() || selection?.model?.trim())) return false
+    if (untouchedOfficialDefault && !deps.officialAccount) return false
+    if (deps.officialAccount && (await deps.officialAccount.getState()).status !== 'signed-out') return false
+    if ((await deps.credentials.listRecords?.())?.some(entry => credentialKeyScope(entry.key) === LLM_SETTINGS_NAMESPACE)) return false
+    for (const entry of entries) {
+      if (!isRecord(entry.value)) continue
+      if (entry.ns === LLM_SETTINGS_NAMESPACE && isRecord(entry.value.providers)) {
+        const layers = entry.base !== undefined || entry.user !== undefined
+          ? [entry.base, entry.user] : [entry.value]
+        for (const layer of layers) {
+          if (!isRecord(layer) || !isRecord(layer.providers)) continue
+          if (Object.entries(layer.providers).some(([id, provider]) => id !== RELAY_PROVIDER_ID
+            && isRecord(provider) && (id !== 'openai-codex' || Object.keys(provider).length > 0))) return false
+        }
+      }
+      if (!entry.ns.startsWith('llm-')) continue
+      if (entry.secrets?.some(secret => secret.set)) return false
+      if (entry.value.apiKey) return false
+      if (typeof entry.value.apiKeyEnv === 'string'
+        && (await deps.credentials.describe(credentialRef(entry.value.apiKeyEnv))).configured) return false
+    }
+    return true
+  } catch { return false }
+}
+
+async function setFirstDefault(deps: RelayRouteDeps, models: readonly RelayModelView[]): Promise<void> {
+  if (!deps.defaultModel || !models[0]) return
+  const before = deps.defaultModel.currentSelection()
+  if (!(await isFirstRun(deps))) return
+  const current = deps.defaultModel.currentSelection()
+  if (before.provider !== current.provider || before.model !== current.model) return
+  const preferred = models.find(model => model.id === RELAY_PREFERRED_MODEL_ID) ?? models[0]
+  try { await deps.defaultModel.saveSelection({ provider: RELAY_PROVIDER_ID, model: preferred.id }) }
+  catch { throw new RelayRouteError('default-save-failed') }
 }
 
 function providerMutation(models: readonly RelayModelView[]): SettingsPathOp[] {
@@ -240,41 +298,123 @@ function codeOf(error: unknown): string {
 
 function statusFor(code: string): number {
   if (code === 'relay-auth' || code === 'relay-rate-limit' || code === 'relay-http' || code === 'relay-server' || code === 'relay-unreachable' || code === 'relay-malformed-response' || code === 'relay-response-too-large') return 502
-  if (code === 'credential-save-failed' || code === 'credential-delete-failed' || code === 'settings-save-failed') return 503
+  if (code === 'credential-save-failed' || code === 'credential-delete-failed' || code === 'settings-save-failed' || code === 'default-save-failed') return 503
   if (code === 'busy') return 409
   return 400
 }
 
 /** Build the guarded routes used by the browser onboarding card. */
-export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): WebRoute[] & { dispose(): void } {
+export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): WebRoute[] & { initializeDefault(): Promise<void>; dispose(): void } {
   const guard = createBridgeRouteGuard(access)
   const fetchImpl = deps.fetchImpl ?? fetch
   let configuring = false
+  let disposed = false
+  let sync: NonNullable<RelayStatusResponse['sync']> = { phase: 'idle' }
+  let pendingRefresh: Promise<RelayConfigureResponse> | undefined
+  let lastAttempt = 0
+  const initializeDefault = async () => {
+    if (disposed || deps.settings.writable === false || !deps.defaultModel) return
+    const before = deps.defaultModel.currentSelection()
+    if (!(await isFirstRun(deps)) || disposed) return
+    const current = deps.defaultModel.currentSelection()
+    if (before.provider !== current.provider || before.model !== current.model) return
+    const status = await statusOf(deps)
+    if (!status.writable || disposed) return
+    const latest = deps.defaultModel.currentSelection()
+    if (latest.provider !== before.provider || latest.model !== before.model) return
+    const model = status.configured ? (status.models.find(model => model.id === RELAY_PREFERRED_MODEL_ID) ?? status.models[0])?.id : RELAY_PENDING_MODEL_ID
+    if (!model || (latest.provider === RELAY_PROVIDER_ID && latest.model === model)) return
+    await deps.defaultModel.saveSelection({ provider: RELAY_PROVIDER_ID, model })
+  }
   const configure = async (key: unknown): Promise<RelayConfigureResponse> => {
     if (configuring) throw new RelayRouteError('busy')
     configuring = true
     try {
       const apiKey = normalizedApiKey(key)
       const models = await relayModels(apiKey, fetchImpl)
+      const profile = profileFromSettings(deps.settings)
       try { await deps.credentials.set(RELAY_CREDENTIAL, apiKey) }
       catch { throw new RelayRouteError('credential-save-failed') }
-      try { await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, providerMutation(models)) }
+      const previous = managedProfile(profile) && Array.isArray(profile?.models) ? profile.models.filter(isRecord) : []
+      const mutations: SettingsPathOp[] = managedProfile(profile)
+        ? [{ op: 'set', path: ['providers', RELAY_PROVIDER_ID, 'models'], value: models.map(model => ({ ...previous.find(entry => entry.id === model.id), ...model })) }]
+        : providerMutation(models)
+      try { await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, mutations) }
       catch { throw new RelayRouteError('settings-save-failed') }
+      sync = { phase: 'ready', updatedAt: Date.now() }
+      lastAttempt = Date.now()
+      await setFirstDefault(deps, models)
       return { ok: true, modelCount: models.length, models }
+    } catch (error) {
+      sync = { ...sync, phase: 'failed', error: codeOf(error) }
+      throw error
     } finally { configuring = false }
   }
   const connection = new RelayConnectionController(configure)
 
+  const refresh = (): Promise<RelayConfigureResponse> => {
+    if (pendingRefresh) return pendingRefresh
+    const operation = (async (): Promise<RelayConfigureResponse> => {
+      if (disposed || configuring || ['starting', 'pending', 'connecting'].includes(connection.status().phase)) throw new RelayRouteError('busy')
+      configuring = true
+      lastAttempt = Date.now()
+      sync = { ...sync, phase: 'refreshing', error: undefined }
+      try {
+        const before = profileFromSettings(deps.settings)
+        if (!managedProfile(before)) throw new RelayRouteError('not-configured')
+        const credential = await deps.credentials.resolve(RELAY_CREDENTIAL)
+        if (!credential?.value) throw new RelayRouteError('relay-auth')
+        const models = await relayModels(normalizedApiKey(credential.value), fetchImpl)
+        const current = await deps.credentials.resolve(RELAY_CREDENTIAL)
+        const profile = profileFromSettings(deps.settings)
+        if (disposed || current?.value !== credential.value || !managedProfile(profile)) throw new RelayRouteError('configuration-changed')
+        const previous = Array.isArray(profile!.models) ? profile!.models.filter(isRecord) : []
+        const next = models.map(model => ({ ...previous.find(entry => entry.id === model.id), ...model }))
+        if (JSON.stringify(previous) !== JSON.stringify(next)) {
+          try { await deps.settings.mutate(LLM_SETTINGS_NAMESPACE, [{ op: 'set', path: ['providers', RELAY_PROVIDER_ID, 'models'], value: next }]) }
+          catch { throw new RelayRouteError('settings-save-failed') }
+        }
+        sync = { phase: 'ready', updatedAt: Date.now() }
+        await setFirstDefault(deps, models)
+        return { ok: true, modelCount: models.length, models }
+      } catch (error) {
+        sync = { ...sync, phase: 'failed', error: codeOf(error) }
+        throw error
+      } finally { configuring = false }
+    })()
+    pendingRefresh = operation
+    void operation.finally(() => { if (pendingRefresh === operation) pendingRefresh = undefined }).catch(() => {})
+    return operation
+  }
+
+  const refreshIfDue = () => {
+    if (!disposed && deps.settings.writable !== false && Date.now() - lastAttempt >= RELAY_REFRESH_INTERVAL_MS && managedProfile(profileFromSettings(deps.settings))) {
+      void refresh().catch(() => {})
+    }
+  }
+  const timer = setInterval(refreshIfDue, RELAY_REFRESH_INTERVAL_MS)
+  timer.unref()
+  refreshIfDue()
+
   const handler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     if (!guard(request, response)) return
     const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
-    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REMOVE_PATH, RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH].includes(pathname)) {
+    if (![RELAY_STATUS_PATH, RELAY_CONFIGURE_PATH, RELAY_REMOVE_PATH, RELAY_REFRESH_PATH, RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH].includes(pathname)) {
       writeJson(response, 404, { ok: false, code: 'not-found' })
       return
     }
 
     if (pathname === RELAY_STATUS_PATH) {
-      writeJson(response, 200, await statusOf(deps))
+      refreshIfDue()
+      const status = await statusOf(deps)
+      writeJson(response, 200, { ...status, configured: status.configured && sync.error !== 'relay-auth', firstRun: await isFirstRun(deps), sync })
+      return
+    }
+
+    if (pathname === RELAY_REFRESH_PATH) {
+      if (deps.settings.writable === false) { writeJson(response, 403, { ok: false, code: 'forbidden' }); return }
+      try { writeJson(response, 200, await refresh()) }
+      catch (error) { const code = codeOf(error); writeJson(response, statusFor(code), { ok: false, code }) }
       return
     }
 
@@ -318,6 +458,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
       } catch {
         throw new RelayRouteError('settings-save-failed')
       }
+      sync = { phase: 'idle' }
       writeJson(response, 200, { ok: true })
     } catch (error) {
       const code = codeOf(error)
@@ -327,7 +468,7 @@ export function makeRelayRoutes(deps: RelayRouteDeps, access?: BridgeAccess): We
     }
   }
 
-  return Object.assign([{ kind: 'prefix' as const, path: RELAY_API_PREFIX, handler }], { dispose: () => connection.dispose() })
+  return Object.assign([{ kind: 'prefix' as const, path: RELAY_API_PREFIX, handler }], { initializeDefault, dispose: () => { disposed = true; clearInterval(timer); connection.dispose() } })
 }
 
 export { RELAY_MODELS_URL }

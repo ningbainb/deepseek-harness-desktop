@@ -1,4 +1,7 @@
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000;
+export class ModelCatalogChangedError extends Error {
+    name = 'ModelCatalogChangedError';
+}
 /** A bounded advisory read, not a replacement for the native selection directory. */
 export function createModelCatalogLoader(ctx, translate) {
     let revision = 0;
@@ -25,7 +28,7 @@ export function createModelCatalogLoader(ctx, translate) {
         const started = revision;
         let timer;
         const interrupted = new Promise((_, reject) => {
-            cancel = () => reject(new Error(translate('catalogChanged')));
+            cancel = () => reject(new ModelCatalogChangedError(translate('catalogChanged')));
             timer = setTimeout(() => reject(new Error(translate('catalogTimeout'))), MODEL_CATALOG_TIMEOUT_MS);
         });
         const operation = Promise.race([
@@ -38,7 +41,7 @@ export function createModelCatalogLoader(ctx, translate) {
             interrupted,
         ]).then(value => {
             if (disposed || started !== revision)
-                throw new Error(translate('catalogChanged'));
+                throw new ModelCatalogChangedError(translate('catalogChanged'));
             // Short-lived UI reuse only. The Host remains the source of models and permissions.
             cached = { value, expires: Date.now() + 30_000 };
             return value;

@@ -15,6 +15,7 @@ import { installToolCallArgumentNormalization } from './tool-call-normalization.
 import { installTranscriptBalanceGuard } from './transcript-balance.ts'
 import { registerDesktopConversationImportRoute } from './conversation-import-route.ts'
 import { registerDesktopWorkspaceFileOpenRoute } from './workspace-file-open-route.ts'
+import { installSessionCheckpointRecovery } from './session-checkpoint-recovery.ts'
 
 export const name = 'desktop-compat'
 // The import route resolves the optional log-backed title service through
@@ -28,6 +29,7 @@ export function apply(ctx: Context): void {
   new DesktopSkinStateService(ctx)
   installToolCallArgumentNormalization(ctx)
   installTranscriptBalanceGuard(ctx)
+  installSessionCheckpointRecovery(ctx)
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
     'dsh-desktop-compat: workspace native-open authority',

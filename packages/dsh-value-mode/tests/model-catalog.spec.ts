@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createModelCatalogLoader, MODEL_CATALOG_TIMEOUT_MS } from '../src/client/model-catalog.ts'
+import { createModelCatalogLoader, MODEL_CATALOG_TIMEOUT_MS, ModelCatalogChangedError } from '../src/client/model-catalog.ts'
 import { zh } from '../src/client/locales.ts'
 
 const result = (id = 'configured') => ({ ok: true, value: { groups: [{ id, models: [{ id: 'model', name: 'Model' }] }], failures: [] } })
@@ -76,4 +76,12 @@ it('preserves provider-local failures and retries whole-request failures', async
   await expect(f.load()).rejects.toThrow('denied')
   expect((await f.load()).failures).toEqual([failure])
   expect(f.request).toHaveBeenCalledTimes(2)
+})
+
+it('identifies invalidated reads separately from provider and transport failures', async () => {
+  const catalog = fixture(vi.fn().mockImplementation(() => new Promise(() => {})))
+  const stale = expect(catalog.load()).rejects.toBeInstanceOf(ModelCatalogChangedError)
+  await Promise.resolve()
+  catalog.listeners.get('settings/document-updated')!()
+  await stale
 })

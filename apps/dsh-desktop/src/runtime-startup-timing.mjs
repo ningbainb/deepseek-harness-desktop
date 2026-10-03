@@ -1,4 +1,4 @@
-const PHASES = new Set(['entry', 'environment', 'profile', 'patches', 'boot', 'ready'])
+const PHASES = new Set(['entry', 'environment', 'profile', 'patches', 'legacy-settings', 'boot', 'ready'])
 
 /** Bounded diagnostic timings only; failures must never change Runtime startup. */
 export function createRuntimeStartupTiming({ enabled = true, now = () => performance.now(), emit } = {}) {

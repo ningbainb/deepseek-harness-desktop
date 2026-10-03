@@ -10,12 +10,12 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2"
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-host-webserver": "0.2.0-rc.2"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2"
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-host-webserver": "0.2.0-rc.2"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"

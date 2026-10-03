@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 import { apply } from '../src/index.ts'
+import type { PersonalPromptConfig } from '../src/core/config.ts'
 
 describe('personal prompt host contribution', () => {
   it('registers the official SystemPrompt section and variable without context injection', () => {
@@ -31,19 +32,21 @@ describe('personal prompt host contribution', () => {
       },
     }
 
-    apply(ctx, {
+    const config: PersonalPromptConfig = {
       version: 1,
       enabled: true,
       profiles: [{ id: 'global', name: 'Global', content: 'keep responses concise', enabled: true, scope: 'global', updatedAt: 1 }],
-    })
+    }
+    apply(ctx, config)
 
-    expect(mocks.install).toHaveBeenCalledWith(ctx, 'personal-prompt', expect.anything(), expect.anything(), expect.objectContaining({ validate: expect.any(Function) }))
     expect(sections).toHaveLength(1)
     expect(sections[0]).toMatchObject({ name: 'dsh:personal-prompt', order: 50 })
     expect(variables).toHaveLength(1)
     expect(variables[0]?.name).toBe('dsh_personal_prompt')
     expect(sections[0]?.text({ scope: undefined })).toContain('{{dsh_personal_prompt}}')
     expect(variables[0]?.provider({ scope: undefined })).toContain('keep responses concise')
+    config.profiles[0].content = 'updated preference'
+    expect(variables[0]?.provider({ scope: undefined })).toContain('updated preference')
   })
 
   it('fails closed when the local user-scope service is unavailable', () => {

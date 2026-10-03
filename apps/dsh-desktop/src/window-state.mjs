@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
 
 const MIN_WIDTH = 720
 const MIN_HEIGHT = 540
@@ -99,12 +100,15 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
   }
   const persist = (content) => {
     if (content === undefined) return latestWrite
-    const operation = writeQueue.then(() => writeFile(path, content))
+    const operation = writeQueue.then(() => writeFileAtomic(path, content, { mode: 0o600 }))
     writeQueue = operation.catch(() => {})
     latestWrite = operation
     return operation
   }
-  const save = () => persist(capture())
+  const save = () => {
+    clearTimeout(timer)
+    return persist(capture())
+  }
   const saveFromEvent = () => {
     void save().catch(() => {
       // Explicit lifecycle saves report failures; event-driven saves must not

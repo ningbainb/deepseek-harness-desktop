@@ -10,7 +10,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import { PetService, PET_SETTINGS_NAMESPACE, type PetConfig, type PetSettingsSection } from './service.ts'
 import { makePetRoutes, petPackageRoot } from './routes.ts'
 import {
@@ -83,18 +83,26 @@ export const name = 'pet'
 export const inject = ['webServer']
 
 /** Settings section schema: the display fields and name the web settings surface edits. */
-export const PET_SETTINGS_SCHEMA = z.object({
-  visible: z.boolean().default(true),
-  size: z.number().step(1).min(DISPLAY_SIZE_MIN).max(DISPLAY_SIZE_MAX).default(160),
-  right: z.number().step(1).min(0).max(DISPLAY_INSET_MAX).default(24),
-  bottom: z.number().step(1).min(0).max(DISPLAY_INSET_MAX).default(20),
-  name: z.string().min(1).max(PET_NAME_MAX_LENGTH).pattern(/\S/).default(DEFAULT_PET_NAME),
-  enabled: z.boolean().default(true),
+export const Config = z.object({
+  affinity: z.any(),
+  state: z.any(),
+  treats: z.any(),
+  persistDir: z.string(),
+  visible: z.boolean().volatile(),
+  size: z.number().step(1).min(DISPLAY_SIZE_MIN).max(DISPLAY_SIZE_MAX).volatile(),
+  right: z.number().step(1).min(0).max(DISPLAY_INSET_MAX).volatile(),
+  bottom: z.number().step(1).min(0).max(DISPLAY_INSET_MAX).volatile(),
+  name: z.string().min(1).max(PET_NAME_MAX_LENGTH).pattern(/\S/).volatile(),
+  enabled: z.boolean().volatile(),
 })
+export const PET_SETTINGS_SCHEMA = Config
 
 /** Register the pet service and its API + asset routes on the context. */
 export function apply(ctx: Context, config: PetConfig = {}): void {
-  const service = new PetService(ctx, config)
+  const initial = Object.fromEntries(Object.entries(config).map(([key, field]) => [key,
+    typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+      ? field.get() : field])) as PetConfig
+  const service = new PetService(ctx, initial)
 
   // The settings surface edits the display config through the `pet`
   // namespace. The composition `base` starts as the persisted pet.json
@@ -110,7 +118,7 @@ export function apply(ctx: Context, config: PetConfig = {}): void {
     right: service.display().right,
     bottom: service.display().bottom,
     name: service.petName(),
-    enabled: config.enabled ?? true,
+    enabled: initial.enabled ?? true,
   }
   // The browser half talks to the pet through same-origin JSON endpoints and
   // loads the atlas from the pet's own media route (RPC domains are
@@ -136,15 +144,40 @@ export function apply(ctx: Context, config: PetConfig = {}): void {
     }
   }
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, PET_SETTINGS_NAMESPACE, PET_SETTINGS_SCHEMA, base, {
-      setSource: (source) => { current = source },
-      onChange: () => {
-        const section = current()
-        service.applySettingsSection(section)
-        service.setEnabled(section.enabled ?? true)
-        syncRoutes()
-      },
+    const settings = settingsCtx.settings
+    let seeding = false
+    const refresh = (): void => {
+      const form = settings.describe().find(item => item.ns === PET_SETTINGS_NAMESPACE)
+      if (form === undefined) return
+      const user = form.user as Partial<PetSettingsSection>
+      if (Object.keys(user).length === 0) {
+        if (seeding) return
+        seeding = true
+        // The profile has no pet overrides yet. Seed it from pet.json once so
+        // the form reflects the user's actual layout instead of schema defaults.
+        void settings.update(PET_SETTINGS_NAMESPACE, base).catch(error =>
+          ctx.logger?.warn?.(`pet: could not migrate saved layout: ${String(error)}`)).finally(() => {
+            seeding = false
+          })
+        return
+      }
+      current = () => ({ ...base, ...(form.value as Partial<PetSettingsSection>) })
+      const section = current()
+      if (section.visible !== service.display().visible
+        || section.size !== service.display().size
+        || section.right !== service.display().right
+        || section.bottom !== service.display().bottom
+        || section.name !== service.petName()) service.applySettingsSection(section)
+      if (service.isEnabled() !== (section.enabled ?? true)) service.setEnabled(section.enabled ?? true)
+      syncRoutes()
+    }
+    ctx.on('settings/document-updated', (namespace) => {
+      if (namespace === PET_SETTINGS_NAMESPACE) refresh()
     })
+    refresh()
+    const loader = (ctx.root as Context & { loader?: { await(): Promise<void> } }).loader
+    void loader?.await().then(refresh).catch((error: unknown) =>
+      ctx.logger?.warn?.(`pet: settings initialization failed: ${String(error)}`))
   })
   syncRoutes()
 }

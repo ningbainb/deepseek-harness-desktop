@@ -1,0 +1,1186 @@
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -26,79 +26,53 @@
+ 		* @param workspaces - the workspaces service.
+ 		* @param cwd - the source session's workspace directory.
+ 		*/
+-		async function connectBlank(workspaces, cwd) {
+-			if (cwd === void 0 || cwd === "") throw new Error("source session has no workspace directory");
+-			let workspaceId = workspaces.list.getSnapshot().items.find((item) => item.path === cwd)?.workspaceId;
+-			if (workspaceId === void 0) workspaceId = (await workspaces.create({ path: cwd })).workspaceId;
+-			return workspaces.connectWorkspace(workspaceId);
++		function currentSessionId(snapshot) {
++		  return Object.values(snapshot.byId ?? {}).find(row => (row.retainedBy?.mainView ?? 0) > 0)?.id ?? snapshot.current;
+ 		}
+-		/**
+-		* Fill the supervisor ports from the live services.
+-		* @param sessions - the sessions service.
+-		* @param workspaces - the workspaces service.
+-		*/
+-		function createRetryPorts(sessions, workspaces) {
+-			return {
+-				currentId: () => sessions.list.getSnapshot().current,
+-				snapshot: (id) => sessions.binding(id)?.session.getSnapshot(),
+-				cwdOf: (id) => sessions.list.getSnapshot().byId[id]?.cwd,
+-				fork: (opts) => sessions.fork(opts),
+-				connectBlank: (cwd) => connectBlank(workspaces, cwd),
+-				open: (id) => {
+-					sessions.open(id);
+-				},
+-				prompt: async (id, text) => {
+-					const binding = sessions.binding(id);
+-					if (binding === void 0) return {
+-						ok: false,
+-						code: "session-unavailable",
+-						message: "target session is not available"
+-					};
+-					const result = await binding.session.prompt([{
+-						type: "text",
+-						text
+-					}], "queue");
+-					if (result.ok) return { ok: true };
+-					return {
+-						ok: false,
+-						code: result.error.code,
+-						message: result.error.message
+-					};
+-				},
+-				schedule: (fn, ms) => {
+-					const timer = setTimeout(fn, ms);
+-					return () => {
+-						clearTimeout(timer);
+-					};
+-				}
+-			};
++		function recoverySnapshot(binding, conversations) {
++		  const chat = conversations.binding(binding).target("chat").getSnapshot();
++		  if (chat === void 0) return void 0;
++		  const session = binding.session.getSnapshot();
++		  return { ...chat.legacy, sessionId: session.sessionId, running: session.running, removed: session.removed, lastAgentError: session.lastAgentError };
+ 		}
+-		/**
+-		* Edit submission: fork a child from the history prefix before the edited
+-		* message (or connect a blank sibling for first-turn edits), open it, and
+-		* send the edited text. The original session is never touched: a fork or
+-		* resubmit failure leaves it exactly as it was.
+-		* @param sessions - the sessions service.
+-		* @param workspaces - the workspaces service.
+-		*/
+-		function createSubmitEdit(sessions, workspaces) {
+-			return async (input) => {
+-				const cwd = sessions.list.getSnapshot().byId[input.sessionId]?.cwd;
+-				const targetId = input.forkAtSeq === null ? await connectBlank(workspaces, cwd) : await sessions.fork({
+-					sessionId: input.sessionId,
+-					atSeq: input.forkAtSeq,
+-					increaseTitle: true
+-				});
+-				sessions.open(targetId);
+-				const binding = sessions.binding(targetId);
+-				if (binding === void 0) throw new Error("edited branch is not available");
+-				const result = await binding.session.prompt([{
+-					type: "text",
+-					text: input.editedText
+-				}], "queue");
+-				if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`);
+-			};
++		async function connectBlank(sessions, workspaces, cwd) {
++		  if (cwd === void 0 || cwd === "") throw new Error("source session has no workspace directory");
++		  let workspaceId = workspaces.list.getSnapshot().items.find(item => item.path === cwd)?.workspaceId;
++		  if (workspaceId === void 0) workspaceId = (await workspaces.create({ path: cwd })).workspaceId;
++		  return sessions.create({ workspaceId, cwd });
+ 		}
++		async function promptRetained(sessions, id, text) {
++		  return sessions.using(id, { source: "controllerOperation" }, async reference => {
++		    await reference.ready;
++		    return reference.binding.session.prompt([{ type: "text", text }], "queue");
++		  });
++		}
++		function createRetryPorts(sessions, workspaces, conversations, navigation) {
++		  return {
++		    currentId: () => currentSessionId(sessions.list.getSnapshot()),
++		    snapshot: id => { const binding = sessions.binding(id); return binding === void 0 ? void 0 : recoverySnapshot(binding, conversations); },
++		    cwdOf: id => sessions.list.getSnapshot().byId[id]?.cwd,
++		    fork: opts => sessions.fork(opts),
++		    connectBlank: cwd => connectBlank(sessions, workspaces, cwd),
++		    open: id => navigation.openSession(id),
++		    prompt: async (id, text) => {
++		      const result = await promptRetained(sessions, id, text);
++		      return result.ok ? { ok: true } : { ok: false, code: result.error.code, message: result.error.message };
++		    },
++		    schedule: (fn, ms) => { const timer = setTimeout(fn, ms); return () => clearTimeout(timer); }
++		  };
++		}
++		function createSubmitEdit(sessions, workspaces, navigation) {
++		  return async input => {
++		    const cwd = sessions.list.getSnapshot().byId[input.sessionId]?.cwd;
++		    const targetId = input.forkAtSeq === null
++		      ? await connectBlank(sessions, workspaces, cwd)
++		      : await sessions.fork({ sessionId: input.sessionId, atSeq: input.forkAtSeq, increaseTitle: true });
++		    navigation.openSession(targetId);
++		    const result = await promptRetained(sessions, targetId, input.editedText);
++		    if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`);
++		  };
++		}
+ 		//#endregion
+ 		//#region src/core/transcript.ts
+ 		/**
+@@ -824,17 +798,20 @@
+ 		* returns null wherever nothing applies.
+ 		*/
+ 		const TurnActionsView = (0, react.memo)(function TurnActionsView(props) {
+-			const { useSession, t, supervisor, submitEdit, manualRetry } = props;
++			const { useChat, useSession, t, supervisor, submitEdit, manualRetry } = props;
+ 			const turn = props.turn.turn;
+ 			const sessionId = props.sessionId;
+ 			const [editing, setEditing] = (0, react.useState)(false);
+ 			const [draft, setDraft] = (0, react.useState)("");
+ 			const [saving, setSaving] = (0, react.useState)(false);
+ 			const [error, setError] = (0, react.useState)(null);
+-			const target = useSession((s) => lastCompletedUserTarget(s), (a, b) => a?.seq === b?.seq && a?.turn === b?.turn);
+-			const failure = useSession((s) => failureOfLastTurn(s), (a, b) => a?.turn === b?.turn && a?.kind === b?.kind && a?.message === b?.message && a?.code === b?.code);
+-			const isHostPending = useSession((s) => failure !== null && hostRetryPending(s, failure.turn));
+-			const running = useSession((s) => s.running);
++			const legacy = useChat(chat => chat.legacy);
++			const lifecycle = useSession(session => ({ running: session.running, removed: session.removed, lastAgentError: session.lastAgentError }), (left, right) => left.running === right.running && left.removed === right.removed && left.lastAgentError === right.lastAgentError);
++			const snapshot = { ...legacy, ...lifecycle, sessionId };
++			const target = lastCompletedUserTarget(snapshot);
++			const failure = failureOfLastTurn(snapshot);
++			const isHostPending = failure !== null && hostRetryPending(snapshot, failure.turn);
++			const running = lifecycle.running;
+ 			const retryState = (0, react.useSyncExternalStore)(supervisor.subscribe, supervisor.getSnapshot);
+ 			const canEdit = target !== null && target.turn === turn && !running;
+ 			const busy = retryState.phase === "waiting" || retryState.phase === "running";
+@@ -953,12 +930,11 @@
+ 		/**
+ 		* Composer dock entry: the retry status row (current attempt count, wait
+ 		* state, final failure reason, cancel / retry-now controls). Registered into
+-		* conversation.input.dock — the full-width row above the composer card.
++		* conversation.composer.dock — the full-width row above the composer card.
+ 		*/
+ 		const RetryDockView = (0, react.memo)(function RetryDockView(props) {
+-			const { session, t, supervisor, manualRetry } = props;
++			const { sessionId, t, supervisor, manualRetry } = props;
+ 			const state = (0, react.useSyncExternalStore)(supervisor.subscribe, supervisor.getSnapshot);
+-			const sessionId = session.sessionId;
+ 			if (!(state.phase === "waiting" && (state.targetId ?? state.sourceId) === sessionId || state.phase === "running" && state.targetId === sessionId || (state.phase === "failed" || state.phase === "exhausted") && state.sourceId === sessionId)) return null;
+ 			const cancelButton = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+ 				type: "button",
+@@ -1158,7 +1134,9 @@
+ 			"slots",
+ 			"locale",
+ 			"sessions",
+-			"workspaces"
++			"workspaces",
++			"uiConversation",
++			"uiWorkspace"
+ 		];
+ 		/**
+ 		* Register the chat-recovery surface and start the retry supervisor.
+@@ -1170,44 +1148,52 @@
+ 			ctx.effect(() => releaseChatRecoveryApply, "chat-recovery: apply claim");
+ 			ctx.effect(() => {
+ 				try {
+-					return ctx.locale.register(NS, {
+-						zh,
+-						en
+-					});
++					const offZh = ctx.locale.register(NS, "zh", zh);
++					const offEn = ctx.locale.register(NS, "en", en);
++					return () => { offZh(); offEn(); };
+ 				} catch {
+ 					return () => {};
+ 				}
+ 			}, "chat-recovery: dictionaries");
+ 			const sessions = ctx.sessions;
+ 			const workspaces = ctx.workspaces;
+-			const supervisor = new RetrySupervisor(createRetryPorts(sessions, workspaces));
+-			const submitEdit = createSubmitEdit(sessions, workspaces);
++			const conversations = ctx.uiConversation;
++			const navigation = ctx.uiWorkspace;
++			const supervisor = new RetrySupervisor(createRetryPorts(sessions, workspaces, conversations, navigation));
++			const submitEdit = createSubmitEdit(sessions, workspaces, navigation);
+ 			const manualRetry = (sessionId) => {
+ 				supervisor.manualRetry(sessionId);
+ 			};
+ 			let watchedId;
++			let watchedBinding;
+ 			let unsubscribeSession;
+ 			const rewire = () => {
+-				const current = sessions.list.getSnapshot().current;
+-				if (current !== watchedId) {
++				const current = currentSessionId(sessions.list.getSnapshot());
++				const binding = current === void 0 ? void 0 : sessions.binding(current);
++				if (current !== watchedId || binding !== watchedBinding) {
++					watchedBinding = binding;
+ 					watchedId = current;
+ 					unsubscribeSession?.();
+ 					unsubscribeSession = void 0;
+ 					if (current !== void 0) {
+-						const binding = sessions.binding(current);
+-						if (binding !== void 0) unsubscribeSession = binding.session.subscribe(() => supervisor.review());
++						if (binding !== void 0) {
++						  const chat = conversations.binding(binding).target("chat");
++						  const offSession = binding.session.subscribe(() => supervisor.review());
++						  const offChat = chat.subscribe(() => supervisor.review());
++						  unsubscribeSession = () => { offSession(); offChat(); };
++						}
+ 					}
+ 				}
+ 				supervisor.review();
+ 			};
+ 			ctx.effect(() => sessions.list.subscribe(rewire), "chat-recovery: watch sessions");
+ 			rewire();
+-			ctx.effect(() => () => supervisor.dispose(), "chat-recovery: dispose supervisor");
++			ctx.effect(() => () => { unsubscribeSession?.(); unsubscribeSession = void 0; supervisor.dispose(); }, "chat-recovery: dispose supervisor");
+ 			ctx.slots.inject("conversation.chat.turnTail", () => {
+ 				try {
+ 					return ctx.slots.register({
+ 						name: "conversation.chat.turnTail",
+-						select: (owner) => owner,
++						id: "chat-recovery",
+ 						locale: NS,
+ 						inject: () => ({
+ 							supervisor,
+@@ -1219,10 +1205,10 @@
+ 					return () => {};
+ 				}
+ 			});
+-			ctx.slots.inject("conversation.input.dock", () => {
++			ctx.slots.inject("conversation.composer.dock", () => {
+ 				try {
+ 					return ctx.slots.register({
+-						name: "conversation.input.dock",
++						name: "conversation.composer.dock",
+ 						id: "chat-recovery",
+ 						order: 500,
+ 						locale: NS,
+diff --git a/src/client/wiring.ts b/src/client/wiring.ts
+--- a/src/client/wiring.ts
++++ b/src/client/wiring.ts
+@@ -1,94 +1,63 @@
+-/**
+- * Runtime wiring: fills the framework-free supervisor ports and the edit
+- * submission path with the real client services (ctx.sessions / ctx.workspaces).
+- */
+-import type {
+-  ISessions,
+-  IWorkspaces,
+-  SessionId,
+-  WorkspaceId,
+-} from '@deepseek-ai/dsh-client-runtime/client'
++import type { ISessions, SessionBinding, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
++import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
++import type { UiConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
++import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
++import type { RecoverySnapshot } from '../core/snapshot.ts'
+ import type { RetryPorts } from '../core/retry-supervisor.ts'
+ 
+-/**
+- * Connect (or create) a blank session in the workspace the source session
+- * belongs to. Used as the first-turn fallback when forking cannot cut history
+- * before the message (no earlier turn/end exists).
+- * @param workspaces - the workspaces service.
+- * @param cwd - the source session's workspace directory.
+- */
+-export async function connectBlank(workspaces: IWorkspaces, cwd: string | undefined): Promise<SessionId> {
+-  if (cwd === undefined || cwd === '') {
+-    throw new Error('source session has no workspace directory')
+-  }
+-  const items = workspaces.list.getSnapshot().items
+-  let workspaceId: WorkspaceId | undefined = items.find((item) => item.path === cwd)?.workspaceId
+-  if (workspaceId === undefined) {
+-    const view = await workspaces.create({ path: cwd })
+-    workspaceId = view.workspaceId
+-  }
+-  return workspaces.connectWorkspace(workspaceId)
++export function currentSessionId(snapshot: SessionListState): SessionId | undefined {
++  return Object.values(snapshot.byId).find(row => (row.retainedBy?.mainView ?? 0) > 0)?.id
++    ?? (snapshot as SessionListState & { current?: SessionId }).current
+ }
+ 
+-/**
+- * Fill the supervisor ports from the live services.
+- * @param sessions - the sessions service.
+- * @param workspaces - the workspaces service.
+- */
+-export function createRetryPorts(sessions: ISessions, workspaces: IWorkspaces): RetryPorts {
++export function recoverySnapshot(binding: SessionBinding, conversations: UiConversation): RecoverySnapshot | undefined {
++  const chat = conversations.binding(binding).target('chat').getSnapshot()
++  if (chat === undefined) return undefined
++  const session = binding.session.getSnapshot()
++  return { ...chat.legacy, sessionId: session.sessionId, running: session.running, removed: session.removed, lastAgentError: session.lastAgentError }
++}
++
++export async function connectBlank(sessions: ISessions, workspaces: IWorkspaces, cwd: string | undefined): Promise<SessionId> {
++  if (cwd === undefined || cwd === '') throw new Error('source session has no workspace directory')
++  let workspaceId = workspaces.list.getSnapshot().items.find(item => item.path === cwd)?.workspaceId
++  if (workspaceId === undefined) workspaceId = (await workspaces.create({ path: cwd })).workspaceId
++  return sessions.create({ workspaceId, cwd })
++}
++
++export async function promptRetained(sessions: ISessions, id: SessionId, text: string) {
++  return sessions.using(id, { source: 'controllerOperation' }, async reference => {
++    await reference.ready
++    return reference.binding.session.prompt([{ type: 'text', text }], 'queue')
++  })
++}
++
++export function createRetryPorts(sessions: ISessions, workspaces: IWorkspaces, conversations: UiConversation, navigation: UiWorkspace): RetryPorts {
+   return {
+-    currentId: () => sessions.list.getSnapshot().current,
+-    snapshot: (id) => sessions.binding(id)?.session.getSnapshot(),
+-    cwdOf: (id) => sessions.list.getSnapshot().byId[id]?.cwd,
+-    fork: (opts) => sessions.fork(opts),
+-    connectBlank: (cwd) => connectBlank(workspaces, cwd),
+-    open: (id) => {
+-      sessions.open(id)
+-    },
++    currentId: () => currentSessionId(sessions.list.getSnapshot()),
++    snapshot: id => { const binding = sessions.binding(id); return binding === undefined ? undefined : recoverySnapshot(binding, conversations) },
++    cwdOf: id => sessions.list.getSnapshot().byId[id]?.cwd,
++    fork: opts => sessions.fork(opts),
++    connectBlank: cwd => connectBlank(sessions, workspaces, cwd),
++    open: id => navigation.openSession(id),
+     prompt: async (id, text) => {
+-      const binding = sessions.binding(id)
+-      if (binding === undefined) {
+-        return { ok: false, code: 'session-unavailable', message: 'target session is not available' }
+-      }
+-      const result = await binding.session.prompt([{ type: 'text', text }], 'queue')
+-      if (result.ok) return { ok: true }
+-      return { ok: false, code: result.error.code, message: result.error.message }
++      const result = await promptRetained(sessions, id, text)
++      return result.ok ? { ok: true } : { ok: false, code: result.error.code, message: result.error.message }
+     },
+-    schedule: (fn, ms) => {
+-      const timer = setTimeout(fn, ms)
+-      return () => {
+-        clearTimeout(timer)
+-      }
+-    },
++    schedule: (fn, ms) => { const timer = setTimeout(fn, ms); return () => clearTimeout(timer) },
+   }
+ }
+ 
+-/** Edit submission input (all durable facts; the text is the edited draft). */
+-export interface SubmitEditInput {
+-  sessionId: SessionId
+-  /** Fork anchor: null falls back to a fresh blank session in the workspace. */
+-  forkAtSeq: number | null
+-  editedText: string
+-}
++export interface SubmitEditInput { sessionId: SessionId; forkAtSeq: number | null; editedText: string }
+ 
+-/**
+- * Edit submission: fork a child from the history prefix before the edited
+- * message (or connect a blank sibling for first-turn edits), open it, and
+- * send the edited text. The original session is never touched: a fork or
+- * resubmit failure leaves it exactly as it was.
+- * @param sessions - the sessions service.
+- * @param workspaces - the workspaces service.
+- */
+-export function createSubmitEdit(sessions: ISessions, workspaces: IWorkspaces) {
++export function createSubmitEdit(sessions: ISessions, workspaces: IWorkspaces, navigation: UiWorkspace) {
+   return async (input: SubmitEditInput): Promise<void> => {
+     const cwd = sessions.list.getSnapshot().byId[input.sessionId]?.cwd
+     const targetId = input.forkAtSeq === null
+-      ? await connectBlank(workspaces, cwd)
++      ? await connectBlank(sessions, workspaces, cwd)
+       : await sessions.fork({ sessionId: input.sessionId, atSeq: input.forkAtSeq, increaseTitle: true })
+-    sessions.open(targetId)
+-    const binding = sessions.binding(targetId)
+-    if (binding === undefined) throw new Error('edited branch is not available')
+-    const result = await binding.session.prompt([{ type: 'text', text: input.editedText }], 'queue')
++    navigation.openSession(targetId)
++    const result = await promptRetained(sessions, targetId, input.editedText)
+     if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
+   }
+ }
+diff --git a/src/core/snapshot.ts b/src/core/snapshot.ts
+new file mode 100644
+--- /dev/null
++++ b/src/core/snapshot.ts
+@@ -0,0 +1,4 @@
++import type { ChatSnapshot, UserMessageNode, AssistantMessageNode, TurnErrorNode } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
++export type RecoverySnapshot = ChatSnapshot['legacy'] & Pick<SessionSnapshot, 'sessionId' | 'running' | 'removed' | 'lastAgentError'>
++export type { UserMessageNode, AssistantMessageNode, TurnErrorNode }
+diff --git a/src/core/transcript.ts b/src/core/transcript.ts
+--- a/src/core/transcript.ts
++++ b/src/core/transcript.ts
+@@ -1,15 +1,15 @@
+ /**
+- * Pure transcript helpers over the client ConversationSnapshot. Both halves
++ * Pure transcript helpers over the client RecoverySnapshot. Both halves
+  * of the plugin compile this module; it imports only types from the official
+  * NPM SDK and never touches a DSH source checkout.
+  */
+ import type {
+   AssistantMessageNode,
+-  ConversationSnapshot,
++  RecoverySnapshot,
+   TurnErrorNode,
+   UserMessageNode,
+-} from '@deepseek-ai/dsh-client-runtime/client'
+-import type { ContentBlock } from '@deepseek-ai/dsh-client-connection/client'
++} from './snapshot.ts'
++import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+ 
+ /**
+  * The last completed user message of a session, plus everything the edit
+@@ -58,7 +58,7 @@
+  * @param snapshot - the live conversation snapshot.
+  * @returns the edit target, or null when nothing is editable right now.
+  */
+-export function lastCompletedUserTarget(snapshot: ConversationSnapshot): EditTarget | null {
++export function lastCompletedUserTarget(snapshot: RecoverySnapshot): EditTarget | null {
+   if (snapshot.running || snapshot.removed) return null
+   let last: UserMessageNode | null = null
+   for (const node of snapshot.nodes) if (node.kind === 'user') last = node
+@@ -100,7 +100,7 @@
+  * @param turn - the turn number.
+  * @returns the boundary seq (exclusive start of the turn).
+  */
+-export function turnStartSeq(snapshot: ConversationSnapshot, turn: number): number {
++export function turnStartSeq(snapshot: RecoverySnapshot, turn: number): number {
+   let start = 0
+   for (const [t, end] of snapshot.turnEnds) if (t < turn && end > start) start = end
+   return start
+@@ -112,7 +112,7 @@
+  * @param turn - the turn number.
+  * @returns the message node, or null when the turn has none in-window.
+  */
+-export function lastUserInTurn(snapshot: ConversationSnapshot, turn: number): UserMessageNode | null {
++export function lastUserInTurn(snapshot: RecoverySnapshot, turn: number): UserMessageNode | null {
+   const end = snapshot.turnEnds.get(turn)
+   if (end === undefined) return null
+   const start = turnStartSeq(snapshot, turn)
+@@ -130,7 +130,7 @@
+  * @param snapshot - the live conversation snapshot.
+  * @param turn - the turn number.
+  */
+-export function turnHasToolActivity(snapshot: ConversationSnapshot, turn: number): boolean {
++export function turnHasToolActivity(snapshot: RecoverySnapshot, turn: number): boolean {
+   const end = snapshot.turnEnds.get(turn) ?? Number.POSITIVE_INFINITY
+   const start = turnStartSeq(snapshot, turn)
+   for (const node of snapshot.nodes) {
+@@ -140,7 +140,7 @@
+ }
+ 
+ /** The interruption-frozen assistant partial of one turn, when present. */
+-export function interruptedAssistantInTurn(snapshot: ConversationSnapshot, turn: number): AssistantMessageNode | null {
++export function interruptedAssistantInTurn(snapshot: RecoverySnapshot, turn: number): AssistantMessageNode | null {
+   for (const node of snapshot.nodes) {
+     if (node.kind === 'assistant' && node.turn === turn && node.interrupted === true) return node
+   }
+@@ -148,7 +148,7 @@
+ }
+ 
+ /** The durable terminal error node of one turn, when present. */
+-export function turnErrorInTurn(snapshot: ConversationSnapshot, turn: number): TurnErrorNode | null {
++export function turnErrorInTurn(snapshot: RecoverySnapshot, turn: number): TurnErrorNode | null {
+   for (const node of snapshot.nodes) {
+     if (node.kind === 'turn-error' && node.turn === turn) return node
+   }
+@@ -156,7 +156,7 @@
+ }
+ 
+ /** Whether the turn hit the per-request output-token cap. */
+-export function maxTokensInTurn(snapshot: ConversationSnapshot, turn: number): boolean {
++export function maxTokensInTurn(snapshot: RecoverySnapshot, turn: number): boolean {
+   return snapshot.nodes.some((node) => node.kind === 'turn-max-tokens' && node.turn === turn)
+ }
+ 
+@@ -165,21 +165,21 @@
+  * chain scheduled or started). While the host is retrying, the client
+  * supervisor must stand down: acting would double the retry traffic.
+  */
+-export function hostRetryPending(snapshot: ConversationSnapshot, turn: number): boolean {
++export function hostRetryPending(snapshot: RecoverySnapshot, turn: number): boolean {
+   return snapshot.nodes.some(
+     (node) => node.kind === 'model-retry' && node.turn === turn && (node.retryState === 'scheduled' || node.retryState === 'started'),
+   )
+ }
+ 
+ /** Whether the turn settled with a finalized (messageId-bearing) assistant message. */
+-export function assistantFinalizedInTurn(snapshot: ConversationSnapshot, turn: number): boolean {
++export function assistantFinalizedInTurn(snapshot: RecoverySnapshot, turn: number): boolean {
+   return snapshot.nodes.some(
+     (node) => node.kind === 'assistant' && node.turn === turn && node.interrupted !== true && node.messageId !== undefined,
+   )
+ }
+ 
+ /** Count of durable user messages in the window (duplicate-message guard). */
+-export function userNodeCount(snapshot: ConversationSnapshot): number {
++export function userNodeCount(snapshot: RecoverySnapshot): number {
+   let count = 0
+   for (const node of snapshot.nodes) if (node.kind === 'user') count += 1
+   return count
+@@ -190,14 +190,14 @@
+  * fork keeps). Used to compute how many user messages a retry child is
+  * EXPECTED to carry: prefix count plus the one replayed message.
+  */
+-export function userNodeCountBefore(snapshot: ConversationSnapshot, boundarySeq: number): number {
++export function userNodeCountBefore(snapshot: RecoverySnapshot, boundarySeq: number): number {
+   let count = 0
+   for (const node of snapshot.nodes) if (node.kind === 'user' && node.seq <= boundarySeq) count += 1
+   return count
+ }
+ 
+ /** The latest completed turn number, or null when none exists in-window. */
+-export function lastTurnOf(snapshot: ConversationSnapshot): number | null {
++export function lastTurnOf(snapshot: RecoverySnapshot): number | null {
+   let max = -1
+   for (const turn of snapshot.turnEnds.keys()) if (turn > max) max = turn
+   return max === -1 ? null : max
+diff --git a/src/core/retry-policy.ts b/src/core/retry-policy.ts
+--- a/src/core/retry-policy.ts
++++ b/src/core/retry-policy.ts
+@@ -1,9 +1,9 @@
+ /**
+  * Retry policy: failure detection, recoverability classification and retry
+- * planning over a ConversationSnapshot. Pure and framework-free so both the
++ * planning over a RecoverySnapshot. Pure and framework-free so both the
+  * transcript UI and the supervisor share one decision source.
+  */
+-import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
++import type { RecoverySnapshot } from './snapshot.ts'
+ import {
+   hostRetryPending,
+   interruptedAssistantInTurn,
+@@ -55,7 +55,7 @@
+  * @param snapshot - the live conversation snapshot.
+  * @returns the failure descriptor, or null when the last turn did not fail.
+  */
+-export function failureOfLastTurn(snapshot: ConversationSnapshot): TurnFailure | null {
++export function failureOfLastTurn(snapshot: RecoverySnapshot): TurnFailure | null {
+   if (snapshot.running) return null
+   let turn = -1
+   let end = 0
+@@ -130,7 +130,7 @@
+  * @param turn - the failed turn number.
+  * @returns the plan, or null when the turn has no safely-replayable user message.
+  */
+-export function planForTurn(snapshot: ConversationSnapshot, turn: number): RetryPlan | null {
++export function planForTurn(snapshot: RecoverySnapshot, turn: number): RetryPlan | null {
+   const message = lastUserInTurn(snapshot, turn)
+   if (message === null) return null
+   const text = userText(message.content)
+@@ -151,7 +151,7 @@
+  * crash (lastAgentError), never when the user stopped the turn on purpose;
+  * output-token caps are never auto-retried.
+  */
+-function isAutoRetryable(snapshot: ConversationSnapshot, failure: TurnFailure): boolean {
++function isAutoRetryable(snapshot: RecoverySnapshot, failure: TurnFailure): boolean {
+   if (failure.hasTools) return false
+   switch (failure.kind) {
+     case 'turn-error':
+@@ -169,7 +169,7 @@
+  * failed but not auto-retryable lands on the manual path (transcript button).
+  * @param snapshot - the live conversation snapshot.
+  */
+-export function verdictFor(snapshot: ConversationSnapshot): RetryVerdict {
++export function verdictFor(snapshot: RecoverySnapshot): RetryVerdict {
+   if (snapshot.running || snapshot.removed) return { action: 'none' }
+   const failure = failureOfLastTurn(snapshot)
+   if (failure === null) return { action: 'none' }
+diff --git a/src/core/retry-supervisor.ts b/src/core/retry-supervisor.ts
+--- a/src/core/retry-supervisor.ts
++++ b/src/core/retry-supervisor.ts
+@@ -1,3 +1,4 @@
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
+ /**
+  * Retry supervisor: a framework-free state machine that re-runs a failed
+  * turn by forking one child session from the history prefix BEFORE the
+@@ -20,7 +21,7 @@
+  * through review() on every session/list change and cancels on navigation,
+  * user input, or the UI cancel button.
+  */
+-import type { ConversationSnapshot, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
++import type { RecoverySnapshot } from './snapshot.ts'
+ import { assistantFinalizedInTurn, lastTurnOf, userNodeCount, userNodeCountBefore } from './transcript.ts'
+ import {
+   BACKOFF_DELAYS_MS,
+@@ -67,7 +68,7 @@
+ /** Everything the supervisor needs from the runtime; the client wiring fills it. */
+ export interface RetryPorts {
+   currentId(): SessionId | undefined
+-  snapshot(id: SessionId): ConversationSnapshot | undefined
++  snapshot(id: SessionId): RecoverySnapshot | undefined
+   cwdOf(id: SessionId): string | undefined
+   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>
+   /** Connect (or create) a blank session in the same workspace as the source. */
+@@ -514,7 +515,7 @@
+   }
+ 
+   /** Record one terminal failure so ordinary subscription churn cannot re-arm it. */
+-  private suppressFailure(snapshot: ConversationSnapshot | undefined): number | undefined {
++  private suppressFailure(snapshot: RecoverySnapshot | undefined): number | undefined {
+     if (snapshot === undefined) return undefined
+     const failure = failureOfLastTurn(snapshot)
+     if (failure === null) return undefined
+@@ -542,7 +543,7 @@
+ }
+ 
+ /** Highest completed turn/end seq in one snapshot (0 for blank/unavailable). */
+-function latestTurnEnd(snapshot: ConversationSnapshot | undefined): number {
++function latestTurnEnd(snapshot: RecoverySnapshot | undefined): number {
+   if (snapshot === undefined) return 0
+   let latest = 0
+   for (const end of snapshot.turnEnds.values()) if (end > latest) latest = end
+diff --git a/src/client/index.ts b/src/client/index.ts
+--- a/src/client/index.ts
++++ b/src/client/index.ts
+@@ -5,20 +5,23 @@
+  * - a turn-tail entry (conversation.chat.turnTail) with the Edit affordance
+  *   for the last completed user message and the manual Retry affordance for
+  *   failed turns;
+- * - a composer dock entry (conversation.input.dock) showing the retry
++ * - a composer dock entry (conversation.composer.dock) showing the retry
+  *   supervisor's attempt count, wait state, cancel / retry-now controls and
+  *   the final failure reason.
+  *
+  * Failure policy: nothing here throws at apply time - an external plugin
+  * must never take the GUI down.
+  */
+-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
++import type { Context as ClientContext } from '@deepseek-ai/cordis'
++import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
++import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+ // Type-only: pulls the locale plugin's Context merge (ctx.locale).
+ import type {} from '@deepseek-ai/dsh-client-locale/client'
+ // Type-only: pulls the ui-conversation SlotMap merge (conversation.* slots).
+ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+ import { claimChatRecoveryApply, releaseChatRecoveryApply } from './apply-guard.ts'
+-import { createRetryPorts, createSubmitEdit } from './wiring.ts'
++import { currentSessionId, createRetryPorts, createSubmitEdit } from './wiring.ts'
+ import { RetrySupervisor } from '../core/retry-supervisor.ts'
+ import { TurnActionsView } from './TurnActionsView.tsx'
+ import { RetryDockView } from './RetryDock.tsx'
+@@ -36,7 +38,7 @@
+ }
+ 
+ /** Services required by this plugin. */
+-export const inject = ['slots', 'locale', 'sessions', 'workspaces']
++export const inject = ['slots', 'locale', 'sessions', 'workspaces', 'uiConversation', 'uiWorkspace']
+ 
+ /**
+  * Register the chat-recovery surface and start the retry supervisor.
+@@ -54,7 +56,9 @@
+ 
+   ctx.effect(() => {
+     try {
+-      return ctx.locale.register(NS, { zh, en })
++      const offZh = ctx.locale.register(NS, 'zh', zh)
++      const offEn = ctx.locale.register(NS, 'en', en)
++      return () => { offZh(); offEn() }
+     } catch {
+       return () => {}
+     }
+@@ -62,8 +66,10 @@
+ 
+   const sessions = ctx.sessions
+   const workspaces = ctx.workspaces
+-  const supervisor = new RetrySupervisor(createRetryPorts(sessions, workspaces))
+-  const submitEdit = createSubmitEdit(sessions, workspaces)
++  const conversations = ctx.uiConversation
++  const navigation = ctx.uiWorkspace
++  const supervisor = new RetrySupervisor(createRetryPorts(sessions, workspaces, conversations, navigation))
++  const submitEdit = createSubmitEdit(sessions, workspaces, navigation)
+   const manualRetry = (sessionId: Parameters<RetrySupervisor['manualRetry']>[0]): void => {
+     supervisor.manualRetry(sessionId)
+   }
+@@ -72,17 +78,22 @@
+   // supervisor only acts on the CURRENT session: a retry fork opens the child,
+   // which becomes current and is then watched to settle the attempt.
+   let watchedId: string | undefined
++  let watchedBinding: SessionBinding | undefined
+   let unsubscribeSession: (() => void) | undefined
+   const rewire = (): void => {
+-    const current = sessions.list.getSnapshot().current
+-    if (current !== watchedId) {
++    const current = currentSessionId(sessions.list.getSnapshot())
++    const binding = current === undefined ? undefined : sessions.binding(current)
++    if (current !== watchedId || binding !== watchedBinding) {
++      watchedBinding = binding
+       watchedId = current
+       unsubscribeSession?.()
+       unsubscribeSession = undefined
+       if (current !== undefined) {
+-        const binding = sessions.binding(current)
+         if (binding !== undefined) {
+-          unsubscribeSession = binding.session.subscribe(() => supervisor.review())
++          const chat = conversations.binding(binding).target('chat')
++          const offSession = binding.session.subscribe(() => supervisor.review())
++          const offChat = chat.subscribe(() => supervisor.review())
++          unsubscribeSession = () => { offSession(); offChat() }
+         }
+       }
+     }
+@@ -90,7 +101,7 @@
+   }
+   ctx.effect(() => sessions.list.subscribe(rewire), 'chat-recovery: watch sessions')
+   rewire()
+-  ctx.effect(() => () => supervisor.dispose(), 'chat-recovery: dispose supervisor')
++  ctx.effect(() => () => { unsubscribeSession?.(); unsubscribeSession = undefined; supervisor.dispose() }, 'chat-recovery: dispose supervisor')
+ 
+   ctx.slots.inject('conversation.chat.turnTail', () => {
+     try {
+@@ -97,11 +109,8 @@
+       return ctx.slots.register({
+         name: 'conversation.chat.turnTail',
+-        // The chain owner share carries only turn/seq/openFile - a pure selector
+-        // cannot see the snapshot, so this entry matches every completed turn and
+-        // the component gates on the snapshot itself.
+-        select: (owner) => owner,
++        id: 'chat-recovery',
+         locale: NS,
+         inject: () => ({ supervisor, submitEdit, manualRetry }),
+       }, TurnActionsView)
+     } catch {
+       return () => {}
+@@ -108,10 +119,10 @@
+     }
+   })
+ 
+-  ctx.slots.inject('conversation.input.dock', () => {
++  ctx.slots.inject('conversation.composer.dock', () => {
+     try {
+       return ctx.slots.register({
+-        name: 'conversation.input.dock',
++        name: 'conversation.composer.dock',
+         id: 'chat-recovery',
+         order: 500,
+         locale: NS,
+diff --git a/src/client/TurnActionsView.tsx b/src/client/TurnActionsView.tsx
+--- a/src/client/TurnActionsView.tsx
++++ b/src/client/TurnActionsView.tsx
+@@ -12,9 +12,9 @@
+ import { memo, useState } from 'react'
+ import { useSyncExternalStore } from 'react'
+ import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+-import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
++import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
+ import { lastCompletedUserTarget, hostRetryPending } from '../core/transcript.ts'
+ import { failureOfLastTurn } from '../core/retry-policy.ts'
+ import type { RetrySupervisor } from '../core/retry-supervisor.ts'
+@@ -29,12 +29,12 @@
+ }
+ 
+ export type TurnActionsProps = PropsRuntime<'conversation.chat.turnTail'> & {
+-  matched: TurnTailOwnerProps
++  matched?: TurnTailOwnerProps
+   t: TranslateNS<'chat-recovery'>
+ } & TurnActionsFace
+ 
+ export const TurnActionsView = memo(function TurnActionsView(props: TurnActionsProps) {
+-  const { useSession, t, supervisor, submitEdit, manualRetry } = props
++  const { useChat, useSession, t, supervisor, submitEdit, manualRetry } = props
+   const turn = props.turn.turn
+   const sessionId = props.sessionId
+   const [editing, setEditing] = useState(false)
+@@ -42,18 +42,13 @@
+   const [saving, setSaving] = useState(false)
+   const [error, setError] = useState<string | null>(null)
+ 
+-  const target = useSession(
+-    (s) => lastCompletedUserTarget(s),
+-    (a, b) => a?.seq === b?.seq && a?.turn === b?.turn,
+-  )
+-  const failure = useSession(
+-    (s) => failureOfLastTurn(s),
+-    (a, b) => a?.turn === b?.turn && a?.kind === b?.kind && a?.message === b?.message && a?.code === b?.code,
+-  )
+-  const isHostPending = useSession(
+-    (s) => failure !== null && hostRetryPending(s, failure.turn),
+-  )
+-  const running = useSession((s) => s.running)
++  const legacy = useChat(chat => chat.legacy)
++  const lifecycle = useSession(session => ({ running: session.running, removed: session.removed, lastAgentError: session.lastAgentError }), (left, right) => left.running === right.running && left.removed === right.removed && left.lastAgentError === right.lastAgentError)
++  const snapshot = { ...legacy, ...lifecycle, sessionId }
++  const target = lastCompletedUserTarget(snapshot)
++  const failure = failureOfLastTurn(snapshot)
++  const isHostPending = failure !== null && hostRetryPending(snapshot, failure.turn)
++  const running = lifecycle.running
+   const retryState = useSyncExternalStore(supervisor.subscribe, supervisor.getSnapshot)
+ 
+   const canEdit = target !== null && target.turn === turn && !running
+diff --git a/src/client/RetryDock.tsx b/src/client/RetryDock.tsx
+--- a/src/client/RetryDock.tsx
++++ b/src/client/RetryDock.tsx
+@@ -1,13 +1,13 @@
+ /**
+  * Composer dock entry: the retry status row (current attempt count, wait
+  * state, final failure reason, cancel / retry-now controls). Registered into
+- * conversation.input.dock — the full-width row above the composer card.
++ * conversation.composer.dock — the full-width row above the composer card.
+  */
+ import { memo } from 'react'
+ import { useSyncExternalStore } from 'react'
+ import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
+ import type { RetrySupervisor } from '../core/retry-supervisor.ts'
+ import styles from './retry-dock.module.css'
+ 
+@@ -17,14 +17,13 @@
+   manualRetry(sessionId: SessionId): void
+ }
+ 
+-export type RetryDockProps = PropsRuntime<'conversation.input.dock'> & {
++export type RetryDockProps = PropsRuntime<'conversation.composer.dock'> & {
+   t: TranslateNS<'chat-recovery'>
+ } & RetryDockFace
+ 
+ export const RetryDockView = memo(function RetryDockView(props: RetryDockProps) {
+-  const { session, t, supervisor, manualRetry } = props
++  const { sessionId, t, supervisor, manualRetry } = props
+   const state = useSyncExternalStore(supervisor.subscribe, supervisor.getSnapshot)
+-  const sessionId = session.sessionId
+ 
+   const visible =
+     (state.phase === 'waiting' && (state.targetId ?? state.sourceId) === sessionId) ||
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -29,25 +29,39 @@
+     },
+     "client": {
+       "inject": [
+-        "@deepseek-ai/dsh-client-runtime",
+-        "@deepseek-ai/dsh-client-connection",
++        "@deepseek-ai/dsh-api-session-controller",
++        "@deepseek-ai/dsh-api-workspace-controller",
++        "@deepseek-ai/dsh-client-ui-chat",
+         "@deepseek-ai/dsh-client-ui-conversation",
+-        "@deepseek-ai/dsh-client-locale"
++        "@deepseek-ai/dsh-client-ui-renderer",
++        "@deepseek-ai/dsh-client-ui-session",
++        "@deepseek-ai/dsh-client-ui-workspace",
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-slots"
+       ],
+       "platform": "web"
+     }
+   },
+   "peerDependencies": {
+     "react": "^18.2.0",
+-    "react-dom": "^18.2.0"
++    "react-dom": "^18.2.0",
++    "@deepseek-ai/dsh-api-session-controller": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-api-workspace-controller": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-chat": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-session": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-workspace": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-session": "^0.2.0-rc.2",
++    "@deepseek-ai/dsh-llm": "^0.2.0-rc.2"
+   },
+   "devDependencies": {
+-    "@deepseek-ai/cordis": "^4.0.1",
+-    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.2",
+-    "@deepseek-ai/dsh-client-locale": "^0.1.1-rc.2",
+-    "@deepseek-ai/dsh-client-runtime": "^0.1.1-rc.2",
+-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.1-rc.2",
+-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.1-rc.2",
++    "@deepseek-ai/cordis": "4.0.4",
++    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+     "@testing-library/dom": "^10.4.1",
+     "@testing-library/react": "^16.3.2",
+     "@types/node": "^22.20.0",
+@@ -59,7 +73,15 @@
+     "tsdown": "^0.22.2",
+     "typescript": "^6.0.3",
+     "vite-tsconfig-paths": "^6.1.1",
+-    "vitest": "^4.1.8"
++    "vitest": "^4.1.8",
++    "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-api-workspace-controller": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-chat": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-session": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-client-ui-workspace": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
++    "@deepseek-ai/dsh-llm": "0.2.0-rc.2"
+   },
+   "files": [
+     "lib",
+diff --git a/lib/types/core/transcript.d.ts b/lib/types/core/transcript.d.ts
+--- a/lib/types/core/transcript.d.ts
++++ b/lib/types/core/transcript.d.ts
+@@ -1,10 +1,10 @@
+ /**
+- * Pure transcript helpers over the client ConversationSnapshot. Both halves
++ * Pure transcript helpers over the client RecoverySnapshot. Both halves
+  * of the plugin compile this module; it imports only types from the official
+  * NPM SDK and never touches a DSH source checkout.
+  */
+-import type { AssistantMessageNode, ConversationSnapshot, TurnErrorNode, UserMessageNode } from '@deepseek-ai/dsh-client-runtime/client';
+-import type { ContentBlock } from '@deepseek-ai/dsh-client-connection/client';
++import type { AssistantMessageNode, RecoverySnapshot, TurnErrorNode, UserMessageNode } from './snapshot.ts';
++import type { ContentBlock } from '@deepseek-ai/dsh-llm';
+ /**
+  * The last completed user message of a session, plus everything the edit
+  * flow needs to re-submit it from the position BEFORE that message.
+@@ -42,7 +42,7 @@
+  * @param snapshot - the live conversation snapshot.
+  * @returns the edit target, or null when nothing is editable right now.
+  */
+-export declare function lastCompletedUserTarget(snapshot: ConversationSnapshot): EditTarget | null;
++export declare function lastCompletedUserTarget(snapshot: RecoverySnapshot): EditTarget | null;
+ /**
+  * The seq of the event right before the given turn started: the latest
+  * turn/end of any earlier turn, or 0 for the first turn.
+@@ -50,14 +50,14 @@
+  * @param turn - the turn number.
+  * @returns the boundary seq (exclusive start of the turn).
+  */
+-export declare function turnStartSeq(snapshot: ConversationSnapshot, turn: number): number;
++export declare function turnStartSeq(snapshot: RecoverySnapshot, turn: number): number;
+ /**
+  * The last user message inside one turn (the turn opener).
+  * @param snapshot - the live conversation snapshot.
+  * @param turn - the turn number.
+  * @returns the message node, or null when the turn has none in-window.
+  */
+-export declare function lastUserInTurn(snapshot: ConversationSnapshot, turn: number): UserMessageNode | null;
++export declare function lastUserInTurn(snapshot: RecoverySnapshot, turn: number): UserMessageNode | null;
+ /**
+  * Whether the turn ran any tool call or slash command. Re-running such a turn
+  * would repeat side effects, so the retry policy treats tool-involved turns
+@@ -65,28 +65,28 @@
+  * @param snapshot - the live conversation snapshot.
+  * @param turn - the turn number.
+  */
+-export declare function turnHasToolActivity(snapshot: ConversationSnapshot, turn: number): boolean;
++export declare function turnHasToolActivity(snapshot: RecoverySnapshot, turn: number): boolean;
+ /** The interruption-frozen assistant partial of one turn, when present. */
+-export declare function interruptedAssistantInTurn(snapshot: ConversationSnapshot, turn: number): AssistantMessageNode | null;
++export declare function interruptedAssistantInTurn(snapshot: RecoverySnapshot, turn: number): AssistantMessageNode | null;
+ /** The durable terminal error node of one turn, when present. */
+-export declare function turnErrorInTurn(snapshot: ConversationSnapshot, turn: number): TurnErrorNode | null;
++export declare function turnErrorInTurn(snapshot: RecoverySnapshot, turn: number): TurnErrorNode | null;
+ /** Whether the turn hit the per-request output-token cap. */
+-export declare function maxTokensInTurn(snapshot: ConversationSnapshot, turn: number): boolean;
++export declare function maxTokensInTurn(snapshot: RecoverySnapshot, turn: number): boolean;
+ /**
+  * Whether the HOST already owns a pending retry for this turn (llm/retry
+  * chain scheduled or started). While the host is retrying, the client
+  * supervisor must stand down: acting would double the retry traffic.
+  */
+-export declare function hostRetryPending(snapshot: ConversationSnapshot, turn: number): boolean;
++export declare function hostRetryPending(snapshot: RecoverySnapshot, turn: number): boolean;
+ /** Whether the turn settled with a finalized (messageId-bearing) assistant message. */
+-export declare function assistantFinalizedInTurn(snapshot: ConversationSnapshot, turn: number): boolean;
++export declare function assistantFinalizedInTurn(snapshot: RecoverySnapshot, turn: number): boolean;
+ /** Count of durable user messages in the window (duplicate-message guard). */
+-export declare function userNodeCount(snapshot: ConversationSnapshot): number;
++export declare function userNodeCount(snapshot: RecoverySnapshot): number;
+ /**
+  * User messages with seq at or below the given boundary (the history prefix a
+  * fork keeps). Used to compute how many user messages a retry child is
+  * EXPECTED to carry: prefix count plus the one replayed message.
+  */
+-export declare function userNodeCountBefore(snapshot: ConversationSnapshot, boundarySeq: number): number;
++export declare function userNodeCountBefore(snapshot: RecoverySnapshot, boundarySeq: number): number;
+ /** The latest completed turn number, or null when none exists in-window. */
+-export declare function lastTurnOf(snapshot: ConversationSnapshot): number | null;
++export declare function lastTurnOf(snapshot: RecoverySnapshot): number | null;
+diff --git a/lib/types/core/retry-policy.d.ts b/lib/types/core/retry-policy.d.ts
+--- a/lib/types/core/retry-policy.d.ts
++++ b/lib/types/core/retry-policy.d.ts
+@@ -1,9 +1,9 @@
+ /**
+  * Retry policy: failure detection, recoverability classification and retry
+- * planning over a ConversationSnapshot. Pure and framework-free so both the
++ * planning over a RecoverySnapshot. Pure and framework-free so both the
+  * transcript UI and the supervisor share one decision source.
+  */
+-import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
++import type { RecoverySnapshot } from './snapshot.ts';
+ /** Additional retries after the first (failed) attempt, per the issue contract. */
+ export declare const MAX_EXTRA_RETRIES = 5;
+ /** Exponential backoff delays for attempts 1..5 (1s, 2s, 4s, 8s, 16s). */
+@@ -46,7 +46,7 @@
+  * @param snapshot - the live conversation snapshot.
+  * @returns the failure descriptor, or null when the last turn did not fail.
+  */
+-export declare function failureOfLastTurn(snapshot: ConversationSnapshot): TurnFailure | null;
++export declare function failureOfLastTurn(snapshot: RecoverySnapshot): TurnFailure | null;
+ /**
+  * Recoverable-error classification. Only model/API-level transient failures
+  * count as auto-retryable: timeouts, network errors, server errors, rate
+@@ -65,11 +65,11 @@
+  * @param turn - the failed turn number.
+  * @returns the plan, or null when the turn has no safely-replayable user message.
+  */
+-export declare function planForTurn(snapshot: ConversationSnapshot, turn: number): RetryPlan | null;
++export declare function planForTurn(snapshot: RecoverySnapshot, turn: number): RetryPlan | null;
+ /**
+  * The full retry decision for the current state of a session. The host's own
+  * pending llm/retry chain stands the supervisor down; everything else that is
+  * failed but not auto-retryable lands on the manual path (transcript button).
+  * @param snapshot - the live conversation snapshot.
+  */
+-export declare function verdictFor(snapshot: ConversationSnapshot): RetryVerdict;
++export declare function verdictFor(snapshot: RecoverySnapshot): RetryVerdict;
+diff --git a/lib/types/core/retry-supervisor.d.ts b/lib/types/core/retry-supervisor.d.ts
+--- a/lib/types/core/retry-supervisor.d.ts
++++ b/lib/types/core/retry-supervisor.d.ts
+@@ -1,3 +1,4 @@
++import type { SessionId } from '@deepseek-ai/dsh-session/types';
+ /**
+  * Retry supervisor: a framework-free state machine that re-runs a failed
+  * turn by forking one child session from the history prefix BEFORE the
+@@ -20,7 +21,7 @@
+  * through review() on every session/list change and cancels on navigation,
+  * user input, or the UI cancel button.
+  */
+-import type { ConversationSnapshot, SessionId } from '@deepseek-ai/dsh-client-runtime/client';
++import type { RecoverySnapshot } from './snapshot.ts';
+ export type SupervisorPhase = 'idle' | 'waiting' | 'running' | 'cancelled' | 'exhausted' | 'failed' | 'done';
+ export interface RetryState {
+     phase: SupervisorPhase;
+@@ -46,7 +47,7 @@
+ /** Everything the supervisor needs from the runtime; the client wiring fills it. */
+ export interface RetryPorts {
+     currentId(): SessionId | undefined;
+-    snapshot(id: SessionId): ConversationSnapshot | undefined;
++    snapshot(id: SessionId): RecoverySnapshot | undefined;
+     cwdOf(id: SessionId): string | undefined;
+     fork(opts: {
+         sessionId: SessionId;
+diff --git a/lib/types/client/index.d.ts b/lib/types/client/index.d.ts
+--- a/lib/types/client/index.d.ts
++++ b/lib/types/client/index.d.ts
+@@ -5,14 +5,14 @@
+  * - a turn-tail entry (conversation.chat.turnTail) with the Edit affordance
+  *   for the last completed user message and the manual Retry affordance for
+  *   failed turns;
+- * - a composer dock entry (conversation.input.dock) showing the retry
++ * - a composer dock entry (conversation.composer.dock) showing the retry
+  *   supervisor's attempt count, wait state, cancel / retry-now controls and
+  *   the final failure reason.
+  *
+  * Failure policy: nothing here throws at apply time - an external plugin
+  * must never take the GUI down.
+  */
+-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
++import type { Context as ClientContext } from '@deepseek-ai/cordis';
+ import { type ChatRecoveryKey } from './locales.ts';
+ declare module '@deepseek-ai/dsh-client-ui-slots' {
+     interface LocaleNamespaceMap {
+diff --git a/lib/types/client/TurnActionsView.d.ts b/lib/types/client/TurnActionsView.d.ts
+--- a/lib/types/client/TurnActionsView.d.ts
++++ b/lib/types/client/TurnActionsView.d.ts
+@@ -1,6 +1,6 @@
+ import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
+-import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client';
+-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client';
++import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client';
++import type { SessionId } from '@deepseek-ai/dsh-session/types';
+ import type { RetrySupervisor } from '../core/retry-supervisor.ts';
+ import type { SubmitEditInput } from './wiring.ts';
+ /** Business face injected into the slot component by the plugin apply. */
+@@ -10,7 +10,7 @@
+     manualRetry(sessionId: SessionId): void;
+ }
+ export type TurnActionsProps = PropsRuntime<'conversation.chat.turnTail'> & {
+-    matched: TurnTailOwnerProps;
++    matched?: TurnTailOwnerProps;
+     t: TranslateNS<'chat-recovery'>;
+ } & TurnActionsFace;
+ export declare const TurnActionsView: import("react").MemoExoticComponent<(props: TurnActionsProps) => import("react").JSX.Element | null>;
+diff --git a/lib/types/client/RetryDock.d.ts b/lib/types/client/RetryDock.d.ts
+--- a/lib/types/client/RetryDock.d.ts
++++ b/lib/types/client/RetryDock.d.ts
+@@ -1,12 +1,12 @@
+ import type { PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
+-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client';
++import type { SessionId } from '@deepseek-ai/dsh-session/types';
+ import type { RetrySupervisor } from '../core/retry-supervisor.ts';
+ /** Business face injected into the slot component by the plugin apply. */
+ export interface RetryDockFace {
+     supervisor: RetrySupervisor;
+     manualRetry(sessionId: SessionId): void;
+ }
+-export type RetryDockProps = PropsRuntime<'conversation.input.dock'> & {
++export type RetryDockProps = PropsRuntime<'conversation.composer.dock'> & {
+     t: TranslateNS<'chat-recovery'>;
+ } & RetryDockFace;
+ export declare const RetryDockView: import("react").MemoExoticComponent<(props: RetryDockProps) => import("react").JSX.Element | null>;
+diff --git a/lib/types/core/snapshot.d.ts b/lib/types/core/snapshot.d.ts
+new file mode 100644
+--- /dev/null
++++ b/lib/types/core/snapshot.d.ts
+@@ -0,0 +1,4 @@
++import type { ChatSnapshot, UserMessageNode, AssistantMessageNode, TurnErrorNode } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
++export type RecoverySnapshot = ChatSnapshot['legacy'] & Pick<SessionSnapshot, 'sessionId' | 'running' | 'removed' | 'lastAgentError'>
++export type { UserMessageNode, AssistantMessageNode, TurnErrorNode }
+diff --git a/lib/types/client/wiring.d.ts b/lib/types/client/wiring.d.ts
+--- a/lib/types/client/wiring.d.ts
++++ b/lib/types/client/wiring.d.ts
+@@ -1,36 +1,14 @@
+-/**
+- * Runtime wiring: fills the framework-free supervisor ports and the edit
+- * submission path with the real client services (ctx.sessions / ctx.workspaces).
+- */
+-import type { ISessions, IWorkspaces, SessionId } from '@deepseek-ai/dsh-client-runtime/client';
++import type { ISessions, SessionBinding, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client';
++import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client';
++import type { UiConversation } from '@deepseek-ai/dsh-client-ui-conversation/client';
++import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client';
++import type { SessionId } from '@deepseek-ai/dsh-session/types';
++import type { RecoverySnapshot } from '../core/snapshot.ts';
+ import type { RetryPorts } from '../core/retry-supervisor.ts';
+-/**
+- * Connect (or create) a blank session in the workspace the source session
+- * belongs to. Used as the first-turn fallback when forking cannot cut history
+- * before the message (no earlier turn/end exists).
+- * @param workspaces - the workspaces service.
+- * @param cwd - the source session's workspace directory.
+- */
+-export declare function connectBlank(workspaces: IWorkspaces, cwd: string | undefined): Promise<SessionId>;
+-/**
+- * Fill the supervisor ports from the live services.
+- * @param sessions - the sessions service.
+- * @param workspaces - the workspaces service.
+- */
+-export declare function createRetryPorts(sessions: ISessions, workspaces: IWorkspaces): RetryPorts;
+-/** Edit submission input (all durable facts; the text is the edited draft). */
+-export interface SubmitEditInput {
+-    sessionId: SessionId;
+-    /** Fork anchor: null falls back to a fresh blank session in the workspace. */
+-    forkAtSeq: number | null;
+-    editedText: string;
+-}
+-/**
+- * Edit submission: fork a child from the history prefix before the edited
+- * message (or connect a blank sibling for first-turn edits), open it, and
+- * send the edited text. The original session is never touched: a fork or
+- * resubmit failure leaves it exactly as it was.
+- * @param sessions - the sessions service.
+- * @param workspaces - the workspaces service.
+- */
+-export declare function createSubmitEdit(sessions: ISessions, workspaces: IWorkspaces): (input: SubmitEditInput) => Promise<void>;
++export declare function currentSessionId(snapshot: SessionListState): SessionId | undefined;
++export declare function recoverySnapshot(binding: SessionBinding, conversations: UiConversation): RecoverySnapshot | undefined;
++export declare function connectBlank(sessions: ISessions, workspaces: IWorkspaces, cwd: string | undefined): Promise<SessionId>;
++export declare function promptRetained(sessions: ISessions, id: SessionId, text: string): ReturnType<SessionBinding['session']['prompt']>;
++export declare function createRetryPorts(sessions: ISessions, workspaces: IWorkspaces, conversations: UiConversation, navigation: UiWorkspace): RetryPorts;
++export interface SubmitEditInput { sessionId: SessionId; forkAtSeq: number | null; editedText: string; }
++export declare function createSubmitEdit(sessions: ISessions, workspaces: IWorkspaces, navigation: UiWorkspace): (input: SubmitEditInput) => Promise<void>;

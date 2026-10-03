@@ -11,7 +11,7 @@ import { _electron as electron } from 'playwright'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
-import { verifyLocalPanelControls } from './panel-layout-fixture.mjs'
+import { verifyLocalPanelControls, waitForNativeSidebarCollapsed } from './panel-layout-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -21,6 +21,8 @@ const dshHome = resolve(temporary, 'dsh-home')
 const userData = resolve(temporary, 'user-data')
 const runtimeFetchGate = resolve(temporary, 'runtime-fetch-gate.txt')
 let electronApp
+let page
+let failure
 const processOutput = []
 
 async function waitForRuntimeWindow(application, timeoutMs) {
@@ -70,7 +72,6 @@ try {
     process.stderr.write(chunk)
   })
   const startupPage = await electronApp.firstWindow()
-  let page
   try {
     page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
   } catch (error) {
@@ -221,7 +222,7 @@ try {
     }))))
     throw error
   }
-  await initialNativePanel.waitFor({ state: 'hidden' })
+  await waitForNativeSidebarCollapsed(initialNativePanel)
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'collapsing the default native surface keeps compatibility tools inactive')
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-default.png') })
   await verifyLocalPanelControls(page, resolve(appDir, '../../.tmp/interaction-qa'))
@@ -312,7 +313,7 @@ try {
   await page.screenshot({ path: resolve(appDir, '../../.tmp/interaction-qa/native-preview.png') })
   assert.equal(await page.locator('[data-aionui-preview-toolbar]').isVisible(), false, 'common file preview must not load a duplicate Desktop preview')
   await nativePreview.locator('[data-sidebar-right-toggle]').click()
-  await nativePreview.waitFor({ state: 'hidden' })
+  await waitForNativeSidebarCollapsed(nativePreview)
   assert.equal(await page.locator('[data-aionui-explorer-toolbar]').isVisible(), false, 'native collapse must not automatically restore compatibility columns')
   await page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible').click()
   await nativeDock.getByRole('tab').filter({ hasText: /^文件工具$/u }).click()
@@ -321,7 +322,7 @@ try {
   await nativeDock.getByRole('tab').filter({ hasText: /^文件工具$/u }).click()
   await previewFile.click({ button: 'right' })
   await page.getByRole('menuitem', { name: '编辑 / 兼容预览', exact: true }).click()
-  await nativePreview.waitFor({ state: 'hidden' })
+  await waitForNativeSidebarCollapsed(nativePreview)
   await page.locator('[data-aionui-preview-toolbar]').waitFor({ state: 'visible' })
   await page.getByRole('button', { name: '关闭文件面板', exact: true }).click()
   const previewControls = await page.evaluate(() => {
@@ -511,6 +512,22 @@ try {
   // target before quitting the app so pending picker work cannot hold teardown.
   await browserPage.close()
 
+} catch (error) {
+  failure = error
+  console.error('directory-picker failure evidence', temporary)
+  console.error('native panel geometry', JSON.stringify(await page?.evaluate(() => [...document.querySelectorAll('[data-sidebar-right-panel]')].map(panel => {
+    const style = getComputedStyle(panel)
+    const ancestors = []
+    for (let ancestor = panel.parentElement; ancestor && ancestors.length < 8; ancestor = ancestor.parentElement) {
+      const ancestorStyle = getComputedStyle(ancestor)
+      ancestors.push({ rect: ancestor.getBoundingClientRect().toJSON(), overflowX: ancestorStyle.overflowX, overflowY: ancestorStyle.overflowY })
+    }
+    return { rect: panel.getBoundingClientRect().toJSON(), viewport: { width: innerWidth, height: innerHeight },
+      hidden: panel.getAttribute('aria-hidden'), open: panel.hasAttribute('data-sidebar-right-open'),
+      transform: style.transform, display: style.display, visibility: style.visibility, ancestors }
+  })).catch(() => undefined)))
+  await page?.screenshot({ path: resolve(temporary, 'failure.png') }).catch(() => {})
+  throw error
 } finally {
   console.log('closing directory-picker fixture')
   const closeFixture = async () => {
@@ -540,7 +557,8 @@ try {
   } finally { clearTimeout(closeDeadline) }
   assert.doesNotMatch(processOutput.join(''), /\[fixture-shutdown-navigation\]/u,
     `Desktop initiated a main-frame navigation after before-quit; fixture retained at ${temporary}`)
-  await rm(temporary, { recursive: true, force: true })
+  if (!failure && process.env.DSH_DESKTOP_KEEP_E2E_ARTIFACTS !== '1') await rm(temporary, { recursive: true, force: true })
+  else console.log(`directory-picker artifacts retained at ${temporary}`)
   console.log('directory-picker fixture exited and cleaned up')
 }
 assert.doesNotMatch(

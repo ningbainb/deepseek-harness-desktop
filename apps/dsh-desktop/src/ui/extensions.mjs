@@ -12,6 +12,8 @@ import {
   pluginEnvironmentRepairPresentation,
   pluginInstallPresentation,
 } from './plugin-management-view.mjs'
+import { normalizeDockTab } from '../dock-pages.mjs'
+import { LEGACY_CONTEXT_SUMMARY_PROMPT } from './legacy-context-guide.mjs'
 
 const themeQuery = new URLSearchParams(window.location.search).get('theme')
 if (themeQuery === 'dark' || themeQuery === 'light') {
@@ -341,9 +343,10 @@ function pluginDetailMarkup(plugin) {
     : plugin.updateAvailable
       ? `<button type="button" class="primary" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}" data-mutation-control>更新到 v${escapeHtml(plugin.latestVersion ?? '')}</button>`
       : '<span class="meta">已是当前可用版本</span>'
-  const attention = plugin.attention
+  const configuration = `<button type="button" class="primary" data-configure-plugin="${escapeHtml(plugin.name)}">配置插件自带选项</button>`
+  const attention = configuration + (plugin.attention
     ? `<section class="plugin-attention"><strong>${escapeHtml(plugin.statusLabel || '需要处理')}</strong><p>${escapeHtml(plugin.attention)}</p><div class="plugin-attention-actions"><button type="button" class="primary" data-restart-plugin="${escapeHtml(plugin.name)}" data-mutation-control>重新启动</button>${plugin.enabled ? `<button type="button" data-disable-plugin="${escapeHtml(plugin.name)}" data-mutation-control>停用</button>` : ''}${plugin.updateAvailable && !plugin.updateBlocked ? `<button type="button" data-update-plugin="${escapeHtml(plugin.name)}" data-update-compatibility="${escapeHtml(plugin.updateCompatibility?.status ?? 'unknown')}" data-mutation-control>检查更新</button>` : ''}<button type="button" data-copy-plugin-diagnostics="${escapeHtml(plugin.name)}">复制诊断信息</button></div></section>`
-    : ''
+    : '')
   const permissions = plugin.permissions?.length
     ? plugin.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
     : '<li>未声明额外权限</li>'
@@ -1136,7 +1139,29 @@ document.querySelector('#developer-copy-environment').addEventListener('click', 
       runtimeVersion: info?.runtimeVersion ?? info?.runtime,
       platform: info?.platform,
     }, null, 2)
-    await navigator.clipboard.writeText(payload)
+    if (typeof window !== 'undefined' && typeof window.dshDesktop?.copyText === 'function') {
+      await window.dshDesktop.copyText(payload)
+    } else if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(payload)
+      } catch (error) {
+        if (typeof document === 'undefined' || typeof document.execCommand !== 'function') throw error
+        const textarea = document.createElement('textarea')
+        textarea.value = payload
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        textarea.style.top = '-9999px'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        try {
+          textarea.focus()
+          textarea.select()
+          document.execCommand('copy')
+        } finally {
+          textarea.remove()
+        }
+      }
+    }
     notify('环境信息已复制')
   } catch (error) {
     await showPluginFailure(error, '复制环境信息失败')
@@ -1190,16 +1215,18 @@ for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
 let activeSettingsTab
+let activeSettingsPlugin
 const groupTitles = {
   plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能'], qqbot: ['扩展能力', 'QQ 机器人'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
-function activateTab(tab, focus = false, settingOverride) {
+function activateTab(tab, focus = false, settingOverride, plugin) {
   try { localStorage.setItem('dsh-dock-tab', tab.id) } catch { /* storage may be unavailable */ }
   const request = ++settingsRequest
   const requestedSetting = settingOverride ?? tab.dataset.setting
   const setting = requestedSetting === 'relay' ? 'models' : requestedSetting
   activeSettingsTab = setting ? tab : undefined
+  activeSettingsPlugin = plugin
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting)
   for (const nav of document.querySelectorAll('[data-tab-group]')) nav.hidden = nav.dataset.tabGroup !== tab.dataset.group
@@ -1226,7 +1253,7 @@ function activateTab(tab, focus = false, settingOverride) {
     panel.hidden = true
     panel.classList.remove('active')
   }
-  void Promise.resolve().then(() => window.dshDesktop.selectDockSetting?.(setting ?? null)).then(() => {
+  void Promise.resolve().then(() => window.dshDesktop.selectDockSetting?.(setting ?? null, plugin)).then(() => {
     if (request !== settingsRequest) return
     settingState.hidden = true
     if (!setting) applyPanels()
@@ -1249,7 +1276,7 @@ function activateTab(tab, focus = false, settingOverride) {
   if (focus) tab.focus()
 }
 document.querySelector('#dock-settings-retry').addEventListener('click', () => {
-  if (activeSettingsTab) activateTab(activeSettingsTab)
+  if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin)
 })
 
 for (const tab of tabs) {
@@ -1342,10 +1369,9 @@ document.querySelectorAll('.native-chip').forEach((chip) => {
 })
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
-  if (payload?.setting === 'value-mode') {
-    const tab = tabs.find((item) => item.dataset.tab === 'dock-settings')
+  if (['value-mode', 'models', 'usage'].includes(payload?.setting)) {
+    const tab = tabs.find((item) => item.dataset.setting === payload.setting)
     if (tab) activateTab(tab)
-    document.querySelector('[data-setting="value-mode"]')?.click()
     return
   }
   const tab = tabs.find((item) => item.dataset.tab === payload?.tab)
@@ -1473,6 +1499,11 @@ window.addEventListener('beforeunload', () => {
 }, { once: true })
 
 document.querySelector('#plugins').addEventListener('click', async (event) => {
+  const configurationButton = event.target.closest('[data-configure-plugin]')
+  if (configurationButton) {
+    activateTab(document.querySelector('#plugin-options-tab'), true, undefined, configurationButton.dataset.configurePlugin)
+    return
+  }
   const openButton = event.target.closest('[data-open-plugin]')
   if (openButton) {
     openPluginDetail(openButton.dataset.openPlugin)
@@ -1525,7 +1556,30 @@ document.querySelector('#plugins').addEventListener('click', async (event) => {
         attention: plugin.attention,
       }
       try {
-        await navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2))
+        const payload = JSON.stringify(diagnostics, null, 2)
+        if (typeof window !== 'undefined' && typeof window.dshDesktop?.copyText === 'function') {
+          await window.dshDesktop.copyText(payload)
+        } else if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(payload)
+          } catch (error) {
+            if (typeof document === 'undefined' || typeof document.execCommand !== 'function') throw error
+            const textarea = document.createElement('textarea')
+            textarea.value = payload
+            textarea.style.position = 'fixed'
+            textarea.style.left = '-9999px'
+            textarea.style.top = '-9999px'
+            textarea.style.opacity = '0'
+            document.body.appendChild(textarea)
+            try {
+              textarea.focus()
+              textarea.select()
+              document.execCommand('copy')
+            } finally {
+              textarea.remove()
+            }
+          }
+        }
         notify('诊断信息已复制')
       } catch (error) {
         await showPluginFailure(error, '复制诊断信息失败')
@@ -1811,6 +1865,20 @@ document.querySelector('#open-conversation-import')?.addEventListener('click', (
     }
   })
 })
+const legacyContextPrompt = document.querySelector('#legacy-context-prompt')
+if (legacyContextPrompt) legacyContextPrompt.value = LEGACY_CONTEXT_SUMMARY_PROMPT
+document.querySelector('#copy-legacy-context-prompt')?.addEventListener('click', async () => {
+  if (!legacyContextPrompt) return
+  try {
+    await navigator.clipboard.writeText(legacyContextPrompt.value)
+    notify('提示词已复制；请先审阅并脱敏旧会话，再手动发送给你信任的模型')
+  } catch {
+    legacyContextPrompt.focus()
+    legacyContextPrompt.select()
+    notify('自动复制失败，提示词已选中，请按 Ctrl+C 手动复制', true)
+  }
+})
+
 document.querySelector('#reset-profile-env')?.addEventListener('click', async () => {
   await extensionOperations.run(async () => {
     for (;;) {
@@ -1990,11 +2058,17 @@ document.querySelector('#import-preset').addEventListener('click', () => {
 let initialTab = document.querySelector('#value-mode-tab')
 let initialSetting
 try {
-  const previousId = localStorage.getItem('dsh-dock-tab')
-  initialTab = tabs.find(tab => tab.id === previousId)
-    ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : previousId === 'relay-tab' ? document.querySelector('#models-tab') : initialTab)
-  const previousSetting = previousId === 'memory-tab' ? 'memory' : localStorage.getItem('dsh-dock-setting')
-  if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
+  const requestedTab = normalizeDockTab(new URLSearchParams(window.location.search).get('tab'))
+  if (requestedTab) {
+    const requested = tabs.find(tab => tab.dataset.tab === requestedTab)
+    if (requested) initialTab = requested
+  } else {
+    const previousId = localStorage.getItem('dsh-dock-tab')
+    initialTab = tabs.find(tab => tab.id === previousId)
+      ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : previousId === 'relay-tab' ? document.querySelector('#models-tab') : initialTab)
+    const previousSetting = previousId === 'memory-tab' ? 'memory' : localStorage.getItem('dsh-dock-setting')
+    if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
+  }
 } catch { /* first visit opens model collaboration */ }
 activateTab(initialTab, false, initialSetting)
 await refresh()

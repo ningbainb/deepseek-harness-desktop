@@ -95,7 +95,7 @@ export function detectFrameCounts(image: HTMLImageElement): number[] {
   const canvas = document.createElement('canvas')
   canvas.width = image.naturalWidth
   canvas.height = image.naturalHeight
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (ctx === null) return Array.from({ length: 9 }, () => FRAME_COLUMNS)
   ctx.drawImage(image, 0, 0)
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data

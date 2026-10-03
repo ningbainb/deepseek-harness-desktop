@@ -6,6 +6,7 @@ export const DESKTOP_RUNTIME_ORIGIN = `${DESKTOP_RUNTIME_SCHEME}://app`
 const STREAM_OPEN_CHANNEL = 'desktop:runtime-stream-open'
 const STREAM_CANCEL_CHANNEL = 'desktop:runtime-stream-cancel'
 const STREAM_WRITE_CHANNEL = 'desktop:runtime-stream-write'
+const STREAM_END_CHANNEL = 'desktop:runtime-stream-end'
 const STREAM_FRAME_CHANNEL = 'desktop:runtime-stream-frame'
 const ENDPOINT_PATTERN = /^[A-Za-z0-9_$.-]+(?:\/[A-Za-z0-9_$.-]+)*$/u
 const MAX_STREAM_PAYLOAD_BYTES = 4 * 1024 * 1024
@@ -68,6 +69,7 @@ export async function installDesktopRuntimeProtocol({ protocol, getProvider, bef
     if (forwarded === undefined) return new Response('not found', { status: 404 })
     const provider = getProvider()
     if (provider?.status?.state !== 'ready' || typeof provider.fetch !== 'function') {
+      if (quiescing) return new Response(null, { status: 204 })
       return new Response('runtime unavailable', { status: 503 })
     }
     try {
@@ -103,7 +105,13 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     throw new TypeError('runtime stream IPC and provider getter are required')
   }
   const active = new Map()
+  const suspendedSenders = new Set()
   let quiescing = false
+  const suspend = sender => {
+    if (sender.isDestroyed?.() || suspendedSenders.has(sender)) return
+    suspendedSenders.add(sender)
+    sender.send(STREAM_FRAME_CHANNEL, { type: 'lifecycle', phase: 'quiescing' })
+  }
   const cancel = (id, reason = new Error('runtime stream cancelled')) => {
     const entry = active.get(id)
     if (entry === undefined) return false
@@ -116,6 +124,7 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
   ipcMain.handle(STREAM_OPEN_CHANNEL, (event, value) => {
     const request = validateStreamRequest(value)
     if (quiescing) {
+      suspend(event.sender)
       const id = randomUUID()
       schedule(() => {
         if (!event.sender.isDestroyed?.()) event.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'end' })
@@ -179,8 +188,19 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     return true
   })
 
+  ipcMain.handle(STREAM_END_CHANNEL, async (event, id) => {
+    if (typeof id !== 'string') return false
+    const entry = active.get(id)
+    if (entry?.sender !== event.sender) return false
+    const source = entry.source ?? await entry.sourceReady
+    if (typeof source?.close !== 'function' || controllerAborted(entry)) return false
+    await source.close()
+    return true
+  })
+
   const quiesce = async () => {
     quiescing = true
+    for (const entry of active.values()) suspend(entry.sender)
     for (const [id, entry] of active) {
       if (!entry.sender.isDestroyed?.()) entry.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'end' })
       cancel(id, new Error('runtime stream IPC quiesced'))
@@ -191,10 +211,17 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     ipcMain.removeHandler?.(STREAM_OPEN_CHANNEL)
     ipcMain.removeHandler?.(STREAM_CANCEL_CHANNEL)
     ipcMain.removeHandler?.(STREAM_WRITE_CHANNEL)
+    ipcMain.removeHandler?.(STREAM_END_CHANNEL)
     void quiesce()
   }
   dispose.quiesce = quiesce
-  dispose.resume = () => { quiescing = false }
+  dispose.resume = () => {
+    quiescing = false
+    for (const sender of suspendedSenders) {
+      if (!sender.isDestroyed?.()) sender.send(STREAM_FRAME_CHANNEL, { type: 'lifecycle', phase: 'resumed' })
+    }
+    suspendedSenders.clear()
+  }
   return dispose
 }
 

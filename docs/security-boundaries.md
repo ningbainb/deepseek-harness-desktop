@@ -37,6 +37,8 @@ There is no complete in-app local multi-account switch. The supported local iden
 
 ## Privacy defaults
 
+Desktop transports its UI and RPC over the authenticated private pipe. Official account sign-in has a separate ephemeral `127.0.0.1` HTTP listener accepting only `GET /oauth/callback`; it exposes neither the UI, plugin assets nor RPC, and closes with the Runtime. The official NPM account provider retains PKCE, state validation, credential storage and cancellation ownership. Only HTTPS `platform.deepseek.com/dsh/authorize` popups may open directly in the system browser; other renderer-owned popups retain their existing deny policy. The optional bai recommendation is a third-party connection entry, not an official account login, and price comparisons require the same model's current prices.
+
 Official packaged builds upload a fixed product-event vocabulary to the release-injected first-party endpoint. A Desktop-only local random secret derives rotating daily and monthly anonymous actors; the stable secret, IP, content, credentials, paths, and long-lived device identity are not persisted by the service. Development, source, test, and Fork builds have an inert committed configuration. Diagnostic export remains separately user initiated with `userInitiated: true` and `automaticUpload: false`; its manifest lists excluded secret values, project files, prompts, sessions, answers, tool results, user names, real home paths, and URL credentials.
 
 Diagnostic collectors are bounded and independently timed out so a damaged recovery subsystem does not force a broad data capture. Logs are redacted for credentials and account paths, and lines carrying conversation or tool content are excluded rather than summarized.

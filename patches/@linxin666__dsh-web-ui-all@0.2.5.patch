@@ -1,8 +1,8 @@
 diff --git a/cordis.patch.yml b/cordis.patch.yml
-index bb015a1b282acb7966bdbacafb60871b7f8d5010..0fb81511e8f7d8816328c1412a557cc278a40575 100644
+index bb015a1b282acb7966bdbacafb60871b7f8d5010..572a4c242a7960f7e8023fe3fe5d57b60f4aa7b0 100644
 --- a/cordis.patch.yml
 +++ b/cordis.patch.yml
-@@ -13,16 +13,40 @@
+@@ -13,16 +13,45 @@
      - id: web-ui-settings
        name: '@linxin666/dsh-client-ui-web-ui-settings'
  
@@ -28,20 +28,22 @@ index bb015a1b282acb7966bdbacafb60871b7f8d5010..0fb81511e8f7d8816328c1412a557cc2
 +- insert:
 +    - id: memory
 +      name: '@ningbainb/dsh-memory'
- 
--# from ../dsh-community-plugins
++
 +# supplied by DeepSeek Harness Desktop
- - insert:
--    - id: web-ui-community-plugins
--      name: '@linxin666/dsh-client-ui-community-plugins'
++- insert:
 +    - id: web-ui-mode-switcher
 +      name: '@linxin666/dsh-client-ui-mode-switcher'
- 
++
 +# supplied by DeepSeek Harness Desktop
 +- insert:
 +    - id: live-stats
 +      name: '@linxin666/dsh-live-stats'
-+
+ 
+ # from ../dsh-community-plugins
+ - insert:
+     - id: web-ui-community-plugins
+       name: '@linxin666/dsh-client-ui-community-plugins'
+ 
 +# from ../dsh-plugin-manager
 +- insert:
 +    - id: web-ui-plugin-manager
@@ -49,7 +51,7 @@ index bb015a1b282acb7966bdbacafb60871b7f8d5010..0fb81511e8f7d8816328c1412a557cc2
  # from ../dsh-aionui-panel
  - insert:
      - id: web-ui-dsh-aionui-panel
-@@ -82,8 +106,3 @@
+@@ -82,8 +111,3 @@
  - insert:
      - id: web-ui-skin-center
        name: '@linxin666/dsh-client-ui-skin-center'
@@ -59,7 +61,7 @@ index bb015a1b282acb7966bdbacafb60871b7f8d5010..0fb81511e8f7d8816328c1412a557cc2
 -    - id: web-ui-better-sidebar
 -      name: 'dsh-better-sidebar'
 diff --git a/lib/client.js b/lib/client.js
-index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..74f55fb852101cdcc1639138a3e818fb162d4c01 100644
+index 4c3d714fb46bf1781dcc3d18743980c9e8b521d5..3a4ff60e504ad34ba2297dbc2ce90e58fe5050a0 100644
 --- a/lib/client.js
 +++ b/lib/client.js
 @@ -4,6 +4,376 @@ window.__ModuleLoader__.load({

@@ -4,11 +4,12 @@ import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-s
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { AgentTeamSettingsCard } from './AgentTeamSettingsCard.tsx'
 import css from './dock-settings.module.css'
+import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
 
-export const DOCK_SETTINGS = ['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions'] as const
+export const DOCK_SETTINGS = ['relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
-export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'dsh-session-archive' } as const
+export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions' } as const
 function sectionFor(id: DockSetting): string | undefined { return DOCK_SECTIONS[id as keyof typeof DOCK_SECTIONS] }
 
 export function isDockSetting(value: unknown): value is DockSetting {
@@ -27,8 +28,9 @@ export function dockSettingFromUrl(): DockSetting | undefined {
 }
 
 /** Dedicated runtime document in the Dock; all forms keep their official slot bindings. */
-export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plugin.item' | 'settings.section'> & PropsLocale<'web-ui-plugins'>) {
+export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSlots<'web-ui.plugin.item' | 'settings.section' | 'plugins.row.config'> & PropsLocale<'web-ui-plugins'> & { pluginOptions?: PluginOptionsDirectory }) {
   const [selected, setSelected] = useState<DockSetting>(() => dockSettingFromUrl() ?? 'value-mode')
+  const [plugin, setPlugin] = useState(() => new URLSearchParams(window.location.search).get('desktop-dock-plugin') ?? '')
   const [theme, setTheme] = useState(() => new URLSearchParams(window.location.search).get('desktop-dock-theme') === 'dark' ? 'dark' : 'light')
   const [visited, setVisited] = useState<DockSetting[]>([selected])
   const [palette, setPalette] = useState<DesktopPalette | null>(null)
@@ -44,18 +46,27 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
       navigateTo(next)
     }
     window.addEventListener('dsh:dock-setting', navigate)
-    const syncTheme = (event: Event) => setTheme((event as CustomEvent).detail === 'dark' ? 'dark' : 'light')
+    const syncPlugin = (event: Event) => {
+      const value = (event as CustomEvent).detail
+      if (typeof value === 'string') setPlugin(value)
+    }
+    window.addEventListener('dsh:dock-plugin', syncPlugin)
+    const syncTheme = (event: Event) => {
+      setTheme((event as CustomEvent).detail === 'dark' ? 'dark' : 'light')
+      setPalette(null)
+    }
     window.addEventListener('dsh:dock-theme', syncTheme)
     const syncPalette = (event: Event) => setPalette((event as CustomEvent<DesktopPalette | null>).detail)
     window.addEventListener('dsh:dock-palette', syncPalette)
     return () => {
       window.removeEventListener('dsh:dock-setting', navigate)
+      window.removeEventListener('dsh:dock-plugin', syncPlugin)
       window.removeEventListener('dsh:dock-theme', syncTheme)
       window.removeEventListener('dsh:dock-palette', syncPalette)
     }
   }, [])
   const personal = selected === 'personal-prompt' || selected === 'memory'
-  const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions' } as const
+  const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions', 'plugin-options': 'dockPluginOptions' } as const
   const sectionTitle = sectionTitles[selected as keyof typeof sectionTitles]
   const paletteStyle = palette ? {
     '--dsw-alias-bg-layer-1': palette.background, '--dsw-alias-bg-layer-2': palette.background, '--dsw-alias-bg-layer-3': palette.background,
@@ -83,9 +94,11 @@ export function DockSettingsPage({ renderSlot, t }: PropsRenderSlots<'web-ui.plu
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
         {id === 'value-mode' && <AgentTeamSettingsCard />}
-        {sectionFor(id)
+        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
-            {renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}</>
+            {id === 'appearance'
+              ? renderSlot('settings.section', { close: () => {} }, { only: 'skin-center', fallback: renderSlot('web-ui.plugin.item', {}, { only: 'skins', fallback: <p role="status">{t('dockSettingUnavailable')}</p> }) })
+              : renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}</>
           : renderSlot('web-ui.plugin.item', {}, { only: id, fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
       </SafePluginBoundary>
       {id === 'value-mode' && <aside className={css.collaborationAdvice}><strong>使用建议</strong><span>复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。</span></aside>}

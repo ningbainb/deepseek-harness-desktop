@@ -215,6 +215,16 @@ export function validateCompatPatchRegistry(
 
 export const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
   {
+    id: 'cold-blank-session-checkpoint',
+    appliesTo: ['0.2.0-rc.2'],
+    upstreamReference: '@deepseek-ai/dsh-session-projection-cache 0.2.0-rc.2 cachedSnapshot zero-I/O listing and coldSnapshot durable log replay',
+    owner: 'desktop-platform',
+    tests: ['packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts'],
+    reason: 'Refresh stale blank checkpoints from validated durable logs before the sidebar hides restored history.',
+    removeWhen: 'The upstream session list refreshes stale blank checkpoints before applying workspace visibility filters.',
+    lastVerified: '2026-10-01',
+  },
+  {
     id: 'queued-turn-continuation',
     appliesTo: ['0.1.1-rc.1', '0.1.5-alpha.1', '0.1.5-rc.1'],
     upstreamReference: '@deepseek-ai/dsh-agent 0.1.1-rc.1, 0.1.5-alpha.1, and 0.1.5-rc.1 agent/status public hook behavior',

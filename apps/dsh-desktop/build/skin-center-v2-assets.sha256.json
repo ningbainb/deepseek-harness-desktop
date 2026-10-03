@@ -1,0 +1,469 @@
+{
+  "source": "DeepSeek Harness Desktop 4.4.0 packaged Skin Center 0.2.5",
+  "files": [
+    {
+      "path": "cyber-night/assets/cyber-night-art.webp",
+      "sha256": "166f2d1431778be44d99c25738adb21c6c287df812ad96e39399e62a2d2206b3"
+    },
+    {
+      "path": "cyber-night/assets/cyber-night-icon.svg",
+      "sha256": "cb313f828b2a67342c454aba9ea4beea172a12c8f4a94132403f8efef4429321"
+    },
+    {
+      "path": "cyber-night/hooks.mjs",
+      "sha256": "199f37fe6969e3dfae4891708604b6b639f011068c10356f774145512fd3be69"
+    },
+    {
+      "path": "cyber-night/patches.css",
+      "sha256": "35a8744495f6f1bf78b9e40581d8a93d399141bf008c255a54811326e96c582e"
+    },
+    {
+      "path": "cyber-night/preview/dark.png",
+      "sha256": "66db15c9b02bdd66923583d287ada76847d67ebd5a07f7280e18ff7f0b8ed305"
+    },
+    {
+      "path": "cyber-night/preview/light.png",
+      "sha256": "c419e590b98b51bb5c879ec6f1b918a84197f14f5add7b539e188346345b2ad2"
+    },
+    {
+      "path": "cyber-night/skin.css",
+      "sha256": "1e646b3c16adb2f779737c3bbf443b2b53bda00766283c838b3a371d54cd5193"
+    },
+    {
+      "path": "cyber-night/skin.json",
+      "sha256": "9e6de744a9978df55bd01c25280c85c38e4d3d5c0fa85b8eaa2f0d7d86edf45b"
+    },
+    {
+      "path": "dragon-heir/assets/dark-art.webp",
+      "sha256": "1c3b334a4bce1d5be2b103cd8edb24a1e19a8b65fca6133082b2b05ee446b9e2"
+    },
+    {
+      "path": "dragon-heir/assets/light-art.webp",
+      "sha256": "f78831a369daab14d2c36ef7bf2cdd33600aed5bf11d15d7d4f2b79e2499f9af"
+    },
+    {
+      "path": "dragon-heir/hooks.mjs",
+      "sha256": "ccc644148fd71cc32723891e97ed586b86fe2f86e0f36362133de7d66d08f5bd"
+    },
+    {
+      "path": "dragon-heir/patches.css",
+      "sha256": "90e01cc5e098f90c02d74b3cbccce37df636804dab3cd316ebc9569e8161e43b"
+    },
+    {
+      "path": "dragon-heir/preview/dark.png",
+      "sha256": "d98aefc229e6fa28ee63b36fd9eeaabd170446f02010de02bbf70f5468493afb"
+    },
+    {
+      "path": "dragon-heir/preview/light.png",
+      "sha256": "43585376357a58f17108913f2a63797b2e84df4a6755ba2d4b8b1f39b8fac645"
+    },
+    {
+      "path": "dragon-heir/skin.css",
+      "sha256": "7a50c1b55227f897722430f99c910d02c359a5ce31f8d380893301c27690f4ed"
+    },
+    {
+      "path": "dragon-heir/skin.json",
+      "sha256": "6d261d9c0311ee6bda8ddedb981d37a2e942af7366919993d9e455ce899c9a52"
+    },
+    {
+      "path": "furina/assets/furina-art.jpg",
+      "sha256": "5d73357c5ee028fa67e3615379a89f67d4543dc902f89ee4535bfedcfd77a659"
+    },
+    {
+      "path": "furina/assets/furina-icon.png",
+      "sha256": "d1e6058d19b04817a623dc6e3a99405c70defaf412e9296edf7dbe2032ff7cbe"
+    },
+    {
+      "path": "furina/hooks.mjs",
+      "sha256": "713668d3a50da8878337feb4553f953eea781734934610af37a58dea37112ec9"
+    },
+    {
+      "path": "furina/LICENSE",
+      "sha256": "02e1e3ebf73df5c1840c842a8e93b40942bf6e53a66acbe6c5643fc8664ff97d"
+    },
+    {
+      "path": "furina/patches.css",
+      "sha256": "0f4d48904763b1928c36ed109df5bd8f6666824e0313a650ab9a4adbaad9927d"
+    },
+    {
+      "path": "furina/preview/dark.png",
+      "sha256": "bc16762706c5e205959d81bbcf0df523cc710de23672702b29d9452c49d9c1cc"
+    },
+    {
+      "path": "furina/preview/light.png",
+      "sha256": "8dddbd4dd2e18b0925b3841fd1a641e752b2c202da6e2a45110a7841d0eccdd9"
+    },
+    {
+      "path": "furina/skin.css",
+      "sha256": "3325709c7c7ad7433bbaa3685d7b6bbf24c6099ec86b26839a698a25ba7925f6"
+    },
+    {
+      "path": "furina/skin.json",
+      "sha256": "2eb7afbf5256186882b9b89f5611e899249dd4dad8a9f618df5107a246c31d7d"
+    },
+    {
+      "path": "harbor/assets/harbor-art.webp",
+      "sha256": "8b580f05bf017027d0c8b3d1d0d321a84d89af1efbc43c89cc0705e62557fda2"
+    },
+    {
+      "path": "harbor/assets/harbor-icon.svg",
+      "sha256": "fc9f82e5fa4998cb3e48a85662bcb719c7ecbd305acc7b544e181605192dbf45"
+    },
+    {
+      "path": "harbor/hooks.mjs",
+      "sha256": "7981a2f98d1ade2815f7e33e2d79672c280334001a00406bb11b5362ce8182bf"
+    },
+    {
+      "path": "harbor/patches.css",
+      "sha256": "2683af321f8cc80987550e93768c290a244c0e7f6c321e333550c9bb6927829a"
+    },
+    {
+      "path": "harbor/preview/dark.png",
+      "sha256": "ea181e397f2de98cb2210dc089acb6a43c7ec75e8f4a314e0b85cc6b7f83ca2b"
+    },
+    {
+      "path": "harbor/preview/light.png",
+      "sha256": "c26bc5694fc3aa2f41306da9827afbcfc6019a2cc216bd848dc574654fa1fd2d"
+    },
+    {
+      "path": "harbor/skin.css",
+      "sha256": "ab942b183c21bb3fda441770feced0548915b3d7827fe73be7473094216ff7f0"
+    },
+    {
+      "path": "harbor/skin.json",
+      "sha256": "14873330c16c059dc1076badf09d852ecce6352d4f9dafe7174a56db9bd670ea"
+    },
+    {
+      "path": "maid-atelier/assets/maid-atelier-icon.webp",
+      "sha256": "be7ea360355b13213250b5920c69d2036f10db003c4bcc8756366f409656b6b0"
+    },
+    {
+      "path": "maid-atelier/assets/maid-atelier-maid-left-v5.webp",
+      "sha256": "af7bfd2e18505fc9d6f94cefd9febc92b31c1b2b66c756982d91fc7b93fb184c"
+    },
+    {
+      "path": "maid-atelier/assets/maid-atelier-maid-right-v6.webp",
+      "sha256": "34b55580ada4af5b9d519f5ae09e8656164197a3cbadceace73d98f3da278ca7"
+    },
+    {
+      "path": "maid-atelier/assets/maid-atelier-palace-day-v4.webp",
+      "sha256": "52e7dce6993e3f955c3fbb2875885e7ab60fb38ca89adb15d977c7a85d58c073"
+    },
+    {
+      "path": "maid-atelier/assets/maid-atelier-palace-night-v4.webp",
+      "sha256": "ae6917bb1aafa71e6a10cfcaa1289f13e265aa7f32d3fb7c1988004bf50f8983"
+    },
+    {
+      "path": "maid-atelier/assets/maid-bottom-crest-v1.webp",
+      "sha256": "24f2fb04ce2d38574a3817f6d675b8c1ee5d9322588eec651271f67aabfcb48d"
+    },
+    {
+      "path": "maid-atelier/assets/maid-bottom-trim-tile-v1.webp",
+      "sha256": "47072d2d652f09e857dbc8555ff5c1917c926ef5d4581641f7018b1607c42fda"
+    },
+    {
+      "path": "maid-atelier/assets/maid-bow-v1.webp",
+      "sha256": "dcf64a43ad6b9e71c24c91fb9b1d7fe8af534497fd421213472bea96e6bc04b5"
+    },
+    {
+      "path": "maid-atelier/assets/maid-chibi-v1.webp",
+      "sha256": "405917afdb68d725624bbf7e4f1619a35fc4004039b7d553c5528ca5f65308d3"
+    },
+    {
+      "path": "maid-atelier/assets/maid-composer-frame-v4.webp",
+      "sha256": "3135deb5d14d3ea44940edcf296ba2ffa14e242d5342a1a94618df0c57979482"
+    },
+    {
+      "path": "maid-atelier/assets/maid-new-session-v1.webp",
+      "sha256": "fa6d49a717c04651fd7d1afb30b853f63cbaa5bf483e58cb4bfe5ef69fc6ff50"
+    },
+    {
+      "path": "maid-atelier/assets/maid-settings-frame-v1.webp",
+      "sha256": "3d2b126caf0549c2e86684dcbc0ff4443b887e5e1684190710d2df7940466d98"
+    },
+    {
+      "path": "maid-atelier/assets/maid-sidebar-corner-v1.webp",
+      "sha256": "707f05bf4abed25405ca45c5c32bcf95ab7cb3a6dae3e53da29f814a8495665c"
+    },
+    {
+      "path": "maid-atelier/assets/maid-sidebar-swag-v1.webp",
+      "sha256": "cd728ce5c1794ec4958ef75c4cdd60a3d513b871bea99e3b526656f14089fd74"
+    },
+    {
+      "path": "maid-atelier/assets/maid-top-trim-tile-v1.webp",
+      "sha256": "e49115f3942ea5c5034c81016c61944b5261c8ea410318cb0419b445c990b063"
+    },
+    {
+      "path": "maid-atelier/assets/maid-workspace-ribbon-v2.webp",
+      "sha256": "e2b04c3eca1871c5e73417674582a09b13de60119ca9bb9c112317232c5049fa"
+    },
+    {
+      "path": "maid-atelier/assets/maid-workspace-shield-v2.webp",
+      "sha256": "b59aa9d4ecfbbae6e62d872c964bce8ec870ed500e7cbc7a7f02bbdd0b93e87e"
+    },
+    {
+      "path": "maid-atelier/hooks.mjs",
+      "sha256": "54394436db0a9dfd51972adbc31c567b1871632cb599e1a8440b87b98401a2d4"
+    },
+    {
+      "path": "maid-atelier/LICENSE",
+      "sha256": "1349a4b6148492b44f629e64eed676612e234fe9a839e4f3b277c1482c8849f1"
+    },
+    {
+      "path": "maid-atelier/NOTICE",
+      "sha256": "ca42fd8e4b877137d965afa51ee108d833fa0d6b8f5c7397d7dfcebdddcf5ef6"
+    },
+    {
+      "path": "maid-atelier/patches.css",
+      "sha256": "27b0da69ac0f62206b9f19487b9538b1a5ad6814b71139a9399b2d1f6d3460e5"
+    },
+    {
+      "path": "maid-atelier/preview/dark.png",
+      "sha256": "2d4265c12efa067afc426e507fe651dd2f3b2f56e860c4a07e46b2b080e64cdd"
+    },
+    {
+      "path": "maid-atelier/preview/light.png",
+      "sha256": "1678674d62b70709271b79668dfe061e80b1c66e7d27b83eaf8a0119be4fcad5"
+    },
+    {
+      "path": "maid-atelier/skin.css",
+      "sha256": "cc4530cb981e0aae73ab3bdf785135379dc065ea28ab374204b19e14e2fbb4d9"
+    },
+    {
+      "path": "maid-atelier/skin.json",
+      "sha256": "53d2fa5bb7f6d1bfe8e9753bf0c6e05ed01ddf76d4a66d69de7fac64d9e4f7b7"
+    },
+    {
+      "path": "matrix/hooks.mjs",
+      "sha256": "2e13e495adabe900df797cdbe930b8cb7fdb2ce721c1ba021e6eb2e74326e551"
+    },
+    {
+      "path": "matrix/patches.css",
+      "sha256": "d416957ea4a7761409b2cf945e5235aed941cd8e74948e0806cc7c5f9c8f7bab"
+    },
+    {
+      "path": "matrix/preview/dark.png",
+      "sha256": "4f40dd376d5aba717b4a20f4361c4a908125aba55f270aa9a24950a5eae4a5c8"
+    },
+    {
+      "path": "matrix/preview/light.png",
+      "sha256": "4f40dd376d5aba717b4a20f4361c4a908125aba55f270aa9a24950a5eae4a5c8"
+    },
+    {
+      "path": "matrix/skin.css",
+      "sha256": "08b317825085f5e2803ced8a76cfdb6d1d429af9ecf5276ae6379ebc69b36032"
+    },
+    {
+      "path": "matrix/skin.json",
+      "sha256": "007ff2822caae57fb001801347452957e6a81b28b664dde0d3921b8361681117"
+    },
+    {
+      "path": "miku/assets/miku-art-light.jpg",
+      "sha256": "fcdec57ca0fef16fd775ac598908d24ffcbb7f04dc6a9bb18ed3d8ba4625e61e"
+    },
+    {
+      "path": "miku/assets/miku-art.webp",
+      "sha256": "baa346f68e8aa8b8e5471781d9fc1a56463bd3da4dd261cc5dba34884e2fcfa8"
+    },
+    {
+      "path": "miku/hooks.mjs",
+      "sha256": "34d12bbc572de39aa2e281b1b035128637e14ff59fc0b2c1122687f10d364b5a"
+    },
+    {
+      "path": "miku/patches.css",
+      "sha256": "8afa80ae43371cfd3e4a1f6fdf08b6993f1ed7daf5aac59bbcc3a332411fe353"
+    },
+    {
+      "path": "miku/preview/dark.png",
+      "sha256": "df8a78aa2bceaa21de48acfd94ff1dd56c716ba6b21a2c5f708dcd00d77e615f"
+    },
+    {
+      "path": "miku/preview/light.png",
+      "sha256": "749a5281bb5ce2f4ed36275e494a4522fb91bb3e173dd72128a982c08faa5357"
+    },
+    {
+      "path": "miku/skin.css",
+      "sha256": "054a33cac5bc7baa3828f513c59f027b0fa1800903ce00a93b5d47ac3927646f"
+    },
+    {
+      "path": "miku/skin.json",
+      "sha256": "b7051188bf34dc9bfdf2909ee4d90c351eca1e71a75c059bf094bc6f0b20560a"
+    },
+    {
+      "path": "minecraft/hooks.mjs",
+      "sha256": "deb4abe5e9dc64b075cb6ab1cfbdb153534a6cf837e3558cc0daee7b1bc6eb1a"
+    },
+    {
+      "path": "minecraft/patches.css",
+      "sha256": "610d7aa2b7f0dbf7ae55b23c39f6ac7494e74ab736a821e4e03927a9e3a03435"
+    },
+    {
+      "path": "minecraft/preview/dark.png",
+      "sha256": "bf4dfb106be4f71651cba8b8163b2a8bf6e9e7bb6ea0f65f7a9bdb151179b42e"
+    },
+    {
+      "path": "minecraft/preview/light.png",
+      "sha256": "65cac5d391fa3642d0df59475830d37840d467f7d496e6dc7ac5658206d27c52"
+    },
+    {
+      "path": "minecraft/skin.css",
+      "sha256": "bc976480c58bbf7662d53448d6e1c2b245cb002088bbca670ef8dd3bf739bcbd"
+    },
+    {
+      "path": "minecraft/skin.json",
+      "sha256": "30b5dbc662302e3b2eff1498bba57a4c4d36aa70bf3933f099db8bba96fd8550"
+    },
+    {
+      "path": "mint/preview/dark.png",
+      "sha256": "2d84cc28b0198d006b6f9d5085c97fefe99a98d3121cf651c52e9424dc3f2f78"
+    },
+    {
+      "path": "mint/preview/light.png",
+      "sha256": "f99a8a0bfc76ddbde248e98d436eee3d63df42cfd8478c343264bc090f5103d0"
+    },
+    {
+      "path": "mint/skin.css",
+      "sha256": "ee49e1ef04ab70d3ac12ccad5e6214d165ff18a8659baeb4f7b9a085c1b33622"
+    },
+    {
+      "path": "mint/skin.json",
+      "sha256": "e33eaa5b0340f299a6b801c95df031e7f08aa5ac27cfba06a53c864b17ec8cb7"
+    },
+    {
+      "path": "summer-liquid-glass/assets/summer-liquid-glass-art.jpg",
+      "sha256": "4d6548db1996b79f6f0f3e3f608e099c5d06d54af7f1bcbdb59d82dea1f1b531"
+    },
+    {
+      "path": "summer-liquid-glass/patches.css",
+      "sha256": "33290aa22a16737efb42d441f1d87a03ee8412083b3e11cfd7dfe033c6ab5743"
+    },
+    {
+      "path": "summer-liquid-glass/preview/dark.png",
+      "sha256": "d75aab9d1b5fd82b82cd93d5b3dc3edb3074dee57c28a90fb770cf8e7821c68b"
+    },
+    {
+      "path": "summer-liquid-glass/preview/light.png",
+      "sha256": "83248d107e6b7f999b3816b4b07d847e8a115d6fbe7ec666a57f4fd02524eba7"
+    },
+    {
+      "path": "summer-liquid-glass/skin.css",
+      "sha256": "0d80e3d8b022231afb139e897d13192f0a7933c782f00a6da4e6046f499d6a14"
+    },
+    {
+      "path": "summer-liquid-glass/skin.json",
+      "sha256": "36f98977957f4c6091e10ca593a60dc0cd5733e41993b854d97c074a620f80fd"
+    },
+    {
+      "path": "trading/hooks.mjs",
+      "sha256": "ccdb09baf852656bdd654cd30d5bba0a19c22fab0f3a9f6917a144f53251cec1"
+    },
+    {
+      "path": "trading/patches.css",
+      "sha256": "05fcc37240efb14e87e1ce3417a651b64b597d3ea22da42efccf95d3ab765c02"
+    },
+    {
+      "path": "trading/preview/dark.png",
+      "sha256": "e7d60b5d9c4860e6bba3cf5018c83d157a539db0b98b7d615b7048229c576d1a"
+    },
+    {
+      "path": "trading/preview/light.png",
+      "sha256": "8f83f8ea8a152285a0871bf165f5676845fbdd119e4d400eb7453141495399af"
+    },
+    {
+      "path": "trading/skin.css",
+      "sha256": "3413531a54f1b7762d5cbd995f23fed2fd7e68aa59d9691e673066a846332c39"
+    },
+    {
+      "path": "trading/skin.json",
+      "sha256": "486bab0ccee7b627c3a8c9787bde883774b57778593301aeca7c99cade49ef90"
+    },
+    {
+      "path": "whale-mom/assets/whale-icon.svg",
+      "sha256": "868ad60bce433f097c5ce4844a46b80c00fd4e68f6a925499d36aaa2fdea8e35"
+    },
+    {
+      "path": "whale-mom/assets/whale-mom-art.jpg",
+      "sha256": "358d1913f4c535ca1903f2a16bc3fc57abc5362a8cbf29d38cba24ad4d6e32ef"
+    },
+    {
+      "path": "whale-mom/hooks.mjs",
+      "sha256": "be8921f66e7ef6d73a0c12686f9b0134fb1f4d47e38d1dedc09f4a74c1533b83"
+    },
+    {
+      "path": "whale-mom/patches.css",
+      "sha256": "64787e7cf34ec876a5c9e7513ed53114ce102d171702d8a0360e7f64c1d3121a"
+    },
+    {
+      "path": "whale-mom/preview/dark.png",
+      "sha256": "e2939c0b0d004f44681e838c345e397edfb27b86325fa00ee8d8711ea6b98683"
+    },
+    {
+      "path": "whale-mom/preview/light.png",
+      "sha256": "e9cdb9b63a2028abb6757ba8916a906481e37da3eac077afa9d0e45dd5bdd2c4"
+    },
+    {
+      "path": "whale-mom/skin.css",
+      "sha256": "4b341bab3d52e725e67e913867fe93b72425df54d008b77520064eb8e919d2a8"
+    },
+    {
+      "path": "whale-mom/skin.json",
+      "sha256": "597ed1e8924ef04211f7facb340d593b3430b6091624adc17570b0c6797aca66"
+    },
+    {
+      "path": "whale-song/assets/whale-art.webp",
+      "sha256": "9b74076df6da331a69875b9dcee6233193f1ac6254694fd429e179cefaf5d95d"
+    },
+    {
+      "path": "whale-song/assets/whale-icon.png",
+      "sha256": "d1e6058d19b04817a623dc6e3a99405c70defaf412e9296edf7dbe2032ff7cbe"
+    },
+    {
+      "path": "whale-song/hooks.mjs",
+      "sha256": "beb0f140dab1abb40bda52ad2ae1970feb761e2184e64e1d5810fab7c32dfff3"
+    },
+    {
+      "path": "whale-song/patches.css",
+      "sha256": "ef9f430bc7ec045e7aa7e19ae0dc6fa9c8178d28878966dee0044f0bb38b8f45"
+    },
+    {
+      "path": "whale-song/preview/dark.png",
+      "sha256": "3eef3901f51376aa7df0539e99ab60e21ac6ca49e809fac0cac858b6765a681a"
+    },
+    {
+      "path": "whale-song/preview/light.png",
+      "sha256": "1affc1ceb97f94df4621723227ef7037afdb2b1f5dd752f181765e8506a58bcb"
+    },
+    {
+      "path": "whale-song/skin.css",
+      "sha256": "3a7bb95a121858937dd077b2f3b93f89a639b81ff81c165acefc41e6c47e6992"
+    },
+    {
+      "path": "whale-song/skin.json",
+      "sha256": "0064dc3e004fee30d8290f57f9e90abff4e661cc955fb53067a4b0a89e2718c8"
+    },
+    {
+      "path": "xp/hooks.mjs",
+      "sha256": "823f25fd5f969feb8e51d8ff1577c1cbecbad847b2abac6e5020fc9ef543663f"
+    },
+    {
+      "path": "xp/patches.css",
+      "sha256": "b0ddb4e0671e5ec19866429bdb0d9b1dd5c8bdbef8d7dd3f719bdd33bc91cd00"
+    },
+    {
+      "path": "xp/preview/dark.png",
+      "sha256": "f9041e08777f5eabccb81a67b88e6c2bb4361fd94bd3fb7718fe5d7262cc94d7"
+    },
+    {
+      "path": "xp/preview/light.png",
+      "sha256": "f03d9f40f32ec6275f1173a3572391e5eed060a06aa6367283264063da9e49f6"
+    },
+    {
+      "path": "xp/skin.css",
+      "sha256": "e9230ac95016aca20f482b578d9be4c36556c45d1f61f8a6ab679467c91369e3"
+    },
+    {
+      "path": "xp/skin.json",
+      "sha256": "45df73f14c1ed8b8d3e4dd267f1ab879a7d2c4e99c748048c3d0d99f646b682c"
+    }
+  ]
+}

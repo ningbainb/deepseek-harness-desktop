@@ -14,6 +14,7 @@ export default clientBundle('@ningbainb/dsh-memory', ['src/index.ts'], {
     '@deepseek-ai/dsh-system-prompt',
     '@deepseek-ai/dsh-tools',
     '@deepseek-ai/dsh-workspace',
+    '@deepseek-ai/schemastery',
     '@ningbainb/dsh-user-scope',
     'schemastery',
   ],

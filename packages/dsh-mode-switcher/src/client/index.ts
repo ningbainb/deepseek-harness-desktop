@@ -7,7 +7,7 @@ import { ModeSwitcher } from './ModeSwitcher.tsx'
 import { ModeSwitcherController } from './mode-controller.ts'
 import { modeSwitcherDependencies } from './runtime-adapter.ts'
 
-export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'conversation']
+export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'conversation', 'uiWorkspace']
 
 export function apply(ctx: ClientContext): void {
   if (typeof (ctx.sessions as unknown as { noteAgentPreset?: unknown }).noteAgentPreset === 'function') {

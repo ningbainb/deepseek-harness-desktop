@@ -1,0 +1,315 @@
+:root {
+  color: #0a1e4a;
+  background-color: #d0e8f8;
+}
+
+body[data-ds-dark-theme] {
+  color: #d8e5f5;
+  background-color: #081a40;
+}
+
+:root {
+  --dsw-alias-bg-base: #ffffff6b;
+  --dsw-alias-bg-layer-1: #f4f8fd7a;
+  --dsw-alias-bg-layer-2: #ebf2fa85;
+  --dsw-alias-bg-layer-3: #e2ecf88c;
+  --dsw-alias-bg-mask-1: #0a1e4a6b;
+  --dsw-alias-bg-mask-2: #0a1e4a33;
+  --dsw-alias-bg-mask-3: #0a1e4a80;
+  --dsw-alias-bg-mask-photo: #060e24e0;
+  --dsw-alias-bg-module-platform: #ebf2fa85;
+  --dsw-alias-bg-multi-select: #d9e9f5cc;
+  --dsw-alias-bg-overlay: #f0f6fceb;
+  --dsw-alias-bg-skeleton: #0a1e4a0f;
+  --dsw-alias-border-inverted2: #fff9;
+  --dsw-alias-border-inverted: #fff6;
+  --dsw-alias-border-l1: #1a3a7a26;
+  --dsw-alias-border-l2-darkmode-thin: #1a3a7a33;
+  --dsw-alias-border-l2: #1a3a7a38;
+  --dsw-alias-border-l3: #1a3a7a52;
+  --dsw-alias-border-l4: #1a3a7a6b;
+  --dsw-alias-brand-primary-invert: #fff;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: #4d8fd4;
+  --dsw-alias-brand-primary: #4d8fd4;
+  --dsw-alias-brand-text: #122b54;
+  --dsw-alias-button-contrast-fill: #1a3a7a;
+  --dsw-alias-button-elevated-fill: #fff;
+  --dsw-alias-button-floating-fill: #fff;
+  --dsw-alias-button-floating-hover: #e9f1f9;
+  --dsw-alias-button-ghost-active-border: #a8c8e8;
+  --dsw-alias-button-ghost-active-fill: #d9e9f5;
+  --dsw-alias-button-ghost-active-hover: #c4dbf1;
+  --dsw-alias-button-info-fill: #2f6fb8;
+  --dsw-alias-button-info-hover: #3f7cc6;
+  --dsw-alias-button-primary-dimmed: #d9e9f5;
+  --dsw-alias-button-primary-fill: #4d8fd4;
+  --dsw-alias-button-primary-hover: #5c9cdb;
+  --dsw-alias-button-tool-bar-fill-invisible: #4d8fd45c;
+  --dsw-alias-button-tool-bar-fill: #4d8fd480;
+  --dsw-alias-button-tool-bar-hover: #4d8fd499;
+  --dsw-alias-interactive-bg-active: #4d8fd424;
+  --dsw-alias-interactive-bg-hover-accent: #4d8fd42e;
+  --dsw-alias-interactive-bg-hover-danger: #c000000f;
+  --dsw-alias-interactive-bg-hover-solid: #e5f0f9;
+  --dsw-alias-interactive-bg-hover: #4d8fd414;
+  --dsw-alias-label-caption: #6d86ac;
+  --dsw-alias-label-dimmed: #a2b4cf;
+  --dsw-alias-label-primary-dimmed: #294b82;
+  --dsw-alias-label-primary-foreground: #fff;
+  --dsw-alias-label-primary-inverted: #fff;
+  --dsw-alias-label-primary: #0a1e4a;
+  --dsw-alias-label-secondary: #16315f;
+  --dsw-alias-label-tertiary: #406fab;
+  --dsw-alias-markdown-citation: #ebf2fa99;
+  --dsw-alias-markdown-code-block-banner: #f4f8fd94;
+  --dsw-alias-markdown-code-block: #f4f8fd94;
+  --dsw-alias-markdown-code-segment-selected: #fffc;
+  --dsw-alias-markdown-code-segment-unselected: #f0f6fc99;
+  --dsw-alias-markdown-inline-code: #e3ecf699;
+  --dsw-alias-markdown-placeholder: #f4f8fd94;
+  --dsw-alias-markdown-tag: #e3ecf699;
+  --dsw-alias-scrollbar-bg-l1: #dae3ee;
+  --dsw-alias-scrollbar-bg-l2: #dae3ee;
+  --dsw-alias-scrollbar-hover-l1: #a8c8e8;
+  --dsw-alias-scrollbar-hover-l2: #a8c8e8;
+  --dsw-alias-state-business-primary: #4d8fd4;
+  --dsw-alias-state-business-tertiary: #d9e9f5;
+  --dsw-alias-state-error-primary: #c00000;
+  --dsw-alias-state-error-secondary: #e05c5c;
+  --dsw-alias-state-success-primary: #2e8e52;
+  --dsw-alias-state-success-secondary: #58b058;
+  --dsw-alias-state-success-tertiary: #dcefe2;
+  --dsw-alias-state-warn-label: #c19a43;
+  --dsw-alias-state-warn-primary: #d9b45b;
+  --dsw-alias-state-warn-secondary: #e3c070;
+  --dsw-alias-state-warn-tertiary: #f7efdc;
+  --dsw-alias-toast-bg: #1a3a7a;
+  --dsw-alias-tooltip-bg: #ffffe1;
+  --dsw-alias-tooltip-fg: #0d234e;
+  --dsw-specific-bubble-highlight: #c4dbf1;
+  --dsw-specific-bubble: #d9e9f5;
+  --dsw-specific-input-major: #fff9;
+  --dsw-specific-login-input: #fff9;
+  --dsw-specific-menu: #f4f8fdf0;
+  --dsw-specific-selector: #e5f0f9d9;
+  --dsw-specific-sidebar-fill: #f2f7fc8f;
+  --dsw-specific-sidebar-nav-item-active-accent: #a8c8e8;
+  --dsw-specific-sidebar-nav-item-active: #d9e9f5;
+  --dsw-specific-sidebar-nav-item-hover: #e5f0f9;
+  --dsw-specific-tip: #f4f8fc;
+}
+
+body[data-ds-dark-theme] {
+  --dsw-alias-bg-base: #08143480;
+  --dsw-alias-bg-layer-1: #12244c8c;
+  --dsw-alias-bg-layer-2: #172c5899;
+  --dsw-alias-bg-layer-3: #1c3464a3;
+  --dsw-alias-bg-mask-1: #0000008c;
+  --dsw-alias-bg-mask-2: #0000004d;
+  --dsw-alias-bg-mask-3: #0009;
+  --dsw-alias-bg-mask-photo: #040a1ae6;
+  --dsw-alias-bg-module-platform: #172c5899;
+  --dsw-alias-bg-multi-select: #223e7acc;
+  --dsw-alias-bg-overlay: #12244ceb;
+  --dsw-alias-bg-skeleton: #ffffff0f;
+  --dsw-alias-border-inverted2: #fff9;
+  --dsw-alias-border-inverted: #fff6;
+  --dsw-alias-border-l1: #a8c8e81f;
+  --dsw-alias-border-l2-darkmode-thin: #a8c8e826;
+  --dsw-alias-border-l2: #a8c8e82e;
+  --dsw-alias-border-l3: #a8c8e842;
+  --dsw-alias-border-l4: #a8c8e857;
+  --dsw-alias-brand-primary-invert: #081a40;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: #8ab4de;
+  --dsw-alias-brand-primary: #8ab4de;
+  --dsw-alias-brand-text: #c4dbf1;
+  --dsw-alias-button-contrast-fill: #1a3a7a;
+  --dsw-alias-button-elevated-fill: #172e58;
+  --dsw-alias-button-floating-fill: #0d234e;
+  --dsw-alias-button-floating-hover: #1c3460;
+  --dsw-alias-button-ghost-active-border: #6fa1d5;
+  --dsw-alias-button-ghost-active-fill: #1c3460;
+  --dsw-alias-button-ghost-active-hover: #213a68;
+  --dsw-alias-button-info-fill: #1a3a7a;
+  --dsw-alias-button-info-hover: #2f5388;
+  --dsw-alias-button-primary-dimmed: #1c3460;
+  --dsw-alias-button-primary-fill: #2f6fb8;
+  --dsw-alias-button-primary-hover: #3f7cc6;
+  --dsw-alias-button-tool-bar-fill-invisible: #8ab4de5c;
+  --dsw-alias-button-tool-bar-fill: #8ab4de80;
+  --dsw-alias-button-tool-bar-hover: #8ab4de99;
+  --dsw-alias-interactive-bg-active: #8ab4de29;
+  --dsw-alias-interactive-bg-hover-accent: #8ab4de33;
+  --dsw-alias-interactive-bg-hover-danger: #e05c5c1f;
+  --dsw-alias-interactive-bg-hover-solid: #1c3460;
+  --dsw-alias-interactive-bg-hover: #ffffff12;
+  --dsw-alias-label-caption: #6174a9;
+  --dsw-alias-label-dimmed: #4b6192;
+  --dsw-alias-label-primary-dimmed: #a5b3da;
+  --dsw-alias-label-primary-foreground: #fff;
+  --dsw-alias-label-primary-inverted: #081a40;
+  --dsw-alias-label-primary: #d8e5f5;
+  --dsw-alias-label-secondary: #a5b3da;
+  --dsw-alias-label-tertiary: #8596c8;
+  --dsw-alias-markdown-citation: #172c589e;
+  --dsw-alias-markdown-code-block-banner: #0c1a3ea8;
+  --dsw-alias-markdown-code-block: #0c1a3ea8;
+  --dsw-alias-markdown-code-segment-selected: #1c3464bf;
+  --dsw-alias-markdown-code-segment-unselected: #12244c99;
+  --dsw-alias-markdown-inline-code: #1021479e;
+  --dsw-alias-markdown-placeholder: #12244c99;
+  --dsw-alias-markdown-tag: #1021479e;
+  --dsw-alias-scrollbar-bg-l1: #274070;
+  --dsw-alias-scrollbar-bg-l2: #274070;
+  --dsw-alias-scrollbar-hover-l1: #4d6fa8;
+  --dsw-alias-scrollbar-hover-l2: #4d6fa8;
+  --dsw-alias-state-business-primary: #8ab4de;
+  --dsw-alias-state-business-tertiary: #1c3460;
+  --dsw-alias-state-error-primary: #e05c5c;
+  --dsw-alias-state-error-secondary: #e07070;
+  --dsw-alias-state-success-primary: #58b058;
+  --dsw-alias-state-success-secondary: #58b058;
+  --dsw-alias-state-success-tertiary: #1e3f2c;
+  --dsw-alias-state-warn-label: #d9b45b;
+  --dsw-alias-state-warn-primary: #d9b45b;
+  --dsw-alias-state-warn-secondary: #d9b45b;
+  --dsw-alias-state-warn-tertiary: #6b5420;
+  --dsw-alias-toast-bg: #1c3460;
+  --dsw-alias-tooltip-bg: #ffffe1;
+  --dsw-alias-tooltip-fg: #0d234e;
+  --dsw-specific-bubble-highlight: #213a68;
+  --dsw-specific-bubble: #1c3460;
+  --dsw-specific-input-major: #12244ca6;
+  --dsw-specific-login-input: #12244ca6;
+  --dsw-specific-menu: #12244cf0;
+  --dsw-specific-selector: #142854d9;
+  --dsw-specific-sidebar-fill: #0e1e40b8;
+  --dsw-specific-sidebar-nav-item-active-accent: #213a68;
+  --dsw-specific-sidebar-nav-item-active: #1c3460;
+  --dsw-specific-sidebar-nav-item-hover: #172e58;
+  --dsw-specific-tip: #0d234e;
+}
+
+:root {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body::-webkit-scrollbar-track {
+  background: #eef4fa;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: #c1d5ea;
+  border: 2px solid #eef4fa;
+  border-radius: 5px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: #82acd7;
+}
+
+body::-webkit-scrollbar-corner {
+  background: #eef4fa;
+}
+
+body[data-ds-dark-theme]::-webkit-scrollbar-track, body[data-ds-dark-theme]::-webkit-scrollbar-corner {
+  background: #081a40;
+}
+
+body[data-ds-dark-theme]::-webkit-scrollbar-thumb {
+  background: #3a4f80;
+  border-color: #081a40;
+}
+
+body[data-ds-dark-theme]::-webkit-scrollbar-thumb:hover {
+  background: #4b6192;
+}
+
+body::selection {
+  color: #fff;
+  background: #4d8fd4;
+}
+
+body[data-ds-dark-theme]::selection {
+  color: #081a40;
+  background: #8ab4de;
+}
+
+body[data-ds-dark-theme] :focus-visible {
+  outline-color: var(--dsw-alias-state-business-primary);
+}
+
+:root {
+  --aion-bg-base: #ffffff94;
+  --aion-bg-1: #f4f8fd80;
+  --aion-bg-2: #ebf2fa9e;
+  --aion-bg-3: #4d8fd438;
+  --aion-bg-4: #4d8fd457;
+  --aion-bg-hover: #4d8fd414;
+  --aion-bg-active: #4d8fd424;
+  --aion-text-primary: #0a1e4a;
+  --aion-text-secondary: #16315f;
+  --aion-text-tertiary: #406fab;
+  --aion-text-disabled: #a2b4cf;
+  --aion-primary: #4d8fd4;
+  --aion-success: #2e8e52;
+  --aion-warning: #d9b45b;
+  --aion-danger: #c00000;
+  --aion-brand: #a8c8e8;
+  --aion-aou-1: #eef5fb;
+  --aion-aou-2: #d9e9f5;
+  --aion-aou-3: #a8c8e8;
+  --aion-aou-4: #6fa1d5;
+  --aion-aou-5: #4d8fd4;
+  --aion-aou-6: #16315f;
+  --aion-fill-2: #4d8fd40f;
+  --aion-fill-3: #4d8fd424;
+  --aion-border-base: #1a3a7a2e;
+  --aion-overlay-shadow: 0 8px 24px #0a1e4a40;
+  --aion-font-sans: -apple-system, "system-ui", "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --aion-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+body[data-ds-dark-theme] {
+  --aion-bg-base: #12244cd1;
+  --aion-bg-1: #12244c80;
+  --aion-bg-2: #172c5899;
+  --aion-bg-3: #8ab4de33;
+  --aion-bg-4: #8ab4de4d;
+  --aion-bg-hover: #8ab4de1f;
+  --aion-bg-active: #8ab4de33;
+  --aion-text-primary: #d8e5f5;
+  --aion-text-secondary: #a5b3da;
+  --aion-text-tertiary: #8596c8;
+  --aion-text-disabled: #4b6192;
+  --aion-primary: #8ab4de;
+  --aion-success: #58b058;
+  --aion-warning: #d9b45b;
+  --aion-danger: #e05c5c;
+  --aion-brand: #a8c8e8;
+  --aion-aou-1: #102750;
+  --aion-aou-2: #172e58;
+  --aion-aou-3: #1c3460;
+  --aion-aou-4: #2f5388;
+  --aion-aou-5: #4d6fa8;
+  --aion-aou-6: #6d8ac0;
+  --aion-fill-2: #8ab4de1f;
+  --aion-fill-3: #8ab4de33;
+  --aion-border-base: #a8c8e826;
+  --aion-overlay-shadow: 0 12px 32px #00000080;
+}
+
+[data-dsh-part="dialog"] {
+  backdrop-filter: blur(14px);
+  border-color: #a8c8e866;
+}
+
+body[data-ds-dark-theme] [data-dsh-part="dialog"] {
+  border-color: #a8c8e838;
+}

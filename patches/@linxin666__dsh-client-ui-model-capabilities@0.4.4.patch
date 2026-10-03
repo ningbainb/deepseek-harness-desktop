@@ -1,0 +1,61 @@
+diff --git a/lib/client.js b/lib/client.js
+index 616f75ecd8a648091707ce92fcb27ad629b0f4f2..43c4eb5ab13beeeb76aa9bff89622b752d280625 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -763,7 +763,14 @@ window.__ModuleLoader__.load({
+ 				className: capabilities_module_css_default.panel,
+ 				"data-dsh-plugin": "model-capabilities",
+ 				"data-dsh-part": "panel",
+-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
++				"data-dock-dirty": dirty ? "true" : "false",
++				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
++					type: "button",
++					hidden: true,
++					"data-dock-save": "",
++					disabled: !editing || !dirty || readOnly || save.kind === "saving" || firstIssue !== void 0,
++					onClick: () => { doSave(); }
++				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+ 					type: "button",
+ 					className: capabilities_module_css_default.header,
+ 					"aria-expanded": open,
+@@ -927,6 +934,7 @@ window.__ModuleLoader__.load({
+ 									type: "button",
+ 									className: capabilities_module_css_default.primary,
+ 									"data-dsh-part": "save",
++									"data-dock-save": "",
+ 									disabled: !dirty || readOnly || save.kind === "saving" || firstIssue !== void 0,
+ 									onClick: () => {
+ 										doSave();
+@@ -948,6 +956,12 @@ window.__ModuleLoader__.load({
+ 			const radioName = (0, react.useId)();
+ 			const mode = effortsModeOf(entry);
+ 			const levels = declaredLevelsOf(entry);
++			const inputModes = Array.isArray(entry.input) ? entry.input.filter((value) => typeof value === "string") : ["text"];
++			const imageEnabled = inputModes.includes("image");
++			const setImageEnabled = (enabled) => {
++				const next = [...new Set(["text", ...inputModes.filter((value) => value !== "image"), ...(enabled ? ["image"] : [])])];
++				onChange({ ...entry, input: next });
++			};
+ 			/** Stored wire map (editors toggle against it). */
+ 			const storedLevels = () => new Map(levels.map(({ level, wire }) => [level, wire]));
+ 			const setEffortsMode = (next) => {
+@@ -1120,7 +1134,18 @@ window.__ModuleLoader__.load({
+ 								children: t("caps.wire.offHint")
+ 							}) : null
+ 						]
+-					}) : null]
++					}) : null, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
++						className: capabilities_module_css_default.field,
++						"data-dsh-part": "image-input",
++						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
++							type: "checkbox",
++							checked: imageEnabled,
++							disabled,
++							onChange: (event) => setImageEnabled(event.target.checked)
++						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
++							children: document.documentElement.lang?.startsWith("zh") ? "支持图片输入" : "Image input"
++						})]
++					})]
+ 				}) : null]
+ 			});
+ 		}

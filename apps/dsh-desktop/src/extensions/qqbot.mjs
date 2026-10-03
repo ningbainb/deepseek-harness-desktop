@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
+import { isMap, isSeq, parseDocument } from 'yaml'
 
 import { emitBestEffort } from '../best-effort-events.mjs'
 import { renderQrDataUrl } from '../optional-integrations.mjs'
@@ -53,18 +55,101 @@ export function qqBotPatchSection(enabled) {
   return `${QQBOT_PATCH_START}\n- id: im-qqbot\n  disabled: ${enabled ? 'false' : 'true'}\n${QQBOT_PATCH_END}\n`
 }
 
-export function mergeQqBotPatch(existing = '', enabled = false) {
-  let remainder = String(existing)
-  const start = remainder.indexOf(QQBOT_PATCH_START)
-  if (start !== -1) {
-    const end = remainder.indexOf(QQBOT_PATCH_END, start)
-    if (end === -1) throw new Error('QQ Bot managed patch section is unterminated')
-    const before = remainder.slice(0, start).trimEnd()
-    const after = remainder.slice(end + QQBOT_PATCH_END.length).trimStart()
-    remainder = [before, after].filter(Boolean).join('\n\n')
+function patchDocument(source) {
+  const document = parseDocument(source)
+  if (document.errors.length || (document.contents !== null && !isSeq(document.contents))) {
+    throw new Error('managed patch must be a valid YAML sequence')
   }
+  document.toJS()
+  return document
+}
+
+export function reconcileManagedPatch(existing, template, startMarker, endMarker) {
+  const source = String(existing)
+  const start = source.indexOf(startMarker)
+  if (start === -1) {
+    if (source.includes(endMarker)) throw new Error('managed patch section boundaries are ambiguous')
+    return { managed: template, remainder: source }
+  }
+  const end = source.indexOf(endMarker, start)
+  if (end === -1) throw new Error('managed patch section is unterminated')
+  if (source.indexOf(startMarker, start + startMarker.length) !== -1
+    || source.indexOf(endMarker, end + endMarker.length) !== -1
+    || (start !== 0 && source[start - 1] !== '\n')) {
+    throw new Error('managed patch section boundaries are ambiguous')
+  }
+  patchDocument(source)
+  const previous = patchDocument(source.slice(start + startMarker.length, end))
+  const defaults = patchDocument(template.slice(template.indexOf(startMarker) + startMarker.length, template.indexOf(endMarker)))
+  const preserved = parseDocument('[]')
+  preserved.contents.flow = false
+  const claimed = new Set()
+  let changed = false
+  if (previous.commentBefore || previous.commentAfter) {
+    defaults.commentBefore = previous.commentBefore
+    defaults.commentAfter = previous.commentAfter
+    changed = true
+  }
+  for (const row of previous.contents?.items ?? []) {
+    if (!isMap(row)) throw new Error('managed patch row must be a YAML mapping')
+    const id = row.get('id')
+    const insertion = row.get('insert', true)
+    let target = typeof id === 'string'
+      ? defaults.contents.items.findIndex(candidate => candidate.get('id') === id)
+      : -1
+    if (insertion !== undefined) {
+      if (!isSeq(insertion)) throw new Error('managed patch insert must be a YAML sequence')
+      const matches = defaults.contents.items.flatMap((candidate, index) => {
+        const children = candidate.get('insert', true)
+        return isSeq(children) && children.items.some(child => insertion.items.some(actual =>
+          isMap(actual) && actual.get('id') === child.get('id'))) ? [index] : []
+      })
+      if (matches.length > 1) throw new Error('managed patch insert ownership is ambiguous')
+      target = matches[0] ?? -1
+    }
+    if (target === -1) {
+      preserved.contents.items.push(row.clone())
+      continue
+    }
+    if (claimed.has(target)) throw new Error('managed patch row ownership is ambiguous')
+    claimed.add(target)
+    const candidate = defaults.contents.items[target]
+    const replacement = row.clone()
+    if (isSeq(insertion)) {
+      const expected = candidate.get('insert', true)
+      const children = replacement.get('insert', true)
+      const identities = new Set()
+      for (const child of children.items) {
+        if (!isMap(child) || typeof child.get('id') !== 'string' || identities.has(child.get('id'))) {
+          throw new Error('managed patch insert identities are ambiguous')
+        }
+        identities.add(child.get('id'))
+      }
+      for (const child of expected.items) {
+        if (!identities.has(child.get('id'))) children.items.push(child.clone())
+      }
+    }
+    if (!isDeepStrictEqual(candidate.toJSON(), replacement.toJSON())
+      || String(candidate) !== String(replacement)) changed = true
+    defaults.contents.items[target] = replacement
+  }
+  const managed = changed ? `${startMarker}\n${String(defaults).trimEnd()}\n${endMarker}\n` : template
+  const outside = [source.slice(0, start).trimEnd(), source.slice(end + endMarker.length).trimStart()]
+    .filter(Boolean).join('\n\n')
+  const extra = preserved.contents.items.length ? String(preserved).trimEnd() : ''
+  const remainder = [outside, extra].filter(Boolean).join('\n\n')
+  patchDocument([managed, remainder].join('\n'))
+  return { managed, remainder }
+}
+
+export function mergeQqBotPatch(existing = '', enabled = false) {
+  const reconciled = reconcileManagedPatch(existing, qqBotPatchSection(enabled), QQBOT_PATCH_START, QQBOT_PATCH_END)
+  const document = patchDocument(reconciled.managed.slice(QQBOT_PATCH_START.length, reconciled.managed.indexOf(QQBOT_PATCH_END)))
+  document.contents.items.find(row => row.get('id') === 'im-qqbot').set('disabled', !enabled)
+  const managed = `${QQBOT_PATCH_START}\n${String(document).trimEnd()}\n${QQBOT_PATCH_END}\n`
+  const remainder = reconciled.remainder
   const prefix = remainder.trim()
-  return prefix ? `${prefix}\n\n${qqBotPatchSection(enabled)}` : qqBotPatchSection(enabled)
+  return prefix ? `${prefix}\n\n${managed}` : managed
 }
 
 export function readQqBotPatchEnabled(content = '') {
@@ -72,10 +157,12 @@ export function readQqBotPatchEnabled(content = '') {
   if (start === -1) return undefined
   const end = String(content).indexOf(QQBOT_PATCH_END, start)
   if (end === -1) throw new Error('QQ Bot managed patch section is unterminated')
-  const section = String(content).slice(start, end)
-  const match = /^[ \t]*disabled:[ \t]*(true|false)[ \t]*$/mu.exec(section)
-  if (!match) throw new Error('QQ Bot managed patch section has no disabled state')
-  return match[1] === 'false'
+  const section = patchDocument(String(content).slice(start + QQBOT_PATCH_START.length, end))
+  const states = (section.contents?.items ?? []).filter(row => isMap(row) && row.get('id') === 'im-qqbot')
+  if (states.length !== 1 || typeof states[0].get('disabled') !== 'boolean') {
+    throw new Error('QQ Bot managed patch section has no unambiguous disabled state')
+  }
+  return !states[0].get('disabled')
 }
 
 export async function setQqBotProfileEnabled({ profileDir, enabled }) {

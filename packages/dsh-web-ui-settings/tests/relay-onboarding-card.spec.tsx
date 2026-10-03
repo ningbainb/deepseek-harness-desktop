@@ -30,6 +30,7 @@ describe('RelayOnboardingCard external links', () => {
   })
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('triggers openExternalUrl when clicking the action links', () => {
@@ -54,5 +55,28 @@ describe('RelayOnboardingCard external links', () => {
     const signUpLink = screen.getByRole('link', { name: t('openRegister') })
     fireEvent.click(signUpLink)
     expect(fakePopup.location.href).toBe(RELAY_SIGN_UP_URL)
+  })
+
+  it('uses the trusted Desktop bridge for bai action links without opening popups', () => {
+    const open = vi.fn().mockResolvedValue(true)
+    vi.stubGlobal('dshDesktop', { openExternalUrl: open })
+    const popup = vi.spyOn(window, 'open')
+    render(<RelayOnboardingCard t={t} />)
+    for (const name of ['openKeys', 'openWallet', 'openRegister']) {
+      fireEvent.click(screen.getByRole('link', { name: t(name) }))
+    }
+    expect(open.mock.calls).toEqual([[RELAY_KEYS_URL], [RELAY_WALLET_URL], [RELAY_SIGN_UP_URL]])
+    expect(popup).not.toHaveBeenCalled()
+  })
+
+  it('reports a refused browser action while preserving the bai Key draft', async () => {
+    const open = vi.fn().mockResolvedValue(false)
+    vi.stubGlobal('dshDesktop', { openExternalUrl: open })
+    render(<RelayOnboardingCard t={t} />)
+    const field = screen.getByLabelText(t('keyLabel')) as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'draft-not-submitted' } })
+    fireEvent.click(screen.getByRole('link', { name: t('openKeys') }))
+    expect(await screen.findByText(t('errorOpenBrowser'))).toBeTruthy()
+    expect(field.value).toBe('draft-not-submitted')
   })
 })

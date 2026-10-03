@@ -9,8 +9,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { VALUE_MODE_SETTINGS_NAMESPACE, isEffectivelyActive, isCompleteModelRoute, resolveEffectiveConfig, resolveSessionConfig, } from "./core/config.js";
-import { Config } from "./core/schema.js";
+import { isEffectivelyActive, isCompleteModelRoute, resolveEffectiveConfig, resolveSessionConfig, } from "./core/config.js";
 import { buildSystemPromptGuidance, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, } from "./core/policy.js";
 import { createConsultExpertTool } from "./core/expert.js";
 import { valueModeState } from "./core/state.js";
@@ -18,6 +17,7 @@ import { assessValueModeHealth } from "./core/model-selection.js";
 import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters } from "./core/runtime-telemetry.js";
 import { dshHome } from "./dsh-home.js";
 import { syncPresetTrees } from "./sync.js";
+import { declareBundledPreset } from "./preset-registry.js";
 export const name = 'value-mode';
 export const inject = ['tools', 'systemPrompt', 'settings', 'llm', 'agentDefaultModel'];
 export * from "./core/config.js";
@@ -67,8 +67,9 @@ function syncBundledPreset(ctx) {
  * Apply the Value Mode host plugin to Cordis context.
  */
 export function apply(ctx, initialConfig = {}) {
-    let currentConfig = initialConfig;
-    let currentSource = () => currentConfig;
+    const currentSource = () => Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key,
+        typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+            ? field.get() : field]));
     const routedRequestAttempts = new Map();
     const streams = new Map();
     const requestKey = (payload) => {
@@ -98,25 +99,7 @@ export function apply(ctx, initialConfig = {}) {
     // it appears beside the other modes in dsh-mode-switcher immediately after
     // startup. Routing below remains session-scoped to this preset.
     syncBundledPreset(ctx);
-    // Install settings section with canonical optional-settings consumer wiring
-    ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
-        setSource: (source) => {
-            currentSource = source;
-            currentConfig = source();
-        },
-        onChange: () => {
-            currentConfig = currentSource();
-        },
-        validate: (value) => {
-            const effective = resolveEffectiveConfig(value, readDefaultExpert(ctx));
-            if (value.enabled && !isCompleteModelRoute(effective.executor)) {
-                throw new Error('副模型/子代理执行模型未选择具体模型');
-            }
-            if (value.enabled && !isCompleteModelRoute(effective.expert)) {
-                throw new Error('专家主控模型未选择具体模型');
-            }
-        },
-    });
+    declareBundledPreset(ctx, 'value-mode', join(bundledPresetsRoot(), 'value-mode'));
     // Register the consult_expert tool
     ctx.tools.register(createConsultExpertTool(ctx, () => currentSource()));
     // Inject concise role-specific guidance for the controller and child agents.

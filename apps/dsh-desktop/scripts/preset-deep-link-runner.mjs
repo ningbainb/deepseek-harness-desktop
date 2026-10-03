@@ -7,6 +7,7 @@ import { _electron as electron } from 'playwright'
 
 import { createPresetBuffer } from '../src/presets/preset-archive.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 
 const delay = (milliseconds) => new Promise((resolveDelay) => { setTimeout(resolveDelay, milliseconds) })
 
@@ -51,6 +52,7 @@ export async function runPresetDeepLinkE2E({ appDir, executablePath, electronPat
   await seedPrimaryRuntimePermissionForTest({ userData })
 
   let app
+  let primaryFailure
   try {
     app = await electron.launch({
       executablePath: executablePath || electronPath,
@@ -87,11 +89,18 @@ export async function runPresetDeepLinkE2E({ appDir, executablePath, electronPat
     assert.equal(await extensionPage.locator('#plugins-tab').getAttribute('aria-selected'), 'true')
     console.log('verified .dshpreset preview-only ingress and queued dsh-community://extensions dispatch after Runtime readiness')
   } catch (error) {
+    primaryFailure = error
+    console.error(error)
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
     if (runtimeLog) console.error(`recent Runtime log:\n${runtimeLog.slice(-4_000)}`)
     throw error
   } finally {
-    await app?.close().catch(() => {})
+    try {
+      await closeIsolatedElectron(app)
+    } catch (cleanupFailure) {
+      if (primaryFailure) throw new AggregateError([primaryFailure, cleanupFailure], 'preset acceptance and cleanup failed', { cause: primaryFailure })
+      throw cleanupFailure
+    }
     await rm(temporary, { recursive: true, force: true })
   }
 }

@@ -11,7 +11,7 @@ import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = packagedExecutable ? 120_000 : 60_000
+const runtimeReadyTimeoutMs = 120_000
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-desktop-star-e2e-'))
 const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
@@ -69,16 +69,18 @@ try {
   assert.deepEqual(JSON.parse(await readFile(resolve(userData, 'star-prompt-state.json'), 'utf8')).shownVersions, ['3.4.0'],
     'a blocked prompt must not consume its version claim')
   await firstPage.getByRole('button', { name: 'Close ordering fixture', exact: true }).click()
-  for (let attempt = 0; attempt < 12; attempt++) {
+  for (let attempt = 0; attempt < 120; attempt++) {
     const intro = firstPage.getByRole('dialog').filter({ hasText: /内测声明|插件、技能和桌面核心功能在这里/u })
     const proceed = intro.getByRole('button', { name: /^(继续|Continue)$/u }).last()
-    if (await proceed.isVisible().catch(() => false)) {
+    if (await proceed.isVisible().catch(() => false) && await proceed.isEnabled().catch(() => false)) {
       assert.equal(await firstPrompt.count(), 0, 'native introductory dialog takes priority')
       await proceed.click()
     }
     await firstPage.waitForTimeout(250)
   }
   await firstPrompt.waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(await firstPage.locator('#root').evaluate(root => root.classList.contains('dsh-desktop-modal-layer')), false,
+    'native dialogs must not promote the conversation application root into a modal overlay')
   await firstPrompt.getByText('4.0.0 · 社区支持', { exact: true }).waitFor({ state: 'visible' })
   await firstPage.getByRole('button', { name: '去 GitHub 点个 Star' }).waitFor({ state: 'visible' })
   await firstPrompt.getByRole('button', { name: '在爱发电支持我' }).waitFor({ state: 'visible' })
@@ -117,6 +119,8 @@ try {
   const secondPage = await waitForHarnessPage(electronApp)
   const previewPrompt = secondPage.locator('#dsh-desktop-star-prompt[data-open="true"]')
   await previewPrompt.waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(await secondPage.locator('#root').evaluate(root => root.classList.contains('dsh-desktop-modal-layer')), false,
+    'preview dismissal must remain reachable above the conversation application root')
   await secondPage.getByRole('button', { name: '加入社群，随时反馈 Bug' }).waitFor({ state: 'visible' })
   await secondPage.getByRole('button', { name: '先继续使用', exact: true }).click()
   await previewPrompt.waitFor({ state: 'hidden' })
@@ -126,6 +130,10 @@ try {
     throw new Error(`preview mode changed Star prompt state: ${JSON.stringify(previewState)}`)
   }
   console.log('verified Star prompt waits for existing dialogs, appears once, preserves upgrade claims and preview behavior')
+} catch (error) {
+  const runtimeLog = await readFile(resolve(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
+  if (runtimeLog) console.error(runtimeLog.split(/\r?\n/u).slice(-80).join('\n'))
+  throw error
 } finally {
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })

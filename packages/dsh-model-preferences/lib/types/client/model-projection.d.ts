@@ -1,8 +1,8 @@
-import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client';
+import type { ModelDirectory, ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client';
 import type { SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client';
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client';
 import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog, type ModelCatalogSnapshot, type ModelKey, type ModelPreferencesConfig, type SortedModelCatalog, type SortedModelOption } from '../core/config.ts';
 export { flattenModelOptions, modelKeyFromOptionId, modelOptionId, selectionForModel, sortModelCatalog };
 export type { ModelCatalogSnapshot, ModelKey, ModelPreferencesConfig, SortedModelCatalog, SortedModelOption };
@@ -11,12 +11,7 @@ export declare function catalogFromDirectory(state: ModelDirectoryState): ModelC
 /** Build the model selection represented by one option id. */
 export declare function selectionFromOptionId(state: ModelDirectoryState, id: string, config: ModelPreferencesConfig): ModelSelection | undefined;
 /** Shared selection path used by both `/model` and the composer seat. */
-export declare function selectModelWithPreferences(directory: {
-    select(selection: ModelSelection): Promise<void>;
-    store: {
-        getSnapshot(): ModelDirectoryState;
-    };
-}, settingsScope: SettingsScope<ModelPreferencesConfig>, selection: ModelSelection): Promise<void>;
+export declare function selectModelWithPreferences(directory: Pick<ModelDirectory, 'select' | 'store'>, settingsScope: SettingsScope<ModelPreferencesConfig>, selection: ModelSelection): ReturnType<ModelDirectory['select']>;
 /** Display label that remains useful for an advertised or stale current route. */
 export declare function modelDisplayName(option: SortedModelOption | undefined, current: ModelSelection | null): string;
 /** Resolve one model from a provider group without comparing display names. */

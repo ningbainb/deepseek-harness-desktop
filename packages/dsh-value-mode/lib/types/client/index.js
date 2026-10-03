@@ -24,7 +24,7 @@ export * from "./locales.js";
 function isSettingsBinderFace(value) {
     return typeof value === 'object' && value !== null && typeof value.bind === 'function';
 }
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session'];
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote', 'remote.session'];
 function heroPresetButton() {
     const candidates = [...document.querySelectorAll('button')];
     return candidates.find((button) => {
@@ -170,7 +170,7 @@ function mountHeroOnboarding({ scope, defaultModelScope, onChange, fetchModels }
 export function apply(ctx) {
     ctx.effect(() => ctx.locale.register('value-mode', { zh, en }), 'value-mode: locales');
     const compatibilityBinder = ctx.get('webUiSettings');
-    const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : ctx.settingsScope;
+    const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : { bind: (spec) => ctx.configForms.get(spec.namespace) };
     const scope = binder.bind({ namespace: VALUE_MODE_SETTINGS_NAMESPACE });
     const defaultModelScope = binder.bind({ namespace: 'agent-default-model' });
     const fetchModels = createModelCatalogLoader(ctx, ctx.locale.bind('value-mode'));

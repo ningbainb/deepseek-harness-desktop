@@ -1,4 +1,5 @@
 export const zh = {
+    baiAccess: 'bai 供应商：登录 / 充值',
     settingsNotWritable: '当前配置不可写，请等待运行时连接恢复后重试。',
     settingsSaveFailed: '配置未保存成功，请重试。',
     catalogUnavailable: '模型目录尚未连接，请稍后重试。',
@@ -69,6 +70,7 @@ export const zh = {
     tokens: 'Token',
 };
 export const en = {
+    baiAccess: 'bai provider: sign in / top up',
     settingsNotWritable: 'Settings are not writable. Wait for the runtime connection and try again.',
     settingsSaveFailed: 'Settings were not saved. Please try again.',
     catalogUnavailable: 'The model catalog is not connected yet. Please retry shortly.',

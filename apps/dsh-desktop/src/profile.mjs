@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import {
   cp,
@@ -16,7 +17,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
-import { mergeQqBotPatch, readQqBotPatchEnabled } from './extensions/qqbot.mjs'
+import { mergeQqBotPatch, readQqBotPatchEnabled, reconcileManagedPatch } from './extensions/qqbot.mjs'
 
 export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-base',
@@ -37,7 +38,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
 ])
 
 export const AGENT_TEAM_PROFILE_BUNDLE = '@deepseek-ai/dsh-experimental-agent-team-profile'
-export const AGENT_TEAM_VERSION = '0.1.5-rc.2'
+export const AGENT_TEAM_VERSION = '0.2.0-rc.2'
 export const AGENT_TEAM_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-experimental-agent-team',
   AGENT_TEAM_PROFILE_BUNDLE,
@@ -138,14 +139,13 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
   'llm-pi-ai',
   'live-stats',
   'memory',
-  'model-preferences',
+  'ui-model-preferences',
   'pet',
   'personal-prompt',
   'remote-web-ui',
-  'skin-background',
-  'skin-wallpaper',
-  'task-board',
-  'value-mode',
+  'ui-skin-center',
+  'ui-task-board',
+  'ui-value-mode',
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
@@ -188,6 +188,9 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
 ].toSorted())
 
 export const DESKTOP_SUPPORT_PACKAGES = Object.freeze([
+  '@deepseek-ai/dsh-deepseek-account',
+  '@deepseek-ai/dsh-llm-deepseek',
+  '@deepseek-ai/dsh-ptc-runtime',
   '@deepseek-ai/dsh-agent',
   '@deepseek-ai/dsh-agent-default-model',
   '@deepseek-ai/dsh-client-ui-directory-picker-browse',
@@ -243,6 +246,8 @@ export const DESKTOP_RUNTIME_OVERRIDE_PACKAGES = Object.freeze([
 // Reviewed public releases override the older aggregate carrier. Keep these
 // direct so development and packaged profiles resolve the same patched builds.
 export const DESKTOP_PUBLISHED_OVERRIDE_PACKAGES = Object.freeze([
+  '@linxin666/dsh-pet',
+  '@linxin666/dsh-client-ui-skin-center',
   '@linxin666/dsh-client-ui-plugin-manager',
   '@linxin666/dsh-client-ui-skill-explorer',
   '@linxin666/dsh-desktop-launcher',
@@ -308,7 +313,6 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-client-ui-settings',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-workspace',
-  '@deepseek-ai/dsh-code-runtime',
   '@deepseek-ai/dsh-cmdline',
   '@deepseek-ai/dsh-compaction',
   '@deepseek-ai/dsh-fs',
@@ -376,6 +380,8 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
 - id: web-startup
   name: '@linxin666/dsh-remote-web-ui/startup'
 - insert:
+    - id: ui-plugin-manager-native-desktop
+      name: '@deepseek-ai/dsh-client-ui-plugin-manager'
     - id: authorization
       name: '@deepseek-ai/dsh-authorization'
 - id: llm-pi-ai
@@ -480,6 +486,48 @@ export function createDesktopProfileManifest(existing = {}) {
           ...communityBundles,
           ...(agentTeamEnabled ? [AGENT_TEAM_PROFILE_BUNDLE] : []),
         ],
+      },
+    },
+  }
+}
+
+async function retireMissingPackagedLinks(existing, profileDir, activePackageRoots) {
+  const dependencies = existing?.dependencies ?? {}
+  const retired = []
+  for (const [name, spec] of Object.entries(dependencies)) {
+    if (activePackageRoots.has(name) || typeof spec !== 'string' || !spec.startsWith('link:')) continue
+    const source = spec.slice(5).replaceAll('\\', '/')
+    if (!source.toLowerCase().endsWith(`/resources/app.asar.unpacked/node_modules/${name.toLowerCase()}`)) continue
+    try {
+      await readFile(join(source, 'package.json'), 'utf8')
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+      retired.push(name)
+    }
+  }
+  if (retired.length === 0) return existing
+
+  // Keep the exact previous manifest so a package can be restored later.
+  await writeFile(
+    join(profileDir, `package.json.dsh-desktop-retired-${randomUUID()}.bak`),
+    `${JSON.stringify(existing, null, 2)}\n`,
+    { flag: 'wx' },
+  )
+  const retiredSet = new Set(retired)
+  const nextDependencies = Object.fromEntries(
+    Object.entries(dependencies).filter(([name]) => !retiredSet.has(name)),
+  )
+  const currentBundles = existing?.dsh?.profile?.bundles
+  return {
+    ...existing,
+    dependencies: nextDependencies,
+    dsh: {
+      ...existing.dsh,
+      profile: {
+        ...existing.dsh?.profile,
+        ...(Array.isArray(currentBundles)
+          ? { bundles: currentBundles.filter(name => !retiredSet.has(name)) }
+          : {}),
       },
     },
   }
@@ -904,19 +952,13 @@ async function migrateLegacySkinState({ profilePatch, homePatch, dshHome, profil
 }
 
 export function mergeDesktopPatch(existing = '') {
-  // The skin selector belongs to this isolated profile. Only replace the
-  // desktop-owned block; skin and community rows must survive unchanged.
   let userPatch = String(existing)
-  const start = userPatch.indexOf(DESKTOP_PATCH_START)
-  if (start !== -1) {
-    const end = userPatch.indexOf(DESKTOP_PATCH_END, start)
-    if (end === -1) throw new Error('desktop managed patch section is unterminated')
-    userPatch = `${userPatch.slice(0, start)}${userPatch.slice(end + DESKTOP_PATCH_END.length)}`
-  } else if (userPatch.startsWith(LEGACY_DESKTOP_PATCH_CONFIG)) {
+  if (!userPatch.includes(DESKTOP_PATCH_START) && userPatch.startsWith(LEGACY_DESKTOP_PATCH_CONFIG)) {
     userPatch = userPatch.slice(LEGACY_DESKTOP_PATCH_CONFIG.length)
   }
-  const suffix = userPatch.trim()
-  return suffix ? `${DESKTOP_PATCH_CONFIG.trimEnd()}\n\n${suffix}\n` : DESKTOP_PATCH_CONFIG
+  const { managed, remainder } = reconcileManagedPatch(userPatch, DESKTOP_PATCH_CONFIG, DESKTOP_PATCH_START, DESKTOP_PATCH_END)
+  const suffix = remainder.trim()
+  return suffix ? `${managed.trimEnd()}\n\n${suffix}\n` : managed
 }
 
 async function readJsonIfPresent(path) {
@@ -1134,7 +1176,7 @@ async function retireManagedPackage({ packageName, profileDir, previous }) {
 
 export async function ensureDesktopProfile({
   dshHome,
-  packageRoots = resolveRuntimePackages(),
+  packageRoots,
   profileName,
   mode = 'full',
 } = {}) {
@@ -1169,10 +1211,13 @@ export async function ensureDesktopProfile({
     await readDesktopProfileJson(manifestPath, 'manifest'),
     'manifest',
   )
+  const activePackageRoots = new Map(packageRoots ?? resolveRuntimePackages())
+  const repairedExisting = preserveUserProfile
+    ? await retireMissingPackagedLinks(existing, profileDir, activePackageRoots)
+    : existing
   const manifest = mode === 'repair'
     ? createDesktopRepairProfileManifest()
-    : createDesktopProfileManifest(preserveUserProfile ? existing : {})
-  const activePackageRoots = new Map(packageRoots)
+    : createDesktopProfileManifest(preserveUserProfile ? repairedExisting : {})
   for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
     if (isRetiredLegacySkinPackage(packageName)) activePackageRoots.delete(packageName)
@@ -1282,7 +1327,9 @@ export async function ensureDesktopProfile({
 
 export function resolvePackageRoot(packageName, anchors) {
   for (const anchor of anchors) {
-    const require = createRequire(anchor)
+    const anchorPath = String(anchor).startsWith('file:') ? fileURLToPath(anchor) : String(anchor)
+    const filesystemAnchor = materializeFilesystemPath(anchorPath)
+    const require = createRequire(filesystemAnchor)
     try {
       return materializeFilesystemPath(dirname(require.resolve(`${packageName}/package.json`)))
     } catch {
@@ -1302,8 +1349,7 @@ export function resolvePackageRoot(packageName, anchors) {
     }
     let cursor
     try {
-      const anchorPath = String(anchor).startsWith('file:') ? fileURLToPath(anchor) : String(anchor)
-      cursor = dirname(anchorPath)
+      cursor = dirname(filesystemAnchor)
     } catch {
       cursor = undefined
     }
@@ -1374,7 +1420,32 @@ export function resolveRuntimePackages(
     }
   }
 
+  if (packageNames === MANAGED_RUNTIME_PACKAGES) {
+    for (const [name, root] of resolveOfficialRuntimeClosure(initialAnchor)) {
+      if (!resolved.has(name)) resolved.set(name, root)
+    }
+  }
   return new Map([...resolved].toSorted(([left], [right]) => left.localeCompare(right)))
+}
+
+/** Link the official CLI dependency graph into an isolated Desktop profile. */
+export function resolveOfficialRuntimeClosure(initialAnchor = import.meta.url) {
+  const root = resolvePackageRoot('@deepseek-ai/dsh', [initialAnchor])
+  if (!root) throw new Error('the official @deepseek-ai/dsh runtime is missing')
+  const result = new Map([['@deepseek-ai/dsh', root]])
+  const pending = [root]
+  while (pending.length) {
+    const parent = pending.shift()
+    const manifest = readJsonSync(join(parent, 'package.json'))
+    for (const name of Object.keys(manifest?.dependencies ?? {}).filter(name => name.startsWith('@deepseek-ai/'))) {
+      if (result.has(name)) continue
+      const dependencyRoot = resolvePackageRoot(name, [join(parent, 'package.json'), initialAnchor])
+      if (!dependencyRoot) throw new Error(`official runtime dependency is missing: ${name}`)
+      result.set(name, dependencyRoot)
+      pending.push(dependencyRoot)
+    }
+  }
+  return result
 }
 
 export function resolveDshCliPath(initialAnchor = import.meta.url) {

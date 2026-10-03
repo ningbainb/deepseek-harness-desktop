@@ -1,4 +1,4 @@
-import z from "schemastery";
+import z from "@deepseek-ai/schemastery";
 //#region src/core/config.ts
 /** Settings namespace registered by the Host half. */
 const MODEL_PREFERENCES_SETTINGS_NAMESPACE = "model-preferences";
@@ -109,7 +109,7 @@ function modelForCurrent(group, current) {
 	return group.models.find((model) => model.id === current.model);
 }
 function currentFallbackGroup(groups, current) {
-	if (current === null) return groups.map((group) => ({
+	if (current === null || current.provider === "project-relay" && current.model === "__bai_login_required__") return groups.map((group) => ({
 		...group,
 		models: [...group.models]
 	}));
@@ -238,39 +238,19 @@ const name = "model-preferences";
 const inject = ["settings"];
 /** Host loader schema for the durable model-picker preferences. */
 const Config = z.object({
-	version: z.number().step(1).default(1),
+	version: z.number().step(1).default(1).volatile(),
 	pinnedModels: z.array(z.object({
 		provider: z.string().min(1).max(128),
 		model: z.string().min(1).max(128)
-	})).default([]),
-	providerOrder: z.array(z.string().min(1).max(128)).default([]),
-	disabledProviders: z.array(z.string().min(1).max(128)).default([]),
+	})).default([]).volatile(),
+	providerOrder: z.array(z.string().min(1).max(128)).default([]).volatile(),
+	disabledProviders: z.array(z.string().min(1).max(128)).default([]).volatile(),
 	recentModels: z.array(z.object({
 		provider: z.string().min(1).max(128),
 		model: z.string().min(1).max(128)
-	})).default([])
+	})).default([]).volatile()
 });
-/** Install the Host settings namespace; model routing remains official SDK-owned. */
-function apply(ctx, initialConfig = { ...DEFAULT_CONFIG }) {
-	let currentSource = () => initialConfig;
-	ctx.settings.installSection(ctx, MODEL_PREFERENCES_SETTINGS_NAMESPACE, Config, initialConfig, {
-		setSource: (source) => {
-			currentSource = () => source();
-		},
-		onChange: () => {
-			currentSource = currentSource;
-		},
-		validate: (value) => {
-			assertModelPreferences(value);
-		}
-	});
-}
-const DEFAULT_CONFIG = {
-	version: 1,
-	pinnedModels: [],
-	providerOrder: [],
-	disabledProviders: [],
-	recentModels: []
-};
+/** The loader owns volatile field persistence for this plugin entry. */
+function apply() {}
 //#endregion
 export { Config, DEFAULT_MODEL_PREFERENCES, InvalidModelPreferencesError, MAX_PINNED_MODELS, MAX_PREFERENCE_STRING_LENGTH, MAX_RECENT_MODELS, MODEL_PREFERENCES_SETTINGS_NAMESPACE, PRIMARY_PROVIDER_ID, apply, assertModelPreferences, flattenModelOptions, inject, modelKeyFromOptionId, modelOptionId, moveProvider, name, normalizeModelPreferences, providerIdsInOrder, recordRecentModel, sameModelKey, selectionForModel, sortModelCatalog };

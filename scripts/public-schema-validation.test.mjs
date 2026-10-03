@@ -15,6 +15,7 @@ test('public schema validation accepts current metadata and additive v1 fields',
   const report = await validatePublicSchemas()
   assert.equal(Object.keys(report.schemaIds).length, 8)
   assert.deepEqual(report.patchIds, [
+    'cold-blank-session-checkpoint',
     'queued-turn-continuation',
     'cancellation-presentation',
     'tool-call-arguments-envelope',
@@ -62,7 +63,7 @@ test('deep-link and preset schemas reject unsupported inputs with actionable ver
 test('schema validation fails deterministically when a registered patch test is absent', async () => {
   await assert.rejects(
     validatePublicSchemas({
-      today: '2026-09-10',
+      today: '2026-10-01',
       testExists: () => false,
     }),
     /references missing test/u,

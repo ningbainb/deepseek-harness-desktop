@@ -15,6 +15,7 @@ const { JSDOM } = localRequire('jsdom')
 const ts = sharedRequire('typescript')
 const client = await readFile(resolve(packageDir, 'lib/client.js'), 'utf8')
 const flush = async () => { for (let index = 0; index < 12; index += 1) await Promise.resolve() }
+const pollStateRequests = requests => requests.filter(request => request.path === '/api/pet/state' && request.signal)
 
 async function loadInstalledSettingsForm() {
   const source = await readFile(resolve(packageDir, 'src/client/settings-form.ts'), 'utf8')
@@ -53,13 +54,15 @@ function makeBatchedScope(initial, mutate) {
     mutate: async writes => {
       await mutate?.(writes)
       for (const write of writes) {
-        if (write.op === 'set') user = { ...user, [write.field]: write.value }
+        const field = write.path[0]
+        if (write.op === 'set') user = { ...user, [field]: write.value }
         else {
           const next = { ...user }
-          delete next[write.field]
+          delete next[field]
           user = next
         }
       }
+      return true
     },
     set: async () => assert.fail('batched scope must not use per-field set'),
     unset: async () => assert.fail('batched scope must not use per-field unset'),
@@ -120,9 +123,11 @@ function setup(t) {
   const opened = []
   const ctx = {
     effect: registerDispose, get: () => undefined, settingsScope: { bind: () => scope },
+    configForms: { get: () => scope, describe: () => ({ getSnapshot: () => ({ view: { namespaces: [] } }) }) },
     slots: { inject: (_name, callback) => registerDispose(callback), register: () => () => {} },
     locale: { register: () => () => {}, bind: () => value => value },
-    sessions: { list: { getSnapshot: () => ({ byId: { 'existing-session': {} } }) }, open: id => opened.push(id) },
+    sessions: { list: { getSnapshot: () => ({ byId: { 'existing-session': {} } }), subscribe: () => () => {} } },
+    uiWorkspace: { openSession: id => opened.push(id) },
   }
   exported.apply(ctx)
   const dispose = () => { for (const cleanup of [...disposers].reverse()) cleanup() }
@@ -133,25 +138,26 @@ function setup(t) {
   }
 }
 
-test('installed multi-pet client and workspace use the same tested polling implementation', async () => {
-  assert.equal(JSON.parse(await readFile(resolve(packageDir, 'package.json'), 'utf8')).version, '0.2.5')
-  assert.equal(await readFile(resolve(packageDir, 'src/client/poll-request.ts'), 'utf8'),
-    await readFile(resolve(appDir, '../../packages/dsh-pet/src/client/poll-request.ts'), 'utf8'))
+test('installed multi-pet client retains registry retries and latest-response protection', async () => {
+  assert.equal(JSON.parse(await readFile(resolve(packageDir, 'package.json'), 'utf8')).version, '0.4.4')
+  const source = await readFile(resolve(packageDir, 'src/client/index.ts'), 'utf8')
+  assert.match(source, /new PetPollRequest\(signal => petApi\.pets\(signal\)/u)
+  assert.match(source, /new PetPollRequest\(signal => petApi\.state\(currentSessionId\(\), signal\)/u)
+  assert.match(source, /document\.visibilityState === 'visible'[\s\S]*setInterval\(pollNow, POLL_MS\)/u)
+  assert.match(client, /registryRead\.cancel\(\)[\s\S]*stateRead\.cancel\(\)/u)
 })
 
-test('installed pet settings patch follows the void mutate contract and always settles saving state', async () => {
+test('installed pet settings form confirms atomic mutation and always settles saving state', async () => {
   const source = await readFile(resolve(packageDir, 'src/client/settings-form.ts'), 'utf8')
   const runtime = await readFile(resolve(packageDir, 'lib/client.js'), 'utf8')
-  assert.match(source, /mutate: \(writes: BatchedWrite\[\]\) => Promise<void>/u)
-  assert.match(source, /await batch\.mutate\(plannedWrites\)/u)
-  assert.doesNotMatch(source, /result\.ok/u)
-  assert.match(source, /finally \{[\s\S]*this\.saving = false[\s\S]*this\.failed = landed\.size !== pending\.size/u)
-  assert.match(source, /catch \(error\)[\s\S]*this\.failedReason/u)
-  assert.match(runtime, /await batch\.mutate\(plannedWrites\)/u)
-  assert.match(runtime, /finally \{[\s\S]*this\.saving = false/u)
+  assert.match(source, /accepted = await this\.scope\.mutate\(ops\)/u)
+  assert.match(source, /const landed = accepted && failedReason === undefined && valid\.every\(item => item\.judge\(\)\)/u)
+  assert.match(source, /this\.saving = false\s*this\.failed = !landed/u)
+  assert.match(runtime, /accepted = await this\.scope\.mutate\(ops\)/u)
+  assert.match(runtime, /this\.saving = false;\s*this\.failed = !landed;/u)
 })
 
-test('installed pet settings form saves display, size, and position through a void batch mutation', async () => {
+test('installed pet settings form saves display, size, and position through one accepted mutation', async () => {
   const { CardForm, booleanField, numberField } = await loadInstalledSettingsForm()
   const mutations = []
   const scope = makeBatchedScope({ visible: false, size: 96, right: 12 }, writes => { mutations.push(writes) })
@@ -168,9 +174,9 @@ test('installed pet settings form saves display, size, and position through a vo
 
   assert.equal(mutations.length, 1)
   assert.deepEqual(JSON.parse(JSON.stringify(mutations[0])), [
-    { field: 'visible', op: 'set', value: true },
-    { field: 'size', op: 'set', value: 160 },
-    { field: 'right', op: 'set', value: 672 },
+    { path: ['visible'], op: 'set', value: true },
+    { path: ['size'], op: 'set', value: 160 },
+    { path: ['right'], op: 'set', value: 672 },
   ])
   assert.deepEqual(JSON.parse(JSON.stringify(form.shell())), {
     available: true, exposed: true, writable: true, dirty: false,
@@ -212,7 +218,7 @@ test('installed bundle bounds state and registry reads while preserving multi-pe
   const state = setup(t)
   t.mock.timers.tick(0); await flush()
   for (let tick = 0; tick < 3; tick += 1) { t.mock.timers.tick(2000); await flush() }
-  const reads = state.requests.filter(request => request.path === '/api/pet/state')
+  const reads = pollStateRequests(state.requests)
   assert.equal(reads.length, 1, 'Slow state fetch must not accumulate every two seconds')
   assert.equal(state.requests.filter(request => request.path === '/api/pet/pets').length, 2, 'One sprite registry read and one settings registry read, each without overlap')
   assert.ok(reads[0].signal && !reads[0].signal.aborted)
@@ -231,38 +237,38 @@ test('installed bundle bounds state and registry reads while preserving multi-pe
 test('installed bundle aborts timed-out reads and disables cleanly before later responses arrive', async t => {
   const state = setup(t)
   t.mock.timers.tick(0); await flush()
-  const first = state.requests.filter(request => request.path === '/api/pet/state')[0]
+  const first = pollStateRequests(state.requests)[0]
   t.mock.timers.tick(8000); await flush()
   assert.equal(first.signal.aborted, true)
   assert.equal(state.stores[0].getSnapshot().state, 'error')
   t.mock.timers.tick(2000); await flush()
-  const next = state.requests.filter(request => request.path === '/api/pet/state').at(-1)
+  const next = pollStateRequests(state.requests).at(-1)
   assert.notEqual(first, next)
   state.setEnabled(false)
   assert.equal(next.signal.aborted, true)
   next.resolve({ name: 'late' }); first.resolve({ name: 'older' }); await flush()
   assert.equal(state.stores[0].getSnapshot().snapshot, null)
-  const count = state.requests.filter(request => request.path === '/api/pet/state').length
+  const count = pollStateRequests(state.requests).length
   t.mock.timers.tick(10000); await flush()
-  assert.equal(state.requests.filter(request => request.path === '/api/pet/state').length, count)
+  assert.equal(pollStateRequests(state.requests).length, count)
   state.setEnabled(true); await flush()
   assert.equal(state.roots.length, 2)
-  assert.equal(state.requests.filter(request => request.path === '/api/pet/state').length, count + 1)
+  assert.equal(pollStateRequests(state.requests).length, count + 1)
 })
 
 test('hidden pages cancel reads and plugin disposal cancels settings retries and subscriptions', async t => {
   const state = setup(t)
   t.mock.timers.tick(0); await flush()
-  const first = state.requests.filter(request => request.path === '/api/pet/state')[0]
+  const first = pollStateRequests(state.requests)[0]
   state.setVisible(false)
   assert.equal(first.signal.aborted, true)
   t.mock.timers.tick(6000); await flush()
-  assert.equal(state.requests.filter(request => request.path === '/api/pet/state').length, 1)
+  assert.equal(pollStateRequests(state.requests).length, 1)
   state.setVisible(true); await flush()
-  assert.equal(state.requests.filter(request => request.path === '/api/pet/state').length, 2)
+  assert.equal(pollStateRequests(state.requests).length, 2)
   state.dispose()
   const count = state.requests.length
-  for (const request of state.requests) { assert.equal(request.signal.aborted, true); request.reject(new Error('late transport error')) }
+  for (const request of state.requests) { if (request.signal) assert.equal(request.signal.aborted, true); request.reject(new Error('late transport error')) }
   await flush(); t.mock.timers.tick(30000); await flush()
   assert.equal(state.requests.length, count)
   assert.equal(state.subscriptions.size, 0)
@@ -271,14 +277,14 @@ test('hidden pages cancel reads and plugin disposal cancels settings retries and
 test('an interaction refresh in the installed bundle replaces a pending older snapshot', async t => {
   const state = setup(t)
   t.mock.timers.tick(0); await flush()
-  const old = state.requests.find(request => request.path === '/api/pet/state')
+  const old = pollStateRequests(state.requests)[0]
   state.roots[0].hide(); await flush()
   state.requests.find(request => request.path === '/api/pet/set-visible').resolve({ ok: true })
   await flush()
-  assert.equal(state.requests.filter(request => request.path === '/api/pet/state').length, 1)
+  assert.equal(pollStateRequests(state.requests).length, 1)
   old.resolve({ name: 'stale visible pet' }); await flush()
   assert.equal(state.stores[0].getSnapshot().snapshot, null)
-  const next = state.requests.filter(request => request.path === '/api/pet/state').at(-1)
+  const next = pollStateRequests(state.requests).at(-1)
   assert.notEqual(next, old)
   next.resolve({ name: 'latest hidden pet', display: { visible: false } }); await flush()
   assert.equal(state.stores[0].getSnapshot().snapshot.display.visible, false)

@@ -401,13 +401,15 @@ function installConversationSkillsPage() {
       'button[aria-label="指令"]',
       'button[aria-label="命令"]',
       'button[aria-label="Commands"]',
+      'button[aria-label="添加文件或调用指令"]',
+      'button[aria-label="Add files or run commands"]',
     ].join(','))
     const textarea = composer?.querySelector('textarea, [role="textbox"][contenteditable]:not([contenteditable="false"])')
     if (!composer || !commandButton || !textarea) {
       if (state.composer && !state.composer.isConnected) closeMenu()
       return false
     }
-    if (state.composer === composer && state.anchor?.isConnected) return true
+    if (state.composer === composer && state.commandButton === commandButton && state.textarea === textarea && state.anchor?.isConnected) return true
     closeMenu()
     state.anchor?.remove()
     state.composer = composer
@@ -456,7 +458,8 @@ function installConversationSkillsPage() {
     closeMenu()
   }
   const onResize = () => positionMenu()
-  document.addEventListener('pointerdown', onPointerDown, true)
+  window.addEventListener('pointerdown', onPointerDown, true)
+  window.addEventListener('click', onPointerDown, true)
   document.addEventListener('keydown', onKeyDown, true)
   document.addEventListener('focusin', onFocusIn, true)
   window.addEventListener('resize', onResize)
@@ -464,7 +467,8 @@ function installConversationSkillsPage() {
   state.refresh = scheduleMount
   state.dispose = () => {
     observer.disconnect()
-    document.removeEventListener('pointerdown', onPointerDown, true)
+    window.removeEventListener('pointerdown', onPointerDown, true)
+    window.removeEventListener('click', onPointerDown, true)
     document.removeEventListener('keydown', onKeyDown, true)
     document.removeEventListener('focusin', onFocusIn, true)
     window.removeEventListener('resize', onResize)

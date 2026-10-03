@@ -1,10 +1,17 @@
+param([string]$ConsoleProbeAssemblyPath)
 $ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @'
+$definition = @'
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+public static class DshConsoleProbe {
+  [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+  [DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList([Out] uint[] processes, uint size);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
+}
 public static class DshConsoleEvents {
   public class Entry { public uint pid; public long window; public string kind; public List<int> ancestors; }
   [StructLayout(LayoutKind.Sequential)] struct BasicInfo {
@@ -75,6 +82,12 @@ public static class DshConsoleEvents {
   }
 }
 '@
+if ($ConsoleProbeAssemblyPath) {
+  Add-Type -TypeDefinition $definition -OutputAssembly $ConsoleProbeAssemblyPath -OutputType Library
+  Add-Type -Path $ConsoleProbeAssemblyPath
+} else {
+  Add-Type -TypeDefinition $definition
+}
 $started = [DateTime]::UtcNow
 [DshConsoleEvents]::Observe()
 [PSCustomObject]@{ events = @([DshConsoleEvents]::Entries.ToArray()); dropped = [DshConsoleEvents]::Dropped; seen = [DshConsoleEvents]::Seen; timedOut = -not [DshConsoleEvents]::StopRequested; elapsed = ([DateTime]::UtcNow - $started).TotalMilliseconds } | ConvertTo-Json -Compress -Depth 5

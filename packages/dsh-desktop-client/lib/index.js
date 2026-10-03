@@ -233,7 +233,7 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         },
         async openDesktopSurface(surface, options) {
             if (surface === 'extensions' && typeof bridge?.openExtensionDock === 'function') {
-                if (options?.setting !== undefined && options.setting !== 'value-mode') {
+                if (options?.setting !== undefined && !['value-mode', 'models', 'usage'].includes(options.setting)) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting');
                 }
                 if (!await hasBridgeCapability('extensions.open'))

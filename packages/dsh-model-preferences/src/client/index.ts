@@ -5,7 +5,8 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type { CommandDecoration, CommandUiContract, CommandUiSpec } from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
@@ -61,7 +62,7 @@ declare module '@deepseek-ai/cordis' {
 
 // The nested composer/command injections inherit `sessions` from this
 // package fiber while resolving the official model directory service.
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session', 'sessions']
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote', 'remote.session', 'sessions']
 
 const EMPTY_CONFIG: ModelPreferencesConfig = {
   version: 1,
@@ -76,7 +77,9 @@ function settingsBinder(ctx: ClientContext): { bind<S>(spec: SettingsScopeSpec<S
   if (typeof compatibility === 'object' && compatibility !== null && typeof (compatibility as { bind?: unknown }).bind === 'function') {
     return compatibility as { bind<S>(spec: SettingsScopeSpec<S>): SettingsScope<S> }
   }
-  return ctx.settingsScope
+  return { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(
+    spec.namespace === MODEL_PREFERENCES_SETTINGS_NAMESPACE ? 'ui-model-preferences' : spec.namespace,
+  ) }
 }
 
 function currentConfig(scope: SettingsScope<ModelPreferencesConfig>): ModelPreferencesConfig {
@@ -191,8 +194,8 @@ export function apply(ctx: ClientContext): void {
             if (available) directory.load().catch(() => {})
           },
           select: selection => available
-            ? selectModelWithPreferences(directory, settingsScope, selection).then(() => true, () => false)
-            : Promise.resolve(false),
+            ? selectModelWithPreferences(directory, settingsScope, selection)
+            : Promise.resolve(undefined),
         }
       },
     }, ModelSelect))

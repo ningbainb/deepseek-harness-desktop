@@ -119,7 +119,12 @@ function navigationFixture() {
   const window = Object.assign(new EventEmitter(), {
     isDestroyed: () => false, getContentSize: () => [960, 680], contentView: { addChildView() {} },
   })
-  const state = { loads: 0, visible: [], load: async () => {}, inspect: async () => true }
+  const state = { loads: 0, visible: [], generation: 1, dirty: false, response: 1, saves: 0, saved: true, prompts: 0,
+    load: async () => {}, inspect: async script => {
+      if (script.startsWith('Boolean(')) return state.dirty
+      if (script.startsWith('(async')) { state.saves++; return state.saved }
+      return true
+    } }
   class View {
     webContents = Object.assign(new EventEmitter(), {
       isDestroyed: () => false, close() {}, setWindowOpenHandler() {},
@@ -129,7 +134,9 @@ function navigationFixture() {
     setVisible(value) { state.visible.push(value) }
     setBounds() {}
   }
-  const control = createDockSettingsView({ WebContentsView: View, window, mainWindow: { webContents: { session: {} } }, getRuntimeOrigin: () => 'http://127.0.0.1:1234', navigationTimeoutMs: 15 })
+  const control = createDockSettingsView({ WebContentsView: View, window, mainWindow: { webContents: { session: {} } },
+    getRuntimeOrigin: () => 'http://127.0.0.1:1234', getRuntimeGeneration: () => state.generation, navigationTimeoutMs: 15,
+    dialog: { showMessageBox: async () => { state.prompts++; return { response: state.response } } } })
   return { control, state }
 }
 
@@ -144,6 +151,64 @@ test('warm Dock tabs reuse one document without hiding the form; explicit non-se
   assert.deepEqual(state.visible, [true, true, true])
   await control.select(null)
   assert.equal(state.visible.at(-1), false)
+})
+
+test('a restarted runtime refreshes the plugin roster even when its URL is unchanged', async () => {
+  const { control, state } = navigationFixture()
+  await control.select('value-mode')
+  state.generation++
+  await control.select('plugin-options', 'dsh-free-search')
+  assert.equal(state.loads, 2)
+  assert.equal(state.prompts, 0)
+  await control.select('memory')
+  assert.equal(state.loads, 2)
+})
+
+test('return to editing protects a dirty warm document across repeated runtime refresh attempts', async () => {
+  const { control, state } = navigationFixture()
+  await control.select('memory')
+  state.dirty = true
+  state.generation++
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(control.select('plugin-options', 'dsh-free-search'), /保留未保存/)
+    assert.equal(state.loads, 1)
+    assert.equal(state.visible.at(-1), true)
+  }
+  assert.equal(state.prompts, 2)
+  state.response = 2
+  await control.select('plugin-options', 'dsh-free-search')
+  assert.equal(state.loads, 2)
+  assert.equal(state.saves, 0)
+})
+
+test('save and refresh requires successful draft persistence before replacing the document', async () => {
+  const { control, state } = navigationFixture()
+  await control.select('memory')
+  state.dirty = true
+  state.generation++
+  state.response = 0
+  state.saved = false
+  await assert.rejects(control.select('personal-prompt'), /保存未完成/)
+  assert.equal(state.loads, 1)
+  assert.equal(state.visible.at(-1), true)
+  state.saved = true
+  await control.select('personal-prompt')
+  assert.equal(state.loads, 2)
+  assert.equal(state.saves, 2)
+})
+
+test('a failed draft inspection preserves the old document until a safe retry', async () => {
+  const { control, state } = navigationFixture()
+  await control.select('memory')
+  state.generation++
+  const inspect = state.inspect
+  state.inspect = async () => { throw new Error('renderer unavailable') }
+  await assert.rejects(control.select('personal-prompt'), /无法确认编辑状态/)
+  assert.equal(state.loads, 1)
+  assert.equal(state.visible.at(-1), true)
+  state.inspect = inspect
+  await control.select('personal-prompt')
+  assert.equal(state.loads, 2)
 })
 
 test('a stalled settings document load times out and an explicit retry can reload it', async () => {

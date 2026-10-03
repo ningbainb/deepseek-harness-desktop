@@ -1,5 +1,9 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+type SettingsScopeSpec<T> = {
+    namespace: string;
+    decode?: (section: unknown) => T | undefined;
+};
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type MemoryLocaleKey } from './locales.ts';
 export * from './locales.ts';

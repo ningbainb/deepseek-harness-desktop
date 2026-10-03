@@ -149,11 +149,21 @@ describe('describe-image real Loader composition through cordis.yml', () => {
   }, 30_000)
 
   it.each([
-    { label: 'is omitted', configLines: ['    model: vision-1'], failure: 'describe-image: baseURL must be an absolute http(s) URL' },
     { label: 'is not http(s)', configLines: ['    baseURL: ftp://api.example.com', '    model: vision-1'], failure: 'baseURL must be an absolute http(s) URL' },
     { label: 'is empty', configLines: ['    baseURL: https://api.example.com', '    model: ""'], failure: 'model must be a non-empty model id' },
-  ])('fails loading when baseURL/model $label', async ({ configLines, failure }) => {
-    await expect(boot(configLines)).rejects.toThrow(failure)
+  ])('does not register the tool when baseURL/model $label', async ({ configLines, failure }) => {
+    expect(() => DescribeImage.resolveConfig(Object.fromEntries(configLines.map(line => {
+      const [key, ...value] = line.trim().split(': ')
+      return [key, value.join(': ').replace(/^"|"$/g, '')]
+    })))).toThrow(failure)
+    const ctx = await boot(configLines)
+    expect(ctx.tools.schemas().some(schema => schema.name === 'describe_image')).toBe(false)
+  }, 30_000)
+
+  it('rejects an incomplete composition entry before registering the tool', async () => {
+    const ctx = await boot(['    model: vision-1'])
+    expect(() => DescribeImage.resolveConfig({ model: 'vision-1' })).toThrow('describe-image: baseURL must be an absolute http(s) URL')
+    expect(ctx.tools.schemas().some(schema => schema.name === 'describe_image')).toBe(false)
   }, 30_000)
 
   it('mounts without configuration (family default) and fails per call with a clear message', async () => {

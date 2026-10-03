@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Ships the "Anchored Standard" preset as a one-command plugin of the dsh-web-ui family: on host startup it syncs the bundled preset into `~/.dsh/.agent-presets`, so new sessions can pick "梁神模式" from the preset picker. The first model request sees only the builtin Minimal preset's exact two tools — persistent `bash` plus `str_replace_editor` — the one-line persona prompt section, and the host sandbox policy required to form valid shell calls; after the anchor is established the wire switches to Code Mode (PTC) and the ordinary injections open. Built entirely on the official NPM SDK — no dsh source changes.
+Ships the "Anchored Standard" preset as a one-command plugin of the dsh-web-ui family: on host startup it syncs the bundled preset into `~/.dsh/.agent-presets` and declares it through the official agent preset registry, so new sessions can pick "梁神模式" from the preset picker. The first model request sees only the builtin Minimal preset's exact two tools — persistent `bash` plus `str_replace_editor` — the one-line persona prompt section, and the host sandbox policy required to form valid shell calls; after the anchor is established the wire switches to Code Mode (PTC) and the ordinary injections open. Built entirely on the official NPM SDK — no dsh source changes.
 
 ## Why
 

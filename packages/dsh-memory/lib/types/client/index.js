@@ -4,13 +4,13 @@ import { MemorySettingsCard } from "./MemorySettingsCard.js";
 import { en, zh } from "./locales.js";
 export * from "./locales.js";
 export { MemorySettingsCard } from "./MemorySettingsCard.js";
-export const inject = ['slots', 'locale', 'settingsScope'];
+export const inject = ['slots', 'locale', 'configForms'];
 function settingsBinder(ctx) {
     const compatibility = ctx.get('webUiSettings');
     if (compatibility !== undefined && typeof compatibility.bind === 'function') {
         return compatibility;
     }
-    return ctx.settingsScope;
+    return { bind: (spec) => ctx.configForms.get(spec.namespace) };
 }
 export function apply(ctx) {
     ctx.effect(() => ctx.locale.register('memory', { zh, en }), 'memory: dictionaries');

@@ -32,6 +32,8 @@ Recovery covers both the stored-log reader and the native historical preparation
 
 ## Install
 
+On rc.2 startup, stale blank checkpoints are refreshed from validated durable logs through official read-only handles and the projection cache SDK, with at most four concurrent reads. Live sessions, subagents and current checkpoints are left alone. No Agent or provider request is started and original log bytes are never rewritten. Failed reads remain unchanged and emit count-only diagnostics.
+
 DeepSeek Harness Desktop 2.0 mounts this bundle automatically in its isolated desktop profile. The package is not intended as a general Web UI plugin.
 
 ## Config

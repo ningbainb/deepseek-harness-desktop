@@ -16,13 +16,15 @@ import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-cmdline'
 import { installParticleThemeSettings } from '@linxin666/dsh-particle-theme'
 import z from 'schemastery'
 import { makeBridgeRoutes, type BridgeAccess } from './bridge.ts'
 import { makeChatGptAuthRoutes } from './chatgpt-auth-routes.ts'
 import { ChatGptAuthorizationController } from './chatgpt-auth.ts'
 import { mountOnce } from './mount-once.ts'
-import { makeRelayRoutes } from './relay-routes.ts'
+import { makeRelayRoutes, type RelayDefaultModel } from './relay-routes.ts'
+import { initializeRelayDefaultOnReady } from './relay-default-on-ready.ts'
 
 /** Default environment variable holding the reverse-proxy shared token. */
 export const DEFAULT_PROXY_TOKEN_ENV = 'DSH_WEB_UI_SETTINGS_PROXY_TOKEN'
@@ -133,8 +135,14 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
       const routes = makeRelayRoutes({
         settings: relayCtx.settings,
         credentials: relayCtx.credentials,
+        get defaultModel() { return relayCtx.get('agentDefaultModel') as RelayDefaultModel | undefined },
+        get officialAccount() { return relayCtx.get('deepseekAccount') as { getState(): Promise<{ status: 'signed-out' | 'credential-stored' }> } | undefined },
       }, access)
       const disposers = routes.map(route => relayCtx.webServer.register(route))
+      relayCtx.inject(['agentDefaultModel', 'deepseekAccount', 'appReady'], defaultCtx => {
+        defaultCtx.effect(() => initializeRelayDefaultOnReady(defaultCtx.appReady!, () => routes.initializeDefault(),
+          () => defaultCtx.logger.warn('web-ui-settings: bai initial default save failed')), 'web-ui-settings: first-user bai default')
+      })
       return () => {
         routes.dispose()
         for (const dispose of disposers) dispose()

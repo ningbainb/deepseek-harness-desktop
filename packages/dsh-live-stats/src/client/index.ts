@@ -1,5 +1,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the definitions that
@@ -64,7 +66,7 @@ const NS = 'live-stats'
 const LIVE_STATS_NS = 'live-stats'
 
 /** Services required by this plugin. */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote']
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote']
 
 /**
  * Register the compact statistics supplement, settings and balance center.
@@ -76,7 +78,7 @@ export function apply(ctx: ClientContext): void {
 
   // Plugin configuration card: one staged form over the `live-stats` settings
   // namespace, contributed to the plugin-configuration section.
-  const binder = ctx.get('webUiSettings') ?? ctx.settingsScope
+  const binder = ctx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const liveStatsSettings = new LiveStatsSettingsCardController(
     binder.bind<LiveStatsSettings>({ namespace: LIVE_STATS_NS }),
   )

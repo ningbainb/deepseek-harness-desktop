@@ -10,9 +10,13 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale) and its
@@ -44,6 +48,11 @@ const NS = 'task-board'
 
 /** Settings namespace the settings card edits (the Host plugin registers it). */
 const TASK_BOARD_NS = 'task-board'
+
+function mainViewSessionId(byId: SessionListState['byId']): SessionId | undefined {
+  return Object.values(byId).find(row => Object.entries(row.retainedBy)
+    .some(([source, count]) => source === 'mainView' && count > 0))?.id
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -81,7 +90,7 @@ declare module '@deepseek-ai/cordis' {
 
 
 /** Required services (fiber inject waiting — the runtime must be up first). */
-export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'settingsScope', 'locale', 'remote']
+export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'configForms', 'locale', 'remote', 'uiWorkspace']
 
 /**
  * Mount the task board.
@@ -108,7 +117,7 @@ export function apply(ctx: ClientContext): void {
 
   // Plugin configuration card: one staged form over the `task-board` settings
   // namespace, contributed to the Web UI plugin group.
-  const binder = ctx.get('webUiSettings') ?? ctx.settingsScope
+  const binder = ctx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const settingsScope = binder.bind<TaskBoardSettings>({ namespace: TASK_BOARD_NS })
   const settingsCard = new TaskBoardSettingsCardController(settingsScope)
   ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
@@ -161,7 +170,7 @@ export function apply(ctx: ClientContext): void {
           list: {
             getSnapshot: () => {
               const snapshot = workspaces.list.getSnapshot()
-              const currentSessionId = sessions.list.getSnapshot().current
+              const currentSessionId = mainViewSessionId(sessions.list.getSnapshot().byId)
               const recentWorkspaceId = currentSessionId === undefined
                 ? undefined
                 : snapshot.items.find(item => item.sessionIds.includes(currentSessionId))?.workspaceId
@@ -186,8 +195,11 @@ export function apply(ctx: ClientContext): void {
         evidenceStore,
         reviewService: store === v3Store ? new EvidenceReviewService({ store: v3Store, worktrees: new RemoteWorktreeReviewClient() }) : undefined,
         sessions: {
-          list: sessions.list,
-          open: id => sessions.open(id as SessionId),
+          list: {
+            getSnapshot: () => ({ current: mainViewSessionId(sessions.list.getSnapshot().byId) }),
+            subscribe: fn => sessions.list.subscribe(fn),
+          },
+          open: id => ctx.uiWorkspace.openSession(id as SessionId),
         },
         onExecutionSettled: event => {
           const desktop = (window as typeof window & {
@@ -239,7 +251,7 @@ export function apply(ctx: ClientContext): void {
         let attempt = 0
         while (Date.now() < deadline) {
           try {
-            sessions.open(sessionId as SessionId)
+            ctx.uiWorkspace.openSession(sessionId as SessionId)
             return
           } catch (error) {
             lastError = error

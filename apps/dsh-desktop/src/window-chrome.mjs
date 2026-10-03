@@ -41,13 +41,17 @@ export function setWindowChromeTheme(browserWindow, rawTheme, rawPalette) {
 export const WINDOW_CHROME_CSS = `
 :root {
   --dsh-desktop-window-chrome-height: ${WINDOW_CHROME_HEIGHT}px;
+  --dsh-desktop-skin-top-inset: 0px;
+  --dsh-desktop-skin-bottom-inset: 0px;
+  --dsh-desktop-content-top: calc(var(--dsh-desktop-window-chrome-height) + var(--dsh-desktop-skin-top-inset));
+  --dsh-desktop-content-height: calc(100vh - var(--dsh-desktop-content-top) - var(--dsh-desktop-skin-bottom-inset));
 }
 
-html[data-dsh-desktop-window-chrome="true"] body {
+html[data-dsh-desktop-window-chrome="true"] body:has(> #${WINDOW_CHROME_ID}) {
   box-sizing: border-box !important;
   height: 100vh !important;
   min-height: 0 !important;
-  padding-top: var(--dsh-desktop-window-chrome-height) !important;
+  padding-top: var(--dsh-desktop-content-top) !important;
 }
 
 /* The DSH web shell may pin #root to the viewport with fixed/absolute
@@ -56,18 +60,21 @@ html[data-dsh-desktop-window-chrome="true"] body {
    normal-flow layouts. */
 html[data-dsh-desktop-window-chrome="true"] body > #root {
   box-sizing: border-box !important;
-  height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+  height: var(--dsh-desktop-content-height) !important;
   min-height: 0 !important;
-  max-height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+  max-height: var(--dsh-desktop-content-height) !important;
 }
 
-html[data-dsh-desktop-window-chrome="true"] body > #root.dsh-desktop-viewport-root {
-  top: var(--dsh-desktop-window-chrome-height) !important;
+html[data-dsh-desktop-window-chrome="true"] body > #root.dsh-desktop-viewport-root,
+html[data-dsh-desktop-window-chrome="true"] body > #root[style*="fixed"],
+html[data-dsh-desktop-window-chrome="true"] body > #root[style*="absolute"] {
+  top: var(--dsh-desktop-content-top) !important;
 }
 
 html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
   min-height: 0 !important;
   max-height: 100% !important;
+  height: 100% !important;
 }
 
 /* Native Sidebar fullscreen is viewport-fixed, outside the padded root flow.
@@ -82,6 +89,13 @@ html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel="fullscree
    Keep it visible, but never underneath the native Desktop controls. */
 html[data-dsh-desktop-window-chrome="true"] body > [data-skin-chrome="titlebar"] {
   transform: translateY(var(--dsh-desktop-window-chrome-height)) !important;
+}
+
+/* Deliverable cards and produced files support native external drag-and-drop */
+[data-presented-file],
+[data-presented-file] button,
+[data-produced-files-row] button {
+  -webkit-user-drag: element !important;
 }
 
 #${WINDOW_CHROME_ID} {
@@ -122,7 +136,8 @@ html[data-dsh-desktop-chrome-theme="dark"] {
    sits beside the native caption area. Keep every control and its active
    state, while replacing the heavy cyan group outline with a compact neutral
    segmented surface and an accessible per-button keyboard focus ring. */
-html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] {
+html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"],
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel] [data-dockkit-strip-chrome] {
   gap: 2px !important;
   box-sizing: border-box !important;
   padding: 2px !important;
@@ -134,26 +149,36 @@ html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] {
 }
 
 html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"]:focus,
-html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"]:focus-within {
+html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"]:focus-within,
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel] [data-dockkit-strip-chrome]:focus,
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel] [data-dockkit-strip-chrome]:focus-within {
   outline: none !important;
   box-shadow: none !important;
 }
 
-html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button {
+html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button,
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel] [data-dockkit-strip-chrome] > button {
   margin: 0 !important;
   border-radius: 6px !important;
   box-shadow: none !important;
 }
 
-html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button:focus-visible {
+html[data-dsh-desktop-window-chrome="true"] [class*="_toggleCluster"] > button:focus-visible,
+html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel] [data-dockkit-strip-chrome] > button:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary, #416bd4) !important;
   outline-offset: 0 !important;
 }
 
 html[data-dsh-desktop-window-chrome="true"] .dsh-desktop-modal-layer {
+  z-index: 2147483646 !important;
   top: var(--dsh-desktop-window-chrome-height) !important;
   height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
   max-height: calc(100vh - var(--dsh-desktop-window-chrome-height)) !important;
+}
+
+html[data-dsh-desktop-window-chrome="true"] body > [role="menu"],
+html[data-dsh-desktop-window-chrome="true"] body > [role="listbox"] {
+  z-index: 2147483647 !important;
 }
 
 #${WINDOW_CHROME_ID} .dsh-window-chrome-menus {
@@ -324,11 +349,51 @@ export function markWindowChromeViewportRoot({ document, getComputedStyle, chrom
   if (!root || root.parentElement !== document.body) return
   const marker = 'dsh-desktop-viewport-root'
   const position = getComputedStyle(root).position
+  const skinTop = Number.parseFloat(document.documentElement?.style?.getPropertyValue('--dsh-desktop-skin-top-inset')) || 0
   // Once the rule moves the root below the caption, its corrected rectangle
   // must not make the next observer pass remove that same rule.
   const needsInset = (position === 'fixed' || position === 'absolute')
-    && (root.classList.contains(marker) || root.getBoundingClientRect().top < chromeHeight)
+    && (root.classList.contains(marker) || root.getBoundingClientRect().top < chromeHeight + skinTop)
   root.classList.toggle(marker, needsInset)
+}
+
+export function syncWindowChromeSkinInsets({ document, getComputedStyle, chromeHeight, viewportHeight }) {
+  if (!document.body || !document.documentElement?.style) return
+  let topInset = 0
+  let bottomInset = Math.max(0, Number.parseFloat(getComputedStyle(document.body).paddingBottom) || 0)
+  for (const element of document.body.children) {
+    const kind = element.getAttribute('data-skin-chrome')
+    if (kind !== 'titlebar' && kind !== 'statusbar') continue
+    const style = getComputedStyle(element)
+    if (style.display === 'none' || style.visibility === 'hidden' || style.position !== 'fixed') continue
+    const bounds = element.getBoundingClientRect()
+    if (bounds.height <= 0) continue
+    if (kind === 'titlebar') topInset = Math.max(topInset, bounds.bottom - chromeHeight)
+    else bottomInset = Math.max(bottomInset, viewportHeight - bounds.top)
+  }
+  const available = Math.max(0, viewportHeight - chromeHeight)
+  topInset = Math.min(Math.max(0, topInset), available)
+  bottomInset = Math.min(bottomInset, available - topInset)
+  for (const [name, value] of [['--dsh-desktop-skin-top-inset', topInset], ['--dsh-desktop-skin-bottom-inset', bottomInset]]) {
+    const next = `${value}px`
+    if (document.documentElement.style.getPropertyValue(name) !== next) document.documentElement.style.setProperty(name, next)
+  }
+}
+
+export function markWindowChromeModalLayer({ dialog, document, getComputedStyle }) {
+  let layer = dialog
+  while (layer && layer !== document.body && layer !== document.documentElement) {
+    if (layer.id === 'root' || layer.hasAttribute?.('data-dsh-frame')) {
+      layer.classList.remove('dsh-desktop-modal-layer')
+      return false
+    }
+    if (getComputedStyle(layer).position === 'fixed') {
+      if (!layer.classList.contains('dsh-desktop-modal-layer')) layer.classList.add('dsh-desktop-modal-layer')
+      return true
+    }
+    layer = layer.parentElement
+  }
+  return false
 }
 
 /** Serialized into the renderer. Index dialogs without rescanning all history. */
@@ -337,11 +402,14 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
   const membership = new Set(['role', 'aria-modal', 'open'])
   const dialogs = new Set(document.querySelectorAll(selector))
   let disposed = false
+  let resizeObserver
   const dispose = () => {
     if (disposed) return
     disposed = true
     observer.disconnect()
+    resizeObserver?.disconnect?.()
     dialogs.clear()
+    window.removeEventListener('resize', sync)
     window.removeEventListener('pagehide', pagehide)
   }
   const pagehide = event => { if (!event.persisted) dispose() }
@@ -373,7 +441,14 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
     sync()
   })
   observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
-    attributeFilter: ['class', 'style', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
+    attributeFilter: ['class', 'style', 'data-skin-chrome', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })
+  if (typeof window.ResizeObserver !== 'undefined' && document.body) {
+    try {
+      resizeObserver = new window.ResizeObserver(sync)
+      resizeObserver.observe(document.body)
+    } catch {}
+  }
+  window.addEventListener('resize', sync)
   window.addEventListener('pagehide', pagehide)
   sync()
   return dispose
@@ -509,19 +584,29 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
       }
     };
     const markModalLayer = (dialog) => {
-      let layer = dialog;
-      while (layer.parentElement && layer.parentElement !== document.body) {
-        if (getComputedStyle(layer).position === 'fixed') break;
-        layer = layer.parentElement;
-      }
-      if (getComputedStyle(layer).position === 'fixed' && !layer.classList.contains('dsh-desktop-modal-layer')) {
-        layer.classList.add('dsh-desktop-modal-layer');
-      }
+      (${markWindowChromeModalLayer.toString()})({ dialog, document, getComputedStyle });
     };
-    const markViewportRoot = () => (${markWindowChromeViewportRoot.toString()})({
-      document, getComputedStyle, chromeHeight: data.chromeHeight,
-    });
+    const markViewportRoot = () => {
+      (${syncWindowChromeSkinInsets.toString()})({ document, getComputedStyle, chromeHeight: data.chromeHeight, viewportHeight: window.innerHeight });
+      (${markWindowChromeViewportRoot.toString()})({ document, getComputedStyle, chromeHeight: data.chromeHeight });
+    };
     (${observeWindowChromeDocument.toString()})({ document, window, chrome, syncTheme, markViewportRoot, markModalLayer });
+    document.addEventListener('dragstart', (event) => {
+      const target = event.target;
+      if (!target || typeof target.closest !== 'function') return;
+      const presented = target.closest('[data-presented-file]');
+      const produced = target.closest('[data-produced-files-row] button[title]');
+      let filePath = null;
+      if (presented) {
+        filePath = presented.querySelector('button[title]')?.getAttribute('title') || presented.getAttribute('title');
+      } else if (produced) {
+        filePath = produced.getAttribute('title');
+      }
+      if (filePath && typeof window.dshDesktop?.startDragFile === 'function') {
+        event.preventDefault();
+        window.dshDesktop.startDragFile(filePath);
+      }
+    });
     return true;
   })()`
 }

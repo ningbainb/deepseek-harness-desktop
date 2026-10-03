@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis';
-import z from 'schemastery';
+import z from '@deepseek-ai/schemastery';
 import { type MemoryConfig } from './core/config.ts';
 export declare const name = "memory";
 export declare const inject: string[];

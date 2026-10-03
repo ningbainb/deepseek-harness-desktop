@@ -10,7 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -24,6 +24,12 @@ export const name = 'ssh'
 
 /** Services required before the SSH surfaces can mount. */
 export const inject = ['webServer', 'tools', 'systemPrompt']
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'loader/volatile-update'(paths: readonly (readonly string[])[]): void
+  }
+}
 
 /**
  * Settings namespace of the SSH capability — the section the web settings
@@ -43,9 +49,28 @@ export interface Config {
   enabled?: boolean
 }
 
-export const Config: z<Config> = z.object({
-  announceToAgent: z.boolean().default(true),
-  enabled: z.boolean().default(true),
+interface ConfigRef<T> {
+  get(): T
+}
+
+type ConfigField<T> = ConfigRef<T> | T
+
+interface ResolvedConfig {
+  announceToAgent?: ConfigField<boolean>
+  enabled?: ConfigField<boolean>
+}
+
+function readConfigField<T>(field: ConfigField<T> | undefined, fallback: T): T {
+  if (field === undefined) return fallback
+  if (typeof field === 'object' && field !== null && typeof (field as ConfigRef<T>).get === 'function') {
+    return (field as ConfigRef<T>).get() ?? fallback
+  }
+  return field as T
+}
+
+export const Config = z.object({
+  announceToAgent: z.boolean().default(true).volatile(),
+  enabled: z.boolean().default(true).volatile(),
 })
 
 /** Schema default, re-read for hand-built test contexts (the loader applies them normally). */
@@ -62,15 +87,11 @@ export const SSH_GUIDANCE = '本机已安装 dsh-ssh 插件（DSH 远程 SSH 运
  * @param ctx - host plugin context carrying webServer/tools/systemPrompt.
  * @param config - resolved plugin config (schema defaults applied by the loader).
  */
-export function apply(ctx: Context, config?: Config): void {
-  // The live source the surfaces read: the settings section once the web
-  // settings surface is served, the composition entry otherwise.
-  let current: () => Config = () => config ?? {}
+export function apply(ctx: Context, config?: ResolvedConfig): void {
   const resolve = (): Config => {
-    const value = current()
     return {
-      announceToAgent: value.announceToAgent ?? DEFAULT_ANNOUNCE,
-      enabled: value.enabled ?? true,
+      announceToAgent: readConfigField(config?.announceToAgent, DEFAULT_ANNOUNCE),
+      enabled: readConfigField(config?.enabled, true),
     }
   }
 
@@ -141,17 +162,8 @@ export function apply(ctx: Context, config?: Config): void {
     )
   }
 
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, SSH_SETTINGS_NAMESPACE, Config, config ?? {}, {
-      setSource: (source) => {
-        current = source
-        sync()
-      },
-      onChange: sync,
-    })
-  })
+  ctx.on('loader/volatile-update', sync)
 
-  // Initial registration from the composition entry (covers deployments with
-  // no settings service, whose section installation never fires its hooks).
+  // The loader owns the settings form and updates volatile config references.
   sync()
 }

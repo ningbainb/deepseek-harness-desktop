@@ -17,6 +17,7 @@ export default clientBundle('@linxin666/dsh-tool-describe-image', ['src/index.ts
     '@deepseek-ai/dsh-launch-environment',
     '@deepseek-ai/dsh-settings',
     '@deepseek-ai/dsh-tools',
+    '@deepseek-ai/schemastery',
     'schemastery',
   ],
 })

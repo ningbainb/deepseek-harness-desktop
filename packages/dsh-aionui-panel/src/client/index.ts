@@ -20,6 +20,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the input dock entry).
 import type { ConversationController } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { currentSessionId } from './current-session.ts'
 import { PanelApi, subscribePanelEvents } from './api.ts'
 import { PanelLayoutController } from './layout.ts'
 import { createPanelStores, layoutSetRoot } from './store.ts'
@@ -145,7 +146,7 @@ export function apply(ctx: ClientContext): void {
       return attachDraftImages(conversation as unknown as DraftAttachmentConversation, shell, sessionId, files)
     }
     insertPathIntoCurrentDraft = (path: string): boolean => {
-      const sessionId = sessions.list.getSnapshot().current as SessionId | undefined
+      const sessionId = currentSessionId(sessions.list.getSnapshot())
       return insertPath(sessionId, path)
     }
     scope.slots.inject('conversation.input.dock', () =>
@@ -173,7 +174,7 @@ export function apply(ctx: ClientContext): void {
     const api = new PanelApi()
     const stores = createPanelStores(api, (root, path) => {
       const snapshot = ctx.sessions.list.getSnapshot()
-      const sessionId = snapshot.current
+      const sessionId = currentSessionId(snapshot)
       return openNativePreview({
         sidebar: ctx.get('sidebarRight', false),
         registry: ctx.get('sidebarRightTabs', false),
@@ -195,7 +196,7 @@ export function apply(ctx: ClientContext): void {
     disposers.push(registerNativeBrowser(ctx))
     disposers.push(registerNativeSidebarReturn(ctx))
     disposers.push(registerNativePanels(ctx, stores, (sessionId, path) => {
-      if (ctx.sessions.list.getSnapshot().current !== sessionId) return false
+      if (currentSessionId(ctx.sessions.list.getSnapshot()) !== sessionId) return false
       return insertPathIntoCurrentDraft(path)
     }))
     let disposeEvents: (() => void) | undefined
@@ -206,7 +207,7 @@ export function apply(ctx: ClientContext): void {
     // re-binds every store (widths, collapse, tree, tabs persist per root).
     const bindRoot = (): void => {
       const snapshot = ctx.sessions.list.getSnapshot()
-      const sessionId = snapshot.current as SessionId | undefined
+      const sessionId = currentSessionId(snapshot)
       const cwd = sessionId === undefined ? undefined : snapshot.byId[sessionId]?.cwd
       const root = typeof cwd === 'string' && cwd !== '' ? cwd : ''
       if (root === currentRoot) return

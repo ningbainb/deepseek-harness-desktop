@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-把「Anchored Standard」preset 做成 DSH 全家桶里的一键安装插件：Host 启动时把内置 preset 同步到 `~/.dsh/.agent-presets`，新建会话即可在预设选择器中选择「梁神模式」。首轮模型请求只看到官方 Minimal 精确双工具——持久 `bash` 与 `str_replace_editor`——、一行 persona，以及形成有效 Shell 调用所需的宿主沙箱策略；锚定建立后 wire 切换为 Code Mode（PTC），并开放全部 prompt section 与常规注入。全部通过官方 NPM SDK 实现，不修改 DSH 源码。
+把「Anchored Standard」preset 做成 DSH 全家桶里的一键安装插件：Host 启动时把内置 preset 同步到 `~/.dsh/.agent-presets`，并通过官方预设注册表声明，新建会话即可在预设选择器中选择「梁神模式」。首轮模型请求只看到官方 Minimal 精确双工具——持久 `bash` 与 `str_replace_editor`——、一行 persona，以及形成有效 Shell 调用所需的宿主沙箱策略；锚定建立后 wire 切换为 Code Mode（PTC），并开放全部 prompt section 与常规注入。全部通过官方 NPM SDK 实现，不修改 DSH 源码。
 
 ## 原理
 

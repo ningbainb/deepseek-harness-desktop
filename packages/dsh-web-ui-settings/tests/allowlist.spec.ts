@@ -50,12 +50,14 @@ describe('extractWebSettingsNamespaces', () => {
 
 describe('resolveNamespaceEntry', () => {
   it('maps package names onto their settings namespaces', () => {
-    expect(resolveNamespaceEntry('dsh-client-ui-task-board')).toBe('task-board')
-    expect(resolveNamespaceEntry('dsh-skins')).toBe('skin-background')
+    expect(resolveNamespaceEntry('dsh-client-ui-task-board')).toBe('ui-task-board')
+    expect(resolveNamespaceEntry('dsh-skins')).toBe('ui-skin-center')
+    expect(resolveNamespaceEntry('task-board')).toBe('ui-task-board')
+    expect(resolveNamespaceEntry('skin-background')).toBe('ui-skin-center')
     expect(resolveNamespaceEntry('dsh-ssh')).toBe('dsh-ssh')
     expect(resolveNamespaceEntry('dsh-particle-theme')).toBe('particle-theme')
     expect(resolveNamespaceEntry('dsh-memory')).toBe('memory')
-    expect(resolveNamespaceEntry('dsh-value-mode')).toBe('value-mode')
+    expect(resolveNamespaceEntry('dsh-value-mode')).toBe('ui-value-mode')
   })
 
   it('passes bare family namespaces through', () => {
@@ -76,41 +78,43 @@ describe('composeAllowlist', () => {
   const registered = [
     'dsh-ssh',
     'llm-pi-ai',
-    'task-board',
+    'ui-task-board',
     'remote-web-ui',
     'live-stats',
     'memory',
-    'model-preferences',
+    'ui-model-preferences',
     'pet',
     'personal-prompt',
     'particle-theme',
-    'skin-background',
+    'ui-skin-center',
     'skin-wallpaper',
-    'value-mode',
+    'ui-value-mode',
+    'describe-image',
     'web-search-deepseek',
   ]
 
   it('falls back to the family list when the user configured none', () => {
     expect(composeAllowlist([], registered)).toEqual([
+      'describe-image',
       'dsh-ssh',
       'live-stats',
       'llm-pi-ai',
       'memory',
-      'model-preferences',
       'particle-theme',
       'personal-prompt',
       'pet',
       'remote-web-ui',
-      'skin-background',
       'skin-wallpaper',
-      'task-board',
-      'value-mode',
+      'ui-model-preferences',
+      'ui-skin-center',
+      'ui-task-board',
+      'ui-value-mode',
     ])
   })
 
   it('honors user entries, deduplicates, and ignores unknown names', () => {
     expect(composeAllowlist(['dsh-client-ui-task-board', 'dsh-skins', 'dsh-ssh', 'nope'], registered))
-      .toEqual(['dsh-ssh', 'skin-background', 'task-board'])
+      .toEqual(['dsh-ssh', 'ui-skin-center', 'ui-task-board'])
   })
 
   it('drops namespaces not registered in the settings seam', () => {

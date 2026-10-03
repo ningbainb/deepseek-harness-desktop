@@ -194,7 +194,7 @@ function modelForCurrent(group: ModelProviderGroup, current: ModelSelection | nu
 }
 
 function currentFallbackGroup(groups: readonly ModelProviderGroup[], current: ModelSelection | null): ModelProviderGroup[] {
-  if (current === null) return groups.map(group => ({ ...group, models: [...group.models] }))
+  if (current === null || (current.provider === PRIMARY_PROVIDER_ID && current.model === '__bai_login_required__')) return groups.map(group => ({ ...group, models: [...group.models] }))
   const result = groups.map(group => ({ ...group, models: [...group.models] }))
   const group = result.find(candidate => candidate.id === current.provider)
   if (group === undefined) {

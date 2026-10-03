@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +19,7 @@ const timings = {}
 const errors = []
 let app
 let settings
+let failed = false
 const isCatalog = request => /modelCatalog|model.catalog/i.test(request.url() + ' ' + (request.postData() ?? ''))
 try {
   await Promise.all([mkdir(dshHome), mkdir(userData)])
@@ -106,6 +107,10 @@ try {
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
 } catch (error) {
+  failed = true
+  console.error('Dock catalog runtime evidence', temporary,
+    (await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')).slice(-8000))
+  console.error('Dock catalog window surfaces', app?.windows().map(page => page.url()))
   console.error('Dock catalog fixture', { errors, page: await settings?.evaluate(() => ({
     url: location.href,
     readyState: document.readyState,
@@ -121,5 +126,5 @@ try {
 } finally {
   await writeFile(fetchGate, 'open').catch(() => {})
   await app?.close()
-  await rm(temporary, { recursive: true, force: true })
+  if (!failed) await rm(temporary, { recursive: true, force: true })
 }

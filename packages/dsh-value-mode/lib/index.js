@@ -1,10 +1,11 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import z from "schemastery";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { homedir } from "node:os";
+import { parse } from "yaml";
+import z from "@deepseek-ai/schemastery";
 //#region src/core/config.ts
 const VALUE_MODE_SETTINGS_NAMESPACE = "value-mode";
 const DEFAULT_STRATEGY = "balanced";
@@ -103,31 +104,6 @@ function resolveSessionConfig(globalConfig = {}, override) {
 		...override.expert !== void 0 ? { expert: override.expert } : {}
 	};
 }
-//#endregion
-//#region src/core/schema.ts
-const ModelRouteSchema = z.object({
-	provider: z.string(),
-	model: z.string(),
-	reasoningEffort: z.string()
-});
-const Config = z.object({
-	enabled: z.boolean().default(false),
-	strategy: z.union([
-		"saver",
-		"balanced",
-		"powerful"
-	]).default(DEFAULT_STRATEGY),
-	executor: ModelRouteSchema,
-	expert: ModelRouteSchema,
-	maxOutputTokens: z.number().default(DEFAULT_MAX_OUTPUT_TOKENS),
-	maxContextChars: z.number().default(DEFAULT_MAX_CONTEXT_CHARS),
-	maxDepth: z.number().default(1),
-	allowReview: z.boolean().default(true),
-	showExpertActivity: z.boolean().default(true),
-	maxExpertCallsPerTurn: z.number().default(3),
-	consecutiveFailuresThreshold: z.number().default(2),
-	autoReviewKeywords: z.array(z.string()).default(DEFAULT_AUTO_REVIEW_KEYWORDS)
-});
 //#endregion
 //#region src/core/policy.ts
 const VALUE_MODE_SECTION_NAME = "value-mode:guidance";
@@ -890,6 +866,89 @@ function syncPresetTrees(sourceRoot, targetRoot, retire = []) {
 	return result;
 }
 //#endregion
+//#region src/preset-registry.ts
+function readObject(path) {
+	const value = parse(readFileSync(path, "utf8"), { uniqueKeys: true });
+	if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`preset metadata must be a mapping: ${path}`);
+	return value;
+}
+function rowsAt(path, directory) {
+	const value = parse(readFileSync(path, "utf8"), { uniqueKeys: true });
+	if (!Array.isArray(value)) throw new Error(`preset composition must be a list: ${path}`);
+	const normalize = (rows) => rows.map((item) => {
+		if (item === null || typeof item !== "object" || Array.isArray(item)) throw new Error(`preset composition has an invalid row: ${path}`);
+		const row = item;
+		const name = typeof row.name === "string" && row.name.startsWith("./") ? pathToFileURL(resolve(directory, row.name)).href : row.name;
+		const config = Array.isArray(row.config) ? normalize(row.config) : row.config;
+		return {
+			...row,
+			name,
+			config
+		};
+	});
+	return normalize(value);
+}
+/** Declare the bundled composition through the official rc.2 registry. */
+function declareBundledPreset(ctx, id, directory) {
+	let closed = false;
+	let pending;
+	let release;
+	const start = () => {
+		if (closed || pending) return;
+		const registry = ctx.get("agentPresets");
+		if (!registry) return;
+		pending = (async () => {
+			const metadata = readObject(join(directory, "preset.yml"));
+			const definition = {
+				id,
+				name: typeof metadata.name === "string" ? metadata.name : id,
+				description: typeof metadata.description === "string" ? metadata.description : void 0,
+				order: typeof metadata.order === "number" ? metadata.order : void 0,
+				plugins: rowsAt(join(directory, "agent.cordis.yml"), directory)
+			};
+			const dispose = await registry.register(definition);
+			if (closed) await dispose();
+			else release = dispose;
+		})().catch((error) => {
+			ctx.logger?.warn?.(`${id}: preset declaration failed: ${error instanceof Error ? error.message : String(error)}`);
+		});
+	};
+	ctx.inject(["agentPresets"], start);
+	ctx.effect(() => {
+		start();
+		return async () => {
+			closed = true;
+			await pending;
+			await release?.();
+		};
+	}, `${id}: preset declaration`);
+}
+//#endregion
+//#region src/core/schema.ts
+const ModelRouteSchema = z.object({
+	provider: z.string(),
+	model: z.string(),
+	reasoningEffort: z.string()
+});
+const Config = z.object({
+	enabled: z.boolean().default(false).volatile(),
+	strategy: z.union([
+		"saver",
+		"balanced",
+		"powerful"
+	]).default(DEFAULT_STRATEGY).volatile(),
+	executor: ModelRouteSchema.volatile(),
+	expert: ModelRouteSchema.volatile(),
+	maxOutputTokens: z.number().default(DEFAULT_MAX_OUTPUT_TOKENS).volatile(),
+	maxContextChars: z.number().default(DEFAULT_MAX_CONTEXT_CHARS).volatile(),
+	maxDepth: z.number().default(1).volatile(),
+	allowReview: z.boolean().default(true).volatile(),
+	showExpertActivity: z.boolean().default(true).volatile(),
+	maxExpertCallsPerTurn: z.number().default(3).volatile(),
+	consecutiveFailuresThreshold: z.number().default(2).volatile(),
+	autoReviewKeywords: z.array(z.string()).default(DEFAULT_AUTO_REVIEW_KEYWORDS).volatile()
+});
+//#endregion
 //#region src/index.ts
 /**
 * @module @linxin666/dsh-value-mode
@@ -940,8 +999,7 @@ function syncBundledPreset(ctx) {
 * Apply the Value Mode host plugin to Cordis context.
 */
 function apply(ctx, initialConfig = {}) {
-	let currentConfig = initialConfig;
-	let currentSource = () => currentConfig;
+	const currentSource = () => Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key, typeof field === "object" && field !== null && "get" in field && typeof field.get === "function" ? field.get() : field]));
 	const routedRequestAttempts = /* @__PURE__ */ new Map();
 	const streams = /* @__PURE__ */ new Map();
 	const requestKey = (payload) => {
@@ -959,20 +1017,7 @@ function apply(ctx, initialConfig = {}) {
 		for (const [stream, key] of streams) if (!routedRequestAttempts.has(key)) streams.delete(stream);
 	};
 	syncBundledPreset(ctx);
-	ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
-		setSource: (source) => {
-			currentSource = source;
-			currentConfig = source();
-		},
-		onChange: () => {
-			currentConfig = currentSource();
-		},
-		validate: (value) => {
-			const effective = resolveEffectiveConfig(value, readDefaultExpert(ctx));
-			if (value.enabled && !isCompleteModelRoute(effective.executor)) throw new Error("副模型/子代理执行模型未选择具体模型");
-			if (value.enabled && !isCompleteModelRoute(effective.expert)) throw new Error("专家主控模型未选择具体模型");
-		}
-	});
+	declareBundledPreset(ctx, "value-mode", join(bundledPresetsRoot(), "value-mode"));
 	ctx.tools.register(createConsultExpertTool(ctx, () => currentSource()));
 	ctx.systemPrompt.section({
 		name: VALUE_MODE_SECTION_NAME,

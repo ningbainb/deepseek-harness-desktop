@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis';
-import z from 'schemastery';
+import z from '@deepseek-ai/schemastery';
 import { type PersonalPromptConfig, type PromptProfileScope } from './core/config.ts';
 export declare const name = "personal-prompt";
 export declare const inject: string[];

@@ -8,7 +8,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
@@ -59,17 +59,17 @@ export interface Config {
 
 /** Schemastery configuration for the describe-image tool; doubles as the `describe-image` settings-section schema. */
 export const Config: z<Config> = z.object({
-  baseURL: z.string(),
-  model: z.string(),
-  apiKey: z.string().role('secret'),
-  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
-  defaultPrompt: z.string().default(DEFAULT_PROMPT),
-  maxBytes: z.number().step(1).min(1).default(DEFAULT_MAX_BYTES),
-  maxOutputTokens: z.number().step(1).min(1).default(DEFAULT_MAX_OUTPUT_TOKENS),
-  timeoutMs: z.number().min(1).default(DEFAULT_TIMEOUT_MS),
-  apiStyle: z.union(API_STYLES).default(DEFAULT_API_STYLE),
-  interceptImageSend: z.boolean().default(true),
-})
+  baseURL: z.string().volatile(),
+  model: z.string().volatile(),
+  apiKey: z.string().role('secret').volatile(),
+  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV).volatile(),
+  defaultPrompt: z.string().default(DEFAULT_PROMPT).volatile(),
+  maxBytes: z.number().step(1).min(1).default(DEFAULT_MAX_BYTES).volatile(),
+  maxOutputTokens: z.number().step(1).min(1).default(DEFAULT_MAX_OUTPUT_TOKENS).volatile(),
+  timeoutMs: z.number().min(1).default(DEFAULT_TIMEOUT_MS).volatile(),
+  apiStyle: z.union(API_STYLES).default(DEFAULT_API_STYLE).volatile(),
+  interceptImageSend: z.boolean().default(true).volatile(),
+}) as unknown as z<Config>
 
 /** Settings namespace carrying the endpoint, model, and key reference the Plugins card edits. */
 export const DESCRIBE_IMAGE_SETTINGS_NAMESPACE = 'describe-image'

@@ -18,6 +18,7 @@ export interface CommunityPluginsCardProps {
   t: (key: CommunityPluginKey) => string
   /** Index entries; defaults to the generated registry (injected for tests). */
   plugins?: readonly CommunityPluginEntry[]
+  enabled?: boolean
 }
 
 const CATEGORIES = [
@@ -85,7 +86,7 @@ export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNod
           />
         </svg>
       </button>
-      {open
+      {open && props.enabled !== false
         ? (
           <div className={css.body}>
             <div className={css.filterBar}>
@@ -148,4 +149,4 @@ export function CommunityPluginsCard(props: CommunityPluginsCardProps): ReactNod
         : null}
     </li>
   )
-}
+}

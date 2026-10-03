@@ -5,7 +5,7 @@
  * through props from the entry behavior component.
  */
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconCloseOutline16, IconRefreshOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseOutlineMedium, IconRefreshOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UpdateRunResult, UpdateStatus } from '../update.ts'
 import css from "./remote.module.css"
 
@@ -53,7 +53,7 @@ export function UpdatePanel({ t, view, onClose, onRecheck }: UpdatePanelProps) {
           {subtitle !== undefined && <p className={css.subtitle}>{subtitle}</p>}
         </div>
         <button type="button" className={css.close} aria-label={t("update.close")} onClick={onClose}>
-          <IconCloseOutline16 />
+          <IconCloseOutlineMedium />
         </button>
       </div>
       {view.kind === "checking" && <p className={css.updateStatus}>{t("update.checking")}</p>}
@@ -76,7 +76,7 @@ export function UpdatePanel({ t, view, onClose, onRecheck }: UpdatePanelProps) {
       {(view.kind === "done" || view.kind === "error") && (
         <div className={css.updateActions}>
           <button type="button" className={css.updateRetry} onClick={onRecheck}>
-            <IconRefreshOutline16 /> {t("update.retry")}
+            <IconRefreshOutlineMedium /> {t("update.retry")}
           </button>
         </div>
       )}

@@ -1,0 +1,68 @@
+/**
+ * Desktop Extension Dock sidebar entry styles.
+ * Matches the shell's 36px rail / wide sidebar button look.
+ */
+
+:global(.dsh-dock-entry) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+:global(.dsh-dock-entry:hover) {
+  background: var(--harness-bg-hover, rgba(0, 0, 0, 0.04));
+}
+
+:global(.dsh-dock-entry-icon) {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+:global(.dsh-dock-entry:hover .dsh-dock-entry-icon) {
+  opacity: 1;
+  color: var(--harness-accent, #4d78e8);
+}
+
+:global(.dsh-dock-entry-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rail mode: icon only, centered */
+:global([data-dsh-frame][data-sidebar-collapsed] .dsh-dock-entry),
+:global([data-sidebar-collapsed] .dsh-dock-entry) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+:global([data-dsh-frame][data-sidebar-collapsed] .dsh-dock-entry-label),
+:global([data-sidebar-collapsed] .dsh-dock-entry-label) {
+  display: none;
+}
+
+:global([data-dsh-frame][data-sidebar-collapsed] .dsh-dock-entry-icon),
+:global([data-sidebar-collapsed] .dsh-dock-entry-icon) {
+  width: 20px;
+  height: 20px;
+}

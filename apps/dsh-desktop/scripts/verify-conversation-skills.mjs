@@ -15,10 +15,13 @@ const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const runtimeReadyTimeoutMs = packagedExecutable ? 120_000 : 60_000
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-conversation-skills-e2e-'))
 const dshHome = resolve(temporary, 'dsh-home')
+const agentsHome = resolve(temporary, 'agents-home')
 const workspacePath = resolve(temporary, 'conversation-skills-workspace')
 const skillName = 'desktop-conversation-check'
+const sharedSkillName = 'desktop-conversation-secondary'
 let electronApp
 let page
+let verified = false
 
 async function rpc(runtimePage, method, payload) {
   const response = await runtimePage.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
@@ -43,9 +46,12 @@ async function rpc(runtimePage, method, payload) {
 
 try {
   const skillRoot = resolve(dshHome, 'skills', skillName)
+  const sharedSkillRoot = resolve(agentsHome, 'skills', sharedSkillName)
   await mkdir(skillRoot, { recursive: true })
+  await mkdir(sharedSkillRoot, { recursive: true })
   await mkdir(workspacePath, { recursive: true })
   await writeFile(resolve(skillRoot, 'SKILL.md'), `---\nname: ${skillName}\ndescription: Conversation skill menu release check\n---\n\n# Instructions\n`, 'utf8')
+  await writeFile(resolve(sharedSkillRoot, 'SKILL.md'), `---\nname: ${sharedSkillName}\ndescription: Isolated shared skill menu release check\n---\n\n# Instructions\n`, 'utf8')
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
@@ -55,8 +61,11 @@ try {
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
       DSH_HOME: dshHome,
+      DSH_AGENTS_HOME: agentsHome,
     },
   })
+  electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
+  electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
   page = await electronApp.firstWindow()
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
@@ -81,7 +90,7 @@ try {
   await newSession.waitFor({ state: 'attached', timeout: 20_000 })
   await newSession.dispatchEvent('click')
   await page.locator('[data-composer-card="true"] [role="textbox"][contenteditable]:not([contenteditable="false"])').waitFor({ state: 'visible' })
-  const commandButton = page.getByRole('button', { name: /^(?:指令|命令|Commands)$/u })
+  const commandButton = page.getByRole('button', { name: /^(?:指令|命令|Commands|添加文件或调用指令|Add files or run commands)$/u })
   const skillsButton = page.getByRole('button', { name: '技能库' })
   await skillsButton.waitFor({ state: 'visible' })
   const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
@@ -93,6 +102,28 @@ try {
   // The upstream first-run dialog can mount after workspace creation on a
   // slower runner. It must be gone before validating pointer interaction.
   await dismissIntro(2_000)
+  await commandButton.click()
+  const nativeSuggestions = page.locator('[data-trigger-menu] [role="listbox"]')
+  await nativeSuggestions.waitFor({ state: 'visible' })
+  assert.ok(await nativeSuggestions.getByRole('option').count() >= 2, 'native commands remain available beside the skills action')
+  await nativeSuggestions.getByRole('option').filter({ has: page.getByText(/^(?:技能库|Skill library)$/u) }).click()
+  const plusSkills = page.getByRole('dialog', { name: '技能库' })
+  await plusSkills.waitFor({ state: 'visible' })
+  await plusSkills.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
+  await plusSkills.getByText(sharedSkillName, { exact: true }).waitFor({ state: 'visible' })
+  await nativeSuggestions.waitFor({ state: 'hidden' })
+  await page.keyboard.press('Escape')
+  await plusSkills.waitFor({ state: 'hidden' })
+  const nativeEditor = page.locator('[data-composer-card="true"] [role="textbox"][contenteditable]:not([contenteditable="false"])')
+  await nativeEditor.fill('/')
+  await nativeSuggestions.waitFor({ state: 'visible' })
+  const nativeSkillOptions = nativeSuggestions.locator('button[role="option"][id^="dsh-slash-option-skill-"]')
+  await nativeSkillOptions.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
+  await nativeSkillOptions.getByText(sharedSkillName, { exact: true }).waitFor({ state: 'visible' })
+  await nativeSkillOptions.filter({ has: page.getByText(skillName, { exact: true }) }).click()
+  await nativeSuggestions.waitFor({ state: 'hidden' })
+  assert.ok((await nativeEditor.textContent()).startsWith(`/${skillName} `), 'native skill selection inserts the SDK slash gesture')
+  await nativeEditor.fill('')
   const [commandBounds, skillsBounds] = await Promise.all([commandButton.boundingBox(), skillsButton.boundingBox()])
   assert.ok(commandBounds && skillsBounds)
   assert.ok(skillsBounds.x > commandBounds.x)
@@ -107,6 +138,9 @@ try {
   const listbox = page.getByRole('listbox', { name: '已安装技能' })
   await menu.waitFor({ state: 'visible' })
   await listbox.getByRole('option').first().waitFor({ state: 'visible', timeout: 20_000 })
+  await listbox.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
+  await listbox.getByText(sharedSkillName, { exact: true }).waitFor({ state: 'visible' })
+  await page.getByText(/^(?:重新连接中|Reconnecting)(?:\.{1,3}|…)?$/u).waitFor({ state: 'hidden', timeout: 15_000 })
   const [menuBounds, openSkillsBounds] = await Promise.all([menu.boundingBox(), skillsButton.boundingBox()])
   assert.ok(menuBounds && openSkillsBounds)
   assert.ok(menuBounds.height <= 321, JSON.stringify(menuBounds))
@@ -134,10 +168,21 @@ try {
   assert.match(await composerInput.textContent().catch(async () => await composerInput.inputValue()), new RegExp(`使用 ${selectedName} 技能：`, 'u'))
 
   await skillsButton.click()
-  // Dispatch the underlying navigation click intentionally while the modal
-  // layer is open; this verifies that a real page transition closes it.
-  await page.getByText(/^(?:探索未至之境|Into the Unknown)$/u).click({ force: true })
+  await page.evaluate(() => {
+    globalThis.__skillNavigationEvents = []
+    for (const type of ['pointerdown', 'click']) window.addEventListener(type, event => {
+      globalThis.__skillNavigationEvents.push({ type, target: event.target?.outerHTML?.slice(0, 350), x: event.clientX, y: event.clientY })
+    }, true)
+  })
+  await page.getByRole('button', { name: /^(?:新建会话|New session)$/u }).filter({ hasText: /新会话|New session/u }).click()
   await menu.waitFor({ state: 'hidden' })
+  assert.equal(await skillsButton.getAttribute('aria-expanded'), 'false')
+  assert.ok(await page.evaluate(() => globalThis.__skillNavigationEvents.some(event => event.type === 'click' && !event.target?.includes('dsh-desktop-skills'))), 'ordinary native navigation must receive its pointer click')
+  await skillsButton.click()
+  await menu.waitFor({ state: 'visible' })
+  await page.getByText(/^(?:探索未至之境|Into the Unknown)$/u).dispatchEvent('click')
+  await menu.waitFor({ state: 'hidden' })
+  assert.equal(await skillsButton.getAttribute('aria-expanded'), 'false')
   if (screenshot) {
     await page.locator('#dsh-desktop-skills-toast').waitFor({ state: 'detached', timeout: 4_000 }).catch(() => {})
     await skillsButton.click()
@@ -145,8 +190,9 @@ try {
     await page.screenshot({ path: screenshot })
   }
   console.log(`verified conversation Skills menu at ${page.url()}`)
+  verified = true
 } catch (error) {
-  if (screenshot && page) await page.screenshot({ path: screenshot }).catch(() => {})
+  if (page) await page.screenshot({ path: screenshot ?? resolve(temporary, 'failure.png') }).catch(() => {})
   const diagnostics = page ? await page.evaluate(() => ({
     url: location.href,
     buttons: [...document.querySelectorAll('button')].map((button) => ({
@@ -169,11 +215,16 @@ try {
       dataPlaceholder: field.getAttribute('data-placeholder'),
     })),
     skillController: Boolean(globalThis.__dshDesktopConversationSkillsV1),
+    skillMenuHidden: document.querySelector('#dsh-desktop-skills-menu')?.hidden,
+    skillMenuOpen: globalThis.__dshDesktopConversationSkillsV1?.open,
+    navigationEvents: globalThis.__skillNavigationEvents,
+    focusedElement: document.activeElement?.outerHTML?.slice(0, 500),
   })).catch(() => undefined) : undefined
   if (diagnostics) console.error(`Conversation Skills evidence: ${JSON.stringify(diagnostics)}`)
   console.error((await readFile(resolve(temporary, 'user-data', 'logs', 'desktop.log'), 'utf8').catch(() => '')).slice(-8_000))
   throw error
 } finally {
   await electronApp?.close()
-  await rm(temporary, { recursive: true, force: true })
+  if (verified) await rm(temporary, { recursive: true, force: true })
+  else console.error(`Failed isolated Skills fixture retained at ${temporary}`)
 }

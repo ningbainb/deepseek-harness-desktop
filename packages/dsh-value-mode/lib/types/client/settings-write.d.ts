@@ -1,7 +1,7 @@
 import type { ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts';
 import type { ValueModeLocaleKey } from './locales.ts';
 export interface ValueModeWritableSettingsScope extends ValueModeSettingsScope<ValueModeConfig> {
-    set(field: string, value: unknown): Promise<void>;
+    set(field: string, value: unknown): Promise<boolean | void>;
 }
 /**
  * SettingsScope resolves after refusals as well as accepted writes. Verify the

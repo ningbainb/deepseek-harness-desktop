@@ -13,7 +13,8 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConversationController } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -62,7 +63,7 @@ declare module '@deepseek-ai/cordis' {
 export const NS = 'describe-image' as const
 
 /** Required services: slots for the settings card, conversation for the send hook, settings scope and locale for the card copy. */
-export const inject = ['slots', 'conversation', 'settingsScope', 'locale']
+export const inject = ['slots', 'conversation', 'configForms', 'locale']
 
 /** Apply the browser half. */
 export function apply(ctx: ClientContext): void {
@@ -90,8 +91,8 @@ export function apply(ctx: ClientContext): void {
 
     // The settings card: bound to the describe-image namespace through the
     // family bridge when the official scope does not expose it.
-    ctx.inject(['settingsScope'], (settingsCtx: ClientContext) => {
-      const binder = settingsCtx.get('webUiSettings') ?? settingsCtx.settingsScope
+    ctx.inject(['configForms'], (settingsCtx: ClientContext) => {
+      const binder = settingsCtx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => settingsCtx.configForms.get<S>(spec.namespace) }
       const settingsScope = binder.bind<DescribeImageSettings>({ namespace: NS })
       liveSettings = settingsScope
       const settingsCard = new DescribeImageSettingsCardController(settingsScope)

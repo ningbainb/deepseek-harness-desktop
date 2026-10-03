@@ -2,16 +2,15 @@ import { randomBytes } from 'node:crypto'
 import { createServer, createConnection } from 'node:net'
 import { join, posix } from 'node:path'
 import { tmpdir } from 'node:os'
+import { CHUNK_BYTES, createFrameReader, MAX_MESSAGE_BYTES, RuntimePipeTransportError, writeFrame } from './runtime-pipe-framing.mjs'
 
-export const RUNTIME_PIPE_PROTOCOL_VERSION = 2
+export const RUNTIME_PIPE_PROTOCOL_VERSION = 3
 export const RUNTIME_PIPE_ADDRESS_ENV = 'DSH_DESKTOP_PIPE_ADDRESS'
 export const RUNTIME_PIPE_TOKEN_ENV = 'DSH_DESKTOP_PIPE_TOKEN'
 export const RUNTIME_PIPE_GENERATION_ENV = 'DSH_DESKTOP_PIPE_GENERATION'
 export const RUNTIME_PIPE_READY_LINE = 'dsh desktop pipe: ready'
 
-const MAX_FRAME_BYTES = 512 * 1024
 const MAX_BODY_BYTES = 320 * 1024 * 1024
-const CHUNK_BYTES = 192 * 1024
 // Darwin sockaddr_un.sun_path is only 104 bytes including its terminator.
 // Leave headroom for Node's native conversion and non-ASCII temporary paths.
 export const MAX_POSIX_PIPE_ADDRESS_BYTES = 100
@@ -47,90 +46,6 @@ export function createRuntimePipeIdentity({ platform = process.platform, tempora
 
 function headersObject(headers) {
   return Object.fromEntries(new Headers(headers).entries())
-}
-
-function createFrameReader(socket) {
-  const frames = []
-  const waiters = []
-  let buffered = Buffer.alloc(0)
-  let failure
-  let ended = false
-
-  const settle = () => {
-    while (waiters.length > 0 && (frames.length > 0 || failure || ended)) {
-      const waiter = waiters.shift()
-      if (frames.length > 0) waiter.resolve(frames.shift())
-      else if (failure) waiter.reject(failure)
-      else waiter.resolve(undefined)
-    }
-  }
-  socket.on('data', (chunk) => {
-    buffered = Buffer.concat([buffered, chunk])
-    if (buffered.length > MAX_FRAME_BYTES && !buffered.includes(10)) {
-      failure = new Error('runtime pipe frame exceeded the limit')
-      socket.destroy(failure)
-      settle()
-      return
-    }
-    for (;;) {
-      const newline = buffered.indexOf(10)
-      if (newline === -1) break
-      const line = buffered.subarray(0, newline)
-      buffered = buffered.subarray(newline + 1)
-      if (line.length === 0) continue
-      if (line.length > MAX_FRAME_BYTES) {
-        failure = new Error('runtime pipe frame exceeded the limit')
-        socket.destroy(failure)
-        settle()
-        return
-      }
-      try {
-        frames.push(JSON.parse(line.toString('utf8')))
-      } catch (error) {
-        failure = new Error('runtime pipe received invalid JSON', { cause: error })
-        socket.destroy(failure)
-        settle()
-        return
-      }
-    }
-    settle()
-  })
-  socket.once('error', (error) => {
-    failure = error
-    settle()
-  })
-  socket.once('end', () => {
-    ended = true
-    settle()
-  })
-  socket.once('close', () => {
-    ended = true
-    settle()
-  })
-  return () => {
-    if (frames.length > 0) return Promise.resolve(frames.shift())
-    if (failure) return Promise.reject(failure)
-    if (ended) return Promise.resolve(undefined)
-    return new Promise((resolve, reject) => waiters.push({ resolve, reject }))
-  }
-}
-
-async function writeFrame(socket, frame) {
-  const bytes = Buffer.from(`${JSON.stringify(frame)}\n`)
-  if (bytes.length > MAX_FRAME_BYTES) throw new Error('runtime pipe frame exceeded the limit')
-  if (socket.write(bytes)) return
-  await new Promise((resolve, reject) => {
-    const drained = () => {
-      socket.removeListener('error', failed)
-      resolve()
-    }
-    const failed = (error) => {
-      socket.removeListener('drain', drained)
-      reject(error)
-    }
-    socket.once('drain', drained)
-    socket.once('error', failed)
-  })
 }
 
 async function connect(identity, signal) {
@@ -171,6 +86,7 @@ async function connect(identity, signal) {
     ) {
       throw new Error('runtime pipe identity handshake failed')
     }
+    readFrame.enableFragments()
     return { socket, readFrame, hello, dispose: () => signal?.removeEventListener('abort', abort) }
   } catch (error) {
     signal?.removeEventListener('abort', abort)
@@ -192,23 +108,38 @@ function createValueQueue() {
   const waiters = []
   let ended = false
   let failure
+  let queuedBytes = 0
+  const dequeue = () => {
+    const entry = values.shift()
+    queuedBytes -= entry.bytes
+    return entry.value
+  }
   const settle = () => {
     while (waiters.length > 0 && (values.length > 0 || ended || failure !== undefined)) {
       const waiter = waiters.shift()
-      if (values.length > 0) waiter.resolve({ done: false, value: values.shift() })
+      if (values.length > 0) waiter.resolve({ done: false, value: dequeue() })
       else if (failure !== undefined) waiter.reject(failure)
       else waiter.resolve({ done: true, value: undefined })
     }
   }
   return {
-    push(value) { if (!ended && failure === undefined) { values.push(value); settle() } },
+    push(value) {
+      if (ended || failure !== undefined) return
+      const bytes = Buffer.byteLength(JSON.stringify(value))
+      if (queuedBytes + bytes > MAX_MESSAGE_BYTES) {
+        throw new RuntimePipeTransportError('transport/input-queue-too-large', queuedBytes + bytes, MAX_MESSAGE_BYTES)
+      }
+      queuedBytes += bytes
+      values.push({ value, bytes })
+      settle()
+    },
     end() { ended = true; settle() },
-    fail(error) { failure = error; settle() },
+    fail(error) { failure = error; values.length = 0; queuedBytes = 0; settle() },
     iterable: {
       [Symbol.asyncIterator]() {
         return {
           next() {
-            if (values.length > 0) return Promise.resolve({ done: false, value: values.shift() })
+            if (values.length > 0) return Promise.resolve({ done: false, value: dequeue() })
             if (failure !== undefined) return Promise.reject(failure)
             if (ended) return Promise.resolve({ done: true, value: undefined })
             return new Promise((resolve, reject) => waiters.push({ resolve, reject }))
@@ -352,10 +283,12 @@ export class RuntimePipeClient {
 
   openDuplex(endpoint, payload, signal) {
     const identity = this.identity
+    const cancellation = new AbortController()
+    const activeSignal = signal === undefined ? cancellation.signal : AbortSignal.any([signal, cancellation.signal])
     let connection
     let closed = false
     let writeQueue = Promise.resolve()
-    const opened = connect(identity, signal).then(async (value) => {
+    const opened = connect(identity, activeSignal).then(async (value) => {
       connection = value
       await writeFrame(value.socket, { type: 'duplex-open', endpoint, payload })
       return value
@@ -376,10 +309,9 @@ export class RuntimePipeClient {
       close,
       cancel(reason) {
         closed = true
-        void opened.then(active => {
-          active.socket.destroy(reason instanceof Error ? reason : undefined)
-          active.dispose()
-        }).catch(() => {})
+        cancellation.abort(reason instanceof Error ? reason : new Error('runtime duplex operation was cancelled'))
+        connection?.dispose()
+        void opened.catch(() => {})
       },
       async *[Symbol.asyncIterator]() {
         const active = await opened
@@ -401,9 +333,14 @@ export class RuntimePipeClient {
   }
 }
 
-function safeFailureMessage(error) {
-  const name = error instanceof Error && typeof error.name === 'string' ? error.name : 'Error'
-  return `runtime carrier ${name}`
+function failureDiagnostic(error, operation, endpoint) {
+  return {
+    correlationId: randomBytes(12).toString('hex'),
+    code: error instanceof RuntimePipeTransportError ? error.code : 'transport/host-failure',
+    operation: ['request-start', 'stream-open', 'duplex-open'].includes(operation) ? operation : 'handshake',
+    endpoint: ['session/follow', '$events', 'websocket'].includes(endpoint) ? endpoint : 'other',
+    ...(error instanceof RuntimePipeTransportError ? { bytes: error.bytes, limit: error.limit } : {}),
+  }
 }
 
 async function sendResponse(socket, response) {
@@ -431,7 +368,7 @@ async function sendResponse(socket, response) {
   await writeFrame(socket, { type: 'response-end' })
 }
 
-export async function createRuntimePipeServer({ identity, runtimeVersion, profile, fetch: fetchHandler, openStream, openDuplex }) {
+export async function createRuntimePipeServer({ identity, runtimeVersion, profile, fetch: fetchHandler, openStream, openDuplex, onFailure }) {
   const address = assertAddress(identity?.address)
   const token = assertToken(identity?.token, 'runtime pipe token')
   const generation = assertToken(identity?.generation, 'runtime pipe generation')
@@ -454,6 +391,8 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
     }
     const readFrame = createFrameReader(socket)
     void (async () => {
+      let operation
+      let endpoint
       try {
         const hello = await readFrame()
         if (
@@ -464,6 +403,7 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
         ) {
           throw new Error('runtime pipe authentication failed')
         }
+        readFrame.enableFragments()
         await writeFrame(socket, {
           type: 'hello',
           protocolVersion: RUNTIME_PIPE_PROTOCOL_VERSION,
@@ -473,6 +413,8 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
         })
         const start = await readFrame()
         if (start === undefined) return
+        operation = start.type
+        endpoint = start.endpoint
         if (start.type === 'request-start') {
           const bodyState = { bytes: 0 }
           const requestBody = start.method === 'GET' || start.method === 'HEAD' ? undefined : new ReadableStream({
@@ -530,6 +472,7 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
               }
             } catch (error) {
               input.fail(error)
+              socket.destroy(error)
             }
           })()
           const source = await openDuplex(start.endpoint, start.payload, input.iterable, abort.signal)
@@ -540,8 +483,16 @@ export async function createRuntimePipeServer({ identity, runtimeVersion, profil
         }
         throw new Error('runtime pipe operation is invalid')
       } catch (error) {
+        const diagnostic = failureDiagnostic(error, operation, endpoint)
+        try {
+          if (typeof onFailure === 'function') onFailure(diagnostic)
+          else process.stderr.write(`[runtime-pipe] ${JSON.stringify(diagnostic)}\n`)
+        } catch {}
         if (!socket.destroyed) {
-          await writeFrame(socket, { type: 'error', message: safeFailureMessage(error) }).catch(() => {})
+          await writeFrame(socket, {
+            type: 'error',
+            message: `runtime carrier ${diagnostic.code} [${diagnostic.correlationId}]`,
+          }).catch(() => {})
           socket.end()
         }
       }

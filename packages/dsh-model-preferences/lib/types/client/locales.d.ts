@@ -1,7 +1,10 @@
 /** Chinese copy is the key-set source of truth for the model preferences UI. */
 export declare const zh: {
+    readonly 'action.bai': "bai 供应商：登录 / 充值";
+    readonly 'action.baiCompact': "bai · 登录/充值";
     readonly 'command.description': "选择模型（支持自定义置顶和供应商排序）";
     readonly 'trigger.fallback': "选择模型";
+    readonly 'trigger.baiPending': "bai（登录后获取模型）";
     readonly 'trigger.aria': "当前模型：{model}";
     readonly 'trigger.ariaDisabled': "模型选择不可用";
     readonly 'menu.aria': "模型选择器";

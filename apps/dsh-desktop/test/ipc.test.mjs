@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   normalizeDesktopAction,
@@ -372,6 +373,7 @@ test('desktop repair status degrades to unavailable when the incident store cann
 test('Extension Dock deep links accept only the collaboration page allowlist', () => {
   assert.deepEqual(normalizeDesktopDockOpenOptions(undefined), {})
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'models' }), { setting: 'models' })
   for (const value of [null, 'value-mode', { setting: 'plugins' }, { setting: 'value-mode', url: 'https://example.com' }]) {
     assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
   }
@@ -516,6 +518,10 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
   })
   assert.deepEqual(await handlers.get('desktop:dock-open')({ sender }, { setting: 'value-mode' }), { opened: true })
   assert.deepEqual(observed.at(-1), ['dock-open', { setting: 'value-mode' }])
+  assert.deepEqual(await handlers.get('desktop:dock-open')({ sender }, { setting: 'models' }), { opened: true })
+  assert.deepEqual(observed.at(-1), ['dock-open', { setting: 'models' }])
+  assert.deepEqual(await handlers.get('desktop:dock-open')({ sender }, { setting: 'usage' }), { opened: true })
+  assert.deepEqual(observed.at(-1), ['dock-open', { setting: 'usage' }])
   await assert.rejects(
     handlers.get('desktop:dock-nudge-dismiss')({ sender }, 'other'),
     (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
@@ -552,6 +558,8 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
     ['dock-impression'],
     ['dock-dismiss', 'close'],
     ['dock-open', { setting: 'value-mode' }],
+    ['dock-open', { setting: 'models' }],
+    ['dock-open', { setting: 'usage' }],
     ['settings'],
     ['updates'],
   ])
@@ -1026,4 +1034,60 @@ test('public update status exposes only renderer-safe release state', () => {
   })
   assert.equal(publicUpdateStatus({ phase: 'install-command' }).phase, 'idle')
   assert.equal(publicUpdateStatus({ phase: 'installing' }).phase, 'installing')
+})
+
+test('desktop:drag-file initiates drag for existing files and rejects nonexistent paths', async () => {
+  const handlers = new Map()
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    removeHandler: (channel) => handlers.delete(channel),
+  }
+  const dragged = []
+  const sender = {
+    startDrag: (item) => dragged.push(item),
+  }
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  const mockApp = {
+    getFileIcon: async (filePath) => 'mock-icon-for:' + filePath,
+  }
+  const unregister = registerDesktopIpc({
+    ipcMain,
+    surfaceRegistry,
+    controller,
+    getWindow: () => undefined,
+    metadata: { appId: 'desktop', productName: 'Desktop' },
+    version: '3.1.0',
+    platform: 'win32',
+    app: mockApp,
+    ensureProfile: async () => {},
+    openLogs: async () => {},
+    exportDiagnostics: async () => {},
+    exitApp: () => {},
+    handleHelpAction: async () => {},
+    handleToolAction: async () => {},
+    setWindowChromeTheme: () => {},
+  })
+  try {
+    const invoke = (filePath) => handlers.get('desktop:drag-file')({ sender }, filePath)
+
+    assert.equal(await invoke(''), false)
+    assert.equal(await invoke(null), false)
+    assert.equal(await invoke(123), false)
+
+    assert.equal(await invoke('non-existent-file-path-123456.tmp'), false)
+    assert.equal(dragged.length, 0)
+
+    const existingFile = fileURLToPath(new URL('../package.json', import.meta.url))
+    const result = await invoke(existingFile)
+    assert.equal(result, true)
+    assert.equal(dragged.length, 1)
+    assert.equal(dragged[0].file, existingFile)
+    assert.equal(dragged[0].icon, 'mock-icon-for:' + existingFile)
+  } finally {
+    unregister()
+  }
+
 })

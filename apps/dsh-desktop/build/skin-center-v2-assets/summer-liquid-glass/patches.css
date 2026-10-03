@@ -1,0 +1,115 @@
+/* summer-liquid-glass patches — DOM-level glass polish. The skin-center owns
+   this file's injection: it is added when the skin is active and removed on
+   switch, so every selector here is global (no body-attribute scoping). */
+
+[id="root"] {
+  background: none;
+}
+
+[data-phase="active"] [class*="composerSeat"] {
+  background: none !important;
+}
+
+[data-phase="active"] [class*="composerSeat"]:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0px, var(--dsw-alias-bg-base) 36px);
+  -webkit-backdrop-filter: blur(34px) saturate(150%);
+  backdrop-filter: blur(34px) saturate(150%);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(103, 220, 231, 0.7);
+  outline-offset: 2px;
+}
+
+a {
+  color: #67DCE7;
+}
+
+a:hover {
+  color: #86e2ea;
+  text-decoration: underline;
+}
+
+a:visited {
+  color: #b18df0;
+}
+
+/* Floating glass surfaces: frosted blur, inner highlight, diffuse shadow. */
+[role="dialog"],
+[role="menu"],
+[role="listbox"],
+[data-gitgraph-dialog] {
+  -webkit-backdrop-filter: blur(30px) saturate(145%);
+  backdrop-filter: blur(30px) saturate(145%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 10px 30px rgba(0, 7, 18, 0.25);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.015) 18%,
+    rgba(255, 255, 255, 0) 42%
+  );
+}
+
+[role="tooltip"] {
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 28px rgba(0, 7, 18, 0.3);
+}
+
+/* Thin-glass buttons: hover lifts the inner edge, press darkens (no scale). */
+button:not(:disabled):hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+button:not(:disabled):active {
+  filter: brightness(0.92);
+  box-shadow: inset 0 1px 2px rgba(0, 7, 18, 0.35);
+}
+
+button,
+a {
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+/* git-graph commit-graph palette. */
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n+1),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n+1) { color: #67DCE7; }
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n+2),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n+2) { color: #CBE77D; }
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n+3),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n+3) { color: #F3B75F; }
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n+4),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n+4) { color: #DD8FAC; }
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n+5),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n+5) { color: #86e2ea; }
+[data-gitgraph-lanes] > [data-gitgraph-glyph="node"]:nth-child(6n),
+[data-gitgraph-lanes] > [data-gitgraph-glyph="merge"]:nth-child(6n) { color: #d6ee9a; }
+
+[data-gitgraph-ref]:not([data-gitgraph-ref-current]) {
+  background: rgba(103, 220, 231, 0.12);
+  border: 1px solid rgba(103, 220, 231, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  a {
+    transition: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --dsw-glass-normal: rgba(10, 18, 31, 0.82);
+    --dsw-glass-high: rgba(7, 15, 27, 0.92);
+    --dsw-glass-float: rgba(16, 22, 37, 0.9);
+  }
+}

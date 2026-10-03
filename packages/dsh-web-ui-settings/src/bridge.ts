@@ -14,7 +14,7 @@
 
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { SettingsNamespace, SettingsDescriptor, SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings'
+import type { SettingsNamespace, SettingsDescriptor, SettingsPathOp, SettingsForms } from '@deepseek-ai/dsh-settings'
 import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { composeAllowlist, extractWebSettingsNamespaces } from './allowlist.ts'
@@ -210,7 +210,7 @@ function failureOf(error: unknown): { ok: false; code: string; message: string }
 /** Dependencies of the bridge handlers. */
 export interface BridgeDeps {
   /** The host settings seam (already injected). */
-  settings: SettingsProvider
+  settings: SettingsForms
   /** Read the raw settings.yaml text ('' when unreadable or absent). */
   readSettingsYaml: () => string
 }

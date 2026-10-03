@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { DEFAULT_PERSONAL_PROMPT, MAX_PROMPT_CONTENT_LENGTH, normalizePersonalPrompt, removePromptProfile, renderPromptProfile, setActivePromptProfile, upsertPromptProfile, } from "../core/config.js";
 import styles from './personal-prompt.module.css';
+import { persistPersonalPromptConfig } from "./persist-config.js";
 function workspaceIdOf(item) {
     return item.workspaceId ?? item.id;
 }
@@ -141,12 +142,9 @@ export function PersonalPromptCard(props) {
         setSaved(false);
         setError(null);
         try {
-            await settingsScope.set('profiles', next.profiles);
-            await settingsScope.set('enabled', next.enabled);
-            if (next.activeProfileId === undefined)
-                await settingsScope.unset('activeProfileId');
-            else
-                await settingsScope.set('activeProfileId', next.activeProfileId);
+            const accepted = await persistPersonalPromptConfig(settingsScope, next, settingsSnapshot.revision);
+            if (!accepted)
+                throw new Error(t('error.save'));
             setDraftConfig(next);
             setConfigDirty(false);
             setEditorDirty(false);

@@ -1207,6 +1207,76 @@ function createDesktopWorkspaceFileOpenRoute(workspaceRegistry, { capabilityToke
 function registerDesktopWorkspaceFileOpenRoute(ctx) {
 	return ctx.webServer.register(createDesktopWorkspaceFileOpenRoute(ctx.workspaceRegistry, { capabilityToken: process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] }));
 }
+//#endregion
+//#region src/session-checkpoint-recovery.ts
+function installSessionCheckpointRecovery(ctx) {
+	ctx.inject([
+		"sessionPersistence",
+		"sessionProjectionCache",
+		"sessionController"
+	], async (recoveryCtx) => {
+		const controller = new AbortController();
+		recoveryCtx.effect(() => () => controller.abort(), "dsh-desktop-compat: session checkpoint recovery");
+		try {
+			const result = await refreshBlankSessionCheckpoints({
+				persistence: recoveryCtx.sessionPersistence,
+				cache: recoveryCtx.sessionProjectionCache,
+				sessions: recoveryCtx.sessions
+			}, controller.signal);
+			if (result.refreshed > 0 || result.failed > 0) recoveryCtx.logger.warn(`[dsh-session-checkpoint] scanned=${result.scanned} refreshed=${result.refreshed} failed=${result.failed}`);
+		} catch {
+			if (!controller.signal.aborted) recoveryCtx.logger.warn("[dsh-session-checkpoint] unavailable=list");
+		}
+	});
+}
+function checkpointBlank(snapshot) {
+	const metadata = Reflect.get(snapshot?.values ?? {}, "sessionListMetadata");
+	return typeof metadata === "object" && metadata !== null && "blank" in metadata && typeof metadata.blank === "boolean" ? metadata.blank : void 0;
+}
+async function refreshBlankSessionCheckpoints(services, signal) {
+	const snapshots = await services.persistence.list({ signal });
+	const result = {
+		scanned: snapshots.length,
+		refreshed: 0,
+		failed: 0
+	};
+	let nextIndex = 0;
+	const worker = async () => {
+		while (nextIndex < snapshots.length) {
+			signal.throwIfAborted();
+			const { header } = snapshots[nextIndex++];
+			if (header.cwd === void 0 || header.origin === "subagent" || services.sessions.get(header.id) !== void 0) continue;
+			const readSignal = AbortSignal.any([signal, AbortSignal.timeout(1e4)]);
+			try {
+				const cached = services.cache.cachedSnapshot(header);
+				if (cached === void 0 || checkpointBlank(cached) !== true) continue;
+				const handle = await services.persistence.open(header.id, "read", { signal: readSignal });
+				try {
+					const { events } = await handle.read(0, void 0, { signal: readSignal });
+					readSignal.throwIfAborted();
+					if (services.sessions.get(header.id) !== void 0) continue;
+					const lastSeq = events.at(-1)?.seq ?? -1;
+					if (cached.asOfSeq >= lastSeq) continue;
+					const restored = services.cache.coldSnapshot(handle.header, handle.inheritedEventCount, events);
+					while (true) {
+						readSignal.throwIfAborted();
+						const durable = services.cache.cachedSnapshot(handle.header);
+						if (durable !== void 0 && durable.asOfSeq >= restored.asOfSeq && checkpointBlank(durable) === checkpointBlank(restored)) break;
+						await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+					}
+					result.refreshed += 1;
+				} finally {
+					await handle.close();
+				}
+			} catch {
+				signal.throwIfAborted();
+				result.failed += 1;
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(4, snapshots.length) }, worker));
+	return result;
+}
 const PATCH_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -1306,6 +1376,16 @@ function validateCompatPatchRegistry(entries, options = {}) {
 	return Object.freeze(normalizedEntries);
 }
 const DESKTOP_COMPAT_PATCHES = validateCompatPatchRegistry([
+	{
+		id: "cold-blank-session-checkpoint",
+		appliesTo: ["0.2.0-rc.2"],
+		upstreamReference: "@deepseek-ai/dsh-session-projection-cache 0.2.0-rc.2 cachedSnapshot zero-I/O listing and coldSnapshot durable log replay",
+		owner: "desktop-platform",
+		tests: ["packages/dsh-desktop-compat/tests/session-checkpoint-recovery.spec.ts"],
+		reason: "Refresh stale blank checkpoints from validated durable logs before the sidebar hides restored history.",
+		removeWhen: "The upstream session list refreshes stale blank checkpoints before applying workspace visibility filters.",
+		lastVerified: "2026-10-01"
+	},
 	{
 		id: "queued-turn-continuation",
 		appliesTo: [
@@ -1420,6 +1500,7 @@ function apply(ctx) {
 	new DesktopSkinStateService(ctx);
 	installToolCallArgumentNormalization(ctx);
 	installTranscriptBalanceGuard(ctx);
+	installSessionCheckpointRecovery(ctx);
 	ctx.effect(() => registerDesktopWorkspaceFileOpenRoute(ctx), "dsh-desktop-compat: workspace native-open authority");
 	ctx.effect(() => registerDesktopConversationImportRoute(ctx), "dsh-desktop-compat: conversation import authority");
 	if (process.env.DSH_DESKTOP_BACKGROUND_AUTOMATION === "1") ctx.inject([

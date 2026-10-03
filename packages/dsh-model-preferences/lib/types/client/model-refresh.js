@@ -39,9 +39,11 @@ export function installModelRefreshBridge(options) {
             requestRefresh();
     };
     const onRecovery = () => requestRefresh();
+    const onRelayUpdate = () => requestRefresh(true);
     documentTarget.addEventListener('visibilitychange', onVisible);
     windowTarget.addEventListener('focus', onRecovery);
     windowTarget.addEventListener('online', onRecovery);
+    windowTarget.addEventListener('dsh-relay-models-updated', onRelayUpdate);
     let channel;
     try {
         channel = channelFactory?.(MODEL_REFRESH_CHANNEL);
@@ -49,7 +51,8 @@ export function installModelRefreshBridge(options) {
             channel.onmessage = event => {
                 const message = event.data;
                 if (typeof message === 'object' && message !== null
-                    && message.sessionId === options.sessionId)
+                    && (message.sessionId === options.sessionId
+                        || message.provider === 'project-relay'))
                     requestRefresh(true);
             };
         }
@@ -71,6 +74,7 @@ export function installModelRefreshBridge(options) {
             documentTarget.removeEventListener('visibilitychange', onVisible);
             windowTarget.removeEventListener('focus', onRecovery);
             windowTarget.removeEventListener('online', onRecovery);
+            windowTarget.removeEventListener('dsh-relay-models-updated', onRelayUpdate);
             if (channel !== undefined) {
                 channel.onmessage = null;
                 try {

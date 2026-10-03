@@ -1,4 +1,5 @@
 export declare const zh: {
+    baiAccess: string;
     settingsNotWritable: string;
     settingsSaveFailed: string;
     catalogUnavailable: string;

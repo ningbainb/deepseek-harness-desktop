@@ -9,7 +9,9 @@
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 // Type-only: pulls the locale plugin's Context merge (ctx.locale) and the
 // ui-sidebar SlotMap merge (the 'sidebar.remote' hole).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -94,7 +96,7 @@ const REMOTE_WEB_UI_NS = 'remote-web-ui'
 const HEARTBEAT_INTERVAL_MS = 10_000
 
 /** Services required by this plugin. */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'sessions', 'workspaces']
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote', 'sessions', 'workspaces', 'uiWorkspace']
 
 /**
  * Register the remote-control surface.
@@ -104,7 +106,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'remote-web-ui: dictionaries')
 
   const t = ctx.locale.bind(NS)
-  const binder = ctx.get('webUiSettings') ?? ctx.settingsScope
+  const binder = ctx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const settingsScope = binder.bind<RemoteSettings>({ namespace: REMOTE_WEB_UI_NS })
   const enabled = (): boolean => {
     const snapshot = settingsScope.getSnapshot()

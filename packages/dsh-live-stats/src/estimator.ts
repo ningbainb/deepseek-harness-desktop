@@ -119,6 +119,13 @@ export function estimateContentTokens(blocks: readonly ContentBlock[], spec: Est
 function estimateContentBlocks(blocks: readonly ContentBlock[], spec: EstimatorSpec, depth: number): number {
   let tokens = 0
   for (const block of blocks) {
+    const legacy = block as { type: string; content?: readonly ContentBlock[] }
+    if (legacy.type === 'tool-result') {
+      tokens += depth >= MAX_CONTENT_DEPTH || !Array.isArray(legacy.content)
+        ? spec.blockOverhead
+        : estimateContentBlocks(legacy.content, spec, depth + 1) + spec.blockOverhead
+      continue
+    }
     switch (block.type) {
       case 'text':
       case 'reasoning':
@@ -126,12 +133,6 @@ function estimateContentBlocks(blocks: readonly ContentBlock[], spec: EstimatorS
         break
       case 'tool-call':
         tokens += estimateToolCallBlockTokens(block.name.length, block.arguments.length, spec)
-        break
-      case 'tool-result':
-        // Frame the block even when its nested content is too deep to price.
-        tokens += depth >= MAX_CONTENT_DEPTH
-          ? spec.blockOverhead
-          : estimateContentBlocks(block.content, spec, depth + 1) + spec.blockOverhead
         break
       default:
         tokens += estimateUnknownBlockTokens(block, spec)
@@ -160,7 +161,7 @@ export function estimateHeaderTokens(header: EpochHeader | undefined, spec: Esti
   // Sessions written before 1.1.5 stored the rendered system prompt inside
   // request/header. Keep replay pricing for those logs while current sessions
   // price their dedicated system/message surface node.
-  const legacySystem = (header as EpochHeader & { system?: unknown }).system
+  const legacySystem = (header as unknown as { system?: unknown }).system
   if (typeof legacySystem === 'string') {
     tokens += Math.ceil(legacySystem.length / spec.charsPerToken) + spec.roleOverhead
   }

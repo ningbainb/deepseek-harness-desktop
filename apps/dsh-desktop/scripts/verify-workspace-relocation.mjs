@@ -12,6 +12,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -25,6 +26,8 @@ if (packagedExecutable !== undefined && !existsSync(packagedExecutable)) {
 const temporary = await realpath(await mkdtemp(join(tmpdir(), 'dsh-workspace-relocation-e2e-')))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
+const documentsDirectory = join(temporary, 'documents')
+const defaultWorkspacePath = join(documentsDirectory, 'deepseek-harness', 'default-workspace')
 const oldPath = join(temporary, 'project-before-move')
 const newPath = join(temporary, 'project-after-move')
 const recreatedOldPath = join(temporary, 'project-before-move.runtime-recreated')
@@ -55,6 +58,7 @@ async function dismissStartup(page) {
 
 async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
+  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   const instance = await electron.launch({
     executablePath: packagedExecutable ?? electronPath,
     args: packagedExecutable === undefined ? [mainEntry] : [],
@@ -64,6 +68,7 @@ async function launch() {
       DSH_DESKTOP_USER_DATA: userData,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
+      DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
       DSH_HOME: dshHome,
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
@@ -114,8 +119,18 @@ async function rpc(page, method, payload) {
 }
 
 async function seedHistory(sessionId) {
-  const logs = await findSessionLogs(join(dshHome, 'sessions'))
+  const allLogs = await findSessionLogs(join(dshHome, 'sessions'))
+  const records = await Promise.all(allLogs.map(async path => ({
+    path,
+    header: JSON.parse((await readSessionLogText(path)).split(/\r?\n/u)[0]),
+  })))
+  const logs = records.filter(record => record.header.id === sessionId).map(record => record.path)
   assert.equal(logs.length, 1, `expected one session log, found ${JSON.stringify(logs)}`)
+  const defaultLogs = records.filter(record => record.header.id !== sessionId)
+  if (defaultLogs.length > 0) {
+    assert.equal(defaultLogs.length, 1, 'only one first-use default Session may accompany the relocation fixture')
+    assert.equal(defaultLogs[0].header.cwd, defaultWorkspacePath, 'the default Session must stay in the isolated Documents directory')
+  }
   const logPath = logs[0]
   const lines = (await readSessionLogText(logPath)).trimEnd().split(/\r?\n/u)
   const header = JSON.parse(lines[0])
@@ -148,10 +163,14 @@ async function renameWhenReleased(source, destination, timeoutMs = 30_000) {
 
 try {
   await mkdir(profileDir, { recursive: true })
+  await mkdir(documentsDirectory, { recursive: true })
   await mkdir(oldPath, { recursive: true })
   await writeFile(join(oldPath, 'project-sentinel.txt'), 'workspace relocation sentinel\n')
   await writeFile(invalidFilePath, 'not a directory\n')
   await writeFile(join(profileDir, 'cordis.patch.yml'), [
+    '- id: workspace-controller',
+    '  config:',
+    `    documentsDirectory: ${JSON.stringify(documentsDirectory)}`,
     '- id: session-persistence-jsonl',
     '  config:',
     "    root: !!js dshHomePath('sessions')",
@@ -193,18 +212,27 @@ try {
   if (await oldGroup.getAttribute('aria-expanded') !== 'true') await oldGroup.click({ force: true })
   const history = selection.page.getByText(historyMarker, { exact: true })
   if (!await history.isVisible().catch(() => false)) {
-    const originalSession = selection.page.locator('[role="treeitem"]')
-      .filter({ hasText: originalTitle })
-      .first()
+    const originalSession = selection.page.locator(`[role="treeitem"][data-row-key="session:${oldSessionId}"]`)
     try {
       await originalSession.waitFor({ state: 'visible', timeout: 15_000 })
-      await originalSession.click({ force: true })
+      assert.ok((await originalSession.textContent()).includes(originalTitle), 'the exact retained Session must preserve its title')
+      await originalSession.getByText(originalTitle, { exact: true }).click()
+      await selection.page.locator(`[role="treeitem"][data-row-key="session:${oldSessionId}"][aria-selected="true"]`)
+        .waitFor({ state: 'visible', timeout: 15_000 })
     } catch (error) {
       const tree = await selection.page.locator('[role="treeitem"]').evaluateAll(rows => rows.map(row => ({
         selected: row.getAttribute('aria-selected'),
         text: row.textContent?.trim(),
       })))
-      console.error(JSON.stringify({ selectionSessions, tree }, null, 2))
+      const selectionUi = await selection.page.evaluate(() => ({
+        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(dialog => ({
+          text: dialog.textContent?.trim(),
+          buttons: [...dialog.querySelectorAll('button')].map(button => button.textContent?.trim()),
+        })),
+        selected: [...document.querySelectorAll('[role="treeitem"][aria-selected="true"]')].map(row => row.getAttribute('data-row-key')),
+      }))
+      if (process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT) await selection.page.screenshot({ path: process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT })
+      console.error(JSON.stringify({ selectionSessions, tree, selectionUi, rendererErrors: selection.rendererErrors }, null, 2))
       throw error
     }
   }

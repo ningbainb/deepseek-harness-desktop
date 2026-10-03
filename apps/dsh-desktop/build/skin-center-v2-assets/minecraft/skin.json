@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schemas.linxin666.org/dsh-skin/v2.json",
+  "skinManifestVersion": 2,
+  "id": "minecraft",
+  "name": "Minecraft 方块世界",
+  "nameEn": "Minecraft Voxel",
+  "author": "dsh-web-ui",
+  "tagline": "动态全景天空盒 · 方块按钮 · 告示牌输入框",
+  "description": "复刻《我的世界》主界面氛围的方块皮肤：程序化绘制的像素全景天空盒（方块山、像素云、方块树、草方块地面）在身后缓慢旋转，界面浮在石板上；按钮还原 MC 菜单按钮（灰石板、悬停变黄、按下下沉），输入框做成带钉子的木告示牌。",
+  "tags": [
+    "minecraft",
+    "voxel",
+    "pixel",
+    "game",
+    "panorama",
+    "skybox"
+  ],
+  "accent": "#7cbd4b",
+  "order": 8,
+  "version": "0.2.0",
+  "preview": {
+    "light": "preview/light.png",
+    "dark": "preview/dark.png"
+  },
+  "requires": {
+    "contracts": [
+      {
+        "apiVersion": "x-org.linxin666.skin-center/v1alpha1",
+        "kind": "SkinHooks",
+        "optional": true
+      }
+    ]
+  },
+  "contributes": {
+    "stylesheet": "skin.css",
+    "patches": "patches.css"
+  },
+  "facets": {
+    "client": {
+      "entry": "hooks.mjs",
+      "apiVersion": "x-org.linxin666.skin-center/v1alpha1"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"BaiModelAccess.d.ts","sourceRoot":"","sources":["../../../src/client/BaiModelAccess.tsx"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,WAAW,EAAE,MAAM,kCAAkC,CAAA;AAGnE,wBAAgB,cAAc,CAAC,EAAE,CAAC,EAAE,SAAS,EAAE,SAAS,EAAE,OAAc,EAAE,EAAE,WAAW,CAAC,mBAAmB,CAAC,GAAG;IAAE,SAAS,CAAC,EAAE,MAAM,CAAC;IAAC,OAAO,CAAC,EAAE,OAAO,CAAA;CAAE,sCAWvJ"}

@@ -40,7 +40,7 @@ export async function createRuntimeBaseline({
     throw new TypeError('RuntimeBaseline package policy is required')
   }
   const packages = {}
-  for (const name of policy.names) {
+  const readPackage = async (name) => {
     const resolvedPath = packageRoots.get(name)
     if (typeof resolvedPath !== 'string' || resolvedPath.length === 0) {
       throw new Error(`RuntimeBaseline application package is missing: ${name}`)
@@ -48,15 +48,22 @@ export async function createRuntimeBaseline({
     const manifest = JSON.parse(await read(join(resolvedPath, 'package.json'), 'utf8'))
     if (manifest?.name !== name) throw new Error(`RuntimeBaseline package identity mismatch: ${name}`)
     const policyEntry = policy.get(name)
-    const details = await inspectPath(resolvedPath)
+    const [details, realPath] = await Promise.all([
+      inspectPath(resolvedPath),
+      resolveRealPath(resolvedPath),
+    ])
     const entry = Object.freeze({
       ...policyEntry,
       version: exactVersion(manifest.version, name),
       resolvedPath,
-      realPath: await resolveRealPath(resolvedPath),
+      realPath,
       link: details.isSymbolicLink(),
     })
-    packages[name] = entry
+    return entry
+  }
+  for (let offset = 0; offset < policy.names.length; offset += 8) {
+    const entries = await Promise.all(policy.names.slice(offset, offset + 8).map(readPackage))
+    for (const entry of entries) packages[entry.name] = entry
   }
   const frozenPackages = Object.freeze(packages)
   const baseline = {

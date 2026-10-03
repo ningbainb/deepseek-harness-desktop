@@ -22,7 +22,8 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { SettingsScope, SettingsScopeSnapshot, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope, ConfigFormSnapshot as SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../protocol.ts'
 import type { BridgeDescribeResult, BridgeMutateRequest, BridgeMutateResult } from '../protocol.ts'
 
@@ -125,21 +126,21 @@ class BridgeScopeController<T> implements SettingsScope<T> {
   }
 
   /** Queue a Host refresh through the bridge. */
-  load(): Promise<void> {
+  async load(): Promise<void> {
     const generation = this.writeGeneration
-    return this.enqueue(() => this.read(generation))
+    await this.enqueue(() => this.read(generation))
   }
 
-  set(field: string, value: unknown): Promise<void> {
+  set(field: string, value: unknown): Promise<boolean> {
     const generation = ++this.writeGeneration
     return this.enqueue(() => this.write([{ op: 'set', path: [field], value }], generation))
   }
 
-  unset(field: string): Promise<void> {
+  unset(field: string): Promise<boolean> {
     return this.mutate([{ op: 'unset', path: [field] }])
   }
 
-  mutate(ops: readonly SettingsPathOpView[], expectedRevision?: number): Promise<void> {
+  mutate(ops: readonly SettingsPathOpView[], expectedRevision?: number): Promise<boolean> {
     const generation = ++this.writeGeneration
     const copied = ops.map(op => op.op === 'set'
       ? { op: 'set' as const, path: [...op.path], value: op.value }
@@ -153,13 +154,13 @@ class BridgeScopeController<T> implements SettingsScope<T> {
     await this.tail
   }
 
-  private enqueue(operation: () => Promise<void>): Promise<void> {
-    if (this.disposed) return Promise.resolve()
+  private enqueue(operation: () => Promise<boolean | void>): Promise<boolean> {
+    if (this.disposed) return Promise.resolve(false)
     const task = this.tail.then(async () => {
-      if (this.disposed) return
-      await operation()
+      if (this.disposed) return false
+      return await operation() === true
     })
-    this.tail = task.catch(() => {})
+    this.tail = task.then(() => {}, () => {})
     return task
   }
 
@@ -203,7 +204,7 @@ class BridgeScopeController<T> implements SettingsScope<T> {
     ops: Array<{ op: 'set' | 'unset'; path: string[]; value?: unknown }>,
     generation: number,
     expectedRevision = this.pendingRevision ?? this.getSnapshot().revision,
-  ): Promise<void> {
+  ): Promise<boolean> {
     let response: { result: BridgeMutateResult }
     try {
       response = await this.api.settings.mutate({
@@ -213,20 +214,21 @@ class BridgeScopeController<T> implements SettingsScope<T> {
       })
     } catch {
       if (!this.disposed && generation === this.writeGeneration) await this.read(generation)
-      return
+      return false
     }
     if (!response.result.ok || this.disposed) {
       if (!this.disposed && generation === this.writeGeneration) await this.read(generation)
-      return
+      return false
     }
     // A newer user edit is already queued. Retain the revision fence without
     // publishing an intermediate value over the controller's latest preview.
     if (generation !== this.writeGeneration) {
       this.pendingRevision = response.result.value.revision
-      return
+      return true
     }
     this.pendingRevision = undefined
     this.accept(response.result.value.value, response.result.value, undefined)
+    return true
   }
 
   /** Publish one accepted Host view (value narrowed by the optional decoder). */
@@ -310,6 +312,15 @@ export interface WebUiSettingsBinderFace {
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T>
 }
 
+/** The 0.2 Host form directory is keyed by profile entry id. */
+const PROFILE_ENTRY_BY_NAMESPACE: Readonly<Record<string, string>> = {
+  'community-plugins': 'ui-community-plugins',
+  'task-board': 'ui-task-board',
+  'skin-background': 'ui-skin-center',
+  'value-mode': 'ui-value-mode',
+  'model-preferences': 'ui-model-preferences',
+}
+
 /**
  * The rc.6 compatibility binder, provided as the webUiSettings service. Its
  * bind() rides the official binder first and hands the bridge controller in
@@ -323,13 +334,7 @@ export class WebUiSettingsBinder extends Service {
 
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T> {
     const ctx = this.ctx
-    const official = ctx.get('settingsScope')
-    if (!isBinderFace(official)) {
-      // The official binder is a product seam every dsh web host carries;
-      // when it is absent the bind must not crash the card's activation.
-      throw new Error('webUiSettings: the official settingsScope binder is unavailable')
-    }
-    const primary = official.bind(spec)
+    const primary = ctx.configForms.get<T>(PROFILE_ENTRY_BY_NAMESPACE[spec.namespace] ?? spec.namespace)
     const connectionValue = ctx.get('connection')
     const connection = isConnectionHandle(connectionValue) ? connectionValue : undefined
     // rc.6 Electron connections can omit or misreport isLoopback. The browser
@@ -361,11 +366,6 @@ export class WebUiSettingsBinder extends Service {
     }, 'web-ui-settings: compat scope invalidation')
     return scope
   }
-}
-
-/** True when the value exposes the official settings binder's bind() seam. */
-function isBinderFace(value: unknown): value is WebUiSettingsBinderFace {
-  return typeof value === 'object' && value !== null && typeof (value as { bind?: unknown }).bind === 'function'
 }
 
 /** True when the value looks like the client connection handle this wrapper reads. */

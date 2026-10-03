@@ -32,6 +32,18 @@ test('disabled timings leave dump-config output and clocks untouched', () => {
   assert.doesNotThrow(() => mark('entry'))
 })
 
+test('legacy settings preparation is observable separately from SDK boot', () => {
+  const lines = []
+  let clock = 0
+  const mark = createRuntimeStartupTiming({ now: () => clock, emit: line => lines.push(line) })
+  mark('patches')
+  clock = 10
+  mark('legacy-settings')
+  clock = 40
+  mark('boot')
+  assert.deepEqual(lines, ['[runtime-startup] patches=0ms', '[runtime-startup] legacy-settings=10ms', '[runtime-startup] boot=30ms'])
+})
+
 test('invalid clocks and diagnostic sink failures cannot interrupt Runtime boot', () => {
   const lines = []
   const invalid = createRuntimeStartupTiming({ now: () => NaN, emit: line => lines.push(line) })

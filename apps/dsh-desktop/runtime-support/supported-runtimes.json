@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.1.5-rc.2",
+      "upstreamVersion": "0.2.0-rc.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=4.0.0",
+      "desktopRange": "=5.0.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,23 +55,23 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-09-13",
+      "verifiedAt": "2026-09-30",
       "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
       "knownIssues": [],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.1.5-rc.2",
-          "integrity": "sha512-8Xc8hCQHcIWRmTCVU/xZdp6/qMsWMeAd2ObChKDEsfhUPJFXx6H0lgeb1DxUMD86HZrrVN+1bCvn1ppjZ/fOxw==",
+          "version": "0.2.0-rc.2",
+          "integrity": "sha512-EAJ3gPNcVt/uv8X19PMm9NkVhWgT7xXNMk0UKCVm+IQ5rpSQOcsMUa0HWlnYYVybKMsccjcRB21vVVsaXQ6IdA==",
           "files": {
-            "package.json": "0d9ea2f7a42e7bacf319abd57016e40d0351d07032c7eb709d7c54158300d4cb",
-            "lib/bin.js": "0ff7f1d72c4e0cbe14001709c81e20a04b70464118a7f78568952988e28f2ac5"
+            "package.json": "0a85203e3e907dd2e3bec34324a2494758ca6cdee234b07090a7c8df0b11acac",
+            "lib/bin.js": "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "b1002a9363cd80b67e81be2abd9c783cdc1aacf3b4053f608d4c1b1e8be5c235"
+          "sha256": "a2cdb9f9f6364342065a703c483e4fca2367c900ca28722d36bedb57ec0c2ebd"
         },
         "slots": [
           "conversation.composer.dock",
@@ -92,9 +92,10 @@
         ],
         "patches": {
           "registry": "packages/dsh-desktop-compat/src/patch-registry.ts",
-          "sha256": "e1a32a3cbd87da42b49c493f864f2d9586f4fb18bb8fe359d92c72ca23c0b2b6",
+          "sha256": "66ce4782698ad5c9759ea38b22589271e2adf20306bc8b2c90b705f17dca20a9",
           "ids": [
             "cancellation-presentation",
+            "cold-blank-session-checkpoint",
             "desktop-skin-profile-isolation",
             "queued-turn-continuation",
             "session-startup-corruption",

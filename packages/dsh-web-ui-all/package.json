@@ -52,7 +52,11 @@
     "@ningbainb/dsh-personal-prompt": "workspace:*",
     "@ningbainb/dsh-memory": "workspace:*",
     "@linxin666/dsh-skins": "workspace:*",
-    "@linxin666/dsh-client-ui-skin-center": "workspace:*"
+    "@linxin666/dsh-client-ui-skin-center": "workspace:*",
+    "@linxin666/dsh-client-ui-community-plugins": "0.4.4",
+    "@linxin666/dsh-client-ui-plugin-manager": "0.4.4",
+    "@linxin666/dsh-chat-recovery": "0.3.5",
+    "@linxin666/dsh-desktop-launcher": "0.3.13"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

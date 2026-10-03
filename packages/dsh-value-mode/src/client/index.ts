@@ -6,7 +6,8 @@
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -56,7 +57,7 @@ function isSettingsBinderFace(value: unknown): value is SettingsBinderFace {
   return typeof value === 'object' && value !== null && typeof (value as { bind?: unknown }).bind === 'function'
 }
 
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session']
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote', 'remote.session']
 
 interface HeroOnboardingMountOptions {
   scope: ValueModeSettingsScope<ValueModeConfig>
@@ -217,7 +218,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('value-mode', { zh, en }), 'value-mode: locales')
 
   const compatibilityBinder = (ctx.get as (name: string) => unknown)('webUiSettings')
-  const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : ctx.settingsScope
+  const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const scope = binder.bind<ValueModeConfig>({ namespace: VALUE_MODE_SETTINGS_NAMESPACE as string })
   const defaultModelScope = binder.bind<ModelRouteSelection>({ namespace: 'agent-default-model' })
 

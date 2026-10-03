@@ -19,7 +19,6 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 
 import {
-  VALUE_MODE_SETTINGS_NAMESPACE,
   isConfigured,
   isEffectivelyActive,
   isCompleteModelRoute,
@@ -31,7 +30,6 @@ import {
   type ValueModeStrategy,
   type SessionOverrideConfig,
 } from './core/config.ts'
-import { Config } from './core/schema.ts'
 import {
   buildSystemPromptGuidance,
   VALUE_MODE_SECTION_NAME,
@@ -43,6 +41,7 @@ import { assessValueModeHealth } from './core/model-selection.ts'
 import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters, type RouteParameters } from './core/runtime-telemetry.ts'
 import { dshHome } from './dsh-home.ts'
 import { syncPresetTrees } from './sync.ts'
+import { declareBundledPreset } from './preset-registry.ts'
 
 export const name = 'value-mode'
 export const inject = ['tools', 'systemPrompt', 'settings', 'llm', 'agentDefaultModel']
@@ -100,8 +99,9 @@ function syncBundledPreset(ctx: Context): void {
  * Apply the Value Mode host plugin to Cordis context.
  */
 export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
-  let currentConfig: ValueModeConfig = initialConfig
-  let currentSource: () => ValueModeConfig = () => currentConfig
+  const currentSource = (): ValueModeConfig => Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key,
+    typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+      ? field.get() : field]))
   const routedRequestAttempts = new Map<string, { timestamp: number; params: RouteParameters }>()
   const streams = new Map<string, string>()
 
@@ -135,26 +135,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   // it appears beside the other modes in dsh-mode-switcher immediately after
   // startup. Routing below remains session-scoped to this preset.
   syncBundledPreset(ctx)
-
-  // Install settings section with canonical optional-settings consumer wiring
-  ctx.settings.installSection(ctx, VALUE_MODE_SETTINGS_NAMESPACE, Config, initialConfig, {
-    setSource: (source) => {
-      currentSource = source
-      currentConfig = source()
-    },
-    onChange: () => {
-      currentConfig = currentSource()
-    },
-    validate: (value) => {
-      const effective = resolveEffectiveConfig(value, readDefaultExpert(ctx))
-      if (value.enabled && !isCompleteModelRoute(effective.executor)) {
-        throw new Error('副模型/子代理执行模型未选择具体模型')
-      }
-      if (value.enabled && !isCompleteModelRoute(effective.expert)) {
-        throw new Error('专家主控模型未选择具体模型')
-      }
-    },
-  })
+  declareBundledPreset(ctx, 'value-mode', join(bundledPresetsRoot(), 'value-mode'))
 
   // Register the consult_expert tool
   ctx.tools.register(createConsultExpertTool(ctx, () => currentSource()))

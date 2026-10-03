@@ -155,6 +155,7 @@ function stateFor(session) {
       steps: 0,
       deferredSteps: 0,
       presentationApplied: false,
+      afterCompaction: false,
     }
     promotionBySession.set(session, state)
   }
@@ -251,6 +252,7 @@ function withWorkspaceLine(assembly, agent) {
 export function apply(ctx, config) {
   const commonTools = stringList(config.commonTools, 'commonTools')
   const shellTools = stringList(config.shellTools, 'shellTools')
+  const compactionTools = stringListOrEmpty(config.compactionTools, 'compactionTools')
   const messageSources = new Set(stringList(config.messageSources, 'messageSources', DEFAULT_MESSAGE_SOURCES))
   const deferredSources = new Set(stringListOrEmpty(config.deferredSources, 'deferredSources'))
   const presentation = config.promotedPresentation ?? 'native'
@@ -271,6 +273,20 @@ export function apply(ctx, config) {
   // reasoning events are durable, so the NEXT prompt assembly already sees
   // Code Mode with its generated SDK section.
   ctx.on('session/event', (session, event) => {
+    if (event.type === 'compaction/end') {
+      const state = stateFor(session)
+      state.next = session.snapshotEvents().length
+      state.promoted = false
+      state.toolCalled = false
+      state.responded = false
+      state.anchored = false
+      state.turnEnded = false
+      state.steps = 0
+      state.deferredSteps = 0
+      state.presentationApplied = false
+      state.afterCompaction = true
+      return
+    }
     if (event.type !== 'step/end' && event.type !== 'turn/end') return
     const state = stateFor(session)
     if (!state.promoted) {
@@ -304,7 +320,7 @@ export function apply(ctx, config) {
       )
     }
 
-    const bootstrap = new Set([...selectedShells, ...commonTools])
+    const bootstrap = new Set([...selectedShells, ...commonTools, ...(state.afterCompaction ? compactionTools : [])])
     return {
       ...assembled,
       tools: assembled.tools.filter(tool => bootstrap.has(tool.name)),

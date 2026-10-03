@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  IconCheckOutline16,
-  IconCodeOutline16,
-  IconCopyOutline16,
-  IconDataOutline16,
-  IconFullscreenOutline16,
+  IconCheckOutlineMedium,
+  IconCodeOutlineMedium,
+  IconCopyOutlineMedium,
+  IconDataOutlineMedium,
+  IconFullscreenOutlineMedium,
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -68,7 +68,7 @@ export function ArtifactCard({ artifact, t }: ArtifactCardProps) {
     <section className={css.card} data-artifact-id={artifact.artifactId}>
       <header className={css.header}>
         <div className={css.heading}>
-          <IconDataOutline16 className={css.headingIcon} />
+          <IconDataOutlineMedium className={css.headingIcon} />
           <div className={css.headingText}>
             <div className={css.title} title={artifact.title}>{artifact.title}</div>
             <div className={css.meta}>
@@ -84,7 +84,7 @@ export function ArtifactCard({ artifact, t }: ArtifactCardProps) {
           aria-expanded={expanded}
           onClick={() => setExpanded(value => !value)}
         >
-          <IconFullscreenOutline16 />
+          <IconFullscreenOutlineMedium />
           <span>{expanded ? t('card.collapse') : t('card.expand')}</span>
         </button>
       </header>
@@ -113,11 +113,11 @@ export function ArtifactCard({ artifact, t }: ArtifactCardProps) {
 
       <footer className={css.actions}>
         <button type="button" className={css.actionButton} onClick={() => setSourceOpen(value => !value)}>
-          <IconCodeOutline16 />
+          <IconCodeOutlineMedium />
           <span>{sourceOpen ? t('card.hideSource') : t('card.viewSource')}</span>
         </button>
         <button type="button" className={css.actionButton} onClick={() => { void copyHtml() }}>
-          {copyState === 'copied' ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
+          {copyState === 'copied' ? <IconCheckOutlineMedium /> : <IconCopyOutlineMedium />}
           <span>{copyLabel}</span>
         </button>
         {copyState !== 'idle' ? <span className={css.copyStatus} role="status">{copyLabel}</span> : null}

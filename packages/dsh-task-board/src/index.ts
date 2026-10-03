@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { HostTaskFileStore, resolveTaskBoardStatePath } from './host/file-store.ts'
@@ -52,6 +52,9 @@ export const TASK_BOARD_GUIDANCE = '本机已安装 dsh-task-board 插件（DSH 
 export const TASK_BOARD_SETTINGS_NAMESPACE = 'task-board'
 
 declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'loader/volatile-update'(paths: readonly (readonly string[])[]): void
+  }
   interface Context {
     /**
      * Optional Runtime Provider adapter. Desktop supplies it only after the
@@ -76,11 +79,19 @@ export interface Config {
   profileName?: string
 }
 
-export const Config: z<Config> = z.object({
-  announceToAgent: z.boolean().default(true),
-  enabled: z.boolean().default(true),
+export const Config = z.object({
+  announceToAgent: z.boolean().default(true).volatile(),
+  enabled: z.boolean().default(true).volatile(),
   profileName: z.string().default(process.env.DSH_PROFILE ?? 'web'),
 })
+
+type ConfigField<T> = T | { get(): T | undefined }
+type LiveConfig = { announceToAgent?: ConfigField<boolean>; enabled?: ConfigField<boolean>; profileName?: string }
+
+function fieldValue<T>(field: ConfigField<T> | undefined, fallback: T): T {
+  if (field === undefined) return fallback
+  return typeof field === 'object' && field !== null && 'get' in field ? field.get() ?? fallback : field
+}
 
 /** Schema default, re-read for hand-built test contexts (the loader applies them normally). */
 const DEFAULT_ANNOUNCE = true
@@ -93,7 +104,7 @@ const DEFAULT_ANNOUNCE = true
  * @param ctx - the plugin context (systemPrompt injected).
  * @param config - resolved plugin config (schema defaults applied by the loader).
  */
-export function apply(ctx: Context, config?: Config): void {
+export function apply(ctx: Context, config?: LiveConfig): void {
   const profileName = config?.profileName ?? process.env.DSH_PROFILE ?? 'web'
   const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
   const fileStore = new HostTaskFileStore({
@@ -134,7 +145,7 @@ export function apply(ctx: Context, config?: Config): void {
   // status route atomically flips clients to Host ownership.
   ctx.inject(['taskBoardHostScheduleRunner'], (schedulerCtx) => {
     const runner = schedulerCtx.taskBoardHostScheduleRunner
-    if (runner === undefined || (config?.enabled ?? true) === false) return
+    if (runner === undefined || !fieldValue(config?.enabled, true)) return
     const scheduler = new HostDurableScheduler({
       store: v3Store,
       runner,
@@ -151,7 +162,11 @@ export function apply(ctx: Context, config?: Config): void {
   // The live source the announcement reads: the settings section once the web
   // settings surface is served, the composition entry otherwise
   // (the settings service swaps it when the namespace registers).
-  let current: () => Config = () => config ?? {}
+  const current = (): Config => ({
+    announceToAgent: fieldValue(config?.announceToAgent, true),
+    enabled: fieldValue(config?.enabled, true),
+    profileName: config?.profileName,
+  })
   let disposeSection: (() => void) | undefined
 
   // Register (or drop) the announcement to match the current source. The
@@ -171,12 +186,7 @@ export function apply(ctx: Context, config?: Config): void {
     })
   }
 
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, TASK_BOARD_SETTINGS_NAMESPACE, Config, config ?? {}, {
-      setSource: (source) => { current = source },
-      onChange: sync,
-    })
-  })
+  ctx.on('loader/volatile-update', sync)
 
   // Initial registration from the composition entry (covers deployments with
   // no settings service, whose section installation never fires its hooks).

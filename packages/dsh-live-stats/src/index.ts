@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { resolveEstimatorConfig } from './estimator.ts'
@@ -32,24 +32,45 @@ export interface Config extends EstimatorConfig {
 }
 
 /** Runtime schema for {@link Config}. */
-export const Config: z<Config> = z.object({
-  charsPerToken: z.number().min(0.01).default(4),
-  blockOverhead: z.number().step(1).min(0).default(4),
-  roleOverhead: z.number().step(1).min(0).default(4),
-  enabled: z.boolean().default(true),
-  showCost: z.boolean().default(true),
-  priceMode: z.string().pattern(/^(auto|peak|offpeak)$/).default('auto') as unknown as z<PriceMode>,
+export const Config = z.object({
+  charsPerToken: z.number().min(0.01).default(4).volatile(),
+  blockOverhead: z.number().step(1).min(0).default(4).volatile(),
+  roleOverhead: z.number().step(1).min(0).default(4).volatile(),
+  enabled: z.boolean().default(true).volatile(),
+  showCost: z.boolean().default(true).volatile(),
+  priceMode: (z.string().pattern(/^(auto|peak|offpeak)$/).default('auto') as unknown as z<PriceMode>).volatile(),
 })
+
+type ConfigField<T> = T | { get(): T | undefined }
+type LiveConfig = { [K in keyof Config]?: ConfigField<NonNullable<Config[K]>> }
+
+function fieldValue<T>(field: ConfigField<T> | undefined, fallback: T): T {
+  if (field === undefined) return fallback
+  return typeof field === 'object' && field !== null && 'get' in field ? field.get() ?? fallback : field
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'loader/volatile-update'(paths: readonly (readonly string[])[]): void
+  }
+}
 
 /**
  * Register the replayable live-token projection and balance HTTP routes.
  */
 export function apply(
   ctx: Context,
-  config: Config = {},
+  config: LiveConfig = {},
   deps?: { ledgerFilePath?: string },
 ): void {
-  let current: () => Config = () => config ?? {}
+  const current = (): Config => ({
+    charsPerToken: fieldValue(config.charsPerToken, 4),
+    blockOverhead: fieldValue(config.blockOverhead, 4),
+    roleOverhead: fieldValue(config.roleOverhead, 4),
+    enabled: fieldValue(config.enabled, true),
+    showCost: fieldValue(config.showCost, true),
+    priceMode: fieldValue(config.priceMode, 'auto' as PriceMode),
+  })
   let disposeProjection: (() => void) | undefined
   const ledgerStore = new LedgerStore(
     deps?.ledgerFilePath === undefined ? undefined : { filePath: deps.ledgerFilePath },
@@ -113,12 +134,7 @@ export function apply(
     }, 'live-stats: routes')
   })
 
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, LIVE_STATS_SETTINGS_NAMESPACE, Config, config ?? {}, {
-      setSource: (source) => { current = source },
-      onChange: rebuild,
-    })
-  })
+  ctx.on('loader/volatile-update', rebuild)
   rebuild()
 }
 

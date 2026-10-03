@@ -38,7 +38,7 @@ test('shipped LiangShen keeps SDK persona sections, restores workspace and retai
   const listeners = new Map()
   apply({ on: (name, listener) => listeners.set(name, listener) }, { shellTools: ['bash'],
     commonTools: ['str_replace_editor'], compactionTools: ['read'] })
-  const session = { events: [], header: { cwd: '/workspace' } }
+  const session = { events: [], snapshotEvents() { return this.events }, header: { cwd: '/workspace' } }
   const agent = { session }
   const sections = [{ name: prompt.PERSONA_PREFIX_SECTION, text: 'Persona' },
     { name: 'plan:policy', text: 'Plan policy' }, { name: prompt.PERSONA_SUFFIX_SECTION, text: 'Suffix' }]
@@ -87,8 +87,8 @@ test('public Agent contract exposes scoped lifecycle hooks and session identity'
 
   assert.match(identityTypes, /readonly id: SessionId/u)
   assert.match(runtimeTypes, /interface Agent \{[\s\S]*readonly session: Session/u)
-  for (const event of ['agent/session-start', 'agent/pre-step', 'agent/request', 'agent/turn-stopping']) {
-    assert.match(runtimeTypes, new RegExp(`['"]${event.replace('/', '\\/')}['"]`, 'u'))
+  for (const event of ['agent/created', 'agent/pre-step', 'agent/request', 'agent/turn-stopping']) {
+    assert.match(runtimeTypes, new RegExp(`['"]${event}['"]`, 'u'))
   }
   assert.match(runtimeTypes, /Promise<LlmCallConfig>/u)
 })

@@ -9,6 +9,7 @@ export default clientBundle('@linxin666/dsh-value-mode', ['src/index.ts'], {
     '@deepseek-ai/dsh-settings',
     '@deepseek-ai/dsh-system-prompt',
     '@deepseek-ai/dsh-tools',
+    '@deepseek-ai/schemastery',
     'schemastery',
   ],
 })

@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 
+function nativePresetName(preset) {
+  return preset.name ?? (preset.id === 'minimal' ? '极简模式' : preset.id)
+}
+
 // Runs against the real loaded client and an isolated durable conversation.
 // Only the first create response is fault-injected; successful mode selection
 // uses the real Host, workspace, preset composition and session persistence.
@@ -116,7 +120,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
   await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
   // Blank conversations use the official hero picker, not the history-only
   // desktop header action. Verify the real native seat's target label.
-  const nativePreset = page.getByRole('button', { name: target.name ?? target.id, exact: true })
+  const nativePreset = page.getByRole('button', { name: nativePresetName(target), exact: true })
     .and(page.locator('[aria-haspopup="menu"]'))
   await nativePreset.waitFor({ state: 'visible', timeout: 15_000 })
   const after = (await rpc(page, 'session.list', {})).items
@@ -141,7 +145,7 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
     const body = await response.json()
     assert.equal(body.result?.ok, true, `${id}: ${JSON.stringify(body)}`)
     assert.notEqual(body.result.value.sessionId, sessionId)
-    await page.getByRole('button', { name: preset.name ?? id, exact: true })
+    await page.getByRole('button', { name: nativePresetName(preset), exact: true })
       .and(page.locator('[aria-haspopup="menu"]')).waitFor({ state: 'visible', timeout: 15_000 })
     assert.equal((await roster()).find(item => item.isDefault)?.id, originalDefault)
     await openSeededSession(page, sessionId)

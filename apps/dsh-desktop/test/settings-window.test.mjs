@@ -7,7 +7,23 @@ import {
   createSettingsWindowScript,
   installSettingsWindow,
   SETTINGS_WINDOW_CSS,
+  settingsWindowDragHandle,
 } from '../src/settings-window.mjs'
+
+test('settings drag handle preserves legacy slots and scopes rc2 titles to native settings navigation', () => {
+  const header = { id: 'settings-title' }
+  const fixture = ({ legacy, modal = 'settings', title = 'settings-title', children = [header] } = {}) => ({
+    querySelector: selector => selector === '[data-slot="settings.header"]' ? legacy : { children },
+    getAttribute: attribute => attribute === 'data-shortcut-modal' ? modal : title,
+  })
+  assert.equal(settingsWindowDragHandle(fixture({ legacy: { parentElement: header }, modal: 'other' })), header)
+  assert.equal(settingsWindowDragHandle(fixture()), header)
+  assert.equal(settingsWindowDragHandle(fixture({ modal: 'other' })), undefined)
+  assert.equal(settingsWindowDragHandle(fixture({ title: null })), undefined)
+  assert.equal(settingsWindowDragHandle(fixture({ children: [{ id: 'other-title' }] })), undefined)
+  assert.equal(settingsWindowDragHandle({ querySelector: () => null, getAttribute: () => 'settings' }), undefined)
+  assert.match(createSettingsWindowScript(), /data-shortcut-modal/u)
+})
 
 test('settings controller scopes movement and eight-way resizing to the upstream settings dialog', () => {
   const script = createSettingsWindowScript()

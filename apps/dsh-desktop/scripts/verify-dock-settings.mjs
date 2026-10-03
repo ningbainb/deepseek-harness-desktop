@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packaged = process.argv.includes('--packaged') || Boolean(process.env.DSH_DESKTOP_E2E_EXECUTABLE)
@@ -17,10 +18,11 @@ const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-dock-settings-e2e-'))
 const output = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ?? resolve(temporary, 'screenshots'))
 let app
 let settings
+let failure
 try {
   await mkdir(output, { recursive: true })
   app = await electron.launch({ executablePath, args: packaged ? [] : [resolve(appDir, 'src/main.mjs')], cwd: appDir,
-    env: { ...process.env, DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'), DSH_HOME: resolve(temporary, 'dsh-home'), DSH_DESKTOP_VERIFY_UPDATER: '0', DSH_DESKTOP_OPEN_EXTENSIONS: '1' } })
+    env: { ...process.env, DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'), DSH_HOME: resolve(temporary, 'dsh-home'), DSH_DESKTOP_VERIFY_UPDATER: '0', DSH_DESKTOP_OPEN_EXTENSIONS: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1' } })
   // Install the locale override before the collaboration deep link creates the
   // shared settings child view. English CI runners otherwise create that view
   // before openDockSetting() can register its future-document init script.
@@ -240,7 +242,7 @@ try {
   await dock.locator('#plugin-form').waitFor({ state: 'visible' })
   assert.deepEqual(await dock.locator('.settings-sidebar [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
     'models-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
-    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'skills-tab', 'qqbot-tab',
+    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'plugin-options-tab', 'skills-tab', 'qqbot-tab',
     'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
   ], 'the combined model destination and all other destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
@@ -270,6 +272,7 @@ try {
   await dock.locator('#dock-search-results').getByRole('button', { name: '记忆', exact: true }).click()
   await settings.locator('[data-dsh-dock-settings="memory"]').waitFor()
   assert.equal(await dock.locator('.settings-sidebar > nav').isVisible(), true, 'navigation returns after search selection')
+  await memory.getByRole('listitem').filter({ hasText: 'Dock memory verification.' }).waitFor()
   assert.equal(await memory.getByRole('listitem').filter({ hasText: 'Dock memory verification.' }).count(), 1)
   await (await app.browserWindow(dock)).evaluate(window => window.setSize(960, 680))
   ;({ settings } = await openDockSetting(app, main, 'value-mode'))
@@ -332,12 +335,20 @@ try {
   assert.equal(await main.locator('[data-memory-activity]').count(), 0, 'main conversation has no memory entry')
   console.log(`Dock settings: six working pages, preserved management entry, centered bounds; screenshots ${process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ? `saved to ${output}` : 'validated'}`)
 } catch (error) {
+  failure = error
+  console.error('Dock acceptance failed', error)
   console.error('Settings URL:', settings?.url())
   console.error('Settings body:', await settings?.locator('body').innerText().catch(() => 'unavailable'))
   console.error('Runtime log:', (await readFile(resolve(temporary, 'user-data/logs/runtime.log'), 'utf8').catch(() => '')).slice(-8000))
   await settings?.screenshot({ path: resolve(output, 'failure.png') }).catch(() => {})
   throw error
 } finally {
-  await app?.close()
-  await rm(temporary, { recursive: true, force: true })
+  const cleanupFailures = []
+  try { await closeIsolatedElectron(app) } catch (error) { cleanupFailures.push(error) }
+  try {
+    await rm(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  } catch (error) { cleanupFailures.push(error) }
+  if (cleanupFailures.length) {
+    throw new AggregateError([...failure ? [failure] : [], ...cleanupFailures], 'Dock cleanup failed', { cause: failure })
+  }
 }

@@ -1,0 +1,55 @@
+diff --git a/lib/index.js b/lib/index.js
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,3 +1,6 @@
++import liveSchema from "@deepseek-ai/schemastery";
++import legacySchema from "schemastery";
++import communityPlugins from "../community.json" with { type: "json" };
+ //#region src/mount-once.ts
+ /**
+ * Host single-instance guard shared by the plugin family. The family bundle
+@@ -119,8 +122,28 @@ const name = "ui-community-plugins";
+ const inject = [];
++const COMMUNITY_PLUGINS_SETTINGS_NAMESPACE = "community-plugins";
++const Config = liveSchema.object({ enabled: liveSchema.boolean().default(true).volatile() });
++const LegacyConfig = legacySchema.object({ enabled: legacySchema.boolean().default(true) });
++let current = () => ({ enabled: true });
++let enabled = true;
++function listCommunityPlugins() {
++	return enabled ? communityPlugins : [];
++}
+-/**
+-* Inert apply: the data source carries no runtime behavior.
+-* @param _ctx - cordis context.
+-*/
+-const apply = mountOnce("@linxin666/dsh-client-ui-community-plugins", (_ctx) => {});
++const apply = mountOnce("@linxin666/dsh-client-ui-community-plugins", (ctx, config = {}) => {
++	current = () => ({ enabled: config.enabled !== null && typeof config.enabled === "object" && typeof config.enabled.get === "function" ? config.enabled.get() : config.enabled ?? true });
++	const sync = () => { enabled = current().enabled !== false; };
++	ctx.inject(["settings"], (settingsCtx) => {
++		if (typeof settingsCtx.settings.installSection === "function") {
++			settingsCtx.settings.installSection(ctx, COMMUNITY_PLUGINS_SETTINGS_NAMESPACE, LegacyConfig, {}, {
++				setSource: (source) => { current = source; sync(); },
++				onChange: sync
++			});
++		} else {
++			settingsCtx.effect(() => settingsCtx.settings.configure({ auto: false }, ctx.fiber), "community-plugins: native form");
++			ctx.on("loader/volatile-update", sync);
++		}
++	});
++	ctx.effect(() => () => { current = () => ({ enabled: true }); enabled = true; });
++	sync();
++});
+ //#endregion
+-export { apply, inject, name };
++export { COMMUNITY_PLUGINS_SETTINGS_NAMESPACE, Config, apply, inject, listCommunityPlugins, name };
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -46,5 +46,6 @@
+   },
+   "dependencies": {
++    "@deepseek-ai/schemastery": "~3.18.4",
+     "schemastery": "^3.18.0"
+   },
+   "devDependencies": {

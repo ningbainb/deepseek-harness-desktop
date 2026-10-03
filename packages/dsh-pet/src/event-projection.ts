@@ -74,9 +74,9 @@ export function projectOfficialEvent(
         },
       }
     case 'tool/result': {
-      const block = event.data.message.content[0]
       runtime.activeTools.delete(String(event.data.message.source.callId))
-      runtime.stepHadFailure ||= event.data.error !== undefined || block.isError === true
+      runtime.stepHadFailure ||= event.data.error !== undefined
+        || event.data.message.isError === true
       if (runtime.activeTools.size > 0) {
         return {
           input: {

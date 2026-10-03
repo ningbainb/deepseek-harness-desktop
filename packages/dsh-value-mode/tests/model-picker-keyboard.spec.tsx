@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ModelPicker } from '../src/client/ModelPicker.tsx'
+import { ModelCatalogChangedError } from '../src/client/model-catalog.ts'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const roots: Root[] = []
@@ -73,4 +74,57 @@ it('turns a synchronous loader exception into a recoverable alert', async () => 
   await act(async () => root.render(<ModelPicker title="Models" onClose={() => {}} onSelect={() => {}} fetchModels={() => { throw new Error('not ready') }} />))
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('not ready')
   expect(document.body.textContent).not.toContain('加载已配置模型列表中')
+})
+
+it('refreshes an invalidated advisory read without requiring the user to reopen the picker', async () => {
+  vi.useFakeTimers()
+  const fetchModels = vi.fn().mockRejectedValueOnce(new ModelCatalogChangedError('changed'))
+    .mockResolvedValue({ groups: [{ id: 'current', models: [{ id: 'current-model', name: 'Current Model' }] }] })
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container); roots.push(root)
+  await act(async () => root.render(<ModelPicker title="Models" onClose={() => {}} onSelect={() => {}} fetchModels={fetchModels} />))
+  expect(fetchModels).toHaveBeenCalledTimes(2)
+  expect(document.querySelector('[data-model-id="current-model"]')).toBeTruthy()
+  expect(document.querySelector('[role="alert"]')).toBeNull()
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('bounds repeated catalog invalidations and retains an explicit retry', async () => {
+  const fetchModels = vi.fn().mockRejectedValue(new ModelCatalogChangedError('changed'))
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container); roots.push(root)
+  await act(async () => root.render(<ModelPicker title="Models" onClose={() => {}} onSelect={() => {}} fetchModels={fetchModels} />))
+  expect(fetchModels).toHaveBeenCalledTimes(3)
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('changed')
+  fetchModels.mockResolvedValue({ groups: [{ id: 'current', models: [{ id: 'recovered-model', name: 'Recovered Model' }] }] })
+  const retry = [...document.querySelectorAll('button')].find(button => button.textContent === '重试')!
+  await act(async () => retry.click())
+  expect(fetchModels).toHaveBeenCalledTimes(4)
+  expect(document.querySelector('[data-model-id="recovered-model"]')).toBeTruthy()
+})
+
+it('keeps the original picker deadline across automatic refreshes and ignores late results', async () => {
+  vi.useFakeTimers()
+  let finish!: (value: unknown) => void
+  const fetchModels = vi.fn().mockImplementationOnce(() => new Promise((_resolve, reject) => {
+    setTimeout(() => reject(new ModelCatalogChangedError('changed')), 6_000)
+  }))
+    .mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container); roots.push(root)
+  await act(async () => root.render(<ModelPicker title="Models" onClose={() => {}} onSelect={() => {}} fetchModels={fetchModels} />))
+  await act(async () => { await vi.advanceTimersByTimeAsync(6_000) })
+  expect(fetchModels).toHaveBeenCalledTimes(2)
+  await act(async () => { await vi.advanceTimersByTimeAsync(5_999) })
+  expect(document.querySelector('[role="alert"]')).toBeNull()
+  await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('超时')
+  expect(document.body.textContent).not.toContain('加载已配置模型列表中')
+  await act(async () => finish({ groups: [{ id: 'obsolete', models: [{ id: 'obsolete-model', name: 'Obsolete Model' }] }] }))
+  expect(document.querySelector('[data-model-id="obsolete-model"]')).toBeNull()
+  expect(vi.getTimerCount()).toBe(0)
 })

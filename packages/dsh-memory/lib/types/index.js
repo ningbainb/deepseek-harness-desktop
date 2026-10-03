@@ -1,7 +1,6 @@
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope';
-import z from 'schemastery';
-import { DEFAULT_MEMORY_CONFIG, normalizeMemoryConfig, assertMemoryConfig, } from "./core/config.js";
-import { MEMORY_SETTINGS_NAMESPACE } from "./core/schema.js";
+import z from '@deepseek-ai/schemastery';
+import { DEFAULT_MEMORY_CONFIG, normalizeMemoryConfig, } from "./core/config.js";
 import { MemoryService, } from "./core/service.js";
 import { MEMORY_PROMPT_SECTION_TEMPLATE, } from "./core/rank.js";
 import { extractCurrentUserQuery } from "./core/query.js";
@@ -18,8 +17,8 @@ export { MemoryStore, MemoryStoreError } from "./store.js";
 export { makeMemoryRoutes, MEMORY_API_PREFIX } from "./routes.js";
 export { createMemoryTool } from "./tools.js";
 export const Config = z.object({
-    version: z.number().step(1).default(1),
-    enabled: z.boolean().default(false),
+    version: z.number().step(1).default(1).volatile(),
+    enabled: z.boolean().default(false).volatile(),
 });
 function workspaceForSession(registry, sessionId) {
     try {
@@ -34,7 +33,9 @@ function copyScope(scope) {
 }
 /** Register owner-safe memory prompt, tool, settings and local routes. */
 export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
-    let source = () => initialConfig;
+    const source = () => normalizeMemoryConfig(Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key,
+        typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+            ? field.get() : field])));
     let workspaceRegistry;
     const userScope = ctx.userScope;
     const sessionScopes = new Map();
@@ -115,13 +116,6 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     // ownership. Prompt injection still requires an actual scoped carrier key.
     for (const session of ctx.sessions.list())
         rememberSession(undefined, session);
-    ctx.inject(['settings'], (settingsCtx) => {
-        settingsCtx.settings.installSection(ctx, MEMORY_SETTINGS_NAMESPACE, Config, initialConfig, {
-            setSource: next => { source = next; },
-            onChange: () => { },
-            validate: value => { assertMemoryConfig(value); },
-        });
-    });
     ctx.effect(() => {
         const disposeSection = ctx.systemPrompt.section({
             name: 'dsh:memory',

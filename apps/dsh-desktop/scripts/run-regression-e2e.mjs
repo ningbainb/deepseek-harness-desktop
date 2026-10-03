@@ -25,6 +25,7 @@ import { acceptedReleaseIssue } from './release-known-issues.mjs'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const IS_FULL = process.argv.includes('--full')
+const COLLECT_FAILURES = process.argv.includes('--collect-failures')
 const SOURCE_ONLY = process.argv.includes('--source')
 const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
 const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
@@ -45,6 +46,16 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 
 const CORE_SUITES = [
+  {
+    name: 'bai First-user Sign-in, Model Entry and Browser Isolation',
+    script: 'scripts/verify-bai-onboarding.mjs',
+    args: [],
+  },
+  {
+    name: 'Official Account OAuth, bai Recommendation and Skin Caption Geometry',
+    script: 'scripts/verify-account-skin-chrome.mjs',
+    args: [],
+  },
   {
     name: 'Native Plugin Pages, Preserved Skins and Window Palette',
     script: 'scripts/verify-native-plugin-pages.mjs',
@@ -101,6 +112,11 @@ const CORE_SUITES = [
     args: [],
   },
   {
+    name: 'Native Settings Menu Pointer Input, Link Choices, Shortcuts and Sidebar Cards',
+    script: 'scripts/verify-native-settings-interactions.mjs',
+    args: [],
+  },
+  {
     name: 'Long Conversation Scroll & Turn Navigation',
     script: 'scripts/verify-conversation-scroll.mjs',
     args: [],
@@ -119,6 +135,14 @@ const CORE_SUITES = [
     name: 'Runtime Provider & IPC Services',
     script: 'scripts/verify-runtime-provider.mjs',
     args: [],
+  },
+  {
+    name: 'Real SDK Settings, Third-party Models, Profile Reload and Restart',
+    script: 'scripts/verify-runtime-settings-reload.mjs',
+    args: process.env.DSH_DESKTOP_E2E_EXECUTABLE ? [
+      `--resources=${resolve(dirname(process.env.DSH_DESKTOP_E2E_EXECUTABLE), 'resources')}`,
+      `--executable=${resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE)}`,
+    ] : [],
   },
   ...(process.platform === 'win32' ? [{
     name: 'Windows DPI Persistence, Maximize and Explicit Resize',
@@ -148,7 +172,19 @@ const CORE_SUITES = [
       'test/repair-agent-integration.test.mjs',
       'test/session-preservation.test.mjs',
       'test/legacy-session-backend.test.mjs',
+      'test/runtime-large-legacy-history.test.mjs',
+      'test/runtime-large-v0-history.test.mjs',
+      'test/profile-settings-preservation.test.mjs',
+      'test/plugin-staging.test.mjs',
+      'test/user-plugin-archive.test.mjs',
+      'test/packaged-update-config.test.mjs',
+      'test/package-win-stages.test.mjs',
+      'test/runtime-pipe.test.mjs',
+      'test/runtime-pipe-framing.test.mjs',
+      'test/runtime-history-transport.test.mjs',
       'test/pet-client-polling.test.mjs',
+      'test/pet-installed-canvas.test.mjs',
+      'test/model-capabilities-installed.test.mjs',
       'test/dock-settings-fixture.test.mjs',
       'test/dock-settings-close.test.mjs',
       'test/dock-settings-save.test.mjs',
@@ -176,6 +212,11 @@ const CORE_SUITES = [
 ]
 
 const PACKAGED_SUITES = [
+  {
+    name: 'Real Plugin-owned Configuration, Detail Click and Persisted Options',
+    script: 'scripts/verify-plugin-options.mjs',
+    args: [],
+  },
   ...(process.platform === 'win32' ? [{
     name: 'Compiled NSIS Upgrade & Rollback Lifecycle',
     script: 'scripts/verify-installer-lifecycle.mjs',
@@ -262,7 +303,7 @@ function runSuite(suite) {
     console.log(`============================================================`)
 
     const nodeArgs = suite.script === '--test'
-      ? ['--test', ...suite.args]
+      ? ['--test', '--test-concurrency=2', ...suite.args]
       : [suite.script, ...suite.args]
 
     const child = spawn(process.execPath, nodeArgs, {
@@ -271,6 +312,8 @@ function runSuite(suite) {
         ...process.env,
         // Ensure child processes inherit packaged executable if defined
         DSH_DESKTOP_E2E_EXECUTABLE: process.env.DSH_DESKTOP_E2E_EXECUTABLE,
+        ...(suite.script === 'scripts/verify-settings-readiness.mjs' && process.env.DSH_SETTINGS_READINESS_TRACE === '1'
+          ? { DEBUG: 'pw:browser,pw:protocol' } : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -282,7 +325,7 @@ function runSuite(suite) {
     }
 
     child.on('error', (err) => reject(err))
-    child.on('exit', (code, signal) => {
+    child.on('close', (code, signal) => {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       if (code === 0) {
         console.log(`[PASS] ${suite.name} (${elapsed}s)`)
@@ -354,7 +397,7 @@ function releaseArtifactEvidence() {
   }
 }
 
-function writeReceipt({ startedAt, finishedAt, status, suites, failure }) {
+function writeReceipt({ startedAt, finishedAt, status, suites, failure, terminal = true }) {
   if (!RECEIPT_PATH) return
   const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
     ? relative(APP_DIR, resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE)).replaceAll('\\', '/')
@@ -366,13 +409,17 @@ function writeReceipt({ startedAt, finishedAt, status, suites, failure }) {
     mode: IS_FULL ? 'full-release' : (SOURCE_ONLY ? 'source-core' : 'core'),
     sourceCommit: repositoryCommit(),
     startedAt: new Date(startedAt).toISOString(),
-    finishedAt: new Date(finishedAt).toISOString(),
+    updatedAt: new Date(finishedAt).toISOString(),
+    ...(terminal ? { finishedAt: new Date(finishedAt).toISOString() } : {}),
     durationSeconds: Number(((finishedAt - startedAt) / 1000).toFixed(1)),
     status,
     acceptedIssues: [...acceptedIssues],
     executable,
     ...releaseArtifactEvidence(),
     suites,
+    totalSuites: IS_FULL ? CORE_SUITES.length + PACKAGED_SUITES.length : CORE_SUITES.length,
+    completedSuites: suites.length,
+    completed: terminal && suites.length === (IS_FULL ? CORE_SUITES.length + PACKAGED_SUITES.length : CORE_SUITES.length),
     ...(failure ? { failure } : {}),
   }
   mkdirSync(dirname(RECEIPT_PATH), { recursive: true })
@@ -395,33 +442,64 @@ async function main() {
   console.log(`Starting Desktop Regression E2E Gate (${IS_FULL ? 'FULL RELEASE' : 'CORE PR'} mode, ${suitesToRun.length} suites)...`)
   const totalStart = Date.now()
   const suiteResults = []
+  const failures = []
 
   for (let i = 0; i < suitesToRun.length; i++) {
     const suite = suitesToRun[i]
+    const suiteStartedAt = Date.now()
     console.log(`\nProgress: [${i + 1}/${suitesToRun.length}] ${suite.name}`)
     try {
       suiteResults.push(await runSuite(suite))
+      writeReceipt({
+        startedAt: totalStart,
+        finishedAt: Date.now(),
+        status: failures.length ? 'failed' : 'running',
+        suites: suiteResults,
+        terminal: false,
+        ...(failures.length ? { failure: failures.join('\n') } : {}),
+      })
       if (i + 1 < suitesToRun.length) {
         await new Promise((r) => setTimeout(r, 1200))
       }
     } catch (err) {
-      if (err?.suiteResult) suiteResults.push(err.suiteResult)
+      suiteResults.push(err?.suiteResult ?? {
+        name: suite.name,
+        script: suite.script,
+        args: suite.args,
+        status: 'failed',
+        durationSeconds: Number(((Date.now() - suiteStartedAt) / 1000).toFixed(1)),
+        reason: err instanceof Error ? err.message : String(err),
+      })
+      failures.push(err instanceof Error ? err.message : String(err))
       writeReceipt({
         startedAt: totalStart,
         finishedAt: Date.now(),
         status: 'failed',
         suites: suiteResults,
-        failure: err instanceof Error ? err.message : String(err),
+        failure: failures.join('\n'),
+        terminal: !COLLECT_FAILURES,
       })
       console.error(`\n------------------------------------------------------------`)
       console.error(` [REGRESSION E2E FAILURE] Regression gate blocked release/merge!`)
       console.error(` ${err.message}`)
       console.error(`------------------------------------------------------------`)
-      process.exit(1)
+      if (!COLLECT_FAILURES) process.exit(1)
     }
   }
 
   const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1)
+  if (failures.length) {
+    writeReceipt({
+      startedAt: totalStart,
+      finishedAt: Date.now(),
+      status: 'failed',
+      suites: suiteResults,
+      failure: failures.join('\n'),
+    })
+    console.error(` [FAILED] Unified Desktop Regression Gate (${failures.length}/${suitesToRun.length} suites failed, ${totalElapsed}s)`)
+    process.exitCode = 1
+    return
+  }
   writeReceipt({
     startedAt: totalStart,
     finishedAt: Date.now(),

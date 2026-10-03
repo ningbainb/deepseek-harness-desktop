@@ -31,6 +31,7 @@ const profileDir = join(dshHome, 'profiles', 'desktop')
 const runtimeFetchGate = join(temporary, 'runtime-fetch-gate.txt')
 const runtimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
 const messageCount = 20
+const fixtureTitle = 'G02.5 turn 01'
 const nativeTurns = process.argv.includes('--native-turns')
 let activeApp
 let activeDiagnostics
@@ -173,9 +174,11 @@ async function rpc(page, method, payload) {
 
 async function seedConversationLog(sessionId) {
   const logs = await findSessionLogs(join(dshHome, 'sessions'))
-  assert.equal(logs.length, 1, `expected one session log, found ${JSON.stringify(logs)}`)
-  const logPath = logs[0]
-  const original = await readSessionLogText(logPath)
+  const histories = await Promise.all(logs.map(async path => ({ path, text: await readSessionLogText(path) })))
+  const matchingLogs = histories.filter(history => JSON.parse(history.text.split('\n', 1)[0]).id === sessionId)
+  assert.equal(matchingLogs.length, 1, `expected exactly one fixture session ${sessionId}, found ${JSON.stringify(logs)}`)
+  const logPath = matchingLogs[0].path
+  const original = matchingLogs[0].text
   const lines = original.trimEnd().split(/\r?\n/u)
   assert.ok(lines.length >= 1, 'session log is missing its header')
   const header = JSON.parse(lines[0])
@@ -228,6 +231,9 @@ async function seedConversationLog(sessionId) {
   const appended = session.snapshotEvents().slice(existingEvents.length)
   assert.equal(appended.length, nativeTurns ? messageCount * 3 + 4 : messageCount + 3)
   await appendSessionLogText(logPath, `${appended.map(event => JSON.stringify(event)).join('\n')}\n`)
+  for (const history of histories.filter(history => history.path !== logPath)) {
+    assert.equal(await readSessionLogText(history.path), history.text, 'seeding the fixture must not alter another session')
+  }
   return { logPath, asOfSeq: session.snapshotEvents().at(-1).seq }
 }
 
@@ -254,6 +260,28 @@ async function waitForSeededSummary(page, sessionId, asOfSeq) {
   assert.fail(`restored checkpoint did not reach log cut ${asOfSeq}: ${JSON.stringify(summary)}`)
 }
 
+async function waitForRenamedCheckpoint(page, sessionId) {
+  const summary = (await rpc(page, 'session.list', {})).items.find(item => item.sessionId === sessionId)
+  assert.equal(summary?.projections?.values?.title, fixtureTitle, 'the official rename must be visible in the live projection')
+  const expectedSeq = summary.projections.asOfSeq
+  const checkpointPath = join(dshHome, 'storages', 'session_projcache', 'sessions', `${sessionId}.json`)
+  const deadline = Date.now() + 10_000
+  let checkpoint
+  while (Date.now() < deadline) {
+    checkpoint = await readFile(checkpointPath, 'utf8').then(JSON.parse).catch(error => {
+      if (error.code === 'ENOENT') return undefined
+      throw error
+    })
+    const title = checkpoint?.record?.rows?.title
+    if (title?.seq >= expectedSeq && title.val === fixtureTitle) {
+      console.log('official renamed checkpoint durable', JSON.stringify({ sessionId, asOfSeq: title.seq }))
+      return
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 100))
+  }
+  assert.fail(`official renamed checkpoint did not become durable at cut ${expectedSeq}: ${JSON.stringify(checkpoint)}`)
+}
+
 async function openSeededSession(page, sessionId) {
   const turns = page.locator('[data-chat-flow-kind="user"]')
   if (await turns.count() === messageCount) return
@@ -265,20 +293,22 @@ async function openSeededSession(page, sessionId) {
 
   const group = page.getByRole('treeitem').filter({ hasText: basename(workspacePath) }).first()
   await group.waitFor({ state: 'visible', timeout: 30_000 })
-  if (await group.getAttribute('aria-expanded') !== 'true') await group.click({ force: true })
+  if (await group.getAttribute('aria-expanded') !== 'true') await group.dispatchEvent('click')
   await page.waitForTimeout(500)
+  assert.equal(await group.getAttribute('aria-expanded'), 'true', 'the fixture workspace must be expanded')
 
-  const expectedTitle = typeof summary.displayTitle === 'string' ? summary.displayTitle : summary.title
-  let sessionRow = typeof expectedTitle === 'string' && expectedTitle !== ''
-    ? page.getByRole('treeitem').filter({ hasText: expectedTitle }).first()
-    : undefined
-  if (sessionRow === undefined || !await sessionRow.isVisible().catch(() => false)) {
-    // A title-less restored session falls back to the Workspace label. Select
-    // the non-current session row, not the selected provisional New Session.
-    sessionRow = page.locator('[role="treeitem"][aria-selected="false"]')
-      .filter({ hasText: basename(workspacePath) })
-      .first()
-    assert.equal(await sessionRow.isVisible().catch(() => false), true, `restored session row is unavailable: ${JSON.stringify(listed)}`)
+  const sessionRow = page.getByRole('treeitem').filter({ hasText: fixtureTitle }).last()
+  try {
+    await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
+  } catch (error) {
+    console.error('fixture session row diagnostics', JSON.stringify({
+      summary: await rpc(page, 'session.list', {}),
+      rows: await page.getByRole('treeitem').evaluateAll(rows => rows.map(row => ({
+        text: row.textContent, selected: row.getAttribute('aria-selected'), expanded: row.getAttribute('aria-expanded'),
+      }))),
+    }))
+    await page.screenshot({ path: join(temporary, 'restored-session-row-failure.png') })
+    throw error
   }
   await sessionRow.click({ force: true })
   try {
@@ -435,6 +465,7 @@ try {
   const created = await rpc(first.page, 'session.create', { workspaceId })
   assert.equal(typeof created?.sessionId, 'string', JSON.stringify(created))
   const sessionId = created.sessionId
+  await rpc(first.page, 'session.rename', { sessionId, title: fixtureTitle })
   await first.page.locator('[data-pane="conversation"]').waitFor({ state: 'visible' })
   assert.equal(await first.page.locator('[data-chat-flow-kind="user"]').count(), 0)
   await first.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
@@ -446,13 +477,16 @@ try {
   }
   assert.deepEqual(first.rendererErrors, [])
   await waitForSessionLog(join(dshHome, 'sessions'), sessionId)
+  await waitForRenamedCheckpoint(first.page, sessionId)
   await activeApp.close()
   activeApp = undefined
 
   const { logPath, asOfSeq } = await seedConversationLog(sessionId)
+  const originalSeededLog = await readSessionLogText(logPath)
 
   const second = await launch()
   activeApp = second.instance
+  assert.equal(await readSessionLogText(logPath), originalSeededLog, 'startup checkpoint recovery must not rewrite the original conversation log')
   await openSeededSession(second.page, sessionId)
   const seededSummary = await waitForSeededSummary(second.page, sessionId, asOfSeq)
   assert.equal(seededSummary?.blank, false, 'the restored history must not be classified as a reusable blank draft')

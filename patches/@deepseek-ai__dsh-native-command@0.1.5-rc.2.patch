@@ -1,0 +1,20 @@
+diff --git a/lib/index.js b/lib/index.js
+index 6bc8a267ca378a75ba46d7bf5f52c774c9e4e934..45993b120d31e75da672060c3609cf73d5edf618 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -225,9 +225,13 @@ async function revealNativePath(path, signal, internals = {}) {
+ 			windowsPath = translated.stdout.replace(/[\r\n]+$/, "");
+ 			if (windowsPath === "") throw new Error("wslpath returned no Windows path");
+ 		}
+-		const target = pathToFileURL(windowsPath, { windows: true }).href.replaceAll(",", "%2C");
++		const cleanPath = windowsPath.replaceAll("/", "\\");
+ 		try {
+-			await run("explorer.exe", ["/select,", target], signal);
++			if (cleanPath.includes(",")) {
++				await run("explorer.exe", [dirname(cleanPath)], signal);
++			} else {
++				await run("explorer.exe", [`/select,"${cleanPath}"`], signal);
++			}
+ 		} catch (error) {
+ 			signal.throwIfAborted();
+ 			if (!(error instanceof Error) || !("code" in error) || error.code !== 1) throw error;

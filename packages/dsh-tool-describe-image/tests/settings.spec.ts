@@ -5,10 +5,8 @@ import type { ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { SettingsProvider } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 
@@ -16,26 +14,25 @@ import * as tool from '../src/index.ts'
 import { chatReply, FakeWebServer, jsonReply, PNG_BYTES, responsesReply, startMockServer } from './mock-server.ts'
 import type { MockServer, RecordedRequest } from './mock-server.ts'
 
-/** A provider implementing only the three primitives, backed by an in-memory document. */
-class MemorySettings extends SettingsProvider {
+type FieldRef = { get(): unknown; set(value: unknown): void }
+
+/** Emulate Profile form commits while exercising the plugin's real volatile references. */
+class MemorySettings extends Service {
   doc: Record<string, unknown>
+  private readonly fields: Record<string, FieldRef>
 
-  constructor(ctx: ConstructorParameters<typeof SettingsProvider>[0], options?: { doc?: Record<string, unknown> }) {
-    super(ctx)
-    this.doc = structuredClone(options?.doc ?? {})
+  constructor(ctx: Context, doc: Record<string, unknown>, fields: Record<string, FieldRef>) {
+    super(ctx, 'settings')
+    this.doc = structuredClone(doc)
+    this.fields = fields
   }
 
-  get writable(): boolean {
-    return true
-  }
-
-  protected load(): Promise<Record<string, unknown>> {
-    return Promise.resolve(structuredClone(this.doc))
-  }
-
-  protected persist(ns: SettingsNamespace, section: Record<string, unknown>): Promise<void> {
-    this.doc[ns] = structuredClone(section)
-    return Promise.resolve()
+  async update(ns: string, patch: Record<string, unknown>): Promise<void> {
+    const current = Object.fromEntries(Object.entries(this.fields).map(([key, field]) => [key, field.get()]))
+    tool.resolveConfig({ ...current, ...patch })
+    const next = { ...(this.doc[ns] as Record<string, unknown> ?? {}), ...patch }
+    this.doc[ns] = structuredClone(next)
+    for (const [key, value] of Object.entries(patch)) this.fields[key]?.set(value)
   }
 }
 
@@ -49,11 +46,28 @@ async function boot(
   const server = await startMockServer(handler)
   cleanup.push(server.close)
   const ctx = new Context()
-  await ctx.plugin(MemorySettings, { doc })
+  const entry = { baseURL: server.url, model: 'entry-model', apiKey: 'sk-entry' }
+  const saved = doc['describe-image'] as Record<string, unknown> | undefined
+  const initial = {
+    apiStyle: tool.DEFAULT_API_STYLE,
+    interceptImageSend: true,
+    defaultPrompt: tool.DEFAULT_PROMPT,
+    apiKeyEnv: tool.DEFAULT_API_KEY_ENV,
+    maxBytes: tool.DEFAULT_MAX_BYTES,
+    maxOutputTokens: tool.DEFAULT_MAX_OUTPUT_TOKENS,
+    timeoutMs: tool.DEFAULT_TIMEOUT_MS,
+    ...entry,
+    ...saved,
+  }
+  const fields = Object.fromEntries(Object.entries(initial).map(([key, value]) => {
+    let current: unknown = value
+    return [key, { get: () => current, set: (next: unknown) => { current = next } }]
+  })) as Record<string, FieldRef>
+  new MemorySettings(ctx, doc, fields)
   await ctx.plugin(FakeWebServer)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(tool, { baseURL: server.url, model: 'entry-model', apiKey: 'sk-entry' })
+  tool.apply(ctx, fields as unknown as tool.Config)
   return { ctx, server }
 }
 
@@ -78,20 +92,20 @@ afterEach(async () => {
   await Promise.all(cleanup.splice(0).map(close => close()))
 })
 
-describe('describe-image settings section', () => {
-  it('persists the image interception switch through the official settings service', async () => {
+describe('describe-image profile form', () => {
+  it('persists the image interception switch through a profile form commit', async () => {
     const { ctx } = await boot()
     await ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { interceptImageSend: false })
-    expect((ctx.settings as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: false })
+    expect((ctx.settings as unknown as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: false })
     await ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { interceptImageSend: true })
-    expect((ctx.settings as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: true })
+    expect((ctx.settings as unknown as MemorySettings).doc['describe-image']).toMatchObject({ interceptImageSend: true })
   })
   it('overlays the composition entry from the stored section', async () => {
     const { ctx, server } = await boot({ 'describe-image': { model: 'settings-model', maxOutputTokens: 7 } })
     const path = await tempPng()
 
     const result = await callDescribe(ctx, path)
-    expect(result.isError).toBe(false)
+    expect(result.isError, JSON.stringify(result.content)).toBe(false)
     if (result.isError) throw new Error('expected describe_image success')
     expect(result.value).toMatchObject({ model: 'settings-model' })
     const body = server.request(0).body as { model?: unknown; max_tokens?: unknown }
@@ -117,7 +131,7 @@ describe('describe-image settings section', () => {
     await ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { apiStyle: 'responses' })
 
     const result = await callDescribe(ctx, path)
-    expect(result.isError).toBe(false)
+    expect(result.isError, JSON.stringify(result.content)).toBe(false)
     if (result.isError) throw new Error('expected describe_image success')
     expect(result.value).toMatchObject({ text: 'switched' })
     expect(server.request(0).path).toBe('/responses')
@@ -131,7 +145,7 @@ describe('describe-image settings section', () => {
     expect(server.request(0).authorization).toBe('Bearer sk-settings')
   })
 
-  it('rejects an incoherent section at write time', async () => {
+  it('rejects an incoherent profile edit before committing its live values', async () => {
     const { ctx } = await boot()
 
     await expect(ctx.settings.update(tool.DESCRIBE_IMAGE_SETTINGS_NAMESPACE, { baseURL: 'ftp://example.com' }))

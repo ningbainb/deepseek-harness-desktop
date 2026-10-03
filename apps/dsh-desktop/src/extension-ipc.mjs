@@ -1,4 +1,5 @@
-import { lstat, mkdir, readdir, rename, rm, statfs } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, rename, rm, statfs, writeFile } from 'node:fs/promises'
+import { parse, stringify } from 'yaml'
 import { basename, dirname, join } from 'node:path'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
@@ -8,7 +9,7 @@ import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mj
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 import { desktopDeepLink } from './distribution-identity.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
-import { assertDockSetting } from './dock-pages.mjs'
+import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
 
 export const EXTENSION_QUIESCE_TIMEOUT_MS = 15_000
@@ -645,13 +646,14 @@ export function registerExtensionIpc({
   }
 
   handleExtension('extensions:list', scan)
-  handleExtension('extensions:settings-select', async (_event, id) => {
+  handleExtension('extensions:settings-select', async (_event, id, plugin) => {
     assertDockSetting(id)
+    assertDockPlugin(id, plugin)
     const record = (outcome) => {
       if (id !== null) try { recordFeatureEvent({ feature: 'dock-setting', detail: id, outcome }) } catch {}
     }
     try {
-      const result = await selectDockSetting(id)
+      const result = await selectDockSetting(id, plugin)
       record('opened')
       return result
     } catch (error) { record('failed'); throw error }
@@ -829,6 +831,86 @@ export function registerExtensionIpc({
     const profileDir = join(dshHome, 'profiles', 'desktop')
     return createProfileResetPreview(profileDir, Date.now(), getProfileResetAvailableBytes)
   })
+  const preserveProfileConfiguration = async (backupDir, profileDir) => {
+    try {
+      const backupPatchPath = join(backupDir, 'cordis.patch.yml')
+      const profilePatchPath = join(profileDir, 'cordis.patch.yml')
+      let backupContent
+      try { backupContent = await readFile(backupPatchPath, 'utf8') } catch {}
+
+      if (backupContent) {
+        let backupDoc
+        try { backupDoc = parse(backupContent) } catch {}
+
+        if (Array.isArray(backupDoc)) {
+          let profileContent
+          try { profileContent = await readFile(profilePatchPath, 'utf8') } catch {}
+
+          if (profileContent) {
+            let profileDoc
+            try { profileDoc = parse(profileContent) } catch {}
+
+            if (Array.isArray(profileDoc)) {
+              const backupLlm = backupDoc.findLast(item => item && item.id === 'llm-pi-ai' && Object.hasOwn(item, 'config'))
+              if (backupLlm) {
+                let targetLlm = profileDoc.find(item => item && item.id === 'llm-pi-ai')
+                if (!targetLlm) {
+                  targetLlm = { id: 'llm-pi-ai' }
+                  profileDoc.push(targetLlm)
+                }
+                targetLlm.config = structuredClone(backupLlm.config)
+              }
+
+              const managedDesktopIds = new Set([
+                'directory-picker',
+                'directory-picker-desktop-host',
+                'directory-picker-desktop-client',
+                'web-startup',
+                'authorization',
+                'llm-pi-ai',
+                'llm-deepseek',
+              ])
+
+              for (const item of backupDoc) {
+                if (!item || !item.id || item.id === 'llm-pi-ai') continue
+                const existingItem = profileDoc.find(target => target && target.id === item.id)
+                if (existingItem) {
+                  if (item.config && typeof item.config === 'object') {
+                    existingItem.config = {
+                      ...(existingItem.config || {}),
+                      ...item.config,
+                    }
+                  }
+                } else if (!managedDesktopIds.has(item.id)) {
+                  profileDoc.push(item)
+                }
+              }
+
+              await writeFile(profilePatchPath, stringify(profileDoc), 'utf8')
+            }
+          }
+        }
+      }
+
+      const settingsStatePath = join(dshHome, 'community', 'migrations', 'dsh-0.1.7-settings.json')
+      try {
+        const stateContent = await readFile(settingsStatePath, 'utf8')
+        const state = JSON.parse(stateContent)
+        if (state && state.status === 'verified') {
+          state.status = 'pending'
+          await writeFile(settingsStatePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8')
+        }
+      } catch {}
+
+      const backupSkinState = join(backupDir, '.dsh-desktop-retired-skin.json')
+      const targetSkinState = join(profileDir, '.dsh-desktop-retired-skin.json')
+      try {
+        const skinStateData = await readFile(backupSkinState, 'utf8')
+        await writeFile(targetSkinState, skinStateData, 'utf8')
+      } catch {}
+    } catch {}
+  }
+
   handleExtension('extensions:profile-reset', (_event, request = {}) => enqueuePluginMutation(async () => {
     const requestedTimestamp = request?.timestamp
     if (requestedTimestamp !== undefined && (!Number.isSafeInteger(requestedTimestamp) || requestedTimestamp <= 0)) {
@@ -853,6 +935,7 @@ export function registerExtensionIpc({
       }
       if (moved) await assertRealProfileDirectory(backupDir)
       await ensureProfile()
+      if (moved) await preserveProfileConfiguration(backupDir, profileDir)
       await controller.start()
       archiveRecoveryResolved = (await completeBlockedPluginRecovery())?.resolved === true
     } catch (error) {

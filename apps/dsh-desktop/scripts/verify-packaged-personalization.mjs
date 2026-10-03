@@ -168,6 +168,25 @@ try {
   const promptEnabled = secondSettings.prompt.locator('input[type="checkbox"]').first()
   const promptContent = secondSettings.prompt.locator('textarea[placeholder="写下你希望模型长期遵循的工作偏好…"]')
   const memoryContent = secondSettings.memory.getByRole('listitem').filter({ hasText: 'Packaged memory survives restart.' })
+  const restoredPrompt = secondSettings.prompt.getByRole('listitem').filter({ hasText: 'Packaged Prompt' })
+  const restoreDeadline = Date.now() + 15_000
+  const restoreTimeout = () => {
+    const timeout = restoreDeadline - Date.now()
+    if (timeout <= 0) throw new Error('saved prompt restoration exceeded the 15-second fixture budget')
+    return timeout
+  }
+  try {
+    await restoredPrompt.waitFor({ state: 'visible', timeout: restoreTimeout() })
+    await restoredPrompt.click({ timeout: restoreTimeout() })
+    await promptContent.waitFor({ state: 'visible', timeout: restoreTimeout() })
+  } catch (error) {
+    console.error('personalization restore diagnostics', JSON.stringify({
+      syntheticPromptRowCount: await restoredPrompt.count(),
+      editorCount: await promptContent.count(),
+      syntheticContentMatches: await promptContent.inputValue().then(value => value === 'Prefer concise Chinese explanations.').catch(() => false),
+    }))
+    throw error
+  }
   assert.equal(await secondSettings.prompt.getByRole('listitem').filter({ hasText: 'Packaged Prompt' }).count(), 1)
   assert.equal(await promptEnabled.isChecked(), true)
   assert.equal(await promptContent.inputValue(), 'Prefer concise Chinese explanations.')
@@ -210,5 +229,6 @@ try {
   console.log(JSON.stringify({ prompt: promptPass, memory: memoryPass, restart: restartPass, clear: clearPass, corrupt: { ...corruptPass, expectedUnavailableResponses: expectedCorruptErrors.length }, pageErrorCount: first.errors.length + second.errors.length + unexpectedThirdErrors.length }, null, 2))
 } finally {
   await app?.close()
-  await rm(temporary, { recursive: true, force: true })
+  if (process.env.DSH_DESKTOP_KEEP_E2E === '1') console.error(`preserved E2E state: ${temporary}`)
+  else await rm(temporary, { recursive: true, force: true })
 }

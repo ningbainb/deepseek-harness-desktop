@@ -5,6 +5,9 @@ import { readFile } from 'node:fs/promises'
 export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId, workspacePath, logPath, openSeededSession }) {
   const initialLog = await readFile(logPath, 'utf8')
   const body = page.locator('[data-aionui-native-panel="browser"]')
+  const floatingBrowser = page.locator('[data-sidebar-right-float-host], [data-sidebar-right-session] [data-dockkit-float]:not([hidden], [hidden] *)').filter({ has: body })
+  const unrelatedIds = (await rpc(page, 'session.list', {})).items
+    .filter(item => item.cwd !== workspacePath).map(item => item.id ?? item.sessionId)
   const routePattern = 'https://native-session-browser.test/**'
   await page.route(routePattern, route => route.fulfill({ contentType: 'text/html', body: '<p>Isolated session browser</p>' }))
   const openBrowser = async () => {
@@ -34,21 +37,22 @@ export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId
     await page.mouse.down()
     await page.mouse.move(400, 250, { steps: 18 })
     await page.mouse.up()
-    await page.locator('[data-sidebar-right-float-host]').waitFor({ state: 'visible' })
+    await floatingBrowser.waitFor({ state: 'visible' })
     assert.equal(await body.locator('input').inputValue(), 'session A pending address')
 
     await page.getByRole('button', { name: '新建会话', exact: true }).filter({ hasText: '新会话' }).click()
     await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
     // The native New Session action may reuse the existing untouched draft.
     // Verify its public identity rather than require an unnecessary create RPC.
-    const drafts = (await rpc(page, 'session.list', {})).items.filter(item => item.blank === true && (item.id ?? item.sessionId) !== sessionId)
+    const drafts = (await rpc(page, 'session.list', {})).items.filter(item => item.blank === true
+      && item.cwd === workspacePath && (item.id ?? item.sessionId) !== sessionId)
     assert.equal(drafts.length, 1, 'fixture has exactly one independent draft seat')
     const otherId = drafts[0].id ?? drafts[0].sessionId
     assert.equal(drafts[0].cwd, workspacePath)
     assert.equal(typeof otherId, 'string')
     assert.notEqual(otherId, sessionId)
     await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
-    await page.locator('[data-sidebar-right-float-host]').waitFor({ state: 'detached' })
+    await floatingBrowser.waitFor({ state: 'detached' })
     assert.equal(await body.count(), 0, 'the previous session floating browser must not leak into the new seat')
     await openBrowser()
     assert.equal(await body.locator('input').inputValue(), '', 'new session gets independent browser state')
@@ -56,15 +60,19 @@ export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId
     await body.locator('input').fill('session B pending address')
 
     await openSeededSession(page, sessionId)
-    await page.locator('[data-sidebar-right-float-host]').waitFor({ state: 'visible' })
+    await floatingBrowser.waitFor({ state: 'visible' })
     assert.equal(await body.locator('input').inputValue(), 'session A pending address')
     assert.equal(await body.locator('iframe').getAttribute('src'), 'https://native-session-browser.test/a')
     assert.equal(await body.locator('[data-dsh-browser-close]').count(), 0)
-    await page.locator('[data-sidebar-right-float-host]').getByRole('button', { name: '关闭', exact: true }).click()
+    await floatingBrowser.getByRole('button', { name: '关闭', exact: true }).click()
     await body.waitFor({ state: 'detached' })
     await page.getByRole('button', { name: '新建会话', exact: true }).filter({ hasText: '新会话' }).click()
     await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
-    const returningDrafts = (await rpc(page, 'session.list', {})).items.filter(item => item.blank === true)
+    const returningList = (await rpc(page, 'session.list', {})).items
+    const returningDrafts = returningList.filter(item => item.blank === true && item.cwd === workspacePath)
+    for (const unrelatedId of unrelatedIds) {
+      assert.ok(returningList.some(item => (item.id ?? item.sessionId) === unrelatedId), 'native tab actions must preserve sessions in other workspaces')
+    }
     assert.deepEqual(returningDrafts.map(item => item.id ?? item.sessionId), [otherId], 'native draft navigation returns to the same B seat')
     await body.waitFor({ state: 'visible' })
     assert.equal(await body.locator('input').inputValue(), 'session B pending address', 'closing A must not close or reset B')

@@ -6,6 +6,7 @@ import {
   type RelayConnection, type RelayConnectResponse,
   RELAY_KEYS_URL,
   RELAY_REMOVE_PATH,
+  RELAY_REFRESH_PATH,
   RELAY_SIGN_UP_URL,
   RELAY_STATUS_PATH,
   RELAY_WALLET_URL,
@@ -14,44 +15,10 @@ import {
 } from '../relay-protocol.ts'
 import type { RelayLocaleKey } from './locales.ts'
 import { openExternalUrl } from './open-external.ts'
+import { announceRelayModels, postRelay as postJson, RelayClientError } from './relay-client.ts'
 import css from './relay-onboarding.module.css'
 
 export type RelayOnboardingCardProps = PropsLocale<'relay-onboarding'>
-
-class RelayClientError extends Error {
-  constructor(readonly code: string) {
-    super(code)
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-async function postJson<T extends RelayResponse>(path: string, body: unknown): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify(body),
-    })
-  } catch {
-    throw new RelayClientError('unreachable')
-  }
-  let value: unknown
-  try {
-    value = await response.json()
-  } catch {
-    throw new RelayClientError('malformed-response')
-  }
-  if (!isRecord(value) || value.ok !== true || !response.ok) {
-    const code = isRecord(value) && typeof value.code === 'string' ? value.code : response.status === 403 ? 'forbidden' : 'request-failed'
-    throw new RelayClientError(code)
-  }
-  return value as T
-}
 
 function countText(template: string, count: number): string {
   return template.replace('{count}', String(count))
@@ -72,6 +39,7 @@ function errorText(code: string, t: (key: RelayLocaleKey) => string): string {
     case 'credential-save-failed':
     case 'credential-delete-failed': return t('errorCredential')
     case 'settings-save-failed': return t('errorSettings')
+    case 'default-save-failed': return t('errorSettings')
     case 'busy': return t('errorBusy')
     case 'forbidden': return t('errorForbidden')
     default: return t('errorGeneric')
@@ -130,7 +98,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
         const result = await postJson<RelayConnectResponse>(RELAY_CONNECT_STATUS_PATH, {})
         if (disposed) return
         setConnection(result.connection)
-        if (result.connection.phase === 'connected') { setApiKey(''); setNotice(t('connected')); await loadStatus() }
+        if (result.connection.phase === 'connected') { setApiKey(''); setNotice(t('connected')); announceRelayModels(); await loadStatus() }
         if (['pending', 'connecting', 'starting'].includes(result.connection.phase)) timer = setTimeout(() => { void poll() }, 1000)
       } catch { if (!disposed) timer = setTimeout(() => { void poll() }, 2000) }
     }
@@ -138,12 +106,16 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
     return () => { disposed = true; clearTimeout(timer) }
   }, [connecting, loadStatus, t])
 
+  const openBrowser = (href: string) => {
+    if (!openExternalUrl(href, () => setError(t('errorOpenBrowser')))) setError(t('errorOpenBrowser'))
+  }
+
   const connect = async () => {
     setConnection({ phase: 'starting' }); setError(undefined); setNotice(undefined)
     try {
       const result = await postJson<RelayConnectResponse>(RELAY_CONNECT_PATH, {})
       setConnection(result.connection)
-      if (result.connection.url) openExternalUrl(result.connection.url)
+      if (result.connection.url) openBrowser(result.connection.url)
     } catch { setConnection({ phase: 'failed' }); setError(t('errorConnect')) }
   }
   const cancel = async () => {
@@ -165,6 +137,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
       if (!('modelCount' in result)) throw new RelayClientError('malformed-response')
       setApiKey('')
       setNotice(t('saved'))
+      announceRelayModels()
       await loadStatus()
     }).catch(reason => {
       setError(errorText(reason instanceof RelayClientError ? reason.code : 'request-failed', t))
@@ -201,11 +174,19 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
       </header>
       <div id="dsh-relay-content" className={css.body} hidden={!expanded}>
       <p className={css.notice}>{t('notice')}</p>
+      <p className={css.muted}>{t('autoRefreshNotice')}</p>
 
       <div className={css.actions}>
         <button type="button" className={css.primary} disabled={!canWrite || connecting || saving || clearing} onClick={() => { void connect() }}>{status?.configured ? t('reconnect') : t('connect')}</button>
+        {status?.configured && <button type="button" className={css.secondary} disabled={!canWrite || connecting || saving || clearing} onClick={() => {
+          setSaving(true)
+          setError(undefined)
+          void postJson(RELAY_REFRESH_PATH, {}).then(async () => { announceRelayModels(); setNotice(t('saved')); await loadStatus() })
+            .catch(reason => setError(errorText(reason instanceof RelayClientError ? reason.code : 'request-failed', t)))
+            .finally(() => setSaving(false))
+        }}>{saving ? t('refreshingModels') : t('refreshModels')}</button>}
         {connection.phase === 'pending' && <>
-          <button type="button" className={css.secondary} onClick={() => { if (connection.url) openExternalUrl(connection.url) }}>{t('continueBrowser')}</button>
+          <button type="button" className={css.secondary} onClick={() => { if (connection.url) openBrowser(connection.url) }}>{t('continueBrowser')}</button>
           <button type="button" className={css.secondary} onClick={() => { void cancel() }}>{t('cancelConnect')}</button>
         </>}
       </div>
@@ -227,7 +208,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
             rel="noreferrer"
             onClick={(event) => {
               event.preventDefault()
-              openExternalUrl(RELAY_SIGN_UP_URL)
+              openBrowser(RELAY_SIGN_UP_URL)
             }}
           >
             {t('openRegister')}
@@ -238,7 +219,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
             rel="noreferrer"
             onClick={(event) => {
               event.preventDefault()
-              openExternalUrl(RELAY_WALLET_URL)
+              openBrowser(RELAY_WALLET_URL)
             }}
           >
             {t('openWallet')}
@@ -249,7 +230,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
             rel="noreferrer"
             onClick={(event) => {
               event.preventDefault()
-              openExternalUrl(RELAY_KEYS_URL)
+              openBrowser(RELAY_KEYS_URL)
             }}
           >
             {t('openKeys')}
@@ -288,6 +269,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
         </p>
       )}
       {status?.writable === false && <p className={css.muted}>{t('readonly')}</p>}
+      {status?.sync?.phase === 'failed' && <p className={css.error} role="alert">{errorText(status.sync.error ?? 'request-failed', t)}</p>}
       {notice !== undefined && <p className={css.success} role="status">{notice}</p>}
       {error !== undefined && <p className={css.error} role="alert">{error}</p>}
       </div>

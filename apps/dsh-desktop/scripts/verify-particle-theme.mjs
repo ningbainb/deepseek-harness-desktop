@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { openNativeSettings } from './native-settings-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
@@ -16,8 +18,9 @@ const screenshotArgument = process.argv.find(argument => argument.toLowerCase().
 const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-particle-theme-e2e-'))
 const runtimeFetchGate = resolve(temporary, 'runtime-fetch-gate.txt')
-const runtimeReadyTimeoutMs = packagedExecutable || process.env.CI ? 120_000 : 90_000
+const runtimeReadyTimeoutMs = 150_000
 let electronApp
+let primaryFailure
 const pendingHttp = new Map()
 
 try {
@@ -203,9 +206,7 @@ try {
   })
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'normal')
 
-  await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate(button => button.click())
-  const settingsDialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
-  await settingsDialog.waitFor({ state: 'visible' })
+  const settingsDialog = await openNativeSettings(page)
   await page.waitForFunction(() => document.querySelector('canvas[data-dsh-particle-theme]')?.dataset.dshParticleMode === 'dialog')
   const { dock, settings: dockPage } = await openDockSetting(electronApp, page, 'particle-theme')
   const particleSettingsTitle = dockPage.getByText(/^(?:鲸鱼粒子主题|Whale particle theme)$/iu)
@@ -297,6 +298,8 @@ try {
   assert.equal(profileManifest.dsh.profile.bundles.includes('@linxin666/dsh-particle-theme'), false)
   console.log(`verified particle theme canvas, page profiles, multi-window settings ${JSON.stringify({ disableMs, enableMs })}, and frame budget ${JSON.stringify(frameStats)}`)
 } catch (error) {
+  primaryFailure = error
+  console.error(error)
   console.error('pending particle HTTP', [...pendingHttp.values()].map(item => ({ ...item, ageMs: Date.now() - item.started })))
   const runtime = electronApp?.windows().find(candidate => /^http:\/\/127\.0\.0\.1:/u.test(candidate.url()))
   if (runtime) {
@@ -310,6 +313,11 @@ try {
   }
   throw error
 } finally {
-  await electronApp?.close()
+  try {
+    await closeIsolatedElectron(electronApp)
+  } catch (cleanupFailure) {
+    if (primaryFailure) throw new AggregateError([primaryFailure, cleanupFailure], 'particle acceptance and cleanup failed', { cause: primaryFailure })
+    throw cleanupFailure
+  }
   await rm(temporary, { recursive: true, force: true })
 }

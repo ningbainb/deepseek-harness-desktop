@@ -271,13 +271,10 @@ export function convertExternalEventsToDshEvents(events, importMeta = {}) {
         step,
         message: {
           id: messageId(importId, sourceSessionId, event, index, 'tool-result'),
-          role: 'user',
-          content: [{
-            type: 'tool-result',
-            toolCallId: stableCallId,
-            content: [{ type: 'text', text: resultText }],
-            ...(isError ? { isError: true } : {}),
-          }],
+          role: 'tool',
+          toolCallId: stableCallId,
+          content: [{ type: 'text', text: resultText }],
+          ...(isError ? { isError: true } : {}),
           source: { kind: 'tool', callId: stableCallId },
         },
         ...(isError ? { error: { name: 'ToolError', code: 'TOOL_EXECUTION_ERROR' } } : {}),

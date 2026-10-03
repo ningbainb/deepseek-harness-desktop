@@ -7,6 +7,7 @@ import { applyWindowIcon } from './app-icon.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
 import { getWindowChromeTheme, installWindowChrome, setWindowChromeTheme, windowChromeBrowserOptions } from './window-chrome.mjs'
 import { installWindowMotion, publishWindowMotion } from './window-motion.mjs'
+import { normalizeDockTab } from './dock-pages.mjs'
 
 export const SECONDARY_WINDOW_PARTITION = 'dsh-desktop-secondary'
 
@@ -173,6 +174,7 @@ export function createDesktopWindowFactory({
   WebContentsView,
   dialog,
   getRuntimeOrigin = () => undefined,
+  getRuntimeGeneration = () => undefined,
   appIcon,
   windowChromeIconDataUrl,
   mainPreload,
@@ -254,13 +256,15 @@ export function createDesktopWindowFactory({
     return window && !window.isDestroyed() ? window : undefined
   }
 
-  const createExtensionWindow = async () => {
+  const createExtensionWindow = async (options = {}) => {
     recordSurface('extensions')
+    const tab = normalizeDockTab(typeof options === 'object' && options !== null ? options.tab : undefined)
     const existing = getAuxiliaryWindow('extensions')
     if (existing) {
       if (existing.isMinimized()) existing.restore()
       existing.show()
       existing.focus()
+      if (tab) existing.webContents.send('extensions:navigate', { tab })
       return existing
     }
     const mainWindow = getMainWindow()
@@ -289,7 +293,7 @@ export function createDesktopWindowFactory({
     if (WebContentsView) {
       setWindowChromeTheme(browserWindow, chromeTheme)
       dockSettings = createDockSettingsView({
-        WebContentsView, window: browserWindow, mainWindow, getRuntimeOrigin, dialog, runtimePreload,
+        WebContentsView, window: browserWindow, mainWindow, getRuntimeOrigin, getRuntimeGeneration, dialog, runtimePreload,
         onWebContentsCreated: contents => dockSettingsWebContents.add(contents),
         onWebContentsDisposed: contents => dockSettingsWebContents.delete(contents),
         openExternal: url => shell.openExternal(url),
@@ -306,6 +310,7 @@ export function createDesktopWindowFactory({
       surface: DESKTOP_SURFACES.EXTENSIONS,
       filePath: extensionsPath,
       chromeTheme,
+      query: tab ? { tab } : {},
       permissionCheck: false,
     })
     return browserWindow
@@ -410,9 +415,9 @@ export function createDesktopWindowFactory({
 
   return Object.freeze({
     createExtensionWindow,
-    selectDockSetting: (id) => {
+    selectDockSetting: (id, plugin) => {
       if (!dockSettings) throw new Error('拓展坞设置尚未就绪，请重新打开拓展坞。')
-      return dockSettings.select(id)
+      return dockSettings.select(id, plugin)
     },
     isDockSettingsSender: sender => dockSettingsWebContents.has(sender),
     createHandoffWindow,

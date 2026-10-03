@@ -1,7 +1,7 @@
 import {
-  IconChevronDownOutline14,
-  IconDataOutline16,
-  IconLoadingOutline16,
+  IconChevronDownOutlineRegular,
+  IconDataOutlineMedium,
+  IconLoadingOutlineMedium,
   StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -26,7 +26,7 @@ function isSettled(block: ToolCallBlock): block is ToolResultNode {
 }
 
 function callArgs(block: ToolCallBlock): string {
-  return isSettled(block) ? block.call?.argsRaw ?? '' : block.argsRaw
+  return isSettled(block) ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : ''
 }
 
 function pendingArgs(raw: string): { title?: string; kind?: ArtifactKind } {
@@ -66,10 +66,10 @@ function kindLabel(t: ArtifactTranslate, kind: ArtifactKind): string {
 }
 
 function StatusIcon({ state }: { state: RowState }) {
-  if (state === 'running') return <IconLoadingOutline16 className={css.statusIcon} />
+  if (state === 'running') return <IconLoadingOutlineMedium className={css.statusIcon} />
   if (state === 'error') return <StateDot state="error" />
   if (state === 'stopped') return <StateDot state="warning" />
-  return <IconDataOutline16 className={css.statusIcon} />
+  return <IconDataOutlineMedium className={css.statusIcon} />
 }
 
 interface FallbackRowProps {
@@ -91,7 +91,7 @@ function FallbackRow({ state, title, summary, t, source }: FallbackRowProps) {
             <div className={css.meta}>{summary}</div>
           </div>
         </div>
-        <IconChevronDownOutline14 className={css.fallbackChevron} />
+        <IconChevronDownOutlineRegular className={css.fallbackChevron} />
       </div>
       {source !== undefined ? (
         <details className={css.fallbackSource}>

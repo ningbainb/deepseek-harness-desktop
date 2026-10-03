@@ -14,6 +14,7 @@ export default clientBundle(
           '@deepseek-ai/dsh-client-ui-settings',
           '@deepseek-ai/dsh-client-ui-slots',
           '@deepseek-ai/dsh-settings',
+          '@deepseek-ai/schemastery',
         ],
       },
     },

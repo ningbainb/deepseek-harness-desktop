@@ -7,7 +7,7 @@
 import clsx from 'clsx'
 import { QRCodeSVG } from 'qrcode.react'
 import {
-  IconCloseOutline16, IconCopyOutline16, IconLinkOutline16, IconRefreshOutline16, IconStopFill16,
+  IconCloseOutlineMedium, IconCopyOutlineMedium, IconLinkOutlineMedium, IconRefreshOutlineMedium, IconStopFillMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DesktopAvailability, LocalLanGatewayStatus } from '@linxin666/dsh-desktop-client'
@@ -106,7 +106,7 @@ export function RemotePanel({
           <p className={css.subtitle}>{t('subtitle')}</p>
         </div>
         <button type="button" className={css.close} aria-label={t('close.label')} onClick={onClose}>
-          <IconCloseOutline16 size={14} />
+          <IconCloseOutlineMedium size={14} />
         </button>
       </div>
 
@@ -209,15 +209,15 @@ export function RemotePanel({
 
           <div className={css.actions}>
             <button type="button" className={css.action} onClick={onStop}>
-              <IconStopFill16 size={14} />
+              <IconStopFillMedium size={14} />
               {t('action.stop')}
             </button>
             <button type="button" className={css.action} onClick={onRefresh}>
-              <IconRefreshOutline16 size={14} />
+              <IconRefreshOutlineMedium size={14} />
               {t('action.refresh')}
             </button>
             <button type="button" className={css.action} onClick={onCopy}>
-              {copied ? <IconCopyOutline16 size={14} /> : <IconLinkOutline16 size={14} />}
+              {copied ? <IconCopyOutlineMedium size={14} /> : <IconLinkOutlineMedium size={14} />}
               {copied ? t('action.copied') : t('action.copy')}
             </button>
             {localGateway?.enabled === true && (

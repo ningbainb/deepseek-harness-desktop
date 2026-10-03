@@ -56,7 +56,7 @@ try {
   assert.ok(desktopSkill, 'Extension Dock/Desktop inventory did not discover the canonical user skill')
   assert.equal(desktopSkill.source, 'user-dsh')
 
-  const entry = page.locator('[data-dsh-skill-explorer-entry]')
+  const entry = page.getByRole('button').filter({ has: page.locator('[data-dsh-panel-entry="skill-explorer"]') })
   try {
     await entry.waitFor({ state: 'visible', timeout: 20_000 })
   } catch (error) {
@@ -64,7 +64,19 @@ try {
       [...document.querySelectorAll('style[data-plugin]')].map((element) => element.dataset.plugin)))}`)
     throw error
   }
-  await entry.dispatchEvent('click')
+  const intro = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
+  await intro.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+  if (await intro.isVisible()) {
+    await intro.click()
+    await intro.waitFor({ state: 'hidden' })
+  }
+  const starPrompt = page.locator('#dsh-desktop-star-prompt[data-open="true"]')
+  await starPrompt.waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {})
+  if (await starPrompt.isVisible()) {
+    await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click()
+    await starPrompt.waitFor({ state: 'hidden' })
+  }
+  await entry.click()
   const center = page.locator('[data-dsh-skill-explorer-view]')
   await center.getByRole('heading', { name: /^(技能中心|Skill Center)$/iu }).waitFor({ state: 'visible' })
   const row = center.locator('[data-dsh-part="skill-row"]').filter({ hasText: skillName })

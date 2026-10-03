@@ -6,6 +6,15 @@ import css from './desktop-interactions.module.css'
 /** Add a persistent browser close action by delegating to the existing tab's lifecycle. */
 export function installBrowserClose(document: Document): () => void {
   const owned = new Set<HTMLButtonElement>()
+  const closeAction = (input: HTMLInputElement): HTMLButtonElement | null => {
+    const tabContent = input.parentElement?.parentElement?.parentElement
+    const contents = tabContent?.parentElement
+    const strip = contents?.previousElementSibling
+    if (!tabContent || !contents || !strip) return null
+    const index = [...contents.children].indexOf(tabContent)
+    const tab = strip.querySelectorAll<HTMLElement>('[draggable="true"]')[index]
+    return tab?.querySelector<HTMLButtonElement>('button[aria-label="关闭"], button[aria-label="Close"]') ?? null
+  }
   const scan = () => {
     for (const input of document.querySelectorAll<HTMLInputElement>('[data-dsh-panel-host] input[placeholder]')) {
       if (!/^(输入网址|Enter a URL)/.test(input.placeholder)) continue
@@ -15,17 +24,15 @@ export function installBrowserClose(document: Document): () => void {
       const contents = tabContent?.parentElement
       const strip = contents?.previousElementSibling
       if (!bar || !tabContent || !contents || !strip || bar.querySelector('[data-dsh-browser-close]')) continue
-      const index = [...contents.children].indexOf(tabContent)
-      const tab = strip.querySelectorAll<HTMLElement>('[draggable="true"]')[index]
-      const original = tab?.querySelector<HTMLButtonElement>('button[aria-label="关闭"], button[aria-label="Close"]')
-      if (!original) continue
+      if (!closeAction(input)) continue
       const button = document.createElement('button')
       button.type = 'button'; button.className = css.browserClose; button.textContent = '×'
       button.dataset.dshBrowserClose = 'true'
       button.title = document.documentElement.lang.startsWith('en') ? 'Close browser' : '关闭浏览器'
       button.setAttribute('aria-label', button.title)
       button.addEventListener('click', () => {
-        if (!original.isConnected) return
+        const original = closeAction(input)
+        if (!original?.isConnected) return
         original.click()
         document.querySelector<HTMLTextAreaElement>('[data-slot="conversation"] textarea')?.focus()
       })
@@ -36,7 +43,7 @@ export function installBrowserClose(document: Document): () => void {
   const observer = new MutationObserver(scan)
   observer.observe(document.body, { childList: true, subtree: true })
   const onKey = (event: KeyboardEvent) => {
-    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'w' || event.shiftKey) return
+    if (event.defaultPrevented || event.isComposing || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'w' || event.shiftKey || event.altKey) return
     const active = document.activeElement
     for (const button of owned) {
       const browser = button.parentElement?.parentElement

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope, ConfigFormSnapshot as SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CardForm, booleanField, choiceField, numberField, textField } from '../client/settings/settings-form.ts'
 
 /** Minimal in-memory scope backing a CardForm test. */
@@ -13,9 +13,9 @@ class FakeScope<T extends Record<string, unknown>> implements SettingsScope<T> {
   mutate = vi.fn(async (
     _ops: Parameters<SettingsScope<T>['mutate']>[0],
     _expectedRevision?: number,
-  ) => {})
-  set = vi.fn(async (field: string, value: unknown) => { (this.user as Record<string, unknown>)[field] = value })
-  unset = vi.fn(async (field: string) => { delete (this.user as Record<string, unknown>)[field] })
+  ) => true)
+  set = vi.fn(async (field: string, value: unknown) => { (this.user as Record<string, unknown>)[field] = value; return true })
+  unset = vi.fn(async (field: string) => { delete (this.user as Record<string, unknown>)[field]; return true })
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
@@ -48,10 +48,12 @@ class FakeScope<T extends Record<string, unknown>> implements SettingsScope<T> {
     this.set.mockImplementation(async (field: string, value: unknown) => {
       (this.user as Record<string, unknown>)[field] = value
       this.reflect()
+      return true
     })
     this.unset.mockImplementation(async (field: string) => {
       delete (this.user as Record<string, unknown>)[field]
       this.reflect()
+      return true
     })
   }
 }
@@ -145,7 +147,7 @@ describe('CardForm', () => {
     const originalSet = scope.set.getMockImplementation()
     scope.set.mockImplementation(async (field: string, value: unknown) => {
       await gate
-      await originalSet!(field, value)
+      return await originalSet!(field, value)
     })
     const saving = form.save()
     actions.edit('size', '99')
@@ -160,7 +162,7 @@ describe('CardForm', () => {
   it('marks the shell failed when a write does not land', async () => {
     const scope = new FakeScope<Record<string, unknown>>({ name: 'old' })
     // Drop the write on the floor: the read-back never sees the staged value.
-    scope.set.mockImplementation(async () => {})
+    scope.set.mockImplementation(async () => false)
     const form = new CardForm(scope, fields())
     form.actions().edit('name', 'new')
     await form.save()
@@ -175,7 +177,7 @@ describe('CardForm', () => {
     const gate = new Promise<void>(resolve => { release = resolve })
     scope.set.mockImplementationOnce(async (field, value) => {
       await gate
-      await originalSet(field, value)
+      return await originalSet(field, value)
     })
     const form = new CardForm(scope, fields())
     form.actions().edit('size', '64')

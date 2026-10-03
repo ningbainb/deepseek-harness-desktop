@@ -5,11 +5,15 @@ import {
   mkdir,
   open,
   readFile,
+  readlink,
   readdir,
   rename,
   rm,
+  stat,
+  symlink,
+  unlink,
 } from 'node:fs/promises'
-import { dirname, join, parse, resolve } from 'node:path'
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 
 import { UserPluginArchive } from '../user-plugin-archive.mjs'
 
@@ -89,6 +93,35 @@ async function copyLeafIfPresent(source, destination) {
   }
   await copyFile(source, destination)
   return true
+}
+
+async function relocateDependencyLinks(sourceRoot, destinationRoot) {
+  const visit = async directory => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const destination = join(directory, entry.name)
+      if (entry.isSymbolicLink()) {
+        const originalLink = await readlink(destination)
+        const source = join(sourceRoot, relative(destinationRoot, destination))
+        const originalTarget = resolve(dirname(source), originalLink)
+        const suffix = relative(sourceRoot, originalTarget)
+        const internal = suffix === '' || (!isAbsolute(suffix) && suffix !== '..' && !suffix.startsWith(`..${sep}`))
+        const target = internal ? join(destinationRoot, suffix) : originalTarget
+        if (resolve(dirname(destination), originalLink) === resolve(target)) continue
+        const status = await stat(target)
+        const kind = process.platform === 'win32' && status.isDirectory() ? 'junction' : status.isDirectory() ? 'dir' : 'file'
+        await unlink(destination)
+        try {
+          await symlink(target, destination, kind)
+        } catch (error) {
+          await symlink(originalLink, destination, kind).catch(() => {})
+          throw error
+        }
+      } else if (entry.isDirectory()) {
+        await visit(destination)
+      }
+    }
+  }
+  await visit(destinationRoot)
 }
 
 function assertTransactionId(value) {
@@ -464,6 +497,7 @@ export class PluginStagingManager {
         throw new Error('live plugin dependency tree was not atomically archived')
       }
       await rename(stagedNodeModules, liveNodeModules)
+      await relocateDependencyLinks(stagedNodeModules, liveNodeModules)
       await syncDirectory(this.profileDir)
       await replaceLeafFromStage(
         join(stageDir, 'package.json'),

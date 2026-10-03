@@ -107,25 +107,16 @@ export function describeImageCallView(args: DescribeImageArgs): GenericCallView 
  * @param config - deployment configuration.
  */
 export function apply(ctx: Context, config: Config = {}): void {
+  const current = (): Config => Object.fromEntries(Object.entries(config).map(([key, field]) => [key,
+    typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+      ? field.get() : field]))
   // The loader fills schema defaults before apply, so an unconfigured entry
   // still arrives with default fields set. Only a config that actually names
   // the endpoint/model is validated eagerly — the family aggregate mounts
   // without configuration and must load silently.
-  if (config.baseURL !== undefined || config.model !== undefined) {
-    resolveConfig(config)
+  if (current().baseURL !== undefined || current().model !== undefined) {
+    resolveConfig(current())
   }
-  let current: () => Config = () => config
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, DESCRIBE_IMAGE_SETTINGS_NAMESPACE, Config, config, {
-      setSource: (source) => {
-        current = source
-      },
-      onChange: () => {},
-      validate: (value) => {
-        if (value.baseURL !== undefined || value.model !== undefined) resolveConfig(value)
-      },
-    })
-  })
   const spec = (): ResolvedConfig => resolveConfig(current())
   // Short-lived semantic cache scoped to this mount: identical image + prompt
   // within the TTL reuse the prior answer instead of a second fetch.

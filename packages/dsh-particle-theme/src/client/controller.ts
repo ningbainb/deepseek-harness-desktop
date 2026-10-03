@@ -1,4 +1,4 @@
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { messageClearanceRects } from './content-clearance.ts'
 import { CONTENT_TARGET_ATTRIBUTES, ContentTargets } from './content-targets.ts'
 import { DialogIndex } from './dialog-index.ts'

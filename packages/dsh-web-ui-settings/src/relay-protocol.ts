@@ -9,6 +9,9 @@ export const RELAY_PROVIDER_ID = 'project-relay'
 /** User-facing provider name shown by the official Models page and selector. */
 export const RELAY_PROVIDER_DISPLAY_NAME = 'bai供应商'
 
+export const RELAY_PENDING_MODEL_ID = '__bai_login_required__'
+export const RELAY_PREFERRED_MODEL_ID = 'deepseek-flash'
+
 /** The credential-reference name consumed by llm-pi-ai. */
 export const RELAY_CREDENTIAL_REF = 'PROJECT_RELAY_API_KEY'
 
@@ -20,6 +23,8 @@ export const RELAY_API_PREFIX = '/api/dsh-relay'
 export const RELAY_STATUS_PATH = RELAY_API_PREFIX + '/status'
 export const RELAY_CONFIGURE_PATH = RELAY_API_PREFIX + '/configure'
 export const RELAY_REMOVE_PATH = RELAY_API_PREFIX + '/remove'
+export const RELAY_REFRESH_PATH = RELAY_API_PREFIX + '/refresh'
+export const RELAY_REFRESH_INTERVAL_MS = 5 * 60_000
 export const RELAY_CONNECT_PATH = RELAY_API_PREFIX + '/connect'
 export const RELAY_CONNECT_STATUS_PATH = RELAY_API_PREFIX + '/connect/status'
 export const RELAY_CONNECT_CANCEL_PATH = RELAY_API_PREFIX + '/connect/cancel'
@@ -55,6 +60,8 @@ export interface RelayStatusResponse {
   writable: boolean
   modelCount: number
   models: RelayModelView[]
+  firstRun?: boolean
+  sync?: { phase: 'idle' | 'refreshing' | 'ready' | 'failed'; updatedAt?: number; error?: string }
 }
 
 export interface RelayConfigureResponse {

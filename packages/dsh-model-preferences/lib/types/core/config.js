@@ -133,7 +133,7 @@ function modelForCurrent(group, current) {
     return group.models.find(model => model.id === current.model);
 }
 function currentFallbackGroup(groups, current) {
-    if (current === null)
+    if (current === null || (current.provider === PRIMARY_PROVIDER_ID && current.model === '__bai_login_required__'))
         return groups.map(group => ({ ...group, models: [...group.models] }));
     const result = groups.map(group => ({ ...group, models: [...group.models] }));
     const group = result.find(candidate => candidate.id === current.provider);

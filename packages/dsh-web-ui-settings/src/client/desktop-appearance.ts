@@ -65,7 +65,12 @@ export function installDesktopAppearance(window: Window): () => void {
     apply(value)
   }
   const schedule = () => { if (!timer) timer = setTimeout(sample, 80) }
-  const observer = new MutationObserver(schedule)
+  const observer = new MutationObserver(records => {
+    if (records.some(record => record.attributeName === 'data-dsh-skin')) {
+      clearTimeout(timer)
+      sample()
+    } else schedule()
+  })
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-dsh-skin', 'style', 'class'] })
   observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
   document.addEventListener('load', schedule, true)

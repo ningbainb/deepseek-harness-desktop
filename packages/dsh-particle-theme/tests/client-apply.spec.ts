@@ -27,7 +27,7 @@ describe('particle theme client apply', () => {
       },
       get: () => undefined,
       locale: { register: () => () => {} },
-      settingsScope: { bind: () => scope },
+      configForms: { get: () => scope },
       slots: {
         inject: (name: string, factory: () => unknown) => { slots.push(name); factory(); return () => {} },
         register: () => () => {},

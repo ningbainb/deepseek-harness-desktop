@@ -22,6 +22,10 @@ The adapter is temporary. Each inventory record states its current adapter scope
 
 ## Home and migration
 
+Before SDK boot, Desktop composes legacy model and provider settings into the selected profile through a journaled transaction. Existing profile overrides take precedence. Both the live `settings.yaml` compatibility view and an existing `.imported` archive are retained; unknown sections remain available for deferred recovery. Commit requires settled Loader entries, an active root Include, the Desktop-owned SettingsForms adapter, and matching active configuration. Failed startup disposes the Runtime before restoring the original settings and patch bytes. Live patch reload retains the adapter so the SDK cannot perform an unjournaled second import.
+
+Unknown, disabled and non-migratable sections are deferred regardless of their YAML value type; their original bytes, including scalar preferences, arrays, booleans, nulls, comments and credentials, remain in the selected Home. Registered migratable sections require objects and reject malformed values before any configuration mutation. Deferred section names are recorded in the migration receipt without guessing a replacement SDK namespace.
+
 The community-owned default Home is `~/.dsh-community`. A user-specified Home remains explicit and is not silently rewritten. The migration implementation treats the source as read-only, records a phase journal, obtains a quiescent inventory, copies persistent data to staging, rebuilds executable dependencies, validates the destination, and activates it only after validation. The source Home is retained.
 
 The authoritative ownership rules are [data-ownership.json](./data-ownership.json). Identifiers for sessions, workspaces, memories, prompts, task ledgers, and other owned records are preserved. Credentials are represented by protected operating-system references or require reauthorization; plaintext fallback is not permitted. Migrated schedules are disabled and their old lease is removed until an explicit takeover is recorded.
@@ -30,11 +34,15 @@ Application rollback, plugin-environment rollback, data-format rollback, and res
 
 ## Native and packaging contract
 
+The Runtime launcher and its complete local source graph execute from the physical `app.asar.unpacked` directory. Packaging checks both ASAR SHA-256 integrity and the canonical SDK module objects used by launcher, profile, HMR, config-editor, and plugin-manager; a split app-boot identity is rejected because profile reload relies on its root Include registration. Typed streams use the SDK endpoint, payload, uplink, operator peer, and abort-signal arguments. Uplink EOF does not close the response stream.
+
 The Windows x64 native dependency contract is [native-dependency-inventory.json](./native-dependency-inventory.json). Production packaging verifies the actual unpacked dependency graph, native modules, bundled Git identity, exact Runtime graph, ASAR contents, updater metadata, checksums, and executable signature state.
 
-The 4.0.0-rc.2 candidate is intentionally not Stable. Its fixed Runtime graph uses the reviewed official 0.1.5-rc.2 family. An unsigned local installer is a test artifact and must be labeled unsigned; it is not evidence of publisher identity. Stable promotion remains blocked until the distribution package has a trusted signing and update-authenticity path and every Stable release gate has been rerun against that exact artifact.
+Desktop 4.4.1 targets the official 0.2.0-rc.2 Runtime family. An unsigned local installer is a test artifact and must be labeled unsigned; it is not evidence of publisher identity. Stable promotion remains blocked until the distribution package has a trusted signing and update-authenticity path and every Stable release gate has been rerun against that exact artifact.
 
 ## Acceptance evidence
+
+The rc.2 import inventory records exact public SDK imports for the journaled SettingsForms adapter, isolated legacy-session verification, SDK-identity fixtures, and the community settings form. Existing import allowances remain unchanged; no additional source directory or upstream checkout is permitted. Chat recovery source and declarations are checked against installed official npm types by `apps/dsh-desktop/scripts/verify-chat-recovery-sdk.mjs`; behavioral tests also verify retained-reference release and same-id generation observer cleanup. These checks do not replace real-window or installer acceptance.
 
 The release sequence is build once, write and verify the release manifest, test the same unpacked application and installer, and retain a machine-readable regression receipt. `run-regression-e2e.mjs --full --evidence=<path>` records the source commit, mode, executable, per-suite result, accepted issues, and the installer name, size, SHA-256, and signature state from the verified release manifest. A failed suite also writes a failed receipt before returning a non-zero exit code.
 

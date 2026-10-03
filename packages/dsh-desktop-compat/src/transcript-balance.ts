@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions, Message, RequestMessage } from '@deepseek-ai/dsh-llm'
 
 export interface TranscriptBalanceDiagnostic {
   readonly outcome: 'balanced' | 'stripped-trailing-assistant'
@@ -42,8 +42,8 @@ export function extractToolCallsFromAssistantMessage(message: Message): Extracte
 }
 
 export function balanceTranscriptMessages(
-  messages: readonly Message[] | undefined,
-): { messages: readonly Message[]; diagnostic?: TranscriptBalanceDiagnostic } {
+  messages: readonly RequestMessage[] | undefined,
+): { messages: readonly RequestMessage[]; diagnostic?: TranscriptBalanceDiagnostic } {
   if (!Array.isArray(messages) || messages.length === 0) {
     return { messages: messages ?? [] }
   }
@@ -75,7 +75,7 @@ export function installTranscriptBalanceGuard(ctx: Context): void {
         ctx.logger?.warn?.(
           `[dsh-desktop-compat] transcript balance: dropped trailing assistant message with ${balanced.diagnostic.droppedCallIds.length} incomplete tool call(s)`,
         )
-        options.messages = balanced.messages as Message[]
+        options.messages = balanced.messages as RequestMessage[]
       }
     }
     return next()

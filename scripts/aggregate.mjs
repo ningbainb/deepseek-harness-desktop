@@ -92,7 +92,7 @@ function findAggregates() {
  * belong to the current section.
  */
 function parseManifest(ymlPath) {
-  const manifest = { patchFrom: [], deps: [], self: null }
+  const manifest = { patchFrom: [], deps: [], externalRows: [], self: null }
   let section = null
   for (const raw of readFileSync(ymlPath, 'utf8').split(/\r?\n/)) {
     const line = raw.trim()
@@ -107,6 +107,7 @@ function parseManifest(ymlPath) {
     const entry = entryMatch[1].trim().replace(/\s+#.*$/, '')
     if (section === 'patchFrom') manifest.patchFrom.push(entry)
     else if (section === 'deps') manifest.deps.push(entry)
+    else if (section === 'externalRows') manifest.externalRows.push(entry)
     else if (section === 'self') {
       if (manifest.self !== null && manifest.self !== entry) {
         console.warn(`aggregate.yml defines several self entries (${manifest.self}, ${entry}); keeping the last one`)
@@ -259,7 +260,7 @@ function resolveEntries(pkgDir, entries, section, errors) {
 function renderPackageJson(pkgPath, resolvedDeps) {
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
   const next = {}
-  for (const { name } of resolvedDeps) next[name] = 'workspace:*'
+  for (const { name, version } of resolvedDeps) next[name] = version ?? 'workspace:*'
   for (const key of Object.keys(pkg.dependencies ?? {}).filter((k) => !(k in next)).sort()) {
     next[key] = pkg.dependencies[key]
   }
@@ -291,6 +292,19 @@ for (const { pkgDir, ymlPath } of aggregates) {
     }
     collectRows(target, entry, [], visited, errors, blocks)
   }
+  const externalDeps = []
+  for (const entry of manifest.externalRows) {
+    const parts = entry.split(/\s+/)
+    if (parts.length !== 3 || !/^[a-z0-9-]+$/.test(parts[0])
+      || !/^@linxin666\/dsh-[a-z0-9-]+$/.test(parts[1])
+      || !/^\d+\.\d+\.\d+(?:-[a-z0-9.]+)?$/.test(parts[2])) {
+      errors.push(`invalid externalRows entry: ${entry}`)
+      continue
+    }
+    const [id, name, version] = parts
+    blocks.push({ entry: `external ${name}@${version}`, via: [], rows: [{ id, name, operation: 'insert' }] })
+    externalDeps.push({ name, version })
+  }
   if (manifest.self) {
     // self: the aggregate package loads ITS OWN plugin (host + client half)
     // through one patch row, e.g. the compat shim living inside web-ui-all.
@@ -312,7 +326,7 @@ for (const { pkgDir, ymlPath } of aggregates) {
     console.log(`[aggregate] WARN ${rel}: aggregate.yml has no patchFrom entries (patch would be empty)`)
   }
   const patch = renderPatch(blocks)
-  const resolvedDeps = resolveEntries(pkgDir, manifest.deps, 'deps', errors)
+  const resolvedDeps = [...resolveEntries(pkgDir, manifest.deps, 'deps', errors), ...externalDeps]
   const pkgJson = renderPackageJson(join(pkgDir, 'package.json'), resolvedDeps)
   results.push({ rel, blocks, patch, resolvedDeps, pkgJson })
 }

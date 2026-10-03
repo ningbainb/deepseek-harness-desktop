@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModeSwitcherDeps } from './mode-controller.ts'
 
 /** Use the public Remote and session domain, never their private write stores. */
@@ -11,9 +13,14 @@ export function modeSwitcherDependencies(ctx: Context): ModeSwitcherDeps {
     && typeof presets.select === 'function' && session && typeof session.create === 'function') {
     return {
       sessions: {
-        list: ctx.sessions.list,
-        open: id => ctx.sessions.open(id as Parameters<typeof ctx.sessions.open>[0]),
-        clear: () => ctx.sessions.clear(),
+        list: { getSnapshot: () => {
+          const { byId } = ctx.sessions.list.getSnapshot()
+          const current = Object.values(byId).find(row => Object.entries(row.retainedBy)
+            .some(([source, count]) => source === 'mainView' && count > 0))?.id
+          return { current, byId }
+        } },
+        open: id => ctx.uiWorkspace.openSession(id as SessionId),
+        clear: () => {},
         refresh: () => ctx.sessions.refresh(),
       },
       workspaces: ctx.workspaces,

@@ -48,32 +48,20 @@ test('Desktop aggregate ships the current conversation navigator build', async (
   const workspaceRoot = resolve(import.meta.dirname, '../../../packages/dsh-web-ui-all')
   const workspace = readFileSync(join(workspaceRoot, 'lib/client.js'), 'utf8')
   assert.ok(workspace.includes('function positionNavigator('), 'workspace build contains composer avoidance')
-  // Production minification removes region comments. Build a readable
-  // comparison from current source with the same shared preset, in isolation;
-  // keep the exact whole-navigator equality against the pinned shipped patch.
+  // Compare the full shipped client bundle with a fresh production build.
+  // This retains every navigator operation even when minification removes
+  // source-region comments.
   const temporary = await mkdtemp(join(tmpdir(), 'dsh-navigator-build-'))
   try {
     const require = createRequire(import.meta.url)
     const compiler = join(dirname(require.resolve('tsdown/package.json')), 'dist/run.mjs')
-    const built = spawnSync(process.execPath, [compiler, '--no-minify', '--out-dir', temporary], {
+    const built = spawnSync(process.execPath, [compiler, '--out-dir', temporary], {
       cwd: workspaceRoot, encoding: 'utf8', windowsHide: true, timeout: 30_000,
     })
     assert.equal(built.status, 0, built.stderr || String(built.error ?? 'navigator comparison build failed'))
-    const readable = (await readFile(join(temporary, 'client.js'), 'utf8')).replaceAll('\r\n', '\n')
-    const region = /\t*\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\t*\/\/#endregion/u
-    const expected = readable.match(region)?.[0]
-    assert.ok(expected?.includes('positionNavigator'), 'fresh source build contains composer avoidance')
-    const actual = shipped.match(region)?.[0]
-    assert.ok(actual?.includes('positionNavigator'), 'shipped build contains composer avoidance')
-    // Wrapper indentation is not executable code. Canonically print both
-    // complete syntax trees, retaining all identifiers, operators and literals.
-    const ts = createRequire(compiler)('typescript')
-    const canonical = source => {
-      const tree = ts.createSourceFile('navigator.js', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
-      assert.equal(tree.parseDiagnostics.length, 0, 'navigator comparison must parse as valid JavaScript')
-      return ts.createPrinter({ newLine: ts.NewLineKind.LineFeed, removeComments: true }).printFile(tree)
-    }
-    assert.equal(canonical(actual), canonical(expected), 'update the pinned aggregate patch when changing the navigator')
+    const rebuilt = (await readFile(join(temporary, 'client.js'), 'utf8')).replaceAll('\r\n', '\n')
+    assert.ok(rebuilt.includes('function positionNavigator('), 'fresh source build contains composer avoidance')
+    assert.equal(shipped, rebuilt, 'shipped aggregate client must exactly match the current production build')
   } finally {
     await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
@@ -88,7 +76,8 @@ function aggregateLoaderPackageNames(source) {
     }
     if (value === null || typeof value !== 'object') return
     if (typeof value.id === 'string' && typeof value.name === 'string') {
-      packageNames.add(value.name)
+      const parts = value.name.split('/')
+      packageNames.add(value.name.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0])
     }
     for (const entry of Object.values(value)) visit(entry)
   }
@@ -354,6 +343,36 @@ test('desktop profile directly includes Value Mode as a first-class builtin bund
   assert.equal(MANAGED_RUNTIME_PACKAGES.includes('@linxin666/dsh-value-mode'), true)
   assert.equal(AGGREGATED_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
   assert.equal(DEPENDENCY_ONLY_BUNDLES.includes('@linxin666/dsh-value-mode'), false)
+})
+
+test('profile bootstrap retires missing links into an old packaged app and preserves user links', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-retired-packaged-'))
+  const profileDir = join(root, 'profiles', 'desktop')
+  const missing = join(root, 'old-install', 'resources', 'app.asar.unpacked', 'node_modules', 'dsh-doc')
+  const userLink = join(root, 'user-plugin')
+  try {
+    await mkdir(profileDir, { recursive: true })
+    const original = {
+      name: 'dsh-profile-desktop',
+      dependencies: {
+        'dsh-doc': `link:${missing.replaceAll('\\', '/')}`,
+        '@user/plugin': `link:${userLink.replaceAll('\\', '/')}`,
+      },
+      dsh: { profile: { bundles: ['dsh-doc', '@user/plugin'] } },
+    }
+    await writeFile(join(profileDir, 'package.json'), `${JSON.stringify(original, null, 2)}\n`)
+    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    const current = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+    assert.equal(current.dependencies['dsh-doc'], undefined)
+    assert.equal(current.dsh.profile.bundles.includes('dsh-doc'), false)
+    assert.equal(current.dependencies['@user/plugin'], original.dependencies['@user/plugin'])
+    assert.equal(current.dsh.profile.bundles.includes('@user/plugin'), true)
+    const archive = (await readdir(profileDir)).find(name => /^package\.json\.dsh-desktop-retired-.*\.bak$/u.test(name))
+    assert.ok(archive)
+    assert.deepEqual(JSON.parse(await readFile(join(profileDir, archive), 'utf8')), original)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('Agent Team ships as an exact built-in runtime but stays opt-in in the desktop profile', () => {
@@ -1062,9 +1081,12 @@ test('runtime resolver finds every bundled and desktop support package', async (
     '@deepseek-ai/dsh-agent',
     '@deepseek-ai/dsh-agent-default-model',
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
+    '@deepseek-ai/dsh-deepseek-account',
     '@deepseek-ai/dsh-host-directory-picker-browse',
     '@deepseek-ai/dsh-host-webserver',
     '@deepseek-ai/dsh-llm',
+    '@deepseek-ai/dsh-llm-deepseek',
+    '@deepseek-ai/dsh-ptc-runtime',
     '@deepseek-ai/dsh-session',
     '@deepseek-ai/dsh-session-persistence',
     '@deepseek-ai/dsh-workspace',
@@ -1074,13 +1096,13 @@ test('runtime resolver finds every bundled and desktop support package', async (
   const aggregatePatch = readFileSync(join(resolved.get('@linxin666/dsh-web-ui-all'), 'cordis.patch.yml'), 'utf8')
   assert.match(
     aggregatePatch,
-    /- id: web-ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u,
+    /- id: ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u,
     'the published aggregate must mount the Desktop-owned mode switcher',
   )
-  assert.doesNotMatch(
+  assert.match(
     aggregatePatch,
     /- id: ui-community-plugins\s+name: '@linxin666\/dsh-client-ui-community-plugins'/u,
-    'the settings override already owns the community plugin index',
+    'the aggregate keeps the community plugin index available',
   )
   assert.deepEqual(DESKTOP_RUNTIME_OVERRIDE_PACKAGES, [
     '@linxin666/dsh-client-ui-web-ui-settings',
@@ -1128,11 +1150,14 @@ test('runtime resolver finds every bundled and desktop support package', async (
       || packageName === 'dsh-better-sidebar'
     ) continue
     const manifest = JSON.parse(readFileSync(join(resolved.get(packageName), 'package.json'), 'utf8'))
-    assert.equal(manifest.version, aggregate.version, `${packageName} did not resolve from the aggregate release`)
+    const declaredVersion = aggregate.dependencies?.[packageName]
+    assert.equal(manifest.version, /^\d+\.\d+\.\d+/.test(declaredVersion ?? '') ? declaredVersion : aggregate.version, `${packageName} did not resolve from the aggregate release`)
   }
   const reviewedPublicVersions = {
-    '@linxin666/dsh-client-ui-plugin-manager': '0.3.20',
-    '@linxin666/dsh-client-ui-skill-explorer': '0.3.20',
+    '@linxin666/dsh-pet': '0.4.4',
+    '@linxin666/dsh-client-ui-skin-center': '0.4.4',
+    '@linxin666/dsh-client-ui-plugin-manager': '0.4.4',
+    '@linxin666/dsh-client-ui-skill-explorer': '0.4.4',
     '@linxin666/dsh-desktop-launcher': '0.3.13',
   }
   assert.deepEqual(DESKTOP_PUBLISHED_OVERRIDE_PACKAGES, Object.keys(reviewedPublicVersions).toSorted())
@@ -1209,15 +1234,18 @@ test('desktop runtime launcher composes the isolated desktop profile', async () 
       },
     )
     assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /- id: web-ui-task-board/)
-    assert.equal(result.stdout.match(/- id: web-ui-mode-switcher/gu)?.length, 1)
-    assert.match(result.stdout, /- id: web-ui-plugin-manager/)
-    assert.match(result.stdout, /- id: web-ui-skill-explorer/)
+    assert.match(result.stdout, /- id: ui-task-board/)
+    assert.equal(result.stdout.match(/- id: ui-mode-switcher/gu)?.length, 1)
+    assert.match(result.stdout, /- id: ui-plugin-manager/)
+    assert.equal(result.stdout.match(/- id: ui-plugin-manager-native-desktop/gu)?.length, 1)
+    assert.match(result.stdout, /- id: ui-plugin-manager-native-desktop\s*\n\s*name: ["']@deepseek-ai\/dsh-client-ui-plugin-manager["']/u)
+    assert.match(result.stdout, /- id: ui-plugin-manager\s*\n\s*name: ["']@linxin666\/dsh-client-ui-plugin-manager["']/u)
+    assert.match(result.stdout, /- id: ui-skill-explorer/)
     assert.match(result.stdout, /- id: better-sidebar/)
     assert.doesNotMatch(result.stdout, /- id: web-ui-better-sidebar/u)
-    assert.match(result.stdout, /- id: web-ui-skin-center/)
-    assert.match(result.stdout, /- id: web-ui-pet/)
-    assert.match(result.stdout, /- id: web-ui-remote-web-ui/)
+    assert.match(result.stdout, /- id: ui-skin-center/)
+    assert.match(result.stdout, /- id: pet/)
+    assert.match(result.stdout, /- id: remote-web-ui/)
     assert.match(result.stdout, /- id: live-stats/)
     assert.match(result.stdout, /directory-picker-desktop-host/)
     assert.match(result.stdout, /dsh-host-directory-picker-browse/)

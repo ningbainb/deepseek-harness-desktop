@@ -5,6 +5,7 @@ import test from 'node:test'
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parse, stringify } from 'yaml'
 
 import { registerExtensionIpc } from '../src/extension-ipc.mjs'
 import { DESKTOP_ERROR_CODES } from '../src/desktop-contract.mjs'
@@ -120,6 +121,27 @@ test('Dock settings IPC accepts only fixed page ids and a close request', async 
     assert.equal(selected.length, 6)
   } finally { unregister() }
 })
+test('Dock plugin configuration navigation forwards an exact package target without granting file access', async () => {
+  const ipcMain = new FakeIpcMain()
+  const selected = []
+  const unregister = registerExtensionIpc({
+    ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {},
+    projectRoot: 'C:\\project', dshHome: 'C:\\dsh',
+    qqBotBinding: new EventEmitter(), pluginRecovery: new EventEmitter(),
+    selectDockSetting: async (...args) => { selected.push(args) },
+  })
+  try {
+    const select = ipcMain.handlers.get('extensions:settings-select')
+    await select(undefined, 'plugin-options', 'dsh-free-search')
+    assert.deepEqual(selected, [['plugin-options', 'dsh-free-search']])
+    for (const [id, plugin] of [['memory', 'dsh-free-search'], ['plugin-options', '../config'], ['plugin-options', {}]]) {
+      await assert.rejects(select(undefined, id, plugin), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    }
+    assert.equal(selected.length, 1)
+  } finally { unregister() }
+})
+
 test('extension IPC exposes only renderer-safe QQ Bot state and forwards lifecycle events', async () => {
   const ipcMain = new FakeIpcMain()
   const sent = []
@@ -1902,3 +1924,145 @@ test('extensions:profile-reset restores the old profile when startup fails', asy
     await rm(dshHome, { recursive: true, force: true })
   }
 })
+
+test('extensions:profile-reset preserves user model providers and plugin configs from previous cordis.patch.yml', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-preserve-'))
+  let unregister
+  try {
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    await mkdir(profileDir, { recursive: true })
+    const originalPatch = [
+      {
+        id: 'llm-pi-ai',
+        config: {
+          providers: {
+            'openai-codex': {},
+            'project-relay': {
+              baseURL: 'https://relay.example.com',
+              apiKey: 'test-key',
+            },
+          },
+        },
+      },
+      {
+        id: 'task-board',
+        config: {
+          autoSync: true,
+        },
+      },
+      {
+        id: 'custom-community-plugin',
+        config: {
+          mode: 'custom',
+        },
+      },
+    ]
+    await writeFile(join(profileDir, 'cordis.patch.yml'), stringify(originalPatch), 'utf8')
+
+    const migrationsDir = join(dshHome, 'community', 'migrations')
+    await mkdir(migrationsDir, { recursive: true })
+    await writeFile(join(migrationsDir, 'dsh-0.1.7-settings.json'), JSON.stringify({ status: 'verified' }), 'utf8')
+
+    const ipcMain = new FakeIpcMain()
+    const qqBotBinding = new EventEmitter()
+    qqBotBinding.status = () => ({ bound: false })
+
+    unregister = registerExtensionIpc({
+      ipcMain,
+      dialog: {},
+      shell: {},
+      getWindow: () => undefined,
+      pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+      controller: { stop: async () => {}, start: async () => {} },
+      ensureProfile: async () => {
+        await mkdir(profileDir, { recursive: true })
+        const defaultPatch = [
+          {
+            id: 'llm-pi-ai',
+            config: {
+              providers: {
+                'openai-codex': {},
+              },
+            },
+          },
+        ]
+        await writeFile(join(profileDir, 'cordis.patch.yml'), stringify(defaultPatch), 'utf8')
+      },
+      projectRoot: 'C:\\project',
+      dshHome,
+      qqBotBinding,
+    })
+
+    const result = await ipcMain.handlers.get('extensions:profile-reset')()
+    assert.equal(result.reset, true)
+
+    const restoredPatch = parse(await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8'))
+    const llm = restoredPatch.find(item => item.id === 'llm-pi-ai')
+    assert.ok(llm, 'llm-pi-ai should exist')
+    assert.deepEqual(llm.config.providers['project-relay'], {
+      baseURL: 'https://relay.example.com',
+      apiKey: 'test-key',
+    })
+    assert.ok(llm.config.providers['openai-codex'], 'openai-codex should be kept')
+
+    const taskBoard = restoredPatch.find(item => item.id === 'task-board')
+    assert.ok(taskBoard, 'task-board should be preserved')
+    assert.equal(taskBoard.config.autoSync, true)
+
+    const customPlugin = restoredPatch.find(item => item.id === 'custom-community-plugin')
+    assert.ok(customPlugin, 'custom-community-plugin should be preserved')
+
+    const updatedState = JSON.parse(await readFile(join(migrationsDir, 'dsh-0.1.7-settings.json'), 'utf8'))
+    assert.equal(updatedState.status, 'pending')
+  } finally {
+    await unregister?.()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
+for (const latestConfig of [
+  { providers: { 'before-upgrade': { baseURL: 'http://127.0.0.1:12345/v1' }, 'after-upgrade': { baseURL: 'http://127.0.0.1:12346/v1', models: [{ id: 'new-model' }] } }, retries: 7 },
+  { providers: { 'after-upgrade': { baseURL: 'http://127.0.0.1:12346/v1' } } },
+  { providers: {} },
+]) {
+  test(`extensions:profile-reset retains the last model config with ${Object.keys(latestConfig.providers).length} providers`, async () => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'dsh-profile-reset-latest-models-'))
+    let unregister
+    try {
+      const profileDir = join(dshHome, 'profiles', 'desktop')
+      await mkdir(profileDir, { recursive: true })
+      const originalPatch = stringify([
+        { id: 'llm-pi-ai', config: { providers: { 'before-upgrade': { baseURL: 'http://127.0.0.1:12345/v1' } }, retries: 2 } },
+        { id: 'llm-pi-ai', config: latestConfig },
+        { id: 'llm-pi-ai', disabled: false },
+      ])
+      await writeFile(join(profileDir, 'cordis.patch.yml'), originalPatch, 'utf8')
+      const ipcMain = new FakeIpcMain()
+      const qqBotBinding = new EventEmitter()
+      qqBotBinding.status = () => ({ bound: false })
+      let startedConfig
+      unregister = registerExtensionIpc({
+        ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+        pluginManager: { inventory: async () => ({ plugins: [], skills: [] }) },
+        controller: { stop: async () => {}, start: async () => {
+          startedConfig = parse(await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')).find(item => item.id === 'llm-pi-ai').config
+        } },
+        ensureProfile: async () => {
+          await mkdir(profileDir, { recursive: true })
+          await writeFile(join(profileDir, 'cordis.patch.yml'), stringify([
+            { id: 'llm-pi-ai', config: { providers: { 'openai-codex': {} }, retries: 4 } },
+          ]), 'utf8')
+        },
+        projectRoot: 'C:\\project', dshHome, qqBotBinding,
+      })
+      const result = await ipcMain.handlers.get('extensions:profile-reset')()
+      assert.equal(result.reset, true)
+      assert.deepEqual(startedConfig, latestConfig)
+      assert.equal(await readFile(join(result.backupDirectory, 'cordis.patch.yml'), 'utf8'), originalPatch)
+      assert.equal(Object.hasOwn(startedConfig.providers, 'openai-codex'), false)
+    } finally {
+      await unregister?.()
+      await rm(dshHome, { recursive: true, force: true })
+    }
+  })
+}

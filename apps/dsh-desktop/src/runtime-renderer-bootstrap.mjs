@@ -1,4 +1,10 @@
-export function installDesktopTransportBridge(target = globalThis) {
+export function installDesktopTransportBridge(target = globalThis, { accountCallbackOrigin } = {}) {
+  if (accountCallbackOrigin !== undefined && !/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(accountCallbackOrigin)) {
+    throw new TypeError('Desktop account callback requires a loopback HTTP origin')
+  }
+  if (accountCallbackOrigin !== undefined && Number(new URL(accountCallbackOrigin).port) > 65535) {
+    throw new TypeError('Desktop account callback port is invalid')
+  }
   const bridge = target.dshDesktopTransport ?? target.dshDesktop
   if (!bridge || typeof bridge.openRuntimeStream !== 'function') {
     throw new Error('Desktop transport bridge is unavailable')
@@ -6,7 +12,16 @@ export function installDesktopTransportBridge(target = globalThis) {
 
   const queues = new Map()
   const pendingFrames = new Map()
+  let quiescing = false
   bridge.onRuntimeStream(frame => {
+    if (frame.type === 'lifecycle') {
+      if (frame.phase === 'quiescing') quiescing = true
+      else if (frame.phase === 'resumed') {
+        quiescing = false
+        for (const queue of queues.values()) queue.wake?.()
+      }
+      return
+    }
     const queue = queues.get(frame.id)
     if (queue === undefined) {
       const pending = pendingFrames.get(frame.id) ?? []
@@ -18,10 +33,10 @@ export function installDesktopTransportBridge(target = globalThis) {
     queue.wake?.()
   })
 
-  function openStream(endpoint, payload, signal) {
+  function openStream(endpoint, payload, signal, uplink) {
     const controller = signal === undefined ? new target.AbortController() : undefined
     const activeSignal = signal ?? controller.signal
-    const state = { id: undefined, frames: [], wake: undefined, cancelled: false }
+    const state = { id: undefined, frames: [], wake: undefined, cancelled: activeSignal.aborted, finished: false }
     const started = bridge.openRuntimeStream(endpoint, payload).then(id => {
       state.id = id
       queues.set(id, state)
@@ -39,12 +54,31 @@ export function installDesktopTransportBridge(target = globalThis) {
       if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
       state.wake?.()
     }, { once: true })
+    if (endpoint !== 'websocket') {
+      void (async () => {
+        const id = await started
+        if (uplink !== undefined) {
+          for await (const value of uplink) {
+            activeSignal.throwIfAborted()
+            if (state.cancelled || state.finished) return
+            if (!await bridge.writeRuntimeStream(id, value)) throw new Error('Runtime stream input is closed')
+          }
+        }
+        if (!state.cancelled && !state.finished && typeof bridge.endRuntimeStream === 'function') {
+          await bridge.endRuntimeStream(id)
+        }
+      })().catch(error => {
+        if (state.cancelled || state.finished) return
+        state.frames.push({ type: 'error', message: error instanceof Error ? error.message : 'Runtime stream input failed' })
+        state.wake?.()
+      })
+    }
     return {
       async *[Symbol.asyncIterator]() {
         await started
         try {
           for (;;) {
-            while (state.frames.length === 0 && !state.cancelled) {
+            while (!state.cancelled && (state.frames.length === 0 || (quiescing && state.frames[0].type !== 'item'))) {
               await new Promise(resolve => { state.wake = resolve })
             }
             state.wake = undefined
@@ -55,6 +89,7 @@ export function installDesktopTransportBridge(target = globalThis) {
             else throw new Error(frame.message ?? 'Runtime stream failed')
           }
         } finally {
+          state.finished = true
           queues.delete(state.id)
           pendingFrames.delete(state.id)
           if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
@@ -68,6 +103,8 @@ export function installDesktopTransportBridge(target = globalThis) {
         controller?.abort(new Error('Runtime stream closed'))
       },
       cancel: reason => {
+        state.cancelled = true
+        state.wake?.()
         if (controller !== undefined) controller.abort(reason)
         else if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
       },
@@ -77,13 +114,14 @@ export function installDesktopTransportBridge(target = globalThis) {
   const remap = input => {
     const url = new URL(input instanceof target.Request ? input.url : String(input), target.location.href)
     if (url.protocol === 'dsh-runtime:' && url.hostname === 'app') return url
-    if (url.hostname === target.location.hostname && (url.protocol === 'http:' || url.protocol === 'https:')) {
+    if ((url.hostname === target.location.hostname || url.origin === accountCallbackOrigin) && (url.protocol === 'http:' || url.protocol === 'https:')) {
       return new URL(url.pathname + url.search, 'dsh-runtime://app/')
     }
     return url
   }
 
   target.__DSH_TRANSPORT__ = Object.freeze({
+    ...(accountCallbackOrigin === undefined ? {} : { streamBaseUrl: accountCallbackOrigin }),
     ownsHost: true,
     fetch: (input, init) => target.fetch(
       input instanceof target.Request ? new target.Request(remap(input), input) : remap(input),
@@ -166,7 +204,7 @@ export function installDesktopTransportBridge(target = globalThis) {
       super()
       const url = new URL(String(input), target.location.href)
       const isOwned = target.location.protocol === 'dsh-runtime:'
-        && url.hostname === target.location.hostname
+        && (url.hostname === target.location.hostname || (accountCallbackOrigin !== undefined && url.origin.replace(/^ws/u, 'http') === accountCallbackOrigin))
         && (url.protocol === 'ws:' || url.protocol === 'wss:')
       if (!isOwned) return protocols === undefined ? new NativeWebSocket(input) : new NativeWebSocket(input, protocols)
 
@@ -369,6 +407,6 @@ export function installDesktopTransportBridge(target = globalThis) {
   target.WebSocket = DesktopWebSocket
 }
 
-export function transportBootstrapScript() {
-  return `(${installDesktopTransportBridge.toString()})(globalThis)`
+export function transportBootstrapScript(options = {}) {
+  return `(${installDesktopTransportBridge.toString()})(globalThis, ${JSON.stringify(options)})`
 }

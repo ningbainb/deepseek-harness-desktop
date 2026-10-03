@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { historicalSessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { createReadStream, createWriteStream, constants as fsConstants } from 'node:fs'
 import { copyFile, open, readFile, rename, rm, stat } from 'node:fs/promises'
@@ -321,7 +321,11 @@ async function recoverReleasedV0Artifact(
     )
     if (header === undefined) return false
 
-    const restore = sessionFormatCatalog.createRestore(header, {
+    // Validate the candidate through the official historical chain only.
+    // V3 to V4 needs the parent's complete child inventory, which this
+    // isolated file repair cannot know. The normal Runtime retry performs
+    // that migration with its own catalog context after the atomic rewrite.
+    const restore = historicalSessionFormatCatalog.createRestore(header, {
       recovery: 'strict',
       validation: 'transformed',
     })

@@ -24,6 +24,7 @@
           <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
           <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
+          <button type="button" class="tab" id="plugin-options-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="plugin-options" data-group="plugins"><span class="tab-title">插件自带配置</span></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
           <p class="nav-group-label">桌面体验</p>
@@ -295,6 +296,20 @@
       <section id="conversation-import" class="panel" role="tabpanel" aria-labelledby="conversation-tab" hidden>
         <div class="panel-head"><div><h2>导入已有对话</h2></div><p>将 Claude / Codex 的历史对话导入当前桌面环境。先预览内容，再确认导入。</p></div>
             <button type="button" class="secondary" id="open-conversation-import">导入外部对话 (Claude / Codex)</button>
+        <details id="legacy-context-guide" class="preset-section">
+          <summary>旧 DSH 会话无法识别？转成上下文摘要继续聊</summary>
+          <p>优先尝试现有历史恢复与导入。仍无法读取时，可以让 AI 总结旧会话，再在新会话中继续；这不是无损迁移，附件和工具运行状态不会恢复。</p>
+          <ol>
+            <li>备份原会话 JSON / JSONL，不删除、不覆盖，也不要上传整个用户数据目录。</li>
+            <li>先在本地查看文件，只提取需要续聊的对话文本，移除 API Key、令牌、密码和隐私。无法人工审阅时，先不要上传。</li>
+            <li>选择你信任的模型，确认向该供应商发送内容的范围与费用后，手动粘贴对话或上传已审阅的文件，并使用下方提示词。</li>
+            <li>核对 AI 摘要里的事实和待办，随后新建会话，粘贴摘要及“请先确认上下文，再继续未完成事项”。原文件继续保留。</li>
+          </ol>
+          <p>本入口只提供提示词，不读取旧文件，不自动上传，不自动调用模型。</p>
+          <label for="legacy-context-prompt">上下文压缩提示词</label>
+          <textarea id="legacy-context-prompt" rows="12" readonly></textarea>
+          <button type="button" class="secondary" id="copy-legacy-context-prompt">复制上下文压缩提示词</button>
+        </details>
       </section>
       </main>
     </div>

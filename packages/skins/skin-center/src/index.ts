@@ -10,7 +10,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 // Type-only: pulls the dsh-host-webserver service seat (ctx.webServer).
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { makeSkinCenterRoutes, SKIN_CENTER_API_PREFIX } from './routes.ts'
@@ -43,8 +43,9 @@ export interface SkinBackgroundConfig {
 
 /** Runtime schema for SkinBackgroundConfig. */
 export const SkinBackgroundConfigSchema: z<SkinBackgroundConfig> = z.object({
-  backgroundOpacity: z.number().min(0).max(100).step(5).default(0),
+  backgroundOpacity: z.number().min(0).max(100).step(5).default(0).volatile(),
 })
+export const Config = SkinBackgroundConfigSchema
 
 /**
  * Register the skin-center API routes.
@@ -60,12 +61,6 @@ export function apply(ctx: Context): void {
   // this side just declares the namespace + schema so the value persists and
   // re-resolves across reloads. The settings service is a no-op when no
   // settings service is mounted (pure skin-center installs skip it).
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
-      setSource: () => { /* application is browser-side; value is read from the scope */ },
-      onChange: () => { /* browser half re-applies on scope publish */ },
-    })
-  })
 
   const routes = makeSkinCenterRoutes()
   try {

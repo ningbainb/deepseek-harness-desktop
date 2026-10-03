@@ -13,7 +13,7 @@ import { setInterval as nodeSetInterval } from 'node:timers'
 import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-api-gateway'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { UserScopeService } from '@ningbainb/dsh-user-scope'
@@ -37,6 +37,7 @@ import { makeUpdateRoutes } from './update-routes.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
+    'loader/volatile-update'(paths: readonly (readonly string[])[]): void
     /**
      * Waterfall seam on the /api transport fence: the connection plugin
      * fires this per /api request before bridging to the API proxy on
@@ -134,18 +135,31 @@ export interface Config {
   enabled?: boolean
 }
 
-export const Config: z<Config> = z.object({
-  tokenTtlMs: z.number().step(1).min(60_000).default(10 * 60_000),
-  offlineAfterMs: z.number().step(1).min(5_000).default(25_000),
-  maxDevices: z.number().step(1).min(1).max(64).default(4),
-  cookieName: z.string().min(1).max(64).pattern(/^[A-Za-z0-9_-]+$/u).default('dsh_pair'),
-  requirePairingForLan: z.boolean().default(true),
-  remoteApiMode: z.union(['mobile-only', 'legacy-full-api']).default('mobile-only'),
-  publicBaseUrl: z.string(),
-  autoTunnel: z.boolean().default(false),
-  mobileEnterToSend: z.boolean().default(true),
-  enabled: z.boolean().default(true),
+export const Config = z.object({
+  tokenTtlMs: z.number().step(1).min(60_000).default(10 * 60_000).volatile(),
+  offlineAfterMs: z.number().step(1).min(5_000).default(25_000).volatile(),
+  maxDevices: z.number().step(1).min(1).max(64).default(4).volatile(),
+  cookieName: z.string().min(1).max(64).pattern(/^[A-Za-z0-9_-]+$/u).default('dsh_pair').volatile(),
+  requirePairingForLan: z.boolean().default(true).volatile(),
+  remoteApiMode: z.union(['mobile-only', 'legacy-full-api']).default('mobile-only').volatile(),
+  publicBaseUrl: z.string().volatile(),
+  autoTunnel: z.boolean().default(false).volatile(),
+  mobileEnterToSend: z.boolean().default(true).volatile(),
+  enabled: z.boolean().default(true).volatile(),
 })
+
+type ConfigField<T> = T | { get(): T | undefined }
+type LiveConfig = { [K in keyof Config]?: ConfigField<NonNullable<Config[K]>> }
+
+function fieldValue<T>(field: ConfigField<T> | undefined, fallback: T): T {
+  if (field === undefined) return fallback
+  return typeof field === 'object' && field !== null && 'get' in field ? field.get() ?? fallback : field
+}
+
+function optionalFieldValue<T>(field: ConfigField<T> | undefined): T | undefined {
+  if (field === undefined) return undefined
+  return typeof field === 'object' && field !== null && 'get' in field ? field.get() : field
+}
 
 /** Presence sweep cadence (a stale device flips to disconnected within two sweeps). */
 const SWEEP_INTERVAL_MS = 10_000
@@ -176,38 +190,22 @@ const DEFAULTS: ResolvedConfig = {
  * @param ctx - host plugin context carrying webServer.
  * @param config - resolved plugin config (schema defaults applied by the loader).
  */
-export function apply(ctx: Context, config?: Config): void {
-  const resolved: ResolvedConfig = {
-    tokenTtlMs: config?.tokenTtlMs ?? DEFAULTS.tokenTtlMs,
-    offlineAfterMs: config?.offlineAfterMs ?? DEFAULTS.offlineAfterMs,
-    maxDevices: config?.maxDevices ?? DEFAULTS.maxDevices,
-    cookieName: config?.cookieName ?? DEFAULTS.cookieName,
-    requirePairingForLan: config?.requirePairingForLan ?? DEFAULTS.requirePairingForLan,
-    remoteApiMode: config?.remoteApiMode ?? DEFAULTS.remoteApiMode,
-    publicBaseUrl: config?.publicBaseUrl,
-    autoTunnel: config?.autoTunnel ?? DEFAULTS.autoTunnel,
-    mobileEnterToSend: config?.mobileEnterToSend ?? DEFAULTS.mobileEnterToSend,
-    enabled: config?.enabled ?? DEFAULTS.enabled,
-  }
-  // The live source the pairing service and the gate read: the settings
-  // section once the web settings surface is served, the composition entry
-  // otherwise (the settings service swaps it when the namespace registers).
-  let current: () => Config = () => config ?? {}
+export function apply(ctx: Context, config?: LiveConfig): void {
   const resolve = (): ResolvedConfig => {
-    const value = current()
     return {
-      tokenTtlMs: value.tokenTtlMs ?? DEFAULTS.tokenTtlMs,
-      offlineAfterMs: value.offlineAfterMs ?? DEFAULTS.offlineAfterMs,
-      maxDevices: value.maxDevices ?? DEFAULTS.maxDevices,
-      cookieName: value.cookieName ?? DEFAULTS.cookieName,
-      requirePairingForLan: value.requirePairingForLan ?? DEFAULTS.requirePairingForLan,
-      remoteApiMode: value.remoteApiMode ?? DEFAULTS.remoteApiMode,
-      publicBaseUrl: value.publicBaseUrl,
-      autoTunnel: value.autoTunnel ?? DEFAULTS.autoTunnel,
-      mobileEnterToSend: value.mobileEnterToSend ?? DEFAULTS.mobileEnterToSend,
-      enabled: value.enabled ?? DEFAULTS.enabled,
+      tokenTtlMs: fieldValue(config?.tokenTtlMs, DEFAULTS.tokenTtlMs),
+      offlineAfterMs: fieldValue(config?.offlineAfterMs, DEFAULTS.offlineAfterMs),
+      maxDevices: fieldValue(config?.maxDevices, DEFAULTS.maxDevices),
+      cookieName: fieldValue(config?.cookieName, DEFAULTS.cookieName),
+      requirePairingForLan: fieldValue(config?.requirePairingForLan, DEFAULTS.requirePairingForLan),
+      remoteApiMode: fieldValue(config?.remoteApiMode, DEFAULTS.remoteApiMode),
+      publicBaseUrl: optionalFieldValue(config?.publicBaseUrl),
+      autoTunnel: fieldValue(config?.autoTunnel, DEFAULTS.autoTunnel),
+      mobileEnterToSend: fieldValue(config?.mobileEnterToSend, DEFAULTS.mobileEnterToSend),
+      enabled: fieldValue(config?.enabled, DEFAULTS.enabled),
     }
   }
+  const resolved = resolve()
   const userScope = ctx.get('userScope') as UserScopeService | undefined
   const pairingIdentity = userScope === undefined
     ? {
@@ -431,14 +429,6 @@ export function apply(ctx: Context, config?: Config): void {
       disposeSweep = undefined
     }
   }
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, REMOTE_WEB_UI_SETTINGS_NAMESPACE, Config, config ?? {}, {
-      setSource: (source) => {
-        current = source
-        sync()
-      },
-      onChange: sync,
-    })
-  })
+  ctx.on('loader/volatile-update', sync)
   sync()
 }

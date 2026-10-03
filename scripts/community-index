@@ -15,6 +15,7 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
+const { createRequire } = require('node:module')
 
 const ROOT = path.resolve(__dirname, '..')
 const JSON_FILE = path.join(ROOT, 'packages', 'dsh-web-ui-settings', 'community.json')
@@ -118,8 +119,30 @@ function generatedOutputMatches(current, expected) {
   return current.replace(/\r\n/gu, '\n') === expected.replace(/\r\n/gu, '\n')
 }
 
+function mergePublishedEntries(local, published) {
+  validateEntries(local)
+  validateEntries(published)
+  const accepted = new Map(published.map(entry => [entry.id, entry]))
+  return [...local.map(entry => accepted.get(entry.id) ?? entry), ...published.filter(entry => !local.some(existing => existing.id === entry.id))]
+}
+
+function publishedEntries() {
+  const desktopRequire = createRequire(path.join(ROOT, 'apps', 'dsh-desktop', 'package.json'))
+  const manifest = desktopRequire('@linxin666/dsh-client-ui-community-plugins/package.json')
+  if (manifest.version !== '0.4.4') throw new Error('community-index: expected installed community package 0.4.4')
+  return desktopRequire('@linxin666/dsh-client-ui-community-plugins/community.json')
+}
+
 function main() {
-  const raw = JSON.parse(fs.readFileSync(JSON_FILE, 'utf8'))
+  let raw = JSON.parse(fs.readFileSync(JSON_FILE, 'utf8'))
+  if (process.argv.includes('--sync-npm')) {
+    raw = mergePublishedEntries(raw, publishedEntries())
+    fs.writeFileSync(JSON_FILE, JSON.stringify(raw, null, 2) + '\n')
+  }
+  if (process.argv.includes('--check-npm')) {
+    const merged = mergePublishedEntries(raw, publishedEntries())
+    if (buildOutput(raw) !== buildOutput(merged)) throw new Error('community-index: published registry differs; run node scripts/community-index --sync-npm')
+  }
   validateEntries(raw)
   const out = buildOutput(raw)
   const CHECK = process.argv.includes('--check')
@@ -140,4 +163,4 @@ function main() {
 
 if (require.main === module) main()
 
-module.exports = { validateEntries, buildOutput, generatedOutputMatches }
+module.exports = { validateEntries, buildOutput, generatedOutputMatches, mergePublishedEntries }

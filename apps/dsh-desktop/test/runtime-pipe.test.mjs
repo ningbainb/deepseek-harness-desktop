@@ -163,3 +163,92 @@ test('runtime pipe carries bounded bidirectional values and half-close', async (
   for await (const value of duplex) values.push(value)
   assert.deepEqual(values, ['echo:one', 'echo:two'])
 })
+
+for (const contentBytes of [600 * 1024, 1024 * 1024, 5 * 1024 * 1024]) {
+  test(`runtime pipe reopens lossless ${contentBytes}-byte history snapshots`, async (context) => {
+    const identity = createRuntimePipeIdentity()
+    const snapshot = {
+      type: 'snapshot',
+      records: [{ type: 'tool/result', content: '中文\\n"'.repeat(Math.ceil(contentBytes / 9)) }],
+      hasMore: false,
+    }
+    assert.ok(Buffer.byteLength(JSON.stringify(snapshot)) > contentBytes)
+    const server = await createRuntimePipeServer({
+      identity,
+      runtimeVersion: '0.2.0-rc.2',
+      profile: 'desktop',
+      fetch: async () => new Response('ok'),
+      openStream: async function * () { yield snapshot; yield { type: 'append', sequence: 2 } },
+      openDuplex: async function * (endpoint, payload, input) {
+        if (endpoint === 'echo') {
+          for await (const item of input) yield item
+        } else {
+          assert.equal(endpoint, 'session/follow')
+          yield snapshot
+          yield { type: 'append', sequence: 2 }
+        }
+      },
+    })
+    context.after(() => server.close())
+    const client = new RuntimePipeClient(identity)
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      for (const source of [
+        client.openStream('session/follow', { sessionId: 'synthetic' }),
+        client.openDuplex('session/follow', { sessionId: 'synthetic' }),
+      ]) {
+        const items = []
+        for await (const item of source) items.push(item)
+        assert.deepEqual(items, [snapshot, { type: 'append', sequence: 2 }])
+      }
+    }
+    const echo = client.openDuplex('echo', { largePayload: snapshot })
+    const reading = (async () => {
+      const items = []
+      for await (const item of echo) items.push(item)
+      return items
+    })()
+    await Promise.all([echo.write(snapshot), echo.write({ sequence: 3 }), echo.write(snapshot)])
+    await echo.close()
+    assert.deepEqual(await reading, [snapshot, { sequence: 3 }, snapshot])
+  })
+}
+
+test('runtime carrier failures retain correlation without exposing host secrets', async context => {
+  const identity = createRuntimePipeIdentity()
+  const diagnostics = []
+  const secret = 'synthetic-key-must-never-appear'
+  const server = await createRuntimePipeServer({
+    identity, runtimeVersion: '0.2.0-rc.2', profile: 'desktop',
+    fetch: async () => new Response('ok'),
+    openStream: async function * () {
+      const error = new Error(secret)
+      error.name = secret
+      throw error
+    },
+    onFailure: diagnostic => diagnostics.push(diagnostic),
+  })
+  context.after(() => server.close())
+  const client = new RuntimePipeClient(identity)
+  await assert.rejects(client.openStream('session/follow', { secret }).next(), error => {
+    assert.match(error.message, /runtime carrier transport\/host-failure \[[a-f0-9]{24}\]/u)
+    assert.equal(error.message.includes(secret), false)
+    assert.equal(error.message.includes(diagnostics[0].correlationId), true)
+    return true
+  })
+  assert.equal(diagnostics.length, 1)
+  assert.equal(diagnostics[0].endpoint, 'session/follow')
+  assert.equal(JSON.stringify(diagnostics).includes(secret), false)
+})
+
+test('duplex cancel interrupts an uncompleted large open without waiting for acknowledgement', async context => {
+  const identity = createRuntimePipeIdentity()
+  const server = await createRuntimePipeServer({
+    identity, runtimeVersion: '0.2.0-rc.2', profile: 'desktop',
+    fetch: async () => new Response('ok'), openStream: async function * () {},
+    openDuplex: async function * () { yield 'unexpected' },
+  })
+  context.after(() => server.close())
+  const source = new RuntimePipeClient(identity).openDuplex('session/follow', { value: 'x'.repeat(5 * 1024 * 1024) })
+  source.cancel(new Error('large open cancelled'))
+  await assert.rejects(source[Symbol.asyncIterator]().next(), /large open cancelled/u)
+})

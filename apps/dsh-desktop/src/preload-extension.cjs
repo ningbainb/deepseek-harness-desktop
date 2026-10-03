@@ -21,7 +21,7 @@ const baseApi = {
 }
 
 const api = Object.freeze({
-  selectDockSetting: (id) => ipcRenderer.invoke('extensions:settings-select', id),
+  selectDockSetting: (id, plugin) => ipcRenderer.invoke('extensions:settings-select', id, plugin),
   ...baseApi,
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   checkPluginUpdates: () => ipcRenderer.invoke('extensions:plugin-check'),
@@ -47,6 +47,7 @@ const api = Object.freeze({
   openProfileDirectory: () => ipcRenderer.invoke('extensions:profile-dir-open'),
   openLogs: () => ipcRenderer.invoke('extensions:logs-open'),
   previewProfileReset: () => ipcRenderer.invoke('extensions:profile-reset-preview'),
+  startDragFile: (filePath) => ipcRenderer.invoke('desktop:drag-file', filePath),
   resetProfile: (request) => ipcRenderer.invoke('extensions:profile-reset', request),
   openConversationImport: () => ipcRenderer.invoke('desktop:conversation-import-open'),
   getQqBotStatus: () => ipcRenderer.invoke('extensions:qqbot-status'),

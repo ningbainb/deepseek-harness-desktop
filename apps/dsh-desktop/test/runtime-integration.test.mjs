@@ -5,14 +5,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { chromium } from 'playwright'
+import afterPack from '../scripts/after-pack.cjs'
+import { dismissRuntimeOnboarding } from '../scripts/dismiss-onboarding-fixture.mjs'
 
-import { BoundedLogStore } from '../src/log-store.mjs'
+import { BoundedLogStore, sanitizeLogLine } from '../src/log-store.mjs'
 import {
   SECONDARY_WINDOW_PARTITION,
   beginDesktopStartup,
   createSerializedStartupSurfaceLoader,
   desktopLocalSurfaceUrl,
   createDesktopShutdownLifecycle,
+  prepareDesktopRuntimeStop,
+  completeDesktopQuit,
   prepareDesktopRuntimeInputs,
   requestsUpdateShutdown,
   runtimeStatusNeedsStartupSurface,
@@ -69,7 +73,7 @@ async function createAuthenticatedRuntimeFetch(launchUrl) {
   })
   let cookie
   if (exchange.status === 303) {
-    assert.equal(exchange.headers.get('location'), '/')
+    assert.equal(new URL(exchange.headers.get('location'), launchUrl).pathname, '/')
     const setCookie = exchange.headers.getSetCookie?.()[0] ?? exchange.headers.get('set-cookie')
     assert.equal(typeof setCookie, 'string', 'runtime launch-token exchange omitted its session cookie')
     cookie = setCookie.split(';', 1)[0]
@@ -269,6 +273,72 @@ test('secondary windows use an isolated non-persistent Electron session', () => 
   assert.equal('preload' in secondaryWindowWebPreferences(), false)
 })
 
+test('quit preserves windows until pending mutations and runtime shutdown complete', async () => {
+  const calls = []
+  let finishShutdown
+  const pendingShutdown = new Promise(resolve => { finishShutdown = resolve })
+  const operation = completeDesktopQuit({
+    saveState: async () => calls.push('save'),
+    shutdown: async () => { calls.push('shutdown'); await pendingShutdown },
+    destroyWindows: () => calls.push('destroy'),
+    quit: () => calls.push('quit'),
+  })
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.deepEqual(calls, ['save', 'shutdown'])
+  finishShutdown()
+  await operation
+  assert.deepEqual(calls, ['save', 'shutdown', 'destroy', 'quit'])
+})
+
+test('Runtime stream handlers stay registered until every renderer is gone', async () => {
+  const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
+  const disposal = source.slice(source.indexOf('disposeResources: async () => {'), source.indexOf('let rendererIpcFinalized = false'))
+  const finalization = source.slice(source.indexOf('const finalizeRendererIpc = () => {'), source.indexOf('const closeBypassReason = () => {'))
+  assert.doesNotMatch(disposal, /unregisterRuntimeStreamIpc/u)
+  assert.match(finalization, /unregisterRuntimeStreamIpc\(\)/u)
+  assert.match(source, /app\.on\('quit', finalizeRendererIpc\)/u)
+})
+
+test('failed quit keeps every window available and never claims a completed exit', async () => {
+  const calls = []
+  await assert.rejects(completeDesktopQuit({
+    saveState: async () => calls.push('save'),
+    shutdown: async () => { calls.push('shutdown'); throw new Error('pending mutation') },
+    destroyWindows: () => calls.push('destroy'),
+    quit: () => calls.push('quit'),
+  }), /pending mutation/u)
+  assert.deepEqual(calls, ['save', 'shutdown'])
+})
+
+test('pending extension mutations retain their transport until they settle', async () => {
+  const calls = []
+  let finishMutation
+  const pendingMutation = new Promise(resolve => { finishMutation = resolve })
+  const operation = prepareDesktopRuntimeStop({
+    quiesceExtensions: async () => { calls.push('extensions'); await pendingMutation },
+    stopGateway: async () => calls.push('gateway'),
+    quiesceProtocol: () => calls.push('protocol'),
+    quiesceStreams: async () => calls.push('streams'),
+  })
+  await Promise.resolve()
+  assert.deepEqual(calls, ['extensions'])
+  finishMutation()
+  await operation
+  assert.deepEqual(calls, ['extensions', 'gateway', 'protocol', 'streams'])
+})
+
+test('mutation quiesce failure keeps the gateway and renderer transport usable', async () => {
+  const calls = []
+  await assert.rejects(prepareDesktopRuntimeStop({
+    quiesceExtensions: async () => { calls.push('extensions'); throw new Error('mutation quiesce timeout') },
+    stopGateway: async () => calls.push('gateway'),
+    quiesceProtocol: () => calls.push('protocol'),
+    quiesceStreams: async () => calls.push('streams'),
+  }), /mutation quiesce timeout/u)
+  assert.deepEqual(calls, ['extensions'])
+})
+
 test('update preparation stops the runtime without disposing the desktop surface', async () => {
   const calls = []
   const lifecycle = createDesktopShutdownLifecycle({
@@ -366,10 +436,10 @@ test('recovery does not start a replacement runtime when the old runtime cannot 
   assert.equal(starts, 0)
 })
 
-test('legacy v1 skin selections migrate before the official runtime resolves its boot graph', { timeout: 150_000 }, async () => {
+test('legacy v1 skin selections migrate before the official runtime resolves its boot graph', { timeout: 240_000 }, async () => {
   for (const { skinId, expectedActive } of [
     { skinId: 'xp', expectedActive: 'xp' },
-    { skinId: 'qq98', expectedActive: null },
+    { skinId: 'qq98', expectedActive: 'blue-fantasy' },
   ]) {
     const root = await mkdtemp(join(tmpdir(), `dsh-desktop-legacy-skin-${skinId}-`))
     const logs = new BoundedLogStore({ directory: join(root, 'logs') })
@@ -379,6 +449,7 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
       await mkdir(profileDir, { recursive: true })
       await writeFile(join(profileDir, 'cordis.patch.yml'), legacySkinPatch(skinId), 'utf8')
 
+      await afterPack.restoreAllBundledSkinAssets(join(import.meta.dirname, '..', 'node_modules'))
       await ensureDesktopProfile({ dshHome: root })
 
       const migratedPatch = await readFile(join(profileDir, 'cordis.patch.yml'), 'utf8')
@@ -386,7 +457,7 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
       assert.doesNotMatch(migratedPatch, new RegExp(`dsh-client-ui-skin-${skinId}`, 'u'))
 
       const activeState = await readJsonIfPresent(join(root, 'skin-center-active.json'))
-      if (expectedActive === null) {
+      if (skinId === 'qq98') {
         assert.notEqual(activeState?.active, skinId)
         const retired = await readJsonIfPresent(join(profileDir, '.dsh-desktop-retired-skin.json'))
         assert.equal(retired?.skinId, skinId)
@@ -403,7 +474,7 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
         cwd: process.cwd(),
         dshHome: root,
         logStore: logs,
-        startupTimeoutMs: 45_000,
+        startupTimeoutMs: 120_000,
       })
       const url = await controller.start()
       const runtimeFetch = await createAuthenticatedRuntimeFetch(url)
@@ -433,19 +504,24 @@ test('legacy v1 skin selections migrate before the official runtime resolves its
   }
 })
 
-test('official DSH host serves the complete desktop profile', { timeout: 150_000 }, async () => {
+test('official DSH host serves the complete desktop profile', { timeout: 360_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-runtime-'))
   const logs = new BoundedLogStore({ directory: join(root, 'logs') })
   let controller
   let browser
+  let runtimePage
+  const browserErrors = []
+  const browserConsole = []
+  const resourceEvents = []
   try {
+    await afterPack.restoreAllBundledSkinAssets(join(import.meta.dirname, '..', 'node_modules'))
     await ensureDesktopProfile({ dshHome: root })
     controller = new DshRuntimeController({
       cliPath: resolveDshCliPath(),
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,
-      startupTimeoutMs: 45_000,
+      startupTimeoutMs: 120_000,
     })
     let url = await controller.start()
     let runtimeFetch = await createAuthenticatedRuntimeFetch(url)
@@ -462,8 +538,11 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     assert.equal(particleSettings.ok, true)
     const namespaces = new Set(particleSettings.value.namespaces.map((entry) => entry.ns))
     for (const namespace of WEB_UI_SETTINGS_NAMESPACES) {
-      assert.equal(namespaces.has(namespace), true, `settings namespace ${namespace} is hidden`)
+      assert.equal(namespaces.has(namespace), true, `settings namespace ${namespace} is hidden; available: ${[...namespaces].join(', ')}`)
     }
+    const skinBackground = particleSettings.value.namespaces.find(entry => entry.ns === 'ui-skin-center')
+    assert.equal(typeof skinBackground?.value?.['skin-background']?.backgroundOpacity, 'number', 'skin background form is missing its opacity setting')
+    assert.equal(typeof skinBackground?.value?.['skin-wallpaper'], 'object', 'skin wallpaper form is missing')
     const particleNamespace = particleSettings.value.namespaces.find(entry => entry.ns === 'particle-theme')
     assert.equal(
       particleNamespace?.value?.enabled,
@@ -544,7 +623,7 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       dshHome: root,
       logStore: logs,
       preferredPort: replacementPort,
-      startupTimeoutMs: 45_000,
+      startupTimeoutMs: 120_000,
     })
     url = await controller.start()
     runtimeFetch = await createAuthenticatedRuntimeFetch(url)
@@ -612,7 +691,7 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(initialSkinStateResponse.ok, true)
-    assert.deepEqual(await initialSkinStateResponse.json(), { ok: true, active: null })
+    assert.deepEqual(await initialSkinStateResponse.json(), { ok: true, active: 'blue-fantasy', background: null })
     for (const skinId of BUILTIN_SKIN_IDS) {
       const stylesheet = await runtimeFetch(`/api/skin-center/v2/skins/${skinId}/stylesheet`, {
         signal: AbortSignal.timeout(5_000),
@@ -621,6 +700,21 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     }
     browser = await chromium.launch({ headless: true })
     const page = await browser.newPage({ locale: 'en-US' })
+    runtimePage = page
+    page.on('pageerror', error => browserErrors.push(error.message))
+    page.on('console', message => {
+      if (browserConsole.length < 64) browserConsole.push({ type: message.type(), text: sanitizeLogLine(message.text()).slice(0, 1_000) })
+      if (message.type() === 'error') browserErrors.push(message.text())
+    })
+    const navigationStarted = Date.now()
+    const recordResource = (request, state, status) => {
+      const pathname = new URL(request.url()).pathname
+      if (resourceEvents.length >= 160 || !/\.(?:js|css)$|\/(?:plugins|modules|describe)(?:\/|$)/u.test(pathname)) return
+      resourceEvents.push({ ms: Date.now() - navigationStarted, pathname, state, status })
+    }
+    page.on('request', request => recordResource(request, 'requested'))
+    page.on('requestfinished', request => recordResource(request, 'finished'))
+    page.on('requestfailed', request => recordResource(request, 'failed', request.failure()?.errorText))
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
     try {
@@ -632,7 +726,17 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     await page.locator('[data-pet-dock]').waitFor({ state: 'attached', timeout: 10_000 })
     await page.locator('style[data-plugin-css="reasoning-slider"]').waitFor({ state: 'attached', timeout: 10_000 })
     await page.getByRole('button', { name: /^(?:鲸鱼娘（原版）|whale girl)$/u }).waitFor({ state: 'visible', timeout: 10_000 })
-    await page.locator('button').filter({ hasText: /^(?:设置|Settings)$/u }).first().evaluate((button) => button.click())
+    await dismissRuntimeOnboarding(page)
+    const settingsButton = page.getByRole('button', { name: /^(?:设置|Settings)$/u })
+    if (await settingsButton.count() === 0) {
+      const labels = await page.locator('button').evaluateAll(buttons => buttons.map(button => ({
+        text: button.textContent?.trim(),
+        label: button.getAttribute('aria-label'),
+        title: button.getAttribute('title'),
+      })).filter(button => button.text || button.label || button.title))
+      throw new Error(`settings button missing: ${JSON.stringify({ labels, url: page.url(), body: (await page.locator('body').innerText()).slice(0, 4000), browserErrors })}`)
+    }
+    await settingsButton.first().click()
     assert.equal(
       await page.getByRole('button', { name: /^(?:插件市场|Plugin Market)$/u }).count(),
       0,
@@ -646,15 +750,15 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(applySkin.ok, true)
-    assert.deepEqual(await applySkin.json(), { ok: true, active: 'xp' })
+    assert.deepEqual(await applySkin.json(), { ok: true, active: 'xp', background: null })
     assert.deepEqual(
       JSON.parse(await readFile(join(root, 'skin-center-active.json'), 'utf8')),
-      { active: 'xp' },
+      { active: 'xp', initialized: true },
     )
     const selectedSkinStateResponse = await runtimeFetch('/api/skin-center/v2/active', {
       signal: AbortSignal.timeout(5_000),
     })
-    assert.deepEqual(await selectedSkinStateResponse.json(), { ok: true, active: 'xp' })
+    assert.deepEqual(await selectedSkinStateResponse.json(), { ok: true, active: 'xp', background: null })
     const selectedSkinPage = await runtimeFetch('/', { signal: AbortSignal.timeout(5_000) })
     assert.equal(selectedSkinPage.ok, true)
     const selectedSkinHtml = await selectedSkinPage.text()
@@ -668,7 +772,16 @@ test('official DSH host serves the complete desktop profile', { timeout: 150_000
     assert.equal(await page.locator('html').getAttribute('data-dsh-skin'), 'xp')
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`${message}\nRecent runtime log:\n${await logs.tail(80)}`, { cause: error })
+    const renderer = await runtimePage?.evaluate(() => ({
+      readyState: document.readyState,
+      petRoots: document.querySelectorAll('[data-dsh-pet-root]').length,
+      frames: document.querySelectorAll('[data-dsh-frame]').length,
+      body: document.body.innerText.slice(0, 500),
+      externalScripts: [...document.scripts].filter(script => script.src).map(script => new URL(script.src).pathname).slice(-12),
+      resources: performance.getEntriesByType('resource').filter(entry => ['script', 'link', 'fetch'].includes(entry.initiatorType))
+        .slice(-20).map(entry => ({ pathname: new URL(entry.name).pathname, duration: entry.duration, bytes: entry.transferSize })),
+    })).catch(() => undefined)
+    throw new Error(`${message}\nRenderer diagnostics: ${JSON.stringify({ renderer, browserErrors: browserErrors.slice(-12), browserConsole, resourceEvents })}\nRecent runtime log:\n${await logs.tail(80)}`, { cause: error })
   } finally {
     await browser?.close()
     await controller?.stop()

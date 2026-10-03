@@ -6,6 +6,7 @@ Value Mode (性价比模式) V2 plugin for DeepSeek Harness (DSH): uses an exper
 
 ## Features
 
+- The named Value Mode preset is declared through the official `0.2.0-rc.2` agent preset registry and remains selectable while its model settings are incomplete.
 - Expert Controller Model (专家主控模型) and Subagent Worker Model (副模型 / 子代理执行模型) are selected from existing DSH providers. If no controller is explicitly configured, the current default model is preselected and used as a runtime fallback.
 - The settings, quick entry and setup guide use the native Host model catalog without reading API keys in the browser. Concurrent reads are shared and successful lists reused for up to 30 seconds; runtime, adapter, settings or credential changes invalidate that reuse. A ten-second query deadline ends loading with a retry action; partial provider failures preserve the usable models.
 - Three built-in operating strategies:

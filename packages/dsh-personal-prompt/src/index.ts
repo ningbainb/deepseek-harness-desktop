@@ -4,15 +4,13 @@ import { carrierKeyOf, type ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import type { UserScopeService } from '@ningbainb/dsh-user-scope'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import {
   PERSONAL_PROMPT_SECTION_NAME,
   PERSONAL_PROMPT_ORDER,
   PERSONAL_PROMPT_SECTION_TEMPLATE,
-  PERSONAL_PROMPT_SETTINGS_NAMESPACE,
   PERSONAL_PROMPT_VARIABLE,
-  assertPersonalPrompt,
   normalizePersonalPrompt,
   promptVariableValue,
   resolveEffectivePrompt,
@@ -38,10 +36,10 @@ const profileSchema = z.object({
 })
 
 export const Config: z<PersonalPromptConfig> = z.object({
-  version: z.number().step(1).default(1),
-  enabled: z.boolean().default(false),
-  activeProfileId: z.string().min(1).max(128),
-  profiles: z.array(profileSchema).default([]),
+  version: z.number().step(1).default(1).volatile(),
+  enabled: z.boolean().default(false).volatile(),
+  activeProfileId: z.string().min(1).max(128).volatile(),
+  profiles: z.array(profileSchema).default([]).volatile(),
 }) as unknown as z<PersonalPromptConfig>
 
 const DEFAULT_CONFIG: PersonalPromptConfig = { version: 1, enabled: false, profiles: [] }
@@ -126,7 +124,11 @@ function promptContext(
 
 /** Register the owner-safe Personal Prompt section and variable. */
 export function apply(ctx: Context, initialConfig: PersonalPromptConfig = DEFAULT_CONFIG): void {
-  let source: () => PersonalPromptConfig = () => initialConfig
+  const source = (): PersonalPromptConfig => normalizePersonalPrompt(Object.fromEntries(
+    Object.entries(initialConfig).map(([key, field]) => [key,
+      typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+        ? field.get() : field]),
+  ))
   let workspaceRegistry: WorkspaceRegistryLike | undefined
   const sessionScopes = new Map<ScopeKey, ScopeSessionIndex>()
   const userScope = ctx.userScope as unknown as UserScopeLike
@@ -161,14 +163,6 @@ export function apply(ctx: Context, initialConfig: PersonalPromptConfig = DEFAUL
       return undefined
     }
   }
-
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, PERSONAL_PROMPT_SETTINGS_NAMESPACE, Config, initialConfig, {
-      setSource: next => { source = next },
-      onChange: () => {},
-      validate: value => { assertPersonalPrompt(value) },
-    })
-  })
 
   ctx.effect(() => {
     const disposeSection = ctx.systemPrompt.section({

@@ -306,6 +306,18 @@ test('Windows packaging gives electron-builder and the release manifest one expl
   assert.match(source, /--channel', RELEASE_CHANNEL/u)
 })
 
+test('Windows packaging validates runtime evidence and matrix before replacing generated output', async () => {
+  const source = await readFile(join(appDirectory, 'scripts', 'package-win.mjs'), 'utf8')
+  const evidenceCheck = source.indexOf("'../../scripts/generate-runtime-support.mjs'")
+  const matrixCheck = source.indexOf("'../../scripts/generate-runtime-support-matrix.mjs'")
+  const cleanup = source.indexOf('await prepareReleaseDirectory()')
+  assert.ok(evidenceCheck > 0)
+  assert.ok(matrixCheck > evidenceCheck)
+  assert.ok(cleanup > matrixCheck)
+  assert.match(source.slice(evidenceCheck, matrixCheck), /'--check'[\s\S]*'--support-status'[\s\S]*runtimeSupportEvidence\.supportStatus/u)
+  assert.match(source.slice(matrixCheck, cleanup), /'--check'/u)
+})
+
 test('Windows signature verification is injectable and requires signer plus timestamp for signed artifacts', async () => {
   const verified = await verifyWindowsSignature('C:\\release\\desktop.exe', {
     runPowerShell: async () => JSON.stringify({

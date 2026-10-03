@@ -42,6 +42,7 @@ function createBufferedSubscription(channel, label, maxPending = 32) {
 }
 
 const baseApi = {
+  openExternalUrl: (url) => ipcRenderer.invoke('desktop:external-url-open', url),
   shellContext: Object.freeze({ mode: 'advanced', platform: process.platform }),
   getContract: () => ipcRenderer.invoke('desktop:contract'),
   getInfo: () => ipcRenderer.invoke('desktop:info'),
@@ -62,8 +63,10 @@ const baseApi = {
   onConversationImportBatchProgress: createBufferedSubscription('desktop:conversation-import-batch-progress', 'conversation import batch progress', 128),
   openRuntimeStream: (endpoint, payload) => ipcRenderer.invoke('desktop:runtime-stream-open', { endpoint, payload }),
   writeRuntimeStream: (id, value) => ipcRenderer.invoke('desktop:runtime-stream-write', id, value),
+  endRuntimeStream: (id) => ipcRenderer.invoke('desktop:runtime-stream-end', id),
   cancelRuntimeStream: (id) => ipcRenderer.invoke('desktop:runtime-stream-cancel', id),
   onRuntimeStream: createBufferedSubscription('desktop:runtime-stream-frame', 'runtime stream', 256),
+  startDragFile: (filePath) => ipcRenderer.invoke('desktop:drag-file', filePath),
 }
 
 const api = Object.freeze({

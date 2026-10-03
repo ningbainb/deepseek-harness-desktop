@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createRequire } from 'node:module'
 
 import {
   applyConversationSkills,
@@ -12,6 +13,44 @@ import {
   normalizeConversationSkills,
   normalizeSkillDiagnostics,
 } from '../src/conversation-skills.mjs'
+
+const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/package.json', import.meta.url))('jsdom')
+
+for (const label of ['指令', '命令', 'Commands', '添加文件或调用指令', 'Add files or run commands']) {
+  test(`skills mount next to ${label} and rebind to the current rich editor`, async () => {
+    const dom = new JSDOM('<main data-composer-card="true"><div class="toolbar"><button></button></div><div role="textbox" contenteditable="true"></div></main>', { runScripts: 'outside-only', url: 'https://dsh.internal/' })
+    try {
+      const document = dom.window.document
+      const composer = document.querySelector('main')
+      const command = composer.querySelector('button')
+      command.setAttribute('aria-label', label)
+      composer.getClientRects = () => [{ width: 400, height: 200 }]
+      dom.window.dshDesktop = { listSkills: async () => ({ skills: [] }) }
+      dom.window.eval(CONVERSATION_SKILLS_SCRIPT)
+      await new Promise(resolve => setImmediate(resolve))
+      let skills = composer.querySelector('button[aria-label="技能库"]')
+      assert.ok(skills)
+      assert.equal(skills.parentElement.previousElementSibling, command)
+      assert.equal(command.getAttribute('aria-label'), label)
+      skills.click()
+      assert.equal(skills.getAttribute('aria-expanded'), 'true')
+      const previousEditor = composer.querySelector('[role="textbox"]')
+      const nextEditor = previousEditor.cloneNode()
+      previousEditor.replaceWith(nextEditor)
+      await new Promise(resolve => setImmediate(resolve))
+      skills = composer.querySelector('button[aria-label="技能库"]')
+      assert.equal(composer.querySelectorAll('button[aria-label="技能库"]').length, 1)
+      assert.equal(skills.getAttribute('aria-expanded'), 'false')
+      assert.equal(dom.window.__dshDesktopConversationSkillsV1.textarea, nextEditor)
+      dom.window.__dshDesktopConversationSkillsV1.refresh()
+      await new Promise(resolve => setImmediate(resolve))
+      assert.equal(composer.querySelector('button[aria-label="技能库"]'), skills)
+    } finally {
+      dom.window.__dshDesktopConversationSkillsV1?.dispose()
+      dom.window.close()
+    }
+  })
+}
 
 test('skill inventory hides shadowed entries, deduplicates names, and pins recent use', () => {
   const skills = normalizeConversationSkills([
@@ -26,6 +65,38 @@ test('skill inventory hides shadowed entries, deduplicates names, and pins recen
   assert.equal(skills[1].recent, false)
   assert.deepEqual(filterConversationSkills(skills, 'browser').map((skill) => skill.name), ['playwright'])
   assert.deepEqual(filterConversationSkills(skills, 'CODE').map((skill) => skill.name), ['code'])
+})
+
+test('outside navigation closes skills even when the native document consumes pointer events and keeps its composer', async () => {
+  const dom = new JSDOM('<button id="navigate">Navigate</button><main data-composer-card="true"><button aria-label="指令"></button><div role="textbox" contenteditable="true"></div></main>', { runScripts: 'outside-only', url: 'https://dsh.internal/' })
+  try {
+    const document = dom.window.document
+    const composer = document.querySelector('main')
+    composer.getClientRects = () => [{ width: 400, height: 200 }]
+    const navigation = document.querySelector('#navigate')
+    const blockNativeEvent = event => { if (event.target === navigation) event.stopImmediatePropagation() }
+    document.addEventListener('pointerdown', blockNativeEvent, true)
+    document.addEventListener('click', blockNativeEvent, true)
+    dom.window.dshDesktop = { listSkills: async () => ({ skills: [] }) }
+    dom.window.eval(CONVERSATION_SKILLS_SCRIPT)
+    await new Promise(resolve => setImmediate(resolve))
+    const skills = composer.querySelector('button[aria-label="技能库"]')
+    const menu = document.querySelector('#dsh-desktop-skills-menu')
+    skills.click()
+    assert.equal(menu.hidden, false)
+    navigation.dispatchEvent(new dom.window.Event('pointerdown', { bubbles: true }))
+    assert.equal(menu.hidden, true)
+    assert.equal(skills.getAttribute('aria-expanded'), 'false')
+    skills.click()
+    assert.equal(menu.hidden, false)
+    navigation.click()
+    assert.equal(menu.hidden, true, 'keyboard and programmatic navigation must also close a live menu')
+    assert.equal(skills.getAttribute('aria-expanded'), 'false')
+    assert.equal(dom.window.__dshDesktopConversationSkillsV1.composer, composer)
+  } finally {
+    dom.window.__dshDesktopConversationSkillsV1?.dispose()
+    dom.window.close()
+  }
 })
 
 test('skill trigger uses a stable natural-language invocation', () => {

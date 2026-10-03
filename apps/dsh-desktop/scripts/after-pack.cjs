@@ -1,7 +1,9 @@
 const { cp, mkdir, readFile, readdir, realpath, rm, stat, writeFile } = require('node:fs/promises')
+const { createHash } = require('node:crypto')
 const { dirname, extname, isAbsolute, join, relative, resolve } = require('node:path')
 
 const sharp = require('sharp')
+const { writeWindowsUpdateConfiguration } = require('./packaged-update-config.cjs')
 
 // electron-builder cannot always disambiguate pnpm packages that have several
 // peer-dependency snapshots. These are required by the DSH boot graph, so copy
@@ -140,6 +142,8 @@ const FIRST_PARTY_BUILD_FILES = /^(?:tsconfig(?:\.[^.]+)?\.json|tsdown\.config\.
 const PUBLISHED_DOCUMENTATION_FILES = /^(?:readme(?:\.[^.]+)?|changelog|changes|history|contributing|security|code_of_conduct)(?:\.(?:md|markdown|txt|rst|adoc|html|ya?ml))?$/iu
 const RETIRED_SKIN_CARRIER_ASSETS = ['@linxin666', 'dsh-skins', 'skins']
 const SKIN_CENTER_ROOT = ['@linxin666', 'dsh-client-ui-skin-center', 'skins']
+const BUNDLED_SKIN_ASSETS_ROOT = join(__dirname, '..', 'build', 'skin-center-v2-assets')
+const BUNDLED_SKIN_ASSETS_MANIFEST = join(__dirname, '..', 'build', 'skin-center-v2-assets.sha256.json')
 const SKIN_PREVIEW_BOUNDS = Object.freeze({ width: 1440, height: 900 })
 
 const DEFAULT_PACKING_TARGET = Object.freeze({ platform: 'win32', arch: 'x64' })
@@ -484,7 +488,7 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
     try {
       resolutionAnchor = require.resolve(resolveFrom)
     } catch (error) {
-      if (error?.code !== 'MODULE_NOT_FOUND') throw error
+      if (error?.code !== 'MODULE_NOT_FOUND' && error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error
       resolutionAnchor = require.resolve(`${resolveFrom}/package.json`)
     }
     const source = Array.isArray(sourceFromEntry)
@@ -505,16 +509,90 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
   return restored
 }
 
+async function restoreBundledSkinAssets(nodeModulesRoot) {
+  const packageRoot = join(nodeModulesRoot, '@linxin666', 'dsh-client-ui-skin-center')
+  let packageManifest
+  try {
+    packageManifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+  } catch (error) {
+    if (error?.code === 'ENOENT') return []
+    throw error
+  }
+  if (packageManifest.version !== '0.4.4') {
+    throw new Error(`Skin Center asset supplement requires version 0.4.4, found ${packageManifest.version}`)
+  }
+  const manifest = JSON.parse(await readFile(BUNDLED_SKIN_ASSETS_MANIFEST, 'utf8'))
+  if (!Array.isArray(manifest.files)) throw new Error('bundled Skin Center asset manifest is invalid')
+  const expectedFiles = []
+  const skinIds = new Set()
+  for (const entry of manifest.files) {
+    if (typeof entry.path !== 'string' || typeof entry.sha256 !== 'string'
+      || !/^[a-z0-9-]+\/.+/u.test(entry.path) || entry.path.includes('..') || entry.path.includes('\\')) {
+      throw new Error('bundled Skin Center asset path is invalid')
+    }
+    const source = resolve(BUNDLED_SKIN_ASSETS_ROOT, entry.path)
+    const difference = relative(BUNDLED_SKIN_ASSETS_ROOT, source)
+    if (difference.startsWith('..') || isAbsolute(difference)) throw new Error('bundled Skin Center asset escapes source root')
+    const actualHash = createHash('sha256').update(await readFile(source)).digest('hex')
+    if (actualHash !== entry.sha256) throw new Error(`bundled Skin Center asset hash mismatch: ${entry.path}`)
+    expectedFiles.push(entry.path)
+    skinIds.add(entry.path.split('/')[0])
+  }
+  const actualFiles = (await listFiles(BUNDLED_SKIN_ASSETS_ROOT))
+    .map(path => relative(BUNDLED_SKIN_ASSETS_ROOT, path).replaceAll('\\', '/')).sort()
+  if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles.toSorted())) {
+    throw new Error('bundled Skin Center asset inventory differs from its hash manifest')
+  }
+  const restored = []
+  for (const skinId of [...skinIds].sort()) {
+    const destination = join(packageRoot, 'skins', skinId)
+    try {
+      await stat(destination)
+      continue
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+    await cp(join(BUNDLED_SKIN_ASSETS_ROOT, skinId), destination, {
+      recursive: true, force: false, errorOnExist: true,
+    })
+    restored.push(skinId)
+  }
+  // The published catalog filters builtins through package.json's files list.
+  // Keep that list in sync with the verified supplemental assets.
+  const shippedFiles = new Set(packageManifest.files ?? [])
+  const beforeCount = shippedFiles.size
+  for (const skinId of skinIds) shippedFiles.add(`skins/${skinId}`)
+  if (shippedFiles.size !== beforeCount) {
+    packageManifest.files = [...shippedFiles]
+    await writeFile(join(packageRoot, 'package.json'), `${JSON.stringify(packageManifest, null, 2)}\n`)
+  }
+  return restored
+}
+
+async function restoreAllBundledSkinAssets(nodeModulesRoot) {
+  const roots = [
+    nodeModulesRoot,
+    join(nodeModulesRoot, '@linxin666', 'dsh-web-ui-all', 'node_modules'),
+    join(nodeModulesRoot, '@linxin666', 'dsh-skins', 'node_modules'),
+  ]
+  const restored = []
+  for (const root of roots) restored.push(...await restoreBundledSkinAssets(root))
+  return [...new Set(restored)].sort()
+}
+
 async function afterPack(context) {
   const platform = context.electronPlatformName
   if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') return
+  await writeWindowsUpdateConfiguration(context)
   const target = packingTargetFromContext(context)
   const nodeModulesRoot = packagedNodeModulesRoot(context)
   const restoredPeers = await restoreRequiredPackagedPeers(nodeModulesRoot)
   const restoredNativeBindings = await restoreRequiredNativeBindings(nodeModulesRoot, target)
+  const restoredSkinAssets = await restoreAllBundledSkinAssets(nodeModulesRoot)
   const report = await prunePackagedRuntime(nodeModulesRoot, target)
   report.restoredPeers = restoredPeers
   report.restoredNativeBindings = restoredNativeBindings
+  report.restoredSkinAssets = restoredSkinAssets
   const outputPath = join(context.outDir, 'runtime-prune-report.json')
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(
@@ -528,6 +606,8 @@ module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers
 module.exports.restoreRequiredNativeBindings = restoreRequiredNativeBindings
+module.exports.restoreBundledSkinAssets = restoreBundledSkinAssets
+module.exports.restoreAllBundledSkinAssets = restoreAllBundledSkinAssets
 module.exports.packingTargetFromContext = packingTargetFromContext
 module.exports.packagedNodeModulesRoot = packagedNodeModulesRoot
 module.exports.DEFAULT_PACKING_TARGET = DEFAULT_PACKING_TARGET

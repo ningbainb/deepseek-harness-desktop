@@ -9,6 +9,7 @@ import electronPath from 'electron'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { openNativeSettings } from './native-settings-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const sourceMode = process.env.DSH_DESKTOP_E2E_SOURCE === '1'
@@ -22,6 +23,7 @@ const dshHome = join(temporary, 'dsh-home')
 const workspace = join(temporary, 'workspace')
 let app
 let latestPage
+let fixtureWorkspaceId
 const lifecycleErrors = []
 
 async function dismissStartup(page) {
@@ -86,8 +88,7 @@ async function launch() {
 }
 
 async function openSettings(page) {
-  await page.getByRole('button', { name: '设置', exact: true }).click({ force: true })
-  const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
+  const settings = await openNativeSettings(page)
   await settings.waitFor({ state: 'visible', timeout: 30_000 })
   await settings.getByText('Web UI 插件', { exact: true }).click()
   await page.waitForFunction(() => document.querySelectorAll('[data-relay-onboarding-card="true"]').length === 0, undefined, { timeout: 10_000 })
@@ -96,7 +97,7 @@ async function openSettings(page) {
   assert.equal(await modelNav.count(), 1)
   assert.equal(await settings.getByRole('button', { name: '模型选项', exact: true }).count(), 0)
   await modelNav.click()
-  const baiProvider = page.locator('[data-dsh-provider-id="project-relay"]').first()
+  const baiProvider = settings.locator('li').filter({ has: page.getByRole('button', { name: /^(?:编辑|Edit) (?:.* \(project-relay\)|project-relay)$/u }) }).first()
   await baiProvider.waitFor({ state: 'visible', timeout: 30_000 })
   const baiPosition = await baiProvider.evaluate((element) => {
     const row = element.closest('li')
@@ -133,25 +134,45 @@ async function chooseWorkspace(page) {
       return { canceled: false, filePaths: [path] }
     }
   }, workspace)
-  await page.getByRole('button', { name: '选择工作区', exact: true }).click({ force: true })
-  const picker = page.getByRole('dialog', { name: '选择工作区', exact: true })
+  await page.getByRole('button', { name: /^(?:添加工作区|选择工作区)$/u }).first().click({ force: true })
+  const picker = page.getByRole('dialog', { name: /^(?:创建项目|选择工作区)$/u })
   await picker.waitFor({ state: 'visible', timeout: 30_000 })
   await picker.getByRole('button', { name: /点击选择项目文件夹/u }).click()
   await picker.getByRole('textbox').fill('Model preferences fixture')
-  await picker.getByRole('button', { name: /^(创建项目|打开已有项目)$/u }).click()
+  const [created] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace/create', { timeout: 30_000 }),
+    picker.getByRole('button', { name: /^(创建项目|打开已有项目)$/u }).click(),
+  ])
+  const envelope = await created.json()
+  assert.equal(envelope.result?.ok, true)
+  fixtureWorkspaceId = envelope.result.value.workspace?.workspaceId ?? envelope.result.value.workspaceId
+  assert.equal(typeof fixtureWorkspaceId, 'string')
   await picker.waitFor({ state: 'hidden', timeout: 30_000 })
   await dismissStartup(page)
 }
 
 async function ensureWorkspace(page) {
-  const newSession = page.getByRole('button', { name: '新建会话', exact: true }).last()
-  if (await newSession.isVisible().catch(() => false)) return
   await dismissStartup(page)
-  const chooser = page.getByRole('button', { name: '选择工作区', exact: true })
-  if (await chooser.count().catch(() => 0) > 0 && await chooser.first().isVisible().catch(() => false)) {
-    await chooseWorkspace(page)
-  }
-  await newSession.waitFor({ state: 'visible', timeout: 30_000 })
+  assert.equal(typeof fixtureWorkspaceId, 'string')
+  await page.locator(`[role="treeitem"][data-row-key="workspace:${fixtureWorkspaceId}"]`).waitFor({ state: 'visible', timeout: 30_000 })
+}
+
+async function createSession(page) {
+  await ensureWorkspace(page)
+  const group = page.locator(`[role="treeitem"][data-row-key="workspace:${fixtureWorkspaceId}"]`)
+  await group.hover()
+  const button = group.locator('button').last()
+  assert.match(await button.getAttribute('aria-label') ?? '', /会话|session/iu)
+  const [response] = await Promise.all([
+    page.waitForResponse(candidate => new URL(candidate.url()).pathname === '/api/session/create'
+      && candidate.request().postDataJSON()?.payload?.args?.request?.workspaceId === fixtureWorkspaceId, { timeout: 30_000 }),
+    button.click(),
+  ])
+  const envelope = await response.json()
+  assert.equal(envelope.result?.ok, true)
+  const sessionId = envelope.result.value.sessionId
+  assert.equal(typeof sessionId, 'string')
+  await page.locator(`[role="treeitem"][data-row-key="session:${sessionId}"][aria-selected="true"]`).waitFor({ state: 'visible', timeout: 30_000 })
 }
 
 function providerRows(card) {
@@ -169,6 +190,11 @@ async function configurePreferences(card) {
   }))
   await modelRows.nth(0).getByRole('button', { name: '置顶', exact: true }).click()
   await modelRows.nth(1).getByRole('button', { name: '置顶', exact: true }).click()
+  const initialOrder = await providerRows(card).locator('[class*="providerMain"] code').allTextContents()
+  assert.deepEqual(initialOrder.map(value => value.trim()), ['project-relay', 'openai-codex', 'deepseek-official'])
+  await deepseekRow.getByRole('button', { name: '上移', exact: true }).click()
+  const beforeDown = await providerRows(card).locator('[class*="providerMain"] code').allTextContents()
+  assert.deepEqual(beforeDown.map(value => value.trim()), ['project-relay', 'deepseek-official', 'openai-codex'])
   await deepseekRow.getByRole('button', { name: '下移', exact: true }).click()
   await deepseekRow.getByRole('button', { name: '禁用', exact: true }).click()
   await card.getByRole('button', { name: '保存', exact: true }).click()
@@ -221,18 +247,20 @@ async function readComposerSelector(page) {
       disabled: button.disabled,
     })),
   })))
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
+  await trigger.click()
   await menu.waitFor({ state: 'hidden', timeout: 30_000 })
   return sections
 }
 
 async function readModelCommand(page) {
-  const commandButton = page.getByRole('button', { name: '指令', exact: true }).last()
+  const commandButton = page.getByRole('button', { name: /^(?:指令|命令|Commands|添加文件或调用指令|Add files or run commands)$/u }).last()
   await commandButton.click({ force: true })
   const commandList = page.locator('[role="listbox"][aria-label="触发候选建议"]')
   await commandList.waitFor({ state: 'visible', timeout: 30_000 })
-  await commandList.getByRole('option', { name: /^model/u }).click({ force: true })
+  const modelCommand = commandList.getByRole('option').filter({ has: page.getByText('模型', { exact: true }) })
+  await modelCommand.waitFor({ state: 'visible', timeout: 30_000 })
+  assert.equal(await modelCommand.count(), 1)
+  await modelCommand.click({ force: true })
   const popup = page.locator('[aria-label="/model 选项"]')
   await popup.waitFor({ state: 'visible', timeout: 30_000 })
   const rows = await popup.locator('[role="option"]').evaluateAll((items) => items.map((row) => ({
@@ -290,7 +318,7 @@ try {
   assert.equal(firstSettingsState.deepseekEnabledButtonCount, 1)
   await closeSettings(firstSettings.settings)
   await chooseWorkspace(firstPage)
-  await firstPage.getByRole('button', { name: '新建会话', exact: true }).last().click({ force: true })
+  await createSession(firstPage)
   const firstSections = await readComposerSelector(firstPage)
   const firstRows = await readModelCommand(firstPage)
   assertComposerProjection(firstSections, expectedPins.labels)
@@ -308,7 +336,7 @@ try {
   assert.equal(restartedSettingsState.deepseekEnabledButtonCount, 1)
   await closeSettings(secondSettings.settings)
   await ensureWorkspace(second.page)
-  await second.page.getByRole('button', { name: '新建会话', exact: true }).last().click({ force: true })
+  await createSession(second.page)
   const restartedSections = await readComposerSelector(second.page)
   const restartedRows = await readModelCommand(second.page)
   assertComposerProjection(restartedSections, expectedPins.labels)

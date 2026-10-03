@@ -42,6 +42,73 @@ test('window state save is a no-op after the Electron window is destroyed', asyn
   }
 })
 
+test('window state readers never observe partial JSON during queued saves', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-atomic-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  let bounds = { x: 80, y: 60, width: 960, height: 700 }
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  const save = attachWindowStatePersistence(window, statePath)
+  try {
+    await save()
+    await Promise.all([
+      (async () => {
+        for (let iteration = 0; iteration < 150; iteration += 1) {
+          const state = JSON.parse(await readFile(statePath, 'utf8'))
+          assert.equal(state.width, 960)
+          assert.equal(state.height, 700)
+          assert.equal(state.maximized, false)
+          assert.ok(Number.isInteger(state.x))
+        }
+      })(),
+      (async () => {
+        for (let iteration = 0; iteration < 75; iteration += 1) {
+          bounds = { ...bounds, x: 80 + iteration }
+          window.emit('move')
+          await save()
+        }
+      })(),
+    ])
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...bounds, maximized: false })
+  } finally {
+    window.emit('closed')
+    window.isDestroyed = () => true
+    await save()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('explicit window save cancels a pending event-driven capture', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-timer-'))
+  const statePath = join(root, 'window-state.json')
+  const window = new EventEmitter()
+  const bounds = { x: 80, y: 60, width: 960, height: 700 }
+  let captures = 0
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => {
+    captures += 1
+    return { ...bounds }
+  }
+  window.isMaximized = () => false
+  const save = attachWindowStatePersistence(window, statePath)
+  try {
+    window.emit('move')
+    await save()
+    assert.equal(captures, 1)
+    context.mock.timers.tick(250)
+    assert.equal(captures, 1)
+    assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...bounds, maximized: false })
+  } finally {
+    window.emit('closed')
+    window.isDestroyed = () => true
+    await save()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('window close persists the final geometry before BrowserWindow destruction', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-close-'))
   const statePath = join(root, 'window-state.json')
@@ -79,11 +146,12 @@ test('restored logical bounds do not accumulate native constructor DPI rounding 
   const intended = { x: 80, y: 60, width: 1280, height: 820 }
   let bounds = { x: 82, y: 60, width: 1286, height: 824 }
   let maximized = false
+  let save
   window.isDestroyed = () => false
   window.getNormalBounds = () => ({ ...bounds })
   window.isMaximized = () => maximized
   try {
-    const save = attachWindowStatePersistence(window, statePath, { restoredBounds: intended })
+    save = attachWindowStatePersistence(window, statePath, { restoredBounds: intended })
     await save()
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...intended, maximized: false })
     // A cancelled gesture has not changed native geometry and must not
@@ -127,6 +195,8 @@ test('restored logical bounds do not accumulate native constructor DPI rounding 
     assert.deepEqual(JSON.parse(await readFile(statePath, 'utf8')), { ...bounds, maximized: false })
   } finally {
     window.emit('closed')
+    window.isDestroyed = () => true
+    await save?.()
     await rm(root, { recursive: true, force: true })
   }
 })

@@ -42,7 +42,7 @@ try {
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
   app = await electron.launch({ executablePath: packagedExecutable || electronPath, args: packagedExecutable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
-    env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData, DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', BALANCE_OFFICIAL_TEST_KEY: 'official-fixture-key', BALANCE_RELAY_TEST_KEY: 'relay-fixture-key' } })
+    env: { ...process.env, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData, DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DEEPSEEK_API_KEY: 'official-fixture-key', BALANCE_OFFICIAL_TEST_KEY: 'official-fixture-key', BALANCE_RELAY_TEST_KEY: 'relay-fixture-key' } })
   await useChineseFixtureLocale(app)
   const page = await app.firstWindow()
   const errors = []
@@ -63,7 +63,7 @@ try {
     const response = await fetch('/api/live-stats/balance?' + new URLSearchParams({ ...selection, force: '1' }))
     return response.json()
   }, selection)
-  assert.equal((await query({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })).totalBalance, '11.25')
+  assert.equal((await query({ provider: 'deepseek-official', model: 'deepseek-flash' })).totalBalance, '11.25')
   assert.equal((await query({ provider: 'balance-relay', model: 'balance-test-model' })).totalBalance, '7.5')
   await app.evaluate(({ dialog }, directory) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] })
@@ -91,12 +91,12 @@ try {
     await menu.getByRole('menuitemradio', { name }).first().click()
     await menu.waitFor({ state: 'hidden' })
   }
-  await chooseModel(/DeepSeek-V4-Flash/u)
+  await chooseModel(/^DeepSeek-V41-Flash$/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '11.25 CNY')
   await chooseModel(/Balance Test Model/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '7.5 USD')
   assert.match(await page.locator('[data-dsh-balance-entry]').getAttribute('title'), /balance-relay/u)
-  await chooseModel(/DeepSeek-V4-Flash/u)
+  await chooseModel(/^DeepSeek-V41-Flash$/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '11.25 CNY')
   assert.ok(requests.length > 0)
   assert.ok(requests.every(request => request.authorized && request.method === 'GET' && !/completions|responses/.test(request.path)))
@@ -108,6 +108,7 @@ try {
     amount: document.querySelector('[data-dsh-balance-amount]')?.textContent,
     title: document.querySelector('[data-dsh-balance-entry]')?.getAttribute('title'),
     model: document.querySelector('[data-slot="conversation.input.model"]')?.textContent,
+    modelChoices: [...document.querySelectorAll('[role="menuitemradio"]')].map(node => node.textContent?.trim()),
     slots: [...document.querySelectorAll('[data-slot]')].map(node => node.getAttribute('data-slot')).filter(Boolean),
     treeitems: [...document.querySelectorAll('[role="treeitem"]')].map(node => ({ text: node.textContent?.trim(), selected: node.getAttribute('aria-selected'), expanded: node.getAttribute('aria-expanded') })),
     buttons: [...document.querySelectorAll('button')].slice(-24).map(node => node.textContent?.trim()).filter(Boolean),

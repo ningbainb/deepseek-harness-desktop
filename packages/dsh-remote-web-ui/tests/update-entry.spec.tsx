@@ -11,8 +11,11 @@ import { en, type RemoteKey } from '../src/client/locales.ts'
 // the platform module table, so stub the value import minimally.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconCloseOutline16: () => null,
+  IconCloseOutlineMedium: () => null,
   IconRefreshOutline16: () => null,
+  IconRefreshOutlineMedium: () => null,
   IconDownloadOutline16: () => null,
+  IconDownloadOutlineMedium: () => null,
 }))
 
 // English dictionary translate stub with {param} interpolation.

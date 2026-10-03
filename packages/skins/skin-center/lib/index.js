@@ -1,4 +1,4 @@
-import z from "schemastery";
+import z from "@deepseek-ai/schemastery";
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { homedir } from "node:os";
@@ -1091,7 +1091,8 @@ const inject = ["webServer"];
 */
 const SKIN_BACKGROUND_NAMESPACE = "skin-background";
 /** Runtime schema for SkinBackgroundConfig. */
-const SkinBackgroundConfigSchema = z.object({ backgroundOpacity: z.number().min(0).max(100).step(5).default(0) });
+const SkinBackgroundConfigSchema = z.object({ backgroundOpacity: z.number().min(0).max(100).step(5).default(0).volatile() });
+const Config = SkinBackgroundConfigSchema;
 /**
 * Register the skin-center API routes.
 *
@@ -1101,12 +1102,6 @@ const SkinBackgroundConfigSchema = z.object({ backgroundOpacity: z.number().min(
 * @param ctx - cordis context.
 */
 function apply(ctx) {
-	ctx.inject(["settings"], (settingsCtx) => {
-		settingsCtx.settings.installSection(ctx, SKIN_BACKGROUND_NAMESPACE, SkinBackgroundConfigSchema, {}, {
-			setSource: () => {},
-			onChange: () => {}
-		});
-	});
 	const routes = makeSkinCenterRoutes();
 	try {
 		ctx.effect(() => {
@@ -1126,4 +1121,4 @@ function apply(ctx) {
 	}
 }
 //#endregion
-export { SKIN_BACKGROUND_NAMESPACE, SKIN_CENTER_API_PREFIX, SkinBackgroundConfigSchema, apply, inject, makeSkinCenterRoutes, name };
+export { Config, SKIN_BACKGROUND_NAMESPACE, SKIN_CENTER_API_PREFIX, SkinBackgroundConfigSchema, apply, inject, makeSkinCenterRoutes, name };

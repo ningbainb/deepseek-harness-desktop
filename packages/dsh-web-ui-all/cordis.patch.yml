@@ -98,3 +98,23 @@
 - insert:
     - id: ui-skin-center
       name: '@linxin666/dsh-client-ui-skin-center'
+
+# from external @linxin666/dsh-client-ui-community-plugins@0.4.4
+- insert:
+    - id: ui-community-plugins
+      name: '@linxin666/dsh-client-ui-community-plugins'
+
+# from external @linxin666/dsh-client-ui-plugin-manager@0.4.4
+- insert:
+    - id: ui-plugin-manager
+      name: '@linxin666/dsh-client-ui-plugin-manager'
+
+# from external @linxin666/dsh-chat-recovery@0.3.5
+- insert:
+    - id: ui-chat-recovery
+      name: '@linxin666/dsh-chat-recovery'
+
+# from external @linxin666/dsh-desktop-launcher@0.3.13
+- insert:
+    - id: desktop-launcher
+      name: '@linxin666/dsh-desktop-launcher'

@@ -136,7 +136,7 @@ index b0bb430657b4d67a2f197d15201c3d17a1a0f423..c6d8e889eb967a5b1f4e03c878f37fbd
  					latestRequest += 1;
  					if (currentActivation !== null) {
  						ledger.disposeActivation(currentActivation);
-@@ -2608,11 +2642,25 @@ window.__ModuleLoader__.load({
+@@ -2608,11 +2642,28 @@ window.__ModuleLoader__.load({
  			const doc = options.doc ?? document;
  			const apiBase = options.apiBase ?? "/api/skin-center/v2";
  			const fetchImpl = options.fetchImpl ?? fetch.bind(doc.defaultView);
@@ -157,7 +157,10 @@ index b0bb430657b4d67a2f197d15201c3d17a1a0f423..c6d8e889eb967a5b1f4e03c878f37fbd
 +						body: JSON.stringify({ active: id })
 +					});
 +					if (!response.ok || (await response.json()).ok !== true) throw new Error("skin selection was not saved");
-+					if (!stopped) selectionChannel?.postMessage({ active: id });
++					if (!stopped) {
++						selectionChannel?.postMessage({ active: id });
++						try { doc.defaultView?.dispatchEvent(new doc.defaultView.CustomEvent("dsh-skin-applied", { detail: { id } })); } catch {}
++					}
 +				},
  				suppressBackgroundMedia: options.suppressBackgroundMedia,
  				onError: (message, error) => {
@@ -202,7 +205,7 @@ index b0bb430657b4d67a2f197d15201c3d17a1a0f423..c6d8e889eb967a5b1f4e03c878f37fbd
  			{
  				const root = doc.defaultView;
  				root.__skinRuntime = store;
-@@ -2663,22 +2730,39 @@ window.__ModuleLoader__.load({
+@@ -2663,22 +2730,42 @@ window.__ModuleLoader__.load({
  			(async () => {
  				try {
  					await refreshCatalog();
@@ -231,13 +234,16 @@ index b0bb430657b4d67a2f197d15201c3d17a1a0f423..c6d8e889eb967a5b1f4e03c878f37fbd
 +				const onSkinApplied = (event) => {
 +					if (stopped) return;
 +					const detail = event.detail;
-+					if (detail && typeof detail.id === "string") refreshCatalog().then(async () => {
-+						if (stopped) return;
-+						const entry = store.find(detail.id);
-+						if (entry !== null) await controller.switchTo(detail.id, entry);
-+					}).catch((error) => {
-+						if (!stopped) console.error("[skin-center] applied selection failed", error);
-+					});
++					if (detail && typeof detail.id === "string") {
++						if (controller.getState().active === detail.id) return;
++						refreshCatalog().then(async () => {
++							if (stopped) return;
++							const entry = store.find(detail.id);
++							if (entry !== null) await controller.switchTo(detail.id, entry);
++						}).catch((error) => {
++							if (!stopped) console.error("[skin-center] applied selection failed", error);
++						});
++					}
 +				};
 +				win.addEventListener("dsh-skin-applied", onSkinApplied);
 +				removeAppliedListener = () => win.removeEventListener("dsh-skin-applied", onSkinApplied);

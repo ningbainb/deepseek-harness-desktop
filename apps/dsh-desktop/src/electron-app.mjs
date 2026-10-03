@@ -121,7 +121,7 @@ import { desktopRuntimeOrigin } from './runtime-origin.mjs'
 import { installSettingsWindow } from './settings-window.mjs'
 import { exportStartupDiagnostics } from './startup-diagnostics.mjs'
 import { SettingsWindowStateStore } from './settings-window-state.mjs'
-import { installStarPromptSurface, StarPromptStore } from './star-prompt.mjs'
+import { installStarPromptSurface, STAR_PROMPT_VERSION, StarPromptStore } from './star-prompt.mjs'
 import { createDesktopTerminalPanel } from './terminal-window.mjs'
 import { ProductTelemetryClient } from './telemetry-client.mjs'
 import { resolveTelemetryEndpoint } from './telemetry-config.mjs'
@@ -559,6 +559,20 @@ export function createDesktopShutdownLifecycle({
   })
 }
 
+export async function prepareDesktopRuntimeStop({ quiesceExtensions, stopGateway, quiesceProtocol, quiesceStreams }) {
+  await quiesceExtensions()
+  await stopGateway()
+  await quiesceProtocol()
+  await quiesceStreams()
+}
+
+export async function completeDesktopQuit({ saveState, shutdown, destroyWindows, quit }) {
+  await saveState()
+  await shutdown()
+  destroyWindows()
+  quit()
+}
+
 export async function startElectronApp(metadata) {
   const applicationStartedAt = performance.now()
   const bootId = randomUUID().replaceAll('-', '').slice(0, 16)
@@ -813,6 +827,7 @@ export async function startElectronApp(metadata) {
     dialog,
     WebContentsView,
     getRuntimeOrigin: () => activeOrigin,
+    getRuntimeGeneration: () => runtimeProvider?.status?.pid,
     appIcon,
     windowChromeIconDataUrl,
     mainPreload: MAIN_PRELOAD_PATH,
@@ -1254,6 +1269,11 @@ export async function startElectronApp(metadata) {
       )
       return result
     } catch (error) {
+      if (mode === 'full') {
+        const reason = typeof error?.audit?.reasonCode === 'string' ? error.audit.reasonCode : 'unknown'
+        const cause = typeof error?.cause?.code === 'string' ? error.cause.code : 'unknown'
+        await logStore.append(`[startup] full profile init failed code=${error?.code ?? 'unknown'} reason=${reason} cause=${cause}`).catch(() => {})
+      }
       if (mode === 'builtins' || mode === 'repair') {
         await logStore.append(`[startup] profile init for ${mode} failed: ${error.message}; attempting clean rebuild`).catch(() => {})
         const targetProfileDir = join(dshHome, 'profiles', mode === 'repair' ? 'desktop-repair' : 'desktop-builtins')
@@ -1430,13 +1450,13 @@ export async function startElectronApp(metadata) {
     profileDir,
     baseline: runtimeBaseline,
     policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
-    managedPackageNames: [...runtimePackages.keys()],
+    managedPackageNames: [...runtimePackages.keys()].filter(name => DESKTOP_RUNTIME_PACKAGE_POLICY.owns(name)),
   })
   auditFullProfileIntegrity = () => auditRuntimeIntegrity({
     profileDir: desktopProfileDir,
     baseline: runtimeBaseline,
     policy: DESKTOP_RUNTIME_PACKAGE_POLICY,
-    managedPackageNames: [...runtimePackages.keys()],
+    managedPackageNames: [...runtimePackages.keys()].filter(name => DESKTOP_RUNTIME_PACKAGE_POLICY.owns(name)),
   })
   let primaryFullUserPermission
   try {
@@ -1844,6 +1864,7 @@ export async function startElectronApp(metadata) {
   })
   const unregisterIpc = registerDesktopIpc({
     ipcMain,
+    app,
     surfaceRegistry,
     controller: runtimeProvider,
     runtimeProvider,
@@ -1947,6 +1968,7 @@ export async function startElectronApp(metadata) {
       try {
         const window = await createExtensionWindow()
         if (options.setting) window.webContents.send('extensions:navigate', { setting: options.setting })
+        else if (options.tab) window.webContents.send('extensions:navigate', { tab: options.tab })
         productMetrics.recordDockOpened(true)
         return true
       } catch (error) {
@@ -1958,8 +1980,7 @@ export async function startElectronApp(metadata) {
       // Mirrors the .dshpreset handoff: validate in Electron main, open the
       // Extension Dock, and deliver only the structured install source. The
       // dock's install form and its native approval own every later step.
-      const window = await createExtensionWindow()
-      window.webContents.send('extensions:navigate', { tab: 'plugins' })
+      const window = await createExtensionWindow({ tab: 'plugins' })
       window.webContents.send('extensions:plugin-install-prefill', { spec })
       await logStore.append(`[extensions] plugin install request received for a ${spec.split(':')[0] === 'git' ? 'git' : 'registry'} source`).catch(() => {})
     },
@@ -1975,7 +1996,7 @@ export async function startElectronApp(metadata) {
     },
     claimStarPrompt: async () => {
       try {
-        return await starPromptStore.claim(desktopVersion)
+        return await starPromptStore.claim(STAR_PROMPT_VERSION)
       } catch (error) {
         await logStore.append(`[star-prompt] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)
         return false
@@ -2108,6 +2129,15 @@ export async function startElectronApp(metadata) {
   const createHandoffWindow = (...args) => desktopWindowFactory.createHandoffWindow(...args)
   const createCommunityWindow = (...args) => desktopWindowFactory.createCommunityWindow(...args)
 
+  // Allow the privileged main-window runtime (and future kernel sidebar hooks) to open
+  // the Extension Dock directly on a given management tab, so every desktop entry
+  // point converges on the same Dock UI.
+  ipcMain.handle('desktop:open-extensions', async (_event, payload) => {
+    const tab = payload !== null && typeof payload === 'object' ? payload.tab : undefined
+    await createExtensionWindow(typeof tab === 'string' ? { tab } : {})
+    return true
+  })
+
   // Normal plugin installation is already an explicit user action. Keep the
   // source descriptor private to Electron main, revalidate it, and install it
   // transactionally without a second trust or compatibility decision.
@@ -2161,7 +2191,7 @@ export async function startElectronApp(metadata) {
   }
   let extensionRuntimeMaintenance = false
   const unregisterExtensionIpc = registerExtensionIpc({
-    selectDockSetting: (id) => desktopWindowFactory.selectDockSetting(id),
+    selectDockSetting: (id, plugin) => desktopWindowFactory.selectDockSetting(id, plugin),
     ipcMain,
     surfaceRegistry,
     isDockSettingsSender: sender => desktopWindowFactory.isDockSettingsSender(sender),
@@ -2196,10 +2226,7 @@ export async function startElectronApp(metadata) {
   let legacyNpmRestoreScheduled = false
   const dispatchDeepLink = async (link) => {
     if (link.kind === 'extensions' || link.kind === 'preset-preview') {
-      const window = await createExtensionWindow()
-      window.webContents.send('extensions:navigate', {
-        tab: link.kind === 'preset-preview' ? 'presets' : 'plugins',
-      })
+      await createExtensionWindow({ tab: link.kind === 'preset-preview' ? 'presets' : 'plugins' })
       return
     }
     if (!mainWindow || mainWindow.isDestroyed()) return
@@ -2749,12 +2776,12 @@ export async function startElectronApp(metadata) {
   releaseStartupSurface()
 
   const shutdownLifecycle = createDesktopShutdownLifecycle({
-    prepareStop: async () => {
-      await lanGateway.stop()
-      runtimeProtocolLifecycle.quiesce()
-      await unregisterRuntimeStreamIpc.quiesce()
-      await unregisterExtensionIpc.quiesce()
-    },
+    prepareStop: () => prepareDesktopRuntimeStop({
+      quiesceExtensions: () => unregisterExtensionIpc.quiesce(),
+      stopGateway: () => lanGateway.stop(),
+      quiesceProtocol: () => runtimeProtocolLifecycle.quiesce(),
+      quiesceStreams: () => unregisterRuntimeStreamIpc.quiesce(),
+    }),
     saveState: saveWindowState,
     stopRuntime: () => runtimeProvider.stop(),
     resumeOperations: async () => {
@@ -2784,7 +2811,6 @@ export async function startElectronApp(metadata) {
           removeLanGatewayStatusListener()
           return lanGateway.dispose()
         },
-        unregisterRuntimeStreamIpc,
       ]
       for (const dispose of disposers) {
         try {
@@ -2799,6 +2825,7 @@ export async function startElectronApp(metadata) {
   const finalizeRendererIpc = () => {
     if (rendererIpcFinalized) return
     rendererIpcFinalized = true
+    unregisterRuntimeStreamIpc()
     unregisterMainSurface()
     unregisterIpc()
     void unregisterExtensionIpc().catch((error) => {
@@ -3047,17 +3074,18 @@ export async function startElectronApp(metadata) {
     event.preventDefault()
     if (wasQuitting) return
     setQuitInProgress(true)
-    void (async () => {
-      await Promise.resolve(saveWindowState()).catch((error) => logStore.append(
+    void completeDesktopQuit({
+      saveState: () => Promise.resolve(saveWindowState()).catch((error) => logStore.append(
         `[shutdown] ${error instanceof Error ? error.message : String(error)}`,
-      ))
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.destroy()
-      }
-      await new Promise(resolve => setImmediate(resolve))
-      await shutdownLifecycle.shutdown()
-      app.quit()
-    })()
+      )),
+      shutdown: () => shutdownLifecycle.shutdown(),
+      destroyWindows: () => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.destroy()
+        }
+      },
+      quit: () => app.quit(),
+    })
       .catch((error) => {
         appQuitStarted = false
         setQuitInProgress(false)

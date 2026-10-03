@@ -1,5 +1,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -28,7 +30,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const inject = ['slots', 'locale', 'settingsScope']
+export const inject = ['slots', 'locale', 'configForms']
 
 interface SettingsBinderFace {
   bind<S>(spec: SettingsScopeSpec<S>): SettingsScope<S>
@@ -60,7 +62,9 @@ export function installParticleThemeClient(ctx: ClientContext, binderOverride?: 
 
   ctx.effect(() => ctx.locale.register(PARTICLE_THEME_NAMESPACE, { zh, en }), 'particle-theme: dictionaries')
   const compatibilityBinder = binderOverride ?? (ctx.get as (name: string) => unknown)('webUiSettings')
-  const binder = isSettingsBinderFace(compatibilityBinder) ? compatibilityBinder : ctx.settingsScope
+  const binder = isSettingsBinderFace(compatibilityBinder)
+    ? compatibilityBinder
+    : { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const scope = binder.bind<ParticleThemeSettings>({ namespace: PARTICLE_THEME_NAMESPACE })
   const controller = new ParticleThemeController({
     scope,

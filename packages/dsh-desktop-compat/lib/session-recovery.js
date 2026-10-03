@@ -1,6 +1,6 @@
 import { constants, createReadStream, createWriteStream } from "node:fs";
 import { copyFile, open, readFile, rename, rm, stat } from "node:fs/promises";
-import { sessionFormatCatalog } from "@deepseek-ai/dsh-session-format-catalog";
+import { historicalSessionFormatCatalog } from "@deepseek-ai/dsh-session-format-catalog";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 import { constants as constants$1, createZstdCompress, zstdCompress, zstdDecompressSync } from "node:zlib";
@@ -254,7 +254,7 @@ async function recoverReleasedV0Artifact(path, expectedId, signal, allowSubagent
 		if (headerRange === void 0) return false;
 		const header = parseSingleHeaderFrame(zstdDecompressSync(source.subarray(headerRange.start, headerRange.end)), expectedId);
 		if (header === void 0) return false;
-		const restore = sessionFormatCatalog.createRestore(header, {
+		const restore = historicalSessionFormatCatalog.createRestore(header, {
 			recovery: "strict",
 			validation: "transformed"
 		});

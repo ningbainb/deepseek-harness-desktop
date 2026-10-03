@@ -15,13 +15,13 @@ import {
 describe('ValueMode Config', () => {
   it('has valid defaults in schema', () => {
     const parsed = Config({})
-    expect(parsed.enabled).toBe(false)
-    expect(parsed.strategy).toBe(DEFAULT_STRATEGY)
-    expect(parsed.maxOutputTokens).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
-    expect(parsed.maxContextChars).toBe(DEFAULT_MAX_CONTEXT_CHARS)
-    expect(parsed.maxDepth).toBe(DEFAULT_MAX_DEPTH)
-    expect(parsed.allowReview).toBe(DEFAULT_ALLOW_REVIEW)
-    expect(parsed.showExpertActivity).toBe(DEFAULT_SHOW_EXPERT_ACTIVITY)
+    expect((parsed.enabled as unknown as { get(): boolean }).get()).toBe(false)
+    expect((parsed.strategy as unknown as { get(): string }).get()).toBe(DEFAULT_STRATEGY)
+    expect((parsed.maxOutputTokens as unknown as { get(): number }).get()).toBe(DEFAULT_MAX_OUTPUT_TOKENS)
+    expect((parsed.maxContextChars as unknown as { get(): number }).get()).toBe(DEFAULT_MAX_CONTEXT_CHARS)
+    expect((parsed.maxDepth as unknown as { get(): number }).get()).toBe(DEFAULT_MAX_DEPTH)
+    expect((parsed.allowReview as unknown as { get(): boolean }).get()).toBe(DEFAULT_ALLOW_REVIEW)
+    expect((parsed.showExpertActivity as unknown as { get(): boolean }).get()).toBe(DEFAULT_SHOW_EXPERT_ACTIVITY)
   })
 
   it('correctly judges isConfigured', () => {

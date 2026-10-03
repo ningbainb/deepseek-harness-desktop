@@ -40,6 +40,7 @@ import {
 const dock = await getDockEntryState()
 if (dock.available) {
   await openDesktopSurface('extensions')
+  await openDesktopSurface('extensions', { setting: 'models' })
   await openDesktopSurface('extensions', { setting: 'value-mode' }) // 直接打开模型协作
 }
 

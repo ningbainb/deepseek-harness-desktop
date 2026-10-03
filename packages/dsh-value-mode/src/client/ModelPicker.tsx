@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelRouteSelection } from '../core/config.ts'
 import { en, zh, type ValueModeLocaleKey } from './locales.ts'
+import { ModelCatalogChangedError } from './model-catalog.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
 import picker from './value-mode-picker.module.css'
@@ -51,6 +52,16 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    const refresh = () => setReloadToken(value => value + 1)
+    window.addEventListener('dsh-relay-models-updated', refresh)
+    const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('dsh-model-selection-confirmed-v1') : undefined
+    if (channel) channel.onmessage = event => {
+      if (typeof event.data === 'object' && event.data !== null && event.data.provider === 'project-relay') refresh()
+    }
+    return () => { window.removeEventListener('dsh-relay-models-updated', refresh); channel?.close() }
+  }, [])
+
+  useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     dialogRef.current?.querySelector<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
@@ -93,16 +104,27 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
       setError(catalogText('catalogTimeout'))
       setLoading(false)
     }, 12_000)
-    void Promise.resolve().then(() => fetchModels()).then((result) => {
+    void Promise.resolve().then(async () => {
+      for (let refresh = 0; active; refresh += 1) {
+        try {
+          return await fetchModels()
+        } catch (reason) {
+          if (!(reason instanceof ModelCatalogChangedError) || refresh >= 2 || !active) throw reason
+        }
+      }
+    }).then((result) => {
+      clearTimeout(timer)
       if (!active) return
+      if (!result) return
       setGroups(sortValueModeProviderGroups(result.groups ?? []))
       setFailures(result.failures ?? [])
       setLoading(false)
     }).catch((reason) => {
+      clearTimeout(timer)
       if (!active) return
       setError(errorText(reason))
       setLoading(false)
-    }).finally(() => clearTimeout(timer))
+    })
     return () => { active = false; clearTimeout(timer) }
   }, [fetchModels, reloadToken])
 
@@ -126,6 +148,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
           </div>
           <button type="button" className={styles.button} aria-label="关闭模型选择器" onClick={onClose}>×</button>
         </div>
+
+        {document.querySelector('[data-dsh-relay-access-root]') && <button type="button" className={styles.button} data-dsh-relay-connect="true">{catalogText('baiAccess')}</button>}
 
         {loading && <div className={styles.desc} role="status">加载已配置模型列表中...</div>}
 
@@ -171,6 +195,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
                     className={`${styles.modelOption} ${picker.optionButton} ${selected ? styles.modelOptionSelected : ''}`}
                     aria-pressed={selected}
                     data-model-provider={group.id}
+                    data-dsh-relay-model-entry="true"
+                    data-dsh-relay-provider={group.id}
                     data-model-id={model.id}
                     data-testid={`value-mode-model-${model.id}`}
                     onClick={() => {

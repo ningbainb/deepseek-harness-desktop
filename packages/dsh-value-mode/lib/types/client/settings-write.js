@@ -28,7 +28,8 @@ export function createValueModeSettingsWriter(scope, t) {
                 const before = scope.getSnapshot();
                 if (before.status !== 'ready' || !before.writable)
                     throw new Error(t('settingsNotWritable'));
-                await scope.set(key, value);
+                if (await scope.set(key, value) === false)
+                    throw new Error(t('settingsSaveFailed'));
                 const accepted = scope.getSnapshot();
                 const user = accepted.user;
                 // An equal inherited value does not prove that this explicit override

@@ -44,3 +44,33 @@ test('RuntimeBaseline fails when application-owned identity is missing or replac
     policy,
   }), /application package is missing/u)
 })
+
+test('RuntimeBaseline uses bounded parallel identity checks and retains deterministic fingerprints', async () => {
+  const names = Array.from({ length: 19 }, (_, index) => `package-${String(index).padStart(2, '0')}`)
+  const policy = createRuntimePackagePolicy({ desktopRuntime: names })
+  const packageRoots = new Map(names.map(name => [name, join(tmpdir(), name)]))
+  let active = 0
+  let peak = 0
+  const read = async (path) => {
+    const name = names.find(candidate => path === join(packageRoots.get(candidate), 'package.json'))
+    assert.ok(name)
+    active += 1
+    peak = Math.max(peak, active)
+    await new Promise(resolveRead => setTimeout(resolveRead, names.indexOf(name) % 3))
+    active -= 1
+    return JSON.stringify({ name, version: '1.2.3' })
+  }
+  const input = {
+    desktopVersion: '4.4.1', runtimeVersion: '0.2.0-rc.2', packageRoots, policy, read,
+    inspectPath: async () => ({ isSymbolicLink: () => false }),
+    resolveRealPath: async path => path,
+    generatedAt: '2026-09-30T00:00:00.000Z',
+  }
+  const first = await createRuntimeBaseline(input)
+  const second = await createRuntimeBaseline(input)
+  assert.equal(peak, 8)
+  assert.deepEqual(Object.keys(first.packages), policy.names)
+  assert.equal(first.fingerprint, second.fingerprint)
+  assert.equal(Object.isFrozen(first.packages['package-18']), true)
+  await assert.rejects(() => createRuntimeBaseline({ ...input, read: async () => JSON.stringify({ name: 'wrong-package', version: '1.2.3' }) }), /identity mismatch/u)
+})

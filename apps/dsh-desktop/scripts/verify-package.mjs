@@ -7,6 +7,7 @@ import sharp from 'sharp'
 
 import afterPack from './after-pack.cjs'
 import { verifyAsarIntegrity } from './verify-asar-integrity.mjs'
+import { verifyBrandingAssets } from './verify-branding-assets.mjs'
 import {
   macBundleRootFromResources,
   parseVerifyPackageArguments,
@@ -26,7 +27,8 @@ import {
   MANAGED_RUNTIME_PACKAGES,
   packagePathSegments,
 } from '../src/profile.mjs'
-import { CRITICAL_RUNTIME_FILES } from '../src/runtime-integrity.mjs'
+import { verifyPackagedRuntimeCriticalFiles } from './packaged-runtime-integrity.mjs'
+import { verifyPackagedRuntimeSdkIdentity } from './packaged-runtime-sdk-identity.mjs'
 import { assertPackagedUpdateIdentity } from '../src/update-identity.mjs'
 import {
   assessRuntimeSupport,
@@ -253,9 +255,7 @@ if (TARGET_PLATFORM.platform === 'win32') {
   await access(join(resources, 'managed-git', 'current', 'LICENSE.txt'))
 }
 await access(join(unpackedModules, 'pnpm', 'bin', 'pnpm.mjs'))
-for (const relativePath of CRITICAL_RUNTIME_FILES) {
-  await access(join(unpackedModules, ...relativePath.split('/')))
-}
+await verifyPackagedRuntimeCriticalFiles(unpackedModules)
 const skinCenterRoot = join(unpackedModules, '@linxin666', 'dsh-client-ui-skin-center')
 const skinCenterManifest = JSON.parse(await readFile(join(skinCenterRoot, 'package.json'), 'utf8'))
 if (skinCenterManifest.name !== '@linxin666/dsh-client-ui-skin-center') {
@@ -368,15 +368,16 @@ if (TARGET_PLATFORM.platform === 'win32') {
   await access(join(unpackedModules, 'node-pty', 'prebuilds', 'win32-x64', 'conpty', 'conpty.dll'))
 }
 const aggregateClient = await readFile(join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'lib', 'client.js'), 'utf8')
-const aggregateNavigator = aggregateClient.match(/\/\/#region src\/client\/turn-navigator\.ts[\s\S]*?\/\/#endregion/u)?.[0] ?? ''
-if (!aggregateNavigator.includes('positionNavigator') || !aggregateNavigator.includes('[data-composer-seat]') || aggregateNavigator.includes('bottom: 80px')) {
+const aggregateNavigator = aggregateClient
+if (!aggregateNavigator.includes('positionNavigator') || !aggregateNavigator.includes('[data-composer-seat]') || /bottom\s*:\s*80px/u.test(aggregateNavigator)) {
   throw new Error('packaged web UI aggregate is missing composer-aware conversation navigation')
 }
 const aggregatePatch = await readFile(
   join(unpackedModules, '@linxin666', 'dsh-web-ui-all', 'cordis.patch.yml'),
   'utf8',
 )
-if (!/- id: web-ui-mode-switcher\s+name: '@linxin666\/dsh-client-ui-mode-switcher'/u.test(aggregatePatch)) {
+const aggregateInsertions = YAML.parse(aggregatePatch).flatMap(entry => entry.insert ?? [])
+if (!aggregateInsertions.some(entry => entry.id === 'ui-mode-switcher' && entry.name === '@linxin666/dsh-client-ui-mode-switcher')) {
   throw new Error('packaged web UI aggregate is missing the Desktop mode switcher')
 }
 for (const retiredPackage of ['dsh-client-runtime', 'dsh-host-apiproxy']) {
@@ -389,6 +390,12 @@ for (const retiredPackage of ['dsh-client-runtime', 'dsh-host-apiproxy']) {
 }
 
 const PACKAGED_PATCH_CONTRACTS = Object.freeze([
+  Object.freeze({
+    packageName: '@linxin666/dsh-client-ui-community-plugins',
+    file: Object.freeze(['lib', 'index.js']),
+    required: Object.freeze(['settings.installSection', 'const COMMUNITY_PLUGINS_SETTINGS_NAMESPACE = "community-plugins"']),
+    forbidden: Object.freeze(['installSettingsSection', 'settingsNamespace']),
+  }),
   Object.freeze({
     packageName: '@linxin666/dsh-desktop-launcher',
     file: Object.freeze(['lib', 'index.js']),
@@ -514,10 +521,16 @@ if (!settingsBridge.includes('"particle-theme"')) {
   throw new Error('packaged settings bridge is missing the particle-theme namespace')
 }
 await access(join(resources, 'app.asar'))
+const packagedSdkIdentity = await verifyPackagedRuntimeSdkIdentity(resources, {
+  expectedManifest: desktopManifest,
+  sourceDirectory: join(appDir, 'src'),
+})
+console.log(`verified ${packagedSdkIdentity.runtimeFiles.length} physical unpacked Runtime files and ${packagedSdkIdentity.consumers.length} SDK consumers sharing ${packagedSdkIdentity.canonicalURL}`)
 console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'), {
-  requiredFiles: ['runtime-launcher.mjs', 'runtime-startup-timing.mjs', 'runtime-shutdown-control.mjs', 'runtime-stream-drain.mjs', 'modal-reveal.mjs'].map(name => join('src', name)),
+  requiredFiles: ['runtime-support/community-plugin-known-issues.json'],
 })} packed ASAR files`)
 await access(join(resources, 'app-icon.png'))
+await verifyBrandingAssets(appDir, { resources })
 const telemetryConfiguration = JSON.parse(await readFile(join(resources, 'telemetry-config.json'), 'utf8'))
 const telemetryConfigurationKeys = telemetryConfiguration !== null && typeof telemetryConfiguration === 'object'
   ? Object.keys(telemetryConfiguration).sort()

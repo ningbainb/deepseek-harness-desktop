@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PairingPhase } from '../pairing.ts'
 import { createDesktopClient, type DesktopAvailability, type LocalLanGatewayStatus } from '@linxin666/dsh-desktop-client'
@@ -69,6 +69,11 @@ const EMPTY_SESSION_SOURCE = {
   subscribe: () => () => {},
   getSnapshot: () => EMPTY_SESSION_LIST,
 }
+
+function mainViewSessionId(byId: SessionListState['byId']) {
+  return Object.values(byId).find(row => Object.entries(row.retainedBy)
+    .some(([source, count]) => source === 'mainView' && count > 0))?.id
+}
 const EMPTY_WORKSPACE_SOURCE = {
   subscribe: () => () => {},
   getSnapshot: () => EMPTY_WORKSPACE_LIST,
@@ -97,10 +102,11 @@ export function RemoteEntry({ wide, sessions, workspaces, useWorkspaces, t }: Re
     () => workspaceSource.getSnapshot(),
     () => workspaceSource.getSnapshot(),
   )
-  const legacyWorkspaceId = useWorkspaces?.(state => state.recentWorkspaceId) as string | undefined
-  const currentWorkspaceId = sessionList.current === undefined
+  const legacyWorkspaceId = useWorkspaces?.(state => (state as { recentWorkspaceId?: string }).recentWorkspaceId) as string | undefined
+  const currentSessionId = mainViewSessionId(sessionList.byId)
+  const currentWorkspaceId = currentSessionId === undefined
     ? undefined
-    : workspaceList.items.find(workspace => workspace.sessionIds.includes(sessionList.current!))?.workspaceId
+    : workspaceList.items.find(workspace => workspace.sessionIds.includes(currentSessionId))?.workspaceId
   const workspaceId = currentWorkspaceId ?? workspaceList.items[0]?.workspaceId ?? legacyWorkspaceId
 
   const closeEventSource = useCallback(() => {

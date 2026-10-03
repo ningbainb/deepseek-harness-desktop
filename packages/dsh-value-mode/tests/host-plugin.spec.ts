@@ -47,7 +47,6 @@ describe('ValueMode Host Plugin', () => {
     })
 
     expect(ctx.tools.register).toHaveBeenCalled()
-    expect(ctx.settings.installSection).toHaveBeenCalled()
     expect(registeredTools.length).toBe(1)
     expect((registeredTools[0] as { name: string }).name).toBe('consult_expert')
 

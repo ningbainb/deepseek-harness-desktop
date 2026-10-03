@@ -6,6 +6,20 @@ class TestDocument extends EventTarget {
 }
 
 describe('model refresh bridge', () => {
+  it('refreshes every session after bai authorization locally or in a sibling window', () => {
+    const windowTarget = new EventTarget()
+    const documentTarget = new TestDocument()
+    const refresh = vi.fn()
+    const channel = { onmessage: null as ((event: MessageEvent<unknown>) => void) | null, postMessage: vi.fn(), close: vi.fn() }
+    const bridge = installModelRefreshBridge({ sessionId: 'any-session', refresh, windowTarget, documentTarget, schedule: callback => callback(), channelFactory: () => channel })
+    windowTarget.dispatchEvent(new Event('dsh-relay-models-updated'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    channel.onmessage?.(new MessageEvent('message', { data: { provider: 'project-relay' } }))
+    expect(refresh).toHaveBeenCalledTimes(2)
+    bridge.dispose()
+    windowTarget.dispatchEvent(new Event('dsh-relay-models-updated'))
+    expect(refresh).toHaveBeenCalledTimes(2)
+  })
   it('reconciles on visible recovery and a matching sibling-window confirmation without polling', () => {
     const windowTarget = new EventTarget()
     const documentTarget = new TestDocument()

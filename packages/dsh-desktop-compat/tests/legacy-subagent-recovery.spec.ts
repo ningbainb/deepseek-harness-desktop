@@ -4,7 +4,8 @@ import { appendFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
-import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
+import { createSessionFormatCatalogWithChildren } from '@deepseek-ai/dsh-session-format-catalog'
+import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { installSessionPersistenceRecovery } from '../src/session-recovery.ts'
 
 // Published @deepseek-ai/dsh-subagent 0.1.1-rc.1 snapshots these generation-2
@@ -32,7 +33,9 @@ async function officialRead(path: string, _expectedId: string) {
   const boundary = zstdCompressSync(Buffer.from(JSON.stringify(header) + '\n')).length
   const plaintext = Buffer.concat([zstdDecompressSync(bytes.subarray(0, boundary)), zstdDecompressSync(bytes.subarray(boundary))])
   const rows = plaintext.toString('utf8').trimEnd().split('\n').map(line => JSON.parse(line))
-  const restore = sessionFormatCatalog.createRestore(rows[0], { recovery: 'strict', validation: 'transformed' })
+  // This child fixture has no children of its own; the current official
+  // catalog requires that fact for the V3 to V4 migration.
+  const restore = createSessionFormatCatalogWithChildren([]).createRestore(rows[0], { recovery: 'strict', validation: 'transformed' })
   for (const row of rows.slice(1)) restore.decodeRow(row)
   return restore.finish()
 }
@@ -45,7 +48,7 @@ it.each([minimal, continuable])('recovers a released generation-2 child through 
     const install = installSessionPersistenceRecovery(target, { onRecovered: event => { outcomes.push(event) } })
     try {
       const result = await target.readStoredLog(path, header.id)
-      expect(result.header.version).toBe(3)
+      expect(result.header.version).toBe(SESSION_FORMAT_VERSION)
       expect(result.events[0]?.data).toEqual({ ...data, version: 3 })
       expect(await readFile(path + backupSuffix)).toEqual(source)
       expect((await readFile(path)).subarray(0, headerFrame.length)).toEqual(headerFrame)

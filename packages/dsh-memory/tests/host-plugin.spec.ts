@@ -39,7 +39,6 @@ describe('memory host plugin', () => {
 
     apply(ctx)
 
-    expect(settingsMocks.install).toHaveBeenCalled()
     expect(sections).toHaveLength(1)
     expect(variables).toHaveLength(1)
     expect(variables[0]).toMatchObject({ name: 'dsh_memory' })

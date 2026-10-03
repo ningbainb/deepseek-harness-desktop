@@ -1,5 +1,5 @@
 import { carrierKeyOf } from "@deepseek-ai/dsh-scope";
-import z from "schemastery";
+import z from "@deepseek-ai/schemastery";
 import { chmod, mkdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { dshHomePath } from "@deepseek-ai/dsh-home-paths";
@@ -1537,8 +1537,8 @@ const inject = [
 	"tools"
 ];
 const Config = z.object({
-	version: z.number().step(1).default(1),
-	enabled: z.boolean().default(false)
+	version: z.number().step(1).default(1).volatile(),
+	enabled: z.boolean().default(false).volatile()
 });
 function workspaceForSession(registry, sessionId) {
 	try {
@@ -1552,7 +1552,7 @@ function copyScope(scope) {
 }
 /** Register owner-safe memory prompt, tool, settings and local routes. */
 function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
-	let source = () => initialConfig;
+	const source = () => normalizeMemoryConfig(Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key, typeof field === "object" && field !== null && "get" in field && typeof field.get === "function" ? field.get() : field])));
 	let workspaceRegistry;
 	const userScope = ctx.userScope;
 	const sessionScopes = /* @__PURE__ */ new Map();
@@ -1619,17 +1619,6 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		if (entry !== void 0) hydrate(entry);
 	});
 	for (const session of ctx.sessions.list()) rememberSession(void 0, session);
-	ctx.inject(["settings"], (settingsCtx) => {
-		settingsCtx.settings.installSection(ctx, MEMORY_SETTINGS_NAMESPACE, Config, initialConfig, {
-			setSource: (next) => {
-				source = next;
-			},
-			onChange: () => {},
-			validate: (value) => {
-				assertMemoryConfig(value);
-			}
-		});
-	});
 	ctx.effect(() => {
 		const disposeSection = ctx.systemPrompt.section({
 			name: "dsh:memory",

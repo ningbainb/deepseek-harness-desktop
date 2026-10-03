@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 import test from 'node:test'
@@ -58,7 +58,7 @@ for (const [name, rows, suffix] of [
         await writer.append([{ type: 'permission/preset', seq: rows.length, time: 2, data: { preset: 'standard' } }])
         assert.equal((await writer.read()).events.length, rows.length + 1)
       } finally { await writer.close() }
-      assert.ok((await readdir(dirname(current))).includes('session.v3.jsonl.zstd'))
+      assert.ok((await readdir(dirname(current))).includes(basename(current)))
       assert.deepEqual(await readFile(sourcePath + suffix), source)
       install.restore()
       const freshContext = new Context()
@@ -106,7 +106,7 @@ test('native historical preparation keeps invalid later rows and failed retries 
       assert.deepEqual(await readFile(sourcePath), source)
       assert.equal(install.getRecoveredCount(), 0)
       const names = await readdir(directory)
-      assert.equal(names.includes('session.v3.jsonl.zstd'), false)
+      assert.equal(names.includes(basename(backend.locate(header).path)), false)
       assert.equal(names.some(name => name.endsWith('.tmp')), false)
       if (failure === 'retry') {
         assert.deepEqual(await readFile(sourcePath + '.desktop-v0-subagent-descriptor-backup-v3.4.0'), source)

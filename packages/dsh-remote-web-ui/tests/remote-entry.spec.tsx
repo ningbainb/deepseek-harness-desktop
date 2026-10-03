@@ -216,8 +216,8 @@ describe('apply registration', () => {
         inject: (key: string) => { injected.push(key); return () => {} },
         register: () => () => {},
       },
-      settingsScope: {
-        bind: () => ({
+      configForms: {
+        get: () => ({
           getSnapshot: () => ({ status: 'unavailable' as const, writable: false }),
           subscribe: () => () => {},
           set: async () => {},
@@ -254,8 +254,8 @@ describe('apply registration', () => {
           return () => {}
         },
       },
-      settingsScope: {
-        bind: () => ({
+      configForms: {
+        get: () => ({
           getSnapshot: () => snapshot,
           subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn) } },
           set: async () => {},

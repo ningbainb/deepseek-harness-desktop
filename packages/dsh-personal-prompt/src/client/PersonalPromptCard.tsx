@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   DEFAULT_PERSONAL_PROMPT,
@@ -14,6 +14,7 @@ import {
   type PromptProfileScope,
 } from '../core/config.ts'
 import styles from './personal-prompt.module.css'
+import { persistPersonalPromptConfig } from './persist-config.ts'
 
 interface WorkspaceItem {
   id?: string
@@ -190,10 +191,8 @@ export function PersonalPromptCard(props: PersonalPromptCardProps) {
     setSaved(false)
     setError(null)
     try {
-      await settingsScope.set('profiles', next.profiles)
-      await settingsScope.set('enabled', next.enabled)
-      if (next.activeProfileId === undefined) await settingsScope.unset('activeProfileId')
-      else await settingsScope.set('activeProfileId', next.activeProfileId)
+      const accepted = await persistPersonalPromptConfig(settingsScope, next, settingsSnapshot.revision)
+      if (!accepted) throw new Error(t('error.save'))
       setDraftConfig(next)
       setConfigDirty(false)
       setEditorDirty(false)

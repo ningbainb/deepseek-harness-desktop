@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 
 import { parseStartupTimings } from './startup-metrics.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { openNativeSettings } from './native-settings-fixture.mjs'
 import { SECONDARY_WINDOW_PARTITION } from '../src/electron-app.mjs'
+import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
@@ -44,7 +48,7 @@ function attachRendererDiagnostics(window) {
 
 try {
   await seedPrimaryRuntimePermissionForTest({ userData })
-  electronApp = await electron.launch({
+  const launchOptions = {
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
     cwd: appDir,
@@ -58,7 +62,8 @@ try {
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
-  })
+  }
+  electronApp = await electron.launch(launchOptions)
   electronApp.process().stdout?.on('data', (chunk) => process.stdout.write(chunk))
   electronApp.process().stderr?.on('data', (chunk) => process.stderr.write(chunk))
   const startupPage = await electronApp.firstWindow()
@@ -129,6 +134,91 @@ try {
     console.error(`window frame runtime log:\n${runtimeLog.slice(-8_000) || '(no runtime log)'}`)
     throw error
   }
+  const workspacePath = resolve(temporary, 'window-chrome-workspace')
+  await mkdir(workspacePath)
+  const workspace = await page.evaluate(async path => {
+    const response = await fetch('/api/workspace/create', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'workspace/create',
+        payload: { args: { request: { path } } } }),
+    })
+    return { status: response.status, body: await response.json() }
+  }, workspacePath)
+  assert.equal(workspace.status, 200)
+  assert.equal(workspace.body.result.ok, true)
+  const workspaceValue = workspace.body.result.value
+  const workspaceId = workspaceValue.workspace?.workspaceId ?? workspaceValue.workspaceId
+  assert.equal(typeof workspaceId, 'string')
+  const session = await page.evaluate(async workspaceId => {
+    const response = await fetch('/api/session/create', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/create',
+        payload: { args: { request: { workspaceId } } } }),
+    })
+    return { status: response.status, body: await response.json() }
+  }, workspaceId)
+  assert.equal(session.status, 200)
+  assert.equal(session.body.result.ok, true)
+  assert.equal(typeof session.body.result.value.sessionId, 'string')
+  const sessionId = session.body.result.value.sessionId
+  const renamed = await page.evaluate(async sessionId => {
+    const response = await fetch('/api/session/rename', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/rename',
+        payload: { args: { request: { sessionId, title: 'Window chrome controls fixture' } } } }),
+    })
+    return { status: response.status, body: await response.json() }
+  }, sessionId)
+  assert.equal(renamed.status, 200)
+  assert.equal(renamed.body.result.ok, true)
+  await waitForSessionLog(resolve(dshHome, 'sessions'), sessionId)
+  await electronApp.close()
+  const logs = await findSessionLogs(resolve(dshHome, 'sessions'))
+  const histories = await Promise.all(logs.map(async path => ({ path, text: await readSessionLogText(path) })))
+  const matchingLogs = histories.filter(history => JSON.parse(history.text.split('\n', 1)[0]).id === sessionId)
+  assert.equal(matchingLogs.length, 1)
+  const logPath = matchingLogs[0].path
+  const lines = matchingLogs[0].text.trimEnd().split(/\r?\n/u)
+  assert.equal(JSON.parse(lines[0]).id, sessionId)
+  const prefix = lines.slice(1).filter(Boolean).map(line => JSON.parse(line))
+  const fixtureSession = Session.create(SessionId(sessionId), prefix)
+  fixtureSession.append('turn/start', { turn: 1 })
+  fixtureSession.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: 'Window chrome controls fixture' }], source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  fixtureSession.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  const appended = fixtureSession.snapshotEvents().slice(prefix.length)
+  assert.equal(appended.length, 4)
+  assert.deepEqual(appended.map(event => event.seq), Array.from({ length: 4 }, (_value, index) => prefix.length + index))
+  await appendSessionLogText(logPath, appended.map(event => JSON.stringify(event)).join('\n') + '\n')
+  for (const history of histories.filter(history => history.path !== logPath)) {
+    assert.equal(await readSessionLogText(history.path), history.text)
+  }
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [] }))
+  electronApp = await electron.launch(launchOptions)
+  page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
+  attachRendererDiagnostics(page)
+  await page.locator('[data-dsh-frame]').waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+  const group = page.getByRole('treeitem').filter({ hasText: 'window-chrome-workspace' }).first()
+  await group.waitFor({ state: 'visible', timeout: 30_000 })
+  if (await group.getAttribute('aria-expanded') !== 'true') await group.dispatchEvent('click')
+  const sessions = await page.evaluate(async () => {
+    const response = await fetch('/api/session/list', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/list',
+        payload: { args: { _request: {} } } }),
+    })
+    return { status: response.status, body: await response.json() }
+  })
+  assert.equal(sessions.status, 200)
+  assert.equal(sessions.body.result.ok, true)
+  const summary = sessions.body.result.value.items.find(item =>
+    (item.id ?? item.sessionId) === session.body.result.value.sessionId)
+  assert.ok(summary)
+  const sessionRow = page.getByRole('treeitem').filter({ hasText: 'Window chrome controls fixture' }).last()
+  await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
+  await sessionRow.dispatchEvent('click')
+  await page.locator('[data-composer-card="true"]').waitFor({ state: 'visible' })
   const state = await page.evaluate(() => ({
     chromeCount: document.querySelectorAll('#dsh-desktop-window-chrome').length,
     chromeText: document.querySelector('#dsh-desktop-window-chrome')?.textContent,
@@ -166,7 +256,7 @@ try {
       }
     }),
     layoutCluster: (() => {
-      const cluster = document.querySelector('[class*="_toggleCluster"]')
+      const cluster = document.querySelector('[class*="_toggleCluster"], [data-sidebar-right-panel] [data-dockkit-strip-chrome]')
       if (!cluster) return undefined
       const style = getComputedStyle(cluster)
       const rect = cluster.getBoundingClientRect()
@@ -218,6 +308,30 @@ try {
       state.sidebarToggles.every((toggle) => toggle.top >= 32 && !toggle.hitChrome),
       `right-sidebar toggles overlap the native title bar: ${JSON.stringify(state.sidebarToggles)}`,
     )
+  }
+  if (!state.layoutCluster) {
+    const controls = await page.evaluate(() =>
+      [...document.querySelectorAll('button')].filter(button => {
+        const bounds = button.getBoundingClientRect()
+        return bounds.width > 0 && bounds.height > 0 && bounds.top < 100
+      }).map(button => ({
+        label: button.getAttribute('aria-label'), title: button.getAttribute('title'),
+        className: button.className, slot: button.getAttribute('data-slot'),
+        parentClass: button.parentElement?.className,
+        parentSlot: button.parentElement?.getAttribute('data-slot'),
+        parentAttributes: [...button.parentElement?.attributes ?? []]
+          .filter(attribute => attribute.name.startsWith('data-')).map(attribute => [attribute.name, attribute.value]),
+        ancestors: (() => {
+          const ancestors = []
+          for (let element = button.parentElement; element && ancestors.length < 6; element = element.parentElement) {
+            ancestors.push({ className: element.className, data: [...element.attributes]
+              .filter(attribute => attribute.name.startsWith('data-')).map(attribute => [attribute.name, attribute.value]) })
+          }
+          return ancestors
+        })(),
+      })))
+    console.error('layout control inventory', JSON.stringify(controls))
+    if (screenshot) await page.screenshot({ path: screenshot })
   }
   assert.ok(state.layoutCluster, 'native layout toggle cluster is missing')
   assert.ok(state.layoutCluster.controls >= 2, JSON.stringify(state.layoutCluster))
@@ -375,7 +489,12 @@ try {
     secondaryUsesExpected: true,
   })
   await communityPage.close()
+  await page.waitForFunction(() => window.__skinRuntime?.controller)
+  assert.equal(await page.evaluate(async () => window.__skinRuntime.controller.switchTo(null, null)), null)
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-dsh-skin')
+    && document.documentElement.style.getPropertyValue('--dsh-desktop-chrome-bg') === '')
   await page.evaluate(() => {
+    delete document.documentElement.dataset.dshDesktopTheme
     document.body.removeAttribute('data-ds-dark-theme')
     document.documentElement.style.colorScheme = 'light'
     document.body.style.backgroundColor = 'rgb(250, 250, 250)'
@@ -455,8 +574,7 @@ try {
   // data-open changes before the 360 ms fade finishes. Wait for the actual
   // root to hide so its outgoing dialog cannot be mistaken for Settings.
   await starPrompt.waitFor({ state: 'hidden' })
-  await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate((button) => button.click())
-  const settingsDialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
+  const settingsDialog = await openNativeSettings(page)
   await assertDialogUsesSafeViewport(settingsDialog)
   const dynamicModal = await page.evaluate(async () => {
     const layer = document.createElement('div'), dialog = document.createElement('div')

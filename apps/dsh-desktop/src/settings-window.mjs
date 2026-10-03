@@ -102,6 +102,15 @@ export const SETTINGS_WINDOW_CSS = `
 }
 `
 
+export function settingsWindowDragHandle(dialog) {
+  const legacySlot = dialog.querySelector('[data-slot="settings.header"]')
+  if (legacySlot?.parentElement) return legacySlot.parentElement
+  if (dialog.getAttribute('data-shortcut-modal') !== 'settings') return undefined
+  const titleId = dialog.getAttribute('aria-labelledby')
+  const navigation = dialog.querySelector(':scope > nav')
+  return titleId && navigation ? [...navigation.children].find(element => element.id === titleId) : undefined
+}
+
 export function createSettingsWindowScript() {
   const config = JSON.stringify({
     dialogClass: SETTINGS_DIALOG_CLASS,
@@ -248,8 +257,7 @@ export function createSettingsWindowScript() {
     };
     const attach = (dialog) => {
       if (dialog.classList.contains(config.dialogClass)) return;
-      const settingsHeaderSlot = dialog.querySelector('[data-slot="settings.header"]');
-      const dragHandle = settingsHeaderSlot?.parentElement;
+      const dragHandle = (${settingsWindowDragHandle.toString()})(dialog);
       const layer = dialog.parentElement;
       if (!dragHandle || !layer) return;
       const box = dialog.getBoundingClientRect();

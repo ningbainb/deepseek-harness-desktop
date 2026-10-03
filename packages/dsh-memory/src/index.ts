@@ -4,17 +4,15 @@ import { carrierKeyOf, type ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import type { AccessScope, UserScopeService } from '@ningbainb/dsh-user-scope'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import {
   DEFAULT_MEMORY_CONFIG,
   normalizeMemoryConfig,
-  assertMemoryConfig,
   type MemoryConfig,
 } from './core/config.ts'
-import { MEMORY_SETTINGS_NAMESPACE } from './core/schema.ts'
 import {
   MemoryService,
   type MemoryRequestContext,
@@ -39,8 +37,8 @@ export { makeMemoryRoutes, MEMORY_API_PREFIX } from './routes.ts'
 export { createMemoryTool } from './tools.ts'
 
 export const Config: z<MemoryConfig> = z.object({
-  version: z.number().step(1).default(1),
-  enabled: z.boolean().default(false),
+  version: z.number().step(1).default(1).volatile(),
+  enabled: z.boolean().default(false).volatile(),
 }) as unknown as z<MemoryConfig>
 
 interface WorkspaceViewLike {
@@ -73,7 +71,11 @@ function copyScope(scope: AccessScope): AccessScope {
 
 /** Register owner-safe memory prompt, tool, settings and local routes. */
 export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_MEMORY_CONFIG }): void {
-  let source: () => MemoryConfig = () => initialConfig
+  const source = (): MemoryConfig => normalizeMemoryConfig(Object.fromEntries(
+    Object.entries(initialConfig).map(([key, field]) => [key,
+      typeof field === 'object' && field !== null && 'get' in field && typeof field.get === 'function'
+        ? field.get() : field]),
+  ))
   let workspaceRegistry: WorkspaceRegistryLike | undefined
   const userScope = ctx.userScope as unknown as HostUserScope
   const sessionScopes = new Map<ScopeKey, SessionEntry>()
@@ -143,14 +145,6 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   // Sessions already live when the plugin is mounted are registered for
   // ownership. Prompt injection still requires an actual scoped carrier key.
   for (const session of ctx.sessions.list()) rememberSession(undefined, session)
-
-  ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, MEMORY_SETTINGS_NAMESPACE, Config, initialConfig, {
-      setSource: next => { source = next },
-      onChange: () => {},
-      validate: value => { assertMemoryConfig(value) },
-    })
-  })
 
   ctx.effect(() => {
     const disposeSection = ctx.systemPrompt.section({

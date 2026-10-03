@@ -5,6 +5,8 @@ copyright: Copyright (c) 2026 ningbai牛逼 and DeepSeek Harness Desktop contrib
 asar: true
 asarUnpack:
   - node_modules/**
+  - src/**
+  - package.json
 npmRebuild: false
 compression: normal
 electronLanguages:

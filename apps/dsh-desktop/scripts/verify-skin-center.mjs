@@ -9,6 +9,8 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { openNativeSettings } from './native-settings-fixture.mjs'
+import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -24,6 +26,7 @@ const dshHome = join(temporary, 'dsh-home')
 const runtimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
 const relaunchScaleFactors = [1, 1.25, 1.5, 1.25, 1]
 let activeApp
+let failure
 
 async function dismissStartup(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
@@ -61,6 +64,7 @@ async function launch(scaleFactor) {
       DSH_AGENTS_HOME: join(userData, 'agents'),
     },
   })
+  activeApp = instance
   const page = await instance.firstWindow()
   const rendererErrors = []
   const rendererConsole = []
@@ -86,19 +90,12 @@ async function launch(scaleFactor) {
 }
 
 async function openSkinCenter(page) {
-  await page.getByRole('button', { name: /设置|Settings/iu }).first().click({ force: true })
-  const dialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
-  await dialog.waitFor({ state: 'visible', timeout: 30_000 })
+  const dialog = await openNativeSettings(page)
 
-  const pluginsTab = dialog.getByRole('button', { name: /^(?:插件|Plugins)$/u })
-  if (await pluginsTab.isVisible().catch(() => false)) await pluginsTab.click()
-  const webUiGroup = dialog.getByRole('button', { name: /Web UI (?:插件|Plugins)/iu })
-  if (await webUiGroup.isVisible().catch(() => false)) await webUiGroup.click()
-
-  const header = dialog.getByRole('button', { name: /皮肤中心|Skin Center/iu })
+  const header = dialog.locator(':scope > nav').getByRole('button', { name: /^(?:皮肤|Skin Center)$/iu })
   await header.waitFor({ state: 'visible', timeout: 30_000 })
   await header.scrollIntoViewIfNeeded()
-  if (await header.getAttribute('aria-expanded') !== 'true') await header.click()
+  await header.click()
   const title = dialog.getByText('Blue Fantasy', { exact: true })
   await title.waitFor({ state: 'visible', timeout: 30_000 })
   await title.scrollIntoViewIfNeeded()
@@ -116,7 +113,7 @@ async function waitForBackgroundSettings(page, expected) {
   await page.waitForFunction(async values => {
     const response = await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })
     const payload = await response.json().catch(() => null)
-    const namespace = payload?.value?.namespaces?.find(entry => entry.ns === 'skin-background')
+    const namespace = payload?.value?.namespaces?.find(entry => entry.ns === 'ui-skin-center')
     if (!response.ok || payload?.ok !== true || namespace?.value === undefined) return false
     return Object.entries(values).every(([field, value]) => namespace.value[field] === value)
   }, expected, { timeout: 30_000 })
@@ -141,6 +138,11 @@ async function visualState(page, dialog) {
     const content = dialogElement.querySelector(':scope > nav + div')
     if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')
     const dialogBox = dialogElement.getBoundingClientRect()
+    const background = document.querySelector('[data-dsh-skin-layer="background"]')
+    const media = background?.querySelector('img')
+    const mediaStyle = media ? getComputedStyle(media) : undefined
+    const mediaBox = media?.getBoundingClientRect()
+    const backgroundStyle = background ? getComputedStyle(background) : undefined
     const coveringAncestors = []
     for (let element = dialogElement.parentElement; element !== null; element = element.parentElement) {
       const style = getComputedStyle(element)
@@ -155,6 +157,23 @@ async function visualState(page, dialog) {
       activeSkin: document.documentElement.getAttribute('data-dsh-skin'),
       backgroundImage: getComputedStyle(document.body).backgroundImage,
       bodyInlineBackgroundImage: document.body.style.getPropertyValue('background-image'),
+      bodyBackgroundColor: getComputedStyle(document.body).backgroundColor,
+      backgroundMedia: {
+        count: background?.querySelectorAll('img').length ?? 0,
+        src: media?.src,
+        complete: media?.complete,
+        naturalWidth: media?.naturalWidth,
+        width: mediaBox?.width,
+        height: mediaBox?.height,
+        left: mediaBox?.left,
+        top: mediaBox?.top,
+        visibility: mediaStyle?.visibility,
+        opacity: mediaStyle?.opacity,
+        objectFit: mediaStyle?.objectFit,
+        position: backgroundStyle?.position,
+        zIndex: backgroundStyle?.zIndex,
+        pointerEvents: backgroundStyle?.pointerEvents,
+      },
       brand: getComputedStyle(root).getPropertyValue('--dsw-alias-brand-primary').trim(),
       conversationFound: conversation instanceof HTMLElement,
       conversationBrand: conversation instanceof HTMLElement
@@ -168,10 +187,14 @@ async function visualState(page, dialog) {
         bottom: dialogBox.bottom,
       },
       viewport: { width: innerWidth, height: innerHeight },
+      layoutViewport: { width: visualViewport.width, height: visualViewport.height, scale: visualViewport.scale },
       rootOverflow: { clientWidth: root.clientWidth, scrollWidth: root.scrollWidth },
       contentOverflow: { clientWidth: content.clientWidth, scrollWidth: content.scrollWidth },
       scrim: document.body.style.getPropertyValue('--dsw-skin-scrim').trim(),
-      activeMedia: document.body.style.getPropertyValue('--dsh-skin-scrim').trim(),
+      activeMedia: {
+        body: document.body.getAttribute('data-dsh-backdrop-active'),
+        root: document.documentElement.getAttribute('data-dsh-backdrop-active'),
+      },
       stylesheetCount: [...document.querySelectorAll('link[rel="stylesheet"]')]
         .filter(link => link.href.includes('/api/skin-center/v2/skins/blue-fantasy/stylesheet')).length,
       blurLayerCount: [...document.body.children].filter(element => {
@@ -205,10 +228,28 @@ function assertGeometry(state) {
 
 function assertBlueFantasy(state) {
   assert.equal(state.activeSkin, 'blue-fantasy', JSON.stringify(state))
-  assert.match(state.backgroundImage, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
-  assert.match(state.bodyInlineBackgroundImage, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
+  assert.equal(state.backgroundImage, 'none')
+  assert.equal(state.bodyInlineBackgroundImage, 'none')
+  assert.equal(state.bodyBackgroundColor, 'rgba(0, 0, 0, 0)')
+  assert.equal(state.backgroundMedia.count, 1, JSON.stringify(state))
+  assert.match(state.backgroundMedia.src, /\/api\/skin-center\/v2\/skins\/blue-fantasy\/assets\//u)
+  assert.equal(state.backgroundMedia.complete, true, JSON.stringify(state))
+  assert.ok(state.backgroundMedia.naturalWidth > 0, JSON.stringify(state))
+  assert.equal(state.layoutViewport.scale, 1)
+  assert.equal(Math.round(state.layoutViewport.width), state.viewport.width)
+  assert.equal(Math.round(state.layoutViewport.height), state.viewport.height)
+  assert.equal(state.backgroundMedia.left, 0)
+  assert.equal(state.backgroundMedia.top, 0)
+  assert.equal(state.backgroundMedia.width, state.layoutViewport.width)
+  assert.equal(state.backgroundMedia.height, state.layoutViewport.height)
+  assert.equal(state.backgroundMedia.visibility, 'visible')
+  assert.equal(state.backgroundMedia.opacity, '1')
+  assert.equal(state.backgroundMedia.objectFit, 'cover')
+  assert.equal(state.backgroundMedia.position, 'fixed')
+  assert.equal(state.backgroundMedia.zIndex, '-2')
+  assert.equal(state.backgroundMedia.pointerEvents, 'none')
   assert.equal(state.scrim, '0')
-  assert.equal(state.activeMedia, '1')
+  assert.deepEqual(state.activeMedia, { body: 'true', root: 'true' })
   assert.ok(state.stylesheetCount >= 1, JSON.stringify(state))
   assert.equal(state.blurLayerCount, 0, JSON.stringify(state))
   for (const ancestor of state.coveringAncestors) {
@@ -217,10 +258,30 @@ function assertBlueFantasy(state) {
   }
 }
 
+async function waitForBlueFantasyMedia(page) {
+  await page.waitForFunction(() => {
+    const media = document.querySelector('[data-dsh-skin-layer="background"] img')
+    return media instanceof HTMLImageElement && media.complete && media.naturalWidth > 0
+      && media.src.includes('/api/skin-center/v2/skins/blue-fantasy/assets/')
+  }, undefined, { timeout: 30_000 })
+}
+
 try {
   const first = await launch(1)
   activeApp = first.instance
   const firstCenter = await openSkinCenter(first.page)
+  const officialCard = firstCenter.dialog.getByText(/^(?:官方默认|Official default)$/iu).locator('xpath=../..')
+  await officialCard.getByRole('button', { name: /^(?:恢复默认|Restore)$/iu }).click()
+  await first.page.waitForFunction(async () => {
+    const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
+    const payload = await response.json()
+    return response.ok && payload.ok === true && payload.active === null
+      && !document.documentElement.hasAttribute('data-dsh-skin')
+      && ![...document.querySelectorAll('link[rel="stylesheet"]')].some(link => link.href.includes('/api/skin-center/v2/skins/'))
+  }, undefined, { timeout: 30_000 })
+  const officialDisk = JSON.parse(await readFile(join(dshHome, 'skin-center-active.json'), 'utf8'))
+  assert.equal(officialDisk.active, null)
+  assert.equal(officialDisk.initialized, true)
   const official = await visualState(first.page, firstCenter.dialog)
   assert.equal(official.activeSkin, null)
 
@@ -244,6 +305,7 @@ try {
     console.error(`renderer console:\n${first.rendererConsole.join('\n') || '(none)'}`)
     throw error
   }
+  await waitForBlueFantasyMedia(first.page)
   const tried = await visualState(first.page, firstCenter.dialog)
   assertBlueFantasy(tried)
   assert.equal(tried.conversationFound, true, JSON.stringify(tried))
@@ -278,7 +340,14 @@ try {
   assertBlueFantasy(await visualState(first.page, firstCenter.dialog))
 
   await firstCenter.card.getByRole('button', { name: /^(?:退出试穿|Exit try-on)$/iu }).click()
-  await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === null)
+  try {
+    await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === null
+      && ![...document.querySelectorAll('link[rel="stylesheet"]')]
+        .some(link => link.href.includes('/api/skin-center/v2/skins/blue-fantasy/stylesheet')))
+  } catch (error) {
+    console.error('exit try-on state', JSON.stringify(await visualState(first.page, firstCenter.dialog)))
+    throw error
+  }
   await first.page.waitForFunction(async () => {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
     const payload = await response.json().catch(() => null)
@@ -301,7 +370,7 @@ try {
   assert.equal(applied.payload?.ok, true, JSON.stringify(applied))
   assert.equal(applied.payload?.active, 'blue-fantasy', JSON.stringify(applied))
   assert.deepEqual(first.rendererErrors, [])
-  await activeApp.close()
+  await closeIsolatedElectron(activeApp)
   activeApp = undefined
 
   assert.deepEqual(first.rendererErrors, [])
@@ -317,6 +386,7 @@ try {
     assert.equal(state.payload?.ok, true, JSON.stringify(state))
     assert.equal(state.payload?.active, 'blue-fantasy', JSON.stringify(state))
     await current.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
+    await waitForBlueFantasyMedia(current.page)
     const center = await openSkinCenter(current.page)
     const visual = await visualState(current.page, center.dialog)
     assertBlueFantasy(visual)
@@ -333,7 +403,7 @@ try {
       devicePixelRatio: visual.devicePixelRatio,
       viewport: visual.viewport,
     })
-    await activeApp.close()
+    await closeIsolatedElectron(activeApp)
     activeApp = undefined
     assert.deepEqual(current.rendererErrors, [])
     assert.deepEqual(JSON.parse(await readFile(join(userData, 'window-state.json'), 'utf8')),
@@ -348,7 +418,16 @@ try {
     windowGeometryPersisted: true,
     relaunches,
   }, null, 2))
+} catch (error) {
+  failure = error
+  throw error
 } finally {
-  await activeApp?.close()
-  await rm(temporary, { recursive: true, force: true })
+  const cleanupFailures = []
+  try { await closeIsolatedElectron(activeApp) } catch (error) { cleanupFailures.push(error) }
+  try {
+    await rm(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  } catch (error) { cleanupFailures.push(error) }
+  if (cleanupFailures.length) {
+    throw new AggregateError([...failure ? [failure] : [], ...cleanupFailures], 'skin-center cleanup failed', { cause: failure })
+  }
 }

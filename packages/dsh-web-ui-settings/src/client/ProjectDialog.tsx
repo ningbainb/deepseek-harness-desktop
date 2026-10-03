@@ -67,7 +67,7 @@ export function ProjectDialog({ services, onClose, language = 'zh', pickFolder, 
       if (!duplicate) await services.workspaces.rename(workspace.workspaceId, name.trim())
       const sessionId = await services.uiWorkspace.connectWorkspace(workspace.workspaceId)
       if (!mounted.current) return
-      services.sessions.open(sessionId)
+      services.uiWorkspace.openSession(sessionId)
       reportFeatureEvent({ feature: 'project', outcome: 'succeeded', detail })
       onClose()
     } catch (reason) {

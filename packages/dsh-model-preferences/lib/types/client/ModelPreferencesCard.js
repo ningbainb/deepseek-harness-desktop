@@ -1,7 +1,9 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { BaiModelAccess } from "./BaiModelAccess.js";
 import { DEFAULT_MODEL_PREFERENCES, MAX_PINNED_MODELS, PRIMARY_PROVIDER_ID, moveProvider, normalizeModelPreferences, providerIdsInOrder, sameModelKey, } from "../core/config.js";
 import styles from './model-preferences.module.css';
+import { persistModelPreferencesConfig } from "./persist-config.js";
 const EMPTY_CATALOG = { groups: [], failures: [] };
 function modelLabel(key) {
     return `${key.provider} / ${key.model}`;
@@ -70,13 +72,9 @@ export function ModelPreferencesCard(props) {
         setSaved(false);
         setSaveError(null);
         try {
-            // SettingsScope exposes field-level writes and serializes them with the
-            // Host revision fence. Keep the order deterministic and do not write
-            // provider credentials or any official model setting here.
-            await settingsScope.set('pinnedModels', next.pinnedModels);
-            await settingsScope.set('providerOrder', next.providerOrder);
-            await settingsScope.set('disabledProviders', next.disabledProviders);
-            await settingsScope.set('recentModels', next.recentModels);
+            const accepted = await persistModelPreferencesConfig(settingsScope, next, settingsSnapshot.revision);
+            if (!accepted)
+                throw new Error(t('settings.conflict'));
             setDraft(normalizeModelPreferences(next));
             setDirty(false);
             setConflict(false);
@@ -125,5 +123,5 @@ export function ModelPreferencesCard(props) {
                                             const isPinned = draft.pinnedModels.some(candidate => sameModelKey(candidate, key));
                                             return (_jsxs("div", { className: styles.modelRow, children: [_jsx("span", { title: model.description, children: model.name || model.id }), _jsx("code", { children: model.id }), _jsx("button", { type: "button", className: styles.smallButton, disabled: !isPinned && draft.pinnedModels.length >= MAX_PINNED_MODELS, onClick: () => isPinned ? unpin(key) : pin(key), children: isPinned ? t('settings.unpin') : t('settings.pin') })] }, model.id));
                                         }) })] }, provider));
-                        }) })] }), _jsxs("footer", { className: styles.footer, children: [_jsx("button", { type: "button", className: styles.secondaryButton, disabled: saving, onClick: () => { const next = { ...DEFAULT_MODEL_PREFERENCES }; edit(next); void persist(next); }, children: t('settings.reset') }), _jsx("button", { type: "button", className: styles.primaryButton, disabled: !dirty || saving || !settingsSnapshot.writable, onClick: () => void persist(draft), children: saving ? t('status.selecting') : t('settings.save') })] })] }));
+                        }) })] }), _jsxs("footer", { className: styles.footer, children: [_jsx(BaiModelAccess, { t: t, className: styles.secondaryButton, compact: false }), _jsx("button", { type: "button", className: styles.secondaryButton, disabled: saving, onClick: () => { const next = { ...DEFAULT_MODEL_PREFERENCES }; edit(next); void persist(next); }, children: t('settings.reset') }), _jsx("button", { type: "button", className: styles.primaryButton, disabled: !dirty || saving || !settingsSnapshot.writable, onClick: () => void persist(draft), children: saving ? t('status.selecting') : t('settings.save') })] })] }));
 }

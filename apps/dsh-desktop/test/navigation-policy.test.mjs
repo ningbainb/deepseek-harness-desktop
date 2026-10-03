@@ -1,7 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { classifyNavigation, installNavigationPolicy, isOAuthPopupBootstrap } from '../src/navigation-policy.mjs'
+import { classifyNavigation, installNavigationPolicy, isOAuthPopupBootstrap, isOfficialAccountAuthorization } from '../src/navigation-policy.mjs'
+
+test('official login opens only the exact HTTPS authorization origin and path', async () => {
+  const valid = 'https://platform.deepseek.com/dsh/authorize?authorize_id=fixture&theme=dark'
+  assert.equal(isOfficialAccountAuthorization(valid), true)
+  for (const url of ['http://platform.deepseek.com/dsh/authorize', 'https://platform.deepseek.com.evil.test/dsh/authorize',
+    'https://evil.test/dsh/authorize', 'https://user:secret@platform.deepseek.com/dsh/authorize',
+    'https://platform.deepseek.com:444/dsh/authorize', 'https://platform.deepseek.com/other',
+    'https://platform.deepseek.com/dsh/authorize#other', 'javascript:alert(1)']) {
+    assert.equal(isOfficialAccountAuthorization(url), false, url)
+  }
+  let open
+  const opened = []
+  installNavigationPolicy({ webContents: { on() {}, setWindowOpenHandler: handler => { open = handler } },
+    getRuntimeOrigin: () => 'dsh-runtime://app', openExternal: url => { opened.push(url) } })
+  assert.deepEqual(open({ url: valid }), { action: 'deny' })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(opened, [valid])
+  assert.deepEqual(open({ url: 'https://platform.deepseek.com/other' }), { action: 'deny' })
+  assert.deepEqual(opened, [valid])
+})
 
 test('navigation policy keeps the renderer on the active DSH origin', () => {
   const runtimeOrigin = 'http://127.0.0.1:43125'

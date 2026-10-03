@@ -1,5 +1,5 @@
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ModelPreferencesConfig } from '../core/config.ts';
 export interface ModelPreferenceCatalog {

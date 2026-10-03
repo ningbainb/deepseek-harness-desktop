@@ -85,6 +85,25 @@ test('runtime protocol ends an active response cleanly while quiescing', async (
   lifecycle.resume()
 })
 
+test('intentional Runtime stop does not report an unavailable carrier to late HTTP requests', async () => {
+  let handler
+  let calls = 0
+  const provider = { status: { state: 'stopped' }, fetch: async () => { calls++; return new Response('ready') } }
+  const lifecycle = await installDesktopRuntimeProtocol({
+    protocol: { handle: async (_scheme, value) => { handler = value } },
+    getProvider: () => provider,
+  })
+  lifecycle.quiesce()
+  assert.equal((await handler(new Request('dsh-runtime://app/api/state'))).status, 204)
+  assert.equal((await handler(new Request('dsh-runtime://foreign/api/state'))).status, 404)
+  assert.equal(calls, 0)
+  lifecycle.resume()
+  assert.equal((await handler(new Request('dsh-runtime://app/api/state'))).status, 503)
+  provider.status.state = 'ready'
+  assert.equal(await (await handler(new Request('dsh-runtime://app/api/state'))).text(), 'ready')
+  assert.equal(calls, 1)
+})
+
 test('runtime stream IPC forwards frames and cancels only the opening renderer', async () => {
   const handlers = new Map()
   const ipcMain = {
@@ -97,12 +116,14 @@ test('runtime stream IPC forwards frames and cancels only the opening renderer',
   sender.isDestroyed = () => false
   let observedSignal
   const writes = []
+  let inputEnded = false
   const provider = {
     status: { state: 'ready' },
     openDuplex: (_endpoint, _payload, signal) => {
       observedSignal = signal
       return {
         write: async value => { writes.push(value) },
+        close: async () => { inputEnded = true },
         async *[Symbol.asyncIterator]() {
           yield { sequence: 1 }
           await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
@@ -129,6 +150,11 @@ test('runtime stream IPC forwards frames and cancels only the opening renderer',
   assert.equal(await handlers.get(RUNTIME_STREAM_WRITE_CHANNEL)({ sender }, id, { input: 'value' }), true)
   assert.deepEqual(writes, [{ input: 'value' }])
   assert.equal(await handlers.get(RUNTIME_STREAM_WRITE_CHANNEL)({ sender: {} }, id, 'ignored'), false)
+  assert.equal(await handlers.get('desktop:runtime-stream-end')({ sender: {} }, id), false)
+  assert.equal(inputEnded, false)
+  assert.equal(await handlers.get('desktop:runtime-stream-end')({ sender }, id), true)
+  assert.equal(inputEnded, true)
+  assert.equal(observedSignal.aborted, false)
   assert.equal(handlers.get('desktop:runtime-stream-cancel')({ sender: {} }, id), false)
   assert.equal(handlers.get('desktop:runtime-stream-cancel')({ sender }, id), true)
   assert.equal(observedSignal.aborted, true)
@@ -155,10 +181,15 @@ test('runtime stream IPC quiesce sends EOF before cancellation', async () => {
   scheduled.shift()()
   await new Promise(resolve => setImmediate(resolve))
   await dispose.quiesce()
-  assert.deepEqual(sender.frames, [{ channel: RUNTIME_STREAM_FRAME_CHANNEL, frame: { id, type: 'end' } }])
+  assert.deepEqual(sender.frames, [
+    { channel: RUNTIME_STREAM_FRAME_CHANNEL, frame: { type: 'lifecycle', phase: 'quiescing' } },
+    { channel: RUNTIME_STREAM_FRAME_CHANNEL, frame: { id, type: 'end' } },
+  ])
   const lateId = handlers.get('desktop:runtime-stream-open')({ sender }, { endpoint: 'session/observe', payload: {} })
   scheduled.shift()()
   assert.deepEqual(sender.frames.at(-1), { channel: RUNTIME_STREAM_FRAME_CHANNEL, frame: { id: lateId, type: 'end' } })
   dispose.resume()
+  assert.deepEqual(sender.frames.at(-1), { channel: RUNTIME_STREAM_FRAME_CHANNEL, frame: { type: 'lifecycle', phase: 'resumed' } })
+  assert.equal(sender.frames.filter(({ frame }) => frame.type === 'lifecycle').length, 2)
   dispose()
 })

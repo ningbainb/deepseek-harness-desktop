@@ -17,13 +17,16 @@ vi.mock('@linxin666/dsh-particle-theme/src/client/index.ts', () => ({
 }))
 
 vi.mock('../src/client/compat-settings-scope.ts', () => ({
-  WebUiSettingsBinder: class WebUiSettingsBinder {},
+  WebUiSettingsBinder: class WebUiSettingsBinder {
+    bind() { return { getSnapshot: () => ({ status: 'unavailable' }), subscribe: () => () => {}, set: async () => false } }
+  },
 }))
 
 import { apply } from '../src/client/index.ts'
 import { ChatGptAuthSection } from '../src/client/ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from '../src/client/WebUIPluginsCard.tsx'
 import { RelayOnboardingCard } from '../src/client/RelayOnboardingCard.tsx'
+import { CommunityPluginsSettingsCard } from '../src/client/CommunityPluginsSettingsCard.tsx'
 import { DesktopCollaborationEntry, DesktopExtensionDockEntry } from '../src/client/desktop-extension-dock.tsx'
 
 afterEach(() => {
@@ -57,7 +60,7 @@ describe('Web UI settings section', () => {
       effect: (callback: () => unknown) => callback(),
       inject: vi.fn(),
       locale: { register: localeRegister, bind },
-      slots: { inject, register },
+      slots: { inject, register, entriesOfSlot: () => [], subscribe: () => () => {} },
     }
 
     apply(ctx as never)
@@ -67,9 +70,11 @@ describe('Web UI settings section', () => {
     expect(localeRegister).toHaveBeenCalledWith('web-ui-plugins', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(5)
-    const [authOptions, AuthComponent] = register.mock.calls[0] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
+    expect(localeRegister).toHaveBeenCalledWith('community-plugins', expect.any(Object))
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'settings.section', 'model-preferences.onboarding', 'sidebar.footer.action', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(6)
+    expect(register.mock.calls[0]).toEqual([expect.objectContaining({ name: 'web-ui.plugin.item', id: 'community-plugins', inject: expect.any(Function) }), CommunityPluginsSettingsCard])
+    const [authOptions, AuthComponent] = register.mock.calls[1] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
       name: 'settings.section',
       id: 'chatgpt-auth',
@@ -77,7 +82,7 @@ describe('Web UI settings section', () => {
       locale: 'chatgpt-auth',
     })
     expect(AuthComponent).toBe(ChatGptAuthSection)
-    const [options, Component] = register.mock.calls[1] as unknown as [Record<string, unknown>, typeof WebUIPluginsSection]
+    const [options, Component] = register.mock.calls[2] as unknown as [Record<string, unknown>, typeof WebUIPluginsSection]
     expect(options).toMatchObject({
       name: 'settings.section',
       id: 'web-ui-plugins',
@@ -87,7 +92,7 @@ describe('Web UI settings section', () => {
     })
     expect(options).not.toHaveProperty('key')
     expect(Component).toBe(WebUIPluginsSection)
-    const [relayOptions, RelayComponent] = register.mock.calls[2] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
+    const [relayOptions, RelayComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
     expect(relayOptions).toMatchObject({
       name: 'model-preferences.onboarding',
       id: 'bai',
@@ -95,10 +100,10 @@ describe('Web UI settings section', () => {
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)
-    const [collaborationOptions, CollaborationComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof DesktopCollaborationEntry]
+    const [collaborationOptions, CollaborationComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopCollaborationEntry]
     expect(collaborationOptions).toMatchObject({ name: 'sidebar.footer.action', id: 'desktop-model-collaboration', order: 99 })
     expect(CollaborationComponent).toBe(DesktopCollaborationEntry)
-    const [dockOptions, DockComponent] = register.mock.calls[4] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [dockOptions, DockComponent] = register.mock.calls[5] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',
@@ -117,13 +122,21 @@ describe('Web UI settings section', () => {
       effect: (callback: () => unknown) => callback(),
       inject: vi.fn(),
       locale: { register: vi.fn(() => () => {}), bind: vi.fn(() => (key: string) => key) },
-      slots: { inject, register },
+      slots: { inject, register, entriesOfSlot: () => [], subscribe: () => () => {} },
     }
     apply(ctx as never)
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['settings.section', 'web-ui.plugin.item', 'sidebar.footer.action', 'sidebar.footer.action', 'root'])
-    expect(register).toHaveBeenCalledTimes(5)
-    expect(register.mock.calls[1]![0]).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', order: 1 })
-    expect(register.mock.calls[1]![1]).toBe(RelayOnboardingCard)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'web-ui.plugin.item', 'sidebar.footer.action', 'sidebar.footer.action', 'root'])
+    expect(register).toHaveBeenCalledTimes(6)
+    expect(register.mock.calls[2]![0]).toMatchObject({ name: 'web-ui.plugin.item', id: 'relay', order: 1 })
+    expect(register.mock.calls[2]![1]).toBe(RelayOnboardingCard)
+    const dockChildren = (register.mock.calls[5]![0] as { children: Record<string, unknown> }).children
+    expect(dockChildren).toEqual({
+      'web-ui.plugin.item': { kind: 'list', scope: 'root' },
+      'desktop-dock.settings.section': { kind: 'list', scope: 'root' },
+      'desktop-dock.plugins.row.config': { kind: 'keyed', scope: 'root' },
+    })
+    expect(dockChildren).not.toHaveProperty('settings.section')
+    expect(dockChildren).not.toHaveProperty('plugins.row.config')
   })
 
   it('renders the declared web-ui.plugin.item child slot under the static section heading', () => {

@@ -11,7 +11,9 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface Context merge (ctx.settingsScope).
@@ -71,7 +73,7 @@ const POLL_MS = 2000
 const PET_SETTINGS_NS = 'pet'
 
 /** Required services. */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote']
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote']
 
 /** Re-exported for consumers that type against the injected face. */
 export type { PetInjected, PetDockEntryProps } from './PetDockEntry.tsx'
@@ -117,7 +119,7 @@ declare module '@deepseek-ai/cordis' {
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'pet: dictionaries')
 
-  const binder = ctx.get('webUiSettings') ?? ctx.settingsScope
+  const binder = ctx.get('webUiSettings') ?? { bind: <S>(spec: SettingsScopeSpec<S>) => ctx.configForms.get<S>(spec.namespace) }
   const settingsScope = binder.bind<PetSettings>({ namespace: PET_SETTINGS_NS })
   const enabled = (): boolean => {
     const snapshot = settingsScope.getSnapshot()

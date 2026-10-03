@@ -209,8 +209,12 @@ async function* controlFrames(
   for await (const value of stream) {
     const frame = value as SessionControlFrame
     if (frame.type === 'baseline') {
-      const queue = frame.value.queues[sessionId as keyof typeof frame.value.queues]
-      const jobs = frame.value.jobs[sessionId as keyof typeof frame.value.jobs]
+      const legacy = frame.value as typeof frame.value & {
+        queues?: Readonly<Record<string, readonly unknown[]>>
+        jobs?: Readonly<Record<string, readonly unknown[]>>
+      }
+      const queue = legacy.queues?.[sessionId]
+      const jobs = legacy.jobs?.[sessionId]
       const projections = frame.value.projections[sessionId as keyof typeof frame.value.projections]
       if (queue !== undefined) yield { type: 'session/queue', sessionId, items: queue }
       if (jobs !== undefined) yield { type: 'session/jobs', sessionId, jobs }
@@ -220,9 +224,14 @@ async function* controlFrames(
       continue
     }
     if (String(frame.sessionId) !== sessionId) continue
-    if (frame.type === 'queue') yield { type: 'session/queue', sessionId, items: frame.items }
-    else if (frame.type === 'jobs') yield { type: 'session/jobs', sessionId, jobs: frame.jobs }
-    else yield { type: 'session/projection', sessionId, key: frame.key, value: frame.value, seq: frame.seq }
+    const legacy = frame as unknown as {
+      type: string
+      items?: readonly unknown[]
+      jobs?: readonly unknown[]
+    }
+    if (legacy.type === 'queue' && legacy.items !== undefined) yield { type: 'session/queue', sessionId, items: legacy.items }
+    else if (legacy.type === 'jobs' && legacy.jobs !== undefined) yield { type: 'session/jobs', sessionId, jobs: legacy.jobs }
+    else if (frame.type === 'projection') yield { type: 'session/projection', sessionId, key: frame.key, value: frame.value, seq: frame.seq }
   }
 }
 

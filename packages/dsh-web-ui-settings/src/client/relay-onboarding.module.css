@@ -8,6 +8,30 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.accessBackdrop { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 40%); }
+.accessDialog { width: min(520px, 100%); max-height: calc(100vh - 40px); overflow: auto; background: var(--dsw-alias-bg-layer-2, #202124); }
+
+.accountRecommendation {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  max-width: 260px;
+  white-space: normal;
+}
+
+.accountRecommendation button {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.accountRecommendation button:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
 .header {
   flex-wrap: wrap;
   display: flex;

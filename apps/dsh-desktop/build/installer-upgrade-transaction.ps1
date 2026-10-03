@@ -105,20 +105,55 @@ function Read-Journal {
 function Get-RegistryEntries {
   $entries = [System.Collections.Generic.List[object]]::new()
   foreach ($hive in @(
-    [pscustomobject]@{ Provider = 'HKEY_CURRENT_USER'; Command = 'HKCU' },
-    [pscustomobject]@{ Provider = 'HKEY_LOCAL_MACHINE'; Command = 'HKLM' }
+    [pscustomobject]@{ Provider = 'HKEY_CURRENT_USER'; Hive = 'CurrentUser'; Command = 'HKCU'; Views = @('Default') },
+    [pscustomobject]@{
+      Provider = 'HKEY_LOCAL_MACHINE'
+      Hive = 'LocalMachine'
+      Command = 'HKLM'
+      Views = $(if ([Environment]::Is64BitOperatingSystem) { @('Registry64', 'Registry32') } else { @('Default') })
+    }
   )) {
     foreach ($key in @($InstallRegistryKey, $UninstallRegistryKey)) {
       if ([string]::IsNullOrWhiteSpace($key)) {
         continue
       }
-      $entries.Add([pscustomobject]@{
-        ProviderPath = "Registry::$($hive.Provider)\$key"
-        CommandPath = "$($hive.Command)\$key"
-      })
+      foreach ($view in $hive.Views) {
+        $entries.Add([pscustomobject]@{
+          ProviderPath = "Registry::$($hive.Provider)\$key"
+          CommandPath = "$($hive.Command)\$key"
+          Hive = $hive.Hive
+          SubKey = $key
+          View = $view
+          ViewOption = switch ($view) {
+            'Registry64' { '/reg:64' }
+            'Registry32' { '/reg:32' }
+            default { '' }
+          }
+        })
+      }
     }
   }
   $entries
+}
+
+function Get-RegistryState([object] $entry) {
+  if ([string]::IsNullOrWhiteSpace([string] $entry.View)) {
+    # Journals written by older installers used the process-default view.
+    return Get-ItemProperty -LiteralPath ([string] $entry.ProviderPath) -ErrorAction SilentlyContinue
+  }
+  $hive = [Enum]::Parse([Microsoft.Win32.RegistryHive], [string] $entry.Hive)
+  $view = [Enum]::Parse([Microsoft.Win32.RegistryView], [string] $entry.View)
+  $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey($hive, $view)
+  try {
+    $key = $base.OpenSubKey([string] $entry.SubKey)
+    if ($null -eq $key) { return $null }
+    try {
+      return [pscustomobject]@{
+        InstallLocation = $key.GetValue('InstallLocation')
+        UninstallString = $key.GetValue('UninstallString')
+      }
+    } finally { $key.Dispose() }
+  } finally { $base.Dispose() }
 }
 
 function Get-UninstallerDirectory([string] $uninstallString) {
@@ -162,11 +197,14 @@ function Assert-InstallBackup([object] $install) {
 
 function Remove-RegistryEntries([object[]] $entries) {
   foreach ($entry in $entries) {
-    $path = [string] $entry.providerPath
-    if (Test-Path -LiteralPath $path) {
+    if ($null -ne (Get-RegistryState $entry)) {
       # Do not fall through to the legacy uninstaller with stale registration.
-      Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop
-      if (Test-Path -LiteralPath $path) { throw 'previous install registration is still present' }
+      $arguments = @('DELETE', [string] $entry.commandPath, '/f')
+      if (-not [string]::IsNullOrWhiteSpace([string] $entry.viewOption)) { $arguments += [string] $entry.viewOption }
+      & $registryExecutable @arguments | Out-Null
+      if ($LASTEXITCODE -ne 0 -or $null -ne (Get-RegistryState $entry)) {
+        throw "previous install registration is still present: $($entry.commandPath) $($entry.viewOption)"
+      }
     }
   }
 }
@@ -192,8 +230,10 @@ function Move-InstallToBackup([object] $install) {
   }
 }
 
-function Invoke-RegistryImport([string] $exportPath) {
-  & $registryExecutable IMPORT $exportPath | Out-Null
+function Invoke-RegistryImport([string] $exportPath, [object] $entry) {
+  $arguments = @('IMPORT', $exportPath)
+  if (-not [string]::IsNullOrWhiteSpace([string] $entry.viewOption)) { $arguments += [string] $entry.viewOption }
+  & $registryExecutable @arguments | Out-Null
   if ($LASTEXITCODE -ne 0) {
     throw "registry import failed with exit code $LASTEXITCODE`: $exportPath"
   }
@@ -351,7 +391,7 @@ function Invoke-Rollback([object] $journal) {
     if (-not (Test-Path -LiteralPath $exportPath -PathType Leaf)) {
       throw "registry backup is missing: $exportPath"
     }
-    Invoke-RegistryImport $exportPath
+    Invoke-RegistryImport $exportPath $entry
   }
 
   Remove-TransactionRootIfEmpty
@@ -377,7 +417,7 @@ function Begin-Transaction {
   [void] $roots.Add($normalizedInstallDirectory)
 
   foreach ($entry in $registryEntries) {
-    $state = Get-ItemProperty -LiteralPath $entry.ProviderPath -ErrorAction SilentlyContinue
+    $state = Get-RegistryState $entry
     if ($null -eq $state) {
       continue
     }
@@ -399,7 +439,7 @@ function Begin-Transaction {
   })
 
   $presentRegistryCount = @($registryEntries | Where-Object {
-    Test-Path -LiteralPath $_.ProviderPath
+    $null -ne (Get-RegistryState $_)
   }).Count
   if ($installPlans.Count -eq 0 -and $presentRegistryCount -eq 0) {
     Write-Output 'upgrade-transaction-not-required'
@@ -410,11 +450,13 @@ function Begin-Transaction {
   $registryJournal = [System.Collections.Generic.List[object]]::new()
   for ($index = 0; $index -lt $registryEntries.Count; $index += 1) {
     $entry = $registryEntries[$index]
-    $present = Test-Path -LiteralPath $entry.ProviderPath
+    $present = $null -ne (Get-RegistryState $entry)
     $exportFile = "registry-$index.reg"
     if ($present) {
       $exportPath = Join-Path $transactionRoot $exportFile
-      & $registryExecutable EXPORT $entry.CommandPath $exportPath /y | Out-Null
+      $arguments = @('EXPORT', [string] $entry.CommandPath, $exportPath, '/y')
+      if ($entry.ViewOption -ne '') { $arguments += $entry.ViewOption }
+      & $registryExecutable @arguments | Out-Null
       if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exportPath -PathType Leaf)) {
         throw "registry export failed: $($entry.CommandPath)"
       }
@@ -422,6 +464,10 @@ function Begin-Transaction {
     $registryJournal.Add([pscustomobject]@{
       providerPath = $entry.ProviderPath
       commandPath = $entry.CommandPath
+      hive = $entry.Hive
+      subKey = $entry.SubKey
+      view = $entry.View
+      viewOption = $entry.ViewOption
       present = $present
       exportFile = $exportFile
     })
@@ -439,12 +485,14 @@ function Begin-Transaction {
   Write-Journal $journal
 
   try {
+    # Clear every registration the native NSIS uninstall pass could read
+    # before the corresponding executable leaves its original path.
+    Remove-RegistryEntries @($registryJournal)
     foreach ($rawInstall in $installPlans) {
       $install = Assert-InstallBackup $rawInstall
       Move-InstallToBackup $install
       Write-Output "upgrade-install-staged root=$($install.Root)"
     }
-    Remove-RegistryEntries @($registryJournal)
     Write-Output 'upgrade-transaction-prepared'
   } catch {
     $beginError = $_.Exception

@@ -7,7 +7,9 @@ import {
   decorateDesktopRuntimeUrl,
   getWindowChromeTheme,
   installWindowChrome,
+  markWindowChromeModalLayer,
   markWindowChromeViewportRoot,
+  syncWindowChromeSkinInsets,
   WINDOW_CHROME_CSS,
   WINDOW_CHROME_HEIGHT,
   normalizeWindowChromeTheme,
@@ -38,6 +40,32 @@ function viewportRootFixture(position, authoredTop = 0) {
   return { root, document, classes, mutations: () => mutations,
     sync: () => mark({ document, getComputedStyle: element => ({ position: element.position }), chromeHeight: WINDOW_CHROME_HEIGHT }) }
 }
+
+test('modal stacking never promotes the application root or frame and clears a stale promotion', () => {
+  const document = { body: {}, documentElement: {} }
+  const makeElement = (parentElement, position, id = '', frame = false) => {
+    const classes = new Set()
+    return { parentElement, position, id, classes, hasAttribute: name => frame && name === 'data-dsh-frame',
+      classList: { contains: name => classes.has(name), add: name => classes.add(name), remove: name => classes.delete(name) } }
+  }
+  const mark = new Function(`return (${markWindowChromeModalLayer.toString()})`)()
+  const root = makeElement(document.body, 'fixed', 'root')
+  const frame = makeElement(root, 'fixed', '', true)
+  for (const applicationContainer of [root, frame]) {
+    applicationContainer.classes.add('dsh-desktop-modal-layer')
+    const dialog = makeElement(applicationContainer, 'relative')
+    assert.equal(mark({ dialog, document, getComputedStyle: element => ({ position: element.position }) }), false)
+    assert.equal(applicationContainer.classes.has('dsh-desktop-modal-layer'), false)
+  }
+  const overlay = makeElement(frame, 'fixed')
+  const dialog = makeElement(overlay, 'relative')
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    assert.equal(mark({ dialog, document, getComputedStyle: element => ({ position: element.position }) }), true)
+    assert.deepEqual([...overlay.classes], ['dsh-desktop-modal-layer'])
+  }
+  assert.equal(frame.classes.size, 0)
+  assert.equal(root.classes.size, 0)
+})
 
 test('positioned roots retain their caption inset through consecutive document mutations', () => {
   for (const position of ['fixed', 'absolute']) {
@@ -169,17 +197,25 @@ test('window chrome uses a native overlay with a compact caption area', () => {
   })
   assert.match(WINDOW_CHROME_CSS, /-webkit-app-region: drag/)
   assert.match(WINDOW_CHROME_CSS, /box-sizing: border-box/)
-  assert.match(WINDOW_CHROME_CSS, /padding-top: var\(--dsh-desktop-window-chrome-height\)/)
+  assert.match(WINDOW_CHROME_CSS, /body:has\(> #dsh-desktop-window-chrome\)/)
+  assert.match(WINDOW_CHROME_CSS, /padding-top: var\(--dsh-desktop-content-top\)/)
+  assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-content-top: calc\(var\(--dsh-desktop-window-chrome-height\) \+ var\(--dsh-desktop-skin-top-inset\)\)/)
   assert.match(WINDOW_CHROME_CSS, /body > #root/)
   assert.match(WINDOW_CHROME_CSS, /height: calc\(100vh - var\(--dsh-desktop-window-chrome-height\)\)/)
   assert.match(WINDOW_CHROME_CSS, /data-dsh-frame/)
   assert.match(WINDOW_CHROME_CSS, /data-skin-chrome="titlebar"/)
+  assert.match(WINDOW_CHROME_CSS, /height: var\(--dsh-desktop-content-height\)/)
+  assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-content-height: calc\(100vh - var\(--dsh-desktop-content-top\) - var\(--dsh-desktop-skin-bottom-inset\)\)/)
   assert.match(WINDOW_CHROME_CSS, /data-dsh-desktop-chrome-theme="light"/)
   assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-chrome-bg: #071117/)
   assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-chrome-bg: #f7f8fa/)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /--dsh-desktop-chrome-bg: rgba\(/)
   assert.match(WINDOW_CHROME_CSS, /dsh-desktop-modal-layer/)
+  assert.match(WINDOW_CHROME_CSS, /z-index: 2147483646 !important/)
   assert.match(WINDOW_CHROME_CSS, /\[class\*="_toggleCluster"\]/)
+  assert.match(WINDOW_CHROME_CSS, /\[data-sidebar-right-panel\] \[data-dockkit-strip-chrome\] \{/u)
+  assert.match(WINDOW_CHROME_CSS, /\[data-sidebar-right-panel\] \[data-dockkit-strip-chrome\] > button:focus-visible/u)
+  assert.doesNotMatch(WINDOW_CHROME_CSS, /\[data-dockkit-strip-chrome\][^{]*\{[^}]*display:\s*none/su)
   assert.match(WINDOW_CHROME_CSS, /--dsh-desktop-layout-cluster-bg/)
   assert.match(WINDOW_CHROME_CSS, /button:focus-visible/)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /\[class\*="_toggleCluster"\][^{]*\{[^}]*display:\s*none/su)
@@ -196,6 +232,13 @@ test('native sidebar fullscreen reserves the caption without rewriting docked ta
   assert.match(rule, /top: var\(--dsh-desktop-window-chrome-height\) !important/u)
   assert.match(rule, /height: calc\(100vh - var\(--dsh-desktop-window-chrome-height\)\) !important/u)
   assert.doesNotMatch(rule, /transform|z-index|pointer-events/u)
+})
+
+test('native portalled menus and listboxes stay clickable above adapted dialogs without changing placement', () => {
+  const rule = WINDOW_CHROME_CSS.match(/html\[data-dsh-desktop-window-chrome="true"\] body > \[role="menu"\],\s*html\[data-dsh-desktop-window-chrome="true"\] body > \[role="listbox"\] \{([^}]+)\}/u)?.[1]
+  assert.ok(rule)
+  assert.match(rule, /z-index: 2147483647 !important/u)
+  assert.doesNotMatch(rule, /top:|left:|height:|width:|transform:|pointer-events:/u)
 })
 
 test('window chrome script keeps child-window caption areas visually quiet', () => {

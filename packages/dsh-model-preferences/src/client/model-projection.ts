@@ -1,4 +1,5 @@
 import type {
+  ModelDirectory,
   ModelDirectoryState,
 } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { SelectOption } from '@deepseek-ai/dsh-client-ui-commands/client'
@@ -6,7 +7,7 @@ import type {
   ModelSelection,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   flattenModelOptions,
   modelKeyFromOptionId,
@@ -91,11 +92,12 @@ function persistRecentSelection(settingsScope: SettingsScope<ModelPreferencesCon
 
 /** Shared selection path used by both `/model` and the composer seat. */
 export async function selectModelWithPreferences(
-  directory: { select(selection: ModelSelection): Promise<void>; store: { getSnapshot(): ModelDirectoryState } },
+  directory: Pick<ModelDirectory, 'select' | 'store'>,
   settingsScope: SettingsScope<ModelPreferencesConfig>,
   selection: ModelSelection,
-): Promise<void> {
-  await directory.select(selection)
+): ReturnType<ModelDirectory['select']> {
+  const result = await directory.select(selection)
+  if (!result.ok) return result
   try {
     persistRecentSelection(settingsScope, { provider: selection.provider, model: selection.model })
   } catch {
@@ -103,6 +105,7 @@ export async function selectModelWithPreferences(
     // unavailable settings mirror must not make a valid model switch appear
     // to have failed.
   }
+  return result
 }
 
 /** Display label that remains useful for an advertised or stale current route. */

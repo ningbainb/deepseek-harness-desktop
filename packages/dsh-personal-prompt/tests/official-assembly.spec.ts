@@ -38,7 +38,9 @@ it('updates through official assembly without duplicate sections or changing nat
     expect(first.contexts).toEqual(baseline.contexts)
     expect(first.tools).toEqual(baseline.tools)
 
-    current = { ...current, profiles: [{ ...current.profiles[0], content: 'fixture changed preference', updatedAt: 2 }] }
+    current.profiles = [{ ...current.profiles[0], content: 'fixture changed preference', updatedAt: 2 }]
+    plugin.update(current)
+    await plugin.await()
     const second = await ctx.systemPrompt.assemble()
     expect(renderPrompt(second).includes(current.profiles[0].content)).toBe(true)
     expect(renderPrompt(second).includes('{{literal_reference}}')).toBe(false)
@@ -52,9 +54,13 @@ it('updates through official assembly without duplicate sections or changing nat
     expect(complete.sections.length).toBe(1)
     expect(renderPrompt(complete).includes(current.profiles[0].content)).toBe(false)
     disposeComplete()
-    current = { ...current, enabled: false }
+    current.enabled = false
+    plugin.update(current)
+    await plugin.await()
     expect(renderPrompt(await ctx.systemPrompt.assemble()).includes(current.profiles[0].content)).toBe(false)
-    current = { ...current, enabled: true }
+    current.enabled = true
+    plugin.update(current)
+    await plugin.await()
 
     // The contribution only reads the session identity; storage is outside this fixture.
     const session = { id: 'fixture-session' } as Session

@@ -292,4 +292,7 @@
   .modelRow { align-items: flex-start; flex-wrap: wrap; }
   .modelRow code { flex-basis: 100%; text-align: left; }
 }
-:global(li:has([data-dsh-provider-id='project-relay'])) { order: -1; }
+:global(li:has([data-dsh-provider-id='project-relay'])),
+:global(li:has(button[aria-label$=' (project-relay)'])),
+:global(li:has(button[aria-label='编辑 project-relay'])),
+:global(li:has(button[aria-label='Edit project-relay'])) { order: -1; }

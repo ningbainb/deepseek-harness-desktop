@@ -9,6 +9,7 @@
   },
   "include": [
     "src/index.ts",
+    "src/preset-registry.ts",
     "src/dsh-home.ts",
     "src/sync.ts",
     "src/preset-schema.ts",

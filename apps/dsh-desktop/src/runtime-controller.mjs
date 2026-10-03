@@ -27,7 +27,7 @@ import {
 
 const READY_LINE = /^dsh web:\s+(http:\/\/\S+)/u
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
-export const DEFAULT_STARTUP_TIMEOUT_MS = 120_000
+export const DEFAULT_STARTUP_TIMEOUT_MS = 180_000
 export const DESKTOP_PROFILE_NAME = 'desktop'
 export const DESKTOP_REMOTE_HOST_ENV = 'DSH_DESKTOP_REMOTE_HOST'
 export const DESKTOP_RUNTIME_TRANSPORTS = Object.freeze(['http', 'pipe'])
@@ -35,16 +35,23 @@ export const DESKTOP_PIPE_RUNTIME_URL = 'dsh-runtime://app/'
 const RUNTIME_HOSTS = new Set(['127.0.0.1', '0.0.0.0'])
 const STABLE_RUNTIME_RESET_MS = 60_000
 const WINDOWS_CONSOLE_PRELOAD_PATH = fileURLToPath(new URL('./windows-console-preload.cjs', import.meta.url))
-const DESKTOP_RUNTIME_LAUNCHER_PATH = fileURLToPath(new URL('./runtime-launcher.mjs', import.meta.url))
+const DESKTOP_RUNTIME_LAUNCHER_PATH = materializeRuntimeLauncherPath(fileURLToPath(new URL('./runtime-launcher.mjs', import.meta.url)))
 const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/iu
 const shutdownControls = new WeakMap()
 
 /** The 1.1.5 CLI reserves `desktop`; Electron boots that profile through the public SDK. */
-export function runtimeEntryPath(cliPath) {
-  const normalized = String(cliPath).replaceAll('\\', '/').toLowerCase()
-  return normalized.endsWith('/@deepseek-ai/dsh/lib/bin.js')
-    ? DESKTOP_RUNTIME_LAUNCHER_PATH
+function materializeRuntimeLauncherPath(path) {
+  return path.replace(/(^|[/\\])app\.asar(?=[/\\])/giu, '$1app.asar.unpacked')
+}
+
+export function runtimeEntryPath(cliPath, launcherPath = DESKTOP_RUNTIME_LAUNCHER_PATH) {
+  return isOfficialDshCliPath(cliPath)
+    ? materializeRuntimeLauncherPath(launcherPath)
     : cliPath
+}
+
+function isOfficialDshCliPath(cliPath) {
+  return String(cliPath).replaceAll('\\', '/').toLowerCase().endsWith('/@deepseek-ai/dsh/lib/bin.js')
 }
 
 export function validateRuntimeHost(value) {
@@ -379,11 +386,10 @@ export async function probeHttpReady(
         redirect: 'manual',
       })
       if (response.ok) return
-      if (
-        response.status === 303
-        && response.headers?.get?.('location') === '/'
-        && response.headers?.get?.('set-cookie') !== null
-      ) return
+      if (response.status === 303) {
+        const location = response.headers?.get?.('location')
+        if (location && new URL(location, url).origin === new URL(url).origin) return
+      }
       lastError = new Error(`runtime health probe returned HTTP ${response.status}`)
     } catch (error) {
       lastError = error
@@ -604,9 +610,7 @@ export class DshRuntimeController extends EventEmitter {
     if (this.status.state !== 'ready' || this.pipeClient === undefined) {
       throw new Error('runtime pipe is not ready')
     }
-    return endpoint === 'websocket'
-      ? this.pipeClient.openDuplex(endpoint, payload, signal)
-      : this.pipeClient.openStream(endpoint, payload, signal)
+    return this.pipeClient.openDuplex(endpoint, payload, signal)
   }
 
   start({ preserveRestartAttempt = false } = {}) {
@@ -680,7 +684,7 @@ export class DshRuntimeController extends EventEmitter {
       DSH_HOME: this.dshHome,
       DSH_PROFILE: this.profileName,
       DSH_SKIN_PROFILE: this.profileName,
-      DSH_SKINS_DIR: join(this.dshHome, 'profiles', this.profileName, 'node_modules', '@linxin666'),
+      DSH_SKINS_DIR: join(this.dshHome, 'skins'),
       // Override an ambient parent value. The token is new for every Host
       // spawn and never appears in argv, diagnostics, or public status.
       [DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV]: workspaceFileOpenToken,
@@ -704,7 +708,9 @@ export class DshRuntimeController extends EventEmitter {
     try {
       const launchPatchFiles = validateRuntimePatchFiles(this.patchFilesProvider() ?? [])
       const runtimeCliPath = runtimeEntryPath(this.cliPath)
-      const shutdownControl = this.platform === 'win32' && runtimeCliPath === DESKTOP_RUNTIME_LAUNCHER_PATH
+      const desktopRuntimeEntry = isOfficialDshCliPath(this.cliPath)
+        || materializeRuntimeLauncherPath(runtimeCliPath) === DESKTOP_RUNTIME_LAUNCHER_PATH
+      const shutdownControl = this.platform === 'win32' && desktopRuntimeEntry
         ? createRuntimeShutdownControl(this.platform) : undefined
       delete environment[RUNTIME_SHUTDOWN_CONTROL_ENV]
       if (shutdownControl) environment[RUNTIME_SHUTDOWN_CONTROL_ENV] = JSON.stringify(shutdownControl)

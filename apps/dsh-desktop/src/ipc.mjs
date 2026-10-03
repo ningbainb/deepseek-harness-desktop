@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { lstat } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 import {
   DESKTOP_ERROR_CODES,
@@ -399,7 +401,7 @@ export function normalizeDesktopDockOpenOptions(value) {
     throw new TypeError('invalid Extension Dock navigation options')
   }
   const keys = Object.keys(value)
-  if (keys.some(key => key !== 'setting') || (value.setting !== undefined && value.setting !== 'value-mode')) {
+  if (keys.some(key => key !== 'setting') || (value.setting !== undefined && !['value-mode', 'models', 'usage'].includes(value.setting))) {
     throw new TypeError('invalid Extension Dock setting')
   }
   return Object.freeze(value.setting === undefined ? {} : { setting: value.setting })
@@ -493,6 +495,7 @@ export function registerDesktopIpc({
   onConversationImportConfirmed,
   onConversationImportProgress,
   shell,
+  app,
   // Best-effort diagnostics sink for failures that are non-fatal but still
   // worth knowing about. Absent in tests and during early startup
   // registration, so every call site must tolerate it being undefined.
@@ -555,6 +558,7 @@ export function registerDesktopIpc({
     'desktop:conversation-import-batch-confirm',
     'desktop:conversation-import-batch-cancel',
     'desktop:conversation-import-search-content',
+    'desktop:drag-file',
   ]
   for (const channel of channels) ipcMain.removeHandler(channel)
   const handle = (channel, allowedSurfaces, handler) => {
@@ -774,6 +778,28 @@ export function registerDesktopIpc({
   handle('desktop:conversation-import-search-content', [main, extensions], async (_event, _surface, query) => {
     if (!conversationImportService) throw new Error('conversation import service is unavailable')
     return await conversationImportService.searchContent(query)
+  })
+  handle('desktop:drag-file', [main, extensions], async (event, _surface, rawPath) => {
+    if (typeof rawPath !== 'string' || rawPath.length === 0) return false
+    const cleanPath = resolve(rawPath)
+    try {
+      const stat = await lstat(cleanPath)
+      if (!stat.isFile() && !stat.isDirectory()) return false
+    } catch {
+      return false
+    }
+    let icon = ''
+    try {
+      if (typeof app?.getFileIcon === 'function') {
+        icon = await app.getFileIcon(cleanPath)
+      }
+    } catch {}
+    try {
+      event.sender.startDrag({ file: cleanPath, icon })
+      return true
+    } catch {
+      return false
+    }
   })
   const publishStatus = async (status = controller.status) => {
     const window = getWindow()

@@ -192,13 +192,13 @@ export function SkinCenter({ t, controller, theme, background }: SkinCenterCompo
         if (!response.ok || payload?.ok !== true) {
           throw new Error(payload?.error ?? `HTTP ${response.status}`)
         }
-        setApplying(null)
         // Patch written; reload only once the watcher reports the target
         // active AND the boot manifest caught up, so the page never boots
         // into the old skin.
         void confirmActive(target).then(confirmed => {
           if (!mounted.current) return
           if (!confirmed) {
+            setApplying(null)
             const command = target === OFFICIAL ? 'dsh-skin use official' : `dsh-skin use ${target}`
             setError(`${t('appliedUnconfirmed')} — ${command}`)
             return
@@ -206,8 +206,12 @@ export function SkinCenter({ t, controller, theme, background }: SkinCenterCompo
           void manifestReady(target).then(ready => {
             if (!mounted.current) return
             if (ready) {
+              try {
+                window.dispatchEvent(new CustomEvent('dsh-skin-applied', { detail: { id: target } }))
+              } catch {}
               window.location.reload()
             } else {
+              setApplying(null)
               const command = target === OFFICIAL ? 'dsh-skin use official' : `dsh-skin use ${target}`
               setError(`${t('appliedUnconfirmed')} — ${command}`)
             }
@@ -248,11 +252,11 @@ export function SkinCenter({ t, controller, theme, background }: SkinCenterCompo
       )}
       <button
         type="button"
-        className={css.button}
-        disabled={applying !== null}
+        className={`${css.button} ${opts.isActive && !opts.isTrying ? css.buttonGhost : ''}`.trim()}
+        disabled={applying !== null || (opts.isActive && !opts.isTrying)}
         onClick={() => { applySkin(opts.key) }}
       >
-        {applying === opts.key ? t('applying') : opts.applyLabel}
+        {applying === opts.key ? t('applying') : (opts.isActive && !opts.isTrying ? t('active') : opts.applyLabel)}
       </button>
     </div>
   )

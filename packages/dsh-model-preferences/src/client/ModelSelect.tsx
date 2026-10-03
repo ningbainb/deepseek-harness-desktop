@@ -18,7 +18,7 @@ export type ModelSelectProps = PropsRuntime<'conversation.input.model'>
   & ModelSelectInjected
   & {
     modelSessionId: string
-    settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').SettingsScope<ModelPreferencesConfig>
+    settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').ConfigForm<ModelPreferencesConfig>
   }
 
 type Pane = 'root' | 'model' | 'effort'
@@ -100,7 +100,8 @@ export function ModelSelect(props: ModelSelectProps) {
     ]
   }, [reasoning, t])
   const busy = state.status === 'selecting' || selecting
-  const currentName = modelDisplayName(currentOption, state.current)
+  const currentName = state.current?.provider === 'project-relay' && state.current.model === '__bai_login_required__'
+    ? t('trigger.baiPending') : modelDisplayName(currentOption, state.current)
   const modelLabel = currentName || t('trigger.fallback')
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
 
@@ -163,7 +164,7 @@ export function ModelSelect(props: ModelSelectProps) {
     lastActionRef.current = 'select'
     try {
       const accepted = await select(selection)
-      if (!accepted) throw new Error(t('error.select'))
+      if (!accepted?.ok) throw new Error(accepted?.error?.message || t('error.select'))
       refreshBridgeRef.current?.announce()
       close()
       triggerRef.current?.focus()
@@ -196,6 +197,8 @@ export function ModelSelect(props: ModelSelectProps) {
       role="menuitemradio"
       aria-checked={option.current}
       title={option.model.name || option.model.id}
+      data-dsh-relay-model-entry="true"
+      data-dsh-relay-provider={option.provider}
       disabled={option.providerDisabled || busy}
       onClick={() => chooseModel(option)}
     >
@@ -230,6 +233,8 @@ export function ModelSelect(props: ModelSelectProps) {
         aria-controls={open ? `${id}-menu` : undefined}
         aria-label={currentName ? t('trigger.aria', { model: triggerLabel }) : t('trigger.fallback')}
         title={triggerLabel}
+        data-dsh-relay-model-entry="true"
+        data-dsh-relay-provider={state.current?.provider}
         disabled={locked}
         onClick={() => {
           if (open) close()

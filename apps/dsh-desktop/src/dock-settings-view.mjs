@@ -1,9 +1,11 @@
 import { classifyNavigation, installNavigationPolicy } from './navigation-policy.mjs'
 import { getWindowChromeTheme, getWindowPalette, WINDOW_CHROME_HEIGHT } from './window-chrome.mjs'
 import { publishWindowMotion } from './window-motion.mjs'
-import { assertDockSetting } from './dock-pages.mjs'
+import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
 
 export { DOCK_SETTING_IDS, assertDockSetting } from './dock-pages.mjs'
+
+class DockSettingsDraftRefreshError extends Error {}
 
 /** Runs in the settings renderer; each draft is submitted at most once. */
 export async function saveDockSettingsDrafts({
@@ -60,10 +62,11 @@ export async function saveDockSettingsDrafts({
 
 /** Lazy, unprivileged runtime view. It shares the local user's browser session,
  * but never receives the extension-management preload or an IPC surface grant. */
-export function createDockSettingsView({ WebContentsView, window, mainWindow, getRuntimeOrigin, dialog, runtimePreload, onWebContentsCreated = () => {}, onWebContentsDisposed = () => {}, openExternal = () => {}, closeCheckTimeoutMs = 1500, navigationTimeoutMs = 25000 }) {
+export function createDockSettingsView({ WebContentsView, window, mainWindow, getRuntimeOrigin, getRuntimeGeneration = () => undefined, dialog, runtimePreload, onWebContentsCreated = () => {}, onWebContentsDisposed = () => {}, openExternal = () => {}, closeCheckTimeoutMs = 1500, navigationTimeoutMs = 25000 }) {
   let view
   let selected = null
   let origin
+  let runtimeGeneration
   let ready
   let documentReady = false
   let navigation = 0
@@ -129,14 +132,42 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   }
   window.on('minimize', minimize)
   window.on('restore', restore)
-  const select = async (id, request) => {
+  const select = async (id, request, plugin) => {
     assertDockSetting(id)
-    selected = id
-    if (id === null) { view?.setVisible(false); return }
+    assertDockPlugin(id, plugin)
+    if (id === null) { selected = id; view?.setVisible(false); return }
     const runtimeOrigin = getRuntimeOrigin()
     if (!runtimeOrigin) throw new Error('运行时尚未就绪，请启动后重试。')
+    const nextGeneration = getRuntimeGeneration()
+    const reload = origin !== runtimeOrigin || runtimeGeneration !== nextGeneration
+    if (view && origin !== undefined && reload) {
+      let dirty
+      try {
+        dirty = await inspect('Boolean(document.querySelector(\'[data-dock-dirty="true"]\'))')
+      } catch (error) {
+        throw new DockSettingsDraftRefreshError('无法确认编辑状态，请关闭设置页面时检查未保存的修改后重试。', { cause: error })
+      }
+      if (request !== navigation || window.isDestroyed()) return
+      if (dirty) {
+        if (!dialog) throw new DockSettingsDraftRefreshError('请先保存或放弃未完成的编辑，再刷新插件配置页面。')
+        const { response } = await dialog.showMessageBox(window, {
+          type: 'question', title: '刷新插件配置页面', message: '内核已重启，刷新前需要处理尚未保存的修改。',
+          buttons: ['保存并刷新', '返回编辑', '放弃并刷新'], defaultId: 1, cancelId: 1, noLink: true,
+        })
+        if (request !== navigation || window.isDestroyed()) return
+        if (response !== 0 && response !== 2) throw new DockSettingsDraftRefreshError('已保留未保存的编辑，请保存或放弃修改后重试。')
+        if (response === 0) {
+          let saved
+          try { saved = await inspect(`(${saveDockSettingsDrafts.toString()})()`, 32000) }
+          catch (error) { throw new DockSettingsDraftRefreshError('保存未完成，已保留编辑，请检查后重试。', { cause: error }) }
+          if (!saved) throw new DockSettingsDraftRefreshError('保存未完成，已保留编辑，请检查后重试。')
+        }
+      }
+    }
+    if (request !== navigation || window.isDestroyed()) return
+    selected = id
     // Keep a warm form visible while React changes tabs; its draft stays mounted.
-    if (!documentReady || origin !== runtimeOrigin) view?.setVisible(false)
+    if (!documentReady || reload) view?.setVisible(false)
     if (!view) {
       view = new WebContentsView({ webPreferences: {
         ...(runtimePreload ? { preload: runtimePreload } : {}),
@@ -153,11 +184,13 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
       })
       window.on('resize', layout)
     }
-    if (origin !== runtimeOrigin) {
+    if (reload) {
       origin = runtimeOrigin
+      runtimeGeneration = nextGeneration
       documentReady = false
       const url = new URL(runtimeOrigin)
       url.searchParams.set('desktop-dock-setting', id)
+      if (plugin) url.searchParams.set('desktop-dock-plugin', plugin)
       url.searchParams.set('desktop-dock-theme', theme)
       ready = view.webContents.loadURL(url.href).catch(error => {
         if (window.isDestroyed() || !view || view.webContents.isDestroyed()) return
@@ -178,6 +211,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
           if (!dispatched) {
             dispatched = true;
             window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: ${JSON.stringify(id)} }));
+            window.dispatchEvent(new CustomEvent('dsh:dock-plugin', { detail: ${JSON.stringify(plugin ?? '')} }));
             window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: ${JSON.stringify(theme)} }));
             window.dispatchEvent(new CustomEvent('dsh:dock-palette', { detail: ${JSON.stringify(palette)} }));
           }
@@ -205,11 +239,13 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   })
   return {
     setInteracting: active => publishWindowMotion(view?.webContents, active),
-    select: async id => {
+    select: async (id, plugin) => {
       const request = ++navigation
-      try { await select(id, request) } catch (error) {
+      try { await select(id, request, plugin) } catch (error) {
         if (request !== navigation || window.isDestroyed()) return
+        if (error instanceof DockSettingsDraftRefreshError) throw error
         origin = undefined
+        runtimeGeneration = undefined
         documentReady = false
         // Expose the Dock shell's retry message instead of an obsolete opaque form.
         if (view && !view.webContents.isDestroyed()) view.setVisible(false)

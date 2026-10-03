@@ -14,7 +14,7 @@ export { ModelSelect } from "./ModelSelect.js";
 export * from "./model-projection.js";
 // The nested composer/command injections inherit `sessions` from this
 // package fiber while resolving the official model directory service.
-export const inject = ['slots', 'locale', 'connection', 'settingsScope', 'remote', 'remote.session', 'sessions'];
+export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote', 'remote.session', 'sessions'];
 const EMPTY_CONFIG = {
     version: 1,
     pinnedModels: [],
@@ -27,7 +27,7 @@ function settingsBinder(ctx) {
     if (typeof compatibility === 'object' && compatibility !== null && typeof compatibility.bind === 'function') {
         return compatibility;
     }
-    return ctx.settingsScope;
+    return { bind: (spec) => ctx.configForms.get(spec.namespace === MODEL_PREFERENCES_SETTINGS_NAMESPACE ? 'ui-model-preferences' : spec.namespace) };
 }
 function currentConfig(scope) {
     try {
@@ -141,8 +141,8 @@ export function apply(ctx) {
                             directory.load().catch(() => { });
                     },
                     select: selection => available
-                        ? selectModelWithPreferences(directory, settingsScope, selection).then(() => true, () => false)
-                        : Promise.resolve(false),
+                        ? selectModelWithPreferences(directory, settingsScope, selection)
+                        : Promise.resolve(undefined),
                 };
             },
         }, ModelSelect));

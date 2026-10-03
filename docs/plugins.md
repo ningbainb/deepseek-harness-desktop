@@ -102,6 +102,14 @@ dsh plugin --profile web add link:<dsh-web-ui>/packages/dsh-web-ui-all
 - 默认卸载只移除插件代码和加载入口，不删除插件设置或用户内容。未来如果提供“同时删除插件数据”，必须作为单独的二次确认操作实现。
 - 插件不得直接读取或写入其他插件的安装目录，也不得把 `node_modules` 当成持久存储。
 
+### Desktop 插件自带配置验收
+
+插件详情自带配置使用官方 keyed 槽 `plugins.row.config`，key 为 `<完整 npm 包名>#<插件入口 ID>`，owner 的 `view` 为 `summary` 或 `page`。该入口与 `web-ui.plugin.item` 设置卡片并存；表单和保存操作由原插件提供，Desktop 不用脱敏配置重建表单。
+
+Desktop 激活暂存依赖时会把指向暂存树内部的 pnpm 包链接和传递依赖链接迁移到正式 profile，保留外部 SDK 链接且不遍历其目标。无法解析的内部链接必须触发事务回滚，不能以主界面启动成功代替插件可用性检查。
+
+完整桌面回归 `pnpm desktop:regression:e2e --full` 包含真实插件详情点击、原表单展示、保存和 Profile 持久化验收。夹具默认从公开 NPM 获取固定版本的原包，并核验固定摘要；离线运行可用 `DSH_DESKTOP_E2E_PLUGIN_OPTIONS_ARCHIVE` 指向同一原包，摘要校验不会跳过。验收只使用隔离 Home 与 userData，不执行搜索 API 请求，不改动真实用户数据。
+
 ## 插件规范要点
 
 - **package.json 的 `dsh.bundle.patch` 声明**：指向包内 `cordis.patch.yml`，这是官方 bundle 清单，`dsh plugin` 依赖它识别与挂载插件。

@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { en, zh } from "./locales.js";
+import { ModelCatalogChangedError } from "./model-catalog.js";
 import styles from './value-mode.module.css';
 import layout from './value-mode-polish.module.css';
 import picker from './value-mode-picker.module.css';
@@ -30,6 +31,17 @@ export const ModelPicker = ({ title, current, onSelect, onClose, fetchModels }) 
     const [error, setError] = useState(null);
     const [reloadToken, setReloadToken] = useState(0);
     const dialogRef = useRef(null);
+    useEffect(() => {
+        const refresh = () => setReloadToken(value => value + 1);
+        window.addEventListener('dsh-relay-models-updated', refresh);
+        const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('dsh-model-selection-confirmed-v1') : undefined;
+        if (channel)
+            channel.onmessage = event => {
+                if (typeof event.data === 'object' && event.data !== null && event.data.provider === 'project-relay')
+                    refresh();
+            };
+        return () => { window.removeEventListener('dsh-relay-models-updated', refresh); channel?.close(); };
+    }, []);
     useEffect(() => {
         const previous = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
         dialogRef.current?.querySelector('button:not([disabled]), [tabindex]:not([tabindex="-1"])')?.focus();
@@ -79,26 +91,40 @@ export const ModelPicker = ({ title, current, onSelect, onClose, fetchModels }) 
             setError(catalogText('catalogTimeout'));
             setLoading(false);
         }, 12_000);
-        void Promise.resolve().then(() => fetchModels()).then((result) => {
+        void Promise.resolve().then(async () => {
+            for (let refresh = 0; active; refresh += 1) {
+                try {
+                    return await fetchModels();
+                }
+                catch (reason) {
+                    if (!(reason instanceof ModelCatalogChangedError) || refresh >= 2 || !active)
+                        throw reason;
+                }
+            }
+        }).then((result) => {
+            clearTimeout(timer);
             if (!active)
+                return;
+            if (!result)
                 return;
             setGroups(sortValueModeProviderGroups(result.groups ?? []));
             setFailures(result.failures ?? []);
             setLoading(false);
         }).catch((reason) => {
+            clearTimeout(timer);
             if (!active)
                 return;
             setError(errorText(reason));
             setLoading(false);
-        }).finally(() => clearTimeout(timer));
+        });
         return () => { active = false; clearTimeout(timer); };
     }, [fetchModels, reloadToken]);
     const choiceCount = groups.reduce((count, group) => count + group.models.length, 0);
     const hasFailures = failures.length > 0;
-    const pickerContent = (_jsx("div", { className: `${styles.modalBackdrop} ${layout.modalBackdrop}`, role: "presentation", "data-value-mode-model-picker": "true", onClick: onClose, children: _jsxs("div", { ref: dialogRef, className: `${styles.modalContent} ${layout.modalContent}`, role: "dialog", "aria-modal": "true", "aria-label": title, onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: styles.header, children: [_jsxs("div", { className: styles.titleArea, children: [_jsx("div", { className: styles.title, children: title }), _jsx("div", { className: `${styles.desc} ${picker.subtitle}`, children: "\u4EC5\u663E\u793A\u5DF2\u914D\u7F6E\u5E76\u53EF\u8BBF\u95EE\u7684\u4F9B\u5E94\u5546\u6A21\u578B\uFF0C\u4E0D\u4F1A\u8BFB\u53D6\u6216\u586B\u5199 API Key\u3002" })] }), _jsx("button", { type: "button", className: styles.button, "aria-label": "\u5173\u95ED\u6A21\u578B\u9009\u62E9\u5668", onClick: onClose, children: "\u00D7" })] }), loading && _jsx("div", { className: styles.desc, role: "status", children: "\u52A0\u8F7D\u5DF2\u914D\u7F6E\u6A21\u578B\u5217\u8868\u4E2D..." }), error && (_jsxs("div", { className: picker.errorPanel, role: "alert", children: [_jsx("div", { className: picker.errorMessage, children: error }), _jsx("button", { type: "button", className: styles.button, onClick: () => setReloadToken((value) => value + 1), children: "\u91CD\u8BD5" })] })), !loading && hasFailures && (_jsxs("div", { className: picker.failurePanel, role: "status", children: [_jsx("div", { className: picker.failureTitle, children: choiceCount > 0 ? '部分供应商暂时无法读取模型，已成功加载的模型仍可选择。' : '已配置供应商暂时无法读取模型。' }), failures.map((failure) => (_jsxs("div", { className: picker.failureItem, children: [_jsx("span", { className: picker.failureProvider, children: failure.name || failure.id }), _jsx("span", { children: failure.message.trim() || '模型列表读取失败。' })] }, `${failure.id}:${failure.message}`)))] })), !loading && groups.length === 0 && !error && !hasFailures && (_jsx("div", { className: styles.desc, role: "status", children: "\u6682\u65E0\u5DF2\u914D\u7F6E\u7684\u6A21\u578B\u3002\u8BF7\u5148\u5728 DeepSeek Harness \u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u5E76\u542F\u7528\u4F9B\u5E94\u5546\u3002" })), _jsx("div", { className: `${styles.modelList} ${layout.modelList}`, children: groups.map((group) => (_jsxs("div", { children: [_jsxs("div", { className: `${styles.providerGroup} ${picker.providerLabel}`, children: [_jsx("span", { children: group.name || group.id }), _jsxs("span", { className: picker.providerCount, children: [group.models.length, " \u4E2A\u6A21\u578B"] })] }), group.models.map((model) => {
+    const pickerContent = (_jsx("div", { className: `${styles.modalBackdrop} ${layout.modalBackdrop}`, role: "presentation", "data-value-mode-model-picker": "true", onClick: onClose, children: _jsxs("div", { ref: dialogRef, className: `${styles.modalContent} ${layout.modalContent}`, role: "dialog", "aria-modal": "true", "aria-label": title, onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: styles.header, children: [_jsxs("div", { className: styles.titleArea, children: [_jsx("div", { className: styles.title, children: title }), _jsx("div", { className: `${styles.desc} ${picker.subtitle}`, children: "\u4EC5\u663E\u793A\u5DF2\u914D\u7F6E\u5E76\u53EF\u8BBF\u95EE\u7684\u4F9B\u5E94\u5546\u6A21\u578B\uFF0C\u4E0D\u4F1A\u8BFB\u53D6\u6216\u586B\u5199 API Key\u3002" })] }), _jsx("button", { type: "button", className: styles.button, "aria-label": "\u5173\u95ED\u6A21\u578B\u9009\u62E9\u5668", onClick: onClose, children: "\u00D7" })] }), document.querySelector('[data-dsh-relay-access-root]') && _jsx("button", { type: "button", className: styles.button, "data-dsh-relay-connect": "true", children: catalogText('baiAccess') }), loading && _jsx("div", { className: styles.desc, role: "status", children: "\u52A0\u8F7D\u5DF2\u914D\u7F6E\u6A21\u578B\u5217\u8868\u4E2D..." }), error && (_jsxs("div", { className: picker.errorPanel, role: "alert", children: [_jsx("div", { className: picker.errorMessage, children: error }), _jsx("button", { type: "button", className: styles.button, onClick: () => setReloadToken((value) => value + 1), children: "\u91CD\u8BD5" })] })), !loading && hasFailures && (_jsxs("div", { className: picker.failurePanel, role: "status", children: [_jsx("div", { className: picker.failureTitle, children: choiceCount > 0 ? '部分供应商暂时无法读取模型，已成功加载的模型仍可选择。' : '已配置供应商暂时无法读取模型。' }), failures.map((failure) => (_jsxs("div", { className: picker.failureItem, children: [_jsx("span", { className: picker.failureProvider, children: failure.name || failure.id }), _jsx("span", { children: failure.message.trim() || '模型列表读取失败。' })] }, `${failure.id}:${failure.message}`)))] })), !loading && groups.length === 0 && !error && !hasFailures && (_jsx("div", { className: styles.desc, role: "status", children: "\u6682\u65E0\u5DF2\u914D\u7F6E\u7684\u6A21\u578B\u3002\u8BF7\u5148\u5728 DeepSeek Harness \u8BBE\u7F6E\u4E2D\u6DFB\u52A0\u5E76\u542F\u7528\u4F9B\u5E94\u5546\u3002" })), _jsx("div", { className: `${styles.modelList} ${layout.modelList}`, children: groups.map((group) => (_jsxs("div", { children: [_jsxs("div", { className: `${styles.providerGroup} ${picker.providerLabel}`, children: [_jsx("span", { children: group.name || group.id }), _jsxs("span", { className: picker.providerCount, children: [group.models.length, " \u4E2A\u6A21\u578B"] })] }), group.models.map((model) => {
                                 const selected = current?.provider === group.id && current?.model === model.id;
                                 const reasoningDefault = model.reasoning?.defaultEffort;
-                                return (_jsxs("button", { type: "button", className: `${styles.modelOption} ${picker.optionButton} ${selected ? styles.modelOptionSelected : ''}`, "aria-pressed": selected, "data-model-provider": group.id, "data-model-id": model.id, "data-testid": `value-mode-model-${model.id}`, onClick: () => {
+                                return (_jsxs("button", { type: "button", className: `${styles.modelOption} ${picker.optionButton} ${selected ? styles.modelOptionSelected : ''}`, "aria-pressed": selected, "data-model-provider": group.id, "data-dsh-relay-model-entry": "true", "data-dsh-relay-provider": group.id, "data-model-id": model.id, "data-testid": `value-mode-model-${model.id}`, onClick: () => {
                                         onSelect({
                                             provider: group.id,
                                             model: model.id,

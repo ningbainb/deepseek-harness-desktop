@@ -6,8 +6,11 @@ import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { openNativeSettings } from './native-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-settings-window-e2e-'))
 const runtimeReadyTimeoutMs = process.env.CI ? 120_000 : 90_000
 let electronApp
@@ -48,17 +51,21 @@ const assertContained = (state) => {
 }
 
 try {
+  await seedPrimaryRuntimePermissionForTest({ userData: resolve(temporary, 'user-data') })
   electronApp = await electron.launch({
-    executablePath: electronPath,
-    args: [resolve(appDir, 'src', 'main.mjs')],
+    executablePath: packagedExecutable || electronPath,
+    args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
     cwd: appDir,
     env: {
       ...process.env,
       DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
       DSH_HOME: resolve(temporary, 'dsh-home'),
+      DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
+      DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
     },
   })
+  assert.equal(await electronApp.evaluate(({ app }) => app.isPackaged), Boolean(packagedExecutable))
   page = await electronApp.firstWindow()
   page.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
@@ -88,10 +95,7 @@ try {
   await starPrompt.waitFor({ state: 'hidden' })
 
   const openSettings = async () => {
-    await page.getByRole('button', { name: /设置|Settings/iu }).first().evaluate((button) => button.click())
-    const dialog = page.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
-    await dialog.waitFor({ state: 'visible' })
-    return dialog
+    return openNativeSettings(page)
   }
 
   let dialog = await openSettings()

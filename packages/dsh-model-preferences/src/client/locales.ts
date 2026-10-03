@@ -1,7 +1,10 @@
 /** Chinese copy is the key-set source of truth for the model preferences UI. */
 export const zh = {
+  'action.bai': 'bai 供应商：登录 / 充值',
+  'action.baiCompact': 'bai · 登录/充值',
   'command.description': '选择模型（支持自定义置顶和供应商排序）',
   'trigger.fallback': '选择模型',
+  'trigger.baiPending': 'bai（登录后获取模型）',
   'trigger.aria': '当前模型：{model}',
   'trigger.ariaDisabled': '模型选择不可用',
   'menu.aria': '模型选择器',
@@ -54,8 +57,11 @@ export type ModelPreferencesLocaleKey = keyof typeof zh
 
 /** English dictionary must keep the Chinese key set complete. */
 export const en: Record<ModelPreferencesLocaleKey, string> = {
+  'action.bai': 'bai provider: sign in / top up',
+  'action.baiCompact': 'bai · sign in/top up',
   'command.description': 'Choose a model with custom pins and provider ordering',
   'trigger.fallback': 'Select model',
+  'trigger.baiPending': 'bai (models after sign-in)',
   'trigger.aria': 'Current model: {model}',
   'trigger.ariaDisabled': 'Model selection unavailable',
   'menu.aria': 'Model selector',

@@ -7,7 +7,7 @@
 export const DESKTOP_CLIENT_API_VERSION = '1.2.0'
 
 export type DesktopSurface = 'extensions' | 'updates'
-export type DesktopDockSetting = 'value-mode'
+export type DesktopDockSetting = 'value-mode' | 'models' | 'usage'
 export type DesktopSurfaceOpenOptions = Readonly<{ setting?: DesktopDockSetting }>
 export type DesktopAvailability = { available: false; reason: 'unavailable' }
 export type DockDismissReason = 'close' | 'escape' | 'clicked'
@@ -336,7 +336,7 @@ export function createDesktopClient({ globalObject = globalThis }: { globalObjec
     },
     async openDesktopSurface(surface, options) {
       if (surface === 'extensions' && typeof bridge?.openExtensionDock === 'function') {
-        if (options?.setting !== undefined && options.setting !== 'value-mode') {
+        if (options?.setting !== undefined && !['value-mode', 'models', 'usage'].includes(options.setting)) {
           throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting')
         }
         if (!await hasBridgeCapability('extensions.open')) return false

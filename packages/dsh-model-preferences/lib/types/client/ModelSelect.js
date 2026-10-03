@@ -59,7 +59,8 @@ export function ModelSelect(props) {
         ];
     }, [reasoning, t]);
     const busy = state.status === 'selecting' || selecting;
-    const currentName = modelDisplayName(currentOption, state.current);
+    const currentName = state.current?.provider === 'project-relay' && state.current.model === '__bai_login_required__'
+        ? t('trigger.baiPending') : modelDisplayName(currentOption, state.current);
     const modelLabel = currentName || t('trigger.fallback');
     const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`;
     const reload = useCallback(() => {
@@ -124,8 +125,8 @@ export function ModelSelect(props) {
         lastActionRef.current = 'select';
         try {
             const accepted = await select(selection);
-            if (!accepted)
-                throw new Error(t('error.select'));
+            if (!accepted?.ok)
+                throw new Error(accepted?.error?.message || t('error.select'));
             refreshBridgeRef.current?.announce();
             close();
             triggerRef.current?.focus();
@@ -151,7 +152,7 @@ export function ModelSelect(props) {
             ...(effort === undefined ? {} : { reasoningEffort: effort }),
         });
     };
-    const renderOption = (option) => (_jsxs("button", { type: "button", className: `${styles.option} ${option.current ? styles.optionCurrent : ''}`, role: "menuitemradio", "aria-checked": option.current, title: option.model.name || option.model.id, disabled: option.providerDisabled || busy, onClick: () => chooseModel(option), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: option.model.name || option.model.id }), option.providerDisabled && _jsx("span", { className: styles.description, children: t('status.providerDisabled') })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: option.current && _jsx("span", { className: styles.checkmark }) })] }, `${option.provider}\u0000${option.model.id}`));
+    const renderOption = (option) => (_jsxs("button", { type: "button", className: `${styles.option} ${option.current ? styles.optionCurrent : ''}`, role: "menuitemradio", "aria-checked": option.current, title: option.model.name || option.model.id, "data-dsh-relay-model-entry": "true", "data-dsh-relay-provider": option.provider, disabled: option.providerDisabled || busy, onClick: () => chooseModel(option), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: option.model.name || option.model.id }), option.providerDisabled && _jsx("span", { className: styles.description, children: t('status.providerDisabled') })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: option.current && _jsx("span", { className: styles.checkmark }) })] }, `${option.provider}\u0000${option.model.id}`));
     const renderGroup = (label, groupOptions, key) => (_jsxs("section", { role: "group", "aria-label": label, className: styles.group, children: [_jsx("div", { className: styles.groupTitle, children: label }), groupOptions.map(renderOption)] }, key));
     return (_jsxs("div", { className: styles.root, ref: rootRef, onKeyDown: event => {
             if (event.key !== 'Escape' || !open)
@@ -161,7 +162,7 @@ export function ModelSelect(props) {
                 setPane('root');
             else
                 close();
-        }, children: [_jsxs("button", { ref: triggerRef, type: "button", className: styles.trigger, "aria-haspopup": "menu", "aria-expanded": open, "aria-controls": open ? `${id}-menu` : undefined, "aria-label": currentName ? t('trigger.aria', { model: triggerLabel }) : t('trigger.fallback'), title: triggerLabel, disabled: locked, onClick: () => {
+        }, children: [_jsxs("button", { ref: triggerRef, type: "button", className: styles.trigger, "aria-haspopup": "menu", "aria-expanded": open, "aria-controls": open ? `${id}-menu` : undefined, "aria-label": currentName ? t('trigger.aria', { model: triggerLabel }) : t('trigger.fallback'), title: triggerLabel, "data-dsh-relay-model-entry": "true", "data-dsh-relay-provider": state.current?.provider, disabled: locked, onClick: () => {
                     if (open)
                         close();
                     else {

@@ -7,7 +7,7 @@ import { apply } from '../src/client/index.ts'
 
 function nativeFixture(blank = false) {
   const state = { current: 'old' as string | undefined,
-    byId: { old: { id: 'old', cwd: 'C:/project', blank,
+    byId: { old: { id: 'old', cwd: 'C:/project', blank, retainedBy: { mainView: 1 },
       projectionValues: { agentPreset: 'standard' } } } as Record<string, any> }
   const remote = {
     agentPresets: {
@@ -23,7 +23,7 @@ function nativeFixture(blank = false) {
     list: { getSnapshot: () => state },
     refresh: vi.fn(async () => {
       if (blank) state.byId.old.projectionValues.agentPreset = 'minimal'
-      else state.byId.new = { id: 'new', blank: true, cwd: 'C:/project', projectionValues: { agentPreset: 'minimal' } }
+      else state.byId.new = { id: 'new', blank: true, cwd: 'C:/project', retainedBy: {}, projectionValues: { agentPreset: 'minimal' } }
     }),
     clear: vi.fn(() => { state.current = undefined }),
     open: vi.fn((id: string) => { state.current = id }),
@@ -33,10 +33,15 @@ function nativeFixture(blank = false) {
     if (name === 'remote.session') return remote.session
     throw new Error(`modern branch must not read ${name}`)
   })
-  const ctx = { get, sessions,
+  const uiWorkspace = { openSession: vi.fn((id: string) => {
+    state.byId.old.retainedBy.mainView = 0
+    state.byId[id].retainedBy = { mainView: 1 }
+    state.current = id
+  }) }
+  const ctx = { get, sessions, uiWorkspace,
     workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'workspace', path: 'C:/project' }] }) } },
   } as unknown as Context
-  return { ctx, state, remote, sessions }
+  return { ctx, state, remote, sessions, uiWorkspace }
 }
 
 describe('official mode Runtime adapter', () => {
@@ -70,6 +75,7 @@ describe('official mode Runtime adapter', () => {
     expect(f.remote.session.create).toHaveBeenCalledWith({ workspaceId: 'workspace', agentPreset: 'minimal' })
     expect(f.sessions.refresh).toHaveBeenCalledOnce()
     expect(f.state.current).toBe('new')
+    expect(f.uiWorkspace.openSession).toHaveBeenCalledWith('new')
     expect(sessionPreset(f.state.byId.new)).toBe('minimal')
     expect(f.remote.settings.update).not.toHaveBeenCalled()
   })
@@ -88,7 +94,7 @@ describe('official mode Runtime adapter', () => {
     f.remote.session.create.mockRejectedValueOnce(new Error('native create failed'))
     await expect(new ModeSwitcherController(modeSwitcherDependencies(f.ctx)).switch('old', 'minimal')).rejects.toThrow('native create failed')
     expect(f.state.current).toBe('old')
-    expect(f.sessions.clear).not.toHaveBeenCalled()
+    expect(f.uiWorkspace.openSession).not.toHaveBeenCalled()
   })
 
   it('keeps the explicit old-host API boundary when typed Remote is unavailable', () => {

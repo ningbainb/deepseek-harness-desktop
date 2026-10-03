@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, readlink, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -111,6 +111,73 @@ test('activation rollback restores the exact manifest, lockfile, and dependency 
     assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
     assert.equal(await exists(value.manager.backupDirectory(staged.transactionId)), false)
     assert.equal((await value.profileArchive.getState()).active, undefined)
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('activation relocates absolute pnpm package and transitive links before removing staging', async () => {
+  const value = await fixture()
+  try {
+    const staged = await prepareChangedStage(value)
+    const modules = join(staged.stageDir, 'node_modules')
+    const store = join(modules, '.pnpm', 'linked-plugin@1.0.0', 'node_modules')
+    const packageRoot = join(store, 'linked-plugin')
+    await mkdir(packageRoot, { recursive: true })
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: 'linked-plugin', version: '1.0.0' }))
+    await symlink(packageRoot, join(modules, 'linked-plugin'), 'junction')
+    await symlink(join(modules, 'community-plugin'), join(store, 'community-plugin'), 'junction')
+    const external = join(value.root, 'external-sdk')
+    await mkdir(external)
+    await writeFile(join(external, 'unchanged.txt'), 'external data')
+    await symlink(external, join(modules, 'external-sdk'), 'junction')
+    const externalLink = await readlink(join(modules, 'external-sdk'))
+    const transaction = await staged.activate()
+    await transaction.validateActivated()
+    await transaction.markRuntimeStarting()
+    await transaction.markRuntimeHealthy()
+    await transaction.commit()
+    const live = join(value.profileDir, 'node_modules')
+    assert.equal(JSON.parse(await readFile(join(live, 'linked-plugin', 'package.json'), 'utf8')).name, 'linked-plugin')
+    assert.equal(JSON.parse(await readFile(join(live, '.pnpm', 'linked-plugin@1.0.0', 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '2.0.0')
+    assert.equal(await readlink(join(live, 'external-sdk')), externalLink)
+    assert.equal(await readFile(join(external, 'unchanged.txt'), 'utf8'), 'external data')
+    assert.equal(await exists(staged.stageDir), false)
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('relocated plugin links remain inside the transaction rollback boundary', async () => {
+  const value = await fixture()
+  try {
+    const originalManifest = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+    const staged = await prepareChangedStage(value)
+    await symlink(join(staged.stageDir, 'node_modules', 'community-plugin'), join(staged.stageDir, 'node_modules', 'linked-plugin'), 'junction')
+    const transaction = await staged.activate()
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'linked-plugin', 'package.json'), 'utf8')).version, '2.0.0')
+    await transaction.rollback()
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
+    assert.equal(await exists(join(value.profileDir, 'node_modules', 'linked-plugin')), false)
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('activation rejects an unresolved internal package link and restores the previous environment', async () => {
+  const value = await fixture()
+  try {
+    const originalManifest = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+    const originalLock = await readFile(join(value.profileDir, 'pnpm-lock.yaml'), 'utf8')
+    const staged = await prepareChangedStage(value)
+    await symlink(join(staged.stageDir, 'node_modules', '.pnpm', 'missing-package'), join(staged.stageDir, 'node_modules', 'missing-package'), 'junction')
+    await assert.rejects(staged.activate(), { code: 'ENOENT' })
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), originalManifest)
+    assert.equal(await readFile(join(value.profileDir, 'pnpm-lock.yaml'), 'utf8'), originalLock)
+    assert.equal(JSON.parse(await readFile(join(value.profileDir, 'node_modules', 'community-plugin', 'package.json'), 'utf8')).version, '1.0.0')
+    assert.equal((await value.manager.list())[0].phase, 'ROLLED_BACK')
+    assert.equal(await exists(join(value.profileDir, 'node_modules', 'missing-package')), false)
   } finally {
     await rm(value.root, { recursive: true, force: true })
   }

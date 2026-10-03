@@ -1,0 +1,232 @@
+/* summer-liquid-glass (夏沫琉璃) skin — iOS 26 Liquid Glass token remap.
+   Dark-only: the same deep-night palette applies under both base modes. The
+   glass surfaces, panel tokens and aionui tokens are all remapped here; the
+   DOM-level glass polish (backdrop blur, inner highlights, composer seat) lives
+   in patches.css, and the night-festival backdrop is declared in skin.json
+   (contributes.backgroundMedia). */
+
+:root {
+  color: #F8F3F5;
+  background-color: #071321;
+
+  /* ── Glass tiers ─────────────────────────────────────────────────────────── */
+  --dsw-glass-normal: rgba(18, 25, 39, 0.46);
+  --dsw-glass-high: rgba(10, 18, 31, 0.78);
+  --dsw-glass-float: rgba(28, 31, 47, 0.68);
+
+  /* ── Static palette ──────────────────────────────────────────────────────── */
+  --dsw-static-amber-100: #fcead3;
+  --dsw-static-amber-400: #f7cb8b;
+  --dsw-static-amber-500: #F3B75F;
+  --dsw-static-amber-600: #d99a3f;
+  --dsw-static-amber-900: #7a5220;
+  --dsw-static-blue-100: #dcf8fa;
+  --dsw-static-blue-300: #a3e9ef;
+  --dsw-static-blue-400: #86e2ea;
+  --dsw-static-blue-450: #76dfe8;
+  --dsw-static-blue-500: #67DCE7;
+  --dsw-static-blue-50: #f2fdfe;
+  --dsw-static-blue-50p: #f0fcfd;
+  --dsw-static-blue-600: #45c2cf;
+  --dsw-static-blue-75: #e6fbfc;
+  --dsw-static-blue-800: #27808c;
+  --dsw-static-blue-900: #1e6069;
+  --dsw-static-blue-950: #0f3a40;
+  --dsw-static-deepseek-100: #dcf8fa;
+  --dsw-static-deepseek-200: #c2f1f5;
+  --dsw-static-deepseek-300: #a3e9ef;
+  --dsw-static-deepseek-400: #86e2ea;
+  --dsw-static-deepseek-450: #76dfe8;
+  --dsw-static-deepseek-500: #67DCE7;
+  --dsw-static-deepseek-50: #f2fdfe;
+  --dsw-static-deepseek-600: #45c2cf;
+  --dsw-static-deepseek-700-delete: #33a3af;
+  --dsw-static-deepseek-800: #27808c;
+  --dsw-static-deepseek-900: #1e6069;
+  --dsw-static-green-100: #eef7d8;
+  --dsw-static-green-400: #d6ee9a;
+  --dsw-static-green-500: #CBE77D;
+  --dsw-static-green-900: #5a6f2e;
+  --dsw-static-neutral-00: #071321;
+  --dsw-static-neutral-1000: #F8F3F5;
+  --dsw-static-neutral-100: #0d1a2e;
+  --dsw-static-neutral-150: #111927;
+  --dsw-static-neutral-200: #14243b;
+  --dsw-static-neutral-250: #172a43;
+  --dsw-static-neutral-300: #1d334f;
+  --dsw-static-neutral-400: #2a4463;
+  --dsw-static-neutral-500: #385678;
+  --dsw-static-neutral-50: #0a1424;
+  --dsw-static-neutral-550: #446289;
+  --dsw-static-neutral-600: #52709a;
+  --dsw-static-neutral-700: #6885ad;
+  --dsw-static-neutral-800: #849dbf;
+  --dsw-static-neutral-850: #97adca;
+  --dsw-static-neutral-900: #adbfd6;
+  --dsw-static-neutral-bluish-00: #071321;
+  --dsw-static-neutral-bluish-1000: #F8F3F5;
+  --dsw-static-neutral-bluish-100: #102033;
+  --dsw-static-neutral-bluish-150: #13253a;
+  --dsw-static-neutral-bluish-200: #162a41;
+  --dsw-static-neutral-bluish-300: #1f3a56;
+  --dsw-static-neutral-bluish-400: #2c4c6e;
+  --dsw-static-neutral-bluish-500: #3a6086;
+  --dsw-static-neutral-bluish-50: #0a1626;
+  --dsw-static-neutral-bluish-600: #4f759e;
+  --dsw-static-neutral-bluish-60: #0b1929;
+  --dsw-static-neutral-bluish-700: #648ab2;
+  --dsw-static-neutral-bluish-750: #7498bd;
+  --dsw-static-neutral-bluish-75: #0d1c2e;
+  --dsw-static-neutral-bluish-800: #86a6c8;
+  --dsw-static-neutral-bluish-850: #98b4d1;
+  --dsw-static-neutral-bluish-875: #aac1da;
+  --dsw-static-neutral-bluish-900: #bdcfe4;
+  --dsw-static-neutral-bluish-950: #d3e0ee;
+  --dsw-static-red-100: #fbdde0;
+  --dsw-static-red-400: #f58a95;
+  --dsw-static-red-500: #F1717F;
+  --dsw-static-red-50: #fcebed;
+  --dsw-static-red-600: #d95564;
+  --dsw-static-red-900: #7a2a34;
+
+  /* ── Alias palette ───────────────────────────────────────────────────────── */
+  --dsw-alias-bg-base: var(--dsw-glass-normal);
+  --dsw-alias-bg-layer-1: rgba(17, 25, 39, calc(.42 + var(--dsh-skin-scrim, 0) * .3));
+  --dsw-alias-bg-layer-2: rgba(24, 31, 46, calc(.46 + var(--dsh-skin-scrim, 0) * .3));
+  --dsw-alias-bg-layer-3: rgba(30, 28, 44, calc(.46 + var(--dsh-skin-scrim, 0) * .3));
+  --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.5);
+  --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.28);
+  --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.58);
+  --dsw-alias-bg-mask-photo: rgba(7, 19, 33, 0.9);
+  --dsw-alias-bg-module-platform: var(--dsw-glass-normal);
+  --dsw-alias-bg-multi-select: rgba(24, 31, 46, 0.46);
+  --dsw-alias-bg-overlay: rgba(20, 26, 42, 0.9);
+  --dsw-alias-bg-skeleton: rgba(255, 255, 255, 0.06);
+  --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.6);
+  --dsw-alias-border-inverted: rgba(255, 255, 255, 0.4);
+  --dsw-alias-border-l1: rgba(103, 220, 231, 0.07);
+  --dsw-alias-border-l2-darkmode-thin: rgba(103, 220, 231, 0.09);
+  --dsw-alias-border-l2: rgba(103, 220, 231, 0.1);
+  --dsw-alias-border-l3: rgba(103, 220, 231, 0.15);
+  --dsw-alias-border-l4: rgba(103, 220, 231, 0.2);
+  --dsw-alias-brand-primary-invert: #071321;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: #67DCE7;
+  --dsw-alias-brand-primary: #67DCE7;
+  --dsw-alias-brand-text: #dcf8fa;
+  --dsw-alias-button-contrast-fill: #1e6069;
+  --dsw-alias-button-elevated-fill: #14243b;
+  --dsw-alias-button-floating-fill: #0d1a2e;
+  --dsw-alias-button-floating-hover: #172a43;
+  --dsw-alias-button-ghost-active-border: #45c2cf;
+  --dsw-alias-button-ghost-active-fill: #1d334f;
+  --dsw-alias-button-ghost-active-hover: #1f3a56;
+  --dsw-alias-button-info-fill: #27808c;
+  --dsw-alias-button-info-hover: #33a3af;
+  --dsw-alias-button-primary-dimmed: #1d334f;
+  --dsw-alias-button-primary-fill: #67DCE7;
+  --dsw-alias-button-primary-hover: #76dfe8;
+  --dsw-alias-button-tool-bar-fill-invisible: rgba(103, 220, 231, 0.24);
+  --dsw-alias-button-tool-bar-fill: rgba(103, 220, 231, 0.34);
+  --dsw-alias-button-tool-bar-hover: rgba(103, 220, 231, 0.44);
+  --dsw-alias-interactive-bg-active: rgba(103, 220, 231, 0.08);
+  --dsw-alias-interactive-bg-hover-accent: rgba(103, 220, 231, 0.1);
+  --dsw-alias-interactive-bg-hover-danger: rgba(241, 113, 127, 0.12);
+  --dsw-alias-interactive-bg-hover-solid: #1f3a56;
+  --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.07);
+  --dsw-alias-label-caption: #8997A7;
+  --dsw-alias-label-dimmed: #52709a;
+  --dsw-alias-label-primary-bluish: #dcf8fa;
+  --dsw-alias-label-primary-dimmed: #adbfd6;
+  --dsw-alias-label-primary-foreground: #071321;
+  --dsw-alias-label-primary-inverted: #F8F3F5;
+  --dsw-alias-label-primary: #F8F3F5;
+  --dsw-alias-label-secondary: #C0CAD5;
+  --dsw-alias-label-tertiary: #8997A7;
+  --dsw-alias-markdown-citation: rgba(24, 31, 46, 0.44);
+  --dsw-alias-markdown-code-block-banner: var(--dsw-glass-high);
+  --dsw-alias-markdown-code-block: var(--dsw-glass-high);
+  --dsw-alias-markdown-code-segment-selected: rgba(29, 51, 79, 0.78);
+  --dsw-alias-markdown-code-segment-unselected: rgba(13, 22, 39, 0.64);
+  --dsw-alias-markdown-inline-code: rgba(16, 26, 42, 0.68);
+  --dsw-alias-markdown-placeholder: rgba(13, 22, 39, 0.64);
+  --dsw-alias-markdown-tag: rgba(16, 26, 42, 0.68);
+  --dsw-alias-scrollbar-bg-l1: #1d334f;
+  --dsw-alias-scrollbar-bg-l2: #1d334f;
+  --dsw-alias-scrollbar-hover-l1: #3a6086;
+  --dsw-alias-scrollbar-hover-l2: #3a6086;
+  --dsw-alias-state-business-primary: #67DCE7;
+  --dsw-alias-state-business-tertiary: #1d334f;
+  --dsw-alias-state-error-primary: #F1717F;
+  --dsw-alias-state-error-secondary: #f58a95;
+  --dsw-alias-state-success-primary: #CBE77D;
+  --dsw-alias-state-success-secondary: #d6ee9a;
+  --dsw-alias-state-success-tertiary: #5a6f2e;
+  --dsw-alias-state-warn-label: #F3B75F;
+  --dsw-alias-state-warn-primary: #F3B75F;
+  --dsw-alias-state-warn-secondary: #f7cb8b;
+  --dsw-alias-state-warn-tertiary: #7a5220;
+  --dsw-alias-toast-bg: rgba(20, 26, 42, 0.92);
+  --dsw-alias-tooltip-bg: rgba(20, 26, 42, 0.92);
+  --dsw-specific-bubble-highlight: #1f3a56;
+  --dsw-specific-bubble: #1d334f;
+  --dsw-specific-input-major: rgba(13, 22, 39, 0.5);
+  --dsw-specific-login-input: rgba(13, 22, 39, 0.5);
+  --dsw-specific-menu: var(--dsw-glass-float);
+  --dsw-specific-selector: rgba(24, 31, 46, 0.5);
+  --dsw-specific-sidebar-fill: rgba(17, 25, 39, 0.36);
+  --dsw-specific-sidebar-nav-item-active-accent: #1f3a56;
+  --dsw-specific-sidebar-nav-item-active: #1d334f;
+  --dsw-specific-sidebar-nav-item-hover: #172a43;
+  --dsw-specific-tip: #0d1a2e;
+
+  /* ── aionui 右侧面板 token ───────────────────────────────────────────────── */
+  --aion-bg-base: rgba(17, 25, 39, 0.46);
+  --aion-bg-1: rgba(17, 25, 39, 0.4);
+  --aion-bg-2: rgba(24, 31, 46, 0.46);
+  --aion-bg-3: rgba(103, 220, 231, 0.09);
+  --aion-bg-4: rgba(103, 220, 231, 0.28);
+  --aion-bg-hover: rgba(103, 220, 231, 0.1);
+  --aion-bg-active: rgba(221, 143, 172, 0.2);
+  --aion-text-primary: #F8F3F5;
+  --aion-text-secondary: #C0CAD5;
+  --aion-text-tertiary: #8997A7;
+  --aion-text-disabled: #52709a;
+  --aion-primary: #67DCE7;
+  --aion-success: #CBE77D;
+  --aion-warning: #F3B75F;
+  --aion-danger: #F1717F;
+  --aion-brand: #DD8FAC;
+  --aion-aou-1: #0b1929;
+  --aion-aou-2: #102033;
+  --aion-aou-3: #1d334f;
+  --aion-aou-4: #27808c;
+  --aion-aou-5: #45c2cf;
+  --aion-aou-6: #86e2ea;
+  --aion-fill-2: rgba(103, 220, 231, 0.1);
+  --aion-fill-3: rgba(103, 220, 231, 0.09);
+  --aion-border-base: rgba(103, 220, 231, 0.08);
+  --aion-overlay-shadow: 0 12px 32px rgba(0, 7, 18, 0.4);
+
+  /* ── Shared finish tokens ────────────────────────────────────────────────── */
+  --dsw-mask-blur: blur(30px) saturate(140%);
+  --dsw-shadow-lv1: 0 2px 8px rgba(0, 7, 18, 0.18);
+  --dsw-shadow-lv2: 0 4px 14px rgba(0, 7, 18, 0.22);
+  --dsw-shadow-lv3: 0 10px 30px rgba(0, 7, 18, 0.25);
+
+  /* ── Scrollbar ───────────────────────────────────────────────────────────── */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+body[data-ds-dark-theme] {
+  color: #F8F3F5;
+  background-color: #071321;
+}
+
+body::-webkit-scrollbar { width: 10px; height: 10px; }
+body::-webkit-scrollbar-track { background: #071321; }
+body::-webkit-scrollbar-thumb { background: #1d334f; border: 2px solid #071321; border-radius: 5px; }
+body::-webkit-scrollbar-thumb:hover { background: #3a6086; }
+body::-webkit-scrollbar-corner { background: #071321; }
+
+body::selection { background: rgba(221, 143, 172, 0.38); color: #F8F3F5; }

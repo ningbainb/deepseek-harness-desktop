@@ -9,8 +9,6 @@ import type { StreamChunk, TokenUsage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { SettingsProvider } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { apply, inject, resolveEstimatorConfig } from '../src/index.ts'
 import { createLiveTokenUsageProjectionDefinition } from '../src/projection.ts'
 import type { LiveTokenUsageProjection } from '../src/projection.ts'
@@ -24,23 +22,10 @@ import {
 
 afterEach(() => { vi.useRealTimers() })
 
-class MemorySettings extends SettingsProvider {
-  readonly writable = true
-
-  protected load(): Promise<Record<string, unknown>> {
-    return Promise.resolve({})
-  }
-
-  protected persist(_ns: SettingsNamespace, _section: Record<string, unknown>): Promise<void> {
-    return Promise.resolve()
-  }
-}
-
 async function harness(): Promise<{ ctx: Context; session: Session; ledgerFilePath: string }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
-  await ctx.plugin(MemorySettings)
   // Keep the bridge's ledger writes out of the real user state directory.
   const ledgerFilePath = join(tmpdir(), `test-projection-ledger-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
   await ctx.plugin({ inject, apply: (context: Context) => apply(context, {}, { ledgerFilePath }) })
@@ -529,8 +514,9 @@ describe('liveTokenUsage projection', () => {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     session.append('step/start', { turn: 1, step: 1 })
-    // Tool result: 5 (text) + 4 (block) + 4 (role); user message: 5 + 4 (role).
-    expect(projected(ctx, session).uncachedInputTokens).toBe(22)
+    // Current SDK uses a first-class tool message: both tool and user
+    // contribute 5 text tokens and 4 role tokens.
+    expect(projected(ctx, session).uncachedInputTokens).toBe(18)
   })
 
   it('replaces current surface ranges and degrades invalid historical ranges without blocking replay', async () => {

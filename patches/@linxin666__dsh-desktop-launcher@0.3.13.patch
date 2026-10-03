@@ -1,0 +1,94 @@
+diff --git a/lib/client.js b/lib/client.js
+index a1f26691ea41a22657388103a601fe83664764f2..d24a2c9b77c67cfc725a6b888a21b7a7a0f4f7bb 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -1500,7 +1500,7 @@ window.__ModuleLoader__.load({
+ 			"slots",
+ 			"locale",
+ 			"connection",
+-			"settingsScope",
++			"webUiSettings",
+ 			"remote"
+ 		];
+ 		/**
+@@ -1529,7 +1529,7 @@ window.__ModuleLoader__.load({
+ 			const enabled = () => {
+ 				const snapshot = settingsScope.getSnapshot();
+-				return snapshot.status === "ready" ? snapshot.value?.enabled ?? false : snapshot.status === "unavailable";
++				return snapshot.status === "ready" && snapshot.value?.enabled === true;
+ 			};
+ 			const confirmShutdown = () => read()?.confirmShutdown ?? true;
+ 			let disposeFloating;
+ 			const syncFloating = () => {
+diff --git a/lib/index.js b/lib/index.js
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,4 +1,5 @@
+ import z from "schemastery";
++import liveSchema from "@deepseek-ai/schemastery";
+ import { execFile } from "node:child_process";
+ import { existsSync } from "node:fs";
+ import { chmod, copyFile, mkdir, writeFile } from "node:fs/promises";
+@@ -708,7 +709,7 @@ const DESKTOP_LAUNCHER_SETTINGS_NAMESPACE = "desktop-launcher";
+-const Config = z.object({
++const LegacyConfig = z.object({
+ 	announceToAgent: z.boolean().default(false),
+ 	enabled: z.boolean().default(false),
+ 	dshCommand: z.string().default("dsh"),
+ 	url: z.string().default(DEFAULT_URL),
+ 	profile: z.string().default(""),
+ 	iconPath: z.string().default(""),
+@@ -715,6 +716,9 @@ const LegacyConfig = z.object({
+ 	confirmShutdown: z.boolean().default(true)
+ });
++const Config = liveSchema.object(Object.fromEntries(Object.entries(LegacyConfig.dict).map(([field, schema]) => [
++	field, new liveSchema(schema.toJSON()).volatile()
++])));
+ /** Schema default, re-read for hand-built test contexts (the loader applies them normally). */
+ const DEFAULT_ANNOUNCE = false;
+ /** Order of the announcement section within the tool-guidance band. */
+ const SECTION_ORDER = 210;
+@@ -728,6 +732,8 @@ const DESKTOP_LAUNCHER_GUIDANCE =
+ const apply = mountOnce("@linxin666/dsh-desktop-launcher", applyImpl);
+ function applyImpl(ctx, config) {
+-	let current = () => config ?? {};
++	let current = () => Object.fromEntries(Object.entries(config ?? {}).map(([field, value]) => [
++		field, value !== null && typeof value === "object" && typeof value.get === "function" ? value.get() : value
++	]));
+ 	let disposeRoutes;
+ 	let disposeShutdownRoute;
+ 	let disposeSection;
+@@ -778,11 +785,16 @@ function applyImpl(ctx, config) {
+ 	ctx.inject(["settings"], (settingsCtx) => {
+-		settingsCtx.settings.installSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, Config, config ?? {}, {
+-			setSource: (source) => {
+-				current = source;
+-				sync();
+-			},
+-			onChange: sync
+-		});
++		if (typeof settingsCtx.settings.installSection === "function") {
++			settingsCtx.settings.installSection(ctx, DESKTOP_LAUNCHER_SETTINGS_NAMESPACE, LegacyConfig, config ?? {}, {
++				setSource: (source) => {
++					current = source;
++					sync();
++				},
++				onChange: sync
++			});
++		} else {
++			settingsCtx.effect(() => settingsCtx.settings.configure({ auto: false }, ctx.fiber), "dsh-desktop-launcher: native form");
++			ctx.on("loader/volatile-update", sync);
++		}
+ 	});
+ 	sync();
+ }
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -56,5 +56,6 @@
+   },
+   "dependencies": {
++    "@deepseek-ai/schemastery": "~3.18.4",
+     "schemastery": "^3.18.0"
+   },
+   "devDependencies": {

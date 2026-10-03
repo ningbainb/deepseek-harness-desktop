@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schemas.linxin666.org/dsh-skin/v2.json",
+  "skinManifestVersion": 2,
+  "id": "dragon-heir",
+  "name": "龙的传人",
+  "nameEn": "Dragon Heir",
+  "author": "dsh-web-ui",
+  "tagline": "不屈龙魂 · 万里长城双主题 · 朱砂龙印",
+  "description": "龙的传人 — 一面是不屈龙魂（墨龙穿云、朱砂印章、不屈锋芒），一面是万里长城（青黛山色、金晖镀墙、苍茫暮色）。亮暗主题各自配一幅画与一枚龙印 favicon，面板半透明磨砂，让画透出来。",
+  "tags": [
+    "dragon",
+    "loong",
+    "chinese",
+    "ink-wash",
+    "great-wall",
+    "dual-theme"
+  ],
+  "accent": "#c3272b",
+  "order": 7,
+  "version": "0.2.0",
+  "preview": {
+    "light": "preview/light.png",
+    "dark": "preview/dark.png"
+  },
+  "requires": {
+    "contracts": [
+      {
+        "apiVersion": "x-org.linxin666.skin-center/v1alpha1",
+        "kind": "SkinHooks",
+        "optional": true
+      }
+    ]
+  },
+  "contributes": {
+    "stylesheet": "skin.css",
+    "patches": "patches.css",
+    "backgroundMedia": {
+      "light": {
+        "type": "image",
+        "src": "assets/light-art.webp",
+        "scrim": "linear-gradient(rgba(240, 236, 224, 0.05) 0%, rgba(235, 228, 212, 0.09) 55%, rgba(228, 219, 199, 0.14) 100%)"
+      },
+      "dark": {
+        "type": "image",
+        "src": "assets/dark-art.webp",
+        "scrim": "linear-gradient(rgba(10, 6, 6, 0.14) 0%, rgba(14, 8, 7, 0.2) 60%, rgba(9, 5, 5, 0.24) 100%)"
+      }
+    }
+  },
+  "facets": {
+    "client": {
+      "entry": "hooks.mjs",
+      "apiVersion": "x-org.linxin666.skin-center/v1alpha1"
+    }
+  }
+}

@@ -2,7 +2,7 @@ import type { ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts'
 import type { ValueModeLocaleKey } from './locales.ts'
 
 export interface ValueModeWritableSettingsScope extends ValueModeSettingsScope<ValueModeConfig> {
-  set(field: string, value: unknown): Promise<void>
+  set(field: string, value: unknown): Promise<boolean | void>
 }
 
 /** Compare settings values after JSON transport omits optional undefined keys. */
@@ -36,7 +36,7 @@ export function createValueModeSettingsWriter(
       for (const [key, value] of entries) {
         const before = scope.getSnapshot()
         if (before.status !== 'ready' || !before.writable) throw new Error(t('settingsNotWritable'))
-        await scope.set(key, value)
+        if (await scope.set(key, value) === false) throw new Error(t('settingsSaveFailed'))
         const accepted = scope.getSnapshot()
         const user = accepted.user
         // An equal inherited value does not prove that this explicit override

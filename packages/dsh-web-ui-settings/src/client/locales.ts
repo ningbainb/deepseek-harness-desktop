@@ -4,6 +4,14 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  dockPluginOptions: '插件自带配置',
+  pluginOptionsDescription: '使用插件提供的原生配置页面；设置中的独立卡片仍保持原入口。',
+  pluginOptionsEntry: '配置入口',
+  pluginOptionsUnavailable: '此插件尚未提供可用的行配置页面。请确认已启用并适配当前内核；有独立设置卡片的插件仍可在设置中配置。',
+  skillsCommandLabel: '技能库',
+  skillsCommandDescription: '打开桌面已安装技能列表',
+  skillsCommandOpenFailed: '无法打开技能库，请使用输入框旁的技能按钮重试。',
+  usageOpenFailed: '无法打开使用统计设置，请从扩展坞的“用量与余额”重试。',
   dockSkins: '皮肤与壁纸', dockModelCapabilities: '模型与能力', dockUsage: '用量与余额', dockSessions: '会话管理',
   dockAiGroup: 'AI 设置', dockDesktopGroup: '桌面体验', dockPersonal: '个人偏好',
   dockModels: '模型与能力',
@@ -60,6 +68,14 @@ export type WebUIPluginsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  dockPluginOptions: 'Plugin options',
+  pluginOptionsDescription: 'Use the configuration page provided by the plugin. Standalone settings cards keep their existing entry points.',
+  pluginOptionsEntry: 'Configuration entry',
+  pluginOptionsUnavailable: 'No row configuration page is available. Check that the plugin is enabled and compatible with this runtime. Plugins with standalone settings cards remain configurable in Settings.',
+  skillsCommandLabel: 'Skill library',
+  skillsCommandDescription: 'Open installed Desktop skills',
+  skillsCommandOpenFailed: 'Could not open the skill library. Retry using the skill button beside the composer.',
+  usageOpenFailed: 'Could not open usage settings. Retry from Extension Dock → Usage and balance.',
   dockSkins: 'Skins and wallpapers', dockModelCapabilities: 'Models and capabilities', dockUsage: 'Usage and balance', dockSessions: 'Session manager',
   dockAiGroup: 'AI settings', dockDesktopGroup: 'Desktop', dockPersonal: 'Personal preferences',
   dockModels: 'Models and capabilities',
@@ -159,6 +175,10 @@ export const chatGptAuthEn = {
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const communityPluginsZh = {
+  enabled: '显示社区插件索引',
+  unavailable: '社区插件设置暂时不可用。',
+  readonly: '当前社区插件设置只读。',
+  saveFailed: '社区插件设置未保存，请重试。',
   'title': '社区插件',
   'description': '社区贡献者开发与维护的插件，链接指向作者自己的仓库。',
   'expand': '展开',
@@ -174,6 +194,10 @@ export type CommunityPluginKey = keyof typeof communityPluginsZh
 
 /** English dictionary, checked complete against the zh key set. */
 export const communityPluginsEn = {
+  enabled: 'Show community plugin index',
+  unavailable: 'Community plugin settings are unavailable.',
+  readonly: 'Community plugin settings are read-only.',
+  saveFailed: 'Community plugin settings were not saved. Retry.',
   'title': 'Community Plugins',
   'description': "Plugins developed and maintained by community contributors, linking to each author's own repository.",
   'expand': 'Show plugins',
@@ -185,6 +209,13 @@ export const communityPluginsEn = {
 } satisfies Record<CommunityPluginKey, string>
 
 export const relayZh = {
+  accessTitle: 'bai 供应商：登录与模型', closeAccess: '关闭',
+  notSignedIn: '暂未登录 bai 供应商，请在浏览器登录并确认授权；需要额度时可前往充值。',
+  autoRefreshNotice: '授权后自动获取模型，启动及每 5 分钟检查更新。网络失败保留已有模型；不会自动充值。',
+  refreshModels: '立即更新模型', refreshingModels: '正在更新模型…',
+  accountRecommendation: '推荐登录 bai 供应商：部分模型费用可能低于官方，请以同模型的实时价格为准。bai 为第三方服务。',
+  accountConnect: '登录并连接 bai 供应商',
+  accountOpenFailed: '无法打开 bai 接入页，请通过扩展坞的模型与能力页重试。',
   collapseRelay: '收起中转设置', expandRelay: '展开中转设置',
   connect: '登录并连接 bai', reconnect: '更换授权 / 重新连接',
   manualConnect: '已有 API Key？手动接入', continueBrowser: '在浏览器继续', cancelConnect: '取消连接',
@@ -193,6 +224,7 @@ export const relayZh = {
   connected: '连接完成，已同步可用模型。现在可以在模型选择器中选择 bai 模型。',
   expiredConnect: '本次连接已过期，请重新点击登录并连接。',
   errorConnect: '连接未完成，请重新发起或使用手动接入。',
+  errorOpenBrowser: '无法打开系统浏览器，请复制链接到浏览器后继续。',
   title: '推荐：使用 bai 供应商',
   description: '登录你的中转站账号，授权后自动连接并同步可用模型。',
   notice: '账号密码留在供应商网站。授权 Key 保存在本机，并用于向 bai 发起模型请求。充值和 Key 撤销可在控制台管理。',
@@ -236,6 +268,13 @@ export const relayZh = {
 export type RelayLocaleKey = keyof typeof relayZh
 
 export const relayEn: Record<RelayLocaleKey, string> = {
+  accessTitle: 'bai provider: sign-in and models', closeAccess: 'Close',
+  notSignedIn: 'Not signed in to bai yet. Sign in and authorize in your browser. Top up there when needed.',
+  autoRefreshNotice: 'Models sync after authorization, at startup and every 5 minutes. Failed updates keep the existing catalog. No automatic payments.',
+  refreshModels: 'Refresh models now', refreshingModels: 'Refreshing models…',
+  accountRecommendation: 'Consider signing in to bai: some models may cost less than the official service. Compare current prices for the same model. bai is a third-party service.',
+  accountConnect: 'Sign in and connect the bai provider',
+  accountOpenFailed: 'Could not open bai setup. Retry from the Extension Dock models and capabilities page.',
   collapseRelay: 'Collapse relay settings', expandRelay: 'Expand relay settings',
   connect: 'Sign in and connect bai', reconnect: 'Change authorization / reconnect',
   manualConnect: 'Already have an API Key? Connect manually', continueBrowser: 'Continue in browser', cancelConnect: 'Cancel connection',
@@ -244,6 +283,7 @@ export const relayEn: Record<RelayLocaleKey, string> = {
   connected: 'Connected and models synced. Choose a bai model in the model selector.',
   expiredConnect: 'This connection expired. Start sign-in again.',
   errorConnect: 'Connection did not complete. Retry or connect manually.',
+  errorOpenBrowser: 'Could not open the system browser. Copy the link into your browser to continue.',
   title: 'Recommended: use the bai provider',
   description: 'Sign in to your relay account to authorize access and sync available models automatically.',
   notice: 'Your password stays on the provider website. The authorized Key is saved locally and used for requests to bai. Manage billing and Key revocation in the console.',

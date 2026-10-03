@@ -18,6 +18,8 @@ const output = join(temporary, '导出目录', '当前环境.dshpreset')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
 let app
 let dock
+let main
+let failure
 try {
   await mkdir(join(dshHome, 'skills', 'review'), { recursive: true })
   await mkdir(userData)
@@ -31,7 +33,7 @@ try {
     env: { ...process.env, NODE_ENV: 'test', DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData,
       DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
       DSH_DESKTOP_OPEN_EXTENSIONS: '1' } })
-  const main = await app.firstWindow()
+  main = await app.firstWindow()
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
   for (let attempt = 0; attempt < 120; attempt++) {
     dock = app.windows().find(page => page.url().includes('/extensions.html'))
@@ -121,6 +123,11 @@ try {
   assert.deepEqual(errors, [])
   console.log('Preset export passed: real lockless profile, validated file, visible feedback, cancellation, filesystem failure and retry')
 } catch (error) {
+  failure = error
+  console.error('Preset export failure evidence', temporary)
+  console.error('Preset export runtime log', (await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')).slice(-12_000))
+  console.error('Preset export startup surface', (await main?.locator('body').innerText().catch(() => '') ?? '').slice(-2000))
+  await main?.screenshot({ path: join(temporary, 'failure.png') }).catch(() => {})
   console.error('Preset export fixture state', await dock?.evaluate(() => ({
     state: document.querySelector('#preset-export-status')?.dataset.state,
     message: document.querySelector('#preset-export-status')?.textContent,
@@ -129,5 +136,6 @@ try {
   throw error
 } finally {
   await app?.close()
-  await rm(temporary, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
+  if (!failure && process.env.DSH_DESKTOP_KEEP_E2E_ARTIFACTS !== '1') await rm(temporary, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
+  else console.log(`Preset export artifacts retained at ${temporary}`)
 }

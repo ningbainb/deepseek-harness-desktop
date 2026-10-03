@@ -5,7 +5,7 @@ import { installDesktopAppearance, opaqueColor, surfaceColor } from '../src/clie
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 describe('native Dock sections', () => {
-  for (const [id, section] of [['appearance', 'skin-center'], ['models', 'models'], ['usage', 'dsh-usage'], ['sessions', 'dsh-session-archive']]) {
+  for (const [id, section] of [['appearance', 'skin-center'], ['models', 'models'], ['usage', 'dsh-usage'], ['sessions', 'archived-sessions']]) {
     it(`renders ${id} through the official section contract`, () => {
       window.history.replaceState({}, '', `/?desktop-dock-setting=${id}`)
       const renderSlot = vi.fn((slot: string, _owner: unknown, _options: { only: string }) => slot === 'settings.section'
@@ -47,6 +47,35 @@ it('flattens translucent skin colors into opaque native surfaces', () => {
   expect(surfaceColor('#fff8', '#000000')).toBe('#888888')
   expect(surfaceColor('rgba(32, 64, 96, 0.5)', '#000000')).toBe('#102030')
   expect(surfaceColor('url(https://invalid.test)', '#112233')).toBe('#112233')
+})
+
+it('publishes a committed skin palette before the debounce timer can expose stale caption colors', async () => {
+  vi.useFakeTimers()
+  const desktopWindow = window as Window & { dshDesktop?: { setWindowChromeTheme: ReturnType<typeof vi.fn> } }
+  const setWindowChromeTheme = vi.fn().mockResolvedValue(undefined)
+  const rootStyle = document.documentElement.getAttribute('style')
+  const bodyStyle = document.body.getAttribute('style')
+  desktopWindow.dshDesktop = { setWindowChromeTheme }
+  const dispose = installDesktopAppearance(window)
+  try {
+    document.body.style.setProperty('--dsw-alias-bg-layer-1', '#123456')
+    document.documentElement.setAttribute('data-dsh-skin', 'committed-fixture')
+    await Promise.resolve()
+    expect(document.documentElement.style.getPropertyValue('--dsh-desktop-chrome-bg')).toBe('#123456')
+    expect(setWindowChromeTheme).toHaveBeenCalledTimes(1)
+    expect(setWindowChromeTheme.mock.calls[0][1].background).toBe('#123456')
+    await vi.advanceTimersByTimeAsync(200)
+    expect(setWindowChromeTheme).toHaveBeenCalledTimes(1)
+  } finally {
+    dispose()
+    delete desktopWindow.dshDesktop
+    document.documentElement.removeAttribute('data-dsh-skin')
+    for (const [element, value] of [[document.documentElement, rootStyle], [document.body, bodyStyle]] as const) {
+      if (value === null) element.removeAttribute('style')
+      else element.setAttribute('style', value)
+    }
+    vi.useRealTimers()
+  }
 })
 
 it('observes skin changes, clears native colors on reset, and stops on disposal', async () => {

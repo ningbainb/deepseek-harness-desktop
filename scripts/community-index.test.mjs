@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { buildOutput, generatedOutputMatches, validateEntries } from './community-index'
+import { buildOutput, generatedOutputMatches, validateEntries, mergePublishedEntries } from './community-index'
 
 const VALID = [
   {
@@ -31,6 +31,15 @@ const VALID = [
 
 test('validateEntries accepts a well-formed list', () => {
   assert.doesNotThrow(() => validateEntries(VALID))
+})
+
+test('published registry sync updates matching entries without deleting local-only plugins', () => {
+  const published = [{ ...VALID[0], name: 'Updated' }, { ...VALID[1], id: 'dsh-new' }]
+  const merged = mergePublishedEntries(VALID, published)
+  assert.deepEqual(merged.map(entry => entry.id), ['dsh-a', 'dsh-b', 'dsh-new'])
+  assert.equal(merged[0].name, 'Updated')
+  assert.deepEqual(merged[1], VALID[1])
+  assert.deepEqual(mergePublishedEntries(merged, published), merged)
 })
 
 test('validateEntries rejects a non-empty array contract violation', () => {

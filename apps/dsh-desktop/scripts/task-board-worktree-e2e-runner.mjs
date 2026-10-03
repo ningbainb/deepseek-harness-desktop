@@ -147,6 +147,12 @@ export async function runTaskBoardWorktreeE2E({ appDir = resolve('.'), executabl
     const evidence = evidenceStore.get(execution.evidenceId)
     assert.equal(evidence?.resultStatus, 'awaiting-review')
     assert.equal(evidence?.worktreeId, execution.run.worktreeId)
+    if (!evidence?.changedFiles.some(file => file.path === 'packaged-result.txt')) {
+      const status = await worktrees.getWorktreeStatus(execution.run.worktreeId)
+      const diff = await worktrees.diffWorktree(execution.run.worktreeId)
+      const porcelain = await git(providerCwd, 'status', '--porcelain')
+      console.error(`packaged Worktree evidence diagnostic ${JSON.stringify({ evidence, status, diff, porcelain }).slice(0, 16 * 1024)}`)
+    }
     assert.equal(evidence?.changedFiles.some(file => file.path === 'packaged-result.txt'), true)
 
     const review = new taskBoard.EvidenceReviewService({ store: evidenceStore, worktrees })

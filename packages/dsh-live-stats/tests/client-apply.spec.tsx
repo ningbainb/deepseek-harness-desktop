@@ -3,11 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 // __ModuleLoader__ (not importable under vitest); provide the one value
 // member the apply chain needs.
 vi.mock('@deepseek-ai/dsh-client-store', () => ({
-  createSnapshotStore: (init: unknown) => ({
-    get: () => init,
-    set: () => {},
-    subscribe: () => () => {},
-  }),
+  createSnapshotStore: (init: unknown) => {
+    let value = init
+    return {
+      getSnapshot: () => value,
+      update: (change: (draft: unknown) => void) => { change(value) },
+      subscribe: () => () => {},
+    }
+  },
 }))
 import { apply } from '../src/client/index.ts'
 
@@ -25,8 +28,8 @@ describe('live-stats client apply', () => {
         inject: (key: string, register: () => unknown) => { injected.push(key); register(); return () => {} },
         register: (spec: { name: string; locale?: string }) => { registrations.push(spec); return () => {} },
       },
-      settingsScope: {
-        bind: () => ({
+      configForms: {
+        get: () => ({
           getSnapshot: () => ({ status: 'unavailable' as const, writable: false }),
           subscribe: () => () => {},
           set: async () => {},

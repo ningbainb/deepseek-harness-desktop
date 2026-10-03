@@ -2,11 +2,12 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 /** Read-only, bounded window-show observer. Collects PID ancestry, never titles or commands. */
-export async function startWindowsConsoleObserver() {
+export async function startWindowsConsoleObserver({ probeAssemblyPath } = {}) {
   if (process.platform !== 'win32') return { stop: async () => ({ events: [], dropped: 0, elapsed: 0 }) }
   const child = spawn('powershell.exe', [
     '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', fileURLToPath(new URL('./windows-console-observer.ps1', import.meta.url)),
+    ...(probeAssemblyPath === undefined ? [] : ['-ConsoleProbeAssemblyPath', probeAssemblyPath]),
   ], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
   let output = ''
   let errors = ''

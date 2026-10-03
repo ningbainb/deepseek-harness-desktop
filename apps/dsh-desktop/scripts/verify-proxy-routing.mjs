@@ -11,6 +11,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-proxy-routing-e2e-'))
 
 async function listen(server) {
@@ -77,12 +78,13 @@ try {
   ])
   console.log('Proxy routing fixture servers ready')
   electronApp = await electron.launch({
-    executablePath: electronPath,
-    args: [resolve(APP_DIR, 'src', 'main.mjs')],
+    executablePath: packagedExecutable || electronPath,
+    args: packagedExecutable ? [] : [resolve(APP_DIR, 'src', 'main.mjs')],
     cwd: APP_DIR,
     env: {
       ...process.env,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
+      DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
       DSH_DESKTOP_HOLD_STARTUP: '1',
       DSH_DESKTOP_PROXY_MODE: 'direct',
       DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'),
@@ -90,6 +92,7 @@ try {
       ELECTRON_ENABLE_LOGGING: '0',
     },
   })
+  assert.equal(await electronApp.evaluate(({ app }) => app.isPackaged), Boolean(packagedExecutable))
   const page = await electronApp.firstWindow()
   // firstWindow only means BrowserWindow exists. On a clean runner, profile
   // preparation is still running and quitting now can interrupt bootstrap.

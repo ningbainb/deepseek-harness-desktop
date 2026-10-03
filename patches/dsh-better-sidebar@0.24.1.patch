@@ -1,0 +1,230 @@
+diff --git a/lib/index.js b/lib/index.js
+--- a/lib/index.js	
++++ b/lib/index.js
+@@ -4103,6 +4103,7 @@
+ * @returns the section's own fields, or undefined when no usable section exists.
+ */
+ async function readLegacyPrefs(home) {
++	const ns = SIDEBAR_PREFS_NS;
+ 	const declared = new Set(Object.keys(Config.dict ?? {}));
+ 	for (const name of [`${LEGACY_SETTINGS_FILE}.imported`, LEGACY_SETTINGS_FILE]) {
+ 		let text;
+@@ -4118,7 +4119,7 @@
+ 			continue;
+ 		}
+ 		if (document === null || typeof document !== "object" || Array.isArray(document)) continue;
+-		const section = document[SIDEBAR_PREFS_NS];
++		const section = document[ns];
+ 		if (section === null || typeof section !== "object" || Array.isArray(section)) continue;
+ 		const filtered = Object.fromEntries(Object.entries(section).filter(([key]) => declared.has(key)));
+ 		if (Object.keys(filtered).length > 0) return filtered;
+diff --git a/src/index.ts b/src/index.ts
+--- a/src/index.ts	
++++ b/src/index.ts
+@@ -665,6 +665,7 @@
+  * @returns the section's own fields, or undefined when no usable section exists.
+  */
+ async function readLegacyPrefs(home: string): Promise<Record<string, unknown> | undefined> {
++  const ns = SIDEBAR_PREFS_NS
+   const declared = new Set(Object.keys(Config.dict ?? {}))
+   for (const name of [`${LEGACY_SETTINGS_FILE}.imported`, LEGACY_SETTINGS_FILE]) {
+     let text: string
+@@ -680,7 +681,7 @@
+       continue
+     }
+     if (document === null || typeof document !== 'object' || Array.isArray(document)) continue
+-    const section = (document as Record<string, unknown>)[SIDEBAR_PREFS_NS]
++    const section = (document as Record<string, unknown>)[ns]
+     if (section === null || typeof section !== 'object' || Array.isArray(section)) continue
+     // Drop fields the current row schema no longer declares (the retired
+     // terminal and browser keys, `defaultWidthPercent`, …). A form write
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js	
++++ b/lib/client.js
+@@ -19255,12 +19255,13 @@
+ 			const hasWindow = typeof window !== "undefined";
+ 			const hasPreloadMarker = hasWindow && typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
+ 			const params = hasWindow ? new URLSearchParams(window.location.search.replace(/^\?/, "")) : new URLSearchParams();
+-			const modeParam = params.get("dsh-desktop-mode");
++			const shellContext = hasWindow ? window.dshDesktop?.shellContext : void 0;
++			const modeParam = params.get("dsh-desktop-mode") ?? shellContext?.mode;
+ 			const mode = modeParam === "compatibility" || modeParam === "advanced" ? modeParam : null;
+-			const platformParam = params.get("dsh-desktop-platform");
+-			const platform = platformParam !== null && platformParam !== "" ? platformParam.toLowerCase() : null;
++			const platformParam = params.get("dsh-desktop-platform") ?? shellContext?.platform;
++			const platform = typeof platformParam === "string" && platformParam !== "" ? platformParam.toLowerCase() : null;
+ 			cached = {
+-				desktop: mode !== null || hasPreloadMarker,
++				desktop: mode !== null || hasPreloadMarker || shellContext !== void 0,
+ 				mode,
+ 				platform,
+ 				titlebarInset: parseTitlebarInset(params.get("dsh-desktop-titlebar-inset"))
+@@ -23061,7 +23062,34 @@
+ 		* Client plugin body.
+ 		* @param ctx - the client cordis context (slots, sessions).
+ 		*/
++		function installLayoutCompatibilityAnchors() {
++		  const ownedFrames = new Set();
++		  const ownedCenters = new Set();
++		  const sync = () => {
++		    for (const rightbar of document.querySelectorAll("[data-rightbar-col], [data-sidebar-right-col]")) {
++		      const frame = rightbar.parentElement;
++		      const center = rightbar.previousElementSibling;
++		      if (frame !== null && !frame.hasAttribute("data-dsh-frame")) {
++		        frame.setAttribute("data-dsh-frame", "");
++		        ownedFrames.add(frame);
++		      }
++		      if (center instanceof HTMLElement && !center.hasAttribute("data-pane")) {
++		        center.setAttribute("data-pane", "conversation");
++		        ownedCenters.add(center);
++		      }
++		    }
++		  };
++		  sync();
++		  const observer = new MutationObserver(sync);
++		  observer.observe(document.body, { childList: true, subtree: true });
++		  return () => {
++		    observer.disconnect();
++		    for (const frame of ownedFrames) if (frame.getAttribute("data-dsh-frame") === "") frame.removeAttribute("data-dsh-frame");
++		    for (const center of ownedCenters) if (center.getAttribute("data-pane") === "conversation") center.removeAttribute("data-pane");
++		  };
++		}
+ 		function apply(ctx) {
++			ctx.effect(installLayoutCompatibilityAnchors, "dsh-better-sidebar: Desktop layout anchors");
+ 			attachLocale(ctx.locale);
+ 			ctx.effect(() => {
+ 				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
+diff --git a/lib/client-registry.js b/lib/client-registry.js
+--- a/lib/client-registry.js	
++++ b/lib/client-registry.js
+@@ -19255,12 +19255,13 @@
+ 			const hasWindow = typeof window !== "undefined";
+ 			const hasPreloadMarker = hasWindow && typeof window.__DSH_DESKTOP_FILE_PATH__ !== "undefined";
+ 			const params = hasWindow ? new URLSearchParams(window.location.search.replace(/^\?/, "")) : new URLSearchParams();
+-			const modeParam = params.get("dsh-desktop-mode");
++			const shellContext = hasWindow ? window.dshDesktop?.shellContext : void 0;
++			const modeParam = params.get("dsh-desktop-mode") ?? shellContext?.mode;
+ 			const mode = modeParam === "compatibility" || modeParam === "advanced" ? modeParam : null;
+-			const platformParam = params.get("dsh-desktop-platform");
+-			const platform = platformParam !== null && platformParam !== "" ? platformParam.toLowerCase() : null;
++			const platformParam = params.get("dsh-desktop-platform") ?? shellContext?.platform;
++			const platform = typeof platformParam === "string" && platformParam !== "" ? platformParam.toLowerCase() : null;
+ 			cached = {
+-				desktop: mode !== null || hasPreloadMarker,
++				desktop: mode !== null || hasPreloadMarker || shellContext !== void 0,
+ 				mode,
+ 				platform,
+ 				titlebarInset: parseTitlebarInset(params.get("dsh-desktop-titlebar-inset"))
+@@ -23061,7 +23062,34 @@
+ 		* Client plugin body.
+ 		* @param ctx - the client cordis context (slots, sessions).
+ 		*/
++		function installLayoutCompatibilityAnchors() {
++		  const ownedFrames = new Set();
++		  const ownedCenters = new Set();
++		  const sync = () => {
++		    for (const rightbar of document.querySelectorAll("[data-rightbar-col], [data-sidebar-right-col]")) {
++		      const frame = rightbar.parentElement;
++		      const center = rightbar.previousElementSibling;
++		      if (frame !== null && !frame.hasAttribute("data-dsh-frame")) {
++		        frame.setAttribute("data-dsh-frame", "");
++		        ownedFrames.add(frame);
++		      }
++		      if (center instanceof HTMLElement && !center.hasAttribute("data-pane")) {
++		        center.setAttribute("data-pane", "conversation");
++		        ownedCenters.add(center);
++		      }
++		    }
++		  };
++		  sync();
++		  const observer = new MutationObserver(sync);
++		  observer.observe(document.body, { childList: true, subtree: true });
++		  return () => {
++		    observer.disconnect();
++		    for (const frame of ownedFrames) if (frame.getAttribute("data-dsh-frame") === "") frame.removeAttribute("data-dsh-frame");
++		    for (const center of ownedCenters) if (center.getAttribute("data-pane") === "conversation") center.removeAttribute("data-pane");
++		  };
++		}
+ 		function apply(ctx) {
++			ctx.effect(installLayoutCompatibilityAnchors, "dsh-better-sidebar: Desktop layout anchors");
+ 			attachLocale(ctx.locale);
+ 			ctx.effect(() => {
+ 				const offZh = ctx.locale.register(LOCALE_NS, "zh", zh);
+diff --git a/src/client/index.tsx b/src/client/index.tsx
+--- a/src/client/index.tsx	
++++ b/src/client/index.tsx
+@@ -59,7 +59,10 @@
+  * Client plugin body.
+  * @param ctx - the client cordis context (slots, sessions).
+  */
++import { installLayoutCompatibilityAnchors } from './desktop-layout.ts'
++
+ export function apply(ctx: Context): void {
++  ctx.effect(installLayoutCompatibilityAnchors, 'dsh-better-sidebar: Desktop layout anchors')
+   // The sidebar follows the DSH i18n system: attach the locale service so
+   // the module-level t()/isZh() resolve the Host-backed language preference
+   // (and switch live — the Sidebar root subscribes to it), and register the
+diff --git a/src/client/desktop-layout.ts b/src/client/desktop-layout.ts
+new file mode 100644
+--- /dev/null	
++++ b/src/client/desktop-layout.ts
+@@ -0,0 +1,26 @@
++export function installLayoutCompatibilityAnchors(): () => void {
++  const ownedFrames = new Set<HTMLElement>();
++  const ownedCenters = new Set<HTMLElement>();
++  const sync = () => {
++    for (const rightbar of document.querySelectorAll("[data-rightbar-col], [data-sidebar-right-col]")) {
++      const frame = rightbar.parentElement;
++      const center = rightbar.previousElementSibling;
++      if (frame !== null && !frame.hasAttribute("data-dsh-frame")) {
++        frame.setAttribute("data-dsh-frame", "");
++        ownedFrames.add(frame);
++      }
++      if (center instanceof HTMLElement && !center.hasAttribute("data-pane")) {
++        center.setAttribute("data-pane", "conversation");
++        ownedCenters.add(center);
++      }
++    }
++  };
++  sync();
++  const observer = new MutationObserver(sync);
++  observer.observe(document.body, { childList: true, subtree: true });
++  return () => {
++    observer.disconnect();
++    for (const frame of ownedFrames) if (frame.getAttribute("data-dsh-frame") === "") frame.removeAttribute("data-dsh-frame");
++    for (const center of ownedCenters) if (center.getAttribute("data-pane") === "conversation") center.removeAttribute("data-pane");
++  };
++}
+diff --git a/src/client/desktop-env.ts b/src/client/desktop-env.ts
+--- a/src/client/desktop-env.ts	
++++ b/src/client/desktop-env.ts
+@@ -44,11 +44,14 @@
+   const params = hasWindow
+     ? new URLSearchParams(window.location.search.replace(/^\?/, ''))
+     : new URLSearchParams()
+-  const modeParam = params.get('dsh-desktop-mode')
++  const shellContext = hasWindow
++    ? (window as { dshDesktop?: { shellContext?: { mode?: string; platform?: string } } }).dshDesktop?.shellContext
++    : undefined
++  const modeParam = params.get('dsh-desktop-mode') ?? shellContext?.mode
+   const mode = modeParam === 'compatibility' || modeParam === 'advanced' ? modeParam : null
+-  const platformParam = params.get('dsh-desktop-platform')
+-  const platform = platformParam !== null && platformParam !== '' ? platformParam.toLowerCase() : null
+-  const desktop = mode !== null || hasPreloadMarker
++  const platformParam = params.get('dsh-desktop-platform') ?? shellContext?.platform
++  const platform = typeof platformParam === 'string' && platformParam !== '' ? platformParam.toLowerCase() : null
++  const desktop = mode !== null || hasPreloadMarker || shellContext !== undefined
+   cached = {
+     desktop,
+     mode,
+diff --git a/package.json b/package.json
+--- a/package.json	
++++ b/package.json
+@@ -82,6 +82,7 @@
+     "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.1",
+     "@deepseek-ai/dsh-client-ui-conversation": "^0.2.0-rc.1",
+     "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.0-rc.1",
+     "@deepseek-ai/dsh-client-ui-settings": "^0.2.0-rc.1",
+     "@deepseek-ai/dsh-client-ui-sidebar-right": "^0.2.0-rc.1",
+     "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.1",

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace, SettingsProvider } from '@deepseek-ai/dsh-settings'
+import type { SettingsNamespace, SettingsForms as SettingsProvider } from '@deepseek-ai/dsh-settings'
 import { makeBridgeHandlers, makeBridgeRoutes, WEB_UI_SETTINGS_PROXY_TOKEN_HEADER } from '../src/bridge.ts'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../src/protocol.ts'
 
@@ -65,7 +65,7 @@ const userYaml = (): string => [
 describe('bridge describe', () => {
   it('serves the built-in family allowlist when the user configured none', async () => {
     const { seam } = fakeSettings({
-      'task-board': { value: { enabled: true }, revision: 1 },
+      'ui-task-board': { value: { enabled: true }, revision: 1 },
       pet: { value: { visible: true }, revision: 2 },
       'web-search-deepseek': { value: { provider: 'exa' }, revision: 3 },
     })
@@ -73,14 +73,14 @@ describe('bridge describe', () => {
     const result = await handlers.describe()
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.namespaces.map(view => view.ns)).toEqual(['pet', 'task-board'])
+    expect(result.value.namespaces.map(view => view.ns)).toEqual(['pet', 'ui-task-board'])
     expect(result.value.writable).toBe(true)
   })
 
   it('maps user package names onto their namespaces', async () => {
     const { seam } = fakeSettings({
-      'task-board': { value: { enabled: true }, revision: 1 },
-      'skin-background': { value: { backgroundOpacity: 0.5 }, revision: 2 },
+      'ui-task-board': { value: { enabled: true }, revision: 1 },
+      'ui-skin-center': { value: { 'skin-background': { backgroundOpacity: 0.5 } }, revision: 2 },
       'live-stats': { value: { enabled: true }, revision: 3 },
     })
     const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: userYaml })
@@ -88,7 +88,7 @@ describe('bridge describe', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     // dsh-web-ui owns no namespace and must be ignored.
-    expect(result.value.namespaces.map(view => view.ns)).toEqual(['skin-background', 'task-board'])
+    expect(result.value.namespaces.map(view => view.ns)).toEqual(['ui-skin-center', 'ui-task-board'])
   })
 
   it('returns an empty list when nothing on the allowlist is registered', async () => {
@@ -118,36 +118,36 @@ describe('bridge mutate', () => {
 
   it('writes an allowlisted namespace and returns its fresh view', async () => {
     const { seam, writes } = fakeSettings({
-      'task-board': { value: { enabled: true }, revision: 4 },
+      'ui-task-board': { value: { enabled: true }, revision: 4 },
     })
     const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' })
     const result = await handlers.mutate({
-      ns: 'task-board',
+      ns: 'ui-task-board',
       ops: [{ op: 'set', path: ['enabled'], value: false }],
       expectedRevision: 4,
     })
-    expect(writes).toEqual([{ ns: 'task-board', ops: [{ op: 'set', path: ['enabled'], value: false }], expectedRevision: 4 }])
+    expect(writes).toEqual([{ ns: 'ui-task-board', ops: [{ op: 'set', path: ['enabled'], value: false }], expectedRevision: 4 }])
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.ns).toBe('task-board')
+    expect(result.value.ns).toBe('ui-task-board')
     expect(result.value.value).toEqual({ enabled: false })
     expect(result.value.revision).toBe(5)
   })
 
   it('maps a revision conflict onto the settings-conflict envelope', async () => {
     const { seam } = fakeSettings({
-      'task-board': { value: { enabled: true }, revision: 4 },
+      'ui-task-board': { value: { enabled: true }, revision: 4 },
     })
-    seam.armFailure(new SettingsConflictError('task-board' as unknown as SettingsNamespace, 4, 6))
+    seam.armFailure(new SettingsConflictError('ui-task-board' as unknown as SettingsNamespace, 4, 6))
     const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' })
-    const result = await handlers.mutate({ ns: 'task-board', ops: [{ op: 'set', path: ['enabled'], value: false }], expectedRevision: 4 })
+    const result = await handlers.mutate({ ns: 'ui-task-board', ops: [{ op: 'set', path: ['enabled'], value: false }], expectedRevision: 4 })
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('settings-conflict')
   })
 
   it('rejects a malformed body', async () => {
-    const { seam, writes } = fakeSettings({ 'task-board': { value: {}, revision: 1 } })
+    const { seam, writes } = fakeSettings({ 'ui-task-board': { value: {}, revision: 1 } })
     const handlers = makeBridgeHandlers({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' })
     const result = await handlers.mutate({ ns: 42 })
     expect(result.ok).toBe(false)
@@ -210,7 +210,7 @@ async function describeRoute(
 describe('bridge route access', () => {
   function routes(access?: Parameters<typeof makeBridgeRoutes>[1]) {
     const { seam } = fakeSettings({
-      'task-board': { value: { enabled: true }, revision: 1 },
+      'ui-task-board': { value: { enabled: true }, revision: 1 },
     })
     return makeBridgeRoutes({ settings: seam as unknown as SettingsProvider, readSettingsYaml: () => '' }, access)
   }

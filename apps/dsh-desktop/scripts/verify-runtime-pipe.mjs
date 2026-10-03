@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from '../src/profile.mjs'
@@ -73,6 +73,23 @@ try {
   assert.match(html, /__DSH_TRANSPORT__/u)
   assert.match(html, /__DSH_BOOT__/u)
 
+  const eventsAbort = new AbortController()
+  const eventsTimeout = setTimeout(() => eventsAbort.abort(new Error('Events readiness probe timed out')), 15_000)
+  const events = controller.openDuplex('$events', { args: {} }, eventsAbort.signal)
+  const eventsIterator = events[Symbol.asyncIterator]()
+  try {
+    if (typeof events.close === 'function') await events.close()
+    const ready = await eventsIterator.next()
+    assert.equal(ready.done, false)
+    assert.equal(ready.value.type, 'ready')
+    assert.equal(typeof ready.value.clientId, 'string')
+    assert.equal(ready.value.host.home, homedir())
+  } finally {
+    clearTimeout(eventsTimeout)
+    eventsAbort.abort(new Error('Events readiness probe complete'))
+    await eventsIterator.return()
+  }
+
   const rpcId = crypto.randomUUID()
   const inventory = await controller.fetch('http://dsh.internal/api/pluginInventory/list', {
     method: 'POST',
@@ -137,6 +154,7 @@ try {
     pluginCount: plugins.length,
     communityRoutes: ['live-stats', 'pet-asset', 'ssh-websocket'],
     httpReadyLineObserved: false,
+    officialEventsReady: true,
   }))
 } catch (error) {
   console.error(`Runtime pipe diagnostics:\n${diagnostics.slice(-120).join('\n') || '(empty)'}`)

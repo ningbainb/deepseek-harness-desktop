@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope, ConfigFormSnapshot as SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createCompatScope, isLoopbackHostname } from '../src/client/compat-settings-scope.ts'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../src/protocol.ts'
 
@@ -53,9 +53,9 @@ function fakePrimary<T>(initial: SettingsScopeSnapshot<T>) {
     scope: {
       getSnapshot: () => store.getSnapshot(),
       subscribe: (listener: () => void) => store.subscribe(listener),
-      mutate: async () => {},
-      set: async (field: string, value: unknown) => { sets.push([field, value]) },
-      unset: async () => {},
+      mutate: async () => true,
+      set: async (field: string, value: unknown) => { sets.push([field, value]); return true },
+      unset: async () => true,
     } satisfies SettingsScope<T>,
     update: (patch: Partial<SettingsScopeSnapshot<T>>) => { store.set({ ...store.getSnapshot(), ...patch }) },
     sets,

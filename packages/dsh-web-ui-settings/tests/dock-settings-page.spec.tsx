@@ -53,3 +53,35 @@ it('switches personal forms with the keyboard without losing either draft', () =
   fireEvent.click(screen.getByRole('tab', { name: 'dockMemory' }))
   expect((screen.getByLabelText('memory') as HTMLTextAreaElement).value).toBe('memory draft')
 })
+
+it('clears a stale skin palette when a theme-only update arrives without losing drafts', () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=personal-prompt')
+  render(<DockSettingsPage renderSlot={(() => <input aria-label="draft" />) as never} t={key => key} />)
+  fireEvent.change(screen.getByLabelText('draft'), { target: { value: 'retained' } })
+  const page = screen.getByRole('main')
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-palette', {
+    detail: { background: '#e8ecf5', foreground: '#242a34', accent: '#416bd4', border: '#dce1e8' },
+  })))
+  expect(page.style.getPropertyValue('--dsw-alias-bg-layer-1')).toBe('#e8ecf5')
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: 'dark' })))
+  expect(page.dataset.theme).toBe('dark')
+  expect(page.style.getPropertyValue('--dsw-alias-bg-layer-1')).toBe('')
+  expect(page.style.getPropertyValue('--dsw-alias-label-primary')).toBe('')
+  expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('retained')
+})
+
+it('applies a fresh committed palette after its theme update', () => {
+  render(<DockSettingsPage renderSlot={(() => <input aria-label="draft" />) as never} t={key => key} />)
+  const page = screen.getByRole('main')
+  act(() => {
+    window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: 'dark' }))
+    window.dispatchEvent(new CustomEvent('dsh:dock-palette', {
+      detail: { background: '#123456', foreground: '#ddeeff', accent: '#3366ff', border: '#445566' },
+    }))
+  })
+  expect(page.dataset.theme).toBe('dark')
+  expect(page.style.getPropertyValue('--dsw-alias-bg-layer-1')).toBe('#123456')
+  expect(page.style.getPropertyValue('--dsw-alias-label-primary')).toBe('#ddeeff')
+  expect(page.style.getPropertyValue('--dsw-alias-brand-primary')).toBe('#3366ff')
+  expect(page.style.getPropertyValue('--dsw-alias-border-l2')).toBe('#445566')
+})

@@ -76,7 +76,7 @@ test('Transcript Protocol converts ExternalConversationV2 events to canonical DS
   const session = Session.create(SessionId('import-protocol-test'), dshEvents)
   assert.equal(session.snapshotEvents().at(-1).type, 'session/end-seed')
   assert.ok(session.deriveMessages().some((message) => message.role === 'assistant'))
-  assert.ok(session.deriveMessages().some((message) => message.content[0]?.type === 'tool-result'))
+  assert.ok(session.deriveMessages().some((message) => message.role === 'tool' && message.content[0]?.type === 'text'))
 
   // Chunk validator checks
   assert.equal(validateImportChunk({ events }, 1), true)

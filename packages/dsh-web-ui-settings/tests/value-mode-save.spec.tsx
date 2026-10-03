@@ -35,7 +35,7 @@ async function runtime(initial: ValueModeConfig) {
     status: 'unavailable', writable: false, value: undefined, base: undefined, user: undefined, revision: undefined, mode: 'host',
   }
   const primary: CompatScopeOptions<ValueModeConfig>['primary'] = {
-    getSnapshot: () => unavailable, subscribe: () => () => {}, set: async () => {}, unset: async () => {}, mutate: async () => {},
+    getSnapshot: () => unavailable, subscribe: () => () => {}, set: async () => true, unset: async () => true, mutate: async () => true,
   }
   const view = () => ({ ns: 'value-mode', revision: 1, value, user: value, base: {} })
   const fetchFn = (async (url, init) => ({
@@ -58,9 +58,12 @@ async function runtime(initial: ValueModeConfig) {
   const context = {
     effect: (fn: () => unknown, label: string) => label.includes('blank-session') ? () => {} : fn(),
     locale: { register: () => {}, bind: () => (key: keyof typeof zh) => zh[key] },
-    get: (name: string) => name === 'connection' ? { generation: { subscribe: () => () => {} } } : undefined,
+    get: (name: string) => name === 'connection'
+      ? { generation: { subscribe: () => () => {} } }
+      : name === 'webUiSettings'
+        ? { bind: ({ namespace }: { namespace: string }) => namespace === 'value-mode' ? scope : defaultModelScope }
+        : undefined,
     on: () => () => {},
-    settingsScope: { bind: ({ namespace }: { namespace: string }) => namespace === 'value-mode' ? scope : defaultModelScope },
     remote: { session: { modelCatalog: vi.fn() }, $on: () => () => {} },
     slots: {
       inject: (_name: string, register: () => void) => register(),

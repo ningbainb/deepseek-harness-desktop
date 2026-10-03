@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import z from 'schemastery'
 import { dshHome } from './dsh-home.ts'
 import { syncPresetTrees } from './sync.ts'
+import { declareBundledPreset } from './preset-registry.ts'
 
 /** Stable cordis plugin name. */
 export const name = 'liangshen'
@@ -109,5 +110,8 @@ export function apply(ctx: Context, config?: Config): void {
   }
 
   refresh()
+  if (resolve().enabled) {
+    declareBundledPreset(ctx, 'liangshen', join(bundledPresetsRoot(), 'liangshen'))
+  }
   ctx.effect(() => () => { disposeSection?.(); disposeSection = undefined }, 'dsh-liangshen: announcement')
 }

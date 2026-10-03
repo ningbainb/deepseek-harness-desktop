@@ -47,27 +47,29 @@ export function WebUIPluginsSection(props: WebUIPluginsSectionProps): ReactNode 
     <div className={css.section}>
       <h2 className={css.heading} title={t('title')}>{t('title')}</h2>
       <p className={css.lede} title={t('description')}>{t('description')}</p>
-      {desktop && <div className={css.dockBanner} data-testid="desktop-dock-banner">
-        <div className={css.dockBannerIcon} aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
-            <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
-            <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
-            <path d="M17 13.5v7M13.5 17h7" />
-          </svg>
+      {desktop && (
+        <div className={css.dockBanner} data-testid="desktop-dock-banner">
+          <div className={css.dockBannerIcon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" />
+              <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" />
+              <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" />
+              <path d="M17 13.5v7M13.5 17h7" />
+            </svg>
+          </div>
+          <div className={css.dockBannerContent}>
+            <div className={css.dockBannerTitle}>{t('dockBannerTitle' as WebUIPluginsKey)}</div>
+            <div className={css.dockBannerDesc}>{t('dockBannerDesc' as WebUIPluginsKey)}</div>
+          </div>
+          <button
+            type="button"
+            className={css.dockBannerAction}
+            onClick={handleOpenDock}
+          >
+            {t('dockBannerAction' as WebUIPluginsKey)}
+          </button>
         </div>
-        <div className={css.dockBannerContent}>
-          <div className={css.dockBannerTitle}>{t('dockBannerTitle' as WebUIPluginsKey)}</div>
-          <div className={css.dockBannerDesc}>{t('dockBannerDesc' as WebUIPluginsKey)}</div>
-        </div>
-        <button
-          type="button"
-          className={css.dockBannerAction}
-          onClick={handleOpenDock}
-        >
-          {t('dockBannerAction' as WebUIPluginsKey)}
-        </button>
-      </div>}
+      )}
       {openError && <p role="alert">{t('dockOpenFailed')}</p>}
       <SafePluginBoundary pluginName="repair-status-card">
         <RepairStatusCard t={t} />

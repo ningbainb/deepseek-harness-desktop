@@ -125,14 +125,11 @@ function toolResult(
       step,
       message: {
         id: messageId(`message-${seq}`),
-        role: 'user',
+        role: 'tool',
         source: { kind: 'tool', callId: correlatedId },
-        content: [{
-          type: 'tool-result',
-          toolCallId: correlatedId,
-          content: [{ type: 'text', text: isError ? 'failed' : 'ok' }],
-          isError,
-        }],
+        toolCallId: correlatedId,
+        content: [{ type: 'text', text: isError ? 'failed' : 'ok' }],
+        isError,
       },
       ...(error === undefined ? {} : { error }),
     },
