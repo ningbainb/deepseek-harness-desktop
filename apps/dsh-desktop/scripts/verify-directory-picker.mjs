@@ -15,7 +15,8 @@ import { verifyLocalPanelControls, waitForNativeSidebarCollapsed } from './panel
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = packagedExecutable || process.env.CI ? 120_000 : 60_000
+const runtimeReadyTimeoutMs = Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS)
+  || (packagedExecutable || process.env.CI ? 120_000 : 60_000)
 const temporary = await realpath(await mkdtemp(resolve(tmpdir(), 'dsh-directory-picker-e2e-')))
 const dshHome = resolve(temporary, 'dsh-home')
 const userData = resolve(temporary, 'user-data')
@@ -296,7 +297,7 @@ try {
     return composer?.getBoundingClientRect().width >= 350
       && explorer?.getAttribute('data-aionui-visible') === 'false'
       && native && getComputedStyle(native).transform === 'none'
-  })
+  }, undefined, { polling: 100 })
   const nativeBounds = await nativePreview.boundingBox()
   const conversationBounds = await page.locator('[data-pane="conversation"]').boundingBox()
   assert.ok(nativeBounds && conversationBounds && nativeBounds.x >= conversationBounds.x + conversationBounds.width - 1,
@@ -515,6 +516,13 @@ try {
 } catch (error) {
   failure = error
   console.error('directory-picker failure evidence', temporary)
+  console.error('conversation geometry', JSON.stringify(await page?.evaluate(() => ({
+    elements: ['[data-dsh-frame]', '[data-pane="sidebar"]', '[data-pane="conversation"]', '[data-composer-seat]', '[data-aionui-explorer-col]', '[data-rightbar-col]'].map(selector => ({
+      selector, nodes: [...document.querySelectorAll(selector)].map(element => ({
+        rect: element.getBoundingClientRect().toJSON(), style: element.getAttribute('style'), visible: element.getAttribute('data-aionui-visible'),
+      })),
+    })),
+  })).catch(() => undefined)))
   console.error('native panel geometry', JSON.stringify(await page?.evaluate(() => [...document.querySelectorAll('[data-sidebar-right-panel]')].map(panel => {
     const style = getComputedStyle(panel)
     const ancestors = []

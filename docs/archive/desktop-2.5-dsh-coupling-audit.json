@@ -5356,7 +5356,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-directory-picker.mjs",
-      "line": 60,
+      "line": 61,
       "operation": "DSH_HOME"
     },
     {
@@ -5440,7 +5440,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs",
-      "line": 39,
+      "line": 40,
       "operation": "DSH_HOME"
     },
     {

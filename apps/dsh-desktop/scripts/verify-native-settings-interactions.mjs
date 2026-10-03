@@ -7,6 +7,7 @@ import { _electron as electron } from 'playwright'
 import { parse } from 'yaml'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-native-settings-interactions-'))
@@ -38,8 +39,10 @@ try {
     args: executable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_DESKTOP_USER_DATA: userData, DSH_HOME: home, DSH_AGENTS_HOME: join(temporary, 'agents'),
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0' } })
+  await useChineseFixtureLocale(app)
   page = await app.firstWindow()
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120000 })
+  await page.reload()
   await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: 60000 })
   const openSettings = async () => {
     await page.getByRole('button', { name: '账号菜单', exact: true }).click()
