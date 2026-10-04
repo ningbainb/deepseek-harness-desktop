@@ -26,6 +26,10 @@
 
 Agent WSL 权限使用官方 SDK 原子写入，保留用户选择与重启恢复，并对 Windows 临时文件占用进行有界重试。保存失败继续明确报错，诊断只显示安全错误码，不包含本机路径。
 
+同一正式标签另在 Linux 原生矩阵 `37173422100` 验证 Ubuntu 22.04 与 24.04，两端源码、打包、Landlock 沙箱与 Xvfb 启动冒烟均通过。该矩阵不会替换已发布资产，物理桌面安装与其他发行版仍不在本次验收范围内。
+
+公开 Windows 安装包下载后，实际提取并通过本机 `pack:verify`（141 个运行时包、190 个物理运行时文件与 ASAR 完整性）和隔离 `pack:smoke`（启动、预设入口、社区扩展分发及 Task Board Worktree）。沿用的 4.4.0 图标与官方匿名埋点配置已核对；测试屏蔽生产埋点、协议注册与自动更新，不运行真实 Setup，不修改当前账号的用户数据。完整证据见[正式发布验收记录](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/archive/desktop-5.0.0-formal-release.md)。
+
 设置窗口按每个新文档的 DOM 就绪重新挂载控制器，避免刷新后沿用已失效的适配状态；后续资源加载完成不会重复安装或打断已打开的设置。慢资源与重复刷新验收保留八向缩放、普通点击及配置保存断言。
 
 退出时先等待插件事务并安全停止 Runtime，再销毁窗口；停止失败时保留窗口与传输入口，不让仍在恢复的应用变成无界面的后台进程。
@@ -44,7 +48,7 @@ bai 模型接入使用浏览器授权，登录后优先选择接口实际返回�
 
 三端匿名统计分别归类 Windows、macOS 与 Linux；Linux 不再被计入 Windows，操作系统维度不包含内核版本、发行版或主机名。客户端与服务端保留既有事件格式及历史统计。
 
-Windows x64 安装包名为 DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe。下载后请按同一发布目录内的 SHA256SUMS.txt 核对 SHA-256；文件大小与哈希以最终构建产物为准。
+Windows x64 安装包名为 `DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe`，实际大小 `325650740` 字节（310.6 MiB），SHA-256 为 `4d9a4c79c9c87950f35beb7123498ec6266d943e0059835b9302d3d4a613da5b`。五份安装文件均以实际字节核对公开资产大小、GitHub digest 和同 Release 的 `SHA256SUMS.txt`；[三端完整清单](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-manifest-all-platforms.json) 保留平台、签名边界及各文件校验值。
 
 ### 说明
 
@@ -76,6 +80,10 @@ The formal tag points to `b78af2ef9e310ae9996908ba6a9ccb27add80621`; three-platf
 
 Agent WSL permissions use official SDK atomic writes, preserving user choices across restart with bounded retries for transient Windows file interference. Failed saves remain explicit; diagnostics expose safe error codes without local paths.
 
+The same formal tag also passed native Linux matrix `37173422100` on Ubuntu 22.04 and 24.04, including source contracts, packaging, Landlock enforcement and Xvfb startup smoke. This matrix does not replace published assets; physical-desktop installation and other distributions remain outside this acceptance scope.
+
+The downloaded public Windows installer was actually extracted and passed local `pack:verify` (141 runtime packages, 190 physical Runtime files and ASAR integrity) and isolated `pack:smoke` (startup, preset ingress, community-extension dispatch and Task Board Worktree). The retained 4.4.0 icon and official anonymous metrics configuration were verified. Tests disable production metrics, protocol registration and updates; they do not run Setup or modify the current account's user data. Full evidence is in the [formal release acceptance record](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/archive/desktop-5.0.0-formal-release.md).
+
 The settings controller mounts for every DOM-ready document instead of retaining stale adaptation state after reload. Later resource completion does not reinstall or interrupt an open controller. Slow-resource and repeated-reload acceptance retain eight-way resizing, ordinary pointer input and saved configuration assertions.
 
 Quit drains plugin transactions and safely stops the Runtime before destroying windows. A failed stop retains windows and transport access instead of leaving a recovering application headless.
@@ -94,7 +102,7 @@ Official packages include anonymous activity, retention and fixed feature-outcom
 
 Anonymous metrics distinguish Windows, macOS and Linux. Linux is not counted as Windows; operating-system dimensions exclude kernel releases, distributions and hostnames. Client and server retain existing event shapes and historical analytics.
 
-The Windows x64 installer is named DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe. Compare its SHA-256 value with SHA256SUMS.txt from the same release directory. The final build artifact determines the exact size and checksum.
+The Windows x64 installer is `DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe`, exactly `325650740` bytes (310.6 MiB), with SHA-256 `4d9a4c79c9c87950f35beb7123498ec6266d943e0059835b9302d3d4a613da5b`. Actual bytes of all five installation files matched public asset sizes, GitHub digests and the same release's `SHA256SUMS.txt`. The [all-platform manifest](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-manifest-all-platforms.json) records platform boundaries, signing status and every file checksum.
 
 ### Notice
 
