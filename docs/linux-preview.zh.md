@@ -32,7 +32,7 @@ sudo apt install ./DeepSeek-Harness-Desktop-5.0.0-amd64.deb
 sudo apt remove deepseek-harness-desktop
 ```
 
-卸载应用不会主动删除 `~/.dsh` 中的用户会话、技能和插件数据。
+卸载应用不会主动删除用户会话、技能和插件数据。社区发行版默认使用 `~/.dsh-community`；历史 `~/.dsh` 数据与用户自选数据目录也应单独保留备份。
 
 ## 安全边界
 

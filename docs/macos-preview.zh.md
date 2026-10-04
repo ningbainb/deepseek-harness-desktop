@@ -7,12 +7,12 @@
 - 只支持 Apple Silicon（arm64）。Intel Mac 不能用，Rosetta 也无法反向兼容。
 - 这是未签名预览包，不是正式发行版。不上 Mac App Store。
 - mac 端使用系统 Git，不内置 MinGit。若 `git --version` 不可用，请安装 Xcode Command Line Tools：`xcode-select --install`。
-- 预览版没有自动更新。应用内「检查更新」会说明原因；新版本请到 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 手动下载。不要用 `/releases/latest`，预发布不会出现在 Latest 里。
+- 预览版没有自动更新。应用内「检查更新」会说明原因；请到 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 手动下载对应版本。三端发布会把 macOS Preview 与 Windows、Linux 放在同一个 Release 中；Release 标为 Latest 并不代表 macOS 包已稳定或已签名。
 - macOS 15 Sequoia 起，系统已去掉「右键 -> 打开」这条捷径，只剩下面的终端命令或系统设置路径。
 
 ## 安装
 
-1. 从 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 下载 arm64 的 `.dmg` 或 `.zip`（文件名形如 `DeepSeek-Harness-Desktop-<version>-arm64.dmg`）。预览包的标题会标明未签名、仅供贡献者验证。
+1. 从 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 下载 arm64 的 `.dmg` 或 `.zip`（文件名形如 `DeepSeek-Harness-Desktop-<version>-arm64.dmg`）。打开前按 Release 校验和文件核验；即使包含在三端 Release 中，macOS 资产仍是未签名、未公证的预览包。
 2. 打开 `.dmg` 把 **DeepSeek Harness Desktop.app** 拖到 `/Applications`，或解压 `.zip` 后把 `.app` 放到 `/Applications`。
 3. 去掉隔离属性（下载来的未签名包几乎都会带 quarantine）：
 

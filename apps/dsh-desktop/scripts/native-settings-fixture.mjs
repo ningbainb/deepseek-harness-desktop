@@ -1,7 +1,13 @@
 export async function openNativeSettings(page) {
   const direct = page.getByRole('button', { name: /^(?:设置|Settings)$/iu }).filter({ visible: true }).first()
   const account = page.getByRole('button', { name: /^(?:账号菜单|Account menu)$/iu }).filter({ visible: true }).first()
-  await direct.or(account).first().waitFor({ state: 'visible' })
+  const sidebar = page.getByRole('button', { name: /^(?:打开侧边栏|Open sidebar)$/iu }).filter({ visible: true }).first()
+  const entry = direct.or(account).first()
+  await entry.or(sidebar).first().waitFor({ state: 'visible' })
+  if (!await direct.isVisible() && !await account.isVisible()) {
+    await sidebar.click()
+    await entry.waitFor({ state: 'visible' })
+  }
   if (await direct.isVisible()) {
     await direct.click()
   } else {

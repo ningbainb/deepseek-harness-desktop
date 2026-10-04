@@ -336,6 +336,10 @@ Windows 安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所
 
 只提供 arm64。下载 `.dmg` 或 `.zip` 后把应用放到 `/Applications`，用 `xattr` 去掉隔离属性；macOS 15 起没有「右键打开」。预览版没有自动更新，mac 端使用系统 Git。完整步骤见 [macOS 未签名预览版安装说明](docs/macos-preview.zh.md)。
 
+### Linux x64 预览
+
+提供 AppImage 与 DEB。AppImage 需要执行权限，DEB 可通过系统软件包管理器安装；需要图形会话、系统 Git 及可用沙箱，不应以关闭沙箱的方式处理启动失败。预览版手动更新，实体桌面安装与操作体验仍需用户验收。完整步骤见 [Linux x64 Preview 安装说明](docs/linux-preview.zh.md)。
+
 如果 GitHub 下载速度较慢，也可以加入页面顶部的用户交流群获取同步提供的安装包。
 
 ## 更新

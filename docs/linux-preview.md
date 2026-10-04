@@ -32,7 +32,7 @@ Uninstall with:
 sudo apt remove deepseek-harness-desktop
 ```
 
-Removing the application does not intentionally delete sessions, skills or plugin data stored under `~/.dsh`.
+Removing the application does not intentionally delete sessions, skills or plugin data. The community distribution defaults to `~/.dsh-community`; keep any legacy `~/.dsh` data and any user-selected data directory backed up separately.
 
 ## Security boundary
 

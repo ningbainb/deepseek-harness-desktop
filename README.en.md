@@ -339,6 +339,10 @@ The Windows installer already includes DSH, desktop plugins, skins, pnpm, MinGit
 
 arm64 only. After downloading the `.dmg` or `.zip`, move the app to `/Applications` and clear quarantine with `xattr`. macOS 15 no longer has Right-click > Open. Preview builds have no auto-update and use system Git. Full steps: [macOS unsigned preview install guide](docs/macos-preview.md).
 
+### Linux x64 preview
+
+AppImage and DEB are available. AppImage needs execute permission; DEB can be installed through the system package manager. A graphical session, system Git and a working sandbox are required; do not disable the sandbox to work around startup failures. Preview updates are manual, and physical-desktop installation and usability remain user-acceptance work. Full steps: [Linux x64 Preview install guide](docs/linux-preview.md).
+
 If GitHub downloads are slow in your region, you can also join the community group at the top of this page to get the synchronized installer.
 
 ## Updates

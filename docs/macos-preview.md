@@ -7,12 +7,12 @@ This page covers installing the unsigned contributor preview of **DeepSeek Harne
 - Apple Silicon (arm64) only. Intel Macs are not supported; Rosetta cannot run an arm64 build.
 - This is an unsigned preview, not a stable distribution, and it is not on the Mac App Store.
 - macOS uses the system Git. MinGit is not bundled. If `git --version` fails, install Xcode Command Line Tools with `xcode-select --install`.
-- Preview builds have no in-app auto-update. **Help > Check for Updates** explains this. Download new builds from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases). Do not use `/releases/latest`; pre-releases are omitted from Latest.
+- Preview builds have no in-app auto-update. **Help > Check for Updates** explains this. Download the matching version from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases). A three-platform release includes macOS Preview assets alongside Windows and Linux; the release being marked Latest does not make the macOS package a stable or signed build.
 - Starting with macOS 15 Sequoia, Apple removed the **Right-click > Open** bypass. Use the Terminal command or System Settings path below.
 
 ## Install
 
-1. Download the arm64 `.dmg` or `.zip` from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) (name like `DeepSeek-Harness-Desktop-<version>-arm64.dmg`). Preview titles will say the build is unsigned and for contributor verification only.
+1. Download the arm64 `.dmg` or `.zip` from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) (name like `DeepSeek-Harness-Desktop-<version>-arm64.dmg`). Verify the asset against the release checksum receipt before opening it. macOS assets remain unsigned, unnotarized previews even when included in a three-platform release.
 2. Open the `.dmg` and drag **DeepSeek Harness Desktop.app** to `/Applications`, or unzip the `.zip` and move the `.app` into `/Applications`.
 3. Clear the quarantine attribute (downloaded unsigned apps almost always have it):
 
