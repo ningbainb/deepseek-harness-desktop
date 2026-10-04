@@ -4,7 +4,7 @@
 
 ### 本次亮点
 
-此版本将官方 NPM Runtime 更新到 0.2.0-rc.2，并按新版接口承接桌面现有功能；旧接口不保证兼容，历史会话、模型配置和用户插件数据仍按迁移与回滚流程保全。更新了会话恢复、社区插件、插件管理、宠物、皮肤中心等内置插件的适配。皮肤中心使用新版状态接口，保留 15 款离线皮肤并迁移可用的旧皮肤选择。桌面启动器补齐新版设置服务依赖，避免浏览器插件加载失败。安装事务先备份并清理 Windows 64 位和 32 位卸载注册表视图，再移动旧安装目录；失败时根据事务记录恢复旧文件与注册表。启动时只将指向已不存在旧安装包的插件链接退出活动 Profile，并保存原始清单备份。Windows 首次启动宽限延长至 180 秒。
+内核升级，工作台照旧：Windows x64、macOS arm64 与 Linux x64 同版发布，重点打磨启动、升级、历史恢复和配置保全。此版本将官方 NPM Runtime 更新到 0.2.0-rc.2，并按新版接口承接桌面现有功能；旧接口不保证兼容，历史会话、模型配置和用户插件数据仍按迁移与回滚流程保全。更新了会话恢复、社区插件、插件管理、宠物、皮肤中心等内置插件的适配。皮肤中心使用新版状态接口，保留 15 款离线皮肤并迁移可用的旧皮肤选择。桌面启动器补齐新版设置服务依赖，避免浏览器插件加载失败。安装事务先备份并清理 Windows 64 位和 32 位卸载注册表视图，再移动旧安装目录；失败时根据事务记录恢复旧文件与注册表。启动时只将指向已不存在旧安装包的插件链接退出活动 Profile，并保存原始清单备份。Windows 首次启动宽限延长至 180 秒。
 
 ### 历史与配置保全修复
 
@@ -21,6 +21,8 @@
 原生右侧预览按新版有界列宽计算可用空间，保留至少 360 像素的对话区域；窗口缩小时临时限制侧栏宽度，放大后恢复原宽度，不改写用户偏好。收起原生侧栏释放占用空间，显式“编辑 / 兼容预览”继续可用，避免同时挤压输入框或丢失编辑入口。
 
 ### 验证
+
+正式标签对应提交 `b78af2ef9e310ae9996908ba6a9ccb27add80621`，三端发布流水线 `37168324503` 通过。Windows 核心回归 24/24、完整打包回归 40/40；独立 CI 桌面测试 1585/1585、脚本测试 212/212，零失败、零跳过。真实 Setup 在隔离 Windows Runner 验证新装、公开 4.3.0 覆盖升级、重复覆盖、安装后重启与 Profile/用户数据保全。macOS/Linux 在原生 Runner 完成验证、打包、完整性与启动冒烟；Linux 同时验证沙箱。首次设置点击和正式标签首次终端控制台断言失败记录均保留，原门禁复测通过，未删改断言。本机只做隔离验收，既有慢盘 Host 宠物 Dock 10 秒超时记录保留，不宣称本机完整验证全绿。
 
 Agent WSL 权限使用官方 SDK 原子写入，保留用户选择与重启恢复，并对 Windows 临时文件占用进行有界重试。保存失败继续明确报错，诊断只显示安全错误码，不包含本机路径。
 
@@ -52,7 +54,7 @@ Windows x64 安装包名为 DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe。下�
 
 ### Highlights
 
-This release updates the official NPM Runtime to 0.2.0-rc.2 and carries Desktop features onto its new APIs. Old API compatibility is not guaranteed; conversations, model configuration, and user plugin data remain covered by migration and rollback. Builtin adaptations include session recovery, community plugins, plugin management, pets, and Skin Center. Skin Center uses the new state API, keeps 15 offline skins, and migrates supported legacy selections. The Desktop launcher now injects the new settings service so browser plugins can boot. The upgrade transaction backs up and clears both Windows uninstall registry views before moving the old installation, then restores files and registry entries on failure. Startup retires only plugin links whose old packaged targets no longer exist and saves the prior manifest. The Windows first-launch grace period is now 180 seconds.
+An upgraded kernel, the same complete workbench: Windows x64, macOS arm64 and Linux x64 ship together, focusing on startup, upgrades, history recovery and configuration preservation. This release updates the official NPM Runtime to 0.2.0-rc.2 and carries Desktop features onto its new APIs. Old API compatibility is not guaranteed; conversations, model configuration, and user plugin data remain covered by migration and rollback. Builtin adaptations include session recovery, community plugins, plugin management, pets, and Skin Center. Skin Center uses the new state API, keeps 15 offline skins, and migrates supported legacy selections. The Desktop launcher now injects the new settings service so browser plugins can boot. The upgrade transaction backs up and clears both Windows uninstall registry views before moving the old installation, then restores files and registry entries on failure. Startup retires only plugin links whose old packaged targets no longer exist and saves the prior manifest. The Windows first-launch grace period is now 180 seconds.
 
 ### History and configuration preservation
 
@@ -69,6 +71,8 @@ Skin Center owns and releases the exact stylesheet nodes created by each activat
 The native right preview accounts for the new bounded column tracks and reserves at least 360 pixels for conversation. Smaller windows temporarily cap sidebar width and larger windows restore the original width without rewriting user preferences. Collapsing the native sidebar releases its space while the explicit Edit / Compatibility Preview remains available, avoiding squeezed input or a lost editing entry.
 
 ### Verification
+
+The formal tag points to `b78af2ef9e310ae9996908ba6a9ccb27add80621`; three-platform release run `37168324503` passed. Windows passed 24/24 core and 40/40 packaged suites; independent CI passed 1585/1585 Desktop and 212/212 script tests with zero failures or skips. Production Setup on a disposable Windows Runner verified fresh installation, public 4.3.0 overlay upgrade, overlay reinstall, installed relaunch and Profile/user-data preservation. Native macOS/Linux runners passed verification, packaging, integrity and startup smoke; Linux also passed sandbox checks. The first settings-click failure and first tag terminal-console assertion failure remain recorded; unchanged gates passed on retest without removing assertions. Local acceptance is isolated only; the earlier HDD Host pet-Dock ten-second timeout remains recorded, so local complete verification is not represented as entirely green.
 
 Agent WSL permissions use official SDK atomic writes, preserving user choices across restart with bounded retries for transient Windows file interference. Failed saves remain explicit; diagnostics expose safe error codes without local paths.
 

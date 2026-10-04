@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 5.0.0 发布候选版：融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，提供模型协作、统一 Skills 与可靠升级。">
+    <meta name="description" content="DeepSeek Harness Desktop 5.0.0 三端同版发布：适配官方 DSH 0.2 内核，保留完整工作台，重点修复会话重开、配置保全和可靠升级。Windows、macOS 与 Linux 安装包现已可用。">
     <meta name="keywords" content="DeepSeek Harness Desktop 5.0.0,DSH 0.2.0-rc.2,官方 Desktop 能力,Agent Team,模型协作,Skills,插件恢复,历史会话,Windows AI 编程客户端,开源 AI 编程助手">
     <meta name="author" content="DeepSeek Harness Desktop Community">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -13,7 +13,7 @@
     <meta name="bingbot" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://1521003.xyz/">
     <link rel="sitemap" type="application/xml" href="https://1521003.xyz/sitemap.xml">
-    <meta property="og:title" content="DeepSeek Harness Desktop 5.0.0 发布候选版：社区桌面工作台">
+    <meta property="og:title" content="DeepSeek Harness Desktop 5.0.0：稳定升级，三端同版">
     <meta property="og:description" content="融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，新增模型协作入口、Agent Team、统一 Skills、插件恢复与历史会话保护。">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://1521003.xyz/">
@@ -22,10 +22,10 @@
     <meta property="og:image" content="https://1521003.xyz/assets/desktop-5.0.0-control-center.webp">
     <meta property="og:image:alt" content="DeepSeek Harness Desktop 5.0.0 Windows 智能操控中心">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="DeepSeek Harness Desktop 5.0.0 发布候选版：社区桌面工作台">
+    <meta name="twitter:title" content="DeepSeek Harness Desktop 5.0.0：稳定升级，三端同版">
     <meta name="twitter:description" content="融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，新增模型协作、统一 Skills 和可靠升级。">
     <meta name="twitter:image" content="https://1521003.xyz/assets/desktop-5.0.0-collaboration.webp">
-    <title>DeepSeek Harness Desktop 5.0.0 发布候选版 - Windows、macOS、Linux AI 编程客户端</title>
+    <title>DeepSeek Harness Desktop 5.0.0 - 稳定升级，Windows、macOS、Linux 三端同版</title>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,7 +35,7 @@
             "@id": "https://1521003.xyz/#website",
             "url": "https://1521003.xyz/",
             "name": "DeepSeek Harness Desktop",
-            "description": "DeepSeek Harness Desktop 5.0.0 发布候选版：融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界。",
+            "description": "DeepSeek Harness Desktop 5.0.0 三端同版发布：融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，重点保障会话、配置和升级稳定性。",
             "inLanguage": "zh-CN"
           },
           {
@@ -44,18 +44,18 @@
             "name": "DeepSeek Harness Desktop",
             "alternateName": "DeepSeek Harness 桌面版",
             "url": "https://1521003.xyz/",
-            "description": "DeepSeek Harness Desktop 5.0.0 是基于官方 NPM Runtime 0.2.0-rc.2 的发布候选版，正在验收，尚未发布。",
+            "description": "DeepSeek Harness Desktop 5.0.0 使用官方 NPM Runtime 0.2.0-rc.2，Windows x64、macOS arm64 Preview 和 Linux x64 Preview 安装包已在同一正式 Release 发布。",
             "applicationCategory": "DeveloperApplication",
             "applicationSubCategory": "AI coding assistant",
             "operatingSystem": "Windows 10, Windows 11, macOS arm64, Linux x64",
             "softwareVersion": "5.0.0",
             "isAccessibleForFree": true,
-            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe",
+            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe",
             "installUrl": "https://1521003.xyz/#download",
             "releaseNotes": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0",
             "codeRepository": "https://github.com/ningbainb/deepseek-harness-desktop",
             "license": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/LICENSE",
-            "dateModified": "2026-10-03",
+            "dateModified": "2026-10-04",
             "image": "https://1521003.xyz/assets/desktop-5.0.0-collaboration.webp",
             "screenshot": [
               "https://1521003.xyz/assets/desktop-5.0.0-control-center.webp",
@@ -217,7 +217,7 @@
                 "name": "5.0.0 已经正式发布了吗？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "尚未。5.0.0 当前是发布候选版，正在进行隔离验收；本地构建和源码更新不代表已公开发布。下载前请查看实际 GitHub Release 版本及同目录 SHA-256。未签名安装包可能触发 SmartScreen 提示。"
+                  "text": "是。5.0.0 三端安装包于 2026-10-04 在同一 GitHub Release 发布；Windows 完整打包回归 40/40 通过，并验证新装和 4.3.0 覆盖升级。macOS 与 Linux 仍为 Preview；Windows 未签名，macOS 未签名、未公证。下载后请核对同目录 SHA-256，实际平台能力和验收边界见发布说明。"
                 }
               }
             ]
@@ -260,7 +260,7 @@
           <span data-site-theme-label>动感亮色</span>
         </button>
         <a class="nav-community" href="https://qm.qq.com/q/vehlNjaeye" target="_blank" rel="noreferrer"><span>Q</span> 加群</a>
-        <a class="nav-download download-link" data-download-source="nav" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe">
+        <a class="nav-download download-link" data-download-source="nav" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 15v2h14v-2"/></svg>
           下载 <span class="release-version">v5.0.0</span>
         </a>
@@ -272,12 +272,12 @@
         <div class="hero-backdrop" aria-hidden="true"></div>
         <div class="container hero-inner">
           <div class="hero-copy reveal">
-            <p class="overline">Desktop 5.0.0 发布候选版 · 社区版</p>
-            <h1>保留完整工作台，<br>适配官方 0.2 内核<br><span class="hero-current">5.0.0 三端候选，正在验收</span></h1>
+            <p class="overline">Desktop 5.0.0 正式发布 · 社区版</p>
+            <h1>保留完整工作台，<br>让升级更稳定<br><span class="hero-current">5.0.0 三端同版，现已可用</span></h1>
             <p class="hero-summary">公开的官方 DSH Runtime、Web UI 与官方仓库 Desktop 能力边界进入同一套桌面工作台，覆盖 Windows、macOS 与 Linux。会话、文件、工具、权限与模型仍由 DSH 提供，社区宿主负责生命周期、窗口、更新、隔离和扩展体验。</p>
-            <p class="hero-summary">5.0.0 保留扩展坞、模型协作和 Skills，修复大历史重新打开、配置保全与皮肤切换；最终安装包和验收结果以发布记录为准。</p>
+            <p class="hero-summary">适配官方 0.2 内核，保留扩展坞、模型协作和 Skills，重点修复大历史重新打开、配置保全与覆盖升级。Windows 完整打包回归 40/40 通过；macOS 与 Linux 以 Preview 同步提供，详细验收边界见发布记录。</p>
             <div class="hero-buttons">
-              <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe">
+              <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2h7v7H2V2Zm9 0h7v7h-7V2ZM2 11h7v7H2v-7Zm9 0h7v7h-7v-7Z"/></svg>
                 下载 Windows x64
               </a>
@@ -312,11 +312,11 @@
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6V3h10v10h-3M3 7h10v10H3V7Z"/></svg><span>复制</span>
                 </button>
               </div>
-              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
+              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
                 <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v5.0.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v5.0.0</code>
                 <span class="terminal-cta">立即下载</span>
               </a>
-              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">以最终安装包为准</span></div>
+              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">310.6 MB</span></div>
             </div>
           </div>
         </div>
@@ -353,7 +353,7 @@
       <section class="latest-features" id="latest-features" aria-labelledby="latest-features-title">
         <div class="container">
           <div class="section-title reveal">
-            <span>v5.0.0 发布候选</span>
+            <span>v5.0.0 三端同版发布</span>
             <h2 id="latest-features-title">先保住升级数据，再把协作和 Skills 放到顺手的位置</h2>
           </div>
           <div class="latest-grid">
@@ -530,16 +530,16 @@
           <div class="section-title reveal"><span>开始使用</span><h2>下载桌面版或从源码构建</h2></div>
           <div class="install-grid">
             <article class="install-card reveal">
-              <h3>Windows 一键安装</h3><p>5.0.0 尚未发布。请先确认实际 GitHub Release 版本，公开后再下载对应安装包。</p>
-              <a class="code-line download-link" data-download-source="install" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v5.0.0</span></code><span class="code-action">下载</span></a>
+              <h3>Windows 一键安装</h3><p>5.0.0 x64 安装包现已可用，包含完整运行组件。未签名，安装前请核对同 Release 的 SHA-256。</p>
+              <a class="code-line download-link" data-download-source="install" data-platform="windows-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v5.0.0</span></code><span class="code-action">下载</span></a>
             </article>
             <article class="install-card reveal">
               <h3>macOS arm64 Preview</h3><p>Apple Silicon DMG，未签名、未公证；安装前请阅读平台说明。</p>
-              <a class="code-line" data-platform="macos-arm64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-5.0.0-arm64.dmg"><span class="prompt">$</span><code>Desktop v5.0.0 macOS</code><span class="code-action">下载 DMG</span></a>
+              <a class="code-line" data-platform="macos-arm64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-5.0.0-arm64.dmg"><span class="prompt">$</span><code>Desktop v5.0.0 macOS</code><span class="code-action">下载 DMG</span></a>
             </article>
             <article class="install-card reveal">
               <h3>Linux x64 Preview</h3><p>提供 AppImage 与 DEB，能力取决于桌面会话和系统沙箱。</p>
-              <a class="code-line" data-platform="linux-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage"><span class="prompt">$</span><code>Desktop v5.0.0 Linux</code><span class="code-action">下载 AppImage</span></a>
+              <a class="code-line" data-platform="linux-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage"><span class="prompt">$</span><code>Desktop v5.0.0 Linux</code><span class="code-action">下载 AppImage</span></a>
             </article>
           </div>
         </div>
@@ -551,18 +551,18 @@
           <article class="release-card reveal" data-release-card aria-busy="true">
             <div class="release-copy">
               <div class="release-heading">
-                <span class="release-state">LOCAL CANDIDATE / 尚未发布</span>
+                <span class="release-state">STABLE / 三端同版</span>
                 <strong class="release-version">v5.0.0</strong>
               </div>
-              <p>v5.0.0 使用官方 DSH 0.2.0-rc.2 NPM Runtime，修复大历史首帧传输、A→B→A 切换、配置保全与皮肤样式释放，恢复 4.4.0 品牌图标。保留扩展坞、模型协作和 Skills；安装、升级与回滚范围以最终验收记录为准。</p>
+              <p>v5.0.0 使用官方 DSH 0.2.0-rc.2 NPM Runtime，修复大历史首帧传输、A→B→A 切换、配置保全与皮肤样式释放，沿用 4.4.0 品牌图标。保留扩展坞、模型协作和 Skills；三端原生构建及冒烟通过，Windows 已验证新装和 4.3.0 覆盖升级，其他版本和真实设备边界见发布说明。</p>
               <div class="release-facts">
-                <span><small>候选构建日期</small><time class="release-date" datetime="2026-10-02">2026-10-02</time></span>
-                <span><small>安装包</small><strong class="release-size">以最终安装包为准</strong></span>
+                <span><small>发布日期（UTC）</small><time class="release-date" datetime="2026-10-04">2026-10-04</time></span>
+                <span><small>Windows 安装包</small><strong class="release-size">310.6 MB</strong></span>
                 <span><small>同步状态</small><strong data-release-status>正在同步 GitHub</strong></span>
               </div>
               <div class="release-links">
                 <a class="btn btn-primary release-page-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest" target="_blank" rel="noreferrer">查看中英双语日志</a>
-                <a class="btn btn-ghost checksum-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/latest/download/SHA256SUMS.txt">下载 SHA-256</a>
+                <a class="btn btn-ghost checksum-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/SHA256SUMS.txt">下载 SHA-256</a>
               </div>
             </div>
             <ol class="update-flow" aria-label="内置更新流程">
@@ -580,7 +580,7 @@
           <div class="faq-grid">
             <article class="faq-card reveal"><h3>拖入文件后会自动解析成 Markdown 吗？</h3><p>不会。普通文件保存到当前工作区后显示附件卡片，发送时提供真实文件引用，由模型按需调用工具读取和研究；不自动把全文注入对话。文件可添加不代表所有格式都能被模型理解，图片使用独立的压缩与视觉流程。</p></article>
             <article class="faq-card reveal"><h3>记忆会自动保存或发送吗？</h3><p>模型建议需要你确认后才保存。开启记忆引用后，系统按本轮输入检索相关记忆，并将引用内容随请求发送给当前模型供应商；归属或作用域无法确认时不引用。可在拓展坞的个人偏好中查看和管理。</p></article>
-            <article class="faq-card reveal"><h3>5.0.0 已经正式发布了吗？</h3><p>尚未。5.0.0 当前是发布候选版，正在进行隔离验收；本地构建和源码更新不代表已公开发布。下载前请查看实际 GitHub Release 版本及同目录 SHA-256。未签名安装包可能触发 SmartScreen 提示。</p></article>
+            <article class="faq-card reveal"><h3>5.0.0 已经正式发布了吗？</h3><p>是。5.0.0 三端安装包于 2026-10-04 在同一 GitHub Release 发布；Windows 完整打包回归 40/40 通过，并验证新装和 4.3.0 覆盖升级。macOS 与 Linux 仍为 Preview；Windows 未签名，macOS 未签名、未公证。下载后请核对同目录 SHA-256，实际平台能力和验收边界见发布说明。</p></article>
             <article class="faq-card reveal">
               <h3>DeepSeek Harness Desktop 是什么？</h3>
               <p>它是社区维护的开源桌面发行版，融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，并提供 Browser Use、Computer Use、插件、主题与原生生命周期。</p>

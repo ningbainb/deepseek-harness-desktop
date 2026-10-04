@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.0.0 - 2026-10-04
+
+- 三端同版发布：Windows x64、macOS arm64 Preview 与 Linux x64 Preview 安装包来自同一 `desktop-v5.0.0` 标签；Windows 未签名，macOS 未签名、未公证。
+- 官方 NPM Runtime 固定 `0.2.0-rc.2`，聚合 Web UI 使用 `0.4.4`；插件通过官方 SDK、profile 与 `cordis.patch.yml` 适配，保留扩展坞、模型协作、Skills 和已有桌面功能。
+- 修复大历史首帧传输和 A→B→A 历史重开；分片完整重组，不截断消息或工具输出。无法识别的旧会话可手动制作、审核上下文摘要，不自动上传历史或调用付费模型。
+- 插件环境修复保全升级后新增的模型 provider；恢复插件详情配置、使用统计、默认链接和快捷键设置等入口，改善响应式侧栏中的设置导航。
+- bai 未授权时提供浏览器登录，授权后读取并刷新真实模型目录，优先选择可用的 `deepseek-flash`；密钥失效提供重新登录，不自动充值或重发消息。
+- 修复皮肤样式释放和窄视口入口；应用及安装包沿用 4.4.0 图标。改进安装事务回滚、覆盖升级与启动诊断，保留用户数据。
+- 官方构建带匿名、可退出的数据埋点，不采集会话、提示词、代码、路径或 API 密钥；开发和隔离测试不发送生产事件。
+- 原生 CI 验证：Desktop 1585/1585、根脚本 212/212、Windows 源码 24/24、打包回归 40/40；Windows disposable runner 验证新装、4.3.0 覆盖和重复覆盖及重启数据保全。macOS/Linux 原生打包与启动冒烟通过；此前超时和可见控制台失败保留在发布记录，不推断未证实的根因。
+
+- One release across Windows x64, macOS arm64 Preview and Linux x64 Preview, built from the same `desktop-v5.0.0` tag. Windows is unsigned; macOS is unsigned and unnotarized.
+- Pins official NPM Runtime to `0.2.0-rc.2` and aggregate Web UI to `0.4.4`. Adapters use official SDKs, profiles and `cordis.patch.yml`, preserving Dock, model collaboration, Skills and existing Desktop features.
+- Fixes large-history transport and A-to-B-to-A history reopening with complete fragment reassembly, without truncating messages or tool output. Unrecognized legacy sessions support manually reviewed context summaries, never automatic history uploads or paid model calls.
+- Plugin repair preserves model providers added after upgrading. Restores plugin-detail configuration, usage statistics, default-link and shortcut settings routes, including responsive sidebar navigation.
+- bai offers browser sign-in when unauthorized, discovers and refreshes the real model catalog and prefers available `deepseek-flash`. Invalid keys offer reauthentication, never automatic payment or message resending.
+- Fixes stylesheet ownership and narrow-view navigation; application and installer retain 4.4.0 branding. Improves installer rollback, in-place upgrades and startup diagnostics while retaining user data.
+- Official builds include anonymous opt-out metrics that exclude conversations, prompts, code, paths and API keys. Development and isolated tests do not send production events.
+- Native CI passed Desktop 1585/1585, root scripts 212/212, Windows source 24/24 and packaged regression 40/40. Disposable Windows runners verified fresh installation, 4.3.0 upgrade, repeated upgrade and restart data retention; native macOS/Linux packaging and smoke passed. Earlier timeout and visible-console failures remain documented without unproven root-cause claims.
+
 ## 4.3.0 - 2026-09-22
 
 - 手动终端增加 Windows PowerShell、PowerShell 7、WSL 和 CMD 选择；Agent 的 WSL 工具采用独立权限，默认逐条确认，始终允许需要用户确认，关闭后拒绝执行，不改变官方 PowerShell 沙箱。

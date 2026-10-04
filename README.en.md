@@ -44,7 +44,7 @@ Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git 
 
 ### 5.0.0: reliable upgrades, one version across three platforms
 
-5.0.0 pins the official NPM DSH `0.2.0-rc.2` and uses the public `dsh-web-all@0.4.4` carrier with Desktop-owned adaptations, without changing official source. Windows x64, macOS arm64 and Linux x64 target the same release. Release acceptance is still in progress: every native platform test, package and asset check must pass before publication. The actual GitHub Release and its SHA-256 checksums are authoritative.
+5.0.0 pins the official NPM DSH `0.2.0-rc.2` and uses the public `dsh-web-all@0.4.4` carrier with Desktop-owned adaptations, without changing official source. [Windows x64, macOS arm64 and Linux x64 are released together](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0) after native platform gates passed. Windows passed all 40 packaged regression suites and disposable-runner production Setup checks for fresh installation, 4.3.0 overlay upgrade and relaunch. macOS/Linux remain Preview; all packages are unsigned and macOS is unnotarized. Verify downloads against the same release's SHA-256 receipt and back up important data before upgrading.
 
 - **Reliable conversations**: authenticated fragmentation carries long histories and tool results across A-to-B-to-A navigation and restart. Limits fail explicitly; history is neither silently truncated nor automatically uploaded.
 - **Protected upgrades**: overlay installation uses transactional backup and rollback. Old and newly added providers, plugin configuration and user disable choices survive Profile refresh; plugin detail options, Skills and usage navigation remain available.

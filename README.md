@@ -44,7 +44,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 
 ### 5.0.0：稳定升级，三端同版
 
-5.0.0 锁定官方 NPM DSH `0.2.0-rc.2`，使用公开 `dsh-web-all@0.4.4` 与 Desktop 专有适配，不修改官方源码。发布目标为 Windows x64、macOS arm64、Linux x64 同版发行；当前仍处于发布验收，三端原生测试、打包与资产校验全部通过才发布。以实际 GitHub Release 和同目录 SHA-256 为准。
+5.0.0 锁定官方 NPM DSH `0.2.0-rc.2`，使用公开 `dsh-web-all@0.4.4` 与 Desktop 专有适配，不修改官方源码。[Windows x64、macOS arm64、Linux x64 已同版发布](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0)，三端原生门禁通过；Windows 完整打包回归 40/40，并在隔离 Runner 验证真实新装、4.3.0 覆盖升级及重启。macOS/Linux 仍为 Preview；三端未签名，macOS 未公证。下载按同目录 SHA-256 核验，升级前保留重要数据备份。
 
 - **会话更可靠**：认证分片承载长历史与工具结果，覆盖 A→B→A 切换及重启恢复；超限明确报错，不静默截断，也不自动上传旧会话。
 - **升级保护数据**：覆盖安装使用事务备份与失败回滚；保全 Profile 中新旧模型、插件配置及用户开关，恢复插件详情配置、Skills 与用量统计入口。

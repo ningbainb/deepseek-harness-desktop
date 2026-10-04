@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop Linux x64 Preview
 
-Linux 版本目前是独立预览通道，不会替换 Windows 正式版或 macOS arm64 Preview。
+Linux 仍是 Preview 平台。[Desktop 5.0.0](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0) 将 Linux x64 与 Windows x64、macOS arm64 资产放在同一个 Release 中，不代表 Linux 已成为稳定平台。运行 AppImage 或安装 deb 前，请按该 Release 的 `SHA256SUMS-linux.txt` 核验。
 
 ## 支持范围
 

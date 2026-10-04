@@ -1,6 +1,6 @@
 # DeepSeek Harness Desktop Linux x64 Preview
 
-Linux is distributed through a separate preview channel. It does not replace the Windows stable release or the macOS arm64 Preview.
+Linux remains a Preview platform. [Desktop 5.0.0](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0) includes Linux x64 assets in the same release as Windows x64 and macOS arm64; this does not make Linux a stable platform. Before opening an AppImage or installing a deb, verify it against the release's `SHA256SUMS-linux.txt`.
 
 ## Supported preview scope
 
