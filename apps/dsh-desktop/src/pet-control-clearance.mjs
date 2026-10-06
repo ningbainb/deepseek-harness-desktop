@@ -44,9 +44,10 @@ export function installPetControlClearance(resolveOffset) {
     const original = { left: bounds.left - offset.x, top: bounds.top - offset.y, width: bounds.width, height: bounds.height }
     const controls = [...document.querySelectorAll(selector)].filter(control => !control.closest('[data-dsh-pet-root]'))
       .map(control => control.getBoundingClientRect()).filter(control => control.width > 0 && control.height > 0)
-    offset = resolveOffset(original, controls, { width: innerWidth, height: innerHeight })
-    const translate = offset.x || offset.y ? `${offset.x}px ${offset.y}px` : previousTranslate
-    if (floating.style.translate !== translate) floating.style.translate = translate
+    const nextOffset = resolveOffset(original, controls, { width: innerWidth, height: innerHeight })
+    const changed = offset.x !== nextOffset.x || offset.y !== nextOffset.y
+    offset = nextOffset
+    if (changed) floating.style.translate = offset.x || offset.y ? `${offset.x}px ${offset.y}px` : previousTranslate
   }
   const schedule = () => { if (!disposed && frame === undefined) frame = requestAnimationFrame(sync) }
   const observer = new MutationObserver(records => {

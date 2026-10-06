@@ -37,6 +37,12 @@ test('the clearance controller preserves drag styles, pet actions and restores i
   const { window } = dom
   const sprite = window.document.querySelector('[role="button"]')
   const floating = sprite.parentElement
+  let translation = ''
+  let translationWrites = 0
+  Object.defineProperty(floating.style, 'translate', {
+    get: () => translation.replace(/ 0px$/u, ''),
+    set: value => { translation = value; translationWrites++ },
+  })
   let clicks = 0
   sprite.addEventListener('click', () => { clicks++ })
   const frames = new Map()
@@ -49,7 +55,7 @@ test('the clearance controller preserves drag styles, pet actions and restores i
     return { left: 720 + horizontal, top: 420 + vertical, width: 100, height: 160 }
   }
   window.document.querySelector('[data-dsh-relay-model-entry]').getBoundingClientRect = () => ({
-    left: 690, top: 535, right: 850, bottom: 565, width: 160, height: 30,
+    left: 770, top: 450, right: 790, bottom: 550, width: 20, height: 100,
   })
   try {
     window.eval(PET_CONTROL_CLEARANCE_SCRIPT)
@@ -57,6 +63,9 @@ test('the clearance controller preserves drag styles, pet actions and restores i
     assert.equal(floating.style.right, '24px')
     assert.equal(floating.style.bottom, '120px')
     assert.equal(sprite.tabIndex, 0)
+    window.dispatchEvent(new window.Event('resize'))
+    for (const [identifier, callback] of frames) { frames.delete(identifier); callback() }
+    assert.equal(translationWrites, 1, 'CSS serialization of a zero axis cannot create a mutation loop')
     sprite.click()
     assert.equal(clicks, 1)
     sprite.dispatchEvent(new window.Event('pointerdown', { bubbles: true }))
