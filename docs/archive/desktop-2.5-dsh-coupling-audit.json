@@ -5419,7 +5419,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
-      "line": 33,
+      "line": 35,
       "operation": "DSH_HOME"
     },
     {
@@ -6061,31 +6061,31 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2409,
+      "line": 2411,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2462,
+      "line": 2464,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2494,
+      "line": 2496,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2558,
+      "line": 2560,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2564,
+      "line": 2566,
       "operation": "profileDir"
     },
     {
@@ -13297,37 +13297,37 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2094,
+      "line": 2096,
       "operation": "recover"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2393,
-      "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 2395,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2410,
-      "operation": "recover"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2901,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2907,
+      "line": 2397,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2412,
+      "operation": "recover"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2903,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2909,
       "operation": "start"
     },
     {

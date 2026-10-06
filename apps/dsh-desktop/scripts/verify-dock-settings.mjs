@@ -19,10 +19,12 @@ const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-dock-settings-e2e-'))
 const output = resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ?? resolve(temporary, 'screenshots'))
 let app
 let settings
+let dock
 let failure
 
 async function applyDockSettingsTheme(page, theme) {
-  await app.evaluate(({ nativeTheme }, expectedTheme) => { nativeTheme.themeSource = expectedTheme }, theme)
+  const applied = await dock.evaluate(expectedTheme => window.dshDesktop.setWindowChromeTheme(expectedTheme), theme)
+  assert.equal(applied, theme, 'Dock theme changes use the production window bridge')
   await page.waitForFunction(expectedTheme =>
     document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-theme') === expectedTheme,
   theme, { polling: 250, timeout: 60_000 })
@@ -53,7 +55,6 @@ try {
   })
   const main = await app.firstWindow()
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
-  let dock
   for (let attempt = 0; attempt < 120; attempt++) {
     dock = app.windows().find(page => page.url().includes('/extensions.html'))
     if (dock) break

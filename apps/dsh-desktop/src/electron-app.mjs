@@ -2045,6 +2045,8 @@ export async function startElectronApp(metadata) {
       if (target === mainWindow) {
         desktopWindowFactory.syncTheme(applied, palette)
         syncTerminalPanelTheme(applied)
+      } else if (target === desktopWindowFactory.extensionWindow) {
+        desktopWindowFactory.syncTheme(applied, palette)
       }
       return applied
     },

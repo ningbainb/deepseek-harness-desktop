@@ -189,7 +189,8 @@
         "failed-save-preserves-draft",
         "spritesheet-readback-canvas-preserves-frame-counts-without-performance-warnings",
         "installed-0.4.4-frames2d-readback-canvas-retains-image-fallback",
-        "pet-settings-no-unbounded-batch-mutation"
+        "pet-settings-no-unbounded-batch-mutation",
+        "desktop-transient-control-clearance-preserves-pet-settings-and-dragging"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,

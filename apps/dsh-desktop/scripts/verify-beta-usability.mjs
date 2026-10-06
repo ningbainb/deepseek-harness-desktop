@@ -127,6 +127,7 @@ async function resizeWindow(size) {
     return { width, height }
   }, size)
   await page.waitForFunction(size => innerWidth === size.width && innerHeight === size.height, actual)
+  await page.waitForTimeout(500)
   const expand = page.getByRole('button', { name: /^(打开侧边栏|Open sidebar)$/u })
   if (await expand.count()) await expand.click()
   await page.locator('[data-row-key^="session:"][aria-selected="true"]').waitFor({ state: 'visible' })
@@ -140,7 +141,9 @@ async function resizeWindow(size) {
     const element = document.querySelector(selector)
     return element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0
   }))
-  await page.waitForTimeout(250)
+  await page.waitForTimeout(500)
+  if (await expand.count()) await expand.click()
+  await page.locator('[data-row-key^="session:"][aria-selected="true"]').waitFor({ state: 'visible' })
 }
 
 async function verifyContextHover(label) {
