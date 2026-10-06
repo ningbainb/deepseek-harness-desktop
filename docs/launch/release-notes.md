@@ -1,109 +1,53 @@
-# DeepSeek Harness Desktop 5.0.0
+# DeepSeek Harness Desktop 5.0.1
 
 ## 中文
 
 ### 本次亮点
 
-内核升级，工作台照旧：Windows x64、macOS arm64 与 Linux x64 同版发布，重点打磨启动、升级、历史恢复和配置保全。此版本将官方 NPM Runtime 更新到 0.2.0-rc.2，并按新版接口承接桌面现有功能；旧接口不保证兼容，历史会话、模型配置和用户插件数据仍按迁移与回滚流程保全。更新了会话恢复、社区插件、插件管理、宠物、皮肤中心等内置插件的适配。皮肤中心使用新版状态接口，保留 15 款离线皮肤并迁移可用的旧皮肤选择。桌面启动器补齐新版设置服务依赖，避免浏览器插件加载失败。安装事务先备份并清理 Windows 64 位和 32 位卸载注册表视图，再移动旧安装目录；失败时根据事务记录恢复旧文件与注册表。启动时只将指向已不存在旧安装包的插件链接退出活动 Profile，并保存原始清单备份。Windows 首次启动宽限延长至 180 秒。
+5.0.1 在 5.0.0 完整工作台基础上优化日常可用性，重点改善流式输出、拥挤侧栏和暗色拓展坞。官方 NPM Runtime 保持 0.2.0-rc.2，不修改官方源码，不删除已有插件、模型配置、历史会话或设置入口。Windows x64、macOS arm64 与 Linux x64 使用同一版本号，按三个原生 Runner 的统一门禁发布。
 
-### 历史与配置保全修复
-
-梁神模式使用公开 NPM 的 `0.4.4`，直接接入官方 rc.2 预设注册表，保留工具目录、提示词与会话创建验证；旧预设文件不会被覆盖。设置兼容桥保留历史命名空间别名，读取与保存仍使用官方配置 schema、版本检查及密钥脱敏，不扩大用户白名单。
-
-修复大会话重新打开、A→B→A 切换或重启时，历史首帧超过桌面私有管道物理帧上限导致的加载失败。采用经过身份握手的分片与完整重组，保留 512 KiB 物理帧限制，单逻辑消息预算为 32 MiB；不会为了显示历史而截断消息或工具结果。超出预算仍明确失败，不伪装为成功。修复日志只记录安全错误码和数字，不写入会话内容或密钥。
-
-启动重建托管 Patch 时保留官方 SDK 原地保存的模型、个人偏好及用户插入项，不再按注释边界整块删除用户配置。歧义或损坏的 Patch 拒绝自动重建，原数据交由现有备份与修复流程保全。恢复 4.4.0 品牌图标，并恢复新版官方模型页中的 bai 优先排序，保留原供应商能力扩展。
-
-旧会话可选手动转为上下文摘要；这是备用续聊方式，不是无损历史恢复的前提。操作前保留原文件、检查敏感内容，由用户决定是否发送给模型；应用不自动上传历史或调用收费模型。
-
-皮肤中心按每次激活实际创建的样式节点管理释放，避免反复试穿、退出试穿或恢复默认后残留旧皮肤样式；加载失败与超时的未提交样式也会清理。背景透明度与模糊保存不覆盖正在试穿的皮肤，跨窗口仅同步成功确认的显式应用或恢复默认，保留用户选择持久化及关闭后的写入保护。
-
-原生右侧预览按新版有界列宽计算可用空间，保留至少 360 像素的对话区域；窗口缩小时临时限制侧栏宽度，放大后恢复原宽度，不改写用户偏好。收起原生侧栏释放占用空间，显式“编辑 / 兼容预览”继续可用，避免同时挤压输入框或丢失编辑入口。
+- 新用户默认使用官方原生皮肤；升级保留已有皮肤、背景和明确保存的粒子主题选择，十五款内置皮肤继续可用。
+- 流式文本与 Markdown 内部更新避免重复侧栏兼容扫描，保留完整中文、代码、工具结果及原生轮次导航，不以截断内容换取性能。
+- 左侧工具支持折叠、展开、键盘操作与重启恢复，为工作区和会话列表留出空间；扩展坞只保留底部入口，用量统一保留今日消费，旧外壳兼容入口仍保留。
+- 拓展坞采用纯色面板，去除玻璃模糊、装饰渐变和悬停上浮；保留十五个导航入口、功能搜索和可见键盘焦点，改善暗色文字对比度。
+- 上下文提示不因磨砂容器反复跳动；会话 A 到 B 再返回 A、完整历史及已有 API 接入流程仍纳入回归。
+- 应用菜单提供最小化到托盘，Windows 使用 Ctrl+Shift+M；启用托盘关闭偏好后，标题栏最小化也可后台驻留。保留恢复、明确退出和托盘不可用时的任务栏回退，不自动改写关闭偏好。
+- Windows 应用内升级沿用当前安装目录，手动安装识别已有卸载注册项与两种注册表视图，保留数据备份与事务回滚，不扫描或删除其他盘的旧目录。
 
 ### 验证
 
-正式标签对应提交 `b78af2ef9e310ae9996908ba6a9ccb27add80621`，三端发布流水线 `37168324503` 通过。Windows 核心回归 24/24、完整打包回归 40/40；独立 CI 桌面测试 1585/1585、脚本测试 212/212，零失败、零跳过。真实 Setup 在隔离 Windows Runner 验证新装、公开 4.3.0 覆盖升级、重复覆盖、安装后重启与 Profile/用户数据保全。macOS/Linux 在原生 Runner 完成验证、打包、完整性与启动冒烟；Linux 同时验证沙箱。首次设置点击和正式标签首次终端控制台断言失败记录均保留，原门禁复测通过，未删改断言。本机只做隔离验收，既有慢盘 Host 宠物 Dock 10 秒超时记录保留，不宣称本机完整验证全绿。
-
-Agent WSL 权限使用官方 SDK 原子写入，保留用户选择与重启恢复，并对 Windows 临时文件占用进行有界重试。保存失败继续明确报错，诊断只显示安全错误码，不包含本机路径。
-
-同一正式标签另在 Linux 原生矩阵 `37173422100` 验证 Ubuntu 22.04 与 24.04，两端源码、打包、Landlock 沙箱与 Xvfb 启动冒烟均通过。该矩阵不会替换已发布资产，物理桌面安装与其他发行版仍不在本次验收范围内。
-
-公开 Windows 安装包下载后，实际提取并通过本机 `pack:verify`（141 个运行时包、190 个物理运行时文件与 ASAR 完整性）和隔离 `pack:smoke`（启动、预设入口、社区扩展分发及 Task Board Worktree）。沿用的 4.4.0 图标与官方匿名埋点配置已核对；测试屏蔽生产埋点、协议注册与自动更新，不运行真实 Setup，不修改当前账号的用户数据。完整证据见[正式发布验收记录](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/archive/desktop-5.0.0-formal-release.md)。
-
-设置窗口按每个新文档的 DOM 就绪重新挂载控制器，避免刷新后沿用已失效的适配状态；后续资源加载完成不会重复安装或打断已打开的设置。慢资源与重复刷新验收保留八向缩放、普通点击及配置保存断言。
-
-退出时先等待插件事务并安全停止 Runtime，再销毁窗口；停止失败时保留窗口与传输入口，不让仍在恢复的应用变成无界面的后台进程。
-
-余额与配额查询通过桌面 Host 侧兼容配置读取，使用当前 Profile 的实时设置并保留原有凭据引用；服务商密钥不发送给界面，也不扫描其他用户数据目录。
-
-发布前校验功能基线、插件适配、安装器生命周期、Profile 保全、桌面回归、打包完整性及独立启动。上述检查的实际结果以本次构建的验证记录为准；隔离测试不等同于所有用户机器上的覆盖安装验收。
+当前为正式发布候选，三端验证与安装验收结果以本次工作流为准。5.0.1-beta.1 的本地解包校验、逐段输出、侧栏布局、暗色拓展坞和后台驻留专项检查已通过，但旧的完整回归存在失败，不作为 5.0.1 已通过的证据。发布前保留全部断言，复跑源码及打包回归，并在一次性 Windows Runner 上执行实际新装、历史版本覆盖、重装及数据保全检查。
 
 ### 下载与校验
 
-5.0.0 采用同一版本的 Windows x64、macOS arm64、Linux x64 原生构建。三端门禁与安装资产校验全部成功后，才创建同一个正式 GitHub Release；本地验证不能代表其他平台通过。macOS 和 Linux 的平台能力边界见各自文档。三端均未签名，macOS 未公证；macOS/Linux 需要系统 Git，Linux 需要图形会话及可用沙箱。
-
-bai 模型接入使用浏览器授权，登录后优先选择接口实际返回的 `deepseek-flash`，否则选择首个可用模型，并定期更新目录。未登录或供应商拒绝密钥时显示重新登录入口；不自动充值、付费或重新发送。第三方 API 配置继续独立可用。手动终端、Agent WSL 独立审批、智能操控的预检与失败恢复，以及后台更新退避均保留。
-
-官方安装包包含匿名活跃、留存与固定功能结果统计；不采集会话、Prompt、代码、路径、截图、模型密钥或账号凭据。源码、开发与测试版本默认不连接统计服务，诊断导出仍需用户主动操作。
-
-三端匿名统计分别归类 Windows、macOS 与 Linux；Linux 不再被计入 Windows，操作系统维度不包含内核版本、发行版或主机名。客户端与服务端保留既有事件格式及历史统计。
-
-Windows x64 安装包名为 `DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe`，实际大小 `325650740` 字节（310.6 MiB），SHA-256 为 `4d9a4c79c9c87950f35beb7123498ec6266d943e0059835b9302d3d4a613da5b`。五份安装文件均以实际字节核对公开资产大小、GitHub digest 和同 Release 的 `SHA256SUMS.txt`；[三端完整清单](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-manifest-all-platforms.json) 保留平台、签名边界及各文件校验值。
+正式 5.0.1 尚未发布；官网继续提供已验证的 5.0.0。三端同一候选提交通过统一门禁后，才创建正式标签并由完整流程发布安装包。正式包大小与 SHA-256 以实际资产及同 Release 的校验清单为准，不复用 5.0.0 或内测版哈希。所有包按未签名流程构建，macOS 未公证；macOS/Linux 的能力边界仍按各平台指南说明。
 
 ### 说明
 
-本项目是社区开源桌面端，并非 DeepSeek 官方客户端。直接运行安装包即可覆盖升级；建议保留重要会话与配置备份。Windows 未签名安装包可能触发 SmartScreen 未知发布者提示。
+本项目是社区维护的开源桌面端，并非 DeepSeek 官方客户端。覆盖升级前建议备份重要会话与配置。保留 bai 浏览器授权、deepseek-flash 实际目录优先及独立第三方 API，不自动充值、不重试付费推理。正式构建携带既有匿名活动与功能结果统计，不采集对话、代码、路径、截图、模型密钥或账号凭据；开发和测试构建不发送生产事件。机械硬盘启动耗时与交互流畅度分别记录，不承诺所有设备完全无卡顿。
 
 ## English
 
 ### Highlights
 
-An upgraded kernel, the same complete workbench: Windows x64, macOS arm64 and Linux x64 ship together, focusing on startup, upgrades, history recovery and configuration preservation. This release updates the official NPM Runtime to 0.2.0-rc.2 and carries Desktop features onto its new APIs. Old API compatibility is not guaranteed; conversations, model configuration, and user plugin data remain covered by migration and rollback. Builtin adaptations include session recovery, community plugins, plugin management, pets, and Skin Center. Skin Center uses the new state API, keeps 15 offline skins, and migrates supported legacy selections. The Desktop launcher now injects the new settings service so browser plugins can boot. The upgrade transaction backs up and clears both Windows uninstall registry views before moving the old installation, then restores files and registry entries on failure. Startup retires only plugin links whose old packaged targets no longer exist and saves the prior manifest. The Windows first-launch grace period is now 180 seconds.
+5.0.1 improves everyday usability on top of the complete 5.0.0 workbench, focusing on progressive output, crowded sidebars and readable dark Dock surfaces. The official NPM Runtime remains pinned to 0.2.0-rc.2. Official sources, existing plugins, model configurations, conversation history and settings entries remain intact. Windows x64, macOS arm64 and Linux x64 use one version and the unified native-runner release gates.
 
-### History and configuration preservation
-
-LiangShen uses public NPM version `0.4.4` and the official rc.2 preset registry. Tests retain the active tool catalog, prompt and real session-creation checks without overwriting legacy preset files. The settings bridge retains legacy namespace aliases; reads and writes still use official schemas, revision checks and secret redaction, without expanding the user's allowlist.
-
-Large conversations can reopen after switching A to B to A or restarting without truncating messages or tool results. Authenticated fragmentation preserves the 512 KiB physical frame limit and uses a 32 MiB logical message budget. Oversized messages fail explicitly. Diagnostic logs contain safe error codes and numbers, not conversation content or secrets.
-
-Startup now preserves SDK-saved model and personal-preference settings inside managed Patch comment boundaries, along with user insertions. Ambiguous or malformed Patch content is not silently rebuilt. The 4.4.0 branding icons and bai-first ordering in the official Models page are restored without taking over provider capability slots.
-
-Optional manual context summaries remain a fallback, not a prerequisite for lossless history recovery. Keep original files, review sensitive content, and choose whether to send it to a model; the application does not automatically upload history or request paid inference.
-
-Skin Center owns and releases the exact stylesheet nodes created by each activation, preventing stale styles after repeated previews, preview exit or stock restoration. Failed and timed-out loads release uncommitted nodes. Saving background opacity or blur preserves the live skin preview; cross-window synchronization mirrors only successfully confirmed explicit Apply or Restore actions, retaining persisted user selection and shutdown write protection.
-
-The native right preview accounts for the new bounded column tracks and reserves at least 360 pixels for conversation. Smaller windows temporarily cap sidebar width and larger windows restore the original width without rewriting user preferences. Collapsing the native sidebar releases its space while the explicit Edit / Compatibility Preview remains available, avoiding squeezed input or a lost editing entry.
+- New profiles start with the official appearance; existing skins, backgrounds and explicitly saved particle preferences survive upgrades. All fifteen bundled skins remain available.
+- Streaming text and internal Markdown updates avoid repeated sidebar compatibility scans while preserving complete Chinese text, code, tool results and native turn navigation.
+- Sidebar tools support collapse, expansion, keyboard access and restart persistence, reserving space for workspaces and conversations. The footer Dock and Today spending are the sole primary shortcuts, retaining older-shell fallbacks.
+- Opaque Dock panels remove glass blur, decorative gradients and hover lift while preserving fifteen destinations, feature search and visible keyboard focus, with improved dark text contrast.
+- Context tooltips avoid repeated movement through frosted containers. A-to-B-to-A conversation recovery, complete history and existing third-party API access remain in regression coverage.
+- The App menu offers Minimize to tray with Ctrl+Shift+M on Windows or Cmd+Shift+M on macOS. The saved tray close preference also covers titlebar minimization, retaining restoration, explicit quit and taskbar fallback without rewriting preferences.
+- Windows in-app upgrades carry the current installation directory. Manual installation recognizes existing uninstall entries and both registry views, retaining backups and transactional rollback without scanning or deleting old directories on other drives.
 
 ### Verification
 
-The formal tag points to `b78af2ef9e310ae9996908ba6a9ccb27add80621`; three-platform release run `37168324503` passed. Windows passed 24/24 core and 40/40 packaged suites; independent CI passed 1585/1585 Desktop and 212/212 script tests with zero failures or skips. Production Setup on a disposable Windows Runner verified fresh installation, public 4.3.0 overlay upgrade, overlay reinstall, installed relaunch and Profile/user-data preservation. Native macOS/Linux runners passed verification, packaging, integrity and startup smoke; Linux also passed sandbox checks. The first settings-click failure and first tag terminal-console assertion failure remain recorded; unchanged gates passed on retest without removing assertions. Local acceptance is isolated only; the earlier HDD Host pet-Dock ten-second timeout remains recorded, so local complete verification is not represented as entirely green.
-
-Agent WSL permissions use official SDK atomic writes, preserving user choices across restart with bounded retries for transient Windows file interference. Failed saves remain explicit; diagnostics expose safe error codes without local paths.
-
-The same formal tag also passed native Linux matrix `37173422100` on Ubuntu 22.04 and 24.04, including source contracts, packaging, Landlock enforcement and Xvfb startup smoke. This matrix does not replace published assets; physical-desktop installation and other distributions remain outside this acceptance scope.
-
-The downloaded public Windows installer was actually extracted and passed local `pack:verify` (141 runtime packages, 190 physical Runtime files and ASAR integrity) and isolated `pack:smoke` (startup, preset ingress, community-extension dispatch and Task Board Worktree). The retained 4.4.0 icon and official anonymous metrics configuration were verified. Tests disable production metrics, protocol registration and updates; they do not run Setup or modify the current account's user data. Full evidence is in the [formal release acceptance record](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/archive/desktop-5.0.0-formal-release.md).
-
-The settings controller mounts for every DOM-ready document instead of retaining stale adaptation state after reload. Later resource completion does not reinstall or interrupt an open controller. Slow-resource and repeated-reload acceptance retain eight-way resizing, ordinary pointer input and saved configuration assertions.
-
-Quit drains plugin transactions and safely stops the Runtime before destroying windows. A failed stop retains windows and transport access instead of leaving a recovering application headless.
-
-Balance and quota queries use Desktop's Host-only compatibility reads over the current Profile's live settings, preserving existing credential references. Provider keys stay off the UI, and queries do not scan other user data directories.
-
-Release validation covers the machine readable feature baseline, builtin plugin adaptation, compiled installer lifecycle, Profile preservation, Desktop regression, package integrity, and an isolated startup check. The results recorded for this build define the verified scope. Isolated tests alone do not establish successful overlay installation on every user machine.
+This is a formal release candidate; this workflow's native-platform and installer results define its acceptance. The earlier local beta passed extracted-payload integrity, progressive output, sidebar layout, dark Dock and background-residency checks, but earlier complete regressions had failures and do not establish a passed 5.0.1 release. Existing assertions remain intact. Source and packaged regression must pass, and a disposable Windows Runner exercises real fresh installation, historical-version overlay, reinstall and data preservation.
 
 ### Download and verification
 
-5.0.0 uses one version for native Windows x64, macOS arm64 and Linux x64 builds. One formal GitHub Release is created only after all three platform gates and installation assets pass verification; local checks do not establish other platforms' results. Platform capability boundaries remain documented separately. All packages are unsigned and macOS is unnotarized; macOS/Linux require system Git, and Linux requires a graphical session and a working sandbox.
-
-bai model access uses browser authorization, then prefers `deepseek-flash` actually returned by the directory, otherwise the first available model, with periodic directory refresh. Missing authorization or a rejected key offers sign-in again without automatic top-ups, paid inference or message retries. Independent third-party APIs remain supported. Selectable manual terminals, separately approved Agent WSL, Smart Control preflight and rollback, and background update backoff remain available.
-
-Official packages include anonymous activity, retention and fixed feature-outcome statistics, never conversations, Prompts, code, paths, screenshots, model keys or account credentials. Source, development and test builds remain disconnected by default; diagnostic export still requires a user action.
-
-Anonymous metrics distinguish Windows, macOS and Linux. Linux is not counted as Windows; operating-system dimensions exclude kernel releases, distributions and hostnames. Client and server retain existing event shapes and historical analytics.
-
-The Windows x64 installer is `DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe`, exactly `325650740` bytes (310.6 MiB), with SHA-256 `4d9a4c79c9c87950f35beb7123498ec6266d943e0059835b9302d3d4a613da5b`. Actual bytes of all five installation files matched public asset sizes, GitHub digests and the same release's `SHA256SUMS.txt`. The [all-platform manifest](https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-manifest-all-platforms.json) records platform boundaries, signing status and every file checksum.
+Formal 5.0.1 is not published yet; the website continues to offer verified 5.0.0. The formal tag is created only after all three platforms pass the unified candidate gates at the same commit, followed by complete release validation. Actual asset sizes and SHA-256 receipts must come from that Release, never reused stable or beta hashes. Builds are unsigned and macOS is unnotarized; platform guides retain the macOS/Linux capability boundaries.
 
 ### Notice
 
-This is a community maintained open source Desktop application and is not an official DeepSeek client. The installer supports direct overlay upgrades. Keep a backup of important conversations and settings. Because the installer is unsigned, Windows SmartScreen may show an unknown publisher warning.
+This is a community-maintained open-source Desktop application, not an official DeepSeek client. Back up important conversations and configuration before overlay upgrades. Existing bai browser authorization, preference for deepseek-flash actually present in the model directory, and independent third-party APIs remain available, without automatic top-ups or paid inference retries. Official builds retain anonymous activity and fixed feature-outcome metrics, never conversations, code, paths, screenshots, model keys or account credentials. Development and tests do not send production events. Mechanical-disk startup and interactive performance are measured separately, without promising stall-free behavior on every device.

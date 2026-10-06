@@ -27,10 +27,16 @@ export function installerChecksum(bytes, sums, file) {
   return digest
 }
 
+export function previousInstallerVersion(env) {
+  const version = env.DSH_DESKTOP_PREVIOUS_RELEASE_VERSION ?? '4.3.0'
+  assert.match(version, /^\d+\.\d+\.\d+$/u, 'previous installer must have an exact stable version')
+  return version
+}
+
 async function main() {
   assertDisposableInstallerRunner(process.platform, process.env)
   const previousDirectory = resolve(process.env.DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY)
-  const previousVersion = '4.3.0'
+  const previousVersion = previousInstallerVersion(process.env)
   const appDirectory = resolve(import.meta.dirname, '..')
   const version = JSON.parse(await readFile(join(appDirectory, 'package.json'), 'utf8')).version
   const previousName = `DeepSeek-Harness-Desktop-Setup-${previousVersion}-x64.exe`
@@ -93,6 +99,11 @@ async function main() {
     }
   } finally {
     await writeFile(join(root, 'evidence.json'), JSON.stringify(evidence, null, 2))
+    if (process.env.DSH_DESKTOP_SETUP_RECEIPT) {
+      const receipt = resolve(process.env.DSH_DESKTOP_SETUP_RECEIPT)
+      await mkdir(resolve(receipt, '..'), { recursive: true })
+      await writeFile(receipt, JSON.stringify(evidence, null, 2))
+    }
     console.log(`Real Setup evidence: ${root}`)
   }
 }

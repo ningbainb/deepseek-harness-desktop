@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { assertDisposableInstallerRunner, installerChecksum } from '../scripts/verify-release-installer.mjs'
+import { assertDisposableInstallerRunner, installerChecksum, previousInstallerVersion } from '../scripts/verify-release-installer.mjs'
+
+test('production Setup retains legacy upgrades and permits exact newer release coverage', () => {
+  assert.equal(previousInstallerVersion({}), '4.3.0')
+  assert.equal(previousInstallerVersion({ DSH_DESKTOP_PREVIOUS_RELEASE_VERSION: '5.0.0' }), '5.0.0')
+  for (const version of ['', '../5.0.0', '5.0.1-beta.1', 'desktop-v5.0.0']) {
+    assert.throws(() => previousInstallerVersion({ DSH_DESKTOP_PREVIOUS_RELEASE_VERSION: version }))
+  }
+})
 
 test('real Setup acceptance refuses local accounts and non-Windows runners', () => {
   const runner = { GITHUB_ACTIONS: 'true', RUNNER_TEMP: 'C:\\runner\\temp' }

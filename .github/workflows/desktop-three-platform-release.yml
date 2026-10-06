@@ -44,6 +44,8 @@ jobs:
       DSH_DESKTOP_UPDATE_CHANNEL: stable
       DSH_DESKTOP_SETTINGS_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/native-settings
       DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
+      DSH_DESKTOP_BETA_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/usability
+      DSH_DESKTOP_E2E_RECEIPT: ${{ github.workspace }}/.tmp/release-qa/source-core.json
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
@@ -75,10 +77,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v4.3.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-4.3.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          foreach ($previousVersion in @('4.3.0', '5.0.0')) {
+            $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = $previousVersion
+            $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP "dsh-previous-release-$previousVersion"
+            $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE ".tmp/release-qa/setup-from-$previousVersion.json"
+            New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+            gh release download "desktop-v$previousVersion" --repo ningbainb/deepseek-harness-desktop --pattern "DeepSeek-Harness-Desktop-Setup-$previousVersion-x64.exe" --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+            node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          }
       - name: Run packaged Windows regression
         shell: pwsh
         run: |
@@ -92,6 +98,7 @@ jobs:
           pnpm --filter @linxin666/dsh-desktop test:window-chrome:e2e
           pnpm --filter @linxin666/dsh-desktop test:profile-reset:e2e
           pnpm --filter @linxin666/dsh-desktop test:update-shutdown:e2e
+          $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
           pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke

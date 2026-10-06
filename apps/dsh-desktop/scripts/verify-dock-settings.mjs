@@ -22,10 +22,10 @@ let settings
 let failure
 
 async function applyDockSettingsTheme(page, theme) {
-  await page.waitForFunction(expectedTheme => {
-    window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: expectedTheme }))
-    return document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-theme') === expectedTheme
-  }, theme, { polling: 250, timeout: 60_000 })
+  await app.evaluate(({ nativeTheme }, expectedTheme) => { nativeTheme.themeSource = expectedTheme }, theme)
+  await page.waitForFunction(expectedTheme =>
+    document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-theme') === expectedTheme,
+  theme, { polling: 250, timeout: 60_000 })
 }
 try {
   await mkdir(output, { recursive: true })

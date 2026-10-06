@@ -17,6 +17,7 @@ const appDir = resolve(import.meta.dirname, '..')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const baseline = process.argv.includes('--baseline')
 const output = resolve(process.argv.find(argument => argument.startsWith('--output='))?.slice(9)
+  ?? process.env.DSH_DESKTOP_BETA_SCREENSHOTS
   ?? join(tmpdir(), `dsh-beta-usability-${baseline ? 'baseline' : 'candidate'}`))
 await mkdir(output, { recursive: true })
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-beta-usability-'))
@@ -129,6 +130,16 @@ async function resizeWindow(size) {
   const expand = page.getByRole('button', { name: /^(打开侧边栏|Open sidebar)$/u })
   if (await expand.count()) await expand.click()
   await page.locator('[data-row-key^="session:"][aria-selected="true"]').waitFor({ state: 'visible' })
+  await page.waitForFunction(() => [
+    '[data-dsh-workspace-region]',
+    '[data-row-key^="session:"][aria-selected="true"]',
+    '[data-dsh-tools-toggle]',
+    '[data-dsh-extension-dock-entry] button',
+    '[data-slot="sidebar.settings"] button',
+  ].every(selector => {
+    const element = document.querySelector(selector)
+    return element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0
+  }))
   await page.waitForTimeout(250)
 }
 
@@ -292,6 +303,8 @@ try {
     for (const size of [{ width: 1280, height: 800 }, { width: 1024, height: 720 }, { width: 880, height: 600 }]) {
       await resizeWindow(size)
       await writeFile(join(output, `sidebar-${size.width}.html`), await page.locator('[data-pane="sidebar"]').evaluate(element => element.outerHTML))
+      await page.locator('[data-dsh-workspace-region]').waitFor({ state: 'visible' })
+      await page.locator('[data-row-key^="session:"][aria-selected="true"]').waitFor({ state: 'visible' })
       const geometry = await page.evaluate(() => {
         const workspace = document.querySelector('[data-dsh-workspace-region]').getBoundingClientRect()
         const selected = document.querySelector('[data-row-key^="session:"][aria-selected="true"]').getBoundingClientRect()
