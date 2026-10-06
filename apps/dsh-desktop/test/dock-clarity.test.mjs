@@ -22,6 +22,13 @@ test('Dock pointer feedback preserves navigation geometry and visible keyboard f
   assert.match(base, /button:focus-visible/u)
 })
 
+test('Dock inactive navigation uses readable primary text in light and dark themes', () => {
+  const navigationRules = [...stylesheet.matchAll(/(?:^|\n)nav button\.tab\s*\{([^}]+)\}/gu)]
+  assert.ok(navigationRules.length > 0)
+  assert.ok(navigationRules.some(([, declarations]) => /color:\s*var\(--harness-text\);/u.test(declarations)))
+  assert.ok(navigationRules.every(([, declarations]) => !/color:\s*var\(--harness-text-secondary\);/u.test(declarations)))
+})
+
 test('Dock readability changes preserve all fifteen destinations and the search control', () => {
   const sidebar = html.slice(html.indexOf('<aside class="settings-sidebar">'), html.indexOf('</aside>'))
   const ids = [...sidebar.matchAll(/id="([^"]+-tab)"/gu)].map(match => match[1])

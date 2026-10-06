@@ -761,6 +761,7 @@
         "centered-on-open",
         "synchronized-theme",
         "opaque-dock-surfaces-without-blur-gradients-or-hover-lift",
+        "light-and-dark-dock-navigation-meets-text-contrast-including-inactive-tabs",
         "readable-sidebar-keeps-fifteen-destinations-search-and-keyboard-focus",
         "relay-browser-connect",
         "relay-model-entry-login-and-wallet",

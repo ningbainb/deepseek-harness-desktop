@@ -79,7 +79,7 @@ nav button.tab {
   padding: 6px 12px;
   border: 1px solid transparent;
   border-radius: 12px;
-  color: var(--harness-text-secondary);
+  color: var(--harness-text);
   background: transparent;
   font-size: 13px;
   line-height: 22px;
