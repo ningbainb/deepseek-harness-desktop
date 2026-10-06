@@ -1,6 +1,6 @@
 {
   "name": "@linxin666/dsh-desktop",
-  "version": "5.0.0",
+  "version": "5.0.1-beta.1",
   "private": true,
   "description": "Lossless desktop shell for DeepSeek Harness and the complete dsh-web-ui plugin collection",
   "homepage": "https://github.com/ningbainb/deepseek-harness-desktop",
@@ -34,6 +34,7 @@
     "test:skin-center:e2e": "node scripts/verify-skin-center.mjs",
     "test:plugin-adaptation:e2e": "node scripts/verify-describe-image-adaptation.mjs",
     "test:conversation-scroll:e2e": "node scripts/verify-conversation-scroll.mjs",
+    "test:beta-usability:e2e": "node scripts/verify-beta-usability.mjs",
     "test:image-drop:e2e": "node scripts/verify-packaged-image-drop.mjs",
     "test:agent-work:e2e": "node scripts/verify-packaged-agent-work.mjs",
     "test:conversation-skills:e2e": "node scripts/verify-conversation-skills.mjs",

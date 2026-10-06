@@ -168,8 +168,9 @@ export class DesktopTrayLifecycle {
     }
     let lastError
     for (const icon of icons) {
+      let tray
       try {
-        const tray = new this.Tray(icon)
+        tray = new this.Tray(icon)
         tray.setToolTip?.(this.productName)
         tray.on?.('double-click', this.onRestore)
         tray.on?.('click', this.onRestore)
@@ -178,6 +179,7 @@ export class DesktopTrayLifecycle {
         void this.refresh()
         return true
       } catch (error) {
+        try { tray?.destroy?.() } catch (cleanupError) { this.#report(cleanupError) }
         lastError = error
       }
     }

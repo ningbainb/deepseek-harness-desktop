@@ -12,6 +12,8 @@ Live input/output token estimates, rolling one-second generation rates and peaks
 
 ## What it does
 
+The sidebar keeps Today spending as its single usage entry when that card is mounted, preserving its statistics navigation and collapse controls. Without a usable Today spending card, the compatible balance entry sits below New Session and restores itself after shell replacement or sibling tool insertion. Neither path scans the sidebar for each streamed chat update; balance queries and the standalone usage center remain available.
+
 - **Host half**: registers the replayable `liveTokenUsage` session projection (`ctx.sessionProjections`). The fold estimates input tokens from the surface log plus header/tool framing and turns streamed output increments into timestamped samples. Each sample computes the output-token total in `[t-1000ms, t]`; same-millisecond batches are coalesced, and each step records its latest rolling rate and maximum rolling peak. Usage summaries and final messages correct billing buckets only and never create instantaneous samples. The latest rate remains resident when no new sample arrives; no TPS is shown when a step has no valid streamed sample.
 - **Client half**: mounts one localized disclosure in the official conversation composer dock. It reads the session-scoped `liveTokenUsage` projection; estimated token counts are marked `~`, and cost remains marked `≈`. Native usage/average-speed controls, plugin settings and the balance center remain available. Unknown cost or invalid rates are not filled with zero.
 

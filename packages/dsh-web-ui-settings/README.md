@@ -8,6 +8,10 @@ On DSH 0.2.0-rc.2, the local compatibility bridge retains legacy settings namesp
 
 ## What it is
 
+Desktop management routing tracks the mounted sidebar without rescanning it for streamed conversation text. Replacement sidebars and newly mounted tools retain plugin and skill routing, including native plugin configuration forms.
+
+Dedicated Dock settings documents follow their window theme without publishing it back to the main window. They retain that document theme through late native theme adoption and release it on unmount without writing global preferences. Skin palettes retain readable colors; background/text pairs below 4.5:1 contrast use a readable surface for the selected theme, including native form overlays.
+
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.
 - **Desktop market remains separate**: DeepSeek Harness Desktop uses Extension Dock's native community market for discovery and transactional installation, while Extension Dock continues to own recovery and rollback. This package deliberately does not restore the obsolete in-group community card.
 - **One-click Desktop Dock entry**: on supported Desktop hosts, an Extension Dock button appears immediately beside Settings. The first three eligible launches show a non-modal hint; ordinary Web hosts render no Desktop-only entry.

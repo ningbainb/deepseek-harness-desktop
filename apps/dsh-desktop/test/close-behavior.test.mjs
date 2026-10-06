@@ -71,6 +71,60 @@ test('opt-in minimize-to-tray intercepts a window close and leaves runtime owner
   assert.equal(quit, 0)
 })
 
+test('titlebar minimize follows only the persistent tray opt-in without prompting or quitting', () => {
+  let behavior = CLOSE_BEHAVIORS.QUIT
+  let hidden = 0
+  const controller = createCloseBehaviorController({
+    getCloseBehavior: () => behavior,
+    canMinimizeToTray: () => true,
+    hideWindow: () => { hidden += 1 },
+    promptForClose: () => { throw new Error('minimize must not prompt') },
+    requestQuit: () => { throw new Error('minimize must not quit') },
+  })
+  assert.equal(controller.handleWindowMinimize(), false)
+  behavior = CLOSE_BEHAVIORS.ASK
+  assert.equal(controller.handleWindowMinimize(), false)
+  behavior = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
+  assert.equal(controller.handleWindowMinimize(), true)
+  assert.equal(hidden, 1)
+})
+
+test('one-time tray residency leaves the saved close choice untouched and respects shutdown and tray failure', () => {
+  let bypass
+  let available = true
+  let hidden = 0
+  const controller = createCloseBehaviorController({
+    getCloseBehavior: () => CLOSE_BEHAVIORS.QUIT,
+    getBypassReason: () => bypass,
+    canMinimizeToTray: () => available,
+    hideWindow: () => { hidden += 1 },
+  })
+  assert.equal(controller.minimizeToTray(), true)
+  assert.equal(controller.handleWindowClose(closeEvent()), false)
+  available = false
+  assert.equal(controller.minimizeToTray(), false)
+  available = true
+  bypass = 'runtime-crashed'
+  assert.equal(controller.minimizeToTray(), false)
+  bypass = undefined
+  controller.beginExplicitQuit()
+  assert.equal(controller.minimizeToTray(), false)
+  assert.equal(hidden, 1)
+})
+
+test('minimize failures retain a reachable taskbar window and report the failure', () => {
+  const errors = []
+  const controller = createCloseBehaviorController({
+    getCloseBehavior: () => CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY,
+    canMinimizeToTray: () => true,
+    hideWindow: () => { throw new Error('window hide failed') },
+    log: error => errors.push(error.message),
+  })
+  assert.equal(controller.handleWindowMinimize(), false)
+  assert.equal(controller.minimizeToTray(), false)
+  assert.deepEqual(errors, ['window hide failed', 'window hide failed'])
+})
+
 test('quit, unavailable tray, crash, and explicit process exit all bypass background hiding', () => {
   let hidden = 0
   let behavior = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY

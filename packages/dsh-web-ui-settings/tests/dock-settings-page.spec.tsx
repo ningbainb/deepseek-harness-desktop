@@ -1,9 +1,44 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { DockSettingsPage, dockSettingFromUrl } from '../src/client/DockSettingsPage.tsx'
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
+
+it('retains the dedicated document theme after late native theme adoption and releases ownership on unmount', async () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=models&desktop-dock-theme=dark')
+  const root = document.documentElement
+  root.style.colorScheme = 'light'
+  document.body.removeAttribute('data-ds-dark-theme')
+  const { unmount } = render(<DockSettingsPage renderSlot={(() => null) as never} t={key => key} />)
+  expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(true)
+  expect(root.style.colorScheme).toBe('dark')
+  root.style.colorScheme = 'light'
+  document.body.removeAttribute('data-ds-dark-theme')
+  await waitFor(() => {
+    expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(true)
+    expect(root.style.colorScheme).toBe('dark')
+  })
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: 'light' })))
+  expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
+  expect(root.style.colorScheme).toBe('light')
+  document.body.setAttribute('data-ds-dark-theme', '')
+  root.style.colorScheme = 'dark'
+  await waitFor(() => {
+    expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
+    expect(root.style.colorScheme).toBe('light')
+  })
+  unmount()
+  expect(root.style.colorScheme).toBe('light')
+  expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
+  root.style.colorScheme = 'dark'
+  document.body.setAttribute('data-ds-dark-theme', '')
+  await Promise.resolve()
+  expect(root.style.colorScheme).toBe('dark')
+  expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(true)
+  root.style.colorScheme = 'light'
+  document.body.removeAttribute('data-ds-dark-theme')
+})
 
 it('accepts known setting ids and maps the retired relay URL to Models', () => {
   window.history.replaceState({}, '', '/?desktop-dock-setting=relay')
@@ -65,6 +100,8 @@ it('clears a stale skin palette when a theme-only update arrives without losing 
   expect(page.style.getPropertyValue('--dsw-alias-bg-layer-1')).toBe('#e8ecf5')
   act(() => window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: 'dark' })))
   expect(page.dataset.theme).toBe('dark')
+  expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(true)
+  expect(document.documentElement.style.colorScheme).toBe('dark')
   expect(page.style.getPropertyValue('--dsw-alias-bg-layer-1')).toBe('')
   expect(page.style.getPropertyValue('--dsw-alias-label-primary')).toBe('')
   expect((screen.getByLabelText('draft') as HTMLInputElement).value).toBe('retained')

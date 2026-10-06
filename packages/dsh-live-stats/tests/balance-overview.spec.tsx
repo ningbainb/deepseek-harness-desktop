@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { BalanceOverviewView } from '../src/client/BalanceOverviewView.tsx'
-import { mountBalanceSidebarEntry } from '../src/client/balance-sidebar.ts'
+import { mountBalanceSidebarEntry, USAGE_FOOTER_SELECTOR } from '../src/client/balance-sidebar.ts'
 import type { BalanceController, BalanceState } from '../src/client/balance-controller.ts'
 import css from '../src/client/balance.module.css'
 
@@ -134,6 +134,104 @@ describe('balance sidebar entry', () => {
       newSession: document.querySelector('button[class*="newSession"]') as HTMLButtonElement,
     }
   }
+
+  function mountFooter(): { wrapper: HTMLElement; main: HTMLButtonElement; toggle: HTMLButtonElement } {
+    const wrapper = document.createElement('section')
+    wrapper.dataset.dshUsageFootCard = ''
+    wrapper.innerHTML = '<button data-dsh-part="foot-card-main">今日消费</button><button data-dsh-part="foot-card-toggle">折叠</button>'
+    document.querySelector('[data-pane="sidebar"]')!.append(wrapper)
+    return { wrapper, main: wrapper.querySelectorAll('button')[0]!, toggle: wrapper.querySelectorAll('button')[1]! }
+  }
+
+  it('retains only Today spending and preserves its navigation and collapse controls', async () => {
+    mountShell()
+    const { main, toggle } = mountFooter()
+    const open = vi.fn()
+    const collapse = vi.fn()
+    main.addEventListener('click', open)
+    toggle.addEventListener('click', collapse)
+    const dispose = mountBalanceSidebarEntry(stubController())
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).toBeNull()
+    expect(document.querySelectorAll(USAGE_FOOTER_SELECTOR)).toHaveLength(1)
+    main.click()
+    toggle.click()
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(collapse).toHaveBeenCalledTimes(1)
+    dispose()
+    expect(main.isConnected).toBe(true)
+  })
+
+  it('deduplicates a late footer, restores the fallback after removal and handles shell replacement', async () => {
+    mountShell()
+    const dispose = mountBalanceSidebarEntry(stubController({ totalBalance: '12.50' }))
+    const entry = document.querySelector('[data-dsh-balance-entry]')
+    const { wrapper } = mountFooter()
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).toBeNull()
+    wrapper.remove()
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).toBe(entry)
+    expect(entry?.querySelector('[data-dsh-balance-amount]')?.textContent).toBe('12.50 CNY')
+    mountShell()
+    mountFooter()
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).toBeNull()
+    expect(document.querySelectorAll(USAGE_FOOTER_SELECTOR)).toHaveLength(1)
+    dispose()
+  })
+
+  it('requires a usable footer button and avoids sidebar scans while it is present', async () => {
+    mountShell()
+    const { wrapper, main } = mountFooter()
+    main.remove()
+    const dispose = mountBalanceSidebarEntry(stubController())
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).not.toBeNull()
+    wrapper.append(main)
+    await flushObserver()
+    expect(document.querySelector('[data-dsh-balance-entry]')).toBeNull()
+    const query = vi.spyOn(document, 'querySelector')
+    const rootQuery = vi.spyOn(document.querySelector('[class="x_root"]')!, 'querySelector')
+    query.mockClear()
+    const conversation = document.createElement('main')
+    document.body.append(conversation)
+    for (let index = 0; index < 20; index++) {
+      conversation.textContent = `chunk ${index}`
+      await flushObserver()
+    }
+    expect(query).not.toHaveBeenCalled()
+    expect(rootQuery).not.toHaveBeenCalled()
+    query.mockRestore()
+    rootQuery.mockRestore()
+    dispose()
+  })
+
+  it('ignores streamed chat mutations and restores the entry after shell replacement', async () => {
+    mountShell()
+    const conversation = document.createElement('main')
+    document.body.append(conversation)
+    const dispose = mountBalanceSidebarEntry(stubController({ totalBalance: '12.50' }))
+    await flushObserver()
+    const query = vi.spyOn(document, 'querySelector')
+    const root = document.querySelector<HTMLElement>('[class="x_root"]')!
+    const rootQuery = vi.spyOn(root, 'querySelector')
+    query.mockClear()
+    for (let index = 0; index < 20; index++) {
+      conversation.textContent = `chunk ${index}`
+      await flushObserver()
+    }
+    expect(query).not.toHaveBeenCalled()
+    expect(rootQuery).not.toHaveBeenCalled()
+    rootQuery.mockRestore()
+    query.mockRestore()
+    const { newSession } = mountShell()
+    await flushObserver()
+    const entry = document.querySelector('[data-dsh-balance-entry]')
+    expect(newSession.nextElementSibling).toBe(entry)
+    expect(entry?.querySelector('[data-dsh-balance-amount]')?.textContent).toBe('12.50 CNY')
+    dispose()
+  })
 
   it('places the entry directly below the New Session button and populates the balance', async () => {
     const { newSession } = mountShell()

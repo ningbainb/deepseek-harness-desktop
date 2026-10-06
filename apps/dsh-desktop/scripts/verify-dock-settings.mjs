@@ -161,7 +161,7 @@ try {
       assert.equal(await browserSwitch.isEnabled(), true, 'Browser Use switch settles after the initial capability read')
       await browserSwitch.click()
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="browser"] [role="switch"]')?.getAttribute('aria-checked') === 'true', undefined, { polling: 250, timeout: 120_000 })
-      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: 10_000 })
+      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: startupTimeout })
       await browserSwitch.click()
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="browser"] [role="switch"]')?.getAttribute('aria-checked') === 'false', undefined, { polling: 250, timeout: 120_000 })
       assert.equal(await browserSwitch.isEnabled(), true, 'Browser Use remains interactive after a full restart cycle')
@@ -171,7 +171,7 @@ try {
       assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use switch settles after the initial capability read')
       await computerSwitch.click()
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="computer"] [role="switch"]')?.getAttribute('aria-checked') === 'true', undefined, { polling: 250, timeout: 120_000 })
-      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: 10_000 })
+      await settings.getByRole('status').filter({ hasText: '配置已生效' }).waitFor({ timeout: startupTimeout })
       assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use switch always leaves the busy state')
       if (await computerSwitch.getAttribute('aria-checked') === 'true') {
         await computerSwitch.click()
@@ -319,7 +319,10 @@ try {
       }
     }, theme)
     assert.deepEqual(appliedTheme, { applied: theme, documentTheme: theme }, 'Dock theme bridge and document update atomically')
+    const shellColor = await dock.evaluate(() => getComputedStyle(document.body).backgroundColor)
+    assert.equal(shellColor, theme === 'dark' ? 'rgb(10, 20, 27)' : 'rgb(255, 255, 255)', 'Dock shell background follows its window theme')
     await applyDockSettingsTheme(settings, theme)
+    assert.equal(await settings.evaluate(() => document.body.hasAttribute('data-ds-dark-theme')), theme === 'dark', 'native settings overlays follow the Dock theme')
     const color = await settings.evaluate(() => getComputedStyle(document.querySelector('[data-dsh-dock-settings]')).backgroundColor)
     assert.equal(color, theme === 'dark' ? 'rgb(10, 20, 27)' : 'rgb(255, 255, 255)', 'content follows the Dock theme in real Electron')
   }

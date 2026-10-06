@@ -1,6 +1,12 @@
 import { CONVERSATION_RENDERING_CSS, CONVERSATION_RENDERING_SCRIPT } from './conversation-rendering.mjs'
+import { SIDEBAR_TOOLS_CSS, SIDEBAR_TOOLS_SCRIPT } from './sidebar-tools.mjs'
 
-export const CONVERSATION_POLISH_CSS = CONVERSATION_RENDERING_CSS + `
+export const CONVERSATION_POLISH_CSS = CONVERSATION_RENDERING_CSS + SIDEBAR_TOOLS_CSS + `
+html[data-dsh-desktop-window-chrome="true"] body [data-phase="active"] [data-slot="conversation.composer.dock"] + *:has(> button[aria-haspopup="dialog"]) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 [data-variant="think"] > [data-open] > [data-disclosure-row] {
   position: sticky;
   z-index: 20;
@@ -29,6 +35,8 @@ export async function applyConversationPolish(webContents) {
   await webContents.insertCSS(CONVERSATION_POLISH_CSS, { cssOrigin: 'author' })
   if (webContents.isDestroyed?.()) return false
   await webContents.executeJavaScript(CONVERSATION_RENDERING_SCRIPT)
+  if (webContents.isDestroyed?.()) return false
+  await webContents.executeJavaScript(SIDEBAR_TOOLS_SCRIPT)
   return true
 }
 
@@ -40,6 +48,6 @@ export function installConversationPolish({ browserWindow, onError = () => {} })
   webContents.on('did-finish-load', apply)
   return () => {
     webContents.removeListener('did-finish-load', apply)
-    if (!webContents.isDestroyed?.()) void webContents.executeJavaScript('globalThis.dshConversationRenderingController?.dispose()').catch(onError)
+    if (!webContents.isDestroyed?.()) void webContents.executeJavaScript('globalThis.dshConversationRenderingController?.dispose(); globalThis.dshSidebarToolsController?.dispose()').catch(onError)
   }
 }

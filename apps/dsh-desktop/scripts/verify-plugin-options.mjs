@@ -40,7 +40,7 @@ try {
   app = await electron.launch(launchOptions)
   const main = await app.firstWindow()
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120000 })
-  await main.getByRole('button', { name: '扩展坞', exact: true }).click()
+  await main.locator('[data-dsh-extension-dock-entry] button').click()
   for (let attempt = 0; attempt < 120; attempt += 1) {
     dock = app.windows().find(candidate => candidate.url().includes('extensions.html'))
     if (dock) break
@@ -91,7 +91,7 @@ try {
   app = await electron.launch(launchOptions)
   const restartedMain = await app.firstWindow()
   await restartedMain.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120000 })
-  await restartedMain.getByRole('button', { name: '扩展坞', exact: true }).click()
+  await restartedMain.locator('[data-dsh-extension-dock-entry] button').click()
   for (let attempt = 0; attempt < 120; attempt += 1) {
     dock = app.windows().find(candidate => candidate.url().includes('extensions.html'))
     if (dock) break

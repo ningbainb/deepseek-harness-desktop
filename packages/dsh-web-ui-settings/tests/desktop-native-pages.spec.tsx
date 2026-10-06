@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { DockSettingsPage, DOCK_SETTINGS } from '../src/client/DockSettingsPage.tsx'
-import { installDesktopAppearance, opaqueColor, surfaceColor } from '../src/client/desktop-appearance.ts'
+import { installDesktopAppearance, opaqueColor, surfaceColor, readableDesktopPalette, paletteContrast } from '../src/client/desktop-appearance.ts'
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 describe('native Dock sections', () => {
@@ -65,6 +65,7 @@ it('publishes a committed skin palette before the debounce timer can expose stal
   const dispose = installDesktopAppearance(window)
   try {
     document.body.style.setProperty('--dsw-alias-bg-layer-1', '#123456')
+    document.body.style.setProperty('--dsw-alias-label-primary', '#ddeeff')
     document.documentElement.setAttribute('data-dsh-skin', 'committed-fixture')
     await Promise.resolve()
     expect(document.documentElement.style.getPropertyValue('--dsh-desktop-chrome-bg')).toBe('#123456')
@@ -81,6 +82,37 @@ it('publishes a committed skin palette before the debounce timer can expose stal
       else element.setAttribute('style', value)
     }
     vi.useRealTimers()
+  }
+})
+
+it('keeps readable skin colors and repairs stale light surfaces with dark-theme text', () => {
+  const valid = { background: '#123456', foreground: '#ddeeff', accent: '#3366ff', border: '#445566' }
+  expect(readableDesktopPalette(valid, true)).toBe(valid)
+  const stale = { ...valid, background: '#e8ecf5', foreground: '#dbe2f2' }
+  const repaired = readableDesktopPalette(stale, true)
+  expect(repaired.background).toBe('#0a141b')
+  expect(repaired.foreground).toBe(stale.foreground)
+  expect(paletteContrast(repaired.background, repaired.foreground)).toBeGreaterThanOrEqual(4.5)
+  const light = readableDesktopPalette({ ...valid, background: '#000000', foreground: '#0f1115' }, false)
+  expect(light.background).toBe('#ffffff')
+  expect(paletteContrast(light.background, light.foreground)).toBeGreaterThanOrEqual(4.5)
+})
+
+it('dedicated Dock documents never publish their local theme back to the main window', async () => {
+  const desktopWindow = window as Window & { dshDesktop?: { setWindowChromeTheme: ReturnType<typeof vi.fn> } }
+  desktopWindow.dshDesktop = { setWindowChromeTheme: vi.fn().mockResolvedValue(undefined) }
+  const previousUrl = window.location.href
+  history.replaceState(null, '', '?desktop-dock-setting=models&desktop-dock-theme=dark')
+  const dispose = installDesktopAppearance(window)
+  try {
+    document.body.toggleAttribute('data-ds-dark-theme', true)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(desktopWindow.dshDesktop.setWindowChromeTheme).not.toHaveBeenCalled()
+  } finally {
+    dispose()
+    document.body.removeAttribute('data-ds-dark-theme')
+    history.replaceState(null, '', previousUrl)
+    delete desktopWindow.dshDesktop
   }
 })
 

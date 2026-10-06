@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
 import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -203,6 +204,7 @@ try {
   assert.ok(codex.models.length > 0, `OpenAI Codex has no selectable models: ${JSON.stringify(codex)}`)
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
+  await expandSidebarTools(page)
   const pluginManagementTrigger = page.getByRole('button', { name: /^(?:插件|Plugins)$/u })
   const skillManagementTrigger = page.getByRole('button', { name: /^(?:技能中心|Skill Center)$/u })
   await pluginManagementTrigger.waitFor({ state: 'visible' })

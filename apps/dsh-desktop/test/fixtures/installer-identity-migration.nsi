@@ -19,10 +19,11 @@ Var hasPerMachineInstallation
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
 
 Section
+  SetRegView 64
   !insertmacro customInit
   CreateDirectory "$INSTDIR"
   FileOpen $0 "$INSTDIR\selected-install.txt" w
-  FileWrite $0 "$INSTDIR"
+  FileWriteUTF16LE $0 "$INSTDIR"
   FileClose $0
   WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"
   Call RetireLegacyInstallerIdentity

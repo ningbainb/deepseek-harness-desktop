@@ -83,6 +83,7 @@ export function installDesktopManagementRouting(
 ): () => void {
   let disposed = false
   let observer: MutationObserver | undefined
+  let sidebar: HTMLElement | null = null
   const managed = new Set<HTMLElement>()
   const bridgedSkillEntries = new Set<HTMLElement>()
   const opening = new WeakSet<HTMLElement>()
@@ -95,7 +96,7 @@ export function installDesktopManagementRouting(
     managed.add(entry)
   }
   const scan = (): void => {
-    const sidebar = ownerDocument.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
+    if (!sidebar?.isConnected) sidebar = ownerDocument.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
     if (sidebar === null) return
     const plugin = [...sidebar.querySelectorAll<HTMLElement>('button')].find((button) => {
       if (button.closest('[data-slot="sidebar.footer.action"]') !== null) return false
@@ -156,7 +157,18 @@ export function installDesktopManagementRouting(
   void hasCapability('extensions.open').then((available) => {
     if (disposed || !available) return
     ownerDocument.addEventListener('click', onClick, true)
-    observer = new MutationObserver(scan)
+    observer = new MutationObserver(records => {
+      if (!sidebar?.isConnected || records.some(record => {
+        if (record.target.contains(sidebar)) return true
+        const nodes = [...record.addedNodes, ...record.removedNodes]
+        if (nodes.some(node => node.contains(sidebar))) return true
+        if (!sidebar?.contains(record.target)) return false
+        const button = (record.target instanceof Element ? record.target : record.target.parentElement)?.closest('button')
+        if (button && !managed.has(button) && /^(?:插件|Plugins)$/iu.test(button.getAttribute('aria-label')?.trim() || button.textContent?.trim() || '')) return true
+        const selector = 'button, [data-dsh-panel-entry="skill-explorer"]'
+        return nodes.some(node => node instanceof Element && (node.matches(selector) || node.querySelector(selector)))
+      })) scan()
+    })
     observer.observe(ownerDocument.body, { childList: true, subtree: true })
     scan()
     unsubscribePluginSettings = mainBridge()?.onPluginSettingsOpen?.((request) => {

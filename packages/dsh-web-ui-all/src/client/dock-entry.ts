@@ -13,6 +13,7 @@
 
 /** Stable data attribute identifying the injected entry row. */
 export const ENTRY_SELECTOR = '[data-dsh-dock-entry]'
+export const FOOTER_ENTRY_SELECTOR = '[data-dsh-extension-dock-entry] button'
 
 /** Inline icon (matches the shell's 16px nav-icon look): a dock/panel glyph. */
 const ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="7" height="11" rx="1.5"/><rect x="11" y="2.5" width="3" height="4" rx="1"/><rect x="11" y="9.5" width="3" height="4" rx="1"/></svg>`
@@ -94,39 +95,43 @@ export function mountDockEntry(): () => void {
   const entry = createEntry()
   let root: HTMLElement | undefined
   let placed = false
+  let footerEntry: HTMLElement | undefined
 
   const tryPlace = (): void => {
     if (root !== undefined && !root.isConnected) {
       rootObserver.disconnect()
       root = undefined
       placed = false
-    }
-    if (placed) {
-      if (document.body.contains(entry)) return
-      rootObserver.disconnect()
-      root = undefined
-      placed = false
+      footerEntry = undefined
     }
     root ??= sidebarRoot()
     if (root === undefined) return
-    placed = placeEntry(root, entry)
-    if (placed) {
-      rootObserver.observe(root, { childList: true, subtree: true })
+    rootObserver.observe(root, { childList: true, subtree: true })
+    footerEntry = root.querySelector<HTMLElement>(FOOTER_ENTRY_SELECTOR) ?? undefined
+    if (footerEntry !== undefined) {
+      entry.remove()
+      placed = false
+      return
     }
+    if (placed && root.contains(entry)) return
+    placed = placeEntry(root, entry)
   }
 
-  const waitObserver = new MutationObserver(() => { tryPlace() })
+  const waitObserver = new MutationObserver(() => {
+    if (root === undefined || !root.isConnected) tryPlace()
+  })
   waitObserver.observe(document.body, { childList: true, subtree: true })
 
-  const rootObserver = new MutationObserver(() => {
+  const rootObserver = new MutationObserver(records => {
     if (root === undefined || !root.isConnected) {
       placed = false
       tryPlace()
       return
     }
-    if (!root.contains(entry)) {
-      placed = placeEntry(root, entry)
-    }
+    if (footerEntry?.isConnected) return
+    if (footerEntry !== undefined || !root.contains(entry) || records.some(record =>
+      [...record.addedNodes].some(node => node instanceof Element &&
+        (node.matches(`[data-dsh-extension-dock-entry], ${FOOTER_ENTRY_SELECTOR}`) || node.querySelector(FOOTER_ENTRY_SELECTOR))))) tryPlace()
   })
 
   tryPlace()

@@ -4,7 +4,7 @@ DeepSeek Harness Desktop runs background automation only after the user selects 
 
 ## Window and tray lifecycle
 
-The close preference is one of `quit`, `minimize-to-tray`, or `ask`. Closing a window in the opt-in mode hides the main window and keeps the Desktop Runtime alive. The native tray restores the window, shows current task/runtime state, opens Extension Dock, checks for updates, and provides an explicit quit action.
+The close preference is one of `quit`, `minimize-to-tray`, or `ask`. Closing or minimizing the main window in the opt-in mode hides it and keeps the Desktop Runtime alive. Without that opt-in, the titlebar minimize action retains ordinary taskbar behavior. **App > Minimize to tray** (`Ctrl+Shift+M`, or `Cmd+Shift+M` on macOS) provides one-time residency without rewriting the saved close choice or restarting the Runtime. Changing the close choice to **Quit** restores a hidden main window before removing its tray. If tray creation fails, minimization retains taskbar access instead of hiding the only reachable window. The native tray restores the window on click or double-click, shows current task/runtime state, opens Extension Dock, checks for updates, and provides an explicit quit action.
 
 Update installation, explicit quit, crash recovery, and operating-system shutdown bypass background hiding. A fully exited Desktop application never claims to run scheduled work.
 

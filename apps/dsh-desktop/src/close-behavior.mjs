@@ -222,8 +222,20 @@ export function createCloseBehaviorController({
     return true
   }
 
+  const minimizeToTray = () => {
+    if (shouldBypass() || !trayAvailable()) return false
+    return hide()
+  }
+
+  const handleWindowMinimize = () => {
+    if (selectedBehavior() !== CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY) return false
+    return minimizeToTray()
+  }
+
   return Object.freeze({
     handleWindowClose,
+    handleWindowMinimize,
+    minimizeToTray,
     beginExplicitQuit,
     cancelExplicitQuit,
     get explicitQuit() { return explicitQuit },

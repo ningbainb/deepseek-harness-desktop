@@ -17,6 +17,7 @@ export function createApplicationMenuTemplate({
   checkForUpdates,
   getCloseBehavior,
   setCloseBehavior,
+  minimizeToTray,
   onActionError = () => {},
   platform = 'win32',
 }) {
@@ -47,11 +48,27 @@ export function createApplicationMenuTemplate({
         ],
       }
     : undefined
+  const residencyEntry = typeof minimizeToTray === 'function'
+    ? { label: '最小化到托盘 / Minimize to tray', accelerator: 'CmdOrCtrl+Shift+M', click: action(minimizeToTray) }
+    : undefined
   const applicationMenu = platform === 'darwin'
-    ? { role: 'appMenu' }
+    ? { role: 'appMenu', submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        ...(residencyEntry ? [residencyEntry] : []),
+        ...(closeBehaviorEntry ? [closeBehaviorEntry, { type: 'separator' }] : []),
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ] }
     : {
         label: '应用 / App',
         submenu: [
+          ...(residencyEntry ? [residencyEntry] : []),
           ...(closeBehaviorEntry ? [closeBehaviorEntry, { type: 'separator' }] : []),
           { role: 'quit', label: '退出 / Quit' },
         ],
@@ -141,6 +158,17 @@ export function installEditContextMenu({ webContents, Menu }) {
     webContents.removeListener('context-menu', onContextMenu)
     webContents.removeListener('before-input-event', onBeforeInput)
   }
+}
+
+export function installTrayResidencyShortcut({ webContents, minimizeToTray, platform = process.platform, onActionError = () => {} }) {
+  const onBeforeInput = (event, input = {}) => {
+    const modifier = platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta
+    if (input.type !== 'keyDown' || String(input.key).toLowerCase() !== 'm' || !modifier || !input.shift || input.alt || input.isAutoRepeat) return
+    event.preventDefault()
+    runBestEffort(minimizeToTray, onActionError)
+  }
+  webContents.on('before-input-event', onBeforeInput)
+  return () => webContents.removeListener('before-input-event', onBeforeInput)
 }
 
 export function installApplicationMenu(options) {

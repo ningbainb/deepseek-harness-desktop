@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
+import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -71,6 +72,7 @@ async function launchDesktop() {
   try {
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
     await dismissStartup(page)
+    await expandSidebarTools(page)
     await page.locator('[data-dsh-ssh-entry]').waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')

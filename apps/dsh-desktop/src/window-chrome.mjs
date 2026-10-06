@@ -75,6 +75,7 @@ html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
   min-height: 0 !important;
   max-height: 100% !important;
   height: 100% !important;
+  overflow: clip !important;
 }
 
 /* Native Sidebar fullscreen is viewport-fixed, outside the padded root flow.

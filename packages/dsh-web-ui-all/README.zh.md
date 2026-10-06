@@ -8,6 +8,8 @@ DSH Web UI 全家桶聚合插件：一键安装全部功能插件（task-board /
 
 - **一次安装、全部到位**：其 dependencies 引入全部子插件包（dsh-client-ui-aionui-panel / dsh-client-ui-task-board / dsh-client-ui-git-graph / dsh-pet / dsh-remote-web-ui / dsh-live-stats / dsh-chat-artifacts / dsh-ssh / dsh-client-ui-web-ui-settings / dsh-skins）。
 - **聚合载具**：`cordis.patch.yml` 汇总各子插件的 `insert` 行，经 dsh 插件 profile 机制挂载。
+- **流式友好的兼容层**：会话内部文本和 Markdown 变化不扫描侧栏布局。外壳替换、侧栏内容变化及侧栏尺寸调整仍更新兼容属性；插件卸载时取消待执行任务。
+- **一个扩展坞入口**：保留 Desktop 侧栏底部的扩展坞入口和原有动作。上方兼容入口只在没有底部入口的外壳中出现；延迟挂载和侧栏替换不会遗留重复入口。
 - **原生导航优先**：原生 DSH 轮次导航可见时使用原生；旧会话或原生导航被隐藏的窄布局保留紧凑兼容导航。窗口缩放时自动切换，避免重复显示轮次导航条。空对话不显示无操作可用的导航；导入的可滚动输出即使没有用户轮次也保留回底操作。可见且可用的原生回底按钮优先于兼容按钮；已经到底时隐藏无操作可用的兼容回底按钮。容器替换或重新挂载后导航自动恢复。
 
 ## 安装

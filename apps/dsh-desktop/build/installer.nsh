@@ -1,4 +1,5 @@
 !define DSH_UPGRADE_HELPER_DIR "$TEMP\dsh-desktop-installer-support"
+!include "FileFunc.nsh"
 !define DSH_UPGRADE_HELPER_SCRIPT "${DSH_UPGRADE_HELPER_DIR}\installer-upgrade-transaction.ps1"
 !define /ifndef DSH_LEGACY_APP_GUID "6d90015c-c2fd-5312-844b-e2226e35e28f"
 !define /ifndef DSH_LEGACY_INSTALL_REGISTRY_KEY "Software\${DSH_LEGACY_APP_GUID}"
@@ -13,6 +14,7 @@ Var DshInstallerLogAvailable
 Var DshLegacyInstallDetected
 Var DshLegacyInstallDirectory
 Var DshCurrentInstallDirectory
+Var DshRequestedInstallDirectory
 
 ; Local-only diagnostics. No credentials/sessions are read or uploaded.
 Function WriteInstallerDiagnostic
@@ -65,9 +67,55 @@ FunctionEnd
   StrCpy $DshLegacyInstallDetected "0"
   StrCpy $DshLegacyInstallDirectory ""
   StrCpy $DshCurrentInstallDirectory ""
+  StrCpy $DshRequestedInstallDirectory ""
+  ClearErrors
+  !ifmacrodef GetDParameter
+    !insertmacro GetDParameter $DshRequestedInstallDirectory
+  !else
+    Push $8
+    Push $9
+    Push $7
+    System::Call 'kernel32::GetCommandLineW() w .r8'
+    StrCpy $9 0
+dsh_directory_argument_scan:
+    StrCpy $7 $8 3 $9
+    StrCmp $7 "" dsh_directory_argument_done
+    StrCmp $7 "/D=" dsh_directory_argument_found
+    IntOp $9 $9 + 1
+    Goto dsh_directory_argument_scan
+dsh_directory_argument_found:
+    IntOp $9 $9 + 3
+    StrCpy $DshRequestedInstallDirectory $8 "" $9
+    StrCpy $7 $DshRequestedInstallDirectory 1 -1
+    StrCmp $7 '$\"' 0 dsh_directory_argument_done
+    StrLen $9 $DshRequestedInstallDirectory
+    IntOp $9 $9 - 1
+    StrCpy $DshRequestedInstallDirectory $DshRequestedInstallDirectory $9
+dsh_directory_argument_done:
+    Pop $7
+    Pop $9
+    Pop $8
+  !endif
+  StrCmp $DshRequestedInstallDirectory "" registered_identity
+  StrCpy $INSTDIR $DshRequestedInstallDirectory
+  StrCpy $perUserInstallationFolder $DshRequestedInstallDirectory
+  StrCpy $hasPerUserInstallation "1"
+  StrCpy $hasPerMachineInstallation "0"
+  Goto legacy_identity_done
+registered_identity:
   ; A 4.x upgrade must reuse the user's chosen directory. Only adopt a
   ; registered location when both our private marker and executable exist.
   ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_validate
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_validate
+  SetRegView 32
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_restore_view
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
+current_identity_restore_view:
+  SetRegView lastused
+current_identity_validate:
   StrCmp $DshCurrentInstallDirectory "" current_identity_done
   IfFileExists "$DshCurrentInstallDirectory\resources\update-shutdown-v1" 0 current_identity_done
   IfFileExists "$DshCurrentInstallDirectory\${APP_EXECUTABLE_FILENAME}" 0 current_identity_done

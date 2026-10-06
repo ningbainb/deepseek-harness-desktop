@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { collectReleaseNoteErrors } from './validate-release-notes.mjs'
+import { collectReleaseNoteErrors, releaseNotesFilename } from './validate-release-notes.mjs'
 
 const chineseBody = '本次更新继续完善桌面体验、更新流程、界面信息和安全提示，并完成真实安装包、窗口与目录选择器验证。'.repeat(3)
 const englishBody = 'This release continues to refine the desktop experience, update flow, interface information, and safety guidance with packaged application verification. '.repeat(5)
@@ -49,6 +49,12 @@ ${englishBody}
 
 test('accepts a complete bilingual release body for the package version', () => {
   assert.deepEqual(collectReleaseNoteErrors(bilingualNotes(), '0.1.3'), [])
+})
+
+test('candidate release notes do not overwrite the public stable release', () => {
+  assert.equal(releaseNotesFilename('5.0.0'), 'release-notes.md')
+  assert.equal(releaseNotesFilename('5.0.1-beta.1'), 'release-notes-5.0.1-beta.1.md')
+  assert.throws(() => releaseNotesFilename('../other-file'))
 })
 
 test('accepts release notes for an exact prerelease package version', () => {

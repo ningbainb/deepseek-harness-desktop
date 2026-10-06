@@ -31,7 +31,7 @@ try {
   // Welcome and Star flows have independent gates. Seed their completed state
   // so delayed onboarding cannot race the page-profile assertions here.
   await mkdir(resolve(temporary, 'dsh-home'), { recursive: true })
-  await writeFile(resolve(temporary, 'dsh-home', 'settings.yaml'), "ui-onboarding:\n  welcomeNoticeVersion: '2026-08-13.1'\n")
+  await writeFile(resolve(temporary, 'dsh-home', 'settings.yaml'), "ui-onboarding:\n  welcomeNoticeVersion: '2026-08-13.1'\nparticle-theme:\n  enabled: true\n")
   await writeFile(resolve(temporary, 'user-data', 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   electronApp = await electron.launch({
     executablePath: packagedExecutable || electronPath,

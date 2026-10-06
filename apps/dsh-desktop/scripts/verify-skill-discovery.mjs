@@ -9,6 +9,9 @@ import { _electron as electron } from 'playwright'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../src/runtime-controller.mjs'
+import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -23,6 +26,9 @@ let electronApp
 
 try {
   await seedPrimaryRuntimePermissionForTest({ userData })
+  await mkdir(dshHome, { recursive: true })
+  await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
+  await writeFile(resolve(dshHome, 'settings.yaml'), JSON.stringify({ 'ui-onboarding': { welcomeNoticeVersion: '2026-08-13.1' } }))
   const skillRoot = resolve(dshHome, 'skills', skillName)
   await mkdir(skillRoot, { recursive: true })
   await writeFile(
@@ -44,6 +50,7 @@ try {
       DSH_AGENTS_HOME: resolve(temporary, 'agents-home'),
     },
   })
+  await useChineseFixtureLocale(electronApp)
   const page = await electronApp.firstWindow()
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
@@ -57,6 +64,7 @@ try {
   assert.ok(desktopSkill, 'Extension Dock/Desktop inventory did not discover the canonical user skill')
   assert.equal(desktopSkill.source, 'user-dsh')
 
+  await expandSidebarTools(page)
   const entry = page.getByRole('button').filter({ has: page.locator('[data-dsh-panel-entry="skill-explorer"]') })
   try {
     await entry.waitFor({ state: 'visible', timeout: 20_000 })

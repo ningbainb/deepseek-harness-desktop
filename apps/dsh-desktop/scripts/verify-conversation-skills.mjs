@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -114,6 +115,7 @@ try {
   // The upstream first-run dialog can mount after workspace creation on a
   // slower runner. It must be gone before validating pointer interaction.
   await dismissIntro(2_000)
+  await expandSidebarTools(page)
   await commandButton.click()
   const nativeSuggestions = page.locator('[data-trigger-menu] [role="listbox"]')
   await nativeSuggestions.waitFor({ state: 'visible' })

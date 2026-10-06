@@ -23,6 +23,32 @@ async function registryExists(key) {
 }
 
 try {
+  for (const scenario of ['current-custom', 'current-uninstall', 'current-registry32', 'explicit-running-copy']) {
+    const directory = join(root, scenario)
+    const existing = join(directory, "用户's E 盘安装")
+    const fresh = join(directory, 'C-default-fixture')
+    const installer = join(directory, 'fixture.exe')
+    const registry = `Software\\DeepSeekHarnessDesktopTests\\identity-${process.pid}-${scenario}`
+    await mkdir(join(existing, 'resources'), { recursive: true })
+    await writeFile(join(existing, 'DeepSeek Harness Desktop.exe'), 'owned executable')
+    await writeFile(join(existing, 'resources', 'update-shutdown-v1'), 'dsh-desktop-update-shutdown-protocol=1\n')
+    const registryLocation = scenario === 'current-uninstall' ? 'CurrentUninstall' : 'CurrentInstall'
+    const registered = scenario === 'explicit-running-copy' ? fresh : existing
+    await exec('reg.exe', ['ADD', `HKCU\\${registry}\\${registryLocation}`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', registered, '/f',
+      scenario === 'current-registry32' ? '/reg:32' : '/reg:64'], { windowsHide: true })
+    try {
+      await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+        `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${registry}`,
+        join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi')], { windowsHide: true, timeout: 60_000, env: compiler.env })
+      await exec(installer, ['/S', ...(scenario === 'explicit-running-copy' ? [`/D=${existing}`] : [])], { windowsHide: true, timeout: 60_000 })
+      assert.equal(await readFile(join(existing, 'selected-install.txt'), 'utf16le'), existing)
+      await assert.rejects(stat(join(fresh, 'selected-install.txt')), { code: 'ENOENT' })
+      assert.equal(await readFile(join(existing, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'owned executable')
+      console.log(`PASS installer directory ${scenario}`)
+    } finally {
+      for (const view of ['32', '64']) await exec('reg.exe', ['DELETE', `HKCU\\${registry}`, '/f', `/reg:${view}`], { windowsHide: true }).catch(() => {})
+    }
+  }
   for (const owned of [true, false]) {
     const label = owned ? 'owned-legacy' : 'foreign-legacy'
     const directory = join(root, label)
@@ -47,7 +73,7 @@ try {
       ], { windowsHide: true, timeout: 30_000, env: compiler.env })
       await exec(installer, ['/S'], { windowsHide: true, timeout: 30_000 })
       const selected = owned ? legacyInstall : freshInstall
-      assert.equal(await readFile(join(selected, 'selected-install.txt'), 'utf8'), selected)
+      assert.equal(await readFile(join(selected, 'selected-install.txt'), 'utf16le'), selected)
       await assert.rejects(stat(join(owned ? freshInstall : legacyInstall, 'selected-install.txt')), { code: 'ENOENT' })
       assert.equal(await registryExists(`${registry}\\CurrentInstall`), true)
       assert.equal(await registryExists(`${registry}\\LegacyInstall`), !owned)

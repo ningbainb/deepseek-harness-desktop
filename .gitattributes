@@ -4,3 +4,4 @@ apps/dsh-desktop/test/fixtures/direct-start/** -text
 # Unified diffs prefix context lines with a space, including empty/tabbed lines.
 # Preserve that required patch syntax; normal source whitespace checks remain.
 patches/*.patch whitespace=-blank-at-eol,-space-before-tab
+apps/dsh-desktop/build/skin-center-v2-assets/** -text

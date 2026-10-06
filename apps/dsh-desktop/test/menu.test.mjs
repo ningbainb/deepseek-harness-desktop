@@ -10,7 +10,7 @@ import {
 } from '../src/community-links.mjs'
 import { createCommunityQrImage } from '../src/community.mjs'
 import { createApplicationMenuTemplate } from '../src/menu.mjs'
-import { installEditContextMenu } from '../src/menu.mjs'
+import { installEditContextMenu, installTrayResidencyShortcut } from '../src/menu.mjs'
 
 test('community and feedback destinations are fixed secure URLs', () => {
   assert.equal(COMMUNITY_QQ_URL, 'https://qm.qq.com/q/vehlNjaeye')
@@ -97,6 +97,58 @@ test('App menu exposes all persisted close choices and makes background automati
   background.click()
   await new Promise((resolve) => setImmediate(resolve))
   assert.deepEqual(changes, ['minimize-to-tray'])
+})
+
+test('native menus expose direct tray residency on every platform without changing close preferences', async () => {
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    const calls = []
+    const template = createApplicationMenuTemplate({
+      app: { getVersion: () => '5.0.1-beta.1' },
+      shell: { openExternal() {} },
+      controller: { restart() {} },
+      platform,
+      minimizeToTray: () => calls.push('hide'),
+      getCloseBehavior: () => 'quit',
+      setCloseBehavior: () => calls.push('preferences'),
+    })
+    const application = template[0]
+    const residency = application.submenu.find(entry => entry.label === '最小化到托盘 / Minimize to tray')
+    assert.equal(residency.accelerator, 'CmdOrCtrl+Shift+M')
+    assert.ok(application.submenu.some(entry => entry.role === 'quit'))
+    assert.ok(application.submenu.some(entry => entry.label === '关闭行为 / Close behavior'))
+    if (platform === 'darwin') {
+      assert.equal(application.role, 'appMenu')
+      for (const role of ['about', 'services', 'hide', 'hideOthers', 'unhide']) {
+        assert.ok(application.submenu.some(entry => entry.role === role))
+      }
+    }
+    residency.click()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(calls, ['hide'])
+  }
+})
+
+test('tray residency shortcut binds native input once, ignores unrelated keys and disposes cleanly', () => {
+  for (const platform of ['win32', 'linux', 'darwin']) {
+    let listener, removed, hidden = 0, prevented = 0
+    const webContents = {
+      on: (name, callback) => { assert.equal(name, 'before-input-event'); listener = callback },
+      removeListener: (name, callback) => { removed = [name, callback] },
+    }
+    const dispose = installTrayResidencyShortcut({ webContents, platform, minimizeToTray: () => { hidden += 1 } })
+    const input = { type: 'keyDown', key: 'M', shift: true, control: platform !== 'darwin', meta: platform === 'darwin' }
+    const event = { preventDefault: () => { prevented += 1 } }
+    for (const override of [{ key: 'x' }, { type: 'keyUp' }, { shift: false }, { alt: true }, { isAutoRepeat: true }, { control: true, meta: true }]) {
+      listener(event, { ...input, ...override })
+    }
+    assert.equal(hidden, 0)
+    assert.equal(prevented, 0)
+    listener(event, input)
+    assert.equal(hidden, 1)
+    assert.equal(prevented, 1)
+    dispose()
+    assert.deepEqual(removed, ['before-input-event', listener])
+  }
 })
 
 test('Edit menu and native context menu expose paste without renderer clipboard access', () => {

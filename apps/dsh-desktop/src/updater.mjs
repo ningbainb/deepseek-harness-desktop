@@ -76,6 +76,7 @@ export class DesktopUpdateController extends EventEmitter {
     getWindow,
     currentVersion,
     enabled,
+    installDirectory,
     log = () => {},
     beforeInstall = async () => {},
     onInstallFailure = async () => {},
@@ -93,6 +94,7 @@ export class DesktopUpdateController extends EventEmitter {
   }) {
     super()
     this.updater = updater
+    if (updater && installDirectory !== undefined) updater.installDirectory = installDirectory
     this.getWindow = getWindow
     this.currentVersion = currentVersion
     this.enabled = Boolean(enabled && updater)

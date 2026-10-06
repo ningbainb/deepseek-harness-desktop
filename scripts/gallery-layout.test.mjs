@@ -36,7 +36,7 @@ for (const c of CASES) {
   test(`preview ${c.skin}/${c.theme}: conversation 不被压缩、右侧面板折叠`, { skip: SKIP }, async () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } })
     try {
-      await page.goto(`file://${GALLERY}/preview.html?skin=${c.skin}&theme=${c.theme}&chrome=0`, { waitUntil: 'load' })
+      await page.goto(`file://${GALLERY}/preview.html?skin=${c.skin}&theme=${c.theme}&chrome=0`, { waitUntil: 'load', timeout: 120_000 })
       await page.waitForTimeout(1200)
       const info = await page.evaluate(() => {
         const conv = document.querySelector('[data-pane="conversation"]')

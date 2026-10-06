@@ -10,5 +10,6 @@ await runPresetDeepLinkE2E({
   appDir,
   executablePath: process.env.DSH_DESKTOP_E2E_EXECUTABLE,
   electronPath,
-  timeoutMs: process.env.CI || process.env.DSH_DESKTOP_E2E_EXECUTABLE ? 120_000 : 60_000,
+  timeoutMs: Math.max(process.env.CI || process.env.DSH_DESKTOP_E2E_EXECUTABLE ? 120_000 : 60_000,
+    Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 0),
 })

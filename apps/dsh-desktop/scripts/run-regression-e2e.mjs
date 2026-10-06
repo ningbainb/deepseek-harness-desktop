@@ -48,6 +48,16 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 const CORE_SUITES = [
   {
+    name: 'Background Tray Residency, Restoration, Restart and Safe Quit',
+    script: 'scripts/verify-background-residency.mjs',
+    args: [],
+  },
+  {
+    name: 'Official Defaults, Progressive Streaming and Collapsible Sidebar Tools',
+    script: 'scripts/verify-beta-usability.mjs',
+    args: [],
+  },
+  {
     name: 'bai First-user Sign-in, Model Entry and Browser Isolation',
     script: 'scripts/verify-bai-onboarding.mjs',
     args: [],
@@ -75,6 +85,11 @@ const CORE_SUITES = [
   {
     name: 'Extension Dock Settings & Compact Layout',
     script: 'scripts/verify-dock-settings.mjs',
+    args: [],
+  },
+  {
+    name: 'Extension Dock Opaque Surfaces, Contrast and Preserved Navigation',
+    script: 'scripts/verify-dock-clarity.mjs',
     args: [],
   },
   {

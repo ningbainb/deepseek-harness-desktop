@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = fileURLToPath(new URL('..', import.meta.url))
@@ -81,6 +81,30 @@ try {
   await group.waitFor({ state: 'visible', timeout: 30_000 })
   await group.hover()
   await page.getByRole('button', { name: /Balance fixture.*新建会话/u }).click({ force: true })
+  const footer = page.locator('[data-dsh-usage-foot-card] button[data-dsh-part="foot-card-main"]')
+  await footer.waitFor({ state: 'visible' })
+  assert.equal(await footer.count(), 1)
+  await page.waitForFunction(() => !document.querySelector('[data-dsh-balance-entry]'))
+  await footer.click()
+  let usageSettings
+  for (let attempt = 0; attempt < 120; attempt++) {
+    usageSettings = app.windows().find(candidate => candidate.url().includes('desktop-dock-setting='))
+    if (usageSettings) break
+    await page.waitForTimeout(250)
+  }
+  assert.ok(usageSettings, 'Today spending must open the real usage settings document')
+  const usageSection = usageSettings.locator('[data-dsh-dock-settings="usage"] [data-dsh-plugin="usage"]').first()
+  await usageSection.waitFor({ state: 'visible', timeout: 60_000 })
+  const enabled = usageSection.getByRole('checkbox', { name: '启用插件', exact: true })
+  assert.equal(await enabled.isChecked(), true)
+  await enabled.click()
+  await usageSettings.waitForFunction(() => document.querySelector('[data-dsh-plugin="usage"] input[type="checkbox"]')?.checked === false,
+    undefined, { timeout: 60_000 })
+  await page.locator('[data-dsh-balance-entry]').waitFor({ state: 'visible', timeout: 60_000 })
+  assert.equal(await footer.count(), 0)
+  const dock = app.windows().find(candidate => candidate.url().includes('extensions.html'))
+  assert.ok(dock)
+  await dock.close()
   const amount = page.locator('[data-dsh-balance-amount]')
   const chooseModel = async name => {
     const trigger = page.locator('[data-slot="conversation.input.model"] button').first()
@@ -98,10 +122,24 @@ try {
   assert.match(await page.locator('[data-dsh-balance-entry]').getAttribute('title'), /balance-relay/u)
   await chooseModel(/^DeepSeek-V41-Flash$/u)
   await page.waitForFunction(() => document.querySelector('[data-dsh-balance-amount]')?.textContent === '11.25 CNY')
+  const displayed = await amount.textContent()
+  await page.locator('[data-dsh-balance-entry]').click()
+  await page.getByTestId('llm-balance-overview').waitFor({ state: 'visible' })
+  const reopened = await openDockSetting(app, page, 'usage')
+  const restored = reopened.settings.getByRole('checkbox', { name: '启用插件', exact: true })
+  assert.equal(await restored.isChecked(), false)
+  await restored.click()
+  await reopened.settings.waitForFunction(() => document.querySelector('[data-dsh-plugin="usage"] input[type="checkbox"]')?.checked === true,
+    undefined, { timeout: 60_000 })
+  await footer.waitFor({ state: 'visible', timeout: 60_000 })
+  await page.waitForFunction(() => !document.querySelector('[data-dsh-balance-entry]'))
+  assert.equal(await footer.count(), 1)
+  assert.equal(await reopened.settings.locator('[data-dsh-plugin="usage"] [role="status"]').count(), 0)
+  await reopened.dock.close()
   assert.ok(requests.length > 0)
   assert.ok(requests.every(request => request.authorized && request.method === 'GET' && !/completions|responses/.test(request.path)))
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, mode: packagedExecutable ? 'packaged-electron' : 'development-electron', requests, displayed: await amount.textContent(), paidRequests: 0 }))
+  console.log(JSON.stringify({ passed: true, mode: packagedExecutable ? 'packaged-electron' : 'development-electron', requests, displayed, singleTodaySpendingEntry: true, fallbackRoundTrip: true, paidRequests: 0 }))
 } catch (error) {
   console.error('balance UI', await app?.firstWindow().then(page => page.evaluate(() => ({
     url: location.href,

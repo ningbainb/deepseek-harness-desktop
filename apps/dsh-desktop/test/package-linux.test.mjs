@@ -28,7 +28,7 @@ test('pack:linux accepts only Linux and builds x64 without publishing', () => {
   assert.deepEqual(parsePackLinuxArguments([]), { dir: false })
   assert.deepEqual(parsePackLinuxArguments(['--dir']), { dir: true })
   assert.deepEqual(
-    electronBuilderArgs([]),
+    electronBuilderArgs([], 'stable'),
     ['--linux', '--x64', '--publish', 'never', '--config.publish.channel=latest'],
   )
   assert.deepEqual(
@@ -41,6 +41,13 @@ test('pack:linux accepts only Linux and builds x64 without publishing', () => {
   assert.throws(() => assertLinuxPackHost('win32'), /only runs on Linux/u)
   assert.doesNotThrow(() => assertLinuxPackHost('linux'))
   assert.match(electronBuilderCommand(), /electron-builder$/u)
+})
+
+test('pack:linux defaults to the manifest channel without publishing', async () => {
+  const manifest = JSON.parse(await readFile(join(appDirectory, 'package.json'), 'utf8'))
+  const channel = process.env.DSH_DESKTOP_UPDATE_CHANNEL === 'stable' ? 'latest'
+    : process.env.DSH_DESKTOP_UPDATE_CHANNEL === 'beta' || manifest.version.includes('-') ? 'beta' : 'latest'
+  assert.deepEqual(electronBuilderArgs([]), ['--linux', '--x64', '--publish', 'never', `--config.publish.channel=${channel}`])
 })
 
 test('pack:linux prepares the release directory before invoking electron-builder', async () => {

@@ -245,9 +245,11 @@ export function createDesktopWindowFactory({
       if (windows.get(key) === browserWindow) windows.delete(key)
     })
     return browserWindow.loadFile(filePath, { query: { ...query, theme: chromeTheme } }).then(() => {
-      const palette = getWindowPalette(getMainWindow())
-      setWindowChromeTheme(browserWindow, chromeTheme, palette)
-      return browserWindow.webContents.executeJavaScript(`(${applyWindowPalette.toString()})(document, ${JSON.stringify(palette)})`)
+      const currentMain = getMainWindow()
+      const theme = currentMain && !currentMain.isDestroyed() ? getWindowChromeTheme(currentMain) : chromeTheme
+      const palette = getWindowPalette(currentMain)
+      setWindowChromeTheme(browserWindow, theme, palette)
+      return browserWindow.webContents.executeJavaScript(`document.documentElement.dataset.dshDesktopTheme = ${JSON.stringify(theme)}; (${applyWindowPalette.toString()})(document, ${JSON.stringify(palette)})`)
     })
   }
 

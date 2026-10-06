@@ -32,15 +32,16 @@ test('pack:mac arguments default to a signed-off unsigned arm64 mac build', () =
   assert.deepEqual(parsePackMacArguments([]), { dir: false })
   assert.deepEqual(parsePackMacArguments(['--dir']), { dir: true })
   assert.deepEqual(
-    electronBuilderArgs([]),
+    electronBuilderArgs([], 'stable'),
     ['--mac', '--arm64', '--publish', 'never', '--config.publish.channel=latest'],
   )
   assert.deepEqual(
-    electronBuilderArgs(['--dir']),
+    electronBuilderArgs(['--dir'], 'stable'),
     ['--mac', '--arm64', '--publish', 'never', '--config.publish.channel=latest', '--dir'],
   )
   assert.equal(electronBuilderPublishChannel('stable'), 'latest')
   assert.equal(electronBuilderPublishChannel('beta'), 'beta')
+  assert.deepEqual(electronBuilderArgs(['--dir'], 'beta'), ['--mac', '--arm64', '--publish', 'never', '--config.publish.channel=beta', '--dir'])
   assert.equal(packEnvironment({ PATH: '/bin' }).CSC_IDENTITY_AUTO_DISCOVERY, 'false')
   assert.match(packEnvironment({ PATH: '/bin' }).npm_config_user_agent, /pnpm/u)
   assert.equal(
@@ -49,6 +50,13 @@ test('pack:mac arguments default to a signed-off unsigned arm64 mac build', () =
   )
   assert.throws(() => assertDarwinPackHost('win32'), /only runs on macOS/u)
   assert.doesNotThrow(() => assertDarwinPackHost('darwin'))
+})
+
+test('pack:mac defaults to the manifest channel without publishing', async () => {
+  const manifest = JSON.parse(await readFile(join(appDirectory, 'package.json'), 'utf8'))
+  const channel = process.env.DSH_DESKTOP_UPDATE_CHANNEL === 'stable' ? 'latest'
+    : process.env.DSH_DESKTOP_UPDATE_CHANNEL === 'beta' || manifest.version.includes('-') ? 'beta' : 'latest'
+  assert.deepEqual(electronBuilderArgs([]), ['--mac', '--arm64', '--publish', 'never', `--config.publish.channel=${channel}`])
 })
 
 test('pack:mac never prepares MinGit or asserts Windows signing', async () => {

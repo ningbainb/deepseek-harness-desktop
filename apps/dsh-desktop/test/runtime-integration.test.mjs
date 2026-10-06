@@ -519,6 +519,8 @@ test('official DSH host serves the complete desktop profile', { timeout: 360_000
   const resourceEvents = []
   try {
     await afterPack.restoreAllBundledSkinAssets(join(import.meta.dirname, '..', 'node_modules'))
+    await writeFile(join(root, 'settings.yaml'), 'particle-theme:\n  enabled: true\n')
+    await writeFile(join(root, 'skin-center-active.json'), JSON.stringify({ active: 'blue-fantasy', initialized: true }))
     await ensureDesktopProfile({ dshHome: root })
     controller = new DshRuntimeController({
       cliPath: resolveDshCliPath(),

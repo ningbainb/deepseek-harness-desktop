@@ -55,15 +55,18 @@ export function assertBilingualReleaseNotes(content, version) {
   if (errors.length) throw new Error(`invalid bilingual release notes:\n- ${errors.join('\n- ')}`)
 }
 
+export function releaseNotesFilename(version) {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(version)) throw new Error('invalid release notes version')
+  return version.includes('-') ? `release-notes-${version}.md` : 'release-notes.md'
+}
+
 async function main() {
   const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
-  const notesPath = resolve(process.argv[2] || resolve(repositoryRoot, 'docs', 'launch', 'release-notes.md'))
   const packagePath = resolve(process.argv[3] || resolve(repositoryRoot, 'apps', 'dsh-desktop', 'package.json'))
-  const [notes, manifestText] = await Promise.all([
-    readFile(notesPath, 'utf8'),
-    readFile(packagePath, 'utf8'),
-  ])
+  const manifestText = await readFile(packagePath, 'utf8')
   const candidateVersion = JSON.parse(manifestText).version
+  const notesPath = resolve(process.argv[2] || resolve(repositoryRoot, 'docs', 'launch', releaseNotesFilename(candidateVersion)))
+  const notes = await readFile(notesPath, 'utf8')
   assertBilingualReleaseNotes(notes, candidateVersion)
   console.log(`validated bilingual release notes for ${candidateVersion}`)
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ENTRY_SELECTOR, mountDockEntry } from '../src/client/dock-entry.ts'
+import { ENTRY_SELECTOR, FOOTER_ENTRY_SELECTOR, mountDockEntry } from '../src/client/dock-entry.ts'
 
 let dispose: (() => void) | undefined
 
@@ -23,6 +23,55 @@ afterEach(() => {
 })
 
 describe('sidebar Dock bridge', () => {
+  it('retains only the footer Dock when it is already mounted', () => {
+    shell()
+    const footer = document.createElement('div')
+    footer.dataset.dshExtensionDockEntry = ''
+    const button = document.createElement('button')
+    const open = vi.fn()
+    button.addEventListener('click', open)
+    footer.append(button)
+    document.querySelector('[data-browser]')!.after(footer)
+    dispose = mountDockEntry()
+    expect(document.querySelector(ENTRY_SELECTOR)).toBeNull()
+    expect(document.querySelector(FOOTER_ENTRY_SELECTOR)).toBe(button)
+    button.click()
+    expect(open).toHaveBeenCalledTimes(1)
+    dispose()
+    dispose = undefined
+    expect(button.isConnected).toBe(true)
+  })
+
+  it('deduplicates a late footer and restores the fallback only when the footer disappears', async () => {
+    shell()
+    dispose = mountDockEntry()
+    const fallback = entry()
+    const footer = document.createElement('div')
+    footer.dataset.dshExtensionDockEntry = ''
+    footer.innerHTML = '<button>Footer Dock</button>'
+    document.querySelector('[data-browser]')!.after(footer)
+    await vi.waitFor(() => expect(document.querySelector(ENTRY_SELECTOR)).toBeNull())
+    expect(document.querySelector(FOOTER_ENTRY_SELECTOR)).not.toBeNull()
+    footer.remove()
+    await vi.waitFor(() => expect(entry()).toBe(fallback))
+    shell()
+    document.querySelector('[data-browser]')!.after(footer)
+    await vi.waitFor(() => expect(document.querySelector(ENTRY_SELECTOR)).toBeNull())
+    expect(document.querySelectorAll(FOOTER_ENTRY_SELECTOR)).toHaveLength(1)
+  })
+
+  it('waits for a usable footer button rather than an empty footer wrapper', async () => {
+    shell()
+    const footer = document.createElement('div')
+    footer.dataset.dshExtensionDockEntry = ''
+    document.querySelector('[data-browser]')!.after(footer)
+    dispose = mountDockEntry()
+    expect(entry()).not.toBeNull()
+    footer.append(document.createElement('button'))
+    await vi.waitFor(() => expect(document.querySelector(ENTRY_SELECTOR)).toBeNull())
+    expect(document.querySelectorAll(FOOTER_ENTRY_SELECTOR)).toHaveLength(1)
+  })
+
   it('opens through the actual main-window preload with its receiver intact', () => {
     shell()
     const desktop = { openExtensionDock: vi.fn(function (this: unknown) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import type { DesktopPalette } from './desktop-appearance.ts'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
@@ -35,6 +35,31 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
   const [theme, setTheme] = useState(() => new URLSearchParams(window.location.search).get('desktop-dock-theme') === 'dark' ? 'dark' : 'light')
   const [visited, setVisited] = useState<DockSetting[]>([selected])
   const [palette, setPalette] = useState<DesktopPalette | null>(null)
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const previousTheme = root.getAttribute('data-dsh-desktop-theme')
+    const previousDark = document.body.getAttribute('data-ds-dark-theme')
+    const previousScheme = root.style.colorScheme
+    const sync = () => {
+      if (root.getAttribute('data-dsh-desktop-theme') !== theme) root.setAttribute('data-dsh-desktop-theme', theme)
+      if (root.style.colorScheme !== theme) root.style.colorScheme = theme
+      if (document.body.hasAttribute('data-ds-dark-theme') !== (theme === 'dark')) {
+        document.body.toggleAttribute('data-ds-dark-theme', theme === 'dark')
+      }
+    }
+    const observer = new MutationObserver(sync)
+    observer.observe(root, { attributes: true, attributeFilter: ['style', 'data-dsh-desktop-theme'] })
+    observer.observe(document.body, { attributes: true, attributeFilter: ['data-ds-dark-theme'] })
+    sync()
+    return () => {
+      observer.disconnect()
+      if (previousTheme === null) root.removeAttribute('data-dsh-desktop-theme')
+      else root.setAttribute('data-dsh-desktop-theme', previousTheme)
+      if (previousDark === null) document.body.removeAttribute('data-ds-dark-theme')
+      else document.body.setAttribute('data-ds-dark-theme', previousDark)
+      root.style.colorScheme = previousScheme
+    }
+  }, [theme])
   const navigateTo = (next: DockSetting) => {
     const canonical = canonicalDockSetting(next)
     setSelected(canonical)

@@ -469,6 +469,8 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@ningbainb/dsh-chat-artifacts'
     - id: particle-theme
       name: '@linxin666/dsh-particle-theme'
+      config:
+        enabled: false
     - id: ui-web-ui-compat
       name: '@linxin666/dsh-web-ui-all'
 - id: web-ui-model-capabilities
@@ -1026,6 +1028,10 @@ async function migrateLegacySkinState({ profilePatch, homePatch, dshHome, profil
         )) || changed
       }
     } else {
+      if (!await pathExists(activeStatePath)) {
+        changed = (await writeIfChanged(activeStatePath,
+          JSON.stringify({ active: 'blue-fantasy' }, null, 2) + '\n')) || changed
+      }
       changed = (await writeIfChanged(
         join(profileDir, LEGACY_SKIN_SELECTION_ARCHIVE),
         JSON.stringify({
@@ -1438,6 +1444,13 @@ export async function ensureDesktopProfile({
     existingPatch = legacySkinMigration.profilePatch
     homePatch = legacySkinMigration.homePatch
     changed = legacySkinMigration.stateChanged || changed
+    try {
+      await writeFile(join(dshHome, 'skin-center-active.json'),
+        JSON.stringify({ active: null, initialized: true }, null, 2) + '\n', { flag: 'wx' })
+      changed = true
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error
+    }
   }
   // DSH requires a top-level patch array. Repair only documents with no
   // semantic entries: blank/comment-only files, empty arrays, and legacy empty

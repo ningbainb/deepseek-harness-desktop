@@ -758,6 +758,43 @@ test('profile bootstrap removes Hindsight from profiles created by an earlier de
   }
 })
 
+test('fresh desktop profile defaults to official skin without removing optional particle theme', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-official-default-'))
+  const dshHome = join(root, 'home')
+  try {
+    const first = await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    const state = JSON.parse(await readFile(join(dshHome, 'skin-center-active.json'), 'utf8'))
+    assert.deepEqual(state, { active: null, initialized: true })
+    const patch = parse(await readFile(join(first.profileDir, 'cordis.patch.yml'), 'utf8'))
+    const particle = patch.flatMap(row => row.insert ?? []).find(row => row.id === 'particle-theme')
+    assert.equal(particle.name, '@linxin666/dsh-particle-theme')
+    assert.equal(particle.config.enabled, false)
+    assert.equal((await ensureDesktopProfile({ dshHome, packageRoots: new Map() })).changed, false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+for (const state of [
+  { active: 'mint', background: { path: 'user-background.png' }, initialized: true },
+  { active: null, initialized: true },
+  { background: { path: 'background-only.png' } },
+]) test(`official default preserves existing appearance byte-for-byte: ${JSON.stringify(state)}`, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-preserved-appearance-'))
+  const dshHome = join(root, 'home')
+  try {
+    await mkdir(dshHome)
+    const original = JSON.stringify(state) + '\n'
+    await writeFile(join(dshHome, 'skin-center-active.json'), original)
+    await writeFile(join(dshHome, 'settings.yaml'), 'particle-theme:\n  enabled: true\n')
+    await ensureDesktopProfile({ dshHome, packageRoots: new Map() })
+    assert.equal(await readFile(join(dshHome, 'skin-center-active.json'), 'utf8'), original)
+    assert.equal(await readFile(join(dshHome, 'settings.yaml'), 'utf8'), 'particle-theme:\n  enabled: true\n')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('profile bootstrap is idempotent and links every managed package', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-profile-'))
   const dshHome = join(root, 'home')
@@ -1096,6 +1133,22 @@ test('profile bootstrap preserves explicit Skin Center state and archives an uns
     })
     assert.doesNotMatch(profilePatch, /dsh-skin managed|dsh-client-ui-skin-|ui-skin-/u)
     assert.equal(await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8'), '[]\n')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('retired legacy skins retain the compatible upgrade fallback instead of fresh-install defaults', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-retired-skin-fallback-'))
+  const profileDir = join(root, 'profiles', 'desktop')
+  try {
+    await mkdir(profileDir, { recursive: true })
+    await writeFile(join(profileDir, 'cordis.patch.yml'), '- insert:\n    - id: ui-skin-qq98\n      name: "@deepseek-ai/dsh-client-ui-skin-qq98"\n')
+    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    assert.deepEqual(JSON.parse(await readFile(join(root, 'skin-center-active.json'), 'utf8')), { active: 'blue-fantasy' })
+    assert.equal(JSON.parse(await readFile(join(profileDir, '.dsh-desktop-retired-skin.json'), 'utf8')).skinId, 'qq98')
+    await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
+    assert.deepEqual(JSON.parse(await readFile(join(root, 'skin-center-active.json'), 'utf8')), { active: 'blue-fantasy' })
   } finally {
     await rm(root, { recursive: true, force: true })
   }

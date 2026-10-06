@@ -29,7 +29,7 @@ const dshHome = join(temporary, 'dsh-home')
 const workspacePath = join(temporary, 'conversation-scroll-workspace')
 const profileDir = join(dshHome, 'profiles', 'desktop')
 const runtimeFetchGate = join(temporary, 'runtime-fetch-gate.txt')
-const runtimeReadyTimeoutMs = process.env.CI ? 180_000 : 120_000
+const runtimeReadyTimeoutMs = Math.max(process.env.CI ? 180_000 : 120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 0)
 const messageCount = 20
 const fixtureTitle = 'G02.5 turn 01'
 const nativeTurns = process.argv.includes('--native-turns')
@@ -452,6 +452,7 @@ async function assertDarkReadability(page) {
 
 try {
   await mkdir(profileDir, { recursive: true })
+  await writeFile(join(dshHome, 'settings.yaml'), 'particle-theme:\n  enabled: true\n')
   await mkdir(workspacePath, { recursive: true })
   await writeFile(runtimeFetchGate, 'open')
   await writeFile(join(workspacePath, 'reference-only.pdf'), 'PDF path-reference sentinel; this file is not parsed by the UI.\n')
@@ -616,7 +617,7 @@ try {
       const scroll = document.querySelector('[data-conversation-scroll]')
       return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
     })
-    await second.page.getByRole('button', { name: /工具|Tools/u }).click()
+    await second.page.getByRole('button', { name: '工具 / Tools', exact: true }).click()
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0)
     await second.page.keyboard.press('Escape')
     dark = await assertDarkReadability(second.page)

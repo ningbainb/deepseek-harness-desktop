@@ -1,5 +1,13 @@
 # Desktop upgrade and rollback
 
+## Windows installation location
+
+An in-app update targets the directory of the executable that is actually running, including installations on D or E. Manual Setup first respects an explicit `/D=` destination; otherwise it reuses a verified community installation from the current install registration, uninstall registration or 32-bit registry view, then tries the owned legacy registration. Fresh installations retain the standard installer default and directory chooser. Application identity stays fixed across releases.
+
+The location of a `.lnk` file does not determine where the application is installed: its target does. Standard Desktop and Start menu shortcuts are managed by Setup. A manually copied shortcut continues to work when its target is upgraded in place, but Setup does not search arbitrary drives for shortcuts or unregistered application copies. The existing transaction also protects recognized application directories referenced by its install and uninstall registrations; these are not the same as arbitrary manual copies. If an older duplicate on D or E is still the intended installation while registration points to C, initiate the update from that intended copy or explicitly select its directory in manual Setup. Keep unregistered copies and all data until the intended copy starts successfully; unresolved paths or permissions must not be treated as permission to delete user files.
+
+Installation directory selection is separate from Home, providers, conversation logs and projects. Failed replacement retains the existing transaction and rollback protections described below. Isolated NSIS directory fixtures verify path selection, not a full production Setup upgrade or arbitrary shortcut repair.
+
 ## 4.2.1 to 4.3.0
 
 4.3.0 keeps the exact DSH `0.1.6-alpha.2` runtime and existing Session format; it does not import the newly released DSH `0.1.7-alpha.1` or run its Session V4 migration. Existing sessions, project files, credentials, Skills, and plugin bytes remain outside direct migration writes. The new terminal Shell choice and Agent WSL permission are Desktop-owned preferences; the Agent WSL tool defaults to per-command approval, and an unreadable permission file fails closed.

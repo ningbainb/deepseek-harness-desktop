@@ -12,7 +12,7 @@ import { openNativeSettings } from './native-settings-fixture.mjs'
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-settings-window-e2e-'))
-const runtimeReadyTimeoutMs = process.env.CI ? 120_000 : 90_000
+const runtimeReadyTimeoutMs = Math.max(process.env.CI ? 120_000 : 90_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 0)
 let electronApp
 let page
 

@@ -19,6 +19,14 @@ import {
 
 const tick = () => new Promise((resolve) => setImmediate(resolve))
 
+test('Windows updater retains the exact running install directory instead of falling back to C', () => {
+  const updater = new EventEmitter()
+  new DesktopUpdateController({ updater, installDirectory: "E:\\用户 软件\\DeepSeek Harness Desktop", enabled: false })
+  assert.equal(updater.installDirectory, "E:\\用户 软件\\DeepSeek Harness Desktop")
+  new DesktopUpdateController({ updater, enabled: false })
+  assert.equal(updater.installDirectory, "E:\\用户 软件\\DeepSeek Harness Desktop")
+})
+
 class FakeUpdater extends EventEmitter {
   checks = 0
   downloads = 0

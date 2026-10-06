@@ -30,7 +30,10 @@ export function installConversationRendering() {
     const changed = new Set()
     for (const record of records ?? []) {
       const flow = record.target?.closest?.('[data-chat-flow]')
-      if (flow) { changed.add(flow); continue }
+      if (flow) {
+        if (record.target === flow) changed.add(flow)
+        continue
+      }
       for (const node of record.addedNodes) {
         if (node.matches?.('[data-chat-flow]')) changed.add(node)
         else for (const found of node.querySelectorAll?.('[data-chat-flow]') ?? []) changed.add(found)

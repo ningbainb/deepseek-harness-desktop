@@ -70,7 +70,7 @@ import {
   inspectMacCodeSignature,
   resolveUpdateAvailability,
 } from './unsigned-mac-preview.mjs'
-import { installApplicationMenu, installEditContextMenu } from './menu.mjs'
+import { installApplicationMenu, installEditContextMenu, installTrayResidencyShortcut } from './menu.mjs'
 import { installNavigationPolicy } from './navigation-policy.mjs'
 import { createDesktopNetworkDiagnostics } from './network-diagnostics.mjs'
 import {
@@ -1162,7 +1162,10 @@ export async function startElectronApp(metadata) {
   const getCloseBehavior = () => closeBehavior
   const synchronizeBackgroundMode = () => {
     if (!trayLifecycle) return
-    if (closeBehavior === CLOSE_BEHAVIORS.QUIT) trayLifecycle.dispose()
+    if (closeBehavior === CLOSE_BEHAVIORS.QUIT) {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) restoreDesktopWindow(mainWindow)
+      trayLifecycle.dispose()
+    }
     else trayLifecycle.ensure()
     void trayLifecycle.refresh()
   }
@@ -2954,7 +2957,7 @@ export async function startElectronApp(metadata) {
   }
   closeBehaviorController = createCloseBehaviorController({
     getCloseBehavior,
-    canMinimizeToTray: () => trayLifecycle?.available === true,
+    canMinimizeToTray: () => trayLifecycle?.ensure() === true,
     hideWindow: () => {
       if (!mainWindow || mainWindow.isDestroyed()) throw new Error('main window is unavailable')
       mainWindow.hide()
@@ -2982,6 +2985,7 @@ export async function startElectronApp(metadata) {
     getBypassReason: closeBypassReason,
     log: (error) => logStore.append(`[close-behavior] ${error.message}`),
   })
+  mainWindow.on('minimize', () => closeBehaviorController?.handleWindowMinimize())
   mainWindow.on('close', (event) => {
     const intercepted = closeBehaviorController?.handleWindowClose(event)
     if (!intercepted) {
@@ -3091,6 +3095,7 @@ export async function startElectronApp(metadata) {
   })
   updateController = new DesktopUpdateController({
     updater: autoUpdater,
+    installDirectory: app.isPackaged && process.platform === 'win32' ? dirname(app.getPath('exe')) : undefined,
     getWindow: () => mainWindow,
     // In development Electron reports its own framework version here. Use the
     // already resolved Desktop manifest version so the update surface and
@@ -3149,6 +3154,17 @@ export async function startElectronApp(metadata) {
   }
   updateController.on('status', publishUpdateStatus)
   const openLogs = () => shell.openPath(logsDirectory)
+  const minimizeToTray = () => {
+    if (!closeBehaviorController?.minimizeToTray() && mainWindow && !mainWindow.isDestroyed() && !closeBypassReason()) {
+      mainWindow.minimize()
+    }
+  }
+  const removeTrayResidencyShortcut = installTrayResidencyShortcut({
+    webContents: mainWindow.webContents,
+    minimizeToTray,
+    onActionError: error => logStore.append(`[tray-shortcut] ${error instanceof Error ? error.message : String(error)}`),
+  })
+  mainWindow.once('closed', removeTrayResidencyShortcut)
   refreshApplicationMenu = installApplicationMenu({
     Menu,
     app,
@@ -3179,6 +3195,7 @@ export async function startElectronApp(metadata) {
     },
     getCloseBehavior,
     setCloseBehavior,
+    minimizeToTray,
     onActionError: (error) => logStore.append(`[menu] ${error instanceof Error ? error.message : String(error)}`),
   })
   updateController.start()

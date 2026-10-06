@@ -12,6 +12,16 @@ test('regression suites classify their result only after their output pipes clos
   assert.doesNotMatch(source, /child\.on\('exit',/u)
 })
 
+test('CORE regression retains the real background-residency lifecycle verifier', async () => {
+  const source = await readFile(new URL('../scripts/run-regression-e2e.mjs', import.meta.url), 'utf8')
+  const core = source.slice(source.indexOf('const CORE_SUITES = ['), source.indexOf('const PACKAGED_SUITES = ['))
+  assert.match(core, /script: 'scripts\/verify-background-residency.mjs'/u)
+  const verifier = await readFile(new URL('../scripts/verify-background-residency.mjs', import.meta.url), 'utf8')
+  assert.match(verifier, /await verifyHiddenRuntime\(optedIn\)/u)
+  assert.match(verifier, /await quitFromTray\(\)/u)
+  assert.match(verifier, /owned\.every\(pid => !alive\(pid\)\)/u)
+})
+
 test('complete release regression includes the real original plugin configuration form and save', async () => {
   const source = await readFile(new URL('../scripts/run-regression-e2e.mjs', import.meta.url), 'utf8')
   const packagedSuites = source.slice(source.indexOf('const PACKAGED_SUITES = ['), source.indexOf('function runSuite('))

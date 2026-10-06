@@ -36,6 +36,36 @@ afterEach(() => {
 })
 
 describe('Desktop Extension Dock entry', () => {
+  it('ignores streamed chat changes and restores routing after sidebar replacement', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="插件">插件</button><button data-dsh-balance-entry><span data-dsh-balance-amount></span></button></aside><main data-pane="conversation"></main>'
+    const dispose = installDesktopManagementRouting(document, t)
+    await waitFor(() => expect(screen.getByRole('button', { name: '插件' }).dataset.dshDesktopManagementEntry).toBe('plugins'))
+    const sidebar = document.querySelector<HTMLElement>('[data-pane="sidebar"]')!
+    const conversation = document.querySelector<HTMLElement>('main')!
+    const amount = document.querySelector<HTMLElement>('[data-dsh-balance-amount]')!
+    const query = vi.spyOn(document, 'querySelector')
+    const sidebarQuery = vi.spyOn(sidebar, 'querySelectorAll')
+    for (let index = 0; index < 20; index++) {
+      conversation.textContent = `chunk ${index}`
+      amount.textContent = `${index}.00`
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+    expect(query).not.toHaveBeenCalled()
+    expect(sidebarQuery).not.toHaveBeenCalled()
+    query.mockRestore()
+    sidebarQuery.mockRestore()
+    const replacement = document.createElement('aside')
+    replacement.dataset.pane = 'sidebar'
+    replacement.innerHTML = '<button aria-label="插件">插件</button><button data-dsh-skill-explorer-entry>技能中心</button>'
+    sidebar.replaceWith(replacement)
+    const plugin = screen.getByRole('button', { name: '插件' })
+    await waitFor(() => expect(plugin.dataset.dshDesktopManagementEntry).toBe('plugins'))
+    fireEvent.click(plugin)
+    await waitFor(() => expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { tab: 'plugins' }))
+    dispose()
+    expect(plugin.dataset.dshDesktopManagementEntry).toBeUndefined()
+  })
+
   it('routes the current public skill-explorer entry without removing its native marker', async () => {
     document.body.innerHTML = '<aside data-pane="sidebar"><button aria-label="技能中心"><span data-dsh-panel-entry="skill-explorer">技能中心</span></button></aside>'
     const dispose = installDesktopManagementRouting(document, t)

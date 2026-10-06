@@ -8,6 +8,7 @@ import { zh, type SettingsCardKey } from './locales.ts'
 type Translate = (key: SettingsCardKey) => string
 
 export const BALANCE_ENTRY_SELECTOR = '[data-dsh-balance-entry]'
+export const USAGE_FOOTER_SELECTOR = '[data-dsh-usage-foot-card] button[data-dsh-part="foot-card-main"]'
 const SURFACE_NAVIGATION_EVENT = 'dsh-web-ui:surface-navigation'
 const SURFACE_ID = 'balance'
 
@@ -96,12 +97,20 @@ function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
 
 export function mountBalanceSidebarEntry(controller: BalanceController, t: Translate = key => zh[key]): () => void {
   let entry: HTMLButtonElement | undefined
+  let root: HTMLElement | undefined
   let observer: MutationObserver | undefined
   let unsubState: (() => void) | undefined
+  let footer: HTMLButtonElement | undefined
 
   const ensureEntry = (): void => {
-    const root = sidebarRoot()
+    if (!root?.isConnected) root = sidebarRoot()
     if (root === undefined) return
+    const sidebar = root.closest('[data-pane="sidebar"], [class*="sidebarCol"]') ?? root
+    footer = sidebar.querySelector<HTMLButtonElement>(USAGE_FOOTER_SELECTOR) ?? undefined
+    if (footer !== undefined) {
+      entry?.remove()
+      return
+    }
     if (entry === undefined) {
       entry = createEntry(controller, t)
       // Subscribe at creation time, not only at bootstrap: when the shell is
@@ -117,15 +126,24 @@ export function mountBalanceSidebarEntry(controller: BalanceController, t: Trans
     placeEntry(root, entry)
   }
 
-  observer = new MutationObserver(() => {
-    if (entry === undefined || !entry.isConnected) {
+  observer = new MutationObserver(records => {
+    if (!root?.isConnected) {
+      footer = undefined
       ensureEntry()
       return
     }
-    // Re-assert the slot: sibling plugin insertions push this entry down
-    // without disconnecting it, so presence alone is not enough.
-    const root = sidebarRoot()
-    if (root !== undefined) placeEntry(root, entry)
+    if (footer?.isConnected) return
+    if (footer !== undefined || entry === undefined || !entry.isConnected || records.some(record =>
+      [...record.addedNodes].some(node => node instanceof Element &&
+        (node.matches(USAGE_FOOTER_SELECTOR) || node.querySelector(USAGE_FOOTER_SELECTOR))))) {
+      ensureEntry()
+      return
+    }
+    if (entry.parentElement !== root || records.some(record =>
+      record.target === root || (record.target.parentElement === root
+        && record.target instanceof Element && record.target.matches('[class*="logoRow"]')))) {
+      placeEntry(root, entry)
+    }
   })
   observer.observe(document.body, { childList: true, subtree: true })
 

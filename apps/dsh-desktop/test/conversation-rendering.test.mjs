@@ -105,9 +105,20 @@ test('long-flow eligibility is counted once per batch and removed when the sessi
   const f = fixture(); f.install()
   let enabled = false, writes = 0
   const flow = { isConnected: true, childElementCount: 201,
+    closest: () => flow,
     hasAttribute: () => enabled, toggleAttribute: (_name, value) => { enabled = value; writes++ } }
-  const record = { target: { closest: () => flow }, addedNodes: [] }
+  const record = { target: flow, addedNodes: [] }
   f.allObservers[0].fn([record, record]); assert.equal(enabled, true); assert.equal(writes, 1)
   f.allObservers[0].fn([record]); assert.equal(writes, 1)
   flow.childElementCount = 40; f.allObservers[0].fn([record]); assert.equal(enabled, false); assert.equal(writes, 2)
+})
+
+test('token and markdown mutations do not recount an unchanged message list', () => {
+  const subject = fixture(); subject.install()
+  let reads = 0
+  const flow = { isConnected: true, get childElementCount() { reads++; return 201 },
+    hasAttribute: () => false, toggleAttribute: () => {} }
+  const record = { target: { closest: () => flow }, addedNodes: [] }
+  subject.allObservers[0].fn(Array.from({ length: 120 }, () => record))
+  assert.equal(reads, 0)
 })

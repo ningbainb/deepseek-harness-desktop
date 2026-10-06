@@ -1,6 +1,24 @@
 export interface DesktopPalette { background: string; foreground: string; accent: string; border: string }
 type Appearance = { theme: 'dark' | 'light'; palette: DesktopPalette | null }
 
+export function paletteContrast(background: string, foreground: string): number {
+  const luminance = (color: string) => {
+    const channels = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255)
+      .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
+  }
+  const colors = [luminance(background), luminance(foreground)]
+  return (Math.max(...colors) + 0.05) / (Math.min(...colors) + 0.05)
+}
+
+export function readableDesktopPalette(palette: DesktopPalette, dark: boolean): DesktopPalette {
+  if (paletteContrast(palette.background, palette.foreground) >= 4.5) return palette
+  const background = dark ? '#0a141b' : '#ffffff'
+  const foreground = paletteContrast(background, palette.foreground) >= 4.5
+    ? palette.foreground : dark ? '#e6f1f6' : '#0f1115'
+  return { ...palette, background, foreground }
+}
+
 export function opaqueColor(value: string): string | undefined {
   const hex = value.trim().match(/^#([\da-f]{3}|[\da-f]{6})$/i)?.[1]
   if (hex) return '#' + (hex.length === 3 ? [...hex].map(c => c + c).join('') : hex).toLowerCase()
@@ -33,6 +51,7 @@ export function surfaceColor(value: string, background: string): string {
 /** Synchronize declarative colors only; skin scripts receive no desktop authority. */
 export function installDesktopAppearance(window: Window): () => void {
   const { document } = window
+  if (new URLSearchParams(window.location.search).has('desktop-dock-setting')) return () => {}
   const desktop = (window as Window & { dshDesktop?: { setWindowChromeTheme?: (theme: string, palette: DesktopPalette | null) => Promise<unknown> } }).dshDesktop
   let previous = '', timer: ReturnType<typeof setTimeout> | undefined
   const apply = (value: Appearance) => {
@@ -53,12 +72,12 @@ export function installDesktopAppearance(window: Window): () => void {
     const dark = document.body.hasAttribute('data-ds-dark-theme') || style.colorScheme === 'dark'
     const base = opaqueColor(style.backgroundColor) ?? opaqueColor(window.getComputedStyle(root).backgroundColor) ?? (dark ? '#071117' : '#f7f8fa')
     const background = token('--dsw-alias-bg-layer-1', base)
-    const value: Appearance = { theme: dark ? 'dark' : 'light', palette: skin && skin !== 'official' ? {
+    const value: Appearance = { theme: dark ? 'dark' : 'light', palette: skin && skin !== 'official' ? readableDesktopPalette({
       background,
       foreground: token('--dsw-alias-label-primary', dark ? '#d9edf4' : '#1f2937'),
       accent: token('--dsw-alias-brand-primary', '#416bd4'),
       border: token('--dsw-alias-border-l2', background),
-    } : null }
+    }, dark) : null }
     const key = JSON.stringify(value)
     if (key === previous) return
     previous = key

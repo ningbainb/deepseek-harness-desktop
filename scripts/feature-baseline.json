@@ -43,6 +43,7 @@
         "wide-sidebar-extension-dock-label",
         "desktop-control-actions-require-approval",
         "desktop-plugin-center-single-destination",
+        "management-routing-ignores-streamed-text-and-restores-replaced-sidebar",
         "conversation-plugin-management-entry",
         "conversation-skill-management-entry",
         "rc2-public-skill-panel-marker-routes-to-retained-dock",
@@ -236,6 +237,8 @@
         "empty-session-has-no-stats-supplement",
         "distinct-rolling-and-peak-throughput",
         "balance-follows-native-model-selection",
+        "balance-sidebar-caches-shell-and-restores-sibling-anchor-without-stream-scans",
+        "single-today-spending-sidebar-entry-with-compatible-balance-fallback",
         "provider-key-cache-isolation",
         "rc2-host-settings-read-with-ordinary-credential-references",
         "relay-balance-and-site-quota",
@@ -361,6 +364,8 @@
         "preserve-sidebar-tabs-width-and-default-open-settings",
         "sidebar-npm-patch-retains-preload-context-after-runtime-navigation",
         "sidebar-layout-anchors-follow-panels-and-clean-up-only-owned-attributes",
+        "optional-tools-collapse-without-moving-native-react-nodes",
+        "persistent-accessible-tools-toggle-keeps-workspaces-and-session-actions-visible",
         "startup-package-resolution-prefers-physical-unpacked-sdk-tree",
         "startup-host-identity-checks-remain-complete-and-bounded-parallel",
         "chat-recovery-joins-native-chat-history-and-session-lifecycle",
@@ -474,6 +479,9 @@
         "native-bottom-action-deduplication",
         "navigation-remount-and-empty-session-roundtrip",
         "offscreen-message-layout-with-native-content-retained",
+        "stream-token-mutations-do-not-trigger-sidebar-layout-sweeps-or-flow-recounts",
+        "context-tooltip-does-not-trap-fixed-position-in-accessory-blur",
+        "offscreen-native-panels-cannot-scroll-the-desktop-grid-away",
         "bounded-native-jump-settling-yields-to-reader"
       ]
     },
@@ -481,6 +489,17 @@
       "id": "directory-picker",
       "name": "项目文件夹原生选择与工作区导入",
       "e2eScript": "scripts/verify-directory-picker.mjs"
+    },
+    {
+      "id": "background-tray-residency",
+      "name": "后台最小化驻留、托盘恢复与安全退出",
+      "e2eScript": "scripts/verify-background-residency.mjs",
+      "features": [
+        "explicit-native-menu-tray-residency-preserves-close-preferences",
+        "opt-in-titlebar-minimize-hides-to-tray-with-live-runtime",
+        "tray-restoration-persistent-choice-and-unavailable-tray-taskbar-fallback",
+        "tray-quit-reaps-owned-runtime-processes"
+      ]
     },
     {
       "id": "runtime-provider",
@@ -590,6 +609,8 @@
         "locked-legacy-committed-backup-does-not-block-next-upgrade",
         "stable-installer-transaction-helper",
         "explicit-64-and-32-bit-uninstall-registry-transaction",
+        "updater-passes-running-windows-install-directory",
+        "explicit-directory-and-registered-uninstall-location-survive-upgrades",
         "missing-packaged-profile-links-retired-with-manifest-backup",
         "community-plugin-settings-compatible-with-pinned-runtime",
         "compiled-nsis-commit-and-failure-callback-regression",
@@ -738,6 +759,8 @@
         "draft-close-guard",
         "centered-on-open",
         "synchronized-theme",
+        "opaque-dock-surfaces-without-blur-gradients-or-hover-lift",
+        "readable-sidebar-keeps-fifteen-destinations-search-and-keyboard-focus",
         "relay-browser-connect",
         "relay-model-entry-login-and-wallet",
         "relay-only-selected-or-default-bai-login-preserves-other-providers-and-draft",
@@ -845,7 +868,25 @@
       "id": "skin-center",
       "name": "皮肤中心即时试穿、持久化与背景控制",
       "uiSelector": "body[data-dsh-skin-center]",
-      "e2eScript": "scripts/verify-skin-center.mjs"
+      "e2eScript": "scripts/verify-skin-center.mjs",
+      "features": [
+        "fresh-profile-official-skin-without-particle-overlay",
+        "appearance-initialization-does-not-overwrite-existing-skin-background-or-settings"
+      ]
+    },
+    {
+      "id": "beta-usability",
+      "name": "内测默认外观、流式完整性与工具折叠可用性",
+      "uiSelector": "[data-dsh-tools-toggle]",
+      "e2eScript": "scripts/verify-beta-usability.mjs",
+      "features": [
+        "real-local-provider-progressive-chinese-and-code-output",
+        "collapsed-tools-preserve-workspaces-sessions-dock-and-keyboard-access",
+        "single-footer-dock-entry-with-legacy-shell-fallback",
+        "retained-skin-context-hover-remains-stable",
+        "dark-dock-skin-palette-meets-text-contrast",
+        "small-window-layout-and-expanded-state-restart-restoration"
+      ]
     },
     {
       "id": "project-create-dialog",
@@ -942,14 +983,16 @@
     },
     {
       "id": "selected-model-balance",
-      "name": "余额跟随原生模型选择与服务商凭据隔离",
-      "uiSelector": "[data-dsh-balance-entry]",
+      "name": "今日消费单入口与兼容余额跟随原生模型选择",
+      "uiSelector": "[data-dsh-usage-foot-card] button[data-dsh-part=\"foot-card-main\"]",
       "e2eScript": "scripts/verify-selected-balance.mjs",
       "features": [
         "native-picker-official-relay-round-trip",
         "provider-owned-credentials",
         "no-paid-model-probes",
-        "failed-refresh-clears-stale-balance"
+        "failed-refresh-clears-stale-balance",
+        "single-today-spending-entry-and-official-settings-navigation",
+        "disabled-usage-card-restores-model-balance-and-reenable-deduplicates"
       ]
     },
     {

@@ -45,6 +45,7 @@ try {
   page = await app.firstWindow()
   page.on('pageerror', error => rendererErrors.push(error.message))
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
+  await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: startupTimeout })
   await page.reload()
   await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: 60000 })
   const openSettings = async () => {
@@ -125,7 +126,9 @@ try {
   const dockPromise = app.waitForEvent('window', {
     predicate: candidate => candidate.url().includes('extensions.html'), timeout: 10000,
   }).catch(() => app.windows().find(candidate => candidate.url().includes('extensions.html')))
-  await page.getByRole('button', { name: '扩展坞', exact: true }).click()
+  assert.equal(await page.locator('[data-dsh-dock-entry]').count(), 0)
+  assert.equal(await page.locator('[data-dsh-extension-dock-entry] button').count(), 1)
+  await page.locator('[data-dsh-extension-dock-entry] button').click()
   const dock = await dockPromise
   assert.ok(dock, 'the exact left sidebar Extension Dock button must open its window through an ordinary click')
   await dock.waitForLoadState('domcontentloaded')

@@ -143,6 +143,18 @@ test('tray falls back to a valid native image and failures never abort desktop s
   assert.ok(diagnostics.some((line) => line.includes('shell tray unavailable')))
 })
 
+test('failed tray initialization disposes its native icon instead of leaking an unreachable entry', () => {
+  FakeTray.created = []
+  class FailedInitializationTray extends FakeTray {
+    setToolTip() { throw new Error('tooltip initialization failed') }
+  }
+  const { lifecycle } = createHarness({ Tray: FailedInitializationTray })
+  assert.equal(lifecycle.ensure(), false)
+  assert.equal(lifecycle.available, false)
+  assert.equal(FakeTray.created.length, 2)
+  assert.ok(FakeTray.created.every(tray => tray.destroyed))
+})
+
 test('restore helper treats absent or destroyed windows as a safe no-op', () => {
   assert.equal(restoreDesktopWindow(undefined), false)
   assert.equal(restoreDesktopWindow({ isDestroyed: () => true }), false)

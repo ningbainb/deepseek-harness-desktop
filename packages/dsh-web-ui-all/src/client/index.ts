@@ -19,6 +19,7 @@ import './sidebar-rail.module.css'
 import './dock-entry.module.css'
 import { installTurnNavigator } from './turn-navigator.ts'
 import { mountDockEntry } from './dock-entry.ts'
+import { needsShimPass } from './shim-observer.ts'
 
 /** Column shims: element selector → attribute to stamp. */
 const COLUMN_SHIMS: ReadonlyArray<readonly [selector: string, attribute: string]> = [
@@ -117,25 +118,6 @@ function applyShims(): boolean {
   return changed
 }
 
-/**
- * Coalesce mutation bursts into one pass per frame. React renders burst
- * dozens of subtree mutations per commit; stamping on every single mutation
- * callback turned each render into many querySelector sweeps. A scheduled
- * rAF plus a done flag folds the whole burst into a single pass, and the
- * idempotence check stops the work entirely once every attribute is set.
- */
-function schedulePass(): void {
-  if (shimScheduled) return
-  shimScheduled = true
-  requestAnimationFrame(() => {
-    shimScheduled = false
-    applyShims()
-  })
-}
-
-/** True while a coalesced pass is pending. */
-let shimScheduled = false
-
 /** Required services: none — the shim must run before any DOM mount waits. */
 export const inject = [] as const
 
@@ -146,25 +128,58 @@ export const inject = [] as const
 export function apply(ctx: Context): void {
   ctx.effect(() => {
     applyShims()
+    let frame: number | undefined
+    let disposed = false
+    let sidebarWidth: number | undefined
+    let sidebar = document.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]')
+    let columns = COLUMN_SHIMS.flatMap(([selector]) => {
+      const column = document.querySelector(selector)
+      return column ? [column] : []
+    })
+    const schedulePass = (): void => {
+      if (disposed || frame !== undefined) return
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        applyShims()
+        const nextSidebar = document.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]')
+        if (nextSidebar !== sidebar) {
+          if (sidebar) resizeObserver?.unobserve(sidebar)
+          sidebar = nextSidebar
+          sidebarWidth = undefined
+          if (sidebar) resizeObserver?.observe(sidebar)
+        }
+        columns = COLUMN_SHIMS.flatMap(([selector]) => {
+          const column = document.querySelector(selector)
+          return column ? [column] : []
+        })
+      })
+    }
     // The shell renders after boot settlement and React can re-create the
     // columns on re-render; re-stamp on any DOM mutation. The callback only
     // schedules a coalesced pass — mutations never run the sweep inline, and
     // the pass short-circuits once every attribute is in place. Writes only
     // the same attribute values, so this never fights React.
-    const observer = new MutationObserver(schedulePass)
+    const observer = new MutationObserver(records => {
+      if (needsShimPass(records, sidebar, columns)) schedulePass()
+    })
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-wide', 'data-rail'] })
 
     let resizeObserver: ResizeObserver | undefined
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(schedulePass)
-      const sidebar = document.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]')
+      resizeObserver = new ResizeObserver(entries => {
+        const entry = entries.find(item => item.target === sidebar)
+        if (!entry || entry.contentRect.width === sidebarWidth) return
+        sidebarWidth = entry.contentRect.width
+        schedulePass()
+      })
       if (sidebar) resizeObserver.observe(sidebar)
     }
 
     return () => {
+      disposed = true
       observer.disconnect()
       resizeObserver?.disconnect()
-      shimScheduled = false
+      if (frame !== undefined) cancelAnimationFrame(frame)
     }
   })
 
