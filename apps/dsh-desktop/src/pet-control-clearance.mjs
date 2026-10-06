@@ -34,13 +34,15 @@ export function installPetControlClearance(resolveOffset) {
       positionObserver.disconnect()
       sprite = next
       floating = sprite?.parentElement
+      while (floating && floating.parentElement && !floating.matches('[data-dsh-pet-root]')
+        && getComputedStyle(floating).position !== 'fixed') floating = floating.parentElement
       if (floating) {
         previousTranslate = floating.style.translate
         positionObserver.observe(floating, { attributes: true, attributeFilter: ['style'] })
       }
     }
     if (!floating) return
-    const bounds = sprite.getBoundingClientRect()
+    const bounds = floating.getBoundingClientRect()
     const original = { left: bounds.left - offset.x, top: bounds.top - offset.y, width: bounds.width, height: bounds.height }
     const controls = [...document.querySelectorAll(selector)].filter(control => !control.closest('[data-dsh-pet-root]'))
       .map(control => control.getBoundingClientRect()).filter(control => control.width > 0 && control.height > 0)

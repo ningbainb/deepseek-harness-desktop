@@ -33,10 +33,11 @@ test('pet clearance does not hide or shrink a pet when the viewport has no safe 
 })
 
 test('the clearance controller preserves drag styles, pet actions and restores its transient offset on disposal', () => {
-  const dom = new JSDOM('<div data-dsh-pet-root><div style="right:24px;bottom:120px"><div role="button" tabindex="0">Pet</div></div></div><button data-dsh-relay-model-entry>Model</button>', { runScripts: 'outside-only' })
+  const dom = new JSDOM('<div data-dsh-pet-root><div style="position:fixed;right:24px;bottom:120px"><div data-sprite-wrap><div role="button" tabindex="0">Pet</div></div></div></div><button data-dsh-relay-model-entry>Model</button>', { runScripts: 'outside-only' })
   const { window } = dom
   const sprite = window.document.querySelector('[role="button"]')
-  const floating = sprite.parentElement
+  const wrapping = sprite.parentElement
+  const floating = wrapping.parentElement
   let translation = ''
   let translationWrites = 0
   Object.defineProperty(floating.style, 'translate', {
@@ -50,7 +51,7 @@ test('the clearance controller preserves drag styles, pet actions and restores i
   window.requestAnimationFrame = callback => { frames.set(++serial, callback); return serial }
   window.cancelAnimationFrame = identifier => frames.delete(identifier)
   Object.defineProperties(window, { innerWidth: { value: 880 }, innerHeight: { value: 600 } })
-  sprite.getBoundingClientRect = () => {
+  floating.getBoundingClientRect = () => {
     const [horizontal = 0, vertical = 0] = (floating.style.translate || '0px 0px').split(' ').map(Number.parseFloat)
     return { left: 720 + horizontal, top: 420 + vertical, width: 100, height: 160 }
   }
@@ -60,6 +61,7 @@ test('the clearance controller preserves drag styles, pet actions and restores i
   try {
     window.eval(PET_CONTROL_CLEARANCE_SCRIPT)
     assert.notEqual(floating.style.translate, '')
+    assert.equal(wrapping.style.translate, '', 'the sprite wrapper cannot leave its original floating hitbox behind')
     assert.equal(floating.style.right, '24px')
     assert.equal(floating.style.bottom, '120px')
     assert.equal(sprite.tabIndex, 0)
