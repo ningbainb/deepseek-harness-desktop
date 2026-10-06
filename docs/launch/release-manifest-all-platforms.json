@@ -1,56 +1,56 @@
 {
   "schemaVersion": 1,
-  "version": "5.0.0",
-  "tag": "desktop-v5.0.0",
-  "commit": "b78af2ef9e310ae9996908ba6a9ccb27add80621",
-  "publishedAt": "2026-10-04T03:09:38Z",
-  "releaseUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0",
+  "version": "5.0.1",
+  "tag": "desktop-v5.0.1",
+  "commit": "24650aa59811e37edeaf0f2dd5f97bfbb04802bd",
+  "publishedAt": "2026-10-06T18:22:28Z",
+  "releaseUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1",
   "checksumAsset": {
     "file": "SHA256SUMS.txt",
-    "sha256": "c00227e2c30c7bde6d2360096ba7303b002a7d10cb088d5a8d8526ede8de2597"
+    "sha256": "c95dc5c08904ffde49a60d53fc2239c6b6dff70ceaee0bd325947ce8eba6e702"
   },
   "windowsBuildManifest": "release-manifest.json",
   "note": "The combined receipt and public Windows manifest are consistent. All five public installation files were verified against actual bytes, GitHub asset sizes and available GitHub digests. Platform capability boundaries and unsigned status remain explicit.",
   "files": [
     {
-      "file": "DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe",
+      "file": "DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe",
       "platform": "windows-x64",
       "status": "stable",
       "signature": "unsigned",
-      "size": 325650740,
-      "sha256": "4d9a4c79c9c87950f35beb7123498ec6266d943e0059835b9302d3d4a613da5b"
+      "size": 325656174,
+      "sha256": "cfa5822311f810cbf2a593206c8c7ff9c01cac1796d37d7a40acff79a62c134b"
     },
     {
-      "file": "DeepSeek-Harness-Desktop-5.0.0-arm64.dmg",
+      "file": "DeepSeek-Harness-Desktop-5.0.1-arm64.dmg",
       "platform": "macos-arm64",
       "status": "preview",
       "signature": "unsigned-unnotarized",
-      "size": 359796157,
-      "sha256": "081b14ae2d0a35ea4524f394ce1e64585f8691143a4c3c78d5913de4a6a942b8"
+      "size": 359798248,
+      "sha256": "499ae386da7fc059b55ed21ba7ca31321176e4d200cb71a8455065ca623951ee"
     },
     {
-      "file": "DeepSeek-Harness-Desktop-5.0.0-arm64.zip",
+      "file": "DeepSeek-Harness-Desktop-5.0.1-arm64.zip",
       "platform": "macos-arm64",
       "status": "preview",
       "signature": "unsigned-unnotarized",
-      "size": 371459878,
-      "sha256": "db7079439ec3e900f8067e96bd4188f352da5bf1fcd66a163f46a5e50de338be"
+      "size": 371465543,
+      "sha256": "8b45aeee001529e8aa5a4972a448513f2d171ce203887eb6a2dfc8dc7d9a06f0"
     },
     {
-      "file": "DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage",
+      "file": "DeepSeek-Harness-Desktop-5.0.1-x86_64.AppImage",
       "platform": "linux-x64",
       "status": "preview",
       "signature": "unsigned",
-      "size": 343924365,
-      "sha256": "cd767632277278ff809a8654d30f55c27928d9ccdb07be8518a4b2ad010d18ca"
+      "size": 343932261,
+      "sha256": "a8cc1b4ffc6cba41684e18b9ea82d0dfdbb3eb3c71dcd80fab0ff1a899abe78a"
     },
     {
-      "file": "DeepSeek-Harness-Desktop-5.0.0-amd64.deb",
+      "file": "DeepSeek-Harness-Desktop-5.0.1-amd64.deb",
       "platform": "linux-x64",
       "status": "preview",
       "signature": "unsigned",
-      "size": 271804940,
-      "sha256": "bcb6ade082ceca161f91bb138544b08cb87d4004d6a60ebbb4cf5b19ae104dce"
+      "size": 271812836,
+      "sha256": "3e5f6ed6cc8edb7ee32f43fe694216c21b2985791316ee42886c1ae205140f77"
     }
   ]
 }

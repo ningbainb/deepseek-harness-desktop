@@ -42,6 +42,25 @@ Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git 
 
 [Product Site](https://1521003.xyz/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
+### 5.0.1: lighter streaming, clearer sidebars, one release across three platforms
+
+[5.0.1 installation packages](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1) are published together for Windows x64, macOS arm64 Preview and Linux x64 Preview. Official NPM Runtime remains `0.2.0-rc.2`. Native verification, packaging and smoke passed on all three platforms; Windows source regression passed 27/27 and full packaged regression passed 43/43. Disposable Runners verified real fresh installation, 4.3.0 and 5.0.0 overlay upgrades, same-version reinstall and data-preserving relaunch, not every historical version or physical device.
+
+- **Clean defaults**: new profiles use the official appearance; upgrades preserve existing skins, backgrounds and explicit preferences. All 15 bundled skins remain selectable.
+- **Lighter streaming**: text and Markdown updates avoid repeated sidebar scans while retaining complete Chinese text, code, tool output and turn navigation, never truncating content for speed.
+- **More sidebar space**: tools collapse, expand by keyboard and restore after restart. The footer Dock and Today spending are the sole primary shortcuts, keeping workspaces and conversations accessible.
+- **Readable dark Dock**: opaque panels replace glass effects and warm navigation clears stale palettes. All 15 destinations, feature search and keyboard focus remain; context tooltips avoid repeated flicker.
+- **Background operation and reliable upgrades**: the menu supports tray minimization, restoration and explicit exit. Windows upgrades recognize the existing directory, retaining backups, rollback and old/new model providers.
+- **Complete workbench and privacy**: collaboration, Skills, plugin-detail configuration, independent third-party APIs, bai authorization and history protection remain available. Anonymous metrics exclude user content and credentials.
+
+All packages are unsigned; macOS is unnotarized. Verify the same Release's [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt). [Release notes](docs/launch/release-notes.md) and the [actual asset receipt](docs/launch/release-manifest-all-platforms.json) define the boundaries. Screenshots use the same-release-commit candidate in isolated Windows acceptance. Configuration images combine simultaneous real host and embedded WebContents captures without injecting user conversations; they are not macOS/Linux screenshots or physical-device acceptance.
+
+| Official appearance and collapsed tools | Expanded tools remain accessible |
+| --- | --- |
+| ![5.0.1 Windows official appearance](docs/screenshots/desktop-5.0.1/main.png) | ![5.0.1 Windows expanded tools](docs/screenshots/desktop-5.0.1/sidebar-expanded.png) |
+| Dark Model Collaboration | Plugin center |
+| ![5.0.1 Windows dark Model Collaboration](docs/screenshots/desktop-5.0.1/collaboration.png) | ![5.0.1 Windows plugin center](docs/screenshots/desktop-5.0.1/plugins.png) |
+
 ### 5.0.0: reliable upgrades, one version across three platforms
 
 5.0.0 pins the official NPM DSH `0.2.0-rc.2` and uses the public `dsh-web-all@0.4.4` carrier with Desktop-owned adaptations, without changing official source. [Windows x64, macOS arm64 and Linux x64 are released together](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0) after native platform gates passed. Windows passed all 40 packaged regression suites and disposable-runner production Setup checks for fresh installation, 4.3.0 overlay upgrade and relaunch. macOS/Linux remain Preview; all packages are unsigned and macOS is unnotarized. Verify downloads against the same release's SHA-256 receipt and back up important data before upgrading.
@@ -53,7 +72,7 @@ Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git 
 - **Clear terminal and control boundaries**: PowerShell, PowerShell 7, WSL and CMD remain selectable. Agent WSL requires separate approval; Browser Use and Computer Use default off and restore configuration after failed transitions.
 - **Three platforms and privacy**: native Runners validate each platform independently. Packages are unsigned and macOS is unnotarized. Official packages include anonymous usage metrics, never conversations, code, paths, screenshots or credentials; development and test builds remain disconnected.
 
-[Upstream sync ledger](docs/upstream-web-sync.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md) · [5.0.0 release notes](docs/launch/release-notes.md)
+[Upstream sync ledger](docs/upstream-web-sync.md) · [Upgrade and Rollback](docs/upgrade-and-rollback.md) · [5.0.0 release notes](docs/launch/release-notes-5.0.0.md)
 
 These are isolated 5.0.0 Windows runtime captures, not macOS or Linux acceptance. Dock configuration images combine the real window and embedded WebContents captures without injecting user data.
 
@@ -114,7 +133,7 @@ The chat picker, model settings, and collaboration controller/worker pickers sha
 
 ![DeepSeek Harness Desktop 5.0.0 Windows bai model access](docs/screenshots/desktop-5.0.0/bai-models.png)
 
-See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [5.0.0 release notes](docs/launch/release-notes.md) for the implementation boundaries.
+See [Desktop architecture and capabilities](docs/desktop.md), [Upgrade and Rollback](docs/upgrade-and-rollback.md), and the [5.0.0 release notes](docs/launch/release-notes-5.0.0.md) for the implementation boundaries.
 
 ## Why DeepSeek Harness Desktop
 

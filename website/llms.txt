@@ -1,11 +1,11 @@
 # DeepSeek Harness Desktop
 
-> Community-maintained open-source AI coding desktop. Desktop 5.0.0 uses public `@deepseek-ai/dsh@0.2.0-rc.2`, prioritizes reliable upgrades and is published as one version across Windows, macOS and Linux. Native tests, packaging and smoke checks passed on all three platforms.
+> Community-maintained open-source AI coding desktop. Desktop 5.0.1 uses public `@deepseek-ai/dsh@0.2.0-rc.2`, prioritizes reliable upgrades and is published as one version across Windows, macOS and Linux. Native tests, packaging and smoke checks passed on all three platforms.
 
 ## Canonical identity
 
 - Product: DeepSeek Harness Desktop
-- Version: 5.0.0, published 2026-10-04 UTC
+- Version: 5.0.1, published 2026-10-06 UTC
 - Platforms: Windows 10/11 x64 stable; macOS Apple Silicon arm64 Preview; Linux x64 Preview
 - License: BSD-3-Clause
 - Maintainer: ningbai牛逼
@@ -17,17 +17,22 @@
 - Source repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe
-- macOS arm64 Preview DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-5.0.0-arm64.dmg
-- Linux x64 Preview AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage
-- v5.0.0 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0
-- SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/SHA256SUMS.txt
-- Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.0/release-manifest.json
+- Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe
+- macOS arm64 Preview DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-5.0.1-arm64.dmg
+- Linux x64 Preview AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-5.0.1-x86_64.AppImage
+- v5.0.1 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1
+- SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt
+- Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/release-manifest.json
 - Privacy policy: https://1521003.xyz/privacy.html
 
-## Published 5.0.0
+## Published 5.0.1
 
-- Desktop 5.0.0 uses official NPM Runtime 0.2.0-rc.2 with public dsh-web-all 0.4.4 and reviewed Desktop adapters. Release run 37168324503 passed all three native platform jobs; Windows packaged regression passed 40/40 with new-install and 4.3.0 upgrade checks on disposable runners. Other installed versions and physical macOS/Linux devices are not covered by those checks.
+- New profiles use the official appearance while upgrades retain skins and explicit preferences. Streaming avoids repeated sidebar scans without truncating text, code or tool output; this is not a guarantee of stall-free behavior on every device.
+- Sidebar tools collapse, expand by keyboard and persist across restart; the footer Dock and Today spending are the sole primary shortcuts. Opaque light/dark Dock panels clear stale palettes and retain all 15 destinations, search and focus.
+- The App menu supports tray minimization, restoration, explicit exit and taskbar fallback. Windows updates recognize existing installation directories and retain transactional backup and rollback.
+- Current screenshots are isolated Windows captures of the same-release-commit candidate, not macOS/Linux screenshots or physical-device acceptance; configuration captures combine simultaneous real host and embedded WebContents views.
+
+- Desktop 5.0.1 uses official NPM Runtime 0.2.0-rc.2 with public dsh-web-all 0.4.4 and reviewed Desktop adapters. Release run 37499057103 passed all three native platform jobs; Windows packaged regression passed 43/43, source regression 27/27, with fresh installation, 4.3.0 and 5.0.0 upgrades, same-version overlays and data-preserving relaunch on disposable runners. Other installed versions and physical macOS/Linux devices are not covered by those checks.
 - bai authorization discovers and refreshes the actual model catalog, preferring available deepseek-flash. Authentication errors offer browser sign-in; there is no automatic payment or resend.
 - Official builds include anonymous, opt-out product metrics; conversation content, prompts, code, paths and API keys are not collected.
 - Large histories use authenticated fragmentation and complete reassembly without truncating messages or tool output. A logical message exceeding 32 MiB fails explicitly.

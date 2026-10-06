@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.0.1 - 2026-10-06
+
+- 三端同版发布，官方 Runtime 保持 `0.2.0-rc.2`；新用户默认官方皮肤，保留升级用户的皮肤与明确保存的偏好。
+- 流式文本和 Markdown 更新避开重复兼容扫描，保留完整输出；侧栏工具支持折叠、键盘展开与重启保持，保留底部拓展坞和今日消费入口。
+- 拓展坞去除玻璃效果，修复浅色导航文字对比度及暗色暖导航旧配色；保留 15 个入口、搜索及键盘焦点，改善上下文提示闪动。
+- 补齐托盘最小化、恢复、明确退出及不可用回退；Windows 覆盖升级识别原安装目录，保留事务备份、回滚及用户数据。
+- 正式原生门禁全部通过：Windows 源码 27/27、完整打包回归 43/43，真实 Setup 新装、4.3.0/5.0.0 覆盖、同版重装及重启数据保全；三端打包校验及启动冒烟通过。
+- Windows 未签名；macOS 未签名、未公证，macOS/Linux 仍为 Preview。保留匿名埋点与第三方 API，未验证所有物理设备或生产埋点入库。
+
+- One release across three platforms with official Runtime `0.2.0-rc.2`. New users start with the official appearance; upgrades preserve skins and explicit preferences.
+- Streaming text and Markdown avoid repeated compatibility scans without truncation. Sidebar tools collapse, support keyboard expansion and persist across restart, keeping footer Dock and Today spending shortcuts.
+- Opaque Dock panels fix light navigation contrast and stale palettes after dark warm navigation, preserving 15 destinations, search and keyboard focus while reducing context-tooltip flicker.
+- Tray minimization, restoration, explicit quit and fallback are covered. Windows overlays recognize the existing directory with transactional backups, rollback and data preservation.
+- Formal native gates passed: Windows source 27/27, complete packaged regression 43/43, real Setup fresh/4.3.0/5.0.0 upgrades, reinstall and data-preserving relaunch; all three platforms passed package verification and smoke.
+- Windows is unsigned; macOS is unsigned and unnotarized, and macOS/Linux remain Preview. Anonymous metrics and independent APIs remain; physical-device breadth and production ingestion are not verified.
+
 ## 5.0.0 - 2026-10-04
 
 - 三端同版发布：Windows x64、macOS arm64 Preview 与 Linux x64 Preview 安装包来自同一 `desktop-v5.0.0` 标签；Windows 未签名，macOS 未签名、未公证。

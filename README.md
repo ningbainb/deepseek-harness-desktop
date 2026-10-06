@@ -42,6 +42,25 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 
 [产品介绍](https://1521003.xyz/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
+### 5.0.1：输出更顺，侧栏更清楚，三端同版
+
+[5.0.1 正式安装包](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1)已在 Windows x64、macOS arm64 Preview、Linux x64 Preview 同版发布。官方 NPM Runtime 保持 `0.2.0-rc.2`；三端原生验证、打包和启动冒烟通过，Windows 源码回归 27/27、完整打包回归 43/43。隔离 Runner 验证真实新装、4.3.0 和 5.0.0 覆盖升级、同版重装及重启数据保全；不是所有历史版本或物理设备验收。
+
+- **默认更清爽**：新用户使用官方原生皮肤，升级保留已有皮肤、背景和明确保存的设置，15 款内置皮肤仍可选择。
+- **流式输出减负**：文本和 Markdown 更新避开重复侧栏扫描，完整保留中文、代码、工具结果与轮次导航，不靠截断内容提速。
+- **侧栏让出空间**：工具支持折叠、键盘展开与重启恢复；仅保留底部拓展坞入口和今日消费，工作区及会话列表继续可用。
+- **暗色拓展坞可读**：纯色面板替代玻璃效果，暖导航清除旧配色；15 个入口、功能搜索和键盘焦点保留，上下文提示避免反复闪动。
+- **后台与升级更可靠**：菜单支持最小化到托盘、恢复和明确退出；Windows 升级识别原安装目录，事务备份、失败回滚及新旧模型配置保全继续提供。
+- **完整工作台与隐私**：模型协作、Skills、插件详情配置、第三方 API、bai 授权和历史会话保护继续可用；匿名埋点不采集用户正文或凭据。
+
+三端均未签名，macOS 未公证。请核对同 Release 的 [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt)；[发布说明](docs/launch/release-notes.md)与[实际资产清单](docs/launch/release-manifest-all-platforms.json)记录边界。截图来自同发布提交的候选包 Windows 隔离验收；配置页由真实窗口与内嵌 WebContents 同步采集合成，不注入用户对话，不代表 macOS/Linux 截图或物理设备验收。
+
+| 官方默认皮肤与折叠侧栏 | 展开工具仍可访问 |
+| --- | --- |
+| ![5.0.1 Windows 官方默认皮肤](docs/screenshots/desktop-5.0.1/main.png) | ![5.0.1 Windows 工具展开](docs/screenshots/desktop-5.0.1/sidebar-expanded.png) |
+| 暗色模型协作 | 插件中心 |
+| ![5.0.1 Windows 暗色模型协作](docs/screenshots/desktop-5.0.1/collaboration.png) | ![5.0.1 Windows 插件中心](docs/screenshots/desktop-5.0.1/plugins.png) |
+
 ### 5.0.0：稳定升级，三端同版
 
 5.0.0 锁定官方 NPM DSH `0.2.0-rc.2`，使用公开 `dsh-web-all@0.4.4` 与 Desktop 专有适配，不修改官方源码。[Windows x64、macOS arm64、Linux x64 已同版发布](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0)，三端原生门禁通过；Windows 完整打包回归 40/40，并在隔离 Runner 验证真实新装、4.3.0 覆盖升级及重启。macOS/Linux 仍为 Preview；三端未签名，macOS 未公证。下载按同目录 SHA-256 核验，升级前保留重要数据备份。
@@ -53,7 +72,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 - **终端与操控边界清楚**：保留 PowerShell、PowerShell 7、WSL、CMD 选择；Agent WSL 独立审批，Browser Use 和 Computer Use 默认关闭，启停失败恢复原配置。
 - **三端与隐私**：统一版本，分别使用原生 Runner 验收；安装包不签名，macOS 不公证。官方包包含匿名使用统计，不采集会话、代码、路径、截图或凭据，开发与测试版本默认断开。
 
-[上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [5.0.0 发布说明](docs/launch/release-notes.md)
+[上游同步记录](docs/upstream-web-sync.md) · [升级与回滚](docs/upgrade-and-rollback.md) · [5.0.0 发布说明](docs/launch/release-notes-5.0.0.md)
 
 以下为 5.0.0 Windows 隔离运行界面，不代表 macOS 或 Linux 已验收；扩展坞配置页由真实窗口与内嵌 WebContents 采集合成，无注入用户数据。
 
@@ -110,7 +129,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 
 ![DeepSeek Harness Desktop 5.0.0 Windows bai 模型接入](docs/screenshots/desktop-5.0.0/bai-models.png)
 
-详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [5.0.0 发布说明](docs/launch/release-notes.md)。
+详细边界见 [桌面架构与能力](docs/desktop.md)、[升级与回滚指南](docs/upgrade-and-rollback.md) 和 [5.0.0 发布说明](docs/launch/release-notes-5.0.0.md)。
 
 
 ## 为什么选择 DeepSeek Harness Desktop

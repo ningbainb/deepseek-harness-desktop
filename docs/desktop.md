@@ -4,9 +4,9 @@ DeepSeek Harness Desktop is maintained by repository owner **ningbai牛逼** (`n
 
 ## Architecture
 
-Desktop 5.0.0 is [released together for Windows x64, macOS arm64 and Linux x64](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.0), with native platform verification, packaging and smoke gates passed. Windows passed all 40 packaged regression suites and disposable-runner production Setup checks. Packages are unsigned; macOS is unnotarized, and macOS/Linux remain Preview. The [current Windows screenshots](../README.en.md#500-reliable-upgrades-one-version-across-three-platforms) show isolated runtime UI; Dock configuration captures combine the real window and embedded WebContents, without fabricated data. They are not macOS/Linux screenshots or physical-device acceptance.
+Desktop 5.0.1 is [released together for Windows x64, macOS arm64 and Linux x64](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1), with native platform verification, packaging and smoke gates passed. Windows passed all 43 packaged regression suites and disposable-runner production Setup checks for fresh installation, 4.3.0 and 5.0.0 upgrades, same-version overlays and data-preserving relaunch. Packages are unsigned; macOS is unnotarized, and macOS/Linux remain Preview. The [current Windows screenshots](../README.en.md#501-lighter-streaming-clearer-sidebars-one-release-across-three-platforms) show the same-release-commit candidate's isolated runtime UI; Dock configuration captures combine the real window and embedded WebContents, without fabricated data. They are not macOS/Linux screenshots or physical-device acceptance.
 
-The desktop application is a lifecycle and security layer around the official DSH host. Desktop 5.0.0 validates the packaged `@deepseek-ai/dsh@0.2.0-rc.2` CLI as its installation anchor, then composes the `desktop` Profile through the public official app-boot, command-line, HTTP-proxy, launch-environment, settings, session, workspace, renderer, tool, Browser Use, and Computer Use SDKs. The Web application, protocols, data paths, and tools remain official DSH implementations; Desktop owns the native host, immutable Runtime baseline, permissions surface, and transactional boundary around community plugin dependencies.
+The desktop application is a lifecycle and security layer around the official DSH host. Desktop 5.0.1 validates the packaged `@deepseek-ai/dsh@0.2.0-rc.2` CLI as its installation anchor, then composes the `desktop` Profile through the public official app-boot, command-line, HTTP-proxy, launch-environment, settings, session, workspace, renderer, tool, Browser Use, and Computer Use SDKs. The Web application, protocols, data paths, and tools remain official DSH implementations; Desktop owns the native host, immutable Runtime baseline, permissions surface, and transactional boundary around community plugin dependencies.
 
 The community Desktop home is `DSH_HOME` when explicitly supplied or `~/.dsh-community` by default. The desktop app runs the managed `~/.dsh-community/profiles/desktop` profile, which composes `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@linxin666/dsh-web-all@0.4.4` with Desktop-owned Profile overrides, `@tencent-connect/dsh-qqbot`, and `reasoning-slider` while preserving community bundles already added to that profile. DSH 0.2.0-rc.2 provides the native Codex model adapter through `@deepseek-ai/dsh-base`; the retired standalone Codex providers are removed from Desktop-managed profiles to prevent duplicate provider registration. The native Extension Dock market fetches the public awesome-dsh-plugin index and sends confirmed installs through Desktop's transactional plugin manager; it is not a Runtime bundle. Packaged plugin directories are linked into the profile's `node_modules`; this is runtime package resolution, not a second configuration store. The official Desktop remains free to use its own `~/.dsh` home and package graph.
 
@@ -68,7 +68,15 @@ After a one-time native confirmation, the single primary Runtime runs with `dang
 
 Desktop writes its fixed full-user overlay under `<userData>/runtime-overlays`, outside user configuration, with atomic replacement and read-back verification. The renderer and plugins cannot supply that path or content. The primary invocation contains exactly one `--no-open`, so the Runtime cannot launch the system browser; Electron loads the detected loopback URL in the main window.
 
-## Using Desktop 5.0.0
+## Using Desktop 5.0.1
+
+New profiles use the official appearance; saved upgrade skins and backgrounds remain. Sidebar tools can collapse or expand with keyboard access and restart persistence, while workspace and conversation lists stay accessible. The sole primary Dock shortcut is in the footer; Today spending opens the existing usage surface. Dock panels are opaque, use readable light/dark text and discard stale child-view palettes after theme changes. Streaming updates preserve full text, code and tool output while avoiding repeated sidebar scans; this is not a stall-free guarantee for every device.
+
+Use App > Minimize to tray for one-time background residency (Ctrl+Shift+M on Windows, Cmd+Shift+M on macOS). The saved tray preference also covers titlebar minimization. Restore or explicitly quit from the tray; if the tray is unavailable, taskbar access remains. This does not silently rewrite the close preference.
+
+![5.0.1 Windows official appearance and collapsed sidebar](screenshots/desktop-5.0.1/main.png)
+
+![5.0.1 Windows expanded sidebar tools](screenshots/desktop-5.0.1/sidebar-expanded.png)
 
 1. Use the conversation sidebar's Smart Control entry to configure Browser Use or Computer Use, run a safe provider test, and inspect platform permissions. Both capabilities remain off until explicitly enabled. Open the Extension Dock to connect a model or configure Value Mode; existing plugin, import, backup, and repair entries remain available.
 2. Use Add workspace to open Create project, enter a name, and click the source-folder area to open the system folder picker. Choose workspace uses the shared dialog to connect a directory; an already connected directory opens its existing workspace.
@@ -80,17 +88,17 @@ Model-directory recovery events are coalesced for 30 seconds, so reopening the m
 
 The built-in QQ Bot integration is pinned to `@tencent-connect/dsh-qqbot@0.5.0`. Desktop also packages the matching DSH 0.2.0-rc.2 user-approval service, allowing QQ conversations to answer supported approval prompts while preserving the existing encrypted credential store, profile isolation, and transactional bind or unbind rollback.
 
-![DeepSeek Harness Desktop 5.0.0 Windows control-center](screenshots/desktop-5.0.0/control-center.png)
+![DeepSeek Harness Desktop 5.0.1 Windows control-center](screenshots/desktop-5.0.1/control-center.png)
 
-![DeepSeek Harness Desktop 5.0.0 Windows collaboration](screenshots/desktop-5.0.0/collaboration.png)
+![DeepSeek Harness Desktop 5.0.1 Windows collaboration](screenshots/desktop-5.0.1/collaboration.png)
 
-![DeepSeek Harness Desktop 5.0.0 Windows skills](screenshots/desktop-5.0.0/skills.png)
+![DeepSeek Harness Desktop 5.0.1 Windows skills](screenshots/desktop-5.0.1/skills.png)
 
-![DeepSeek Harness Desktop 5.0.0 Windows bai-models](screenshots/desktop-5.0.0/bai-models.png)
+![DeepSeek Harness Desktop 5.0.1 Windows bai-models](screenshots/desktop-5.0.1/bai-models.png)
 
 ## Model collaboration, usage, and import
 
-These capabilities remain available in 5.0.0. The screenshots below are historical 3.2.0 captures; current Smart Control, collaboration, Skills and model navigation are represented by isolated 5.0.0 Windows runtime captures above, not macOS/Linux captures or production installation acceptance.
+These capabilities remain available in 5.0.1. The screenshots below are historical 3.2.0 captures; current Smart Control, collaboration, Skills and model navigation are represented by isolated 5.0.1 Windows runtime captures above, not macOS/Linux captures or production installation acceptance.
 
 ![DeepSeek Harness Desktop 3.2.0 main workspace and AI coding entry points](screenshots/3.2.0-workspace.webp)
 

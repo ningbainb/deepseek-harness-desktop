@@ -16,11 +16,11 @@
 
 ### 验证
 
-当前为正式发布候选，三端验证与安装验收结果以本次工作流为准。5.0.1-beta.1 的本地解包校验、逐段输出、侧栏布局、暗色拓展坞和后台驻留专项检查已通过，但旧的完整回归存在失败，不作为 5.0.1 已通过的证据。发布前保留全部断言，复跑源码及打包回归，并在一次性 Windows Runner 上执行实际新装、历史版本覆盖、重装及数据保全检查。
+[正式工作流 37499057103](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/37499057103)在提交 `24650aa59811e37edeaf0f2dd5f97bfbb04802bd` 全部通过：Windows 源码回归 27/27、完整打包回归 43/43，三端原生验证、打包完整性与启动冒烟通过。一次性 Windows Runner 验证真实 Setup 新装、4.3.0→5.0.1、5.0.0→5.0.1、同版覆盖及重启数据保全。暗色拓展坞暖导航与浅色文字对比度修复后重新完成门禁，未降低或跳过断言。旧候选失败记录保留，不冒充成功；物理设备、所有历史版本及生产埋点入库不在此次证据范围。
 
 ### 下载与校验
 
-正式 5.0.1 尚未发布；官网继续提供已验证的 5.0.0。三端同一候选提交通过统一门禁后，才创建正式标签并由完整流程发布安装包。正式包大小与 SHA-256 以实际资产及同 Release 的校验清单为准，不复用 5.0.0 或内测版哈希。所有包按未签名流程构建，macOS 未公证；macOS/Linux 的能力边界仍按各平台指南说明。
+[正式 5.0.1 Release](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1)于 2026-10-06 UTC 发布，包含 Windows x64 EXE、macOS arm64 DMG/ZIP、Linux x64 AppImage/DEB。下载后核对同 Release 的 `SHA256SUMS.txt` 和 `release-manifest.json`；Windows 安装包为 325,656,174 字节，SHA-256 为 `cfa5822311f810cbf2a593206c8c7ff9c01cac1796d37d7a40acff79a62c134b`，不复用旧版或候选哈希。三端未签名、macOS 未公证；Windows 可能提示未知发布者，macOS/Linux 仍为 Preview。
 
 ### 说明
 
@@ -42,11 +42,11 @@
 
 ### Verification
 
-This is a formal release candidate; this workflow's native-platform and installer results define its acceptance. The earlier local beta passed extracted-payload integrity, progressive output, sidebar layout, dark Dock and background-residency checks, but earlier complete regressions had failures and do not establish a passed 5.0.1 release. Existing assertions remain intact. Source and packaged regression must pass, and a disposable Windows Runner exercises real fresh installation, historical-version overlay, reinstall and data preservation.
+[Formal workflow 37499057103](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/37499057103) passed at commit `24650aa59811e37edeaf0f2dd5f97bfbb04802bd`: Windows source regression 27/27, complete packaged regression 43/43, and native verification, package integrity and smoke on all three platforms. Disposable Windows Runners verified real Setup fresh installation, 4.3.0-to-5.0.1 and 5.0.0-to-5.0.1 upgrades, same-version overlay and data-preserving relaunch. Dark Dock warm-navigation and light-text contrast fixes passed renewed gates without weakening or skipping assertions. Earlier failures remain recorded, not reclassified as passes. Physical devices, every historical version and production telemetry ingestion are outside this evidence.
 
 ### Download and verification
 
-Formal 5.0.1 is not published yet; the website continues to offer verified 5.0.0. The formal tag is created only after all three platforms pass the unified candidate gates at the same commit, followed by complete release validation. Actual asset sizes and SHA-256 receipts must come from that Release, never reused stable or beta hashes. Builds are unsigned and macOS is unnotarized; platform guides retain the macOS/Linux capability boundaries.
+[Formal 5.0.1 Release](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1) was published on 2026-10-06 UTC with Windows x64 EXE, macOS arm64 DMG/ZIP and Linux x64 AppImage/DEB. Verify `SHA256SUMS.txt` and `release-manifest.json` from that Release. The Windows installer is 325,656,174 bytes with SHA-256 `cfa5822311f810cbf2a593206c8c7ff9c01cac1796d37d7a40acff79a62c134b`, never a reused older or candidate hash. All builds are unsigned and macOS is unnotarized. Windows may show an unknown-publisher prompt; macOS/Linux remain Preview.
 
 ### Notice
 
