@@ -760,6 +760,7 @@
         "draft-close-guard",
         "centered-on-open",
         "synchronized-theme",
+        "theme-only-dock-updates-clear-stale-palettes-before-warm-navigation",
         "opaque-dock-surfaces-without-blur-gradients-or-hover-lift",
         "light-and-dark-dock-navigation-meets-text-contrast-including-inactive-tabs",
         "readable-sidebar-keeps-fifteen-destinations-search-and-keyboard-focus",

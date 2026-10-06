@@ -449,6 +449,15 @@ try {
   failure = error
   console.error('Dock acceptance failed', error)
   console.error('Settings URL:', settings?.url())
+  console.error('Settings appearance:', await settings?.evaluate(() => {
+    const page = document.querySelector('[data-dsh-dock-settings]')
+    const style = page && getComputedStyle(page)
+    return { theme: page?.getAttribute('data-theme'), inline: page?.getAttribute('style'),
+      className: page?.className, background: style?.backgroundColor,
+      transition: style?.transition, animation: style?.animation,
+      backgroundToken: style?.getPropertyValue('--dsw-alias-bg-layer-1'),
+      documentTheme: document.documentElement.dataset.dshDesktopTheme }
+  }).catch(() => 'unavailable'))
   console.error('Settings body:', await settings?.locator('body').innerText().catch(() => 'unavailable'))
   console.error('Runtime log:', (await readFile(resolve(temporary, 'user-data/logs/runtime.log'), 'utf8').catch(() => '')).slice(-8000))
   await settings?.screenshot({ path: resolve(output, 'failure.png') }).catch(() => {})

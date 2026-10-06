@@ -258,6 +258,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
     },
     syncTheme: nextTheme => {
       theme = nextTheme
+      palette = null
       view?.setBackgroundColor?.(theme === 'dark' ? '#0a141b' : '#ffffff')
       if (view && !view.webContents.isDestroyed()) void view.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('dsh:dock-theme', { detail: ${JSON.stringify(theme)} }))`).catch(() => {})
     },
