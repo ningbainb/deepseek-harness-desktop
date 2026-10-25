@@ -190,6 +190,7 @@ export function publicBackgroundStatus(status) {
   return Object.freeze({
     enabled: status.enabled,
     trayAvailable: status.trayAvailable,
+    ...(typeof status.pending === 'boolean' ? { pending: status.pending } : {}),
     ...(closeBehavior === undefined ? {} : { closeBehavior }),
   })
 }
@@ -594,10 +595,11 @@ export function registerDesktopIpc({
     version,
     platform,
   }))
-  const getPublicStatus = async (status = controller.status) => {
+  const getPublicStatus = async () => {
+    const recovery = await pluginRecovery?.getState?.()
     let background
     try { background = getBackgroundStatus() } catch (error) { logDiagnostic('ipc', 'background-status', error) }
-    return publicRuntimeStatus(status, await pluginRecovery?.getState?.(), background)
+    return publicRuntimeStatus(controller.status, recovery, background)
   }
   handle('desktop:status', [main, extensions], () => getPublicStatus())
   handle('desktop:repair-status', main, async () => {
@@ -808,11 +810,11 @@ export function registerDesktopIpc({
       return false
     }
   })
-  const publishStatus = async (status = controller.status) => {
+  const publishStatus = async () => {
     const window = getWindow()
-    if (window && !window.isDestroyed()) window.webContents.send('desktop:status', await getPublicStatus(status))
+    if (window && !window.isDestroyed()) window.webContents.send('desktop:status', await getPublicStatus())
   }
-  const publishStatusSafely = (status) => { void publishStatus(status).catch(() => {}) }
+  const publishStatusSafely = () => { void publishStatus().catch(() => {}) }
   controller.on('status', publishStatusSafely)
   pluginRecovery?.on?.('status', publishStatusSafely)
   const removeBatchProgress = conversationImportService?.subscribeBatchProgress?.((payload) => {

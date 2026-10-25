@@ -267,12 +267,16 @@ try {
   })
   try {
     for (let index = 0; index < petPages.length; index += 1) {
-      await petPages[index].locator('[data-dsh-pet-root]').waitFor({ state: 'attached' })
+      if (index === 0) await petPages[index].locator('[data-dsh-pet-root]').waitFor({ state: 'attached' })
+      else {
+        assert.equal(await petPages[index].locator('[data-dsh-pet-root]').count(), 0, 'dedicated Dock settings do not mount a pet')
+        assert.equal(await petPages[index].locator('[data-dsh-dock-pet-rail]').count(), 0, 'dedicated Dock settings have no unused pet rail')
+      }
       petPages[index].on('request', petHandlers[index])
     }
     await writeFile(runtimeFetchGate, 'stall-pet')
     await page.waitForTimeout(6500)
-    assert.deepEqual(petReadCounts, [1, 1], `Each visible Runtime view must keep one stalled pet read, not one per tick: ${JSON.stringify(petReadPaths)}`)
+    assert.deepEqual(petReadCounts, [1, 0], `The main view keeps one stalled pet read while the dedicated Dock starts none: ${JSON.stringify(petReadPaths)}`)
     assert.equal(await readParticleEnabled(), true, 'Settings remain readable while pet reads are held')
     const recovered = page.waitForResponse(response =>
       desktopLocalPath(new URL(response.url()).pathname) === '/api/pet/state' && response.ok(), { timeout: 10_000 })

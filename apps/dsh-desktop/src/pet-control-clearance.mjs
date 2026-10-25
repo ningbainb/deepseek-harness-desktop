@@ -16,49 +16,111 @@ export function petControlOffset(sprite, controls, viewport) {
   return safe ? { x: safe.left - sprite.left, y: safe.top - sprite.top } : { x: 0, y: 0 }
 }
 
-export function installPetControlClearance(resolveOffset) {
+export function petRailOffset(surface, viewport) {
+  const width = Math.min(224, Math.max(160, Math.floor(viewport.width * 0.4)))
+  const left = viewport.width - width + 12
+  const top = 12
+  return {
+    width,
+    x: Math.max(left, Math.min(surface.left, viewport.width - surface.width - 12)) - surface.left,
+    y: Math.max(top, Math.min(surface.top, viewport.height - surface.height - 12)) - surface.top,
+  }
+}
+
+export function installPetControlClearance(resolveOffset, resolveRailOffset) {
   globalThis.dshPetControlClearance?.dispose()
-  const selector = 'button[data-dsh-relay-model-entry], [data-pane="conversation"] button[aria-haspopup="menu"], [data-pane="conversation"] button[aria-label="回到底部"], [data-pane="conversation"] button[aria-label="Scroll to bottom"], [data-pane="conversation"] textarea, [data-pane="conversation"] [contenteditable="true"]'
+  const selector = 'button[data-dsh-relay-model-entry], [data-pane="conversation"] button[aria-haspopup="menu"], [data-pane="conversation"] button[aria-label="回到底部"], [data-pane="conversation"] button[aria-label="Scroll to bottom"], [data-pane="conversation"] textarea, [data-pane="conversation"] [contenteditable="true"], [data-dsh-dock-settings] :is(button, input, textarea, select, summary, [role="button"], [role="switch"])'
   let sprite, floating, previousTranslate, offset = { x: 0, y: 0 }, frame, dragging = false, disposed = false
+  let settingsPage, previousRailWidth, previousRailPriority
+  const watched = new Set()
+  const restoreRail = () => {
+    if (!settingsPage) return
+    settingsPage.removeAttribute('data-dsh-dock-pet-rail')
+    if (previousRailWidth) document.documentElement.style.setProperty('--dsh-dock-pet-rail-width', previousRailWidth, previousRailPriority)
+    else document.documentElement.style.removeProperty('--dsh-dock-pet-rail-width')
+    settingsPage = undefined
+  }
   const restore = () => {
     if (floating) floating.style.translate = previousTranslate
     sprite = floating = undefined
     offset = { x: 0, y: 0 }
+    restoreRail()
   }
   const sync = () => {
     frame = undefined
     if (disposed || dragging) return
     const next = document.querySelector('[data-dsh-pet-root] [role="button"]')
+      ?? document.querySelector('[data-dsh-pet-root] [data-dsh-part="summon-button"]')
     if (next !== sprite) {
       restore()
       positionObserver.disconnect()
+      surfaceObserver.disconnect()
+      sizeObserver?.disconnect()
+      watched.clear()
       sprite = next
-      floating = sprite?.parentElement
+      floating = sprite
       while (floating && floating.parentElement && !floating.matches('[data-dsh-pet-root]')
         && getComputedStyle(floating).position !== 'fixed') floating = floating.parentElement
       if (floating) {
         previousTranslate = floating.style.translate
         positionObserver.observe(floating, { attributes: true, attributeFilter: ['style'] })
+        surfaceObserver.observe(floating, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-placement'] })
       }
     }
     if (!floating) return
+    const visibleBounds = floating.getBoundingClientRect()
+    const settings = visibleBounds.width > 0 && visibleBounds.height > 0 ? document.querySelector('[data-dsh-dock-settings]') : null
+    if (settingsPage !== settings) {
+      restoreRail()
+      if (settings) {
+        settingsPage = settings
+        previousRailWidth = document.documentElement.style.getPropertyValue('--dsh-dock-pet-rail-width')
+        previousRailPriority = document.documentElement.style.getPropertyPriority('--dsh-dock-pet-rail-width')
+        settingsPage.setAttribute('data-dsh-dock-pet-rail', '')
+      }
+    }
+    const viewport = { width: innerWidth, height: innerHeight }
+    if (settingsPage) {
+      const width = `${resolveRailOffset({ left: 0, top: 0, width: 0, height: 0 }, viewport).width}px`
+      if (document.documentElement.style.getPropertyValue('--dsh-dock-pet-rail-width') !== width) {
+        document.documentElement.style.setProperty('--dsh-dock-pet-rail-width', width)
+      }
+    }
     const bounds = floating.getBoundingClientRect()
     const original = { left: bounds.left - offset.x, top: bounds.top - offset.y, width: bounds.width, height: bounds.height }
-    const controls = [...document.querySelectorAll(selector)].filter(control => !control.closest('[data-dsh-pet-root]'))
+    const controls = [...document.querySelectorAll(selector)].filter(control => !control.closest('[data-dsh-pet-root]')
+      && (!settings || settings.contains(control)))
       .map(control => control.getBoundingClientRect()).filter(control => control.width > 0 && control.height > 0)
-    const nextOffset = resolveOffset(original, controls, { width: innerWidth, height: innerHeight })
+    let nextOffset
+    if (settingsPage) {
+      const root = floating.closest('[data-dsh-pet-root]')
+      const surfaces = [floating, ...floating.querySelectorAll('*')]
+      if (surfaces.length !== watched.size || surfaces.some(surface => !watched.has(surface))) {
+        sizeObserver?.disconnect()
+        watched.clear()
+        for (const surface of surfaces) { watched.add(surface); sizeObserver?.observe(surface) }
+      }
+      const rectangles = surfaces.map(surface => surface.getBoundingClientRect()).filter(rect => rect.width > 0 && rect.height > 0)
+      const left = Math.min(...rectangles.map(rect => rect.left)) - offset.x + (root?.scrollLeft || 0)
+      const top = Math.min(...rectangles.map(rect => rect.top)) - offset.y + (root?.scrollTop || 0)
+      const right = Math.max(...rectangles.map(rect => rect.left + rect.width)) - offset.x + (root?.scrollLeft || 0)
+      const bottom = Math.max(...rectangles.map(rect => rect.top + rect.height)) - offset.y + (root?.scrollTop || 0)
+      nextOffset = resolveRailOffset({ left, top, width: right - left, height: bottom - top }, viewport)
+    } else nextOffset = resolveOffset(original, controls, viewport)
     const changed = offset.x !== nextOffset.x || offset.y !== nextOffset.y
     offset = nextOffset
     if (changed) floating.style.translate = offset.x || offset.y ? `${offset.x}px ${offset.y}px` : previousTranslate
   }
   const schedule = () => { if (!disposed && frame === undefined) frame = requestAnimationFrame(sync) }
   const observer = new MutationObserver(records => {
-    if (!sprite?.isConnected || records.some(record => record.target === floating
+    if (!sprite?.isConnected || records.some(record => record.type === 'attributes' || record.target === floating
       || [...record.addedNodes, ...record.removedNodes].some(node => node.matches?.('[data-dsh-pet-root]')
         || node.matches?.(selector) || node.querySelector?.(selector)))) schedule()
   })
-  observer.observe(document, { childList: true, subtree: true })
+  observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-dsh-dock-settings'] })
   const positionObserver = new MutationObserver(schedule)
+  const surfaceObserver = new MutationObserver(schedule)
+  const sizeObserver = globalThis.ResizeObserver ? new ResizeObserver(schedule) : undefined
   const down = event => { if (sprite?.contains(event.target)) dragging = true }
   const up = () => { dragging = false; schedule() }
   const dispose = () => {
@@ -66,6 +128,8 @@ export function installPetControlClearance(resolveOffset) {
     if (frame !== undefined) cancelAnimationFrame(frame)
     observer.disconnect()
     positionObserver.disconnect()
+    surfaceObserver.disconnect()
+    sizeObserver?.disconnect()
     document.removeEventListener('pointerdown', down, true)
     document.removeEventListener('pointerup', up, true)
     document.removeEventListener('pointercancel', up, true)
@@ -85,4 +149,4 @@ export function installPetControlClearance(resolveOffset) {
   sync()
 }
 
-export const PET_CONTROL_CLEARANCE_SCRIPT = `(${installPetControlClearance.toString()})(${petControlOffset.toString()})`
+export const PET_CONTROL_CLEARANCE_SCRIPT = `(${installPetControlClearance.toString()})(${petControlOffset.toString()}, ${petRailOffset.toString()})`

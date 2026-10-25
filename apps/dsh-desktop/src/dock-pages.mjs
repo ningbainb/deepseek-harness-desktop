@@ -1,7 +1,7 @@
 /** Runtime documents allowed inside the unprivileged Extension Dock view. */
 export const DOCK_SETTING_IDS = Object.freeze([
   'control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image',
-  'appearance', 'models', 'usage', 'sessions', 'plugin-options',
+  'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market',
 ])
 
 export function assertDockSetting(id) {

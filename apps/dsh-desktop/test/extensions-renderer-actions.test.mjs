@@ -11,6 +11,86 @@ const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/p
 const source = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
 const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
 
+test('skill market entry confirms only user navigation and leaves local skills intact on cancel', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const selected = []
+  const prompts = []
+  let enabled = false
+  let canceled = true
+  const context = vm.createContext({
+    document: dom.window.document, localStorage: dom.window.localStorage,
+    tabs: [...dom.window.document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: {
+      getSkillMarketStatus: async () => ({ enabled, revision: 'fixture-revision' }),
+      activateSkillMarket: async revision => { prompts.push(revision); return { enabled: !canceled, canceled } },
+      selectDockSetting: async value => selected.push(value),
+    } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  await vm.runInContext("activateTab(document.getElementById('skill-market-tab'))", context)
+  await tick()
+  assert.deepEqual(prompts, [])
+  assert.equal(dom.window.document.getElementById('skills').hidden, false)
+  await vm.runInContext("activateTab(document.getElementById('skill-market-tab'), false, undefined, undefined, true)", context)
+  assert.deepEqual(prompts, ['fixture-revision'])
+  assert.equal(selected.includes('skill-market'), false)
+  canceled = false
+  await vm.runInContext("activateTab(document.getElementById('skill-market-tab'), false, undefined, undefined, true)", context)
+  await tick()
+  assert.equal(selected.at(-1), 'skill-market')
+  assert.equal(dom.window.document.getElementById('skill-market-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(dom.window.document.getElementById('skills-local-tab').getAttribute('aria-selected'), 'false')
+  enabled = true
+  await vm.runInContext("activateTab(document.getElementById('skill-market-tab'))", context)
+  assert.equal(prompts.length, 2)
+  dom.window.close()
+})
+
+test('leaving skills while market status is loading cannot later reopen the market', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const selected = []
+  let finish
+  const context = vm.createContext({
+    document: dom.window.document, localStorage: dom.window.localStorage,
+    tabs: [...dom.window.document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: {
+      getSkillMarketStatus: () => new Promise(resolve => { finish = resolve }),
+      activateSkillMarket: () => assert.fail('abandoned navigation must not prompt'),
+      selectDockSetting: async value => selected.push(value),
+    } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  const opening = vm.runInContext("activateTab(document.getElementById('skill-market-tab'), false, undefined, undefined, true)", context)
+  await vm.runInContext("activateTab(document.getElementById('plugins-tab'))", context)
+  finish({ enabled: false, revision: 'fixture' })
+  await opening
+  await tick()
+  assert.equal(selected.includes('skill-market'), false)
+  assert.equal(dom.window.document.getElementById('plugins').hidden, false)
+  dom.window.close()
+})
+
+test('restoring an unavailable market falls back to local skills without prompting or losing navigation', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const notices = []
+  const context = vm.createContext({
+    document: dom.window.document, localStorage: dom.window.localStorage,
+    tabs: [...dom.window.document.querySelectorAll('[data-tab]')], notify: message => notices.push(message),
+    window: { dshDesktop: {
+      getSkillMarketStatus: async () => ({ enabled: true, available: false }),
+      activateSkillMarket: () => assert.fail('restoring navigation cannot activate'),
+      selectDockSetting: async () => {},
+    } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  await vm.runInContext("activateTab(document.getElementById('skill-market-tab'))", context)
+  await tick()
+  assert.equal(dom.window.document.getElementById('skills-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(dom.window.document.getElementById('import-skill').closest('[hidden]'), null)
+  assert.match(notices[0], /诊断与恢复/u)
+  dom.window.close()
+})
+
 test('installed plugin detail keeps the Runtime-owned configuration bridge', async () => {
   const preload = await readFile(new URL('../src/preload-extension.cjs', import.meta.url), 'utf8')
   assert.match(source, /插件自带设置/u)

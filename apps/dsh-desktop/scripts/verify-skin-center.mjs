@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -112,7 +113,7 @@ async function skinState(page) {
 }
 
 async function waitForBackgroundSettings(page, expected) {
-  await page.waitForFunction(async values => {
+  await waitForAsyncPageFunction(page, async values => {
     const response = await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })
     const payload = await response.json().catch(() => null)
     const namespace = payload?.value?.namespaces?.find(entry => entry.ns === 'ui-skin-center')
@@ -274,7 +275,7 @@ try {
   const firstCenter = await openSkinCenter(first.page)
   const officialCard = firstCenter.dialog.getByText(/^(?:官方默认|Official default)$/iu).locator('xpath=../..')
   await officialCard.getByRole('button', { name: /^(?:恢复默认|Restore)$/iu }).click()
-  await first.page.waitForFunction(async () => {
+  await waitForAsyncPageFunction(first.page, async () => {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
     const payload = await response.json()
     return response.ok && payload.ok === true && payload.active === null
@@ -350,7 +351,7 @@ try {
     console.error('exit try-on state', JSON.stringify(await visualState(first.page, firstCenter.dialog)))
     throw error
   }
-  await first.page.waitForFunction(async () => {
+  await waitForAsyncPageFunction(first.page, async () => {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
     const payload = await response.json().catch(() => null)
     return response.ok && payload?.ok === true && payload.active === null
@@ -361,7 +362,7 @@ try {
 
   await firstCenter.card.getByRole('button', { name: /^(?:应用|Apply)$/iu }).click()
   await first.page.waitForFunction(() => document.documentElement.getAttribute('data-dsh-skin') === 'blue-fantasy')
-  await first.page.waitForFunction(async () => {
+  await waitForAsyncPageFunction(first.page, async () => {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
     const payload = await response.json().catch(() => null)
     return response.ok && payload?.ok === true && payload.active === 'blue-fantasy'

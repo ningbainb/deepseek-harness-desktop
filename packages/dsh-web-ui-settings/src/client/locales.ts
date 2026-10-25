@@ -4,7 +4,11 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  dockDetails: '详情',
+  dockConnectionDetails: '接入说明',
+  dockAgentTeamCaution: '并行修改可能冲突；切换会重启内核。',
   dockPluginOptions: '插件自带配置',
+  dockSkillMarket: '技能市场',
   pluginOptionsDescription: '使用插件提供的原生配置页面；设置中的独立卡片仍保持原入口。',
   pluginOptionsEntry: '配置入口',
   pluginOptionsUnavailable: '此插件尚未提供可用的行配置页面。请确认已启用并适配当前内核；有独立设置卡片的插件仍可在设置中配置。',
@@ -77,7 +81,11 @@ export type WebUIPluginsKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  dockDetails: 'Details',
+  dockConnectionDetails: 'Connection details',
+  dockAgentTeamCaution: 'Parallel edits can conflict; switching restarts the runtime.',
   dockPluginOptions: 'Plugin options',
+  dockSkillMarket: 'Skill market',
   pluginOptionsDescription: 'Use the configuration page provided by the plugin. Standalone settings cards keep their existing entry points.',
   pluginOptionsEntry: 'Configuration entry',
   pluginOptionsUnavailable: 'No row configuration page is available. Check that the plugin is enabled and compatible with this runtime. Plugins with standalone settings cards remain configurable in Settings.',

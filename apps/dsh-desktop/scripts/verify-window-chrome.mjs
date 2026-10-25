@@ -24,7 +24,11 @@ const runtimeReadyTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-window-chrome-e2e-'))
 const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
+const traceDirectory = process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY
+  ? resolve(process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY) : undefined
+const diagnostic = { temporary, stage: 'startup' }
 let electronApp
+let page
 
 async function waitForRuntimeWindow(application, timeoutMs) {
   const deadline = Date.now() + timeoutMs
@@ -72,7 +76,6 @@ try {
     attachRendererDiagnostics(window)
   }
   electronApp.on('window', attachRendererDiagnostics)
-  let page
   try {
     page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
   } catch (error) {
@@ -172,6 +175,8 @@ try {
   }, sessionId)
   assert.equal(renamed.status, 200)
   assert.equal(renamed.body.result.ok, true)
+  diagnostic.sessionId = sessionId
+  if (traceDirectory) diagnostic.beforeShutdownCheckpoint = await readFile(resolve(dshHome, 'storages', 'session_projcache', 'sessions', `${sessionId}.json`), 'utf8').catch(error => error.code === 'ENOENT' ? null : Promise.reject(error))
   await waitForSessionLog(resolve(dshHome, 'sessions'), sessionId)
   await electronApp.close()
   const logs = await findSessionLogs(resolve(dshHome, 'sessions'))
@@ -196,13 +201,20 @@ try {
     assert.equal(await readSessionLogText(history.path), history.text)
   }
   await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [] }))
+  diagnostic.stage = 'relaunch'
   electronApp = await electron.launch(launchOptions)
   page = await waitForRuntimeWindow(electronApp, runtimeReadyTimeoutMs)
   attachRendererDiagnostics(page)
   await page.locator('[data-dsh-frame]').waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
   const group = page.getByRole('treeitem').filter({ hasText: 'window-chrome-workspace' }).first()
   await group.waitFor({ state: 'visible', timeout: 30_000 })
+  if (traceDirectory) diagnostic.groupBeforeSelection = await group.evaluate(element => ({
+    expanded: element.getAttribute('aria-expanded'), text: element.textContent,
+  }))
   if (await group.getAttribute('aria-expanded') !== 'true') await group.dispatchEvent('click')
+  if (traceDirectory) diagnostic.groupAfterSelection = await group.evaluate(element => ({
+    expanded: element.getAttribute('aria-expanded'), text: element.textContent,
+  }))
   const sessions = await page.evaluate(async () => {
     const response = await fetch('/api/session/list', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -216,8 +228,11 @@ try {
   const summary = sessions.body.result.value.items.find(item =>
     (item.id ?? item.sessionId) === session.body.result.value.sessionId)
   assert.ok(summary)
+  diagnostic.listedSession = summary
+  diagnostic.stage = 'restored-session-row'
   const sessionRow = page.getByRole('treeitem').filter({ hasText: 'Window chrome controls fixture' }).last()
   await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
+  diagnostic.stage = 'window-controls'
   await sessionRow.dispatchEvent('click')
   await page.locator('[data-composer-card="true"]').waitFor({ state: 'visible' })
   const starPrompt = page.locator('#dsh-desktop-star-prompt')
@@ -685,7 +700,29 @@ try {
   const startupTimings = parseStartupTimings(runtimeLog)
   console.log(`startup timings ${JSON.stringify(startupTimings)}`)
   console.log(`verified runtime window chrome at ${state.url}`)
+  diagnostic.stage = 'complete'
+} catch (error) {
+  diagnostic.error = error.stack
+  throw error
 } finally {
+  if (traceDirectory) {
+    try {
+      await mkdir(traceDirectory, { recursive: true })
+      diagnostic.finalCheckpoint = diagnostic.sessionId
+        ? await readFile(resolve(dshHome, 'storages', 'session_projcache', 'sessions', `${diagnostic.sessionId}.json`), 'utf8').catch(error => error.code === 'ENOENT' ? null : Promise.reject(error)) : undefined
+      if (page && !page.isClosed()) {
+        diagnostic.sidebar = await page.locator('[role="treeitem"]').evaluateAll(elements => elements.map(element => ({
+          text: element.textContent, expanded: element.getAttribute('aria-expanded'),
+          hidden: element.hidden, visible: Boolean(element.getClientRects().length),
+        })))
+        diagnostic.surface = await page.locator('body').innerText({ timeout: 5_000 })
+        await page.screenshot({ path: resolve(traceDirectory, 'last-page.png'), timeout: 5_000 })
+      }
+      await writeFile(resolve(traceDirectory, 'state.json'), `${JSON.stringify(diagnostic, null, 2)}\n`)
+      await writeFile(resolve(traceDirectory, 'runtime.log'), await readFile(resolve(userData, 'logs', 'runtime.log'), 'utf8').catch(error => error.code === 'ENOENT' ? '' : Promise.reject(error)))
+    } catch (error) { console.error('window chrome diagnostic capture failed', error.message) }
+  }
   await electronApp?.close()
-  await rm(temporary, { recursive: true, force: true })
+  if (process.env.DSH_DESKTOP_KEEP_TEST_HOME === '1') console.log(`Retained isolated window chrome fixture: ${temporary}`)
+  else await rm(temporary, { recursive: true, force: true })
 }

@@ -32,20 +32,38 @@ let page
 let requests = 0
 const modelRequests = []
 const promptRequests = []
+const modelTimeline = []
 let failure
 const server = createServer(async (request, response) => {
+  const timing = { id: modelTimeline.length + 1, arrived: performance.now(), chunks: 0, backpressure: 0, maxGapMs: 0 }
+  modelTimeline.push(timing)
+  response.on('finish', () => { timing.finished = performance.now() })
+  response.on('close', () => { timing.closed = performance.now(); timing.writableFinished = response.writableFinished })
+  response.on('error', error => { timing.error = { name: error.name, code: error.code } })
   try {
     const body = []
     for await (const chunk of request) body.push(chunk)
     const payload = JSON.parse(Buffer.concat(body).toString('utf8'))
+    timing.bodyRead = performance.now()
     const agent = Array.isArray(payload.tools) && payload.tools.length > 0
+    timing.agent = agent
     modelRequests.push({ model: payload.model, tools: payload.tools?.length ?? 0, agent })
     if (agent) requests++
     response.writeHead(200, { 'content-type': 'text/event-stream' })
-    const send = (content, finishReason = null) => response.write(`data: ${JSON.stringify({
+    const send = (content, finishReason = null) => {
+      const now = performance.now()
+      timing.firstChunk ??= now
+      if (timing.lastChunk !== undefined) timing.maxGapMs = Math.max(timing.maxGapMs, now - timing.lastChunk)
+      timing.lastChunk = now
+      timing.chunks += 1
+      if (content === ending) timing.ending = now
+      const accepted = response.write(`data: ${JSON.stringify({
       id: 'chatcmpl-beta-usability', object: 'chat.completion.chunk', created: 0,
       model: 'beta-fixture', choices: [{ index: 0, delta: { content }, finish_reason: finishReason }],
-    })}\n\n`)
+      })}\n\n`)
+      if (!accepted) timing.backpressure += 1
+      return accepted
+    }
     for (const content of agent ? [...chunks, ending] : ['Beta usability']) {
       if (response.destroyed) break
       send(content)
@@ -54,6 +72,7 @@ const server = createServer(async (request, response) => {
     if (!response.destroyed) {
       send('', 'stop')
       response.end('data: [DONE]\n\n')
+      timing.done = performance.now()
     }
   } catch (error) {
     response.destroy(error)
@@ -417,13 +436,15 @@ try {
   await writeFile(join(output, 'result.json'), JSON.stringify({ baseline, temporary, skin, performance, layouts, requests, errors }, null, 2) + '\n')
   console.log(JSON.stringify({ baseline, output, skin, performance, layouts, requests }))
 } catch (error) {
+  const failureTimeline = structuredClone({ at: performance.now(), modelTimeline })
   failure = error
-  await writeFile(join(output, 'failure-requests.json'), JSON.stringify({ requests, modelRequests, promptRequests, temporary }, null, 2) + '\n')
+  await writeFile(join(output, 'failure-requests.json'), JSON.stringify({ requests, modelRequests, promptRequests, temporary, failureTimeline }, null, 2) + '\n')
   await page?.screenshot({ path: join(output, 'failure.png') }).catch(() => {})
   const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
   console.error(runtimeLog.slice(-5000))
   throw error
 } finally {
+  console.log('Beta fixture transport timeline', JSON.stringify({ cleanupStart: performance.now(), modelTimeline }))
   server.closeAllConnections()
   await new Promise(resolveClose => server.close(resolveClose))
   try { await closeIsolatedElectron(app) } catch (error) {

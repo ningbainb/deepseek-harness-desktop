@@ -42,6 +42,17 @@ Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git 
 
 [Product Site](https://1521003.xyz/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
+### 5.1.0 candidate: complete output, informed activation, simpler settings
+
+5.1.0 is being prepared for release with official NPM Runtime/SDK `0.2.1-rc.2` and Electron `44.0.0`, without modifying official sources. Evidence currently covers a local unsigned Windows beta only; **public downloads remain 5.0.1 below**. Three-platform release authorization does not establish completed gates or publication. The macOS candidate requires Apple Silicon arm64 on macOS 13 Ventura or later; macOS/Linux remain Preview.
+
+- Consumer acknowledgements and streaming backpressure retain complete output/history. Async resource reads and HMR rescans preserve authorization, caching and cancellation cleanup, without claiming general percentage speedups.
+- Installation-directory candidates are validated individually, with per-entry registry recovery on failure. Market activation requires first-use consent; feedback, translation, automatic updates and project-layout scanning default off, and source replacement uses recoverable transactions. Consent is not an execution sandbox.
+- Frameless Dock settings retain 15 destinations, search, controls, advanced details, critical risk notices, selection and keyboard focus. Only dedicated settings windows exclude the floating pet; the main conversation pet and saved configuration remain.
+- Local Setup-extracted payload core regression passed 28/28; this does not substitute for real Setup fresh/upgrade/uninstall acceptance or native macOS/Linux gates. Formal workflow results, asset sizes and checksums must be verified after publication.
+
+[5.1.0 bilingual candidate notes](docs/launch/release-notes.md) · [Required three-platform release gates](docs/launch/desktop-release-workflow.md) · [Local Windows candidate screenshot provenance](website/assets/desktop-5.1.0-candidate-sources.json)
+
 ### 5.0.1: lighter streaming, clearer sidebars, one release across three platforms
 
 [5.0.1 installation packages](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1) are published together for Windows x64, macOS arm64 Preview and Linux x64 Preview. Official NPM Runtime remains `0.2.0-rc.2`. Native verification, packaging and smoke passed on all three platforms; Windows source regression passed 27/27 and full packaged regression passed 43/43. Disposable Runners verified real fresh installation, 4.3.0 and 5.0.0 overlay upgrades, same-version reinstall and data-preserving relaunch, not every historical version or physical device.
@@ -53,7 +64,7 @@ Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git 
 - **Background operation and reliable upgrades**: the menu supports tray minimization, restoration and explicit exit. Windows upgrades recognize the existing directory, retaining backups, rollback and old/new model providers.
 - **Complete workbench and privacy**: collaboration, Skills, plugin-detail configuration, independent third-party APIs, bai authorization and history protection remain available. Anonymous metrics exclude user content and credentials.
 
-All packages are unsigned; macOS is unnotarized. Verify the same Release's [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt). [Release notes](docs/launch/release-notes.md) and the [actual asset receipt](docs/launch/release-manifest-all-platforms.json) define the boundaries. Screenshots use the same-release-commit candidate in isolated Windows acceptance. Configuration images combine simultaneous real host and embedded WebContents captures without injecting user conversations; they are not macOS/Linux screenshots or physical-device acceptance.
+All packages are unsigned; macOS is unnotarized. Verify the same Release's [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt). [5.0.1 release notes](docs/launch/release-notes-5.0.1.md) and the [actual asset receipt](docs/launch/release-manifest-all-platforms.json) define the boundaries. Screenshots use the same-release-commit candidate in isolated Windows acceptance. Configuration images combine simultaneous real host and embedded WebContents captures without injecting user conversations; they are not macOS/Linux screenshots or physical-device acceptance.
 
 | Official appearance and collapsed tools | Expanded tools remain accessible |
 | --- | --- |
@@ -356,7 +367,7 @@ The Windows installer already includes DSH, desktop plugins, skins, pnpm, MinGit
 
 ### macOS unsigned preview (Apple Silicon)
 
-arm64 only. After downloading the `.dmg` or `.zip`, move the app to `/Applications` and clear quarantine with `xattr`. macOS 15 no longer has Right-click > Open. Preview builds have no auto-update and use system Git. Full steps: [macOS unsigned preview install guide](docs/macos-preview.md).
+arm64 only. The 5.1.0 candidate requires macOS 13 Ventura or later because of Electron 44; this floor does not establish testing on every supported OS version or rewrite historical 5.0.1 acceptance. After downloading the `.dmg` or `.zip`, move the app to `/Applications` and clear quarantine with `xattr`. macOS 15 no longer has Right-click > Open. Preview builds have no auto-update and use system Git. Full steps: [macOS unsigned preview install guide](docs/macos-preview.md).
 
 ### Linux x64 preview
 

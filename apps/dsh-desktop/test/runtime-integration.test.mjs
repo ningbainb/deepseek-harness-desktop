@@ -735,14 +735,14 @@ test('official DSH host serves the complete desktop profile', { timeout: 360_000
     await dismissRuntimeOnboarding(page)
     const settingsButton = page.getByRole('button', { name: /^(?:设置|Settings)$/u })
     if (await settingsButton.count() === 0) {
-      const labels = await page.locator('button').evaluateAll(buttons => buttons.map(button => ({
-        text: button.textContent?.trim(),
-        label: button.getAttribute('aria-label'),
-        title: button.getAttribute('title'),
-      })).filter(button => button.text || button.label || button.title))
-      throw new Error(`settings button missing: ${JSON.stringify({ labels, url: page.url(), body: (await page.locator('body').innerText()).slice(0, 4000), browserErrors })}`)
+      const accountMenu = page.getByRole('button', { name: /^(?:账号菜单|Account menu)$/u })
+      assert.equal(await accountMenu.count(), 1, 'the native account menu must expose the official settings entry')
+      await accountMenu.click()
+      await page.getByRole('menuitem', { name: /^(?:设置|Settings)$/u }).click()
+    } else {
+      await settingsButton.first().click()
     }
-    await settingsButton.first().click()
+    await page.locator('[role="dialog"]:visible').last().waitFor({ state: 'visible', timeout: 10_000 })
     assert.equal(
       await page.getByRole('button', { name: /^(?:插件市场|Plugin Market)$/u }).count(),
       0,

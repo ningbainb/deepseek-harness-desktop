@@ -19,8 +19,28 @@ test('CORE regression retains the real background-residency lifecycle verifier',
   const verifier = await readFile(new URL('../scripts/verify-background-residency.mjs', import.meta.url), 'utf8')
   assert.match(verifier, /await verifyHiddenRuntime\(optedIn\)/u)
   assert.match(verifier, /await quitFromTray\(\)/u)
-  assert.match(verifier, /owned\.every\(pid => !alive\(pid\)\)/u)
+  assert.match(verifier, /ownedProcessesStopped\(owned\)/u)
+  assert.match(verifier, /'explicit quit reaps the owned process tree', 90_000/u)
+  assert.match(verifier, /applicationChild = application\.process\(\)/u)
+  assert.match(verifier, /ownedProcessIds\(applicationChild\.pid\)/u)
+  assert.match(verifier, /closeIsolatedElectron\(application, \{ child: applicationChild \}\)/u)
 })
+
+for (const completedAt of [89_999, 90_000, 90_001]) {
+  test(`background quit inventory completing at ${completedAt}ms obeys the unchanged 90s deadline`, async () => {
+    const source = await readFile(new URL('../scripts/verify-background-residency.mjs', import.meta.url), 'utf8')
+    const start = source.indexOf('async function waitUntil(')
+    const end = source.indexOf('\nasync function menuAction(', start)
+    assert.ok(start >= 0 && end > start)
+    let now = 0
+    const waitUntil = new Function('Date', 'delay', `${source.slice(start, end)}; return waitUntil`)(
+      { now: () => now }, async () => { now += 100 },
+    )
+    const operation = waitUntil(async () => { now = completedAt; return true }, 'owned process inventory', 90_000)
+    if (completedAt < 90_000) await operation
+    else await assert.rejects(operation, /background residency timed out: owned process inventory/u)
+  })
+}
 
 test('complete release regression includes the real original plugin configuration form and save', async () => {
   const source = await readFile(new URL('../scripts/run-regression-e2e.mjs', import.meta.url), 'utf8')

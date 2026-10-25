@@ -17,4 +17,5 @@
 
 - id: connection
   name: '@deepseek-ai/dsh-client-connection'
+  inject: []
   config: {}

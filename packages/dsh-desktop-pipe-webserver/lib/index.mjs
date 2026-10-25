@@ -1,6 +1,5 @@
-import { EventEmitter } from 'node:events'
 import { randomBytes } from 'node:crypto'
-import { Duplex, Readable } from 'node:stream'
+import { Duplex, Readable, Writable } from 'node:stream'
 
 import { Service } from '@deepseek-ai/cordis'
 import { renderIndexInjections } from '@deepseek-ai/dsh-host-webserver'
@@ -112,27 +111,27 @@ class CarrierDuplex extends Duplex {
   setKeepAlive() { return this }
 }
 
-class FetchResponseBridge extends EventEmitter {
+class FetchResponseBridge extends Writable {
   #headers = new Headers()
   #writer
   #readable
+  #transformController
   #resolve
   #settled = false
-  #writes = Promise.resolve()
 
   statusCode = 200
   statusMessage = undefined
   headersSent = false
-  destroyed = false
-  writableEnded = false
 
   constructor(method) {
-    super()
-    const transform = new TransformStream()
+    super({ highWaterMark: 64 * 1024 })
+    const transform = new TransformStream({ start: controller => { this.#transformController = controller } })
     this.#writer = transform.writable.getWriter()
     this.#readable = transform.readable
     this.response = new Promise(resolve => { this.#resolve = resolve })
     this.method = method
+    this.on('error', () => {})
+    void this.#writer.closed.catch(error => this.destroy(error))
   }
 
   setHeader(name, value) {
@@ -181,38 +180,35 @@ class FetchResponseBridge extends EventEmitter {
   write(chunk, encoding, callback) {
     if (this.destroyed || this.writableEnded) return false
     this.flushHeaders()
-    const bytes = typeof chunk === 'string' ? Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined) : Buffer.from(chunk)
-    this.#writes = this.#writes.then(() => this.#writer.write(bytes)).then(
-      () => { if (typeof callback === 'function') callback() },
-      error => { if (typeof callback === 'function') callback(error); this.emit('error', error) },
-    )
-    return true
+    return super.write(chunk, encoding, callback)
+  }
+
+  _write(chunk, _encoding, callback) {
+    if (this.method === 'HEAD' || this.statusCode === 204 || this.statusCode === 304) {
+      callback()
+      return
+    }
+    void this.#writer.write(chunk).then(() => callback(), callback)
   }
 
   end(chunk, encoding, callback) {
     if (this.destroyed || this.writableEnded) return this
-    if (chunk !== undefined && chunk !== null) this.write(chunk, encoding)
-    else this.flushHeaders()
-    this.writableEnded = true
-    this.#writes = this.#writes.then(() => this.#writer.close()).finally(() => {
-      if (typeof callback === 'function') callback()
-      this.emit('finish')
-      this.emit('close')
-    })
-    return this
+    this.flushHeaders()
+    return super.end(chunk, encoding, callback)
   }
 
-  destroy(error) {
-    if (this.destroyed || this.writableEnded) return this
-    this.destroyed = true
-    this.writableEnded = true
+  _final(callback) {
+    void this.#writer.close().then(() => callback(), callback)
+  }
+
+  _destroy(error, callback) {
     if (!this.#settled) {
       this.statusCode = 500
       this.flushHeaders()
     }
+    if (!this.writableFinished) this.#transformController.error(error ?? new Error('desktop pipe response closed'))
     void this.#writer.abort(error).catch(() => {})
-    this.emit('close')
-    return this
+    callback(error)
   }
 }
 
@@ -336,7 +332,7 @@ export class DesktopPipeWebServer extends Service {
     return res.response
   }
 
-  openDuplex(endpoint, payload, input, signal) {
+  openDuplex(endpoint, payload, input, signal, browserCookie) {
     if (endpoint !== 'websocket' || payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
       throw new TypeError('desktop pipe duplex request is invalid')
     }
@@ -347,6 +343,10 @@ export class DesktopPipeWebServer extends Service {
     if (url.origin !== `http://${LOOPBACK_HOST}`) throw new TypeError('desktop pipe WebSocket authority is invalid')
     const route = this.upgrade(url.pathname)
     if (route === undefined) throw new Error('desktop pipe WebSocket route is unavailable')
+    if (browserCookie !== undefined && (typeof browserCookie !== 'string' || browserCookie.length === 0
+      || browserCookie.length > 4096 || /[\r\n]/u.test(browserCookie))) {
+      throw new TypeError('desktop pipe WebSocket browser cookie is invalid')
+    }
     const protocols = Array.isArray(payload.protocols)
       ? payload.protocols.filter(value => typeof value === 'string' && /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u.test(value)).slice(0, 8)
       : []
@@ -360,6 +360,7 @@ export class DesktopPipeWebServer extends Service {
       'sec-fetch-site': 'same-origin',
       'sec-websocket-key': randomBytes(16).toString('base64'),
       'sec-websocket-version': '13',
+      ...(browserCookie === undefined ? {} : { cookie: browserCookie }),
       ...(protocols.length === 0 ? {} : { 'sec-websocket-protocol': protocols.join(', ') }),
     }
     const req = Readable.from([])
@@ -404,4 +405,5 @@ export const inject = []
 export function apply(ctx) {
   new DesktopPipeWebServer(ctx)
   new DesktopPipeWebRuntime(ctx)
+  ctx.provide('webApp', { getAdvertisedUrl: () => 'dsh-runtime://app/' })
 }

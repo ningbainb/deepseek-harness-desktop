@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 
 import {
+  assertDesktopHmrGraph,
   assertNoRootIncludeReloadErrors,
   assertSettingsEventsReady,
   createSettingsProvider,
@@ -13,6 +14,16 @@ import {
   persistedSettingsConfig,
   settingsNamespace,
 } from '../scripts/verify-runtime-settings-reload.mjs'
+
+test('real HMR graph acceptance requires one Desktop owner and no synchronous official owner', () => {
+  const desktop = { id: '@linxin666/dsh-desktop-client-hmr' }
+  const official = { id: '@deepseek-ai/dsh-client-hmr' }
+  assert.doesNotThrow(() => assertDesktopHmrGraph({ entries: [desktop, { id: 'retained-plugin' }] }))
+  for (const graph of [undefined, {}, { entries: [] }, { entries: [official] },
+    { entries: [desktop, official] }, { entries: [desktop, desktop] }]) {
+    assert.throws(() => assertDesktopHmrGraph(graph))
+  }
+})
 
 test('settings reload script is import-safe and has no timeout override or background Runtime option', () => {
   assert.deepEqual(parseSettingsReloadArguments([]), { help: false, resources: undefined, executable: process.execPath })
@@ -31,6 +42,10 @@ test('real settings RPC uses the rc2 envelope and exact named settings arguments
     type: 'client-request', rpcId: 'rpc-1', method: 'settings/update', payload: { args },
   })
   assert.deepEqual(createSettingsRpcRequest('settings/describe', {}, 'rpc-2').payload, { args: {} })
+  const mutation = { ns: 'llm-pi-ai', ops: [{ op: 'set', path: ['providers', 'fixture', 'models', '0', 'input'], value: ['text', 'image'] }], expectedRevision: 4 }
+  assert.deepEqual(createSettingsRpcRequest('settings/mutate', mutation, 'rpc-3'), {
+    type: 'client-request', rpcId: 'rpc-3', method: 'settings/mutate', payload: { args: mutation },
+  })
   assert.throws(() => createSettingsRpcRequest('session/prompt'), /Only settings configuration RPCs/u)
   assert.throws(() => createSettingsRpcRequest('model/list'), /Only settings configuration RPCs/u)
 })
@@ -92,6 +107,9 @@ test('E2E script retains the complete profile, real carrier, restart and readine
   assert.match(source, /providerRequests, \[\]/u)
   assert.match(source, /'web-ui-community-plugins', \{ enabled \}/u)
   assert.match(source, /'web-ui-desktop-launcher', \{ enabled \}/u)
+  assert.match(source, /settingsRpc\(controller, 'settings\/mutate'/u)
+  assert.match(source, /bridgeCapability\[field\], capabilityReadback\[field\]/u)
+  assert.match(source, /restartedProvider\.models\[0\]\.input, \['text', 'image'\]/u)
   assert.match(source, /shutdownRoute\.status, enabled \? 405 : 404/u)
   assert.match(source, /settingsNamespace\(restarted, 'web-ui-community-plugins'\)\.value\.enabled, false/u)
   assert.match(source, /settingsNamespace\(restarted, 'web-ui-desktop-launcher'\)\.value\.enabled, false/u)

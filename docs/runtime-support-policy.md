@@ -27,6 +27,18 @@ Candidate evaluation accepts an exact version, works in a disposable detached wo
 
 A candidate becomes Stable only in a separate reviewed change that updates the exact package and lockfile inputs, regenerates known-good and matrix evidence, evaluates every compatibility patch, and passes the release gate. `latest` is never a Stable runtime input.
 
+An unpackaged Desktop can evaluate an exact prerelease with `DSH_DESKTOP_CANDIDATE_VERSION`, `DSH_DESKTOP_CANDIDATE_EVIDENCE` and `DSH_DESKTOP_CANDIDATE_MATRIX`. Both evidence paths must be absolute; `DSH_HOME` and `DSH_DESKTOP_USER_DATA` must be separate explicit directories beneath the process temporary directory. Candidate admission retains package, CLI, lockfile, provider, Desktop and patch provenance checks and reports `candidate`, never `supported`. Packaged Desktop rejects this path. Stable evidence and public updater assets remain unchanged during evaluation.
+
+The private pipe overlay disables Web startup, HTTP server and Web runtime ownership. Its connection entry explicitly clears profile-level Web startup injection and trusted-host configuration; the official Connection plugin retains its own credentials dependency. Authenticated pipe handshakes and SDK credentials checks remain mandatory. Profile composition and real settings reload, restart and environment-repair verification cover this boundary without changing official SDK source.
+
+Logical event and history streams use Connection's SDK-owned browser Peer. The legacy operator is used only when that earlier SDK interface is present; Desktop does not fabricate a principal or bypass the Gateway's Peer checks. Settings consumers accept official snapshots without the legacy `mode` property while retaining Desktop-owned `host` and `memory` values where supplied.
+
+The pinned sidebar's NPM patch delegates each Host request to Connection's public authentication fence; it retains the existing Desktop client, terminal routing, layout anchors and preference migration. GUI acceptance checks use bounded, awaited polling for asynchronous predicates, so an unresolved Promise cannot count as a successful readiness or persistence check.
+
+Desktop's profile-mounted client HMR adapter scans bundle metadata asynchronously with four concurrent reads and no overlapping batches. Official module reconciliation still owns graph and rebuild delivery and can perform synchronous work. Runtime readiness is announced only after the SDK startup listeners and its public initial HMR queue settle; no fixed startup delay or longer shutdown deadline substitutes for that completion barrier.
+
+The application's own root Include applies Desktop composition through the SDK's public config-context waterfall on initial and subsequent reloads. ConfigEditor retains its original membership, schema, file-lock, persistence and rollback implementation. Only a uniquely mapped client HMR entry receives a stable configuration-name view for its original SDK guard; the actual Loader entry and module owner stay unchanged, and stale entries are not rebound by ID.
+
 ## Maintenance commands
 
 Run these only as part of an intentional reviewed runtime update:

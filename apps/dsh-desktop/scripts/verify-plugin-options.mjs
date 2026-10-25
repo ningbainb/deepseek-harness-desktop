@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -69,7 +70,7 @@ try {
   await engine.selectOption('ddg-lite')
   await pluginPage.locator('button.dshfs-save').click()
   stage = 'persisted-plugin-options'
-  await optionsPage.waitForFunction(async () => {
+  await waitForAsyncPageFunction(optionsPage, async () => {
     const result = await (await fetch('/api/dsh-free-search-settings/describe', { method: 'POST' })).json()
     return result.ok && result.value.namespaces.find(entry => entry.ns === 'web-search-free')?.value.provider === 'ddg-lite'
   }, undefined, { timeout: 15000, polling: 100 })
@@ -113,7 +114,7 @@ try {
   await restoredPluginPage.locator('.dshfs-card').waitFor({ timeout: 60000 })
   assert.equal(await optionsPage.evaluate(() => typeof window.dshDesktop), 'undefined')
   const restoredEngine = restoredPluginPage.locator('select.dshfs-select').filter({ has: optionsPage.locator('option[value="ddg-lite"]') })
-  await optionsPage.waitForFunction(async () => {
+  await waitForAsyncPageFunction(optionsPage, async () => {
     const result = await (await fetch('/api/dsh-free-search-settings/describe', { method: 'POST' })).json()
     return result.ok && result.value.namespaces.find(entry => entry.ns === 'web-search-free')?.value.provider === 'ddg-lite'
   }, undefined, { timeout: 15000, polling: 100 })

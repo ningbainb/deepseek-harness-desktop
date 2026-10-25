@@ -20,7 +20,7 @@ class FakeScope<T extends Record<string, unknown>> implements SettingsScope<T> {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
-  getSnapshot(): SettingsScopeSnapshot<T> {
+  getSnapshot(): SettingsScopeSnapshot<T> & { mode: 'host' } {
     return {
       status: this.status,
       writable: this.writable,

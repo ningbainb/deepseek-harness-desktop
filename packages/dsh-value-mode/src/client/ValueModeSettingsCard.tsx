@@ -8,6 +8,7 @@ import layout from './value-mode-polish.module.css'
 import a11y from './value-mode-a11y.module.css'
 import dockStyles from './value-mode-dock.module.css'
 import { reportValueModeTelemetry } from './telemetry.ts'
+import { en, zh } from './locales.ts'
 
 export interface ValueModeSettingsCardProps {
   config: ValueModeConfig
@@ -25,6 +26,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
   fetchModels,
 }) => {
   const dock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('desktop-dock-setting')
+  const copy = typeof document !== 'undefined' && document.documentElement.lang.startsWith('en') ? en : zh
   const liveConfig = useValueModeConfig(settingsScope, config)
   const defaultExpert = useSettingsValue<ModelRouteSelection | undefined>(defaultModelScope, undefined)
   const resolved = resolveResolvedConfig(liveConfig, defaultExpert)
@@ -73,7 +75,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
       <div className={`${styles.header} ${layout.header}`}>
         <div className={`${styles.titleArea} ${layout.titleArea}`}>
           <div className={`${styles.titleRow} ${layout.titleRow}`}>
-            <span className={`${styles.title} ${layout.title}`}>{dock ? '模型协作' : '性价比模式'}</span>
+            <span className={`${styles.title} ${layout.title}`}>性价比模式</span>
             <span className={`${styles.badge} ${statusClass}`}>
               {resolved.enabled ? configured ? '已开启' : '配置不完整' : '已关闭'}
             </span>
@@ -81,9 +83,14 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
           <div className={styles.desc}>
             {dock ? '主控统筹任务，执行模型按需协作。' : '由专家主控模型理解和拆解任务，再按需派发副模型子代理完成并行调查、文件处理和局部实现，在交付质量与模型成本之间取得平衡。'}
           </div>
-          <div className={`${styles.desc} ${a11y.mutedNote}`}>
-            {dock ? '性价比模式 · 使用已有供应商配置' : '模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。'}
-          </div>
+          {dock ? <details className={dockStyles.details} data-value-mode-details>
+            <summary>{copy.dockDetails}</summary>
+            <p>性价比模式 · 使用已有供应商配置</p>
+            <p>{copy.expertModel}：负责规划任务与最终交付。</p>
+            <p>{copy.executorModel}：接收主控分派的任务。</p>
+          </details> : <div className={`${styles.desc} ${a11y.mutedNote}`}>
+            模型直接从你已经配置好的供应商中选择，不需要重新填写 API Key。
+          </div>}
         </div>
         <div className={`${styles.switchArea} ${layout.switchArea}`}>
           <button
@@ -121,7 +128,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
             <div className={styles.modelRole}>{dock ? '主控模型' : '主控模型'}</div>
             <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.expert)}</div>
-            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>{dock ? '负责规划任务与最终交付。' : '负责理解任务、拆分工作、汇总子代理结果并完成最终交付。'}</div>
+            {!dock && <div className={`${styles.modelDesc} ${layout.modelDesc}`}>负责理解任务、拆分工作、汇总子代理结果并完成最终交付。</div>}
           </div>
           <button
             type="button"
@@ -137,7 +144,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
             <div className={styles.modelRole}>{dock ? '执行模型' : '执行模型'}</div>
             <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.executor)}</div>
-            <div className={`${styles.modelDesc} ${layout.modelDesc}`}>{dock ? '接收主控分派的任务。' : '只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。'}</div>
+            {!dock && <div className={`${styles.modelDesc} ${layout.modelDesc}`}>只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。</div>}
           </div>
           <button
             type="button"

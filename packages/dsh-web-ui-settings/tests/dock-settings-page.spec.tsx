@@ -5,6 +5,46 @@ import { DockSettingsPage, dockSettingFromUrl } from '../src/client/DockSettings
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
+it('keeps one collaboration page title and makes all explanatory text expandable without moving settings controls', () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=value-mode')
+  render(<DockSettingsPage renderSlot={(() => <button>Original settings</button>) as never} t={key => key} />)
+  expect(screen.getAllByRole('heading', { level: 1, name: 'dockCollaboration' })).toHaveLength(1)
+  const details = document.querySelector<HTMLDetailsElement>('[data-dock-page-details]')
+  expect(details).not.toBeNull()
+  expect(details!.open).toBe(false)
+  expect(details!.textContent).toContain('两者可独立开启，也可同时使用')
+  expect(details!.textContent).toContain('复杂任务需要多人分工时开启 Agent Team')
+  expect(details!.contains(screen.getByRole('button', { name: 'Original settings' }))).toBe(false)
+  fireEvent.click(details!.querySelector('summary')!)
+  expect(details!.open).toBe(true)
+  expect(screen.getByRole('switch', { name: 'Agent Team' })).toBeTruthy()
+})
+
+it('retains model connection guidance behind an accessible disclosure while provider controls stay directly available', () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=models')
+  render(<DockSettingsPage renderSlot={((_slot: string, _owner: unknown, options: { only?: string }) => <button>{options.only}</button>) as never} t={key => key} />)
+  const details = document.querySelector<HTMLDetailsElement>('[data-dock-connection-details]')
+  expect(details).not.toBeNull()
+  expect(details!.open).toBe(false)
+  expect(details!.textContent).toContain('其他自定义供应商')
+  expect(details!.textContent).toContain('获取可用模型')
+  expect(details!.contains(screen.getByRole('button', { name: 'relay' }))).toBe(false)
+  fireEvent.click(details!.querySelector('summary')!)
+  expect(details!.open).toBe(true)
+})
+
+it('renders the original market settings section without replacing or losing the previous local form', () => {
+  window.history.replaceState({}, '', '/?desktop-dock-setting=skill-market')
+  const renderSlot = vi.fn((slot, _owner, options) => <textarea aria-label={`${slot}:${options.only}`} />)
+  render(<DockSettingsPage renderSlot={renderSlot as never} t={key => key} />)
+  expect(screen.getByRole('textbox').getAttribute('aria-label')).toBe('settings.section:agent-plugin-workspace')
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'market search draft' } })
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: 'memory' })))
+  expect(screen.getByRole('textbox').getAttribute('aria-label')).toBe('web-ui.plugin.item:memory')
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: 'skill-market' })))
+  expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('market search draft')
+})
+
 it('retains the dedicated document theme after late native theme adoption and releases ownership on unmount', async () => {
   window.history.replaceState({}, '', '/?desktop-dock-setting=models&desktop-dock-theme=dark')
   const root = document.documentElement

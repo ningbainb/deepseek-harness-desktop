@@ -43,7 +43,7 @@ async function collectFailureEvidence({ scenario, exitCode, temporary, install, 
   }, null, 2)
 }
 try {
-  for (const scenario of ['fresh', 'upgrade', 'custom-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock']) {
+  for (const scenario of ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock']) {
     const directory = join(root, scenario)
     const install = join(directory, "用户's Desktop")
     const temporary = join(directory, '张律师 临时')
@@ -59,9 +59,10 @@ try {
         await mkdir(join(install, 'resources'), { recursive: true })
         await writeFile(join(install, 'DeepSeek Harness Desktop.exe'), 'old')
         await writeFile(join(install, 'resources', 'app.asar'), 'old')
-        if (scenario === 'custom-location') await writeFile(join(install, 'resources', 'update-shutdown-v1'), '')
+        if (['custom-location', 'conflicting-location'].includes(scenario)) await writeFile(join(install, 'resources', 'update-shutdown-v1'), '')
       }
-      await exec('reg.exe', ['ADD', `HKCU\\${key}\\Install`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', install, '/f'], { windowsHide: true })
+      await exec('reg.exe', ['ADD', `HKCU\\${key}\\Install`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', scenario === 'conflicting-location' ? join(directory, 'stale-location') : install, '/f'], { windowsHide: true })
+      if (scenario === 'conflicting-location') await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', install, '/f'], { windowsHide: true })
       await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', 'old', '/f'], { windowsHide: true })
       await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'UninstallString', '/t', 'REG_SZ', '/d', `"${join(install, 'missing-uninstaller.exe')}" /currentuser`, '/f'], { windowsHide: true })
     }
@@ -70,7 +71,7 @@ try {
       await exec(compiler.path, [
         '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_INSTALL=${install}`,
-        `/DTEST_DEFAULT_INSTALL=${scenario === 'custom-location' ? join(directory, 'default-location') : install}`,
+        `/DTEST_DEFAULT_INSTALL=${['custom-location', 'conflicting-location'].includes(scenario) ? join(directory, 'default-location') : install}`,
         `/DTEST_PAYLOAD=${payload}`, `/DTEST_REGISTRY=${key}`,
         ...(scenario === 'commit-failure' ? ['/DTEST_BAD_MARKER'] : []),
         ...(scenario === 'section-abort' ? ['/DTEST_ABORT'] : []),
@@ -106,7 +107,7 @@ try {
         locker.kill()
         await exited
       }
-      const success = ['fresh', 'upgrade', 'custom-location', 'stale-registration', 'unwritable-log'].includes(scenario)
+      const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log'].includes(scenario)
       if ((exitCode === 0) !== success) {
         const evidence = await collectFailureEvidence({ scenario, exitCode, temporary, install, key })
         assert.equal(exitCode === 0, success, `${scenario}: unexpected installer exit ${exitCode}\n${evidence}`)
@@ -137,8 +138,9 @@ try {
       }
       if (success) assert.equal(await readFile(join(install, 'completed.txt'), 'utf8'), 'committed')
       else await assert.rejects(readFile(join(install, 'completed.txt')), { code: 'ENOENT' })
-      if (scenario === 'custom-location') {
+      if (['custom-location', 'conflicting-location'].includes(scenario)) {
         assert.equal(await pathExists(join(directory, 'default-location', 'DeepSeek Harness Desktop.exe')), false)
+        assert.equal(await pathExists(join(directory, 'stale-location')), false)
       }
       const deadline = Date.now() + 10_000
       while ((await readdir(directory)).some(name => name.startsWith('.dsh-desktop-update-old-')) && Date.now() < deadline) await delay(100)

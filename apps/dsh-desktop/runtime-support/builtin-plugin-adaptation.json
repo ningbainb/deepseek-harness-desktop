@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "policy": "desktop-first",
-  "runtimeVersion": "0.2.0-rc.2",
+  "runtimeVersion": "0.2.1-rc.2",
   "notes": [
-    "The selection records the Desktop packages resolved with official DSH 0.2.0-rc.2.",
+    "The selection records the candidate Desktop packages resolved with official DSH 0.2.1-rc.2; interactive acceptance is recorded separately.",
     "Public registry snapshots below are historical and must be refreshed before a new package upgrade decision.",
     "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts; validation.results records executed checks separately.",
     "A selected version is not a packaged or user-data migration acceptance result."
@@ -13,10 +13,12 @@
       "@deepseek-ai/dsh-base",
       "@linxin666/dsh-desktop-compat",
       "@deepseek-ai/dsh-web-app",
+      "@linxin666/dsh-desktop-client-hmr",
       "@linxin666/dsh-value-mode",
       "dsh-better-sidebar",
       "@linxin666/dsh-web-all",
       "@linxin666/dsh-client-ui-skill-explorer",
+      "dsh-agent-plugins-market",
       "@linxin666/dsh-client-ui-model-capabilities",
       "@linxin666/dsh-usage",
       "@linxin666/dsh-session-archive",
@@ -110,9 +112,32 @@
   },
   "plugins": [
     {
+      "name": "dsh-agent-plugins-market",
+      "selection": { "version": "0.11.1", "source": "npm", "patch": "patches/dsh-agent-plugins-market@0.11.1.patch" },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.11.1",
+        "checkedAt": "2026-10-22T09:23:49.883Z",
+        "url": "https://registry.npmjs.org/dsh-agent-plugins-market"
+      },
+      "reason": "Carry the upstream market as a default-inactive candidate alongside local skills; pin its SDK dependencies, require native activation consent and retain recoverable source replacement while feedback, translation and background source updates remain opt-in. Source-only acceptance does not promote a supported runtime.",
+      "desktopContracts": [
+        "Retain local skill imports, roots and existing source and enable choices",
+        "Show suite capabilities before installation and keep market state inside DSH_HOME",
+        "Use the same official SDK cohort as Desktop",
+        "Native activation owns confirmation, serializes profile writes and retains exact-byte recovery snapshots",
+        "Managed source replacement keeps the last complete checkout until durable state commit"
+      ],
+      "validation": {
+        "automatedChecks": ["apps/dsh-desktop/test/skill-market.test.mjs", "apps/dsh-desktop/test/skill-market-activation.test.mjs", "apps/dsh-desktop/test/skill-market-recovery.test.mjs", "apps/dsh-desktop/scripts/verify-skill-market.mjs"],
+        "desktopAcceptance": ["Verify inactive defaults, cancel and confirm activation, then search, inspect, cancel and install a suite; verify native skill discovery, restart persistence and recovery after source failure."],
+        "results": []
+      }
+    },
+    {
       "name": "@deepseek-ai/dsh-experimental-agent-team",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -140,7 +165,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-agent-team-profile",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -171,7 +196,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-tool-agent-team",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -601,6 +626,40 @@
         ],
         "desktopAcceptance": [
           "Open the existing Desktop surface and verify its saved configuration and primary action."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@linxin666/dsh-desktop-client-hmr",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-desktop-client-hmr"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-10-17T17:43:15.309Z",
+        "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-client-hmr"
+      },
+      "reason": "Use a Desktop-owned adapter over the official module registry and client controller to avoid synchronous whole-graph file scans on slow disks while preserving authenticated graph and rebuild delivery.",
+      "desktopContracts": [
+        "The existing client-hmr row and pollIntervalMs configuration retain one owner",
+        "Bounded asynchronous scanning preserves startup baseline races and missing-file recovery",
+        "Official client module controller retains graph reconciliation and rebuilt-bundle lifecycle"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "packages/dsh-desktop-client-hmr/tests/scanner.spec.ts",
+          "packages/dsh-desktop-client-hmr/tests/host.spec.ts",
+          "packages/dsh-desktop-client-hmr/tests/client.spec.ts",
+          "packages/dsh-desktop-client-hmr/tests/events.spec.ts",
+          "apps/dsh-desktop/scripts/verify-runtime-provider.mjs"
+        ],
+        "desktopAcceptance": [
+          "Start HTTP and private-pipe Runtime profiles, observe graph and rebuilt frames, and stop a healthy Host without force fallback."
         ],
         "results": []
       }
@@ -1194,7 +1253,7 @@
         "checkedAt": "2026-09-12T06:50:37.575Z",
         "url": "https://registry.npmjs.org/dsh-better-sidebar"
       },
-      "reason": "Select 0.24.1 with a persistent NPM patch for Desktop preload detection and owned layout anchors while retaining native terminal routing and original preference migration.",
+      "reason": "Select 0.24.1 with the Desktop preload and layout patch preserved, plus the upstream 0.28 Connection-owned request fence backport for the 0.2.1 SDK without changing the retained sidebar UI, terminal routing or preference migration.",
       "desktopContracts": [
         "Desktop user terminal routing and separate agent PTYs",
         "Legacy tabs, widths, open defaults and path interception remain effective",
@@ -1244,7 +1303,7 @@
     {
       "name": "@deepseek-ai/dsh-browser-use",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1272,7 +1331,7 @@
     {
       "name": "@deepseek-ai/dsh-computer-use",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1300,7 +1359,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1327,7 +1386,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1354,7 +1413,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-runtime",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1381,7 +1440,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1408,7 +1467,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1435,7 +1494,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
       "selection": {
-        "version": "0.2.0-rc.2",
+        "version": "0.2.1-rc.2",
         "source": "npm"
       },
       "publicSnapshot": {

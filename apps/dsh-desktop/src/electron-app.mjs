@@ -11,6 +11,7 @@ import { resolveDesktopVersion } from './app-version.mjs'
 import {
   CLOSE_BEHAVIORS,
   createCloseBehaviorController,
+  createCloseBehaviorUpdater,
   DesktopClosePreferencesStore,
   isBackgroundAutomationEnabled,
 } from './close-behavior.mjs'
@@ -155,6 +156,11 @@ import {
   runtimeSupportStartupLogDetails,
   verifyRuntimeFileEvidence,
 } from './runtime-support-policy.mjs'
+import {
+  assessCandidateRuntimeSupport,
+  candidateRuntimeOptions,
+  normalizeCandidateRuntimeEvidence,
+} from './runtime-candidate-policy.mjs'
 import { DesktopUpdateController, loadElectronAutoUpdater } from './updater.mjs'
 import { DesktopUpdateCheckStore } from './update-check-state.mjs'
 import { parseUpdateMirrors, probeUpdateSource, UpdateDownloadRouter } from './update-mirrors.mjs'
@@ -1169,7 +1175,7 @@ export async function startElectronApp(metadata) {
     else trayLifecycle.ensure()
     void trayLifecycle.refresh()
   }
-  const setCloseBehavior = async (value) => {
+  const closeBehaviorUpdater = createCloseBehaviorUpdater(async (value) => {
     const hadBackgroundAutomation = isBackgroundAutomationEnabled(closeBehavior)
     closeBehavior = await closePreferencesStore.saveCloseBehavior(value)
     synchronizeBackgroundMode()
@@ -1182,7 +1188,8 @@ export async function startElectronApp(metadata) {
       }
     }
     return closeBehavior
-  }
+  })
+  const setCloseBehavior = value => closeBehaviorUpdater.set(value)
   await logStore.append(`[startup] application-ready=${Math.round(applicationReadyAt - applicationStartedAt)}ms`)
   if (!updateChannelPreference.exists) {
     const seededChannel = initialUpdateChannel({
@@ -1350,9 +1357,14 @@ export async function startElectronApp(metadata) {
   let dshCliPath
   let runtimeVersion
   try {
-    const matrix = await readRuntimeSupportMatrix(runtimeMatrixPath, { readFile })
+    const candidate = candidateRuntimeOptions({ isPackaged: app.isPackaged })
+    const matrix = candidate === undefined
+      ? await readRuntimeSupportMatrix(runtimeMatrixPath, { readFile })
+      : JSON.parse(await readFile(candidate.matrixPath, 'utf8'))
     runtimeSupportStage = 'known-good-read'
-    const knownGood = await readKnownGoodRuntimeEvidence(knownGoodRuntimePath, { readFile })
+    const knownGood = candidate === undefined
+      ? await readKnownGoodRuntimeEvidence(knownGoodRuntimePath, { readFile })
+      : normalizeCandidateRuntimeEvidence(JSON.parse(await readFile(candidate.evidencePath, 'utf8')), candidate.version)
     runtimeSupportStage = 'cli-resolve'
     dshCliPath = resolveDshCliPath()
     runtimeVersion = await readRuntimePackageVersion({ cliPath: dshCliPath, readFile })
@@ -1378,7 +1390,7 @@ export async function startElectronApp(metadata) {
     }
     knownGoodRuntimeEvidence = knownGood
     runtimeSupportStage = 'assess'
-    runtimeSupportAssessment = assessRuntimeSupport(matrix, {
+    const identity = {
       upstreamVersion: runtimeVersion,
       providerId: RUNTIME_PROVIDER_ID,
       desktopVersion,
@@ -1386,7 +1398,10 @@ export async function startElectronApp(metadata) {
       lockfileSha256,
       fileHashes: runtimeFileHashes,
       patchEvidence: knownGood.patches,
-    })
+    }
+    runtimeSupportAssessment = candidate === undefined
+      ? assessRuntimeSupport(matrix, identity)
+      : assessCandidateRuntimeSupport(matrix, identity, candidate.version)
   } catch (error) {
     runtimeSupportFailure = error
     runtimeSupportAssessment = Object.freeze({
@@ -2134,6 +2149,7 @@ export async function startElectronApp(metadata) {
     }),
     getBackgroundStatus: () => ({
       enabled: isBackgroundAutomationEnabled(closeBehavior),
+      pending: closeBehaviorUpdater.pending,
       closeBehavior,
       trayAvailable: trayLifecycle?.available === true,
     }),

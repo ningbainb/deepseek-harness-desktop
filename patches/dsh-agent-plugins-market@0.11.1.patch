@@ -1,0 +1,487 @@
+diff --git a/lib/packages/market-contracts/src/contracts/settings.js b/lib/packages/market-contracts/src/contracts/settings.js
+--- a/lib/packages/market-contracts/src/contracts/settings.js
++++ b/lib/packages/market-contracts/src/contracts/settings.js
+@@ -34,10 +34,8 @@ export const MARKET_SETTINGS_DEFAULTS = {
+     mcpEnhanced: true,
+     scanProjectLayouts: false,
+     downloadRegion: 'auto',
+-    feedbackEnabled: true,
++    feedbackEnabled: false,
+     autoUpdateSources: false,
+-    // On for every interface language: a fresh install translates without
+-    // visiting the settings page, and a stored false turns it off.
+-    translationEnabled: true,
++    translationEnabled: false,
+     // On by default: the preset manager entry shows without an opt-in step, and a
+     // stored false hides it.
+diff --git a/client/client.js b/client/client.js
+--- a/client/client.js
++++ b/client/client.js
+@@ -875,9 +875,9 @@
+ const MARKET_SETTINGS_DEFAULTS = {
+ 	mcpEnhanced: true,
+ 	scanProjectLayouts: false,
+ 	downloadRegion: "auto",
+-	feedbackEnabled: true,
++	feedbackEnabled: false,
+ 	autoUpdateSources: false,
+-	translationEnabled: true,
++	translationEnabled: false,
+ 	agentPresetsEnabled: true
+ };
+diff --git a/lib/packages/market-catalog/src/scanning/archive.js b/lib/packages/market-catalog/src/scanning/archive.js
+--- a/lib/packages/market-catalog/src/scanning/archive.js
++++ b/lib/packages/market-catalog/src/scanning/archive.js
+@@ -21,6 +21,7 @@
+ import { Unzip, UnzipInflate } from 'fflate';
+ import { archiveFormatOf } from '../../../market-contracts/src/model/types.js';
+ import { isWithin } from './paths.js';
++import { replaceSourceDirectory } from './source-replacement.js';
+ const run = promisify(execFile);
+ /** Hard cap on archive download size (mirrors Claude Code's archive limit). */
+ export const ARCHIVE_MAX_BYTES = 256 * 1024 * 1024;
+@@ -117,13 +118,8 @@
+         }
+         await assertNoEscapingSymlinks(extractDir);
+         const root = await unwrapSingleRoot(extractDir);
+-        await rm(dest, { recursive: true, force: true });
+-        try {
+-            await rename(root, dest);
+-        }
+-        catch {
+-            await copyTree(root, dest);
+-        }
++        await assertNoEscapingSymlinks(root);
++        await replaceSourceDirectory(root, dest);
+         return { sha256 };
+     }
+     finally {
+diff --git a/lib/packages/market-catalog/src/application/catalog-context.js b/lib/packages/market-catalog/src/application/catalog-context.js
+--- a/lib/packages/market-catalog/src/application/catalog-context.js
++++ b/lib/packages/market-catalog/src/application/catalog-context.js
+@@ -14,6 +14,7 @@
+ import { EMPTY_STATE, loadState, saveState } from './state/state-store.js';
+ import { effectiveSurfaces } from '../../../market-contracts/src/model/types.js';
+ import { SCAN_CACHE_TTL_MS, SnapshotCache } from './snapshot-cache.js';
++import { recoverSourceReplacements } from '../scanning/source-replacement.js';
+ /** Key of one install entry in the persisted `installed` record. */
+ export function installKey(sourceId, suiteId) {
+     return `${sourceId}/${suiteId}`;
+@@ -83,14 +84,15 @@
+     }
+     /** Load persisted user state once at plugin activation. */
+     async load() {
++        await recoverSourceReplacements(join(this.userRoot, '.sources'));
+         this.currentState = await loadState(this.statePath);
+         this.invalidateScans();
+         this.invalidateSnapshot(false);
+     }
+     /** Replace the persisted state and write it out. */
+     async commit(next) {
+-        this.currentState = next;
+         await saveState(this.statePath, next);
++        this.currentState = next;
+     }
+     /** Apply the host's project-layout switch and invalidate every project snapshot. */
+     async setScanProjectLayouts(enabled) {
+diff --git a/lib/packages/market-catalog/src/application/source-store.js b/lib/packages/market-catalog/src/application/source-store.js
+--- a/lib/packages/market-catalog/src/application/source-store.js
++++ b/lib/packages/market-catalog/src/application/source-store.js
+@@ -7,7 +7,9 @@
+  * clone/archive/download, refresh, removal, and the progress state the market
+  * page polls while a long acquisition runs.
+  */
+-import { mkdir, readdir, rename } from 'node:fs/promises';
++import { randomUUID } from 'node:crypto';
++import { mkdir, readdir, rename, rm } from 'node:fs/promises';
++import { hashSourceState, prepareSourceRoot, replaceSourceDirectory } from '../scanning/source-replacement.js';
+ import { join } from 'node:path';
+ import { archiveInstall } from '../scanning/archive.js';
+ import { gitClone, gitCurrentBranch, gitHead, gitRemoteUrl, gitRemove, gitSetRemoteUrl, gitSync } from '../scanning/git.js';
+@@ -182,14 +184,30 @@
+                 ...(patch.sha256 !== undefined ? (patch.sha256 === '' ? {} : { sha256: patch.sha256 }) : current.sha256 === undefined ? {} : { sha256: current.sha256 }),
+                 ...(current.adopted === true ? { adopted: true } : {})
+             };
+-            const urlChanged = patch.url !== undefined && patch.url !== current.url;
+-            // A URL change invalidates the old checkout — except for adopted (user
+-            // cloned) and local sources, whose directories we never own.
+-            if (urlChanged && current.local !== true && current.adopted !== true) {
+-                this.headCache.delete(sourceId);
+-                await gitRemove(sourceCheckoutDir(this.context.userRoot, sourceId));
++            const nextState = { ...this.context.state, sources: this.context.state.sources.map((source, position) => position === index ? next : source) };
++            if (hashSourceState(current) !== hashSourceState(next) && current.local !== true && current.adopted !== true && resolveSourceKind(next) !== 'local') {
++                const root = await prepareSourceRoot(sourcesDir(this.context.userRoot));
++                const staging = join(root, `.desktop-source-stage-${randomUUID()}`);
++                try {
++                    await this.acquire(next, staging);
++                    await replaceSourceDirectory(staging, sourceCheckoutDir(this.context.userRoot, sourceId), {
++                        root,
++                        commit: () => this.context.commit(nextState),
++                        commitState: { sourceId, previous: hashSourceState(current), next: hashSourceState(next) }
++                    });
++                }
++                catch (error) {
++                    await this.context.notifyChanged();
++                    throw error;
++                }
++                finally {
++                    await rm(staging, { recursive: true, force: true });
++                }
+             }
+-            await this.context.commit({ ...this.context.state, sources: this.context.state.sources.map((source, i) => (i === index ? next : source)) });
++            else {
++                await this.context.commit(nextState);
++            }
++            this.headCache.delete(sourceId);
+             await this.context.notifyChanged();
+         });
+     }
+@@ -224,9 +242,6 @@
+     async refresh(sourceId) {
+         return this.context.enqueue(async () => {
+             const targets = sourceId === undefined ? this.context.state.sources : this.context.state.sources.filter(source => source.id === sourceId);
+-            // One route for the whole pass: resolving it reads the host locale
+-            // preference, so asking per source made a refresh of N sources pay N
+-            // whole-profile projections.
+             const route = await this.downloadRoute();
+             for (const source of targets) {
+                 const kind = resolveSourceKind(source);
+@@ -236,69 +251,33 @@
+                     continue;
+                 }
+                 const checkout = sourceCheckoutDir(this.context.userRoot, source.id);
+-                this.headCache.delete(source.id);
+-                if (kind === 'archive') {
+-                    // Re-download and swap; the fresh digest becomes the lock value.
+-                    const lock = await this.acquire(source);
+-                    if (lock !== undefined)
+-                        this.headCache.set(source.id, lock);
+-                    continue;
+-                }
+-                // Adopted checkouts are user-owned working trees: no `reset --hard`
+-                // (it would destroy uncommitted work), and no re-acquire either —
+-                // a broken HEAD means the user repairs the checkout, not that the
+-                // manager may clone or extract over their directory.
+                 if (source.adopted === true) {
+-                    try {
+-                        this.headCache.set(source.id, await gitHead(checkout));
+-                    }
+-                    catch {
+-                        // A failed HEAD read means the next overview re-probes.
+-                    }
+-                    continue;
+-                }
+-                try {
+-                    await gitHead(checkout);
+-                }
+-                catch {
+-                    const lock = await this.acquire(source);
+-                    if (lock !== undefined) {
+-                        this.headCache.set(source.id, lock);
+-                    }
+-                    else {
+-                        try {
+-                            this.headCache.set(source.id, await gitHead(checkout));
+-                        }
+-                        catch {
+-                            // A failed HEAD read means the next overview re-probes.
+-                        }
+-                    }
++                    const head = await tryHead(checkout);
++                    if (head !== undefined) this.headCache.set(source.id, head);
+                     continue;
+                 }
+-                // Shallow-friendly sync: fetch depth 1 into FETCH_HEAD, hard reset.
+-                const branch = source.branch ?? (await gitCurrentBranch(checkout).catch(() => undefined));
+-                // Keep origin on the region's route: a clone made before a region
+-                // switch (or an explicit flip) re-points origin so the fetch follows.
+-                // Only origins this plugin itself wrote (the direct or proxied
+-                // source.url) are re-pointed — a foreign remote is left untouched.
+-                if (source.kind === 'git' || (source.kind === undefined && source.local !== true)) {
+-                    try {
+-                        const routed = githubCloneUrl(route, source.url);
+-                        const origin = await gitRemoteUrl(checkout);
+-                        if (origin !== routed && (origin === source.url || origin === githubCloneUrl('china', source.url))) {
+-                            await gitSetRemoteUrl(checkout, routed);
+-                        }
+-                    }
+-                    catch {
+-                        // Origin reconciliation is best effort; plain sync still runs.
+-                    }
+-                }
+-                await gitSync(checkout, branch, this.context.git);
++                const root = await prepareSourceRoot(sourcesDir(this.context.userRoot));
++                const staging = join(root, `.desktop-source-stage-${randomUUID()}`);
++                const branch = source.branch ?? (kind === 'git' ? await gitCurrentBranch(checkout).catch(() => undefined) : undefined);
++                let acquisition = branch === undefined ? source : { ...source, branch };
++                let preserveOrigin = false;
++                if (kind === 'git') {
++                    const origin = await gitRemoteUrl(checkout).catch(() => undefined);
++                    if (origin !== undefined && ![source.url, githubCloneUrl('china', source.url), githubCloneUrl(route, source.url)].includes(origin)) {
++                        acquisition = { ...acquisition, url: origin };
++                        preserveOrigin = true;
++                    }
++                }
+                 try {
+-                    this.headCache.set(source.id, await gitHead(checkout));
++                    const lock = await this.acquire(acquisition, staging, route, preserveOrigin);
++                    await replaceSourceDirectory(staging, checkout, { root });
++                    this.headCache.delete(source.id);
++                    const head = lock ?? await tryHead(checkout);
++                    if (head !== undefined) this.headCache.set(source.id, head);
++                    await this.context.notifyChanged();
+                 }
+-                catch {
+-                    // A failed HEAD read means the next overview re-probes.
++                finally {
++                    await rm(staging, { recursive: true, force: true });
+                 }
+             }
+             await this.context.notifyChanged();
+@@ -394,14 +373,14 @@
+      * when the acquisition yields one (archive SHA-256, tarball fallback
+      * digest); git HEAD is read separately by the callers.
+      */
+-    async acquire(source) {
++    async acquire(source, checkoutOverride, downloadRoute, preserveOrigin = false) {
+         const kind = resolveSourceKind(source);
+         if (kind === 'local') {
+             if (!(await isDirectory(expandHome(source.url))))
+                 throw new Error(`local source directory ${expandHome(source.url)} is missing`);
+             return undefined;
+         }
+-        const checkout = sourceCheckoutDir(this.context.userRoot, source.id);
++        const checkout = checkoutOverride ?? sourceCheckoutDir(this.context.userRoot, source.id);
+         await mkdir(sourcesDir(this.context.userRoot), { recursive: true });
+         if (kind === 'archive') {
+             const { sha256 } = await archiveInstall(source.url, checkout, {
+@@ -414,9 +393,9 @@
+         try {
+             // The region routes github.com clones through the China mirror prefix;
+             // the proxied URL becomes `origin`, so refreshes follow the same route.
+-            await gitClone(githubCloneUrl(await this.downloadRoute(), source.url), source.branch, checkout, this.context.git);
++            await gitClone(preserveOrigin ? source.url : githubCloneUrl(downloadRoute ?? await this.downloadRoute(), source.url), source.branch, checkout, this.context.git);
+             return undefined;
+         }
+         catch (error) {
+-            if (this.context.git.fallbackTarball !== true)
++            if (preserveOrigin || this.context.git.fallbackTarball !== true)
+                 throw error;
+diff --git a/lib/packages/market-catalog/src/scanning/paths.js b/lib/packages/market-catalog/src/scanning/paths.js
+--- a/lib/packages/market-catalog/src/scanning/paths.js
++++ b/lib/packages/market-catalog/src/scanning/paths.js
+@@ -82,6 +82,9 @@
+ }
+ /** Checkout directory of one source inside a dimension root. */
+ export function sourceCheckoutDir(dimensionRoot, sourceId) {
++    if (typeof sourceId !== 'string' || !/^[a-zA-Z0-9@][a-zA-Z0-9@._-]*$/.test(sourceId) || sourceId.includes('..')) {
++        throw new Error('market source id must be one safe path segment');
++    }
+     return join(sourcesDir(dimensionRoot), sourceId);
+ }
+ /**
+diff --git a/lib/packages/market-catalog/src/scanning/source-replacement.js b/lib/packages/market-catalog/src/scanning/source-replacement.js
+new file mode 100644
+--- /dev/null
++++ b/lib/packages/market-catalog/src/scanning/source-replacement.js
+@@ -0,0 +1,200 @@
++import { createHash, randomUUID } from 'node:crypto'
++import { lstat, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises'
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
++
++export function hashSourceState(source) {
++  const text = JSON.stringify(source ?? null, (_name, value) => value && typeof value === 'object' && !Array.isArray(value)
++    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value)
++  return createHash('sha256').update(text).digest('hex')
++}
++
++function inside(root, path) {
++  const part = relative(root, path)
++  return part && !isAbsolute(part) && part !== '..' && !part.startsWith(`..${sep}`)
++}
++
++async function metadata(path) {
++  try { return await lstat(path) } catch (error) { if (error.code === 'ENOENT') return undefined; throw error }
++}
++
++async function directory(path, optional = false) {
++  const value = await metadata(path)
++  if (!value && optional) return false
++  if (!value?.isDirectory() || value.isSymbolicLink()) throw new Error('market source recovery requires real directories without links')
++  return true
++}
++
++export async function prepareSourceRoot(rootDirectory) {
++  const root = resolve(rootDirectory)
++  await mkdir(root, { recursive: true })
++  await directory(root)
++  return root
++}
++
++async function jsonFile(path) {
++  const value = await metadata(path)
++  if (!value?.isFile() || value.isSymbolicLink()) throw new Error('market recovery journal must be a regular file')
++  return JSON.parse(await readFile(path, 'utf8'))
++}
++
++async function persist(path, value) {
++  const temporary = `${path}.${randomUUID()}.tmp`
++  try {
++    const handle = await open(temporary, 'wx', 0o600)
++    try { await handle.writeFile(JSON.stringify(value)); await handle.sync() } finally { await handle.close() }
++    await rename(temporary, path)
++  } finally { await rm(temporary, { force: true }) }
++}
++
++function journalName(target) {
++  return `.desktop-source-replace-${createHash('sha256').update(target).digest('hex').slice(0, 16)}.json`
++}
++
++function safeTarget(value) {
++  return typeof value === 'string' && /^[a-zA-Z0-9.][a-zA-Z0-9._-]*$/u.test(value) && !value.includes('..')
++}
++
++async function locked(root, filename, operation) {
++  const path = join(root, `${filename}.lock`)
++  const nonce = randomUUID()
++  let handle
++  try { handle = await open(path, 'wx', 0o600) } catch (error) {
++    if (error.code !== 'EEXIST') throw error
++    const owner = await jsonFile(path)
++    if (!Number.isSafeInteger(owner.pid) || owner.pid <= 0 || typeof owner.nonce !== 'string') throw new Error(`invalid market recovery lock; retained at ${path}`)
++    try { process.kill(owner.pid, 0); throw new Error(`market source transaction is active in another host: ${path}`) } catch (alive) {
++      if (alive.code !== 'ESRCH') throw alive
++    }
++    await rm(path)
++    handle = await open(path, 'wx', 0o600)
++  }
++  try {
++    await handle.writeFile(JSON.stringify({ pid: process.pid, nonce }))
++    await handle.sync()
++    await handle.close()
++    handle = undefined
++    return await operation()
++  } finally {
++    await handle?.close()
++    const current = await jsonFile(path).catch(() => undefined)
++    if (current?.nonce === nonce) await rm(path)
++  }
++}
++
++function validateRecord(root, filename, record) {
++  if (record?.version !== 1 || !safeTarget(record.target) || filename !== journalName(record.target)
++    || !['prepared', 'swapped', 'committed', 'restoring', 'restored'].includes(record.phase)
++    || typeof record.hadOriginal !== 'boolean' || typeof record.backup !== 'string'
++    || !record.backup.startsWith(`.${record.target}.desktop-backup-`)
++    || !/^[a-f0-9-]{36}$/u.test(record.backup.slice(`.${record.target}.desktop-backup-`.length))
++    || basename(record.backup) !== record.backup || typeof record.staging !== 'string'
++    || !inside(root, resolve(root, record.staging))) throw new Error(`invalid market recovery journal retained at ${join(root, filename)}`)
++  if (record.commitState !== undefined) {
++    const commit = record.commitState
++    if (basename(root) !== '.sources' || commit.sourceId !== record.target
++      || !/^[a-f0-9]{64}$/u.test(commit.previous) || !/^[a-f0-9]{64}$/u.test(commit.next)) throw new Error('invalid market source state recovery record')
++  }
++}
++
++async function stateDecision(root, record) {
++  if (!record.commitState) return 'previous'
++  const state = await jsonFile(join(dirname(root), 'state.json'))
++  const source = state.sources?.find(source => source.id === record.commitState.sourceId)
++  const digest = hashSourceState(source)
++  if (digest === record.commitState.next) return 'next'
++  if (digest === record.commitState.previous) return 'previous'
++  throw new Error('market source state changed outside the pending transaction; recovery copies retained')
++}
++
++async function recoverOne(root, filename) {
++  const path = join(root, filename)
++  if (!await metadata(path)) return
++  const record = await jsonFile(path)
++  validateRecord(root, filename, record)
++  const destination = join(root, record.target)
++  const backup = join(root, record.backup)
++  const currentExists = await directory(destination, true)
++  const backupExists = await directory(backup, true)
++  const committed = record.phase === 'committed' || await stateDecision(root, record) === 'next'
++  if (committed) {
++    if (!currentExists) throw new Error(`committed market checkout is missing; recovery backup retained at ${backup}`)
++    if (backupExists) await rm(backup, { recursive: true })
++  } else if (backupExists && record.hadOriginal) {
++    if (currentExists) {
++      const quarantine = join(root, `.${record.target}.desktop-uncommitted-${randomUUID()}`)
++      await rename(destination, quarantine)
++    }
++    record.phase = 'restoring'
++    await persist(path, record)
++    await rename(backup, destination)
++    record.phase = 'restored'
++    await persist(path, record)
++  } else if (record.hadOriginal) {
++    if (!currentExists || !['prepared', 'restoring', 'restored'].includes(record.phase)) throw new Error(`previous market source cannot be located; journal retained at ${path}`)
++  } else if (currentExists) {
++    if (backupExists) throw new Error(`uncommitted market source has conflicting recovery copies; retained at ${path}`)
++    await rename(destination, backup)
++  }
++  await rm(path)
++}
++
++export async function recoverSourceReplacements(rootDirectory) {
++  const root = resolve(rootDirectory)
++  if (!await directory(root, true)) return
++  for (const entry of await readdir(root, { withFileTypes: true })) {
++    if (!/^\.desktop-source-replace-[a-f0-9]{16}\.json$/u.test(entry.name)) continue
++    if (!entry.isFile() || entry.isSymbolicLink()) throw new Error('market recovery refuses a linked journal')
++    await locked(root, entry.name, () => recoverOne(root, entry.name))
++  }
++}
++
++export async function replaceSourceDirectory(stagingDirectory, destinationDirectory, { root: rootDirectory = dirname(destinationDirectory), commit, commitState } = {}) {
++  const root = resolve(rootDirectory)
++  const staging = resolve(stagingDirectory)
++  const destination = resolve(destinationDirectory)
++  if (dirname(destination) !== root || !safeTarget(basename(destination)) || !inside(root, staging) || staging === destination) {
++    throw new Error('market source replacement escapes its managed root')
++  }
++  await mkdir(root, { recursive: true })
++  await directory(root)
++  const parts = relative(root, staging).split(sep)
++  let cursor = root
++  for (const part of parts) { cursor = join(cursor, part); await directory(cursor) }
++  await directory(destination, true)
++  const filename = journalName(basename(destination))
++  return locked(root, filename, async () => {
++    await recoverOne(root, filename)
++    const journal = join(root, filename)
++    const record = {
++      version: 1, target: basename(destination), staging: relative(root, staging),
++      backup: `.${basename(destination)}.desktop-backup-${randomUUID()}`,
++      hadOriginal: await directory(destination, true), phase: 'prepared', ...(commitState ? { commitState } : {}),
++    }
++    validateRecord(root, filename, record)
++    const backup = join(root, record.backup)
++    await persist(journal, record)
++    let committed = false
++    try {
++      if (record.hadOriginal) await rename(destination, backup)
++      await rename(staging, destination)
++      record.phase = 'swapped'
++      await persist(journal, record)
++      await commit?.()
++      committed = true
++      record.phase = 'committed'
++      await persist(journal, record)
++    } catch (error) {
++      if (committed) throw new Error(`market source committed but recovery journal needs attention: ${journal}`, { cause: error })
++      try { await recoverOne(root, filename) } catch (rollbackError) {
++        throw new Error(`market source recovery failed; complete backup retained at ${backup}`, { cause: new AggregateError([error, rollbackError]) })
++      }
++      throw error
++    }
++    try {
++      if (record.hadOriginal) await rm(backup, { recursive: true })
++      await rm(journal)
++    } catch (error) {
++      throw new Error(`market source committed; deferred recovery cleanup retained at ${journal}`, { cause: error })
++    }
++  })
++}

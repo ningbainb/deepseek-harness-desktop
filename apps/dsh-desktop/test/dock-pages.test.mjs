@@ -3,6 +3,11 @@ import test from 'node:test'
 
 import { assertDockPlugin, assertDockSetting, DOCK_TAB_IDS, normalizeDockTab } from '../src/dock-pages.mjs'
 
+test('the market uses a fixed Dock document without allowing arbitrary source URLs', () => {
+  assert.doesNotThrow(() => assertDockSetting('skill-market'))
+  assert.throws(() => assertDockSetting('skill-market?url=https://example.com'))
+})
+
 test('plugin options navigation accepts only package identities on the fixed page', () => {
   assert.doesNotThrow(() => assertDockSetting('plugin-options'))
   for (const plugin of ['dsh-free-search', '@author/search']) assert.doesNotThrow(() => assertDockPlugin('plugin-options', plugin))

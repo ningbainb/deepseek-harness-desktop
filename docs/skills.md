@@ -2,6 +2,16 @@
 
 DeepSeek Harness Desktop discovers local Agent Skills and exposes them in Extension Dock and the composer Skills menu. The implementation contract is [extensions/skills.mjs](../apps/dsh-desktop/src/extensions/skills.mjs); the external compatibility reference is the [Agent Skills specification](https://agentskills.io/specification).
 
+## Embedded market
+
+The bundled candidate `dsh-agent-plugins-market` is a community MIT plugin, not an official DSH service. Desktop keeps it disabled by default. Open **Extension Dock > Skills > Skill market** and review the native activation explanation, including effective storage roots and existing Agent declarations. Cancel leaves the profile unchanged; Enable uses the serialized profile transaction, retains a recovery snapshot and restarts the runtime. Explicit enabled or disabled choices remain authoritative. The neighboring Local skills page retains inventory and Import/Open directory actions. Source and native regression acceptance remain separate release gates.
+
+In the enabled market, search configured sources, inspect suites and install them. Its preset source is registered without downloading it; use Refresh to fetch it, or add a trusted repository, archive or local directory. Installing a suite requires a confirmation showing its declared capabilities. Suites may contain executable hooks, MCP or LSP services in addition to skill text; only install sources you trust. The upstream confirmation is a UI safeguard, not a security sandbox or a separate host authorization token.
+
+Desktop defaults `feedbackEnabled`, `translationEnabled`, `autoUpdateSources` and `scanProjectLayouts` to `false`; existing explicit profile preferences take precedence. Opting into translation can send source text to external services and fall back to a paid model. Opting into public feedback enables a model tool that may create a GitHub issue using available credentials. Local skills and imports remain available in Extension Dock and the composer; market suites contribute through the runtime skill registry instead of copying files into the local skill directory.
+
+Market state and source checkouts live under `<DSH_HOME>/agent-plugins`; user-authored resources use `<DSH_AGENTS_HOME>` or `~/.agents`. The market can also read user-declared MCP, LSP and hooks from that Agent root, independently of the project-layout switch. Tests must isolate both roots. Archive refresh recovery and third-party executable capabilities require separate acceptance; the package selection alone does not certify them.
+
 ## Minimal skill
 
 Create a real directory named `review-notes` with this `SKILL.md` file:

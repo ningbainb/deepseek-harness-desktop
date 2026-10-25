@@ -8,6 +8,16 @@ function server() {
   return new DesktopPipeWebServer(new Context())
 }
 
+test('pipe surface advertises the real Desktop URL to official context consumers without a TCP listener', async context => {
+  const ctx = new Context()
+  context.after(() => ctx.fiber.dispose())
+  apply(ctx)
+  assert.ok(ctx.get('webApp'))
+  assert.equal(ctx.webApp.getAdvertisedUrl(), 'dsh-runtime://app/')
+  assert.equal(ctx.webServer.port, 0)
+  assert.equal(ctx.webServer.host, '127.0.0.1')
+})
+
 test('adapter dispatches exact and longest-prefix routes without listening', async () => {
   const web = server()
   web.register({ kind: 'prefix', path: '/items', handler: (_req, res) => res.end('short') })
@@ -159,4 +169,101 @@ test('adapter carries registered upgrade sockets as bounded duplex bytes', async
     chunks.push(Buffer.from(chunk, 'base64'))
   }
   assert.match(Buffer.concat(chunks).toString('utf8'), /101 Switching Protocols[\s\S]*client-frame/u)
+})
+
+test('real pipe response writes apply backpressure and drain only when the consumer reads', async context => {
+  const web = server()
+  const controller = new AbortController()
+  let responseBridge
+  let accepted
+  let drained = false
+  let releaseDrain
+  const drain = new Promise(resolve => { releaseDrain = resolve })
+  web.register({ kind: 'exact', path: '/slow-events', handler: (_req, res) => {
+    responseBridge = res
+    res.on('error', () => {})
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    res.once('drain', () => { drained = true; releaseDrain() })
+    accepted = res.write(Buffer.alloc(64 * 1024, 'a'))
+  } })
+  const response = await web.fetch(new Request('http://dsh.internal/slow-events', { signal: controller.signal }))
+  context.after(() => controller.abort())
+  assert.equal(accepted, false, 'a full response queue must tell the HMR producer to stop adding frames')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(drained, false)
+  const reader = response.body.getReader()
+  const first = await reader.read()
+  assert.equal(first.value.byteLength, 64 * 1024)
+  let timeout
+  try {
+    await Promise.race([drain, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('consuming the queued response did not emit drain')), 1000)
+    })])
+  } finally { clearTimeout(timeout) }
+  responseBridge.end('tail')
+  assert.equal(Buffer.from((await reader.read()).value).toString(), 'tail')
+  assert.equal((await reader.read()).done, true)
+})
+
+test('HEAD suppresses finite response bytes and cancellation releases a pending ended response', async () => {
+  const web = server()
+  let bridge
+  web.register({ kind: 'exact', path: '/finite', handler: (_req, res) => {
+    bridge = res
+    res.end('body')
+  } })
+  const head = await web.fetch(new Request('http://dsh.internal/finite', { method: 'HEAD' }))
+  assert.equal(await head.text(), '')
+  const response = await web.fetch(new Request('http://dsh.internal/finite'))
+  const closed = new Promise(resolve => bridge.once('close', resolve))
+  await response.body.cancel()
+  let timeout
+  try {
+    await Promise.race([closed, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('cancelled response retained pending writes')), 1000)
+    })])
+  } finally { clearTimeout(timeout) }
+  assert.equal(bridge.destroyed, true)
+})
+
+test('request cancellation closes an unread blocked response without waiting for its consumer', async () => {
+  const web = server()
+  const controller = new AbortController()
+  let bridge
+  web.register({ kind: 'exact', path: '/abort-unread', handler: (_req, res) => {
+    bridge = res
+    res.write(Buffer.alloc(64 * 1024, 'a'))
+  } })
+  const response = await web.fetch(new Request('http://dsh.internal/abort-unread', { signal: controller.signal }))
+  await new Promise(resolve => setImmediate(resolve))
+  const closed = new Promise(resolve => bridge.once('close', resolve))
+  controller.abort(new Error('fixture request cancelled'))
+  let timeout
+  try {
+    await Promise.race([closed, new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('unread response cancellation retained a blocked write')), 200)
+    })])
+  } finally {
+    clearTimeout(timeout)
+    await response.body.cancel().catch(() => {})
+  }
+  assert.equal(bridge.destroyed, true)
+})
+
+test('upgrade routes receive only the server-owned browser cookie, not renderer payload credentials', async () => {
+  const web = server()
+  let headers
+  web.registerUpgrade({ path: '/authenticated', handler: (req, socket) => {
+    headers = req.headers
+    socket.end('HTTP/1.1 101 Switching Protocols\r\n\r\n')
+  } })
+  const input = (async function *() {})()
+  const payload = { url: '/authenticated', cookie: 'renderer=forged', headers: { cookie: 'renderer=forged' } }
+  await Array.fromAsync(web.openDuplex('websocket', payload, input, new AbortController().signal, 'official=synthetic-session'))
+  assert.equal(headers.cookie, 'official=synthetic-session')
+  assert.equal(headers.host, '127.0.0.1')
+  assert.equal(headers.origin, 'http://127.0.0.1')
+  for (const cookie of ['', 'official=value\r\nInjected: bad', {}]) {
+    assert.throws(() => web.openDuplex('websocket', payload, input, new AbortController().signal, cookie), /browser cookie/u)
+  }
 })

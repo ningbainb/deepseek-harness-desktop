@@ -36,6 +36,22 @@
       "owner": "runtime-provider"
     },
     {
+      "pluginId": "desktop-client-hmr",
+      "sourcePath": "packages/dsh-desktop-client-hmr/src/index.ts",
+      "endpoint": "/plugins/events",
+      "method": "GET/HEAD",
+      "requestSchema": "authenticated client graph subscription",
+      "responseSchema": "official graph and rebuilt SSE frames",
+      "kind": "SSE",
+      "authPrincipal": "official Connection browser or API Peer",
+      "workspaceScope": "none",
+      "callerSurfaces": ["main-window"],
+      "cancellationAndLimits": "bounded asynchronous scan concurrency; close and unload cancellation; slow stream disconnection",
+      "v4Target": "public ClientModuleRegistry and client entry controller over the private carrier",
+      "migrationTest": "packages/dsh-desktop-client-hmr/tests/host.spec.ts",
+      "owner": "desktop-client-hmr"
+    },
+    {
       "pluginId": "official-api-gateway",
       "sourcePath": "@deepseek-ai/dsh-api-gateway",
       "endpoint": "logical stream endpoints",

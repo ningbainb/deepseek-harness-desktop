@@ -9,6 +9,7 @@ import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
+import { baiRequestShape } from './bai-request-shape.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-bai-onboarding-'))
@@ -156,8 +157,20 @@ try {
   await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
   const rejectedCalls = (await probe('metrics')).body
   assert.equal(rejectedCalls.inferenceRequests, 2, 'the prompt and official first-prompt title both use locally simulated HTTP 401, no real provider traffic')
-  assert.equal(rejectedCalls.inferenceCalls.filter(call => call.maxTokens === 64).length, 1, 'exactly one official title request')
-  assert.equal(rejectedCalls.inferenceCalls.filter(call => call.maxTokens !== 64).length, 1, 'exactly one user prompt request')
+  assert.equal(rejectedCalls.logicalCalls.length, 2, 'exactly two SDK calls must reach the simulated provider')
+  assert.equal(rejectedCalls.logicalCalls.filter(call => call.purpose === 'session-title').length, 1, 'exactly one official title request')
+  assert.equal(rejectedCalls.logicalCalls.filter(call => call.purpose === 'conversation').length, 1, 'exactly one user prompt request')
+  const providerSettings = await page.evaluate(async () => {
+    const response = await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })
+    return { status: response.status, body: await response.json() }
+  })
+  assert.equal(providerSettings.status, 200)
+  const relayProvider = providerSettings.body.value.namespaces.find(entry => entry.ns === 'llm-pi-ai').value.providers['project-relay']
+  assert.equal(relayProvider.models.some(model => model.id === 'bai-fixture-two'), true, 'the effective provider settings must retain the selected model')
+  assert.equal(rejectedCalls.inferenceCalls.every(call => Number.isSafeInteger(call.maxTokens) && call.maxTokens > 0), true,
+    'every provider HTTP request must explicitly carry its positive output limit')
+  assert.deepEqual(baiRequestShape(rejectedCalls.inferenceCalls, relayProvider.defaultMaxTokens),
+    baiRequestShape(rejectedCalls.logicalCalls, relayProvider.defaultMaxTokens), 'the provider must receive the exact SDK-selected models and effective public token limits')
   assert.equal((await probe('status')).body.credentialConfigured, true, 'a rejected Key is retained for recovery, not silently erased')
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).click()
   await dialog.getByRole('button', { name: /关闭|Close/u }).click()

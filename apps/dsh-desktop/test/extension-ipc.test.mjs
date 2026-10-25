@@ -75,6 +75,57 @@ class FakeIpcMain {
   }
 }
 
+test('skill market activation requires native confirmation and rejects extra renderer arguments', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-market-ipc-'))
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  await mkdir(profileDir, { recursive: true })
+  const patchPath = join(profileDir, 'cordis.patch.yml')
+  const original = '- insert:\n    - id: dsh-agent-plugins-market\n      name: dsh-agent-plugins-market\n      disabled: true\n'
+  await writeFile(patchPath, original)
+  const ipcMain = new FakeIpcMain()
+  const prompts = []
+  const decisions = [1, 0]
+  const runtime = []
+  const qqBotBinding = new EventEmitter()
+  qqBotBinding.status = () => ({ bound: false })
+  const unregister = registerExtensionIpc({
+    ipcMain,
+    dialog: { showMessageBox: async (_window, options) => { prompts.push(options); return { response: decisions.shift() } } },
+    shell: {}, getWindow: () => undefined, pluginManager: { profileDir },
+    controller: { stop: async () => { runtime.push('stop') }, start: async () => { runtime.push('start') },
+      fetch: async url => {
+        assert.equal(new URL(url).pathname, '/api/agent-plugins/progress')
+        return Response.json({ active: false })
+      } },
+    ensureProfile: async () => {}, projectRoot: dshHome, dshHome, qqBotBinding,
+    pluginRecovery: new EventEmitter(),
+  })
+  try {
+    const describe = ipcMain.handlers.get('extensions:skill-market-status')
+    const activate = ipcMain.handlers.get('extensions:skill-market-activate')
+    assert.equal(typeof describe, 'function')
+    assert.equal(typeof activate, 'function')
+    const status = await describe()
+    await assert.rejects(activate(undefined, { expectedRevision: status.revision, confirmed: true }), /argument|field/iu)
+    assert.equal(prompts.length, 0)
+    const cancelled = await activate(undefined, { expectedRevision: status.revision })
+    assert.equal(cancelled.canceled, true)
+    assert.equal(await readFile(patchPath, 'utf8'), original)
+    assert.deepEqual(runtime, [])
+    assert.match(prompts[0].detail, /MCP|Hooks/u)
+    assert.match(prompts[0].detail, /agents/u)
+    assert.equal(prompts[0].cancelId, 1)
+    assert.equal(prompts[0].defaultId, 1)
+    const enabled = await activate(undefined, { expectedRevision: status.revision })
+    assert.equal(enabled.enabled, true)
+    assert.deepEqual(runtime, ['stop', 'start'])
+    assert.equal((await describe()).enabled, true)
+  } finally {
+    await unregister()
+    await rm(dshHome, { recursive: true, force: true })
+  }
+})
+
 function stagedFullAccessManager(apply) {
   return {
     prepareFullAccessExternal: async (descriptor) => ({

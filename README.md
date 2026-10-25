@@ -42,6 +42,17 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 
 [产品介绍](https://1521003.xyz/) · [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
+### 5.1.0 候选：完整输出、明确授权、简洁设置
+
+5.1.0 正在准备正式发布，使用官方 NPM Runtime/SDK `0.2.1-rc.2` 与 Electron `44.0.0`，不修改官方源码。当前证据仅为本地 Windows 未签名内测包，**公开下载仍为下方的 5.0.1**；三端发布授权不等于门禁或发布完成。macOS 候选要求 Apple Silicon arm64、macOS 13 Ventura 及以上，macOS/Linux 保持 Preview。
+
+- 消费确认与流式背压保留完整输出和历史；异步资源读取与 HMR 重扫保留授权、缓存及取消清理语义，不宣称普遍性能百分比。
+- 安装目录候选逐项校验，注册表失败逐项恢复；技能市场首次启用需确认，反馈、翻译、自动更新及项目布局扫描默认关闭，来源替换采用可恢复事务。确认不是执行沙箱。
+- 无框拓展坞保留 15 个导航、搜索、控件、高级详情、关键风险提示、选中态与键盘焦点；仅独立设置窗口不挂载浮动宠物，主会话宠物与保存配置保留。
+- 本地实际 Setup 提取载荷核心回归 28/28，不替代真实 Setup 新装/升级/卸载或 macOS/Linux 原生门禁；正式工作流、资产大小与校验和须在发布后核对。
+
+[5.1.0 双语候选说明](docs/launch/release-notes.md) · [待完成的三端发布门禁](docs/launch/desktop-release-workflow.md) · [本地 Windows 候选截图来源](website/assets/desktop-5.1.0-candidate-sources.json)
+
 ### 5.0.1：输出更顺，侧栏更清楚，三端同版
 
 [5.0.1 正式安装包](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1)已在 Windows x64、macOS arm64 Preview、Linux x64 Preview 同版发布。官方 NPM Runtime 保持 `0.2.0-rc.2`；三端原生验证、打包和启动冒烟通过，Windows 源码回归 27/27、完整打包回归 43/43。隔离 Runner 验证真实新装、4.3.0 和 5.0.0 覆盖升级、同版重装及重启数据保全；不是所有历史版本或物理设备验收。
@@ -53,7 +64,7 @@ DeepSeek 官方尚未正式发布独立 Desktop 产品；本项目把公开的�
 - **后台与升级更可靠**：菜单支持最小化到托盘、恢复和明确退出；Windows 升级识别原安装目录，事务备份、失败回滚及新旧模型配置保全继续提供。
 - **完整工作台与隐私**：模型协作、Skills、插件详情配置、第三方 API、bai 授权和历史会话保护继续可用；匿名埋点不采集用户正文或凭据。
 
-三端均未签名，macOS 未公证。请核对同 Release 的 [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt)；[发布说明](docs/launch/release-notes.md)与[实际资产清单](docs/launch/release-manifest-all-platforms.json)记录边界。截图来自同发布提交的候选包 Windows 隔离验收；配置页由真实窗口与内嵌 WebContents 同步采集合成，不注入用户对话，不代表 macOS/Linux 截图或物理设备验收。
+三端均未签名，macOS 未公证。请核对同 Release 的 [SHA-256](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt)；[5.0.1 发布说明](docs/launch/release-notes-5.0.1.md)与[实际资产清单](docs/launch/release-manifest-all-platforms.json)记录边界。截图来自同发布提交的候选包 Windows 隔离验收；配置页由真实窗口与内嵌 WebContents 同步采集合成，不注入用户对话，不代表 macOS/Linux 截图或物理设备验收。
 
 | 官方默认皮肤与折叠侧栏 | 展开工具仍可访问 |
 | --- | --- |
@@ -353,7 +364,7 @@ Windows 安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所
 
 ### macOS 未签名预览（Apple Silicon）
 
-只提供 arm64。下载 `.dmg` 或 `.zip` 后把应用放到 `/Applications`，用 `xattr` 去掉隔离属性；macOS 15 起没有「右键打开」。预览版没有自动更新，mac 端使用系统 Git。完整步骤见 [macOS 未签名预览版安装说明](docs/macos-preview.zh.md)。
+只提供 arm64；5.1.0 候选因 Electron 44 要求 macOS 13 Ventura 及以上，此下限不代表所有系统版本已实测，也不改写 5.0.1 历史验收。下载 `.dmg` 或 `.zip` 后把应用放到 `/Applications`，用 `xattr` 去掉隔离属性；macOS 15 起没有「右键打开」。预览版没有自动更新，mac 端使用系统 Git。完整步骤见 [macOS 未签名预览版安装说明](docs/macos-preview.zh.md)。
 
 ### Linux x64 预览
 

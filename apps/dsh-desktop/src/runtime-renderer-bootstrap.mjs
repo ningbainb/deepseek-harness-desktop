@@ -12,6 +12,7 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
 
   const queues = new Map()
   const pendingFrames = new Map()
+  let opening = 0
   let quiescing = false
   bridge.onRuntimeStream(frame => {
     if (frame.type === 'lifecycle') {
@@ -24,8 +25,9 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
     }
     const queue = queues.get(frame.id)
     if (queue === undefined) {
+      if (opening === 0) return
       const pending = pendingFrames.get(frame.id) ?? []
-      if (pending.length < 256) pending.push(frame)
+      pending.push(frame)
       pendingFrames.set(frame.id, pending)
       return
     }
@@ -36,9 +38,47 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
   function openStream(endpoint, payload, signal, uplink) {
     const controller = signal === undefined ? new target.AbortController() : undefined
     const activeSignal = signal ?? controller.signal
-    const state = { id: undefined, frames: [], wake: undefined, cancelled: activeSignal.aborted, finished: false }
+    const state = {
+      id: undefined, frames: [], wake: undefined, cancelled: activeSignal.aborted, finished: false,
+      reason: activeSignal.reason, consumed: 0, acknowledged: 0, ackTimer: undefined,
+    }
+    const flushAcknowledgement = () => {
+      clearTimeout(state.ackTimer)
+      state.ackTimer = undefined
+      if (state.cancelled || state.finished || state.consumed <= state.acknowledged) return
+      state.acknowledged = state.consumed
+      Promise.resolve(bridge.acknowledgeRuntimeStream(state.id, state.consumed)).catch(error => stop(error))
+    }
+    const consumed = frame => {
+      if (!Number.isSafeInteger(frame.sequence) || typeof bridge.acknowledgeRuntimeStream !== 'function') return
+      state.consumed = frame.sequence
+      if (state.consumed - state.acknowledged >= 16) flushAcknowledgement()
+      else if (state.ackTimer === undefined) state.ackTimer = setTimeout(flushAcknowledgement, 0)
+    }
+    const cleanup = () => {
+      clearTimeout(state.ackTimer)
+      state.ackTimer = undefined
+      state.frames.length = 0
+      queues.delete(state.id)
+      pendingFrames.delete(state.id)
+      activeSignal.removeEventListener('abort', abort)
+      state.wake?.()
+    }
+    const stop = reason => {
+      if (state.cancelled || state.finished) return
+      state.cancelled = true
+      state.reason = reason ?? new Error('Runtime stream cancelled')
+      cleanup()
+      if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
+    }
+    const abort = () => stop(activeSignal.reason)
+    opening += 1
     const started = bridge.openRuntimeStream(endpoint, payload).then(id => {
       state.id = id
+      if (state.cancelled) {
+        bridge.cancelRuntimeStream(id)
+        return id
+      }
       queues.set(id, state)
       const pending = pendingFrames.get(id)
       if (pending !== undefined) {
@@ -46,14 +86,17 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
         pendingFrames.delete(id)
         state.wake?.()
       }
-      if (activeSignal.aborted) bridge.cancelRuntimeStream(id)
       return id
+    }, error => {
+      state.finished = true
+      cleanup()
+      throw error
+    }).finally(() => {
+      opening -= 1
+      if (opening === 0) pendingFrames.clear()
     })
-    activeSignal.addEventListener('abort', () => {
-      state.cancelled = true
-      if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
-      state.wake?.()
-    }, { once: true })
+    if (!state.cancelled) activeSignal.addEventListener('abort', abort, { once: true })
+    void started.catch(() => {})
     if (endpoint !== 'websocket') {
       void (async () => {
         const id = await started
@@ -75,23 +118,25 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
     }
     return {
       async *[Symbol.asyncIterator]() {
-        await started
         try {
+          await started
           for (;;) {
             while (!state.cancelled && (state.frames.length === 0 || (quiescing && state.frames[0].type !== 'item'))) {
               await new Promise(resolve => { state.wake = resolve })
             }
             state.wake = undefined
-            if (state.cancelled) throw activeSignal.reason ?? new Error('Runtime stream cancelled')
+            if (state.cancelled) throw state.reason ?? new Error('Runtime stream cancelled')
             const frame = state.frames.shift()
-            if (frame.type === 'item') yield frame.value
+            if (frame.type === 'item') {
+              yield frame.value
+              consumed(frame)
+            }
             else if (frame.type === 'end') return
             else throw new Error(frame.message ?? 'Runtime stream failed')
           }
         } finally {
           state.finished = true
-          queues.delete(state.id)
-          pendingFrames.delete(state.id)
+          cleanup()
           if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
         }
       },
@@ -100,13 +145,12 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
         if (!await bridge.writeRuntimeStream(id, value)) throw new Error('Runtime stream input is closed')
       },
       close: async () => {
+        stop(new Error('Runtime stream closed'))
         controller?.abort(new Error('Runtime stream closed'))
       },
       cancel: reason => {
-        state.cancelled = true
-        state.wake?.()
+        stop(reason)
         if (controller !== undefined) controller.abort(reason)
-        else if (state.id !== undefined) bridge.cancelRuntimeStream(state.id)
       },
     }
   }

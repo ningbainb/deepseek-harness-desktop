@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import * as closeBehaviorModule from '../src/close-behavior.mjs'
 
 import {
   assertCloseBehavior,
@@ -16,6 +17,46 @@ import {
 } from '../src/close-behavior.mjs'
 
 const tick = () => new Promise((resolve) => setImmediate(resolve))
+
+test('close preference mutations remain pending until the complete runtime transition settles', async () => {
+  assert.equal(typeof closeBehaviorModule.createCloseBehaviorUpdater, 'function')
+  const transitions = []
+  const releases = []
+  const updater = closeBehaviorModule.createCloseBehaviorUpdater(async value => {
+    transitions.push(value)
+    await new Promise(resolveTransition => releases.push(resolveTransition))
+    return value
+  })
+  const first = updater.set('minimize-to-tray')
+  const second = updater.set('quit')
+  assert.equal(updater.pending, true)
+  await tick()
+  assert.deepEqual(transitions, ['minimize-to-tray'])
+  releases.shift()()
+  assert.equal(await first, 'minimize-to-tray')
+  assert.equal(updater.pending, true)
+  await tick()
+  assert.deepEqual(transitions, ['minimize-to-tray', 'quit'])
+  releases.shift()()
+  assert.equal(await second, 'quit')
+  assert.equal(updater.pending, false)
+})
+
+test('a rejected close preference transition stays observable and does not block the next transition', async () => {
+  assert.equal(typeof closeBehaviorModule.createCloseBehaviorUpdater, 'function')
+  const failure = new Error('runtime transition failed')
+  const updater = closeBehaviorModule.createCloseBehaviorUpdater(async value => {
+    if (value === 'minimize-to-tray') throw failure
+    return value
+  })
+  const rejected = updater.set('minimize-to-tray')
+  const recovered = updater.set('quit')
+  await assert.rejects(rejected, error => error === failure)
+  assert.equal(await recovered, 'quit')
+  assert.equal(updater.pending, false)
+  assert.throws(() => updater.set('untrusted'), /invalid close behavior/u)
+  assert.equal(updater.pending, false)
+})
 
 function closeEvent() {
   let prevented = 0

@@ -112,6 +112,10 @@ Electron main and is not renderer-controlled.
   user-side installation, account, or domain is needed — a Cloudflare quick
   tunnel is free and anonymous.
 
+## Security model
+
+The mobile adapter delegates already-authorized requests through a plugin-owned SDK Peer with the local owner's principal and `interactions: none`. Pairing, method allowlists, Workspace/Session ownership checks and revocation remain mandatory before delegation; this Peer grants no new phone endpoints or forwarded-event participation. Wire input cannot select the Peer, and its lifetime ends with the plugin context.
+
 ## Install
 
 Install the family aggregate package `@linxin666/dsh-web-ui-all` (all plugins and skins in one) or this plugin alone:

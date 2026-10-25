@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.2.0-rc.2",
+      "upstreamVersion": "0.2.1-rc.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.0.1",
+      "desktopRange": "=5.1.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,23 +55,28 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-09-30",
+      "verifiedAt": "2026-10-23",
       "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
-      "knownIssues": [],
+      "knownIssues": [
+        "Clean-account Setup installation, overlay upgrade and rollback are not accepted by this local run.",
+        "Local Windows test-package validation only; macOS and Linux native acceptance is pending.",
+        "The preceding 5.0.1 Desktop test run recorded one Host request timeout; the unchanged runtime-integration file passed in isolation.",
+        "The preceding 5.0.1 source regression collection recorded one settings-reload timeout; its unchanged isolated retry passed."
+      ],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.2.0-rc.2",
-          "integrity": "sha512-EAJ3gPNcVt/uv8X19PMm9NkVhWgT7xXNMk0UKCVm+IQ5rpSQOcsMUa0HWlnYYVybKMsccjcRB21vVVsaXQ6IdA==",
+          "version": "0.2.1-rc.2",
+          "integrity": "sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==",
           "files": {
-            "package.json": "0a85203e3e907dd2e3bec34324a2494758ca6cdee234b07090a7c8df0b11acac",
-            "lib/bin.js": "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f"
+            "package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+            "lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "43f9b27a9bf67d16241fca44f3cb67268cc69e4c8ad7b5cefb49c48ed0c8e2ed"
+          "sha256": "523bdc773ae54efc188075a74ff5fb5f755a9248d81552d54ab21fb302e24d72"
         },
         "slots": [
           "conversation.composer.dock",

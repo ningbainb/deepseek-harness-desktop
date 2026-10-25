@@ -16,9 +16,8 @@ function createSubscription(channel, label) {
 // drop that navigation event before the plugin calls onDeepLink(). Keep a
 // small bounded queue in the preload (the trusted renderer boundary) and
 // replay it when the first listener is installed.
-function createBufferedSubscription(channel, label, maxPending = 32) {
+function createBufferedSubscription(channel, label, maxPending = 32, pending = []) {
   const listeners = new Set()
-  const pending = []
   ipcRenderer.on(channel, (_event, payload) => {
     if (listeners.size === 0) {
       if (pending.length < maxPending) pending.push(payload)
@@ -41,6 +40,8 @@ function createBufferedSubscription(channel, label, maxPending = 32) {
   }
 }
 
+const runtimeStreamFrames = []
+
 const baseApi = {
   openExternalUrl: (url) => ipcRenderer.invoke('desktop:external-url-open', url),
   shellContext: Object.freeze({ mode: 'advanced', platform: process.platform }),
@@ -62,11 +63,17 @@ const baseApi = {
   onConversationImported: createSubscription('desktop:conversation-imported', 'conversation imported'),
   onConversationImportBatchProgress: createBufferedSubscription('desktop:conversation-import-batch-progress', 'conversation import batch progress', 128),
   onPluginSettingsOpen: createBufferedSubscription('desktop:plugin-settings-open', 'plugin settings navigation'),
-  openRuntimeStream: (endpoint, payload) => ipcRenderer.invoke('desktop:runtime-stream-open', { endpoint, payload }),
+  openRuntimeStream: (endpoint, payload) => ipcRenderer.invoke('desktop:runtime-stream-open', { endpoint, payload, flowControl: true }),
+  acknowledgeRuntimeStream: (id, sequence) => ipcRenderer.invoke('desktop:runtime-stream-ack', id, sequence),
   writeRuntimeStream: (id, value) => ipcRenderer.invoke('desktop:runtime-stream-write', id, value),
   endRuntimeStream: (id) => ipcRenderer.invoke('desktop:runtime-stream-end', id),
-  cancelRuntimeStream: (id) => ipcRenderer.invoke('desktop:runtime-stream-cancel', id),
-  onRuntimeStream: createBufferedSubscription('desktop:runtime-stream-frame', 'runtime stream', 256),
+  cancelRuntimeStream: (id) => {
+    for (let index = runtimeStreamFrames.length - 1; index >= 0; index--) {
+      if (runtimeStreamFrames[index].id === id) runtimeStreamFrames.splice(index, 1)
+    }
+    return ipcRenderer.invoke('desktop:runtime-stream-cancel', id)
+  },
+  onRuntimeStream: createBufferedSubscription('desktop:runtime-stream-frame', 'runtime stream', Infinity, runtimeStreamFrames),
   startDragFile: (filePath) => ipcRenderer.invoke('desktop:drag-file', filePath),
 }
 

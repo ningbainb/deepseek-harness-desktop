@@ -58,3 +58,28 @@ test('failed Windows candidates retain diagnostics without entering the publicat
   assert.match(publication, /pattern: desktop-\$\{\{ needs\.metadata\.outputs\.version \}\}-\*/u)
   assert.doesNotMatch(publication, /desktop-debug/u)
 })
+
+test('Windows release also verifies the latest 5.0.1 stable upgrade without replacing older coverage', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  const setup = workflow.slice(workflow.indexOf('- name: Verify production Setup'), workflow.indexOf('- name: Run packaged Windows regression'))
+  for (const version of ['4.3.0', '5.0.0', '5.0.1']) {
+    assert.ok(setup.includes(`$env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '${version}'`))
+    assert.ok(setup.includes(`gh release download desktop-v${version} --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-${version}-x64.exe' --pattern SHA256SUMS.txt`))
+    assert.ok(setup.includes(`setup-from-${version}.json`))
+  }
+  assert.equal(setup.match(/node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/gu)?.length, 3)
+})
+
+test('Windows acceptance receipts survive successful runs and remain separate from public assets', async () => {
+  const workflow = await readFile(workflowPath, 'utf8')
+  const start = workflow.indexOf('      - name: Preserve Windows acceptance evidence')
+  assert.ok(start > 0)
+  const evidence = workflow.slice(start, workflow.indexOf('      - name: Preserve failed Windows candidate diagnostics', start))
+  assert.match(evidence, /if: always\(\)/u)
+  assert.match(evidence, /name: desktop-qa-\$\{\{ needs\.metadata\.outputs\.version \}\}-windows-x64/u)
+  assert.match(evidence, /include-hidden-files: true/u)
+  assert.match(evidence, /\.tmp\/release-qa\/\*\*/u)
+  const publication = workflow.slice(workflow.lastIndexOf('  publish:'))
+  assert.match(publication, /pattern: desktop-\$\{\{ needs\.metadata\.outputs\.version \}\}-\*/u)
+  assert.doesNotMatch(publication, /desktop-qa/u)
+})

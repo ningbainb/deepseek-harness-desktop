@@ -50,6 +50,7 @@ import { relayEn, relayZh, type RelayLocaleKey } from './locales.ts'
 import { installRelayModelEntrances } from './relay-model-entrances.tsx'
 import { installRelaySendGuard } from './relay-send-guard.ts'
 import { installRelayAuthFailures } from './relay-auth-failures.ts'
+import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
 export { SafePluginBoundary } from './SafePluginBoundary.tsx'
@@ -99,6 +100,9 @@ export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote']
  */
 export function apply(ctx: ClientContext): void {
   const dockSetting = dockSettingFromUrl()
+  if (!dockSetting && supportsDesktopSettingsPriority(window)) {
+    ctx.effect(() => installSettingsOnboardingPriority(ctx.slots), 'web-ui-settings: settings interaction before automatic onboarding')
+  }
   ctx.effect(() => installDesktopAppearance(window), 'web-ui-settings: desktop appearance')
   if (!dockSetting) {
     ctx.effect(() => installDesktopUsageNavigation(document, ctx.locale.bind('web-ui-plugins')), 'web-ui-settings: usage navigation')

@@ -15,6 +15,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-api-gateway'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { UserScopeService } from '@ningbainb/dsh-user-scope'
 import { isSafePairingCookieName, isSecurePublicBaseUrl, PairingService } from './pairing.ts'
@@ -57,7 +58,7 @@ declare module '@deepseek-ai/cordis' {
 export const name = 'remote-web-ui'
 
 /** Services required before the pairing surfaces can mount. */
-export const inject = ['webServer', 'typertGateway', 'userScope']
+export const inject = ['webServer', 'typertGateway', 'connection', 'userScope']
 
 /** Structural view of the official session-query service used for scoped mobile search. */
 interface SessionSearchEngine {
@@ -296,7 +297,8 @@ export function apply(ctx: Context, config?: LiveConfig): void {
   let disposeSweep: (() => void) | undefined
   // The phone's data channel: pairing routes + the /m page + a narrow adapter
   // over the official Typert Gateway service.
-  const apiProxy = createMobileGatewayProxy(ctx.typertGateway)
+  const mobilePeer = ctx.connection.createPeer({ principal: { kind: 'owner' }, interactions: 'none' })
+  const apiProxy = createMobileGatewayProxy(ctx.typertGateway, mobilePeer)
   const sessionQuery = ctx.get('sessionQuery') as SessionSearchEngine | undefined
   const sessionSearch = sessionQuery === undefined ? undefined : async (
     query: string,

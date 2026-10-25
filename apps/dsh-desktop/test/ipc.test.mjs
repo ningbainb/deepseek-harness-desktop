@@ -997,7 +997,44 @@ test('public status omits process, filesystem, and raw runtime-error internals',
   assert.equal(Object.hasOwn(restartBlocked, 'error'), false)
 })
 
+test('status reads cannot publish a ready snapshot captured before a slow recovery read', async () => {
+  const handlers = new Map()
+  const sender = {}
+  const surfaceRegistry = new DesktopSurfaceRegistry()
+  surfaceRegistry.register(sender, 'main')
+  const controller = new EventEmitter()
+  controller.status = { state: 'ready' }
+  let background = { enabled: false, trayAvailable: true, pending: false }
+  let releaseRecovery
+  let enteredRecovery
+  const recovery = new Promise(resolveRecovery => { releaseRecovery = resolveRecovery })
+  const entered = new Promise(resolveEntered => { enteredRecovery = resolveEntered })
+  const unregister = registerDesktopIpc({
+    ipcMain: { handle: (channel, handler) => handlers.set(channel, handler), removeHandler: channel => handlers.delete(channel) },
+    surfaceRegistry, controller, getWindow: () => undefined,
+    getBackgroundStatus: () => background,
+    pluginRecovery: { getState: () => { enteredRecovery(); return recovery } },
+  })
+  try {
+    const result = handlers.get('desktop:status')({ sender })
+    await entered
+    controller.status = { state: 'starting' }
+    background = { enabled: true, trayAvailable: true, pending: true }
+    releaseRecovery(undefined)
+    const snapshot = await result
+    assert.equal(snapshot.state, 'starting')
+    assert.equal(snapshot.background.pending, true)
+    assert.equal(snapshot.background.enabled, true)
+  } finally {
+    unregister()
+  }
+})
+
 test('public runtime status carries only a read-only background summary', () => {
+  assert.deepEqual(
+    publicBackgroundStatus({ enabled: true, trayAvailable: true, pending: true, internalQueue: {} }),
+    { enabled: true, trayAvailable: true, pending: true },
+  )
   assert.deepEqual(
     publicBackgroundStatus({ enabled: true, trayAvailable: true, closeBehavior: 'minimize-to-tray', nativeTray: { destroy() {} } }),
     { enabled: true, trayAvailable: true, closeBehavior: 'minimize-to-tray' },

@@ -12,11 +12,14 @@ const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx']
 const IGNORED_SOURCE_PREFIXES = Object.freeze(['.cache/', '.patch-work/', '.pnpm_patches/'])
 const CONTROLLED_PREFIXES = Object.freeze([
   'apps/dsh-desktop/src/atomic-write-adapter.mjs',
+  'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
   'apps/dsh-desktop/src/runtime-provider.mjs',
   'packages/dsh-desktop-pipe-webserver/lib/',
   'packages/dsh-desktop-compat/src/',
   'packages/dsh-desktop-repair/src/',
   'packages/dsh-web-ui-settings/src/chatgpt-auth',
+  'packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts',
+  'packages/dsh-web-ui-settings/tests/settings-sdk-adapter.ts',
   'packages/dsh-model-preferences/src/client/persist-config.ts',
   'packages/dsh-personal-prompt/src/client/persist-config.ts',
 ])

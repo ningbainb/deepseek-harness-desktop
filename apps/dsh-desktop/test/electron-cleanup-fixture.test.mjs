@@ -37,3 +37,25 @@ test('cleanup preserves both its original error and a termination failure', asyn
 test('cleanup is safe when Electron launch never returned a process', async () => {
   await closeIsolatedElectron(undefined)
 })
+
+test('closed Electron cleanup uses the child captured at launch without querying process again', async () => {
+  const child = { pid: 12345, exitCode: 0 }
+  let closed = false
+  await closeIsolatedElectron({
+    process: () => { throw new Error('closed app process handle is unavailable') },
+    close: async () => { closed = true },
+  }, { child, terminate: async () => { assert.fail('an exited child must not be terminated') } })
+  assert.equal(closed, true)
+})
+
+test('failed cleanup retains the exact captured child rather than rediscovering a PID', async () => {
+  const child = { pid: 12345, exitCode: null }
+  const original = new Error('close rejected')
+  const targets = []
+  await assert.rejects(closeIsolatedElectron({
+    process: () => { throw new Error('must not rediscover the child') },
+    close: async () => { throw original },
+  }, { child, terminate: async target => targets.push(target) }),
+  error => error instanceof AggregateError && error.cause === original)
+  assert.deepEqual(targets, [child])
+})

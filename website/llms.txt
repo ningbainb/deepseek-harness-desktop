@@ -25,6 +25,17 @@
 - Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/release-manifest.json
 - Privacy policy: https://1521003.xyz/privacy.html
 
+## 5.1.0 candidate preparation — not published
+
+- Status: local unsigned Windows x64 beta evidence only, dated 2026-10-23. Public stable downloads and global homepage release metadata remain 5.0.1. Authorization for an unsigned three-platform release is not proof that publication or its native gates have completed.
+- Candidate stack: official NPM Runtime/SDK 0.2.1-rc.2 and Electron 44.0.0, without official-source changes. macOS candidate requires Apple Silicon arm64 and macOS 13 Ventura or later, remains unsigned/unnotarized Preview; Linux x64 remains Preview. Windows evidence does not establish either platform's acceptance.
+- Changes: consumer-acknowledged streaming backpressure without truncation; asynchronous authorized frontend reads; prompt HMR graph rescans; installation-directory discovery and transactional registry recovery; first-use market consent and recoverable source replacement. Market feedback, translation, automatic updates and project-layout scanning default off; translation may send documents to a model, feedback may open a public GitHub Issue, and activation consent is not a sandbox.
+- Simplified frameless Dock/settings retain all 15 destinations, search, controls, advanced details, critical risk notices, selection, keyboard focus and saved configuration. Dedicated settings documents exclude the floating pet and rail; the main conversation pet and its settings remain available. Existing chat, plugins, Skills, model access, independent APIs, tray behavior and 15 skins remain.
+- Local beta evidence: actual Setup-extracted payload core regression 28/28, streaming tests 99/99, settings tests 314/314; Desktop unit tests 1884 total, 1882 passed, zero failed, two existing skips. These are candidate records, not final release-commit verification. No general speedup or cold-start percentage is established.
+- Still required: clean-runner real Setup fresh installation, separate 4.3.0/5.0.0/5.0.1 upgrades, same-version overlay and data preservation; native macOS/Linux checks; final Release assets and exact checksums. Local isolated fixtures do not prove physical installation/rollback, and Electron-boundary consent simulation does not prove physical-dialog clicks. No 5.1.0 formal installer hash or publication date is claimed here.
+- Candidate notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes.md
+- Candidate screenshot provenance: https://1521003.xyz/assets/desktop-5.1.0-candidate-sources.json (local Windows native-window images, not cloud/final-release or other-platform captures; image hashes are not installer hashes).
+
 ## Published 5.0.1
 
 - New profiles use the official appearance while upgrades retain skins and explicit preferences. Streaming avoids repeated sidebar scans without truncating text, code or tool output; this is not a guarantee of stall-free behavior on every device.

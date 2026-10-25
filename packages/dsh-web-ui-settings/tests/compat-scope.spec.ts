@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { ConfigForm as SettingsScope, ConfigFormSnapshot as SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsScopeSnapshot } from '../src/client/compat-settings-scope.ts'
 import { createCompatScope, isLoopbackHostname } from '../src/client/compat-settings-scope.ts'
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../src/protocol.ts'
 
@@ -104,6 +105,21 @@ const unavailable = (): SettingsScopeSnapshot<never> => ({
 })
 
 describe('createCompatScope', () => {
+  it('accepts mode-less official snapshots without replacing their values or transport', async () => {
+    const primary = fakePrimary<{ enabled: boolean }>({
+      status: 'ready', value: { enabled: true }, base: {}, user: {}, revision: 7, writable: true,
+    })
+    const { fetchFn, handler } = fakeFetch(async () => describeResult([]))
+    const scope = createCompatScope({ namespace: 'task-board', primary: primary.scope, fetchFn })
+    expect(scope.getSnapshot()).toStrictEqual(primary.scope.getSnapshot())
+    expect(scope.getSnapshot().value).toBe(primary.scope.getSnapshot().value)
+    expect(scope.getSnapshot()).not.toHaveProperty('mode')
+    expect(scope.getSnapshot().revision).toBe(7)
+    expect(await scope.set('enabled', false)).toBe(true)
+    expect(primary.sets).toEqual([['enabled', false]])
+    expect(handler).not.toHaveBeenCalled()
+  })
+
   it('passes the official scope through while it serves the namespace', () => {
     const primary = fakePrimary<{ enabled: boolean }>(ready({ enabled: true }))
     const { fetchFn, handler } = fakeFetch(async () => describeResult([]))

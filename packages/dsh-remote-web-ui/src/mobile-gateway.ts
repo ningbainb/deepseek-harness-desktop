@@ -30,6 +30,13 @@ interface RecordValue {
   readonly [key: string]: unknown
 }
 
+type GatewaySource = Pick<TypertGateway, 'invoke' | 'stream'>
+type GatewayRequest = Parameters<TypertGateway['invoke']>[0]
+type MobileGateway = {
+  invoke(request: Omit<GatewayRequest, 'peer'>): Promise<unknown>
+  stream(request: Omit<GatewayRequest, 'peer'>): Promise<AsyncIterable<unknown>>
+}
+
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -43,7 +50,7 @@ function failed<T>(rpcId: string): MobileProxyResponse<T> {
 }
 
 async function invoke<T>(
-  gateway: TypertGateway,
+  gateway: MobileGateway,
   namespace: string,
   method: string,
   args: Readonly<Record<string, unknown>>,
@@ -53,7 +60,7 @@ async function invoke<T>(
 }
 
 async function firstStreamValue<T>(
-  gateway: TypertGateway,
+  gateway: MobileGateway,
   namespace: string,
   method: string,
   args: Readonly<Record<string, unknown>>,
@@ -133,7 +140,7 @@ function projectionFrames(
 }
 
 async function* followFrames(
-  gateway: TypertGateway,
+  gateway: MobileGateway,
   sessionId: string,
   signal: AbortSignal,
 ): AsyncGenerator<MobileMuxFrame> {
@@ -201,7 +208,7 @@ async function* followFrames(
 }
 
 async function* controlFrames(
-  gateway: TypertGateway,
+  gateway: MobileGateway,
   sessionId: string,
   signal: AbortSignal,
 ): AsyncGenerator<MobileMuxFrame> {
@@ -237,7 +244,11 @@ async function* controlFrames(
 }
 
 /** Build the mobile compatibility surface over the supported 0.1.5 Gateway. */
-export function createMobileGatewayProxy(gateway: TypertGateway): MobileApiProxy {
+export function createMobileGatewayProxy(source: GatewaySource, peer: GatewayRequest['peer']): MobileApiProxy {
+  const gateway: MobileGateway = {
+    invoke: request => source.invoke({ ...request, peer }),
+    stream: request => source.stream({ ...request, peer }),
+  }
   const cursors = new Map<string, number>()
   const projections = new Map<string, SessionProjectionBaseline>()
 

@@ -81,6 +81,20 @@ try {
       })
       return { theme: document.documentElement.dataset.dshDesktopTheme, width: innerWidth, height: innerHeight,
         backdrop: style.backdropFilter, background: style.backgroundColor, opacity: sidebarColor[3] / 255, rows,
+        sidebarBorder: style.borderRightWidth,
+        activeNavigation: (() => {
+          const active = document.querySelector('.settings-sidebar button.tab.active')
+          const inactive = document.querySelector('.settings-sidebar button.tab:not(.active)')
+          const selectedStyle = getComputedStyle(active)
+          return { shadow: selectedStyle.boxShadow, border: selectedStyle.borderLeftWidth,
+            weight: selectedStyle.fontWeight, background: selectedStyle.backgroundColor,
+            inactiveBackground: getComputedStyle(inactive).backgroundColor }
+        })(),
+        framedSections: [...document.querySelectorAll('.panel.active, .native-card, .native-masthead, .native-controls, .native-metrics, .native-card-footer')]
+          .filter(element => element.getClientRects().length > 0)
+          .filter(element => ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']
+            .some(property => Number.parseFloat(getComputedStyle(element)[property]) > 0))
+          .map(element => element.className),
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
         sidebarOverflow: sidebar.scrollWidth > sidebar.clientWidth,
         translucentPanels: [...document.querySelectorAll('.settings-sidebar, .content-toolbar, .native-card, .list, .dock-search input')]
@@ -95,6 +109,12 @@ try {
       assert.equal(sample.sidebarOverflow, false, 'sidebar navigation has no horizontal overflow')
       assert.equal(sample.translucentPanels, 0)
       assert.equal(sample.opacity, 1, 'sidebar has an opaque surface')
+      assert.equal(sample.sidebarBorder, '0px', 'sidebar does not draw a region partition')
+      assert.equal(sample.activeNavigation.shadow, 'none', 'selection does not draw an inset rail')
+      assert.equal(sample.activeNavigation.border, '0px')
+      assert.ok(Number(sample.activeNavigation.weight) >= 600)
+      assert.notEqual(sample.activeNavigation.background, sample.activeNavigation.inactiveBackground, 'selection remains distinguishable without a rail')
+      assert.deepEqual(sample.framedSections, [], 'chapter surfaces do not recreate card frames')
       assert.ok(sample.rows.every(row => row.contrast >= 4.5), JSON.stringify(sample.rows))
       assert.ok(sample.rows.every(row => row.transform === 'none'), 'navigation never lifts on hover')
       assert.ok(sample.rows.every(row => row.insideViewport), `all destinations fit default and compact Dock sizes: ${JSON.stringify(sample.rows)}`)
@@ -131,6 +151,11 @@ try {
   await dock.locator('#skills').waitFor({ state: 'visible' })
   await dock.locator('#plugins-hub-tab').click()
   await dock.locator('#plugins').waitFor({ state: 'visible' })
+  const navigation = dock.locator('#models-tab')
+  await navigation.focus()
+  if (!baseline) assert.ok(await navigation.evaluate(element => Number.parseFloat(getComputedStyle(element).outlineWidth)) >= 2)
+  await dock.keyboard.press('Enter')
+  await dock.locator('#models-tab[aria-selected="true"]').waitFor()
   await search.focus()
   if (!baseline) assert.ok(await search.evaluate(element => Number.parseFloat(getComputedStyle(element).outlineWidth)) >= 2)
   assert.deepEqual(errors, [])

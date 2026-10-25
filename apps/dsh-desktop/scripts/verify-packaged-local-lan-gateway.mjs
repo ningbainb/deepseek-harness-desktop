@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { createServer } from 'node:http'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { networkInterfaces, tmpdir } from 'node:os'
@@ -86,7 +87,7 @@ try {
   app = await electron.launch({ executablePath: appPath, cwd: appDir, env: environment })
   const page = await app.firstWindow()
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
-  await page.waitForFunction(async () => {
+  await waitForAsyncPageFunction(page, async () => {
     const status = await window.dshDesktop?.getLanGatewayStatus?.()
     return status?.state === 'running'
   }, undefined, { timeout: 120_000 })

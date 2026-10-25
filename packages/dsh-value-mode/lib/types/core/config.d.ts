@@ -42,7 +42,7 @@ export interface ValueModeSettingsSnapshot<T> {
     user: unknown;
     revision: number | undefined;
     writable: boolean;
-    mode: 'host' | 'memory';
+    mode?: 'host' | 'memory';
 }
 export interface ValueModeSettingsScope<T> {
     getSnapshot(): ValueModeSettingsSnapshot<T>;

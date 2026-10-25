@@ -1,6 +1,15 @@
 diff --git a/lib/index.js b/lib/index.js
 --- a/lib/index.js	
 +++ b/lib/index.js
+@@ -3683,7 +3683,7 @@
+ const inject = [
+ 	"webServer",
+ 	"sessions",
+-	"webRuntime",
++	"connection",
+ 	"tools"
+ ];
+ /** Content types for the media route, by extension. */
 @@ -4103,6 +4103,7 @@
  * @returns the section's own fields, or undefined when no usable section exists.
  */
@@ -18,9 +27,28 @@ diff --git a/lib/index.js b/lib/index.js
  		if (section === null || typeof section !== "object" || Array.isArray(section)) continue;
  		const filtered = Object.fromEntries(Object.entries(section).filter(([key]) => declared.has(key)));
  		if (Object.keys(filtered).length > 0) return filtered;
+@@ -4163,7 +4164,7 @@
+ function apply(ctx, config) {
+ 	const resolved = resolveSidebarConfig(config);
+-	const fence = (req) => isTrustedApiRequest(req, ctx.webRuntime.trustedHosts);
++	const fence = (req) => ctx.get("connection").requestRejection(req) === void 0;
+ 	const agentOpenRegistry = new AgentOpenRegistry();
+ 	let settingsFace;
+ 	let openToolsDisposers = null;
+ 	ctx.inject(["settings"], (sctx) => {
 diff --git a/src/index.ts b/src/index.ts
 --- a/src/index.ts	
 +++ b/src/index.ts
+@@ -41,3 +41,4 @@
+ import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
++import type { HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
+ import { AgentOpenRegistry, registerOpenTool, type AgentOpenRequest } from './agent-opens.ts'
+ import { buildSubagentLiveApi, type SidebarSubagentLiveRoutes } from './subagent-live-route.ts'
+@@ -90,3 +90,3 @@
+ /** Services required before mounting: the webserver routes, the session store, the web runtime's trusted hosts, and the tool registry. */
+-export const inject = ['webServer', 'sessions', 'webRuntime', 'tools']
++export const inject = ['webServer', 'sessions', 'connection', 'tools']
+ 
 @@ -665,6 +665,7 @@
   * @returns the section's own fields, or undefined when no usable section exists.
   */
@@ -38,6 +66,11 @@ diff --git a/src/index.ts b/src/index.ts
      if (section === null || typeof section !== 'object' || Array.isArray(section)) continue
      // Drop fields the current row schema no longer declares (the retired
      // terminal and browser keys, `defaultWidthPercent`, …). A form write
+@@ -767,3 +768,3 @@
+   // service value; a replaced list takes effect without a plugin restart.
+-  const fence = (req: SidebarHttpRequest): boolean => isTrustedApiRequest(req, ctx.webRuntime.trustedHosts)
++  const fence = (req: SidebarHttpRequest): boolean => (ctx.get('connection') as HostConnectionHandle).requestRejection(req) === undefined
+   // The model-facing open-request registry: queues `sidebar_open` requests
 diff --git a/lib/client.js b/lib/client.js
 --- a/lib/client.js	
 +++ b/lib/client.js
@@ -220,7 +253,9 @@ diff --git a/src/client/desktop-env.ts b/src/client/desktop-env.ts
 diff --git a/package.json b/package.json
 --- a/package.json	
 +++ b/package.json
-@@ -82,6 +82,7 @@
+@@ -81,7 +81,9 @@
+     "@deepseek-ai/dsh-agent": "^0.2.0-rc.1",
++    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
      "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.1",
      "@deepseek-ai/dsh-client-ui-conversation": "^0.2.0-rc.1",
      "@deepseek-ai/dsh-client-ui-primitives": "^0.2.0-rc.1",

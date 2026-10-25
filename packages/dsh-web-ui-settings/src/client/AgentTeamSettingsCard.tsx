@@ -16,7 +16,7 @@ function safeError(reason: unknown): string {
   return '配置未能保存，原状态已恢复。请稍后重试。'
 }
 
-export function AgentTeamSettingsCard() {
+export function AgentTeamSettingsCard({ detailsLabel, cautionLabel }: { detailsLabel: string; cautionLabel: string }) {
   const bridge = window.dshDockSettings
   const [status, setStatus] = useState<AgentTeamStatus>({ available: false, enabled: false })
   const [phase, setPhase] = useState<'loading' | 'idle' | 'saving' | 'restarting' | 'rolling-back'>('loading')
@@ -66,13 +66,17 @@ export function AgentTeamSettingsCard() {
     <header className={css.collaborationCardHeader}>
       <div>
         <div className={css.collaborationTitleRow}><h2>Agent Team</h2><span>实验功能</span>{status.version && <span>{status.version}</span>}</div>
-        <p>共享任务板并按职责协作；并行修改同一文件可能冲突。切换会短暂重启，会话、草稿和项目文件不会被删除。</p>
+        <p>{cautionLabel}</p>
       </div>
       <div className={css.collaborationControl}>
         <div className={css.collaborationStatus} role="status" aria-live="polite">{stateText}</div>
         <button type="button" className={css.switch} role="switch" aria-checked={status.enabled} aria-label="Agent Team" disabled={busy || !status.available} onClick={() => { void toggle() }}><span /></button>
       </div>
     </header>
+    <details className={css.disclosure} data-dock-agent-team-details>
+      <summary>{detailsLabel}</summary>
+      <p>共享任务板并按职责协作；并行修改同一文件可能冲突。切换会短暂重启，会话、草稿和项目文件不会被删除。</p>
+    </details>
     {error && <div className={css.collaborationError} role="alert">{error}<button type="button" onClick={() => { void reload() }}>重试</button></div>}
   </section>
 }

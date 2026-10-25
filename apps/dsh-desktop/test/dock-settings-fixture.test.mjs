@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { useChineseFixtureLocale } from '../scripts/dock-settings-fixture.mjs'
+import { openDockSetting, useChineseFixtureLocale } from '../scripts/dock-settings-fixture.mjs'
 
 test('fixture locale registration and document replay are idempotent', async () => {
   const callbacks = []
@@ -26,4 +26,21 @@ test('fixture locale replay respects an immutable existing descriptor', async ()
   runInNewContext(`(${callback.toString()})()`, { navigator })
   assert.equal(navigator.language, 'zh-CN')
   assert.deepEqual(navigator.languages, ['zh-CN', 'zh'])
+})
+
+test('market acceptance opens its retained Skills group before clicking the nested market tab after restart', async () => {
+  const clicked = []
+  const locator = selector => ({
+    first() { return this },
+    async waitFor() {},
+    async click() {
+      if (selector === '#skill-market-tab') assert.ok(clicked.includes('#skills-tab'), 'nested market tab is initially outside the selected group')
+      clicked.push(selector)
+    },
+  })
+  const dock = { url: () => 'file:///fixture/extensions.html', locator }
+  const settings = { url: () => 'dsh-runtime://app/?desktop-dock-setting=skill-market', locator, async waitForFunction() {} }
+  const app = { windows: () => [dock, settings], context: () => ({ async addInitScript() {} }) }
+  assert.deepEqual(await openDockSetting(app, {}, 'skill-market'), { dock, settings })
+  assert.deepEqual(clicked, ['#skills-tab', '#skill-market-tab'])
 })

@@ -1,4 +1,5 @@
 export const zh = {
+  dockDetails: '详情',
   baiAccess: 'bai 供应商：登录 / 充值',
   settingsNotWritable: '当前配置不可写，请等待运行时连接恢复后重试。',
   settingsSaveFailed: '配置未保存成功，请重试。',
@@ -74,6 +75,7 @@ export const zh = {
 export type ValueModeLocaleKey = keyof typeof zh
 
 export const en: Record<ValueModeLocaleKey, string> = {
+  dockDetails: 'Details',
   baiAccess: 'bai provider: sign in / top up',
   settingsNotWritable: 'Settings are not writable. Wait for the runtime connection and try again.',
   settingsSaveFailed: 'Settings were not saved. Please try again.',

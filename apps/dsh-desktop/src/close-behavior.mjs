@@ -45,6 +45,22 @@ export function normalizeDesktopClosePreferences(input) {
   })
 }
 
+export function createCloseBehaviorUpdater(apply) {
+  if (typeof apply !== 'function') throw new TypeError('close behavior updater requires an apply function')
+  let queue = Promise.resolve()
+  let pending = 0
+  return Object.freeze({
+    get pending() { return pending > 0 },
+    set(value) {
+      assertCloseBehavior(value)
+      pending += 1
+      const operation = queue.then(() => apply(value)).finally(() => { pending -= 1 })
+      queue = operation.catch(() => {})
+      return operation
+    },
+  })
+}
+
 async function atomicWrite(path, content) {
   await mkdir(dirname(path), { recursive: true })
   const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -36,14 +37,20 @@ try {
   for (const [id, text] of [['appearance', /皮肤|Skin/], ['models', /模型|Models/], ['usage', /用量|Usage/], ['sessions', /归档|Archive/]]) {
     const { settings } = await openDockSetting(app, main, id)
     activeSettings = settings
+    settings.on('request', request => {
+      if (/(?:\/|\.)mutate$/u.test(new URL(request.url()).pathname)) settingsMutations.push({ phase: 'request', path: new URL(request.url()).pathname })
+    })
+    settings.on('requestfailed', request => {
+      if (/(?:\/|\.)mutate$/u.test(new URL(request.url()).pathname)) settingsMutations.push({ phase: 'failed', failure: request.failure()?.errorText })
+    })
     settings.on('response', async response => {
-      if (!new URL(response.url()).pathname.endsWith('/mutate')) return
+      if (!/(?:\/|\.)mutate$/u.test(new URL(response.url()).pathname)) return
       const payload = await response.json().catch(() => undefined)
       const outcomes = []
       const inspect = value => {
         if (value === null || typeof value !== 'object') return
         for (const [key, child] of Object.entries(value)) {
-          if (['ok', 'code', 'message', 'revision'].includes(key) && (typeof child === 'string' || typeof child === 'boolean')) outcomes.push({ key, value: child })
+          if (['ok', 'code', 'message', 'revision'].includes(key) && ['string', 'boolean', 'number'].includes(typeof child)) outcomes.push({ key, value: child })
           else if (child !== null && typeof child === 'object') inspect(child)
         }
       }
@@ -57,6 +64,21 @@ try {
     assert.equal(await settings.evaluate(() => typeof window.dshDesktop), 'undefined', 'runtime settings remain unprivileged')
     assert.equal(await settings.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${id} fits its pane`)
     if (id === 'models') {
+      await settings.evaluate(() => {
+        const original = window.fetch.bind(window)
+        window.__nativeSettingsRequests = []
+        window.fetch = (...args) => {
+          const path = new URL(args[0] instanceof Request ? args[0].url : args[0], location.href).pathname
+          const result = original(...args)
+          if (path.includes('/settings/')) {
+            const entry = { path, started: performance.now() }
+            window.__nativeSettingsRequests.push(entry)
+            result.then(response => { entry.status = response.status; entry.finished = performance.now() },
+              error => { entry.error = error.name; entry.finished = performance.now() })
+          }
+          return result
+        }
+      })
       const panels = section.locator('[data-dsh-plugin="model-capabilities"][data-dsh-part="panel"]')
       const capabilities = panels.last()
       await capabilities.waitFor({ timeout: 30_000 })
@@ -67,7 +89,7 @@ try {
       await configuredModel.click()
       await capabilities.locator('[data-dsh-part="image-input"] input').check()
       await capabilities.locator('[data-dsh-part="save"]').click()
-      await settings.waitForFunction(async () => {
+      await waitForAsyncPageFunction(settings, async () => {
         const payload = await (await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })).json()
         return payload.value?.namespaces?.find(entry => entry.ns === 'llm-pi-ai')?.value?.providers?.['native-test']?.models?.[0]?.input?.includes('image') === true
       })
@@ -94,7 +116,7 @@ try {
       const collapsedSaved = await settings.evaluate(`(${saveDockSettingsDrafts.toString()})()`)
       if (!collapsedSaved) console.error('Collapsed capability save diagnostic:', JSON.stringify(await settings.evaluate(() => window.__nativeDockSaveDiagnostic)))
       assert.equal(collapsedSaved, true, 'Save and close also handles collapsed capability drafts')
-      await settings.waitForFunction(async () => {
+      await waitForAsyncPageFunction(settings, async () => {
         const payload = await (await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })).json()
         return payload.value?.namespaces?.find(entry => entry.ns === 'llm-pi-ai')?.value?.providers?.['native-test']?.models?.[0]?.input?.join() === 'text'
       })
@@ -150,6 +172,14 @@ try {
   })).catch(() => ({ url: page.url(), unavailable: true }))))
   console.error(`Native window appearances: ${JSON.stringify(appearances)}`)
   console.error(`Settings mutations: ${JSON.stringify(settingsMutations)}`)
+  console.error('Native settings requests:', JSON.stringify(await activeSettings?.evaluate(() => window.__nativeSettingsRequests).catch(() => undefined)))
+  console.error('Native settings readback:', JSON.stringify(await activeSettings?.evaluate(async () => {
+    const response = await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST', signal: AbortSignal.timeout(5_000) })
+    const payload = await response.json()
+    const entry = payload.value?.namespaces?.find(row => row.ns === 'llm-pi-ai')
+    return { status: response.status, ok: payload.ok, revision: entry?.revision,
+      models: entry?.value?.providers?.['native-test']?.models?.map(model => ({ id: model.id, input: model.input })) }
+  }).catch(error => ({ error: error.message }))))
   console.error('Native dirty forms:', JSON.stringify(await activeSettings?.evaluate(() => [...document.querySelectorAll('[data-dock-dirty="true"]')].map(form => ({
     plugin: form.getAttribute('data-dsh-plugin'),
     saveControls: [...form.querySelectorAll('[data-dock-save]')].map(button => ({ disabled: button.disabled, hidden: button.hidden })),

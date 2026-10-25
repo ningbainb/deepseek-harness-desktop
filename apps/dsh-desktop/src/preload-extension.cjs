@@ -44,6 +44,8 @@ const api = Object.freeze({
   listCommunityMarket: (force = false) => ipcRenderer.invoke('extensions:market-list', force),
   installMarketPlugin: (id, allowIncompatible = false) => ipcRenderer.invoke('extensions:market-install', { id, allowIncompatible }),
   importSkill: () => ipcRenderer.invoke('extensions:skill-import'),
+  getSkillMarketStatus: () => ipcRenderer.invoke('extensions:skill-market-status'),
+  activateSkillMarket: (expectedRevision) => ipcRenderer.invoke('extensions:skill-market-activate', { expectedRevision }),
   openSkill: (id) => ipcRenderer.invoke('extensions:skill-open', id),
   openSkillRoot: () => ipcRenderer.invoke('extensions:skill-root'),
   openProfileDirectory: () => ipcRenderer.invoke('extensions:profile-dir-open'),

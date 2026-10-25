@@ -23,10 +23,44 @@ async function registryExists(key) {
 }
 
 try {
-  for (const scenario of ['current-custom', 'current-uninstall', 'current-registry32', 'explicit-running-copy']) {
+  for (const invalid of ['missing', 'no-marker', 'no-executable']) {
+    for (const view of ['64', '32']) {
+      const scenario = `conflicting-${invalid}-${view}`
+      const directory = join(root, scenario)
+      const stale = join(directory, 'stale-install')
+      const existing = join(directory, "用户's E 盘安装")
+      const fresh = join(directory, 'C-default-fixture')
+      const installer = join(directory, 'fixture.exe')
+      const registry = `Software\\DeepSeekHarnessDesktopTests\\identity-${process.pid}-${scenario}`
+      await mkdir(join(existing, 'resources'), { recursive: true })
+      await writeFile(join(existing, 'DeepSeek Harness Desktop.exe'), 'owned executable')
+      await writeFile(join(existing, 'resources', 'update-shutdown-v1'), 'dsh-desktop-update-shutdown-protocol=1\n')
+      if (invalid !== 'missing') {
+        await mkdir(join(stale, 'resources'), { recursive: true })
+        if (invalid !== 'no-marker') await writeFile(join(stale, 'resources', 'update-shutdown-v1'), '')
+        if (invalid !== 'no-executable') await writeFile(join(stale, 'DeepSeek Harness Desktop.exe'), 'foreign executable')
+      }
+      try {
+        await exec('reg.exe', ['ADD', `HKCU\\${registry}\\CurrentInstall`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', stale, '/f', '/reg:64'], { windowsHide: true })
+        await exec('reg.exe', ['ADD', `HKCU\\${registry}\\CurrentUninstall`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', existing, '/f', `/reg:${view}`], { windowsHide: true })
+        await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+          `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${registry}`,
+          join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi')], { windowsHide: true, timeout: 60_000, env: compiler.env })
+        await exec(installer, ['/S'], { windowsHide: true, timeout: 60_000 })
+        assert.equal(await readFile(join(existing, 'selected-install.txt'), 'utf16le'), existing, scenario)
+        for (const rejected of [stale, fresh]) await assert.rejects(stat(join(rejected, 'selected-install.txt')), { code: 'ENOENT' })
+        assert.equal(await readFile(join(existing, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'owned executable')
+        console.log(`PASS installer directory ${scenario}`)
+      } finally {
+        for (const registryView of ['32', '64']) await exec('reg.exe', ['DELETE', `HKCU\\${registry}`, '/f', `/reg:${registryView}`], { windowsHide: true }).catch(() => {})
+      }
+    }
+  }
+  for (const scenario of ['current-custom', 'current-uninstall', 'current-registry32', 'explicit-running-copy', 'explicit-new-directory']) {
     const directory = join(root, scenario)
     const existing = join(directory, "用户's E 盘安装")
     const fresh = join(directory, 'C-default-fixture')
+    const requested = scenario === 'explicit-new-directory' ? join(directory, 'explicit-empty-directory') : existing
     const installer = join(directory, 'fixture.exe')
     const registry = `Software\\DeepSeekHarnessDesktopTests\\identity-${process.pid}-${scenario}`
     await mkdir(join(existing, 'resources'), { recursive: true })
@@ -40,8 +74,9 @@ try {
       await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${registry}`,
         join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi')], { windowsHide: true, timeout: 60_000, env: compiler.env })
-      await exec(installer, ['/S', ...(scenario === 'explicit-running-copy' ? [`/D=${existing}`] : [])], { windowsHide: true, timeout: 60_000 })
-      assert.equal(await readFile(join(existing, 'selected-install.txt'), 'utf16le'), existing)
+      await exec(installer, ['/S', ...(scenario.startsWith('explicit-') ? [`/D=${requested}`] : [])], { windowsHide: true, timeout: 60_000 })
+      assert.equal(await readFile(join(requested, 'selected-install.txt'), 'utf16le'), requested)
+      if (scenario === 'explicit-new-directory') await assert.rejects(stat(join(existing, 'selected-install.txt')), { code: 'ENOENT' })
       await assert.rejects(stat(join(fresh, 'selected-install.txt')), { code: 'ENOENT' })
       assert.equal(await readFile(join(existing, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'owned executable')
       console.log(`PASS installer directory ${scenario}`)

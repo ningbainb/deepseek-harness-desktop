@@ -5,6 +5,7 @@
 ## 适用与限制
 
 - 只支持 Apple Silicon（arm64）。Intel Mac 不能用，Rosetta 也无法反向兼容。
+- 5.1.0 候选要求 **macOS 13 Ventura 及以上**，因为 [Electron 44 已移除 macOS 12 支持](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support)。这是兼容下限，不是所有支持系统版本均已实测的结论；5.1.0 仍须完成原生 macOS 门禁，已发布的 5.0.1 证据单独保留。
 - 这是未签名预览包，不是正式发行版。不上 Mac App Store。
 - mac 端使用系统 Git，不内置 MinGit。若 `git --version` 不可用，请安装 Xcode Command Line Tools：`xcode-select --install`。
 - 预览版没有自动更新。应用内「检查更新」会说明原因；请到 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 手动下载对应版本。三端发布会把 macOS Preview 与 Windows、Linux 放在同一个 Release 中；Release 标为 Latest 并不代表 macOS 包已稳定或已签名。

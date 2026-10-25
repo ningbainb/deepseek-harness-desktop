@@ -92,6 +92,7 @@ test('Windows controller requests its own child cleanup and retains legacy force
     try {
       const ready = controller.start()
       child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+      child.stdout.write('dsh desktop web: ready\n')
       await ready
       const control = consumeRuntimeShutdownControl(environment)
       assert.ok(control)

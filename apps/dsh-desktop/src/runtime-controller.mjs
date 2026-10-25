@@ -9,6 +9,7 @@ import {
   isDesktopWorkspaceFileOpenToken,
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import { emitBestEffort } from './best-effort-events.mjs'
+import { RUNTIME_HTTP_READY_LINE } from './runtime-readiness.mjs'
 import { createRuntimeShutdownControl, requestRuntimeShutdown, RUNTIME_SHUTDOWN_CONTROL_ENV } from './runtime-shutdown-control.mjs'
 import {
   STARTUP_OUTCOMES,
@@ -283,6 +284,20 @@ export function parseDshReadyUrl(line) {
 
 export function redactDshReadyUrlToken(value) {
   return String(value).replace(/([?&]token=)[^&#\s]+/gu, '$1[redacted]')
+}
+
+function createDesktopReadyUrlReader() {
+  let readyUrl
+  let completed = false
+  let probing = false
+  return line => {
+    const url = parseDshReadyUrl(line)
+    if (url !== undefined) readyUrl = url
+    if (String(line).trim() === RUNTIME_HTTP_READY_LINE) completed = true
+    if (!completed || readyUrl === undefined || probing) return
+    probing = true
+    return readyUrl
+  }
 }
 
 export function computeRestartDelay(attempt, maxAttempts = 3) {
@@ -705,11 +720,13 @@ export class DshRuntimeController extends EventEmitter {
       delete environment[RUNTIME_PIPE_GENERATION_ENV]
     }
     let runtimeControlToken
+    let readReadyUrl = parseDshReadyUrl
     try {
       const launchPatchFiles = validateRuntimePatchFiles(this.patchFilesProvider() ?? [])
       const runtimeCliPath = runtimeEntryPath(this.cliPath)
       const desktopRuntimeEntry = isOfficialDshCliPath(this.cliPath)
         || materializeRuntimeLauncherPath(runtimeCliPath) === DESKTOP_RUNTIME_LAUNCHER_PATH
+      if (desktopRuntimeEntry) readReadyUrl = createDesktopReadyUrlReader()
       const shutdownControl = this.platform === 'win32' && desktopRuntimeEntry
         ? createRuntimeShutdownControl(this.platform) : undefined
       delete environment[RUNTIME_SHUTDOWN_CONTROL_ENV]
@@ -763,6 +780,7 @@ export class DshRuntimeController extends EventEmitter {
       line,
       workspaceFileOpenToken,
       runtimeControlToken,
+      readReadyUrl,
     ))
     const stderr = createLineReader((line) => this.#handleLine(
       child,
@@ -770,6 +788,7 @@ export class DshRuntimeController extends EventEmitter {
       line,
       workspaceFileOpenToken,
       runtimeControlToken,
+      readReadyUrl,
     ))
     this.child.stdout?.on('data', (chunk) => stdout.write(chunk))
     this.child.stdout?.on('end', () => stdout.end())
@@ -791,6 +810,7 @@ export class DshRuntimeController extends EventEmitter {
     line,
     redactionToken = this.workspaceFileOpenToken,
     runtimeControlToken,
+    readReadyUrl = parseDshReadyUrl,
   ) {
     if (
       stream === 'stdout'
@@ -818,16 +838,16 @@ export class DshRuntimeController extends EventEmitter {
         redactionToken,
       )
     })
-    if (stream !== 'stdout' || this.status.state !== 'starting') return
+    if (stream !== 'stdout' || this.status.state !== 'starting' || this.child !== child) return
     if (String(line).trim() === RUNTIME_PIPE_READY_LINE) {
       try {
         if (this.pipeClient === undefined) throw new Error('runtime pipe client is unavailable')
         await this.pipeClient.probe()
       } catch (error) {
-        if (this.status.state === 'starting') this.#failBeforeReady(error, redactionToken)
+        if (this.status.state === 'starting' && this.child === child) this.#failBeforeReady(error, redactionToken)
         return
       }
-      if (this.status.state !== 'starting') return
+      if (this.status.state !== 'starting' || this.child !== child) return
       this.cancelSchedule(this.startupTimer)
       this.startupTimer = undefined
       this.#setStatus('ready', { url: DESKTOP_PIPE_RUNTIME_URL }, redactionToken)
@@ -840,7 +860,7 @@ export class DshRuntimeController extends EventEmitter {
     }
     let url
     try {
-      url = parseDshReadyUrl(line)
+      url = readReadyUrl(line)
     } catch (error) {
       this.#failBeforeReady(error, redactionToken)
       return
@@ -849,12 +869,12 @@ export class DshRuntimeController extends EventEmitter {
     try {
       await this.probeReady(url)
     } catch (error) {
-      if (this.status.state === 'starting') {
+      if (this.status.state === 'starting' && this.child === child) {
         this.#failBeforeReady(error, redactionToken)
       }
       return
     }
-    if (this.status.state !== 'starting') return
+    if (this.status.state !== 'starting' || this.child !== child) return
     this.cancelSchedule(this.startupTimer)
     this.startupTimer = undefined
     const readyPort = Number.parseInt(new URL(url).port, 10)

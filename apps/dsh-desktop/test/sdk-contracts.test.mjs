@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { mkdir, mkdtemp, readFile, realpath, rename, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { parse } from 'yaml'
@@ -150,11 +151,94 @@ test('public Workspace contract keeps path and Session cwd immutable during relo
   const clientTypes = await readPackageFile(workspaceControllerManifest, 'lib/types/client/service.d.ts')
 
   assert.match(workspaceTypes, /readonly path: string/u)
-  assert.match(workspaceTypes, /Never rewritten[\s\S]*afterwards/u)
-  assert.match(workspaceTypes, /canonical cwd equals the workspace\s+\* path/u)
+  assert.match(workspaceTypes, /readonly sessionIds: readonly SessionId\[\]/u)
+  assert.match(workspaceTypes, /attachSession\(sessionId: SessionId\): Promise<void>/u)
+  assert.match(workspaceTypes, /status\(\): Promise<'ok' \| 'missing-dir'>/u)
   assert.match(sessionTypes, /readonly cwd\?: string/u)
   assert.doesNotMatch(registryTypes, /(?:setPath|movePath|relocate)\(/u)
   assert.doesNotMatch(clientTypes, /(?:setPath|movePath|relocate)\(/u)
   assert.match(registryTypes, /create\(path: string, title\?: string\): Promise<Workspace>/u)
   assert.match(clientTypes, /create\(input: \{[\s\S]*path: string;[\s\S]*\}\): Promise<WorkspaceView>/u)
+})
+
+test('official Workspace rejects mismatched cwd and retains existing missing-directory membership without relocating Session headers', async () => {
+  const baseRequire = createRequire(appRequire.resolve('@deepseek-ai/dsh-base/package.json'))
+  const load = name => import(pathToFileURL(baseRequire.resolve(name)))
+  const { Context } = await load('@deepseek-ai/cordis')
+  const { Storage } = await load('@deepseek-ai/dsh-storage')
+  const storageJson = await load('@deepseek-ai/dsh-storage-json')
+  const storageDomain = await load('@deepseek-ai/dsh-storage-domain')
+  const persistence = await load('@deepseek-ai/dsh-session-persistence-jsonl')
+  const { WorkspaceRegistry } = await import(pathToFileURL(appRequire.resolve('@deepseek-ai/dsh-workspace')))
+  const { SessionId, SESSION_FORMAT_VERSION } = await load('@deepseek-ai/dsh-session')
+  const temporaryRoot = resolve(await realpath(tmpdir()))
+  const root = await mkdtemp(join(temporaryRoot, 'dsh-workspace-sdk-'))
+  const ctx = new Context()
+  try {
+    const directory = join(root, 'workspace')
+    const otherDirectory = join(root, 'other-workspace')
+    await mkdir(directory)
+    await mkdir(otherDirectory)
+    await ctx.plugin(Storage)
+    await ctx.plugin(storageJson, { root: join(root, 'storage') })
+    await ctx.plugin(storageDomain, { backend: 'json' })
+    await ctx.plugin(persistence, { root: join(root, 'sessions'), compression: 'zstd' })
+    const registration = ctx.plugin(WorkspaceRegistry)
+    await registration
+    const canonicalPath = await realpath(directory)
+    const cwd = `${directory}${sep}.`
+    const workspace = await ctx.workspaceRegistry.create(cwd)
+    const workspaceId = workspace.id
+    assert.equal(workspace.path, canonicalPath)
+    assert.equal(await workspace.status(), 'ok')
+    assert.equal((await ctx.workspaceRegistry.create(canonicalPath)).id, workspaceId)
+    const headers = [
+      { id: SessionId('matching'), cwd },
+      { id: SessionId('mismatched'), cwd: otherDirectory },
+      { id: SessionId('no-cwd') },
+      { id: SessionId('not-yet-attached'), cwd },
+    ].map(header => ({ version: SESSION_FORMAT_VERSION, createdAt: 1, isSeeded: false, delegationDepth: 0, ...header }))
+    for (const header of headers) {
+      const handle = await ctx.sessionPersistence.create(header)
+      try { await handle.flush() }
+      finally { await handle.close() }
+    }
+    await workspace.attachSession(headers[0].id)
+    assert.deepEqual(workspace.sessionIds, [headers[0].id])
+    const updatedAt = workspace.updatedAt
+    await assert.rejects(workspace.attachSession(headers[1].id), /cwd resolves to/u)
+    await assert.rejects(workspace.attachSession(headers[2].id), /no cwd/u)
+    await assert.rejects(workspace.attachSession(SessionId('unknown')))
+    assert.deepEqual(workspace.sessionIds, [headers[0].id])
+    assert.equal(workspace.updatedAt, updatedAt, 'refused attachments must not mutate the workspace')
+    const sessionPath = ctx.sessionPersistence.locate(headers[0]).path
+    const sessionBytes = await readFile(sessionPath)
+    await rename(directory, join(root, 'moved-workspace'))
+    assert.equal(await workspace.status(), 'missing-dir')
+    assert.equal(workspace.path, canonicalPath)
+    await registration.dispose()
+    await ctx.plugin(WorkspaceRegistry)
+    const reopened = ctx.workspaceRegistry.get(workspaceId)
+    assert.ok(reopened)
+    assert.equal(reopened.path, canonicalPath)
+    assert.equal(await reopened.status(), 'missing-dir')
+    assert.deepEqual(reopened.sessionIds, [headers[0].id], 'an existing missing-directory candidate must survive reopening')
+    await assert.rejects(reopened.attachSession(headers[3].id), /does not resolve/u)
+    await reopened.setTitle('Missing directory retained')
+    assert.deepEqual(reopened.sessionIds, [headers[0].id], 'a mutation must not prune an existing missing-directory candidate')
+    assert.equal(reopened.path, canonicalPath)
+    const reader = await ctx.sessionPersistence.open(headers[0].id, 'read')
+    try { assert.deepEqual(reader.header, headers[0], 'relocation must not rewrite the Session cwd') }
+    finally { await reader.close() }
+    assert.deepEqual(await readFile(sessionPath), sessionBytes, 'workspace mutations must not rewrite the Session log')
+  } finally {
+    try { await ctx.fiber.dispose() }
+    finally {
+      const absoluteRoot = resolve(await realpath(root))
+      assert.equal(absoluteRoot, resolve(root))
+      assert.equal(dirname(absoluteRoot), temporaryRoot)
+      assert.ok(basename(absoluteRoot).startsWith('dsh-workspace-sdk-'))
+      await rm(absoluteRoot, { recursive: true, force: true })
+    }
+  }
 })

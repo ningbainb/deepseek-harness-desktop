@@ -46,10 +46,24 @@ try {
   settings.on('request', request => { if (isCatalog(request)) requests.push(new URL(request.url()).pathname) })
   const picker = settings.locator('[data-value-mode-model-picker]')
   const relay = picker.locator('[data-model-provider="dock-test"][data-model-id="dock-test-model"]')
+  assert.equal(await settings.locator('[data-dsh-pet-root]').count(), 0, 'the Dock model page does not mount a pet')
+  assert.equal(await settings.locator('[data-dsh-dock-pet-rail]').count(), 0, 'the Dock model page has no unused pet rail')
+  const assertPickerInForm = async () => {
+    const geometry = await settings.evaluate(() => ({
+      form: document.querySelector('[data-dsh-dock-settings]').getBoundingClientRect().toJSON(),
+      dialog: document.querySelector('[data-value-mode-model-picker] [role="dialog"]').getBoundingClientRect().toJSON(),
+      close: document.querySelector('[data-value-mode-model-picker] [aria-label="关闭模型选择器"]').getBoundingClientRect().toJSON(),
+    }))
+    assert.ok(geometry.dialog.left >= geometry.form.left && geometry.dialog.right <= geometry.form.right,
+      `model dialog must stay inside the settings column: ${JSON.stringify(geometry)}`)
+    assert.ok(geometry.close.left >= geometry.form.left && geometry.close.right <= geometry.form.right,
+      'model dialog close control remains inside the full-width settings form')
+  }
   const open = async name => {
     const started = performance.now()
     await settings.getByRole('button', { name, exact: true }).click()
     await relay.waitFor({ timeout: 15_000 })
+    await assertPickerInForm()
     return Math.round(performance.now() - started)
   }
   timings.firstPickerMs = await open('更换专家主控模型')
@@ -106,7 +120,15 @@ try {
   await writeFile(fetchGate, 'open')
   await picker.getByRole('button', { name: '重试', exact: true }).click()
   await relay.waitFor({ timeout: 15_000 })
+  await assertPickerInForm()
   await picker.getByRole('button', { name: '关闭模型选择器', exact: true }).click()
+  const dockWindow = await app.browserWindow(dock)
+  const originalBounds = await dockWindow.evaluate(window => window.getBounds())
+  await dockWindow.evaluate(window => window.setSize(680, 680))
+  await settings.waitForFunction(() => innerWidth < 600)
+  await open('更换专家主控模型')
+  await picker.getByRole('button', { name: '关闭模型选择器', exact: true }).click()
+  await dockWindow.evaluate((window, bounds) => window.setBounds(bounds), originalBounds)
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
 } catch (error) {

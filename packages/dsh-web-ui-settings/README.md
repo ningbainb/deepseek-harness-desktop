@@ -10,6 +10,8 @@ On DSH 0.2.0-rc.2, the local compatibility bridge retains legacy settings namesp
 
 Desktop management routing tracks the mounted sidebar without rescanning it for streamed conversation text. Replacement sidebars and newly mounted tools retain plugin and skill routing, including native plugin configuration forms.
 
+On Desktop with the official 0.2.1-rc.2 SDK, Settings takes priority over automatic onboarding: late session readiness or onboarding registration cannot close the active panel or discard its unsaved inputs. Pending onboarding resumes after Settings closes; explicit sign-in still opens normally. The adapter reuses the official component, store and actions through public slot composition without modifying SDK files or global preferences. Ordinary Web hosts and dedicated Dock documents retain their existing behavior.
+
 Dedicated Dock settings documents follow their window theme without publishing it back to the main window. They retain that document theme through late native theme adoption and release it on unmount without writing global preferences. Skin palettes retain readable colors; background/text pairs below 4.5:1 contrast use a readable surface for the selected theme, including native form overlays.
 
 - **One section for the family**: on the DSH settings page it registers a first-level section with a static heading and cards for the dsh web UI family plugins.
@@ -46,6 +48,8 @@ dsh plugin --profile web add link:$(pwd)/packages/dsh-web-ui-settings
 Restart `dsh web` for the section to appear in the settings page.
 
 ## Security model
+
+The Skills page in Desktop's Extension Dock retains local inventory and import actions alongside a Skill market tab. That tab reuses the community market's original settings section through the public slot bridge. First activation is confirmed by the native host, not this unprivileged document; cancellation leaves the profile unchanged. Switching to local skills preserves the mounted market form and its draft.
 
 Desktop plugin details expose the original `plugins.row.config` keyed pages in an unprivileged Dock document. The selected package is matched exactly against registered `<package>#<entry>` keys; these forms retain the plugin's own controls and persistence rather than replacing redacted configuration objects. Standalone Settings cards remain available. Unavailable pages show a message instead of silently opening another plugin.
 

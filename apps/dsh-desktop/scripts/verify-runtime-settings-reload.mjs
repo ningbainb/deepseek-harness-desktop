@@ -25,7 +25,7 @@ export function parseSettingsReloadArguments(argv) {
 }
 
 export function createSettingsRpcRequest(method, args = {}, rpcId = randomUUID()) {
-  assert.ok(method === 'settings/describe' || method === 'settings/update', 'Only settings configuration RPCs are allowed')
+  assert.ok(['settings/describe', 'settings/update', 'settings/mutate'].includes(method), 'Only settings configuration RPCs are allowed')
   return { type: 'client-request', rpcId, method, payload: { args } }
 }
 
@@ -71,6 +71,53 @@ export function assertSettingsEventsReady(item) {
 export function assertNoRootIncludeReloadErrors(diagnostics) {
   const failures = diagnostics.filter(line => RELOAD_ERROR.test(line))
   assert.deepEqual(failures, [], 'Root Include configuration reload failed')
+}
+
+export function assertDesktopHmrGraph(graph) {
+  assert.ok(Array.isArray(graph?.entries), 'The real module graph must contain entries')
+  assert.equal(graph.entries.filter(entry => entry.id === '@linxin666/dsh-desktop-client-hmr').length, 1,
+    'The module graph must retain exactly one asynchronous Desktop HMR owner')
+  assert.equal(graph.entries.filter(entry => entry.id === '@deepseek-ai/dsh-client-hmr').length, 0,
+    'A profile refresh must not restore the synchronous official HMR owner')
+}
+
+async function verifyDesktopHmrGraph(controller) {
+  const abort = new AbortController()
+  const timeout = setTimeout(() => abort.abort(new Error('Desktop HMR graph readiness timed out')), EVENTS_TIMEOUT_MS)
+  let reader
+  try {
+    const response = await controller.fetch('http://dsh.internal/plugins/events', { signal: abort.signal })
+    assert.equal(response.status, 200)
+    assert.match(response.headers.get('content-type') ?? '', /^text\/event-stream/u)
+    assert.ok(response.body, 'The real HMR route must expose its event stream')
+    reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let bytes = 0
+    while (true) {
+      const item = await reader.read()
+      assert.equal(item.done, false, 'The HMR route ended before delivering its initial graph')
+      bytes += item.value.byteLength
+      assert.ok(bytes <= 1_048_576, 'The initial HMR graph exceeded the bounded event budget')
+      buffer = (buffer + decoder.decode(item.value, { stream: true })).replaceAll('\r\n', '\n')
+      let end
+      while ((end = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, end)
+        buffer = buffer.slice(end + 2)
+        const data = frame.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n')
+        if (!data) continue
+        const event = JSON.parse(data)
+        assert.equal(event.type, 'graph', 'The first HMR data event must describe the actual module graph')
+        assertDesktopHmrGraph(event.graph)
+        return
+      }
+    }
+  } finally {
+    clearTimeout(timeout)
+    abort.abort(new Error('Desktop HMR graph verification complete'))
+    await reader?.cancel().catch(() => {})
+    reader?.releaseLock()
+  }
 }
 
 export function persistedSettingsConfig(contents, ns) {
@@ -185,6 +232,11 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     stage = 'initial-boot'
     assert.equal(await controller.start(), controllerModule.DESKTOP_PIPE_RUNTIME_URL)
     await verifyEventsReady(controller)
+    stage = 'initial-hmr-owner'
+    await verifyDesktopHmrGraph(controller)
+    stage = 'hmr-live-setting'
+    assert.equal((await updateSettings(controller, diagnostics, 'client-hmr', { pollIntervalMs: 1250 })).value.pollIntervalMs, 1250)
+    await verifyDesktopHmrGraph(controller)
     const profilePatch = join(dshHome, 'profiles', 'desktop', 'cordis.patch.yml')
     const rootIncludePath = join(dshHome, 'profiles', 'desktop', 'cordis.yml')
     const rootInclude = await readFile(rootIncludePath, 'utf8')
@@ -193,6 +245,26 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     const provider = await updateSettings(controller, diagnostics, 'llm-pi-ai', providerPatch)
     assert.equal(provider.value.providers[providerId].baseURL, baseURL)
     assert.deepEqual(provider.value.providers[providerId].models.map(model => model.id), ['reload-model-a', 'reload-model-b'])
+    stage = 'capability-mutation-and-bridge-readback'
+    const updatedCapability = await settingsRpc(controller, 'settings/mutate', {
+      ns: 'llm-pi-ai', expectedRevision: provider.revision,
+      ops: [{ op: 'set', path: ['providers', providerId, 'models', '0', 'input'], value: ['text', 'image'] }],
+    })
+    assert.ok(updatedCapability.revision > provider.revision)
+    assert.deepEqual(updatedCapability.value.providers[providerId].models[0].input, ['text', 'image'])
+    assert.deepEqual(updatedCapability.user.providers[providerId].models[0].input, ['text', 'image'])
+    const capabilityReadback = settingsNamespace(await settingsRpc(controller, 'settings/describe'), 'llm-pi-ai')
+    assert.deepEqual(capabilityReadback.value, updatedCapability.value)
+    const bridgeResponse = await controller.fetch('http://dsh.internal/api/dsh-web-ui-settings/describe', {
+      method: 'POST', signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+    })
+    assert.equal(bridgeResponse.status, 200)
+    const bridge = await bridgeResponse.json()
+    assert.equal(bridge.ok, true)
+    const bridgeCapability = bridge.value.namespaces.find(entry => entry.ns === 'llm-pi-ai')
+    assert.ok(bridgeCapability, 'The compatibility bridge must expose the same live model namespace')
+    for (const field of ['value', 'user', 'revision']) assert.deepEqual(bridgeCapability[field], capabilityReadback[field])
+    assertNoRootIncludeReloadErrors(diagnostics)
     stage = 'default-model-update'
     const initialSelection = { provider: providerId, model: 'reload-model-a' }
     const nextSelection = { provider: providerId, model: 'reload-model-b' }
@@ -209,6 +281,8 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
       assert.equal(shutdownRoute.status, enabled ? 405 : 404, 'Launcher route availability must follow the accepted live setting without invoking shutdown')
     }
     const saved = await readFile(profilePatch, 'utf8')
+    assert.equal(persistedSettingsConfig(saved, 'client-hmr').pollIntervalMs, 1250)
+    await verifyDesktopHmrGraph(controller)
     assert.deepEqual(persistedSettingsConfig(saved, 'agent-default-model'), nextSelection)
     assert.equal(persistedSettingsConfig(saved, 'llm-pi-ai').providers[providerId].baseURL, baseURL)
     assert.equal(persistedSettingsConfig(saved, 'web-ui-community-plugins').enabled, false)
@@ -218,10 +292,13 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     assert.equal(await controller.restart(), controllerModule.DESKTOP_PIPE_RUNTIME_URL)
     await verifyEventsReady(controller)
     const restarted = await settingsRpc(controller, 'settings/describe')
+    assert.equal(settingsNamespace(restarted, 'client-hmr').value.pollIntervalMs, 1250)
+    await verifyDesktopHmrGraph(controller)
     assert.deepEqual(settingsNamespace(restarted, 'agent-default-model').value, nextSelection)
     const restartedProvider = settingsNamespace(restarted, 'llm-pi-ai').value.providers[providerId]
     assert.equal(restartedProvider.baseURL, baseURL)
     assert.deepEqual(restartedProvider.models.map(model => model.id), ['reload-model-a', 'reload-model-b'])
+    assert.deepEqual(restartedProvider.models[0].input, ['text', 'image'])
     assert.deepEqual(persistedSettingsConfig(await readFile(profilePatch, 'utf8'), 'agent-default-model'), nextSelection)
     assert.equal(settingsNamespace(restarted, 'web-ui-community-plugins').value.enabled, false)
     assert.equal(settingsNamespace(restarted, 'web-ui-desktop-launcher').value.enabled, false)
@@ -249,6 +326,8 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     assert.equal(await readFile(join(reset.backupDirectory, 'cordis.patch.yml'), 'utf8'), patchBeforeRepair)
     await verifyEventsReady(controller)
     const repaired = await settingsRpc(controller, 'settings/describe')
+    assert.equal(settingsNamespace(repaired, 'client-hmr').value.pollIntervalMs, 1250)
+    await verifyDesktopHmrGraph(controller)
     assert.deepEqual(settingsNamespace(repaired, 'llm-pi-ai').value.providers[providerId], restartedProvider)
     assert.deepEqual(settingsNamespace(repaired, 'agent-default-model').value, nextSelection)
     assert.deepEqual(persistedSettingsConfig(await readFile(profilePatch, 'utf8'), 'llm-pi-ai'), persistedSettingsConfig(patchBeforeRepair, 'llm-pi-ai'))
@@ -258,7 +337,11 @@ export async function runRuntimeSettingsReload(options = parseSettingsReloadArgu
     return {
       transport: 'pipe',
       sdkSettingsRpc: true,
+      sdkCapabilityMutation: true,
+      bridgeMatchesOfficialSettings: true,
       profileReload: true,
+      desktopHmrGraphChecks: 5,
+      desktopHmrPollIntervalPersisted: true,
       rootIncludeReloadErrors: 0,
       eventsReadyChecks: 4,
       profileResetPreservedNewProvider: true,

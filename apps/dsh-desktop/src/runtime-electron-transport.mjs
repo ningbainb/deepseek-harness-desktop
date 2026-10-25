@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { abortableStreamNext, createRuntimeStreamFlow, runtimeStreamItemBytes } from './runtime-stream-flow.mjs'
 
 export const DESKTOP_RUNTIME_SCHEME = 'dsh-runtime'
 export const DESKTOP_RUNTIME_ORIGIN = `${DESKTOP_RUNTIME_SCHEME}://app`
@@ -8,6 +9,7 @@ const STREAM_CANCEL_CHANNEL = 'desktop:runtime-stream-cancel'
 const STREAM_WRITE_CHANNEL = 'desktop:runtime-stream-write'
 const STREAM_END_CHANNEL = 'desktop:runtime-stream-end'
 const STREAM_FRAME_CHANNEL = 'desktop:runtime-stream-frame'
+const STREAM_ACK_CHANNEL = 'desktop:runtime-stream-ack'
 const ENDPOINT_PATTERN = /^[A-Za-z0-9_$.-]+(?:\/[A-Za-z0-9_$.-]+)*$/u
 const MAX_STREAM_PAYLOAD_BYTES = 4 * 1024 * 1024
 const MAX_STREAM_ITEM_BYTES = 700 * 1024
@@ -100,7 +102,7 @@ function validateStreamRequest(value) {
   ) throw new TypeError('runtime stream request is invalid')
   const bytes = Buffer.byteLength(JSON.stringify(value.payload ?? null))
   if (bytes > MAX_STREAM_PAYLOAD_BYTES) throw new RangeError('runtime stream payload exceeded the limit')
-  return { endpoint: value.endpoint, payload: structuredClone(value.payload) }
+  return { endpoint: value.endpoint, payload: structuredClone(value.payload), flowControl: value.flowControl === true }
 }
 
 export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule = setImmediate }) {
@@ -108,6 +110,7 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     throw new TypeError('runtime stream IPC and provider getter are required')
   }
   const active = new Map()
+  const senderWatches = new Map()
   const suspendedSenders = new Set()
   let quiescing = false
   const suspend = sender => {
@@ -119,9 +122,37 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     const entry = active.get(id)
     if (entry === undefined) return false
     active.delete(id)
+    unwatch(entry.sender, id)
+    entry.resolveSource(undefined)
     entry.controller.abort(reason)
-    entry.source?.cancel?.(reason)
+    try { Promise.resolve(entry.source?.cancel?.(reason)).catch(() => {}) } catch {}
     return true
+  }
+  const unwatch = (sender, id) => {
+    const watch = senderWatches.get(sender)
+    if (!watch) return
+    watch.ids.delete(id)
+    if (watch.ids.size !== 0) return
+    for (const [name, listener] of watch.listeners) sender.removeListener?.(name, listener)
+    senderWatches.delete(sender)
+  }
+  const watch = (sender, id) => {
+    let watch = senderWatches.get(sender)
+    if (!watch) {
+      const ids = new Set()
+      const stop = () => {
+        for (const streamId of [...ids]) cancel(streamId, new Error('runtime stream renderer closed'))
+        suspendedSenders.delete(sender)
+      }
+      const navigate = (details, _url, isInPlace, isMainFrame) => {
+        if ((details?.isSameDocument ?? isInPlace) === true || (details?.isMainFrame ?? isMainFrame) === false) return
+        stop()
+      }
+      watch = { ids, listeners: [['destroyed', stop], ['render-process-gone', stop], ['did-start-navigation', navigate]] }
+      senderWatches.set(sender, watch)
+      for (const [name, listener] of watch.listeners) sender.on?.(name, listener)
+    }
+    watch.ids.add(id)
   }
 
   ipcMain.handle(STREAM_OPEN_CHANNEL, (event, value) => {
@@ -141,18 +172,40 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     const id = randomUUID()
     const controller = new AbortController()
     let resolveSource
-    const entry = { controller, sender: event.sender, source: undefined, sourceReady: new Promise(resolve => { resolveSource = resolve }) }
+    const entry = {
+      controller, sender: event.sender, ownerFrame: event.senderFrame, source: undefined,
+      sourceReady: new Promise(resolve => { resolveSource = resolve }),
+      flow: request.flowControl ? createRuntimeStreamFlow(controller.signal) : undefined,
+    }
+    entry.resolveSource = resolveSource
     active.set(id, entry)
+    watch(event.sender, id)
     schedule(() => {
       void (async () => {
+        let iterator
+        let completed = false
         try {
+          if (controller.signal.aborted) return
+          if (event.sender.isDestroyed?.()) { cancel(id); return }
           const source = provider.openDuplex(request.endpoint, request.payload, controller.signal)
           entry.source = source
           resolveSource(source)
-          for await (const item of source) {
+          iterator = source[Symbol.asyncIterator]()
+          for (;;) {
+            await entry.flow?.wait()
+            const result = await abortableStreamNext(iterator, controller.signal)
+            if (result.done) { completed = true; break }
             if (controller.signal.aborted || event.sender.isDestroyed?.()) return
-            event.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'item', value: item })
+            if (entry.flow) {
+              const bytes = runtimeStreamItemBytes(result.value)
+              await entry.flow.wait(bytes)
+              const sequence = entry.flow.sent(bytes)
+              event.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'item', value: result.value, sequence })
+            } else {
+              event.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'item', value: result.value })
+            }
           }
+          await entry.flow?.drain()
           if (!controller.signal.aborted && !event.sender.isDestroyed?.()) {
             event.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'end' })
           }
@@ -166,11 +219,21 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
             })
           }
         } finally {
+          if (!completed) {
+            try { Promise.resolve(iterator?.return?.()).catch(() => {}) } catch {}
+          }
           active.delete(id)
+          unwatch(entry.sender, id)
         }
       })()
     })
     return id
+  })
+  ipcMain.handle(STREAM_ACK_CHANNEL, (event, id, sequence) => {
+    if (typeof id !== 'string') return false
+    const entry = active.get(id)
+    if (entry?.sender !== event.sender || entry.ownerFrame !== event.senderFrame) return false
+    return entry.flow?.acknowledge(sequence) ?? false
   })
   ipcMain.handle(STREAM_CANCEL_CHANNEL, (event, id) => {
     if (typeof id !== 'string') return false
@@ -215,7 +278,9 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     ipcMain.removeHandler?.(STREAM_CANCEL_CHANNEL)
     ipcMain.removeHandler?.(STREAM_WRITE_CHANNEL)
     ipcMain.removeHandler?.(STREAM_END_CHANNEL)
+    ipcMain.removeHandler?.(STREAM_ACK_CHANNEL)
     void quiesce()
+    suspendedSenders.clear()
   }
   dispose.quiesce = quiesce
   dispose.resume = () => {

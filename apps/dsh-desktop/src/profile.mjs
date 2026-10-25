@@ -20,10 +20,16 @@ import { parse } from 'yaml'
 import { ControlCenterStore, createDefaultControlCenterConfiguration } from './control-center.mjs'
 import { mergeQqBotPatch, readQqBotPatchEnabled, reconcileManagedPatch } from './extensions/qqbot.mjs'
 
+const DESKTOP_DEPENDENCIES = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies
+const IN_PROCESS_SUBAGENT_PACKAGE = Object.hasOwn(DESKTOP_DEPENDENCIES, '@deepseek-ai/dsh-subagent-spawn-in-process')
+  ? '@deepseek-ai/dsh-subagent-spawn-in-process'
+  : '@deepseek-ai/dsh-subagent-in-process-driver'
+
 export const BUILTIN_BUNDLES = Object.freeze([
   '@deepseek-ai/dsh-base',
   '@linxin666/dsh-desktop-compat',
   '@deepseek-ai/dsh-web-app',
+  '@linxin666/dsh-desktop-client-hmr',
   '@linxin666/dsh-value-mode',
   'dsh-better-sidebar',
   '@linxin666/dsh-web-all',
@@ -31,6 +37,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
   // it directly so the profile cannot silently keep only the dependency
   // bytes while omitting its host routes and browser entry.
   '@linxin666/dsh-client-ui-skill-explorer',
+  'dsh-agent-plugins-market',
   '@linxin666/dsh-client-ui-model-capabilities',
   '@linxin666/dsh-usage',
   '@linxin666/dsh-session-archive',
@@ -39,7 +46,7 @@ export const BUILTIN_BUNDLES = Object.freeze([
 ])
 
 export const AGENT_TEAM_PROFILE_BUNDLE = '@deepseek-ai/dsh-experimental-agent-team-profile'
-export const AGENT_TEAM_VERSION = '0.2.0-rc.2'
+export const AGENT_TEAM_VERSION = DESKTOP_DEPENDENCIES['@deepseek-ai/dsh']
 export const AGENT_TEAM_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-experimental-agent-team',
   AGENT_TEAM_PROFILE_BUNDLE,
@@ -161,6 +168,8 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
+  'dsh-agent-plugins-market',
+  '@linxin666/dsh-desktop-client-hmr',
   ...AGENT_TEAM_RUNTIME_PACKAGES,
   ...CONTROL_CENTER_RUNTIME_PACKAGES,
   '@linxin666/dsh-desktop-pipe-webserver',
@@ -352,7 +361,7 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-shell',
   '@deepseek-ai/dsh-spill',
   '@deepseek-ai/dsh-settings',
-  '@deepseek-ai/dsh-subagent-in-process-driver',
+  IN_PROCESS_SUBAGENT_PACKAGE,
   '@deepseek-ai/dsh-subprocess',
   '@deepseek-ai/dsh-timeout',
   '@deepseek-ai/dsh-typert-protocol',
@@ -421,9 +430,17 @@ export function renderControlCenterPatch(configuration = createDefaultControlCen
   return `- insert:\n    - id: desktop-browser-use\n      name: '@deepseek-ai/dsh-browser-use'\n    - id: desktop-browser-provider\n      name: '${browserPackage}'\n      disabled: ${browser.enabled === true ? 'false' : 'true'}${browserConfig}\n    - id: desktop-computer-use\n      name: '@deepseek-ai/dsh-computer-use'\n    - id: desktop-computer-provider\n      name: '${computerPackage}'\n      disabled: ${computer.enabled === true ? 'false' : 'true'}${computerConfig}\n`
 }
 
-function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration()) {
+function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration(), { marketDefaultEnabled = false } = {}) {
   return `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
+- id: dsh-agent-plugins-market
+  name: dsh-agent-plugins-market
+  disabled: ${!marketDefaultEnabled}
+  config:
+    feedbackEnabled: false
+    translationEnabled: false
+    autoUpdateSources: false
+    scanProjectLayouts: false
 - id: web-ui-settings
   disabled: true
 - id: web-ui-task-board
@@ -1098,7 +1115,7 @@ function migrateNativePluginManagerRows(source) {
   return [...lines, ...overrides].join('\n')
 }
 
-export function mergeDesktopPatch(existing = '', controlCenterConfiguration = createDefaultControlCenterConfiguration()) {
+export function mergeDesktopPatch(existing = '', controlCenterConfiguration = createDefaultControlCenterConfiguration(), options = {}) {
   let userPatch = migrateNativePluginManagerRows(String(existing))
   if (!userPatch.includes(DESKTOP_PATCH_START) && userPatch.startsWith(LEGACY_DESKTOP_PATCH_CONFIG)) {
     userPatch = userPatch.slice(LEGACY_DESKTOP_PATCH_CONFIG.length)
@@ -1142,7 +1159,7 @@ export function mergeDesktopPatch(existing = '', controlCenterConfiguration = cr
       return `${prefix}${quote}ssh${quote}${suffix}`
     },
   )
-  const { managed, remainder } = reconcileManagedPatch(userPatch, desktopPatchConfig(controlCenterConfiguration), DESKTOP_PATCH_START, DESKTOP_PATCH_END)
+  const { managed, remainder } = reconcileManagedPatch(userPatch, desktopPatchConfig(controlCenterConfiguration, options), DESKTOP_PATCH_START, DESKTOP_PATCH_END)
   const suffix = remainder.trim()
   return suffix ? `${managed.trimEnd()}\n\n${suffix}\n` : managed
 }
@@ -1468,7 +1485,10 @@ export async function ensureDesktopProfile({
       const controlCenterConfiguration = mode === 'full'
         ? await new ControlCenterStore({ path: join(dshHome, 'desktop-control-center.json') }).profileConfiguration()
         : createDefaultControlCenterConfiguration()
-      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch, controlCenterConfiguration), qqBotEnabled)
+      const marketDefaultEnabled = !Object.hasOwn(previousRecords, 'dsh-agent-plugins-market')
+        && Array.isArray(existing?.dsh?.profile?.bundles)
+        && existing.dsh.profile.bundles.includes('dsh-agent-plugins-market')
+      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch, controlCenterConfiguration, { marketDefaultEnabled }), qqBotEnabled)
     } catch (error) {
       throw profileBootstrapError('desktop profile patch is invalid', error)
     }

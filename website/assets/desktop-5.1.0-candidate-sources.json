@@ -1,0 +1,39 @@
+{
+  "version": "5.1.0",
+  "status": "local-windows-unsigned-candidate-not-published",
+  "collection": "desktop-5.1.0-beta-20261023",
+  "acceptanceRecord": "acceptance.md",
+  "platform": "win32",
+  "architecture": "x64",
+  "runtimeSdk": "0.2.1-rc.2",
+  "electron": "44.0.0",
+  "captureMode": "native-window-desktop-capturer",
+  "imageTransform": "none; byte-for-byte copies of original PNG files",
+  "boundary": "Local Windows unsigned beta only; not cloud, final release, macOS/Linux or real Setup installation acceptance. Hashes below identify screenshots, not installers. Independent WebContents diagnostic composites are excluded.",
+  "images": [
+    {
+      "asset": "desktop-5.1.0-candidate-settings-light.png",
+      "source": "packaged-native-ui-final/dock-light.png",
+      "captureRecord": "packaged-native-ui-final/dock-light-capture.json",
+      "theme": "light",
+      "expectedColor": [255, 255, 255],
+      "sampledColor": [255, 255, 255],
+      "width": 1918,
+      "height": 1360,
+      "bytes": 178898,
+      "sha256": "106cb5117ac2c3c419a7fdb509aa8b546631359869f9323b7bf6ba887b634985"
+    },
+    {
+      "asset": "desktop-5.1.0-candidate-settings-dark.png",
+      "source": "packaged-native-ui-final/dock-dark.png",
+      "captureRecord": "packaged-native-ui-final/dock-dark-capture.json",
+      "theme": "dark",
+      "expectedColor": [10, 20, 27],
+      "sampledColor": [10, 20, 27],
+      "width": 1918,
+      "height": 1360,
+      "bytes": 177354,
+      "sha256": "aecafe99142b28f0b372f7d673c2e0af9c82cc94968ec2ae11aea191c8649906"
+    }
+  ]
+}

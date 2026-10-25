@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { promisify } from 'node:util'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
+import { closeIsolatedElectron, ownedProcessIds, ownedProcessesStopped } from './electron-cleanup-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
-const execFileAsync = promisify(execFile)
 const appDir = resolve(import.meta.dirname, '..')
 const output = resolve(process.argv.find(argument => argument.startsWith('--output='))?.slice(9) ?? join(tmpdir(), 'dsh-background-residency-result'))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-background-residency-'))
@@ -18,9 +16,12 @@ const home = join(temporary, 'home')
 const userData = join(temporary, 'user-data')
 const preferencePath = join(userData, 'desktop-preferences.json')
 const checks = []
-let application, page, failure
+let application, applicationChild, page, failure
 
 const delay = milliseconds => new Promise(resolveWait => setTimeout(resolveWait, milliseconds))
+async function readStatus() {
+  return waitForAsyncPageFunction(page, () => window.dshDesktop.getStatus())
+}
 async function preferenceText() {
   try { return await readFile(preferencePath, 'utf8') } catch (error) {
     if (error.code === 'ENOENT') return null
@@ -30,7 +31,9 @@ async function preferenceText() {
 async function waitUntil(predicate, description, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (await predicate()) return
+    const satisfied = await predicate()
+    if (Date.now() >= deadline) break
+    if (satisfied) return
     await delay(100)
   }
   throw new Error(`background residency timed out: ${description}`)
@@ -66,6 +69,7 @@ async function launch() {
     env: { ...process.env, DSH_HOME: home, DSH_AGENTS_HOME: join(temporary, 'agents-home'),
       DSH_DESKTOP_USER_DATA: userData, DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1' },
   })
+  applicationChild = application.process()
   await application.evaluate(({ Tray }) => {
     globalThis.__dshResidencyProbe = { tray: undefined, menu: undefined }
     const original = Tray.prototype.setContextMenu
@@ -77,7 +81,10 @@ async function launch() {
   })
   page = await application.firstWindow({ timeout: 600_000 })
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
-  await page.waitForFunction(async () => (await window.dshDesktop.getStatus()).state === 'ready', undefined, { timeout: 600_000 })
+  await waitForAsyncPageFunction(page, async () => {
+    const status = await window.dshDesktop.getStatus()
+    return status.state === 'ready' && status.background.pending === false
+  }, undefined, { timeout: 600_000 })
   await page.locator('#dsh-desktop-window-chrome').waitFor({ timeout: 120_000 })
   console.log('Isolated Runtime and native main window ready')
 }
@@ -96,8 +103,8 @@ async function restoreFromTray(event = 'click') {
 
 async function verifyHiddenRuntime(previous) {
   await waitUntil(async () => !(await windowState()).visible, 'hidden main window')
-  assert.equal(application.process().exitCode, null)
-  const status = await page.evaluate(() => window.dshDesktop.getStatus())
+  assert.equal(applicationChild.exitCode, null)
+  const status = await readStatus()
   assert.equal(status.state, 'ready')
   assert.equal(status.url, previous.url)
   assert.equal(status.restartAttempt, previous.restartAttempt)
@@ -112,45 +119,19 @@ async function verifyHiddenRuntime(previous) {
   assert.equal((await windowState()).destroyed, false)
 }
 
-async function ownedProcessIds() {
-  const rootPid = application.process().pid
-  if (process.platform !== 'win32') return [rootPid]
-  const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress'],
-  { windowsHide: true, maxBuffer: 4 * 1024 * 1024 })
-  const processes = JSON.parse(stdout)
-  const owned = new Set([rootPid])
-  let expanded = true
-  while (expanded) {
-    expanded = false
-    for (const processInfo of processes) {
-      if (owned.has(processInfo.ParentProcessId) && !owned.has(processInfo.ProcessId)) {
-        owned.add(processInfo.ProcessId)
-        expanded = true
-      }
-    }
-  }
-  return [...owned]
-}
-
-function alive(pid) {
-  try { process.kill(pid, 0); return true } catch (error) {
-    if (error.code === 'ESRCH') return false
-    throw error
-  }
-}
-
 async function quitFromTray() {
-  const owned = await ownedProcessIds()
+  const owned = await ownedProcessIds(applicationChild.pid)
+  console.log(`Native tray quit tracking owned PIDs: ${JSON.stringify(owned)}`)
   await application.evaluate(() => {
     const item = globalThis.__dshResidencyProbe.menu?.items.find(item => item.label === '退出 / Quit')
     if (!item) throw new Error('native tray quit action missing')
     item.click()
   })
-  await waitUntil(() => owned.every(pid => !alive(pid)), 'explicit quit reaps the owned process tree', 90_000)
+  await waitUntil(() => ownedProcessesStopped(owned), 'explicit quit reaps the owned process tree', 90_000)
   checks.push({ action: 'explicit-tray-quit', ownedProcessesStopped: owned.length })
   console.log(`Native tray quit stopped ${owned.length} owned processes`)
   application = undefined
+  applicationChild = undefined
 }
 
 try {
@@ -159,11 +140,11 @@ try {
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
   await launch()
-  const initial = await page.evaluate(() => window.dshDesktop.getStatus())
+  const initial = await readStatus()
   assert.equal(initial.background.closeBehavior, 'quit')
   await (await application.browserWindow(page)).evaluate(window => window.minimize())
   await waitUntil(async () => (await windowState()).minimized, 'default taskbar minimize')
-  assert.equal((await page.evaluate(() => window.dshDesktop.getStatus())).background.trayAvailable, false)
+  assert.equal((await readStatus()).background.trayAvailable, false)
   await (await application.browserWindow(page)).evaluate(window => { window.restore(); window.show() })
   const beforePreferences = await preferenceText()
   await menuAction('最小化到托盘 / Minimize to tray')
@@ -188,8 +169,13 @@ try {
   }, 'saved tray opt-in')
   await delay(500)
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
-  await page.waitForFunction(async () => (await window.dshDesktop.getStatus()).state === 'ready', undefined, { timeout: 600_000 })
-  const optedIn = await page.evaluate(() => window.dshDesktop.getStatus())
+  await waitForAsyncPageFunction(page, async () => {
+    const status = await window.dshDesktop.getStatus()
+    return status.state === 'ready' && status.background.pending === false
+  }, undefined, { timeout: 600_000 })
+  const optedIn = await readStatus()
+  assert.equal(optedIn.state, 'ready')
+  assert.equal(optedIn.background.pending, false)
   await (await application.browserWindow(page)).evaluate(window => window.minimize())
   await verifyHiddenRuntime(optedIn)
   await restoreFromTray('double-click')
@@ -200,22 +186,25 @@ try {
   console.log('Persistent native minimize, close-to-tray and double-click restoration verified')
   await quitFromTray()
   await launch()
-  assert.equal((await page.evaluate(() => window.dshDesktop.getStatus())).background.closeBehavior, 'minimize-to-tray')
+  assert.equal((await readStatus()).background.closeBehavior, 'minimize-to-tray')
   await menuAction('最小化到托盘 / Minimize to tray')
   await waitUntil(async () => !(await windowState()).visible, 'restarted tray residency')
   await menuAction('退出 / Quit')
   await waitUntil(async () => (await windowState()).visible, 'disabling residency restores the main window')
   await delay(500)
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
-  await page.waitForFunction(async () => (await window.dshDesktop.getStatus()).state === 'ready', undefined, { timeout: 600_000 })
-  assert.equal((await page.evaluate(() => window.dshDesktop.getStatus())).background.trayAvailable, false)
+  await waitForAsyncPageFunction(page, async () => {
+    const status = await window.dshDesktop.getStatus()
+    return status.state === 'ready' && status.background.pending === false
+  }, undefined, { timeout: 600_000 })
+  assert.equal((await readStatus()).background.trayAvailable, false)
   await application.evaluate(({ Tray }) => {
     globalThis.__dshResidencyProbe.originalSetToolTip = Tray.prototype.setToolTip
     Tray.prototype.setToolTip = function() { throw new Error('isolated tray creation failure') }
   })
   await menuAction('最小化到托盘 / Minimize to tray')
   await waitUntil(async () => (await windowState()).minimized, 'unavailable tray keeps taskbar restoration')
-  assert.equal((await page.evaluate(() => window.dshDesktop.getStatus())).background.trayAvailable, false)
+  assert.equal((await readStatus()).background.trayAvailable, false)
   await application.evaluate(({ Tray }) => { Tray.prototype.setToolTip = globalThis.__dshResidencyProbe.originalSetToolTip })
   await (await application.browserWindow(page)).evaluate(window => { window.restore(); window.show() })
   await menuAction('最小化到托盘 / Minimize to tray')
@@ -231,7 +220,7 @@ try {
   console.error(error)
   process.exitCode = 1
 } finally {
-  try { await closeIsolatedElectron(application) } catch (error) {
+  try { await closeIsolatedElectron(application, { child: applicationChild }) } catch (error) {
     failure ??= error
     process.exitCode = 1
     await writeFile(join(output, 'cleanup-error.txt'), `${error.stack}\n`)

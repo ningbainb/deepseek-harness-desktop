@@ -15,7 +15,7 @@ const backendRequire = createRequire(backendPath)
 const catalogPath = backendRequire.resolve('@deepseek-ai/dsh-session-format-catalog')
 const catalogRequire = createRequire(catalogPath)
 
-export const { default: JsonlSessionPersistence } = await import(pathToFileURL(backendPath))
+export const JsonlSessionPersistence = await import(pathToFileURL(backendPath))
 export const { Context } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/cordis')))
 export const {
   createMessage, createUserMessage, freezeMessage, AssistantStreamAccumulator,

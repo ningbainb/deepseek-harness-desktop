@@ -10,7 +10,7 @@ import { installSessionPersistenceRecovery } from '../../../packages/dsh-desktop
 
 const appRequire = createRequire(new URL('../package.json', import.meta.url))
 const baseRequire = createRequire(appRequire.resolve('@deepseek-ai/dsh-base/package.json'))
-const { default: JsonlSessionPersistence } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-session-persistence-jsonl')))
+const JsonlSessionPersistence = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-session-persistence-jsonl')))
 const { Context } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/cordis')))
 const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, cwd: resolve('project'), delegationDepth: 1 }
 const child = { type: 'subagent/descriptor', seq: 0, time: 1, data: { version: 2, mode: 'continuable', provider: 'in-process', label: 'worker' } }

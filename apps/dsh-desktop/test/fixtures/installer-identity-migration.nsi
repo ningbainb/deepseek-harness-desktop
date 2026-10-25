@@ -5,7 +5,6 @@ Name "DSH installer identity migration test"
 OutFile "${TEST_OUTPUT}"
 InstallDir "${TEST_FRESH_INSTALL}"
 
-!define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 !define DSH_LEGACY_APP_GUID "test-legacy"
 !define DSH_LEGACY_INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\LegacyInstall"
 !define DSH_LEGACY_UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\LegacyUninstall"
@@ -17,6 +16,7 @@ Var hasPerUserInstallation
 Var hasPerMachineInstallation
 
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
+!define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 
 Section
   SetRegView 64

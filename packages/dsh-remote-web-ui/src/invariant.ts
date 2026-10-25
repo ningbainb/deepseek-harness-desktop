@@ -5,7 +5,6 @@
 
 /* jscpd:ignore-start */
 import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
 const PACKAGE_NAME = '@linxin666/dsh-remote-web-ui'
 
@@ -20,7 +19,7 @@ export const inject = ['invariants']
  * the package's own specs (route register/dispose symmetry via the
  * webServer disposer contract, token/revocation semantics on the service).
  */
-const install: InvariantInstaller = () => {}
+const install = () => {}
 
 /**
  * Register this package's invariant companion.
@@ -28,5 +27,7 @@ const install: InvariantInstaller = () => {}
  * @returns the installed registration's disposer after setup succeeds.
  */
 export const apply = (ctx: Context): Promise<() => void> =>
-  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
+  Promise.resolve((ctx as Context & {
+    invariants: { register(packageName: string, installer: typeof install): () => void }
+  }).invariants.register(PACKAGE_NAME, install))
 /* jscpd:ignore-end */

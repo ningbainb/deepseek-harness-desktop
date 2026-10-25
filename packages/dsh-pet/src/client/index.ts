@@ -139,6 +139,8 @@ export function apply(ctx: ClientContext): void {
     inject: () => petSettings.inject(),
   }, PetSettingsCard))
 
+  if (new URLSearchParams(window.location.search).has('desktop-dock-setting')) return
+
   // The global pet entry, its store, and the poll loop live while the plugin
   // is enabled; toggling the setting off hides the pet and stops polling.
   let disposeUi: (() => void) | undefined

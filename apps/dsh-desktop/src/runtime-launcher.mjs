@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { stringify } from 'yaml'
@@ -15,6 +15,7 @@ import {
   loadProfileDirectory,
   PluginPackages,
   prepareProfilePatches,
+  readProfilePatches,
 } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
@@ -26,14 +27,19 @@ import {
   RUNTIME_PIPE_READY_LINE,
   RUNTIME_PIPE_TOKEN_ENV,
 } from './runtime-pipe.mjs'
-import { mergeDesktopPipeCookies } from './runtime-cookie.mjs'
+import { createDesktopPipeSessionCookie, mergeDesktopPipeCookies, openDesktopPipeWebSocket } from './runtime-cookie.mjs'
 import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { consumeRuntimeShutdownControl, listenRuntimeShutdownControl } from './runtime-shutdown-control.mjs'
 import { createRuntimeEventStreamDrain } from './runtime-stream-drain.mjs'
 import { createRuntimeStartupTiming } from './runtime-startup-timing.mjs'
+import { createDesktopFrontendFetch } from './runtime-frontend-assets.mjs'
+import { finalizeRuntimeReadiness, RUNTIME_HTTP_READY_LINE } from './runtime-readiness.mjs'
 import { transportBootstrapScript } from './runtime-renderer-bootstrap.mjs'
 import { createRuntimeAccountCallback } from './runtime-account-callback.mjs'
-import { openDesktopWireStream } from './runtime-wire-stream.mjs'
+import { fetchDesktopConnectionApi, openDesktopWireStream } from './runtime-wire-stream.mjs'
+import { adaptDesktopClientHmrPatches, DESKTOP_CLIENT_HMR_PACKAGE } from './runtime-client-hmr.mjs'
+import { installDesktopProfileComposition } from './runtime-profile-composition.mjs'
+import { createDesktopConfigurationGuard } from './runtime-config-identity.mjs'
 import {
   adaptRuntimeLegacySettingsPatches,
   diagnoseRuntimeLegacySettingsHealth,
@@ -62,19 +68,6 @@ async function watchDesktopUserPatches(ctx, filename, rootConfig, compose) {
   })
 }
 
-const CONTENT_TYPES = Object.freeze({
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml; charset=utf-8',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-})
-
 function runtimePipeIdentityFromEnvironment(environment = process.env) {
   const address = environment[RUNTIME_PIPE_ADDRESS_ENV]
   if (address === undefined || address === '') return undefined
@@ -90,32 +83,14 @@ function resolveFrontendDist() {
   return join(dirname(webAppRequire.resolve('@deepseek-ai/dsh-web-frontend/package.json')), 'dist')
 }
 
-function safeFrontendPath(dist, pathname) {
-  let decoded
-  try { decoded = decodeURIComponent(pathname) } catch { return undefined }
-  const candidate = resolve(dist, `.${decoded}`)
-  const within = candidate === dist || (!relative(dist, candidate).startsWith(`..${sep}`) && relative(dist, candidate) !== '..')
-  return within ? candidate : undefined
-}
-
-function createDesktopPipeFetch(ctx, accountCallbackOrigin) {
+function createDesktopPipeFetch(ctx, accountCallbackOrigin, sessionCookie) {
   const api = ctx.connection.createSharedFetchHandler('/api')
-  const dist = resolveFrontendDist()
-  const indexPath = join(dist, 'index.html')
-  let sessionCookiePromise
-  const sessionCookie = () => {
-    sessionCookiePromise ??= (async () => {
-      const launchUrl = ctx.connection.authenticatedUrl(`http://${ctx.webServer.host}/`)
-      const response = await ctx.webServer.authorizeIndex(new Request(launchUrl))
-      const setCookie = response?.headers.get('set-cookie')
-      const cookie = setCookie?.split(';', 1)[0]
-      if (response?.status !== 303 || cookie === undefined || cookie === '') {
-        throw new Error('desktop pipe failed to establish the official browser session')
-      }
-      return cookie
-    })()
-    return sessionCookiePromise
-  }
+  const frontendFetch = createDesktopFrontendFetch({
+    dist: resolveFrontendDist(),
+    authorizeIndex: request => ctx.webServer.authorizeIndex(request),
+    renderIndex: html => ctx.webServer.renderIndex(html),
+    bootstrap: `<script>${transportBootstrapScript({ accountCallbackOrigin })}</script>`,
+  })
   return async (sourceRequest) => {
     const headers = new Headers(sourceRequest.headers)
     const sourceCookie = headers.get('cookie')
@@ -129,34 +104,10 @@ function createDesktopPipeFetch(ctx, accountCallbackOrigin) {
     const localRequest = redirected ? new Request(url, request) : request
     const route = ctx.webServer.match(url.pathname)
     if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(localRequest)
-    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return api.fetch(localRequest)
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return fetchDesktopConnectionApi(ctx, api, localRequest)
     if (url.pathname === '/plugins' || url.pathname.startsWith('/plugins/')) return ctx.clientModules.fetchBundle(localRequest)
     if (route !== undefined) return ctx.webServer.fetch(localRequest)
-    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('method not allowed', { status: 405 })
-
-    const requested = url.pathname === '/' ? indexPath : safeFrontendPath(dist, url.pathname)
-    let body
-    let filePath = requested
-    try {
-      body = readFileSync(filePath)
-    } catch (error) {
-      if (error?.code !== 'ENOENT' || extname(url.pathname) !== '') return new Response('not found', { status: 404 })
-      filePath = indexPath
-      body = readFileSync(filePath)
-    }
-    if (filePath === indexPath) {
-      const authorizationResponse = await ctx.webServer.authorizeIndex(request)
-      if (authorizationResponse !== undefined) return authorizationResponse
-      const bootstrap = `<script>${transportBootstrapScript({ accountCallbackOrigin })}</script>`
-      body = Buffer.from(ctx.webServer.renderIndex(body.toString('utf8').replace('</head>', `${bootstrap}</head>`)))
-    }
-    return new Response(request.method === 'HEAD' ? null : body, {
-      status: 200,
-      headers: {
-        'content-type': CONTENT_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream',
-        'cache-control': filePath === indexPath ? 'no-store' : 'public, max-age=31536000, immutable',
-      },
-    })
+    return frontendFetch(localRequest)
   }
 }
 
@@ -276,7 +227,12 @@ async function run() {
   const homePatches = loadOptionalPatches(NAME, homePatchPath) ?? []
   const overlayPatches = invocation.patchFiles.flatMap(path => loadOverlayPatches(NAME, resolve(path)))
   const baseLayers = [bundlePatches, profile.patches, homePatches, overlayPatches]
-  const allPatches = [...baseLayers.flat(), ...telemetryPatch(baseLayers)]
+  const rawPatches = [...baseLayers.flat(), ...telemetryPatch(baseLayers)]
+  const allPatches = adaptDesktopClientHmrPatches(rawPatches, {
+    enabled: profile.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
+  })
+  const configurationGuard = createDesktopConfigurationGuard()
+  configurationGuard.record(rawPatches, allPatches)
   markStartup('patches')
   if (invocation.dumpConfig) {
     process.stdout.write(stringify(composeEntries(allPatches)))
@@ -291,6 +247,15 @@ async function run() {
   })
   markStartup('legacy-settings')
   let migrationCommitted = false
+  const composeLive = () => {
+    const current = loadProfileDirectory(NAME, profile.dir, installAnchor)
+    const raw = readProfilePatches(NAME, profileContext, current)
+    const mapped = adaptDesktopClientHmrPatches(raw, {
+      enabled: current.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
+    })
+    configurationGuard.record(raw, mapped)
+    return adaptRuntimeLegacySettingsPatches(mapped)
+  }
   let ctx
   let pipeServer
   let accountCallback
@@ -333,8 +298,14 @@ async function run() {
     ctx = await boot(NAME, rootConfig, legacySettings.patches, async hostCtx => {
       ctx = hostCtx
       hostCtx.provide('profileContext', profileContext)
+      hostCtx.provide('desktopConfigurationGuard', configurationGuard)
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
+      installDesktopProfileComposition(hostCtx, {
+        rootUrl: pathToFileURL(rootConfig).href,
+        compose: () => migrationCommitted ? composeLive() : legacySettings.patches,
+        prepare: patches => prepareProfilePatches(hostCtx, patches, pathToFileURL(dirname(rootConfig)).href + '/', NAME),
+      })
       provideCmdline(hostCtx, {
         args: invocation.args,
         exit: code => { void shutdown(code) },
@@ -351,14 +322,15 @@ async function run() {
         throw new Error('desktop pipe mode requires connection, clientModules, and typertGateway services')
       }
       accountCallback = await createRuntimeAccountCallback({ webServer: ctx.webServer })
+      const sessionCookie = createDesktopPipeSessionCookie(ctx)
       pipeServer = await createRuntimePipeServer({
         identity: pipeIdentity,
         runtimeVersion: runtimeManifest.version,
         profile: invocation.profile,
-        fetch: createDesktopPipeFetch(ctx, accountCallback.origin),
+        fetch: createDesktopPipeFetch(ctx, accountCallback.origin, sessionCookie),
         openStream: (endpoint, payload, signal) => openDesktopWireStream(ctx, endpoint, payload, signal),
         openDuplex: (endpoint, payload, input, signal) => endpoint === 'websocket'
-          ? ctx.webServer.openDuplex(endpoint, payload, input, signal)
+          ? openDesktopPipeWebSocket(ctx.webServer, endpoint, payload, input, signal, sessionCookie)
           : openDesktopWireStream(ctx, endpoint, payload, signal, input),
       })
     }
@@ -374,13 +346,6 @@ async function run() {
         if (ctx.get('timer') === undefined) await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-timer' })
         await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-hmr', config: { root: [] } })
       }
-      const composeLive = () => adaptRuntimeLegacySettingsPatches([
-        ...bundlePatches,
-        ...(loadOptionalPatches(NAME, profile.patchPath) ?? []),
-        ...(loadOptionalPatches(NAME, homePatchPath) ?? []),
-        ...overlayPatches,
-        ...telemetryPatch([bundlePatches, profile.patches, homePatches, overlayPatches]),
-      ])
       await watchDesktopUserPatches(ctx, profile.patchPath, rootConfig, composeLive)
       await watchDesktopUserPatches(ctx, homePatchPath, rootConfig, composeLive)
     }
@@ -391,9 +356,16 @@ async function run() {
         return health.healthy
       } })
       migrationCommitted = true
-      if (pipeIdentity !== undefined) process.stdout.write(`${RUNTIME_PIPE_READY_LINE}\n`)
-      markStartup('ready')
-      ready.commit()
+      await finalizeRuntimeReadiness({
+        commit: () => ready.commit(),
+        hmr: ctx.get('hmr'),
+        isStopping: () => shuttingDown,
+        announce: () => {
+          if (pipeIdentity !== undefined) process.stdout.write(`${RUNTIME_PIPE_READY_LINE}\n`)
+          markStartup('ready')
+          if (pipeIdentity === undefined) process.stdout.write(`${RUNTIME_HTTP_READY_LINE}\n`)
+        },
+      })
     } else if (!migrationCommitted) {
       throw new Error('desktop Runtime did not reach migration commit readiness')
     }

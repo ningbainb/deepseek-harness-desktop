@@ -60,6 +60,15 @@ Function RetireLegacyInstallerIdentity
 legacy_identity_retire_done:
 FunctionEnd
 
+!macro DshValidateCurrentInstallDirectory SUFFIX
+  StrCmp $DshCurrentInstallDirectory "" current_directory_validated_${SUFFIX}
+  IfFileExists "$DshCurrentInstallDirectory\resources\update-shutdown-v1" 0 current_directory_invalid_${SUFFIX}
+  IfFileExists "$DshCurrentInstallDirectory\${APP_EXECUTABLE_FILENAME}" current_directory_validated_${SUFFIX}
+current_directory_invalid_${SUFFIX}:
+  StrCpy $DshCurrentInstallDirectory ""
+current_directory_validated_${SUFFIX}:
+!macroend
+
 ; Reuse a verified 4.x custom install location before trying the legacy 3.x
 ; identity. The 3.x appId-derived GUID could also belong to the official
 ; release, so adopt it only when our private shutdown marker proves ownership.
@@ -106,19 +115,21 @@ registered_identity:
   ; A 4.x upgrade must reuse the user's chosen directory. Only adopt a
   ; registered location when both our private marker and executable exist.
   ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
-  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_validate
+  !insertmacro DshValidateCurrentInstallDirectory current_install
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_adopt
   ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
-  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_validate
+  !insertmacro DshValidateCurrentInstallDirectory current_uninstall
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_adopt
   SetRegView 32
   ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  !insertmacro DshValidateCurrentInstallDirectory fallback_install
   StrCmp $DshCurrentInstallDirectory "" 0 current_identity_restore_view
   ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
+  !insertmacro DshValidateCurrentInstallDirectory fallback_uninstall
 current_identity_restore_view:
   SetRegView lastused
-current_identity_validate:
+current_identity_adopt:
   StrCmp $DshCurrentInstallDirectory "" current_identity_done
-  IfFileExists "$DshCurrentInstallDirectory\resources\update-shutdown-v1" 0 current_identity_done
-  IfFileExists "$DshCurrentInstallDirectory\${APP_EXECUTABLE_FILENAME}" 0 current_identity_done
   StrCpy $INSTDIR $DshCurrentInstallDirectory
   StrCpy $perUserInstallationFolder $DshCurrentInstallDirectory
   StrCpy $hasPerUserInstallation "1"

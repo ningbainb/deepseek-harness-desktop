@@ -42,6 +42,19 @@ import {
   setAgentTeamProfileEnabled,
 } from '../src/profile.mjs'
 
+test('Desktop mounts its nonblocking client HMR adapter after the official Web bundle', () => {
+  const adapter = '@linxin666/dsh-desktop-client-hmr'
+  assert.equal(BUILTIN_BUNDLES.filter(name => name === adapter).length, 1)
+  assert.ok(BUILTIN_BUNDLES.indexOf(adapter) > BUILTIN_BUNDLES.indexOf('@deepseek-ai/dsh-web-app'))
+  const manifest = createDesktopProfileManifest()
+  assert.equal(manifest.dsh.profile.bundles.filter(name => name === adapter).length, 1)
+  assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-web-app'))
+  assert.ok(MANAGED_RUNTIME_PACKAGES.includes(adapter), 'the mounted adapter must be materialized in the Runtime package closure')
+  assert.ok(resolveRuntimePackages().has(adapter), 'the complete profile resolver must carry the adapter bytes')
+  assert.deepEqual(parse(readFileSync(join(resolveRuntimePackages().get(adapter), 'cordis.patch.yml'), 'utf8')), [],
+    'the bundle must opt in through the profile without a misleading SDK name-guard patch or duplicate insert')
+})
+
 test('published rc.2 Web aggregate cannot silently remove Desktop-only profile rows', () => {
   const legacy = '@linxin666/dsh-web-ui-all'
   const alpha = '@linxin666/dsh-web-all'
@@ -542,6 +555,19 @@ test('profile bootstrap retires missing links into an old packaged app and prese
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('boot profile follows the declared official in-process subagent backend', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  const backends = [
+    '@deepseek-ai/dsh-subagent-spawn-in-process',
+    '@deepseek-ai/dsh-subagent-in-process-driver',
+  ]
+  const declared = backends.filter(packageName => Object.hasOwn(manifest.dependencies, packageName))
+  assert.equal(declared.length, 1)
+  assert.deepEqual(DSH_BOOT_RUNTIME_PACKAGES.filter(packageName => backends.includes(packageName)), declared)
+  assert.equal(manifest.dependencies[declared[0]], manifest.dependencies['@deepseek-ai/dsh'])
+  assert.equal(AGENT_TEAM_VERSION, manifest.dependencies['@deepseek-ai/dsh'])
 })
 
 test('Agent Team ships as an exact built-in runtime but stays opt-in in the desktop profile', () => {
@@ -1149,6 +1175,35 @@ test('retired legacy skins retain the compatible upgrade fallback instead of fre
     assert.equal(JSON.parse(await readFile(join(profileDir, '.dsh-desktop-retired-skin.json'), 'utf8')).skinId, 'qq98')
     await ensureDesktopProfile({ dshHome: root, packageRoots: new Map() })
     assert.deepEqual(JSON.parse(await readFile(join(root, 'skin-center-active.json'), 'utf8')), { active: 'blue-fantasy' })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('private pipe overlay composes without the disabled Web startup dependency', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-pipe-profile-'))
+  try {
+    const packageRoots = resolveRuntimePackages()
+    await ensureDesktopProfile({ dshHome: root, packageRoots })
+    const composed = spawnSync(
+      process.execPath,
+      [runtimeEntryPath(resolveDshCliPath()), '--dsh-cli', resolveDshCliPath(), '--profile', 'desktop',
+        '--patch', resolve(import.meta.dirname, '../runtime-support/desktop-pipe.patch.yml'), '--dump-config'],
+      { encoding: 'utf8', env: { ...process.env, DSH_HOME: root }, timeout: 60_000 },
+    )
+    assert.equal(composed.status, 0, composed.stderr)
+    const rows = parse(composed.stdout)
+    const connection = rows.find(row => row.id === 'connection')
+    assert.equal(connection.name, '@deepseek-ai/dsh-client-connection')
+    assert.deepEqual(connection.inject, [])
+    assert.deepEqual(connection.config, {})
+    for (const id of ['web-startup', 'webserver', 'web-runtime']) {
+      assert.equal(rows.find(row => row.id === id)?.disabled, true, id)
+    }
+    assert.equal(rows.find(row => row.id === 'desktop-pipe-webserver')?.name,
+      '@linxin666/dsh-desktop-pipe-webserver')
+    const connectionSdk = await import(pathToFileURL(join(packageRoots.get(connection.name), 'lib/index.js')).href)
+    assert.ok(connectionSdk.inject.includes('credentials'), 'The SDK must retain its own credentials dependency')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

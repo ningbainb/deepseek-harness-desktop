@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import sharp from 'sharp'
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +9,7 @@ import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixtur
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
+import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
@@ -22,12 +24,117 @@ let settings
 let dock
 let failure
 
+async function assertPetFreeSettings() {
+  const geometry = await settings.evaluate(() => ({
+    pets: document.querySelectorAll('[data-dsh-pet-root]').length,
+    summons: document.querySelectorAll('[data-dsh-part="summon-button"]').length,
+    rails: document.querySelectorAll('[data-dsh-dock-pet-rail]').length,
+    reservedWidth: document.documentElement.style.getPropertyValue('--dsh-dock-pet-rail-width'),
+    width: document.querySelector('[data-dsh-dock-settings]').getBoundingClientRect().width,
+    viewport: innerWidth,
+    framedSections: [...document.querySelectorAll('[data-agent-team-card], [data-value-mode-card], [data-relay-onboarding-card], [data-model-preferences-card], [data-dsh-plugin], [data-control-kind], [class*="controlHero"], [data-value-mode-card] [class*="modelRow"], [data-value-mode-card] [class*="strategyGroup"]')]
+      .filter(element => element.getClientRects().length > 0)
+      .filter(element => ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']
+        .some(property => Number.parseFloat(getComputedStyle(element)[property]) > 0))
+      .map(element => element.className),
+  }))
+  assert.equal(geometry.pets, 0, 'dedicated Dock documents do not mount the floating pet')
+  assert.equal(geometry.summons, 0, 'dedicated Dock documents do not mount a pet summon control')
+  assert.equal(geometry.rails, 0, 'dedicated Dock documents do not reserve a pet rail')
+  assert.equal(geometry.reservedWidth, '')
+  assert.ok(Math.abs(geometry.width - geometry.viewport) <= 1, JSON.stringify(geometry))
+  assert.deepEqual(geometry.framedSections, [], 'Dock chapters and model rows use whitespace rather than frames')
+  const boundary = await dock.locator('.settings-sidebar').evaluate(element => ({
+    right: element.getBoundingClientRect().right,
+    searchRight: document.querySelector('#dock-search').getBoundingClientRect().right,
+  }))
+  const viewBounds = await (await app.browserWindow(dock)).evaluate(window => window.contentView.children
+    .find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getBounds())
+  assert.ok(viewBounds && Math.abs(viewBounds.x - boundary.right) <= 1, 'runtime child view aligns with, rather than crops, the sidebar')
+  assert.ok(boundary.searchRight <= viewBounds.x, 'the complete search control stays outside the child view')
+  const strategies = await settings.locator('[data-value-mode-card] button[aria-pressed]').evaluateAll(buttons => buttons.map(button => ({
+    selected: button.getAttribute('aria-pressed') === 'true',
+    weight: Number(getComputedStyle(button.querySelector('[class*="strategyTitle"]')).fontWeight),
+    background: getComputedStyle(button).backgroundColor,
+  })))
+  if (strategies.length) {
+    assert.equal(strategies.length, 3)
+    assert.equal(strategies.filter(strategy => strategy.selected).length, 1)
+    const selected = strategies.find(strategy => strategy.selected)
+    assert.ok(strategies.filter(strategy => !strategy.selected).every(strategy => selected.weight > strategy.weight
+      && selected.background !== strategy.background), 'current strategy has an actual title-weight and neutral fill distinction')
+  }
+}
+
 async function applyDockSettingsTheme(page, theme) {
-  const applied = await dock.evaluate(expectedTheme => window.dshDesktop.setWindowChromeTheme(expectedTheme), theme)
+  const applied = await dock.evaluate(expectedTheme => window.dshDesktop.setWindowChromeTheme(expectedTheme, null), theme)
   assert.equal(applied, theme, 'Dock theme changes use the production window bridge')
   await page.waitForFunction(expectedTheme =>
     document.querySelector('[data-dsh-dock-settings]')?.getAttribute('data-theme') === expectedTheme,
   theme, { polling: 250, timeout: 60_000 })
+}
+
+async function selectDockTheme(main, theme) {
+  await main.bringToFront()
+  await dismissRuntimeOnboarding(main)
+  await main.getByRole('button', { name: '账号菜单', exact: true }).click()
+  await main.getByRole('menuitem', { name: /^设置/u }).click()
+  const dialog = main.locator('[role="dialog"].dsh-desktop-settings-window:visible').last()
+  await dialog.getByRole('button', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click()
+  await main.waitForFunction(expected => document.body.hasAttribute('data-ds-dark-theme') === (expected === 'dark'), theme)
+  await main.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'hidden' })
+  await dock.bringToFront()
+}
+
+async function captureDockSnapshot(name, expectedTheme) {
+  const hostImage = await dock.screenshot()
+  const contentImage = await settings.screenshot()
+  const hostMeta = await sharp(hostImage).metadata()
+  const width = await dock.evaluate(() => innerWidth)
+  const viewBounds = await (await app.browserWindow(dock)).evaluate(window => window.contentView.children.find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getBounds())
+  assert.ok(viewBounds, 'runtime child view has visible bounds')
+  const diagnostic = await sharp(hostImage).composite([{ input: contentImage, left: Math.round(viewBounds.x * hostMeta.width / width), top: Math.round(viewBounds.y * hostMeta.width / width) }]).png().toBuffer()
+  await writeFile(resolve(output, name.replace(/\.png$/u, '-diagnostic.png')), diagnostic)
+  let bitmap = diagnostic
+  let evidence = { mode: 'independent-web-contents-diagnostic', platform: process.platform }
+  if (process.platform === 'win32') {
+    const windowState = await (await app.browserWindow(dock)).evaluate(window => {
+      if (!window.isVisible() || window.isMinimized()) throw new Error('Native Dock capture requires a visible restored window')
+      const view = window.contentView.children.find(view => view.webContents?.getURL().includes('desktop-dock-setting='))
+      if (!view?.getVisible()) throw new Error('Native Dock capture requires its real settings child view to be visible')
+      window.focus()
+      return { id: window.getMediaSourceId(), bounds: window.getBounds() }
+    })
+    const expectedColor = expectedTheme === 'dark' ? [10, 20, 27] : [255, 255, 255]
+    assert.equal(await settings.locator('[data-dsh-dock-settings]').getAttribute('data-theme'), expectedTheme)
+    const deadline = Date.now() + 5_000
+    let sampledColor
+    do {
+      const capture = await app.evaluate(async ({ desktopCapturer, screen }, state) => {
+        const scale = screen.getDisplayMatching(state.bounds).scaleFactor
+        const sources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false,
+          thumbnailSize: { width: Math.round(state.bounds.width * scale), height: Math.round(state.bounds.height * scale) } })
+        const source = sources.find(source => source.id === state.id)
+        if (!source || source.thumbnail.isEmpty()) throw new Error('Native Dock window capture is unavailable')
+        return { id: source.id, size: source.thumbnail.getSize(), png: source.thumbnail.toPNG().toString('base64') }
+      }, windowState)
+      assert.equal(capture.id, windowState.id)
+      assert.ok(capture.size.width > 0 && capture.size.height > 0)
+      bitmap = Buffer.from(capture.png, 'base64')
+      sampledColor = [...await sharp(bitmap).extract({
+        left: Math.round((viewBounds.x + 20) * capture.size.width / windowState.bounds.width),
+        top: Math.round((viewBounds.y + 10) * capture.size.height / windowState.bounds.height),
+        width: 1, height: 1,
+      }).removeAlpha().raw().toBuffer()]
+      if (sampledColor.every((channel, index) => channel === expectedColor[index])) break
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } while (Date.now() < deadline)
+    assert.deepEqual(sampledColor, expectedColor, 'native Dock capture contains the current theme, not a stale compositor frame')
+    evidence = { mode: 'native-window-desktop-capturer', platform: process.platform, expectedTheme, expectedColor, sampledColor }
+  }
+  await writeFile(resolve(output, name), bitmap)
+  await writeFile(resolve(output, name.replace(/\.png$/u, '-capture.json')), JSON.stringify(evidence, null, 2))
 }
 try {
   await mkdir(output, { recursive: true })
@@ -120,6 +227,7 @@ try {
     assert.ok(settings, 'runtime settings view exists')
     await settings.locator(`[data-dsh-dock-settings="${id}"]`).waitFor({ timeout: 60_000 })
     await settings.locator(`[data-dsh-dock-settings] > section:not([hidden]) ${selector}`).first().waitFor({ timeout: 20_000 })
+    await assertPetFreeSettings()
     const openingTheme = await dock.evaluate(() => document.documentElement.dataset.dshDesktopTheme)
     assert.equal(await settings.locator('[data-dsh-dock-settings]').getAttribute('data-theme'), openingTheme, 'Dock and form use the same opening theme')
     const horizontalOverflow = await settings.evaluate(() => document.documentElement.scrollWidth > innerWidth)
@@ -147,12 +255,12 @@ try {
       await agentShellPermission.waitFor({ state: 'visible' })
       assert.equal(await agentShellPermission.inputValue(), 'ask', 'Agent WSL defaults to per-command approval')
       await agentShellPermission.selectOption('off')
-      await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'off')
+      await waitForAsyncPageFunction(settings, async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'off')
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'off')
       assert.equal(await agentShellPermission.inputValue(), 'off', 'Agent WSL can be disabled by the user')
       assert.deepEqual(JSON.parse(await readFile(resolve(temporary, 'dsh-home/desktop-agent-shell.json'), 'utf8')), { version: 1, mode: 'off' }, 'disabled Agent WSL permission is persisted on disk')
       await agentShellPermission.selectOption('ask')
-      await settings.waitForFunction(async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'ask')
+      await waitForAsyncPageFunction(settings, async () => (await window.dshDockSettings.getAgentShellPolicy()).mode === 'ask')
       await settings.waitForFunction(() => document.querySelector('[data-control-kind="agent-shell"] select')?.value === 'ask')
       assert.equal(await agentShellPermission.inputValue(), 'ask', 'Agent WSL permission can return to approval mode')
       assert.deepEqual(JSON.parse(await readFile(resolve(temporary, 'dsh-home/desktop-agent-shell.json'), 'utf8')), { version: 1, mode: 'ask' }, 'restored Agent WSL approval is persisted on disk')
@@ -181,7 +289,14 @@ try {
       assert.equal(await computerSwitch.isEnabled(), true, 'Computer Use remains interactive after a full restart cycle')
     }
     if (id === 'models') {
+      const connectionDetails = settings.locator('[data-dock-connection-details]')
+      assert.equal(await connectionDetails.getAttribute('open'), null)
+      await connectionDetails.locator('summary').focus()
+      await settings.keyboard.press('Enter')
+      await settings.locator('[data-dock-connection-details][open]').waitFor()
       await settings.getByText('bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。').waitFor()
+      await connectionDetails.locator('summary').click()
+      assert.equal(await connectionDetails.getAttribute('open'), null)
       const relay = settings.locator('[data-relay-onboarding-card]')
       assert.equal(await relay.count(), 1, 'combined model page renders one bai onboarding card')
       const preferences = settings.locator('[data-model-preferences-card]')
@@ -294,6 +409,18 @@ try {
   assert.equal(await memory.locator('[data-memory-activity]').getAttribute('open'), null, 'memory context panel closes with Escape in Dock settings')
   await dock.locator('#value-mode-tab').click()
   await settings.locator('[data-dsh-dock-settings="value-mode"]').waitFor()
+  const explanation = settings.locator('[data-dock-page-details]')
+  assert.equal(await explanation.getAttribute('open'), null)
+  await explanation.locator('summary').focus()
+  await settings.keyboard.press('Enter')
+  await settings.locator('[data-dock-page-details][open]').waitFor()
+  await explanation.getByText('复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。', { exact: true }).waitFor()
+  await settings.keyboard.press('Space')
+  assert.equal(await explanation.getAttribute('open'), null)
+  assert.equal(await settings.getByRole('heading', { name: '模型协作', exact: true }).count(), 1)
+  await settings.locator('[data-value-mode-details] > summary').click()
+  await settings.locator('[data-value-mode-details][open]').waitFor()
+  await settings.locator('[data-value-mode-details] > summary').click()
   await settings.getByRole('button', { name: '更换专家主控模型', exact: true }).click()
   await settings.locator('[data-value-mode-model-picker="true"]').waitFor()
   await settings.keyboard.press('Escape')
@@ -311,8 +438,9 @@ try {
   const disabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
   assert.equal(disabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'), false)
   for (const theme of ['dark', 'light']) {
+    await selectDockTheme(main, theme)
     const appliedTheme = await dock.evaluate(async theme => {
-      const applied = await window.dshDesktop.setWindowChromeTheme(theme)
+      const applied = await window.dshDesktop.setWindowChromeTheme(theme, null)
       document.documentElement.dataset.dshDesktopTheme = theme
       return {
         applied,
@@ -320,18 +448,54 @@ try {
       }
     }, theme)
     assert.deepEqual(appliedTheme, { applied: theme, documentTheme: theme }, 'Dock theme bridge and document update atomically')
+    await dock.waitForFunction(expectedColor => getComputedStyle(document.body).backgroundColor === expectedColor,
+      theme === 'dark' ? 'rgb(10, 20, 27)' : 'rgb(255, 255, 255)')
     const shellColor = await dock.evaluate(() => getComputedStyle(document.body).backgroundColor)
     assert.equal(shellColor, theme === 'dark' ? 'rgb(10, 20, 27)' : 'rgb(255, 255, 255)', 'Dock shell background follows its window theme')
     await applyDockSettingsTheme(settings, theme)
     assert.equal(await settings.evaluate(() => document.body.hasAttribute('data-ds-dark-theme')), theme === 'dark', 'native settings overlays follow the Dock theme')
     const color = await settings.evaluate(() => getComputedStyle(document.querySelector('[data-dsh-dock-settings]')).backgroundColor)
     assert.equal(color, theme === 'dark' ? 'rgb(10, 20, 27)' : 'rgb(255, 255, 255)', 'content follows the Dock theme in real Electron')
+    await captureDockSnapshot(`dock-${theme}.png`, theme)
   }
   await applyDockSettingsTheme(settings, 'light')
   await settings.screenshot({ path: resolve(output, 'value-mode-light.png') })
   await (await app.browserWindow(dock)).evaluate(window => window.setSize(680, 480))
   await settings.waitForFunction(() => innerWidth < 600, undefined, { polling: 100, timeout: 60_000 })
   assert.equal(await settings.evaluate(() => document.querySelector('[data-dsh-dock-settings]').scrollWidth > innerWidth), false, 'narrow settings pane does not overflow')
+  await assertPetFreeSettings()
+  const assertReachable = async control => {
+    await control.evaluate(element => element.scrollIntoView({ block: 'center' }))
+    assert.ok(await control.evaluate(element => {
+      const bounds = element.getBoundingClientRect()
+      const target = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+      return target === element || element.contains(target)
+    }), 'narrow layout keeps each model, strategy and advanced control reachable without a covering footer')
+  }
+  const advanced = settings.getByRole('button', { name: '高级设置与成本护栏', exact: true })
+  for (const control of [
+    settings.getByRole('button', { name: '更换专家主控模型', exact: true }),
+    settings.getByRole('button', { name: '更换副模型子代理执行模型', exact: true }),
+    settings.locator('[data-value-mode-card] button[aria-pressed="true"]'),
+    settings.locator('[data-value-mode-details] > summary'),
+    advanced,
+  ]) {
+    await assertReachable(control)
+  }
+  await advanced.click()
+  assert.equal(await advanced.getAttribute('aria-expanded'), 'true')
+  for (const name of ['主控最大输出 Token', '主控上下文最大字符数', '子代理最大深度', '连续失败升级阈值', '每轮最大专家调用数']) {
+    const field = settings.getByRole('spinbutton', { name, exact: true })
+    await assertReachable(field)
+    await field.focus()
+    assert.equal(await field.evaluate(element => document.activeElement === element), true)
+  }
+  for (const name of ['重要改动完成后保留主控复核', '显式显示主控与子代理活动']) {
+    await assertReachable(settings.getByRole('checkbox', { name, exact: true }))
+  }
+  await advanced.click()
+  assert.equal(await advanced.getAttribute('aria-expanded'), 'false')
+  await settings.evaluate(() => document.querySelector('[data-dsh-dock-settings]').scrollTo(0, 0))
   await settings.screenshot({ path: resolve(output, 'value-mode-narrow.png') })
   await dock.locator('#plugins-hub-tab').click()
   await dock.locator('#install-plugin > summary').click()
@@ -351,8 +515,15 @@ try {
   ], 'the combined model destination and all unique destinations remain available in order')
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('#plugin-settings').waitFor({ state: 'visible' })
+  assert.ok(await dock.locator('#plugin-settings .setting-row').evaluateAll(rows => rows.length > 0
+    && rows.every(row => getComputedStyle(row).borderBottomWidth === '0px')))
+  assert.deepEqual(await dock.locator('#plugin-update-summary').evaluate(element => {
+    const style = getComputedStyle(element)
+    return { border: style.borderTopWidth, background: style.backgroundColor }
+  }), { border: '0px', background: 'rgba(0, 0, 0, 0)' }, 'update summary retains its actions without a chapter frame')
   await dock.locator('#plugin-developer-mode').check()
   await dock.locator('#plugin-developer-tools').waitFor({ state: 'visible' })
+  assert.equal(await dock.locator('#plugin-developer-tools').evaluate(element => getComputedStyle(element).borderTopWidth), '0px')
   await dock.locator('#developer-copy-environment').click()
   await dock.locator('#toast').waitFor({ state: 'visible' })
   assert.equal((await dock.locator('#toast').textContent())?.trim(), '环境信息已复制')
@@ -367,6 +538,7 @@ try {
     await nativeCatalog.locator(':scope > summary').click()
   }
   assert.equal(await nativeCatalog.evaluate(element => element.open), true)
+  assert.equal(await nativeCatalog.evaluate(element => getComputedStyle(element).borderTopWidth), '0px')
   await dock.locator('#native-plugin-grid').waitFor()
   await dock.locator('#qqbot-tab').click()
   await dock.locator('#qqbot-bind').waitFor()
@@ -388,18 +560,11 @@ try {
   assert.equal(await memory.getByRole('listitem').filter({ hasText: 'Dock memory verification.' }).count(), 1)
   await (await app.browserWindow(dock)).evaluate(window => window.setSize(960, 680))
   ;({ settings } = await openDockSetting(app, main, 'value-mode'))
+  await selectDockTheme(main, 'dark')
   await applyDockSettingsTheme(settings, 'dark')
   await dock.evaluate(() => { document.documentElement.dataset.dshDesktopTheme = 'dark' })
   await settings.evaluate(() => { document.querySelector('[data-dsh-dock-settings]').scrollTop = 0 })
-  const hostImage = await dock.screenshot()
-  const contentImage = await settings.screenshot()
-  const hostMeta = await sharp(hostImage).metadata()
-  const width = await dock.evaluate(() => innerWidth)
-  const viewBounds = await (await app.browserWindow(dock)).evaluate(window => window.contentView.children.find(view => view.webContents?.getURL().includes('desktop-dock-setting='))?.getBounds())
-  assert.ok(viewBounds, 'runtime child view has visible bounds')
-  // Assemble the two independently captured web contents at their native bounds.
-  // Playwright's page screenshot omits Electron child views.
-  await sharp(hostImage).composite([{ input: contentImage, left: Math.round(viewBounds.x * hostMeta.width / width), top: Math.round(viewBounds.y * hostMeta.width / width) }]).toFile(resolve(output, 'dock-final.png'))
+  await captureDockSnapshot('dock-final.png', 'dark')
   assert.equal(await settings.evaluate(() => getComputedStyle(document.querySelector('[data-dsh-dock-settings]')).backgroundColor), 'rgb(10, 20, 27)')
   assert.ok(await dock.evaluate(() => document.querySelector('.settings-sidebar').scrollHeight <= document.querySelector('.settings-sidebar').clientHeight + 2), 'default sidebar fits without scrolling')
   const primaryAction = settings.getByRole('button', { name: '选择执行模型', exact: true })
@@ -418,7 +583,35 @@ try {
   assert.equal(await app.evaluate(() => globalThis.dockClosePrompts), 1)
   assert.equal(dock.isClosed(), false)
   assert.equal(await memory.locator('textarea').inputValue(), 'Unsaved close guard verification.')
+  await assertPetFreeSettings()
   await memory.getByRole('button', { name: '取消编辑', exact: true }).click()
+  await main.bringToFront()
+  await dismissRuntimeOnboarding(main)
+  await main.locator('[data-dsh-pet-root] [role="button"]').hover()
+  const petPanel = main.locator('[data-dsh-pet-root] [data-placement]')
+  await petPanel.getByRole('button', { name: '改名', exact: true }).click()
+  const rename = petPanel.locator('input')
+  await rename.fill('验收宠物')
+  await rename.press('Escape')
+  await petPanel.getByRole('button', { name: '喂食', exact: true }).waitFor({ state: 'visible' })
+  await petPanel.getByRole('button', { name: '隐藏', exact: true }).click()
+  const summon = main.locator('[data-dsh-pet-root] [data-dsh-part="summon-button"]')
+  await summon.waitFor({ state: 'visible' })
+  await assertPetFreeSettings()
+  await summon.click()
+  await main.locator('[data-dsh-pet-root] [role="button"]').waitFor({ state: 'visible' })
+  await dock.bringToFront()
+  const railDock = await app.browserWindow(dock)
+  const beforeRailResize = await railDock.evaluate(window => window.getBounds())
+  await railDock.evaluate(window => window.setSize(680, 680))
+  await settings.waitForFunction(() => innerWidth < 600)
+  await assertPetFreeSettings()
+  const narrowForm = await settings.locator('[data-dsh-dock-settings]').boundingBox()
+  assert.ok(narrowForm.width >= 300, 'minimum Dock width retains a readable settings column')
+  await memory.getByRole('button', { name: '新建', exact: true }).click()
+  await memory.locator('textarea').fill('Minimum width full-form acceptance.')
+  await memory.getByRole('button', { name: '取消编辑', exact: true }).click()
+  await railDock.evaluate((window, bounds) => window.setBounds(bounds), beforeRailResize)
   await app.evaluate(({ dialog }) => { dialog.showMessageBox = globalThis.dockOriginalMessageBox })
   const nativeDock = await app.browserWindow(dock)
   if (process.platform === 'win32') assert.equal(await nativeDock.evaluate(window => window.getParentWindow()), null, 'Windows Dock is a normal taskbar window')
@@ -442,6 +635,24 @@ try {
   for (let attempt = 0; attempt < 60 && !dock.isClosed(); attempt++) await new Promise(resolve => setTimeout(resolve, 50))
   assert.equal(dock.isClosed(), true, 'clean Dock closes directly without a confirmation')
   assert.equal(main.isClosed(), false, 'closing Dock never closes the main chat')
+  console.log('Main pet after independent Dock close:', JSON.stringify(await main.evaluate(() => ({
+    visibility: document.visibilityState,
+    roots: document.querySelectorAll('[data-dsh-pet-root]').length,
+    summon: document.querySelectorAll('[data-dsh-part="summon-button"]').length,
+  }))))
+  assert.equal(await main.locator('[data-dsh-pet-root]').count(), 1, 'closing Dock retains the main conversation pet root')
+  await main.bringToFront()
+  await main.locator('[data-dsh-pet-root] [role="button"]').waitFor({ state: 'visible' })
+  assert.equal(await main.locator('[data-dsh-pet-root] [role="button"]').isVisible(), true, 'closing Dock leaves the main conversation companion available')
+  await main.screenshot({ path: resolve(output, 'main-pet-preserved.png') })
+  ;({ dock, settings } = await openDockSetting(app, main, 'value-mode'))
+  await assertPetFreeSettings()
+  await (await app.browserWindow(dock)).evaluate(window => window.close())
+  for (let attempt = 0; attempt < 60 && !dock.isClosed(); attempt++) await new Promise(resolve => setTimeout(resolve, 50))
+  assert.equal(dock.isClosed(), true, 'a reopened pet-free Dock still closes normally')
+  await main.bringToFront()
+  await main.locator('[data-dsh-pet-root] [role="button"]').waitFor({ state: 'visible' })
+  assert.equal(await main.locator('[data-dsh-pet-root] [role="button"]').isVisible(), true, 'reopening Dock does not disable the main companion')
   assert.deepEqual(errors, [])
   assert.equal(await main.locator('[data-memory-activity]').count(), 0, 'main conversation has no memory entry')
   console.log(`Dock settings: seven working pages, preserved management entry, centered bounds; screenshots ${process.env.DSH_DESKTOP_DOCK_SCREENSHOTS ? `saved to ${output}` : 'validated'}`)

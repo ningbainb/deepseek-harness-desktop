@@ -7,10 +7,10 @@ import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
 import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
 
-export const DOCK_SETTINGS = ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options'] as const
+export const DOCK_SETTINGS = ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
-export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions' } as const
+export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions', 'skill-market': 'agent-plugin-workspace' } as const
 function sectionFor(id: DockSetting): string | undefined { return DOCK_SECTIONS[id as keyof typeof DOCK_SECTIONS] }
 
 export function isDockSetting(value: unknown): value is DockSetting {
@@ -113,7 +113,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     return () => observer.disconnect()
   }, [selected])
   const personal = selected === 'personal-prompt' || selected === 'memory'
-  const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions', 'plugin-options': 'dockPluginOptions' } as const
+  const sectionTitles = { appearance: 'dockSkins', models: 'dockModelCapabilities', usage: 'dockUsage', sessions: 'dockSessions', 'plugin-options': 'dockPluginOptions', 'skill-market': 'dockSkillMarket' } as const
   const sectionTitle = sectionTitles[selected as keyof typeof sectionTitles]
   const paletteStyle = palette ? {
     '--dsw-alias-bg-layer-1': palette.background, '--dsw-alias-bg-layer-2': palette.background, '--dsw-alias-bg-layer-3': palette.background,
@@ -121,7 +121,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
   } as CSSProperties : undefined
   return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')} / {selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (personal ? 'dockPersonal' : selected === 'value-mode' ? 'dockCollaboration' : selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</p>
+    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')}{!personal && selected !== 'value-mode' && <> / {selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</>}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -136,13 +136,17 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     </>}
     {selected === 'value-mode' && <div className={css.collaborationIntro}>
       <h1 className={css.heading}>{t('dockCollaboration')}</h1>
-      <p>Agent Team 负责多角色协作，性价比模式负责模型分工与成本控制；两者可独立开启，也可同时使用。</p>
+      <details className={css.disclosure} data-dock-page-details>
+        <summary>{t('dockDetails')}</summary>
+        <p>Agent Team 负责多角色协作，性价比模式负责模型分工与成本控制；两者可独立开启，也可同时使用。</p>
+        <p>复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。</p>
+      </details>
     </div>}
-    {selected === 'models' && <p className={css.modelDiscoveryHint}>bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。</p>}
+    {selected === 'models' && <details className={css.modelDiscoveryHint} data-dock-connection-details><summary>{t('dockConnectionDetails')}</summary><p>bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。</p></details>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
         {id === 'control-center' && <ControlCenterSettingsCard />}
-        {id === 'value-mode' && <AgentTeamSettingsCard />}
+        {id === 'value-mode' && <AgentTeamSettingsCard detailsLabel={t('dockDetails')} cautionLabel={t('dockAgentTeamCaution')} />}
         {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'control-center' ? null : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
             {id === 'appearance'
@@ -150,7 +154,6 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
               : renderSlot('settings.section', { close: () => {} }, { only: sectionFor(id), fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}</>
           : renderSlot('web-ui.plugin.item', {}, { only: id, fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
       </SafePluginBoundary>
-      {id === 'value-mode' && <aside className={css.collaborationAdvice}><strong>使用建议</strong><span>复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。</span></aside>}
     </section>)}
   </main>
 }

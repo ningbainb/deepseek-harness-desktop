@@ -22,7 +22,9 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { ConfigForm as SettingsScope, ConfigFormSnapshot as SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm as SettingsScope, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+
+export type SettingsScopeSnapshot<T> = ConfigFormSnapshot<T> & { mode?: 'host' }
 type SettingsScopeSpec<T> = { namespace: string; decode?: (section: unknown) => T | undefined }
 import { WEB_UI_SETTINGS_BRIDGE_PREFIX } from '../protocol.ts'
 import type { BridgeDescribeResult, BridgeMutateRequest, BridgeMutateResult } from '../protocol.ts'

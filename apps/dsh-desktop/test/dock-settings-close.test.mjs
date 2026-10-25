@@ -131,6 +131,7 @@ function navigationFixture() {
       loadURL: () => { state.loads++; return state.load() },
       executeJavaScript: script => state.inspect(script),
     })
+    constructor() { state.contents = this.webContents }
     setVisible(value) { state.visible.push(value) }
     setBounds() {}
   }
@@ -139,6 +140,18 @@ function navigationFixture() {
     dialog: { showMessageBox: async () => { state.prompts++; return { response: state.response } } } })
   return { control, state }
 }
+
+test('dedicated settings documents install the shared pet control clearance on every completed load', async () => {
+  const { control, state } = navigationFixture()
+  const scripts = []
+  state.inspect = async script => { scripts.push(script); return true }
+  await control.select('memory')
+  for (let load = 0; load < 2; load++) {
+    state.contents.emit('did-finish-load')
+    await setImmediate()
+  }
+  assert.equal(scripts.filter(script => script.includes('globalThis.dshPetControlClearance')).length, 2)
+})
 
 test('warm Dock tabs reuse one document without hiding the form; explicit non-settings navigation still hides it', async () => {
   const { control, state } = navigationFixture()
@@ -162,6 +175,26 @@ test('a restarted runtime refreshes the plugin roster even when its URL is uncha
   assert.equal(state.prompts, 0)
   await control.select('memory')
   assert.equal(state.loads, 2)
+})
+
+test('a restart replaces a never-presented canceled settings load without inspecting its unavailable renderer', async () => {
+  const { control, state } = navigationFixture()
+  state.load = () => new Promise(() => {})
+  const previous = control.select('value-mode')
+  await control.select(null)
+  assert.equal(state.visible.includes(true), false)
+  state.generation++
+  state.load = async () => {}
+  const inspect = state.inspect
+  state.inspect = async script => {
+    assert.equal(script.startsWith('Boolean('), false, 'an unpresented document has no user-editable draft')
+    return inspect(script)
+  }
+  await control.select('skill-market')
+  assert.equal(state.loads, 2)
+  assert.equal(state.visible.at(-1), true)
+  assert.equal(state.prompts, 0)
+  await assert.doesNotReject(previous)
 })
 
 test('return to editing protects a dirty warm document across repeated runtime refresh attempts', async () => {

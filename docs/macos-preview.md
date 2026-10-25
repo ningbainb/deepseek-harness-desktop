@@ -5,6 +5,7 @@ This page covers installing the unsigned contributor preview of **DeepSeek Harne
 ## Scope and limits
 
 - Apple Silicon (arm64) only. Intel Macs are not supported; Rosetta cannot run an arm64 build.
+- The 5.1.0 candidate requires **macOS 13 Ventura or later**, because [Electron 44 removes macOS 12 support](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support). This is a compatibility floor, not evidence that every supported macOS version was tested. 5.1.0 native macOS gates are still required; the published 5.0.1 release is separate historical evidence.
 - This is an unsigned preview, not a stable distribution, and it is not on the Mac App Store.
 - macOS uses the system Git. MinGit is not bundled. If `git --version` fails, install Xcode Command Line Tools with `xcode-select --install`.
 - Preview builds have no in-app auto-update. **Help > Check for Updates** explains this. Download the matching version from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases). A three-platform release includes macOS Preview assets alongside Windows and Linux; the release being marked Latest does not make the macOS package a stable or signed build.

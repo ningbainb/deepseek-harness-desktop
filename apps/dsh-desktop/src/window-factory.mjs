@@ -299,6 +299,7 @@ export function createDesktopWindowFactory({
         onWebContentsCreated: contents => dockSettingsWebContents.add(contents),
         onWebContentsDisposed: contents => dockSettingsWebContents.delete(contents),
         openExternal: url => shell.openExternal(url),
+        onError: error => report('dock-control-clearance', error),
       })
       browserWindow.once('closed', () => { dockSettings = undefined })
     }

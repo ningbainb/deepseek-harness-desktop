@@ -67,9 +67,9 @@ function makeSettingsScope(initial, mutate) {
   }
 }
 
-function setup(t) {
+function setup(t, options = {}) {
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
-  const dom = new JSDOM('<html><head></head><body></body></html>', { url: 'http://127.0.0.1/' })
+  const dom = new JSDOM('<html><head></head><body></body></html>', { url: `http://127.0.0.1/${options.search ?? ''}` })
   const { window } = dom
   Object.assign(window, { setTimeout, clearTimeout, setInterval, clearInterval })
   let visibility = 'visible', enabled = true, exported
@@ -114,15 +114,15 @@ function setup(t) {
     return dispose
   }
   const scope = {
-    getSnapshot: () => ({ status: 'ready', writable: true, value: { enabled }, base: {}, user: {} }),
+    getSnapshot: () => ({ status: 'ready', writable: true, value: { enabled, visible: options.visible ?? true }, base: {}, user: {} }),
     subscribe: callback => { subscriptions.add(callback); return () => subscriptions.delete(callback) },
-    set: async () => {}, unset: async () => {},
+    set: async (...args) => { writes.push(args) }, unset: async (...args) => { writes.push(args) },
   }
-  const opened = []
+  const opened = [], registered = [], writes = []
   const ctx = {
     effect: registerDispose, get: () => undefined, settingsScope: { bind: () => scope },
     configForms: { get: () => scope, describe: () => ({ getSnapshot: () => ({ view: { namespaces: [] } }) }) },
-    slots: { inject: (_name, callback) => registerDispose(callback), register: () => () => {} },
+    slots: { inject: (_name, callback) => registerDispose(callback), register: entry => { registered.push(entry); return () => {} } },
     locale: { register: () => () => {}, bind: () => value => value },
     sessions: { list: { getSnapshot: () => ({ byId: { 'existing-session': {} } }), subscribe: () => () => {} } },
     uiWorkspace: { openSession: id => opened.push(id) },
@@ -130,9 +130,31 @@ function setup(t) {
   exported.apply(ctx)
   const dispose = () => { for (const cleanup of [...disposers].reverse()) cleanup() }
   t.after(() => { dispose(); dom.window.close() })
-  return { requests, roots, stores, subscriptions, opened, dispose,
+  return { requests, roots, stores, subscriptions, opened, registered, writes, dispose,
     setEnabled(value) { enabled = value; for (const callback of [...subscriptions]) callback() },
     setVisible(value) { visibility = value ? 'visible' : 'hidden'; window.document.dispatchEvent(new window.Event('visibilitychange')) },
+  }
+}
+
+for (const setting of ['value-mode', 'models', 'memory', 'skill-market', 'plugin-options']) {
+  for (const visible of [true, false]) {
+    test(`installed Desktop pet does not mount or poll in ${setting} with visible=${visible}, preserving its settings section`, async t => {
+      const state = setup(t, { search: `?desktop-dock-setting=${setting}`, visible })
+      state.setEnabled(false)
+      state.setEnabled(true)
+      state.setVisible(false)
+      state.setVisible(true)
+      t.mock.timers.tick(4000)
+      await flush()
+      assert.equal(state.registered.filter(entry => entry.id === 'pet').length, 1)
+      assert.equal(state.roots.length, 0)
+      assert.equal(state.stores.length, 0)
+      assert.equal(pollStateRequests(state.requests).length, 0)
+      const registryReads = state.requests.filter(request => request.path === '/api/pet/pets')
+      assert.equal(registryReads.filter(request => request.signal).length, 0, 'the floating registry poller never starts')
+      assert.equal(registryReads.length, 1, 'the preserved configuration card retains its single registry-options read')
+      assert.deepEqual(state.writes, [])
+    })
   }
 }
 

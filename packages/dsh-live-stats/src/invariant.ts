@@ -5,7 +5,6 @@
 
 /* jscpd:ignore-start */
 import type { Context } from '@deepseek-ai/cordis'
-import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
 const PACKAGE_NAME = '@linxin666/dsh-live-stats'
 
@@ -23,7 +22,7 @@ export const inject = ['invariants']
  * the earlier chunk estimate mid-step, and estimator constants are validated
  * synchronously at config resolution.
  */
-const install: InvariantInstaller = () => {}
+const install = () => {}
 
 /**
  * Register this package's invariant companion.
@@ -31,5 +30,7 @@ const install: InvariantInstaller = () => {}
  * @returns the installed registration's disposer after setup succeeds.
  */
 export const apply = (ctx: Context): Promise<() => void> =>
-  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
+  Promise.resolve((ctx as Context & {
+    invariants: { register(packageName: string, installer: typeof install): () => void }
+  }).invariants.register(PACKAGE_NAME, install))
 /* jscpd:ignore-end */

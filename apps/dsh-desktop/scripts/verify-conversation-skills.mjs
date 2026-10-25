@@ -187,10 +187,50 @@ try {
   await skillsButton.click()
   await page.evaluate(() => {
     globalThis.__skillNavigationEvents = []
+    const identities = new WeakMap()
+    let serial = 0
+    const identify = node => {
+      if (!node) return null
+      if (!identities.has(node)) identities.set(node, ++serial)
+      return { id: identities.get(node), connected: node.isConnected }
+    }
+    const record = (type, previous) => {
+      const button = document.querySelector('#dsh-desktop-skills-button')
+        ?? [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === '技能库')
+      globalThis.__skillNavigationEvents.push({ type, at: performance.now(), previous,
+        selected: document.querySelector('[data-row-key^="session:"][aria-selected="true"]')?.getAttribute('data-row-key'),
+        composer: identify(document.querySelector('[data-composer-card="true"]')),
+        editor: identify(document.querySelector('[data-composer-card="true"] [contenteditable="true"]')),
+        button: identify(button), expanded: button?.getAttribute('aria-expanded'),
+        hidden: document.querySelector('#dsh-desktop-skills-menu')?.hidden,
+      })
+      if (globalThis.__skillNavigationEvents.length > 500) globalThis.__skillNavigationEvents.shift()
+    }
     for (const type of ['pointerdown', 'click']) window.addEventListener(type, event => {
       globalThis.__skillNavigationEvents.push({ type, target: event.target?.outerHTML?.slice(0, 350), x: event.clientX, y: event.clientY })
+      record(type)
     }, true)
+    window.addEventListener('focusin', () => record('focusin'), true)
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes') record(mutation.attributeName, mutation.oldValue)
+      }
+      if (mutations.some(mutation => mutation.type === 'childList')) record('childList')
+    })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true,
+      attributeOldValue: true, attributeFilter: ['hidden', 'aria-expanded', 'aria-selected'] })
+    record('start')
   })
+  const sessionTimeline = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/session/create') sessionTimeline.push({ event: 'request', at: performance.now() })
+  })
+  page.on('response', async response => {
+    if (new URL(response.url()).pathname !== '/api/session/create') return
+    const body = await response.json().catch(() => undefined)
+    sessionTimeline.push({ event: 'response', at: performance.now(), ok: body?.result?.ok, sessionId: body?.result?.value?.sessionId })
+  })
+  globalThis.skillSessionTimeline = sessionTimeline
   await page.getByRole('button', { name: /^(?:新建会话|New session)$/u }).filter({ hasText: /新会话|New Session/u }).click()
   await menu.waitFor({ state: 'hidden' })
   assert.equal(await skillsButton.getAttribute('aria-expanded'), 'false')
@@ -236,7 +276,7 @@ try {
   console.log(`verified conversation Skills menu at ${page.url()}`)
   verified = true
 } catch (error) {
-  if (page) await page.screenshot({ path: screenshot ?? resolve(temporary, 'failure.png') }).catch(() => {})
+  console.error('Skills failure time', JSON.stringify({ at: performance.now(), sessionTimeline: globalThis.skillSessionTimeline }))
   const diagnostics = page ? await page.evaluate(() => ({
     url: location.href,
     buttons: [...document.querySelectorAll('button')].map((button) => ({
@@ -264,6 +304,7 @@ try {
     navigationEvents: globalThis.__skillNavigationEvents,
     focusedElement: document.activeElement?.outerHTML?.slice(0, 500),
   })).catch(() => undefined) : undefined
+  if (page) await page.screenshot({ path: screenshot ?? resolve(temporary, 'failure.png') }).catch(() => {})
   if (diagnostics) console.error(`Conversation Skills evidence: ${JSON.stringify(diagnostics)}`)
   console.error((await readFile(resolve(temporary, 'user-data', 'logs', 'desktop.log'), 'utf8').catch(() => '')).slice(-8_000))
   throw error

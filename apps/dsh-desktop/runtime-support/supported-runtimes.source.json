@@ -1,8 +1,13 @@
 {
   "schemaVersion": 1,
   "status": "supported",
-  "verifiedAt": "2026-09-30",
+  "verifiedAt": "2026-10-23",
   "desktopRange": "current",
   "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
-  "knownIssues": []
+  "knownIssues": [
+    "Local Windows test-package validation only; macOS and Linux native acceptance is pending.",
+    "The preceding 5.0.1 source regression collection recorded one settings-reload timeout; its unchanged isolated retry passed.",
+    "The preceding 5.0.1 Desktop test run recorded one Host request timeout; the unchanged runtime-integration file passed in isolation.",
+    "Clean-account Setup installation, overlay upgrade and rollback are not accepted by this local run."
+  ]
 }

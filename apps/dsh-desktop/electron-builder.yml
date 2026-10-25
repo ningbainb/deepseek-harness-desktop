@@ -84,7 +84,7 @@ mac:
   forceCodeSigning: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
-  minimumSystemVersion: '11.0'
+  minimumSystemVersion: '13.0'
   darkModeSupport: true
   artifactName: DeepSeek-Harness-Desktop-${version}-${arch}.${ext}
   target:

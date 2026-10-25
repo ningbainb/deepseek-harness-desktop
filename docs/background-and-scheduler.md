@@ -8,6 +8,8 @@ The close preference is one of `quit`, `minimize-to-tray`, or `ask`. Closing or 
 
 Update installation, explicit quit, crash recovery, and operating-system shutdown bypass background hiding. A fully exited Desktop application never claims to run scheduled work.
 
+Close-preference changes are serialized through persistence and any required Runtime restart. The read-only `background.pending` flag stays true until the complete transition settles, including queued changes; a saved preference alone does not establish Runtime readiness.
+
 Renderers receive only the read-only `background` summary nested in the existing Runtime Status Contract response. The Tray object, close-preference writer, and Electron objects are never exposed to renderer or plugin code.
 
 ## Durable Host scheduling

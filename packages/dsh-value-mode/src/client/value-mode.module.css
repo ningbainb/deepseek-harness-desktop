@@ -458,7 +458,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
+  right: var(--dsh-dock-pet-rail-width, 0px);
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
   display: flex;

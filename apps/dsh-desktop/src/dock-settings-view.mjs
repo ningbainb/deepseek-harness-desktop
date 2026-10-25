@@ -2,6 +2,7 @@ import { classifyNavigation, installNavigationPolicy } from './navigation-policy
 import { getWindowChromeTheme, getWindowPalette, WINDOW_CHROME_HEIGHT } from './window-chrome.mjs'
 import { publishWindowMotion } from './window-motion.mjs'
 import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
+import { PET_CONTROL_CLEARANCE_SCRIPT } from './pet-control-clearance.mjs'
 
 export { DOCK_SETTING_IDS, assertDockSetting } from './dock-pages.mjs'
 
@@ -62,7 +63,7 @@ export async function saveDockSettingsDrafts({
 
 /** Lazy, unprivileged runtime view. It shares the local user's browser session,
  * but never receives the extension-management preload or an IPC surface grant. */
-export function createDockSettingsView({ WebContentsView, window, mainWindow, getRuntimeOrigin, getRuntimeGeneration = () => undefined, dialog, runtimePreload, onWebContentsCreated = () => {}, onWebContentsDisposed = () => {}, openExternal = () => {}, closeCheckTimeoutMs = 1500, navigationTimeoutMs = 25000 }) {
+export function createDockSettingsView({ WebContentsView, window, mainWindow, getRuntimeOrigin, getRuntimeGeneration = () => undefined, dialog, runtimePreload, onWebContentsCreated = () => {}, onWebContentsDisposed = () => {}, openExternal = () => {}, onError = () => {}, closeCheckTimeoutMs = 1500, navigationTimeoutMs = 25000 }) {
   let view
   let selected = null
   let origin
@@ -119,7 +120,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   const layout = () => {
     if (!view || window.isDestroyed() || window.isMinimized?.()) return
     const [width, height] = window.getContentSize()
-    const sidebar = width <= 900 ? 160 : 176
+    const sidebar = width <= 900 ? 180 : 200
     const bounds = { x: sidebar, y: WINDOW_CHROME_HEIGHT, width: Math.max(1, width - sidebar), height: Math.max(1, height - WINDOW_CHROME_HEIGHT) }
     if (lastBounds && Object.keys(bounds).every(key => bounds[key] === lastBounds[key])) return
     lastBounds = bounds
@@ -140,7 +141,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
     if (!runtimeOrigin) throw new Error('运行时尚未就绪，请启动后重试。')
     const nextGeneration = getRuntimeGeneration()
     const reload = origin !== runtimeOrigin || runtimeGeneration !== nextGeneration
-    if (view && origin !== undefined && reload) {
+    if (view && documentReady && origin !== undefined && reload) {
       let dirty
       try {
         dirty = await inspect('Boolean(document.querySelector(\'[data-dock-dirty="true"]\'))')
@@ -176,6 +177,10 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
       } })
       view.setVisible(false)
       window.contentView.addChildView(view)
+      const contents = view.webContents
+      contents.on('did-finish-load', () => {
+        if (!contents.isDestroyed()) void contents.executeJavaScript(PET_CONTROL_CLEARANCE_SCRIPT).catch(onError)
+      })
       onWebContentsCreated(view.webContents)
       view.setBackgroundColor?.(theme === 'dark' ? '#0a141b' : '#ffffff')
       installNavigationPolicy({ webContents: view.webContents, getRuntimeOrigin, openExternal })

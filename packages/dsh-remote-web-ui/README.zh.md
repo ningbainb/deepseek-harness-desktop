@@ -43,6 +43,10 @@ authority 时，才用 `--trusted-host` 扩展传输层信任列表。
 - 局域网使用的前提是 DSH build 明确允许 all-interface bind；但当前官方 runtime 会在启动阶段拒绝 `0.0.0.0`，因此上面的命令只作为可选现场验证路径，不是本轮交付门槛。默认 `127.0.0.1` 绑定时，面板会显示明确说明而不是死二维码——除非配置了公网 base URL（见下文「通过互联网远程访问」），那会让二维码在无需重新绑定即可从任意位置访问。面板的 mint/stop 端点设计上仅限 loopback：在局域网 URL 打开的桌面浏览器只会看到「配对面板仅限本机使用」横幅——请在 `http://127.0.0.1` 打开面板，让手机使用配对链接。
 - 一键公网隧道（`autoTunnel`）使用 `cloudflared` 依赖。常规安装会由 postinstall 准备二进制；若安装器跳过脚本或运行在只读 ASAR 中，首次运行会下载到 profile-local 的 `$DSH_HOME/runtime-bin/cloudflared`。正常网络下无需用户侧安装、账号或域名——Cloudflare quick tunnel 免费且匿名。
 
+## 安全模型
+
+移动端适配器通过插件持有的官方 SDK Peer 委托已经授权的请求，使用本机所有者身份并设置 `interactions: none`。委托前仍须完成配对、方法白名单、Workspace/Session 归属检查与撤销校验；该 Peer 不开放新的手机接口，也不参与转发事件交互。网络输入不能选择 Peer，其生命周期随插件上下文结束。
+
 ## 安装
 
 推荐直接安装全家桶聚合包 `@linxin666/dsh-web-ui-all`（一个包装齐全部功能插件与皮肤），或单独安装本插件：

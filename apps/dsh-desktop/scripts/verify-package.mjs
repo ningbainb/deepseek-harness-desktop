@@ -27,7 +27,7 @@ import {
   MANAGED_RUNTIME_PACKAGES,
   packagePathSegments,
 } from '../src/profile.mjs'
-import { verifyPackagedRuntimeCriticalFiles } from './packaged-runtime-integrity.mjs'
+import { verifyPackagedRuntimeCriticalFiles, verifyWindowsSharpBinding } from './packaged-runtime-integrity.mjs'
 import { verifyPackagedRuntimeSdkIdentity } from './packaged-runtime-sdk-identity.mjs'
 import { assertPackagedUpdateIdentity } from '../src/update-identity.mjs'
 import {
@@ -131,13 +131,7 @@ await access(join(
 ))
 
 if (TARGET_PLATFORM.platform === 'win32' && TARGET_PLATFORM.arch === 'x64') {
-  await access(join(
-    unpackedModules,
-    '@img',
-    'sharp-win32-x64',
-    'lib',
-    'sharp-win32-x64-0.35.3.node',
-  ))
+  await verifyWindowsSharpBinding(unpackedModules)
   await access(join(
     unpackedModules,
     '@koromix',

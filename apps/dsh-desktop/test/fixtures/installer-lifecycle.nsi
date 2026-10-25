@@ -4,13 +4,13 @@ SilentInstall silent
 Name "DSH isolated installer lifecycle test"
 OutFile "${TEST_OUTPUT}"
 InstallDir "${TEST_DEFAULT_INSTALL}"
-!define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 Var perUserInstallationFolder
 Var hasPerUserInstallation
 Var hasPerMachineInstallation
 !define INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Install"
 !define UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Uninstall"
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
+!define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 !insertmacro customHeader
 
 Function .onInit
@@ -47,6 +47,7 @@ Section
   File "/oname=DeepSeek Harness Desktop.exe" "${TEST_PAYLOAD}"
   WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" DisplayVersion "new"
+  WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" UninstallString '$\"$INSTDIR\Uninstall DeepSeek Harness Desktop.exe$\" /currentuser'
   !ifdef TEST_ABORT
     Abort
   !endif

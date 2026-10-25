@@ -1229,13 +1229,37 @@ const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'v
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
+let navigationRequest = 0
 let activeSettingsTab
 let activeSettingsPlugin
 const groupTitles = {
   plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能中心'], qqbot: ['扩展能力', 'QQ 机器人'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
-function activateTab(tab, focus = false, settingOverride, plugin) {
+async function activateTab(tab, focus = false, settingOverride, plugin, userAction = false) {
+  const navigation = ++navigationRequest
+  if ((settingOverride ?? tab.dataset.setting) === 'skill-market') {
+    try {
+      const status = await window.dshDesktop.getSkillMarketStatus()
+      if (navigation !== navigationRequest) return
+      if (status.enabled && status.available === false) throw new Error('技能市场配置已启用但服务不可用，请到「诊断与恢复」检查插件环境后重试。')
+      if (!status.enabled) {
+        if (!userAction) return activateTab(document.getElementById('skills-tab'), focus)
+        tab.disabled = true
+        notify('请阅读原生窗口中的技能市场启用说明。')
+        const result = await window.dshDesktop.activateSkillMarket(status.revision)
+        if (result.canceled) return
+        if (!result.enabled) throw new Error('技能市场尚未启用，请刷新状态后重试。')
+        if (navigation !== navigationRequest) return
+      }
+    } catch (error) {
+      notify(`技能市场启用未完成或状态未知：${error.message || '请刷新后检查状态，再重试。'}`)
+      if (!userAction && navigation === navigationRequest) return activateTab(document.getElementById('skills-tab'), focus)
+      return
+    } finally {
+      tab.disabled = false
+    }
+  }
   try { localStorage.setItem('dsh-dock-tab', tab.id) } catch { /* storage may be unavailable */ }
   const request = ++settingsRequest
   const requestedSetting = settingOverride ?? tab.dataset.setting
@@ -1290,7 +1314,7 @@ function activateTab(tab, focus = false, settingOverride, plugin) {
       ? (exactSidebarDestination
           ? item.dataset.tab === tab.dataset.tab && (item.dataset.setting ?? '') === (tab.dataset.setting ?? '')
           : item.dataset.group === tab.dataset.group)
-      : item.dataset.tab === tab.dataset.tab
+      : item.dataset.tab === tab.dataset.tab && (item.dataset.setting ?? '') === (tab.dataset.setting ?? '')
     item.classList.toggle('active', active)
     item.setAttribute('aria-selected', String(active))
     item.tabIndex = active ? 0 : -1
@@ -1298,11 +1322,11 @@ function activateTab(tab, focus = false, settingOverride, plugin) {
   if (focus) tab.focus()
 }
 document.querySelector('#dock-settings-retry').addEventListener('click', () => {
-  if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin)
+  if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin, true)
 })
 
 for (const tab of tabs) {
-  tab.addEventListener('click', () => { activateTab(tab) })
+  tab.addEventListener('click', () => { activateTab(tab, false, undefined, undefined, true) })
   tab.addEventListener('keydown', (event) => {
     const peers = [...tab.closest('[role="tablist"]').querySelectorAll('[data-tab]')]
     const index = peers.indexOf(tab)
@@ -1313,7 +1337,7 @@ for (const tab of tabs) {
     if (event.key === 'End') nextIndex = peers.length - 1
     if (nextIndex === undefined) return
     event.preventDefault()
-    activateTab(peers[nextIndex], true)
+    activateTab(peers[nextIndex], true, undefined, undefined, true)
   })
 }
 const searchEntries = [
@@ -1330,6 +1354,7 @@ const searchEntries = [
   ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
   ['技能中心', '导入技能 Skill', 'skills-tab'],
+  ['技能市场', 'Skills MCP Hooks 套件 来源', 'skill-market-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
   ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
   ['环境预设', '备份 导入 导出 Preset', 'presets-tab'],
@@ -1357,7 +1382,7 @@ dockSearch.addEventListener('input', () => {
     button.textContent = title
     button.addEventListener('click', () => {
       resetFeatureSearch()
-      activateTab(document.getElementById(id), true, setting)
+      activateTab(document.getElementById(id), true, setting, undefined, true)
     })
     searchResults.append(button)
   }

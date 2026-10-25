@@ -9,6 +9,7 @@ import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mj
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 import { desktopDeepLink } from './distribution-identity.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
+import { createSkillMarketActivation } from './skill-market-activation.mjs'
 import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
 import { normalizeFeatureEvent } from './feature-telemetry.mjs'
@@ -172,6 +173,8 @@ const CHANNELS = [
   'extensions:market-list',
   'extensions:market-install',
   'extensions:skill-import',
+  'extensions:skill-market-status',
+  'extensions:skill-market-activate',
   'extensions:skill-open',
   'extensions:skill-root',
   'extensions:profile-dir-open',
@@ -392,6 +395,27 @@ export function registerExtensionIpc({
     }
     return mutationCoordinator
   }
+
+  let skillMarketActivation
+  const skillMarket = () => skillMarketActivation ??= createSkillMarketActivation({
+    dshHome,
+    agentsHome,
+    runtimeCwd: projectRoot,
+    stopRuntime: () => controller.stop(),
+    verifyHealth: async () => {
+      try {
+        const response = await controller.fetch(new URL('/api/agent-plugins/progress', controller.status?.url ?? 'dsh-runtime://app/').href,
+          { signal: AbortSignal.timeout(10_000) })
+        if (!response.ok || typeof (await response.json()).active !== 'boolean') throw new Error('unavailable')
+      } catch (error) {
+        throw new Error('技能市场配置已启用但服务尚不可用，请到「诊断与恢复」检查插件环境后重试。', { cause: error })
+      }
+    },
+    runMutation: plan => enqueuePluginMutation(async () => {
+      await preflightFeatureMutation('skill-market')
+      return mutation().run(plan)
+    }),
+  })
 
   const installPlugin = (payload, { confirmationMode } = {}) => {
     if (confirmationMode !== undefined && confirmationMode !== 'market') {
@@ -684,6 +708,25 @@ export function registerExtensionIpc({
   }
 
   handleExtension('extensions:list', scan)
+  handleExtension('extensions:skill-market-status', () => skillMarket().describe())
+  handleExtension('extensions:skill-market-activate', async (_event, request) => {
+    if (!request || typeof request !== 'object' || Array.isArray(request)
+      || Object.keys(request).some(key => key !== 'expectedRevision')
+      || typeof request.expectedRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(request.expectedRevision)) {
+      throw new TypeError('invalid market activation argument fields')
+    }
+    const status = await skillMarket().describe()
+    if (status.revision !== request.expectedRevision) throw new Error('market configuration changed; reload and confirm again')
+    if (status.enabled) return skillMarket().activate({ confirmed: true, expectedRevision: request.expectedRevision })
+    const options = {
+      type: 'warning', title: '启用技能市场', message: '是否启用技能市场及其运行时能力？',
+      detail: `技能套件可包含 MCP / LSP 服务器、Hooks 和本地进程，启用后已有 Agent 根目录声明也可能被运行时读取。请只添加可信来源。\n\nDSH_HOME: ${status.dshHome}\nAgent 根目录 (agents): ${status.agentsHome}\n版本: ${status.packageVersion}\n\n反馈、模型翻译、自动更新与项目扫描默认关闭；保留你明确设置的选项。启用会重启内核，本地技能与模型配置保留。`,
+      buttons: ['启用技能市场', '取消'], defaultId: 1, cancelId: 1, noLink: true,
+    }
+    const { response } = await dialog.showMessageBox(getWindow(), options)
+    if (response !== 0) return { canceled: true, enabled: false }
+    return skillMarket().activate({ confirmed: true, expectedRevision: request.expectedRevision })
+  })
   handleExtension('extensions:settings-select', async (_event, id, plugin) => {
     assertDockSetting(id)
     assertDockPlugin(id, plugin)

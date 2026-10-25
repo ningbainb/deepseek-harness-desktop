@@ -16,7 +16,7 @@ const within = relative(root, target)
 assert.ok(within && !isAbsolute(within) && !within.startsWith('..') && !within.split(sep).includes('node_modules'), 'Patch directory must be inside this repository, outside node_modules')
 const manifest = JSON.parse(await readFile(resolve(target, 'package.json'), 'utf8'))
 assert.equal(manifest.name, '@linxin666/dsh-pet')
-assert.equal(manifest.version, '0.2.5')
+assert.ok(['0.2.5', '0.4.4'].includes(manifest.version), 'Rebuild only a reviewed published pet version')
 assert.equal(await readFile(resolve(target, 'src/client/poll-request.ts'), 'utf8'),
   await readFile(resolve(root, 'packages/dsh-pet/src/client/poll-request.ts'), 'utf8'), 'Keep the tested polling implementation identical')
 typecheckPetClient(target)
@@ -26,7 +26,7 @@ const { build } = await import(pathToFileURL(localRequire.resolve('tsdown')).hre
 process.chdir(target)
 const config = clientBundle(manifest.name, [], { clientOnlyBundle: ['clsx'] })({}).find(entry => entry.name === `${manifest.name}/client`)
 assert.ok(config)
-await build({ ...config, config: false, plugins: [...config.plugins, {
+await build({ ...config, config: false, minify: false, plugins: [...config.plugins, {
   name: 'patched-pet-dependency-resolution',
   resolveId(id) { if (id === 'clsx') return installedRequire.resolve(id) },
 }] })

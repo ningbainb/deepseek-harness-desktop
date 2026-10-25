@@ -9,6 +9,8 @@ import SettingsForms from '@deepseek-ai/dsh-settings'
 
 const SDK_SETTINGS = '@deepseek-ai/dsh-settings'
 const ADAPTER_SETTINGS = import.meta.url
+const SDK_CONFIG_EDITOR = '@deepseek-ai/dsh-config-editor'
+const ADAPTER_CONFIG_EDITOR = new URL('./runtime-config-editor.mjs', import.meta.url).href
 const TRANSACTION_DIRECTORY = '.desktop-legacy-settings-transaction'
 const migrationHealthTargets = new WeakMap()
 const SECTION_ENTRIES = {
@@ -101,6 +103,7 @@ export function adaptRuntimeLegacySettingsPatches(patches) {
   const adapt = row => {
     const result = { ...row }
     if (row.name === SDK_SETTINGS) result.name = ADAPTER_SETTINGS
+    if (row.name === SDK_CONFIG_EDITOR) result.name = ADAPTER_CONFIG_EDITOR
     if (Array.isArray(row.insert)) result.insert = row.insert.map(adapt)
     if (row.group && Array.isArray(row.config)) result.config = row.config.map(adapt)
     return result

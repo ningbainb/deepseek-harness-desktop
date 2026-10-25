@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,8 +13,16 @@ const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-settings-window-e2e-'))
 const runtimeReadyTimeoutMs = Math.max(process.env.CI ? 120_000 : 90_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 0)
+const traceDirectory = process.env.DSH_DESKTOP_SETTINGS_TRACE_DIRECTORY
+  ? resolve(process.env.DSH_DESKTOP_SETTINGS_TRACE_DIRECTORY) : undefined
+const traceCloseCalls = traceDirectory !== undefined && process.env.DSH_DESKTOP_SETTINGS_TRACE_CLOSE_CALLS === '1'
 let electronApp
 let page
+let settingsTrace
+let failure
+let debuggerSession
+const closeDiagnostics = { scripts: [], breakpoints: [], calls: [] }
+const closeLogpointTasks = []
 
 const panelState = (dialog) => dialog.evaluate((element) => {
   const layer = element.parentElement
@@ -68,6 +76,31 @@ try {
   assert.equal(await electronApp.evaluate(({ app }) => app.isPackaged), Boolean(packagedExecutable))
   page = await electronApp.firstWindow()
   page.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
+  if (traceCloseCalls) {
+    debuggerSession = await page.context().newCDPSession(page)
+    debuggerSession.on('Debugger.scriptParsed', script => {
+      closeDiagnostics.scripts.push({ scriptId: script.scriptId, url: script.url })
+      if (!/settings-general/u.test(script.url)) return
+      closeLogpointTasks.push((async () => {
+        const { scriptSource } = await debuggerSession.send('Debugger.getScriptSource', { scriptId: script.scriptId })
+        const lines = scriptSource.split('\n')
+        const moduleStart = lines.findIndex(line => line.includes('id: "@deepseek-ai/dsh-client-ui-settings-general"'))
+        const lineNumber = lines.findIndex((line, index) => index > moduleStart && moduleStart >= 0 && line.includes('d.open = false;'))
+        if (lineNumber < 0) throw new Error('settings close action is missing from the diagnostic script')
+        closeDiagnostics.breakpoints.push(await debuggerSession.send('Debugger.setBreakpoint', {
+          location: { scriptId: script.scriptId, lineNumber },
+          condition: '(console.trace("settings-close-trace"), false)',
+        }))
+      })().catch(error => { closeDiagnostics.error = error.message }))
+    })
+    debuggerSession.on('Runtime.consoleAPICalled', event => {
+      if (event.args.some(argument => argument.value === 'settings-close-trace')) {
+        closeDiagnostics.calls.push({ timestamp: event.timestamp, stackTrace: event.stackTrace })
+      }
+    })
+    await debuggerSession.send('Runtime.enable')
+    await debuggerSession.send('Debugger.enable')
+  }
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
   await page.waitForSelector('style[data-plugin="@linxin666/dsh-client-ui-mode-switcher"]', {
     state: 'attached',
@@ -96,6 +129,12 @@ try {
 
   const openSettings = async () => {
     return openNativeSettings(page)
+  }
+
+  if (traceCloseCalls) {
+    await Promise.all(closeLogpointTasks)
+    assert.equal(closeDiagnostics.error, undefined)
+    assert.ok(closeDiagnostics.breakpoints.length > 0, 'settings close diagnostic logpoint must be installed')
   }
 
   let dialog = await openSettings()
@@ -129,12 +168,73 @@ try {
   console.log('drag event coalescing ' + JSON.stringify(dragCoalescing))
   state = await panelState(dialog)
 
+  if (traceDirectory !== undefined) settingsTrace = await dialog.evaluateHandle(element => {
+    const doc = element.ownerDocument
+    const view = doc.defaultView
+    const records = []
+    const listeners = []
+    let stage = 'scrollbar-setup'
+    let planned
+    let firstClosed
+    const identify = node => node?.nodeType === 1 ? {
+      tag: node.tagName, id: node.id, role: node.getAttribute('role'), className: String(node.className).slice(0, 220),
+    } : { tag: node?.nodeName }
+    const geometry = node => node?.getBoundingClientRect().toJSON()
+    const status = () => {
+      const content = element.querySelector(':scope > nav + div')
+      const style = view.getComputedStyle(element)
+      return { connected: element.isConnected, hidden: element.hidden,
+        display: style.display, visibility: style.visibility, dialog: geometry(element),
+        layer: geometry(element.parentElement), content: geometry(content),
+        gutter: content ? content.offsetWidth - content.clientWidth : undefined,
+        scrollTop: content?.scrollTop, scrollHeight: content?.scrollHeight, clientHeight: content?.clientHeight }
+    }
+    const record = (type, detail = {}) => {
+      const current = status()
+      const item = { at: view.performance.now(), type, stage, planned, ...detail, state: current }
+      if (!firstClosed && (!current.connected || current.hidden || current.display === 'none'
+        || current.visibility === 'hidden' || !current.dialog.width || !current.dialog.height)) firstClosed = item
+      if (records.length === 400) records.shift()
+      records.push(item)
+    }
+    for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click', 'keydown', 'resize']) {
+      const target = type === 'resize' ? view : doc
+      const listener = event => record(type, {
+        trusted: event.isTrusted, pointerId: event.pointerId, button: event.button, buttons: event.buttons,
+        x: event.clientX, y: event.clientY, key: type === 'keydown' ? event.key : undefined,
+        target: identify(event.target), path: event.composedPath().slice(0, 6).map(identify),
+        hit: Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
+          ? identify(doc.elementFromPoint(event.clientX, event.clientY)) : undefined,
+      })
+      target.addEventListener(type, listener, true)
+      listeners.push(() => target.removeEventListener(type, listener, true))
+    }
+    const observer = new view.MutationObserver(mutations => {
+      if (firstClosed) return
+      for (const mutation of mutations) {
+        if (mutation.target === element || mutation.target.contains?.(element)
+          || [...mutation.removedNodes].some(node => node === element || node.contains?.(element))) {
+          record('mutation', { attribute: mutation.attributeName, target: identify(mutation.target) })
+        }
+      }
+    })
+    observer.observe(doc.documentElement, { childList: true, subtree: true, attributes: true,
+      attributeFilter: ['hidden', 'aria-hidden', 'data-open', 'data-shortcut-modal', 'class'] })
+    record('installed')
+    return {
+      stage(next, coordinates) { stage = next; planned = coordinates; record('stage') },
+      snapshot() { return { firstClosed, records, final: status() } },
+      dispose() { observer.disconnect(); for (const unsubscribe of listeners) unsubscribe() },
+    }
+  })
+
   const scrollbarResult = await dialog.evaluate(async (element) => {
     const content = element.querySelector(':scope > nav + div')
     if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')
     const spacer = document.createElement('div')
     spacer.dataset.dshSettingsScrollbarProbe = 'true'
     spacer.style.height = Math.max(2400, content.clientHeight * 4) + 'px'
+    spacer.style.flexShrink = '0'
     spacer.style.pointerEvents = 'none'
     content.append(spacer)
     content.style.overflowY = 'scroll'
@@ -145,10 +245,18 @@ try {
       top: box.top,
       bottom: box.bottom,
       gutter: content.offsetWidth - content.clientWidth,
+      scrollHeight: content.scrollHeight,
+      clientHeight: content.clientHeight,
     }
   })
   assert.ok(scrollbarResult.gutter >= 4, JSON.stringify(scrollbarResult))
+  assert.ok(scrollbarResult.scrollHeight > scrollbarResult.clientHeight * 2,
+    `the scrollbar fixture must contain real overflowing content: ${JSON.stringify(scrollbarResult)}`)
+  await settingsTrace?.evaluate((trace, coordinates) => trace.stage('scrollbar-drags', coordinates), scrollbarResult)
   const beforeScrollbarDrag = state.box
+  const scrollbarPositions = [0]
+  const scrollbarDialog = await dialog.elementHandle()
+  assert.ok(scrollbarDialog)
   for (let iteration = 0; iteration < 20; iteration += 1) {
     const startY = iteration % 2 === 0 ? scrollbarResult.top + 32 : scrollbarResult.bottom - 32
     const endY = iteration % 2 === 0 ? scrollbarResult.bottom - 32 : scrollbarResult.top + 32
@@ -156,7 +264,19 @@ try {
     await page.mouse.down()
     await page.mouse.move(scrollbarResult.x, endY, { steps: 4 })
     await page.mouse.up()
+    const observed = await scrollbarDialog.evaluate(element => ({
+      connected: element.isConnected,
+      scrollTop: element.querySelector(':scope > nav + div')?.scrollTop,
+    }))
+    assert.equal(observed.connected, true, `the original settings dialog must survive scrollbar drag ${iteration + 1}`)
+    scrollbarPositions.push(observed.scrollTop)
   }
+  await scrollbarDialog.dispose()
+  assert.ok(Math.max(...scrollbarPositions) > scrollbarResult.clientHeight,
+    `native scrollbar drags must scroll through real content: ${JSON.stringify(scrollbarPositions)}`)
+  assert.ok(scrollbarPositions.some((position, index) => index > 0 && position < scrollbarPositions[index - 1] - 20),
+    `native scrollbar drags must also scroll back: ${JSON.stringify(scrollbarPositions)}`)
+  console.log('native scrollbar positions ' + JSON.stringify(scrollbarPositions))
   state = await panelState(dialog)
   assert.ok(Math.abs(state.box.x - beforeScrollbarDrag.x) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
   assert.ok(Math.abs(state.box.y - beforeScrollbarDrag.y) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
@@ -164,6 +284,7 @@ try {
   assert.ok(Math.abs(state.box.height - beforeScrollbarDrag.height) <= 2, JSON.stringify({ beforeScrollbarDrag, after: state.box }))
 
   const initial = state.box
+  await settingsTrace?.evaluate(trace => trace.stage('window-drag'))
   const dragHandle = dialog.locator('[data-dsh-settings-drag-handle="true"]')
   const dragBox = await dragHandle.boundingBox()
   assert.ok(dragBox)
@@ -183,6 +304,7 @@ try {
   assertContained(state)
 
   const beforeResize = state.box
+  await settingsTrace?.evaluate(trace => trace.stage('window-resize'))
   const southeast = dialog.locator('xpath=..').locator('[data-dsh-settings-resize="se"]')
   const southeastBox = await southeast.boundingBox()
   assert.ok(southeastBox)
@@ -206,8 +328,11 @@ try {
   assertContained(state)
   const persisted = state.box
 
+  await settingsTrace?.evaluate(trace => trace.stage('intentional-escape'))
+
   await page.keyboard.press('Escape')
   await dialog.waitFor({ state: 'hidden' })
+  if (traceCloseCalls) assert.ok(closeDiagnostics.calls.length > 0, 'intentional Escape must reach the settings close logpoint')
   dialog = await openSettings()
   state = await panelState(dialog)
   assert.ok(Math.abs(state.box.x - persisted.x) <= 2, JSON.stringify({ persisted, restored: state.box }))
@@ -237,6 +362,7 @@ try {
   assert.deepEqual(Object.keys(saved).toSorted(), ['height', 'width', 'x', 'y'])
   console.log(`verified settings window movement, resize, persistence, responsive clamp, and DPI scale ${displayScale}`)
 } catch (error) {
+  failure = error
   // Isolated empty-profile fixture only. Keep actionable modal diagnostics
   // while retaining the original failure and timeout.
   console.error('settings fixture failure state', JSON.stringify(await page?.evaluate(() => ({
@@ -254,6 +380,31 @@ try {
   })).catch(() => undefined)))
   throw error
 } finally {
+  if (traceDirectory !== undefined) {
+    try {
+      await mkdir(traceDirectory, { recursive: true })
+      await writeFile(resolve(traceDirectory, 'settings-close-calls.json'), `${JSON.stringify(closeDiagnostics, null, 2)}\n`)
+      const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8')
+        .catch(error => error.code === 'ENOENT' ? '' : Promise.reject(error))
+      await writeFile(resolve(traceDirectory, 'runtime.log'), runtimeLog)
+      await writeFile(resolve(traceDirectory, 'result.json'), `${JSON.stringify({
+        passed: failure === undefined, reachedTrace: settingsTrace !== undefined,
+        traceCloseCalls,
+        error: failure?.stack, at: new Date().toISOString(),
+      }, null, 2)}\n`)
+      if (page && !page.isClosed()) await page.screenshot({ path: resolve(traceDirectory, 'last-page.png'), timeout: 5_000 })
+    } catch (error) { console.error('settings lifecycle evidence capture failed', error.message) }
+  }
+  if (settingsTrace) {
+    try {
+      await mkdir(traceDirectory, { recursive: true })
+      const trace = await settingsTrace.evaluate(trace => trace.snapshot())
+      await writeFile(resolve(traceDirectory, 'settings-trace.json'), `${JSON.stringify(trace, null, 2)}\n`)
+      console.log(`settings diagnostic trace: ${resolve(traceDirectory, 'settings-trace.json')}`)
+      await settingsTrace.evaluate(trace => trace.dispose())
+      await settingsTrace.dispose()
+    } catch (error) { console.error('settings diagnostic capture failed', error.message) }
+  }
   await electronApp?.close()
   await rm(temporary, { recursive: true, force: true })
 }

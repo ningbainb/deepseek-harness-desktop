@@ -35,6 +35,8 @@ function loadController(): typeof ConversationController {
   }).ConversationController
 }
 
+const Constructor = loadController()
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('published SDK image admission', () => {
@@ -42,7 +44,6 @@ describe('published SDK image admission', () => {
     vi.stubGlobal('FileReader', TestFileReader)
     const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true, value: { note: 'N', markdown: '![图片](/describe-image/raw/sha256:x)' } })))
     vi.stubGlobal('fetch', fetch)
-    const Constructor = loadController()
     const ctx = new Context()
     const upload = vi.fn(async () => ({ ok: true, value: { receiptId: 'receipt', file: { attachmentId: 'file-ref', bytes: 4, name: 'notes.txt' } } }))
     ctx.provide('fileUpload', { upload })

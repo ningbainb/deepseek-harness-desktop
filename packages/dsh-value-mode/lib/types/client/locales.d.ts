@@ -1,4 +1,5 @@
 export declare const zh: {
+    dockDetails: string;
     baiAccess: string;
     settingsNotWritable: string;
     settingsSaveFailed: string;

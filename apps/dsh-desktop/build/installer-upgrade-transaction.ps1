@@ -139,7 +139,11 @@ function Get-RegistryEntries {
 function Get-RegistryState([object] $entry) {
   if ([string]::IsNullOrWhiteSpace([string] $entry.View)) {
     # Journals written by older installers used the process-default view.
-    return Get-ItemProperty -LiteralPath ([string] $entry.ProviderPath) -ErrorAction SilentlyContinue
+    try {
+      return Get-ItemProperty -LiteralPath ([string] $entry.ProviderPath) -ErrorAction Stop
+    } catch [System.Management.Automation.ItemNotFoundException] {
+      return $null
+    }
   }
   $hive = [Enum]::Parse([Microsoft.Win32.RegistryHive], [string] $entry.Hive)
   $view = [Enum]::Parse([Microsoft.Win32.RegistryView], [string] $entry.View)
@@ -195,15 +199,23 @@ function Assert-InstallBackup([object] $install) {
   [pscustomobject]@{ Root = $root; Backup = $backup }
 }
 
-function Remove-RegistryEntries([object[]] $entries) {
+function Remove-RegistryEntries([object[]] $entries, [object] $journal = $null) {
   foreach ($entry in $entries) {
     if ($null -ne (Get-RegistryState $entry)) {
+      if ($null -ne $journal) {
+        $entry.removalState = 'pending'
+        Write-Journal $journal
+      }
       # Do not fall through to the legacy uninstaller with stale registration.
       $arguments = @('DELETE', [string] $entry.commandPath, '/f')
       if (-not [string]::IsNullOrWhiteSpace([string] $entry.viewOption)) { $arguments += [string] $entry.viewOption }
       & $registryExecutable @arguments | Out-Null
       if ($LASTEXITCODE -ne 0 -or $null -ne (Get-RegistryState $entry)) {
         throw "previous install registration is still present: $($entry.commandPath) $($entry.viewOption)"
+      }
+      if ($null -ne $journal) {
+        $entry.removalState = 'removed'
+        Write-Journal $journal
       }
     }
   }
@@ -237,6 +249,66 @@ function Invoke-RegistryImport([string] $exportPath, [object] $entry) {
   if ($LASTEXITCODE -ne 0) {
     throw "registry import failed with exit code $LASTEXITCODE`: $exportPath"
   }
+}
+
+function Test-RegistryBackupMatches([object] $entry, [string] $exportPath) {
+  $currentPath = "$exportPath.current.reg"
+  try {
+    $arguments = @('EXPORT', [string] $entry.commandPath, $currentPath, '/y')
+    if (-not [string]::IsNullOrWhiteSpace([string] $entry.viewOption)) { $arguments += [string] $entry.viewOption }
+    & $registryExecutable @arguments | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "registry comparison failed: $($entry.commandPath)" }
+    [IO.File]::ReadAllText($currentPath) -ceq [IO.File]::ReadAllText($exportPath)
+  } finally {
+    Remove-Item -LiteralPath $currentPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Test-TargetRegistration([object] $state) {
+  $paths = @([string] $state.InstallLocation, (Get-UninstallerDirectory ([string] $state.UninstallString)))
+  $matched = $false
+  foreach ($path in $paths) {
+    if ([string]::IsNullOrWhiteSpace($path)) { continue }
+    try { $normalized = Get-NormalizedPath $path } catch { return $false }
+    if (-not $normalized.Equals($normalizedInstallDirectory, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    $matched = $true
+  }
+  $matched
+}
+
+function Restore-RegistryEntries([object] $journal) {
+  $failures = [System.Collections.Generic.List[string]]::new()
+  foreach ($entry in @($journal.registry)) {
+    $tracked = $null -ne $entry.PSObject.Properties['removalState']
+    if ($tracked -and $entry.removalState -eq 'restored') { continue }
+    if ($tracked -and [bool] $entry.present -and $entry.removalState -eq 'none') { continue }
+    if ($tracked -and -not [bool] $entry.present -and -not [bool] $journal.registryPrepared) { continue }
+    try {
+      $exportPath = Join-Path $transactionRoot ([string] $entry.exportFile)
+      if ([bool] $entry.present -and -not (Test-Path -LiteralPath $exportPath -PathType Leaf)) {
+        throw "registry backup is missing: $exportPath"
+      }
+      $state = Get-RegistryState $entry
+      if ($null -ne $state) {
+        $matchesBackup = [bool] $entry.present -and (Test-RegistryBackupMatches $entry $exportPath)
+        if (-not $matchesBackup) {
+          if (-not (Test-TargetRegistration $state)) {
+            if ([bool] $entry.present) { throw "registry recovery conflict: $($entry.commandPath)" }
+            continue
+          }
+          Remove-RegistryEntries @($entry)
+        }
+      } else {
+        $matchesBackup = $false
+      }
+      if ([bool] $entry.present -and -not $matchesBackup) { Invoke-RegistryImport $exportPath $entry }
+      $entry | Add-Member -NotePropertyName removalState -NotePropertyValue 'restored' -Force
+      Write-Journal $journal
+    } catch {
+      $failures.Add("$($entry.commandPath) $($entry.viewOption): $($_.Exception.Message)")
+    }
+  }
+  if ($failures.Count -ne 0) { throw "registry recovery incomplete: $($failures -join '; ')" }
 }
 
 function Remove-TransactionRootIfEmpty {
@@ -385,14 +457,7 @@ function Invoke-Rollback([object] $journal) {
     Write-Output "upgrade-install-restored root=$($install.Root)"
   }
 
-  Remove-RegistryEntries @($journal.registry)
-  foreach ($entry in @($journal.registry | Where-Object { [bool] $_.present })) {
-    $exportPath = Join-Path $transactionRoot ([string] $entry.exportFile)
-    if (-not (Test-Path -LiteralPath $exportPath -PathType Leaf)) {
-      throw "registry backup is missing: $exportPath"
-    }
-    Invoke-RegistryImport $exportPath $entry
-  }
+  Restore-RegistryEntries $journal
 
   Remove-TransactionRootIfEmpty
   Write-Output 'upgrade-transaction-rolled-back'
@@ -470,6 +535,7 @@ function Begin-Transaction {
       viewOption = $entry.ViewOption
       present = $present
       exportFile = $exportFile
+      removalState = 'none'
     })
   }
 
@@ -481,13 +547,16 @@ function Begin-Transaction {
     targetExisted = $targetExisted
     installs = $installPlans
     registry = @($registryJournal)
+    registryPrepared = $false
   }
   Write-Journal $journal
 
   try {
     # Clear every registration the native NSIS uninstall pass could read
     # before the corresponding executable leaves its original path.
-    Remove-RegistryEntries @($registryJournal)
+    Remove-RegistryEntries -entries @($registryJournal) -journal $journal
+    $journal.registryPrepared = $true
+    Write-Journal $journal
     foreach ($rawInstall in $installPlans) {
       $install = Assert-InstallBackup $rawInstall
       Move-InstallToBackup $install

@@ -17,6 +17,23 @@ export async function apply(ctx, config) {
   let inferenceRequests = 0
   const requestPaths = {}
   const inferenceCalls = []
+  const logicalCalls = []
+  ctx.on('llm/stream', function (options, next) {
+    const runtime = this
+    return (async function *() {
+      const call = { purpose: options.purpose ?? 'conversation', model: options.model, maxTokens: options.maxTokens }
+      if (options.maxTokens === undefined) {
+        try {
+          const resolved = await runtime.resolveModelInfo(options.provider, options.model, options.signal)
+          call.maxTokens = resolved.defaultMaxTokens
+        } catch {
+          call.resolutionFailed = true
+        }
+      }
+      logicalCalls.push(call)
+      yield *next()
+    })()
+  })
   const previousDispatcher = getGlobalDispatcher()
   const dispatcher = new MockAgent()
   dispatcher.disableNetConnect()
@@ -64,7 +81,7 @@ export async function apply(ctx, config) {
       handler: async (request, response) => {
         if (request.url === '/api/isolated-bai/metrics') {
           response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-          response.end(JSON.stringify({ modelRequests, inferenceRequests, inferenceCalls, requestPaths, default: probeCtx.agentDefaultModel.currentSelection() }))
+          response.end(JSON.stringify({ modelRequests, inferenceRequests, inferenceCalls, logicalCalls, requestPaths, default: probeCtx.agentDefaultModel.currentSelection() }))
           return
         }
         if (request.url === '/api/isolated-bai/revoke') {

@@ -51,8 +51,13 @@ async function verifyMessageParticleClearance(page) {
       rect.x <= box.left - bounds.left && rect.y <= box.top - bounds.top
       && rect.x + rect.width >= box.right - bounds.left
       && rect.y + rect.height >= box.bottom - bounds.top))) return false
-    const context = canvas.getContext('2d')
-    if (!context || !canvas.width || !canvas.height) return false
+    if (!canvas.width || !canvas.height) return false
+    const snapshot = document.createElement('canvas')
+    snapshot.width = canvas.width
+    snapshot.height = canvas.height
+    const context = snapshot.getContext('2d', { willReadFrequently: true })
+    if (!context) return false
+    context.drawImage(canvas, 0, 0)
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
     let themeStillVisible = false
     for (let index = 3; index < pixels.length; index += 4) {
@@ -119,15 +124,23 @@ async function launch() {
   const rendererErrors = []
   const rendererConsole = []
   const failedRequests = []
-  activeDiagnostics = { rendererErrors, rendererConsole, failedRequests }
+  const httpErrors = []
+  const rendererTimeline = []
+  activeDiagnostics = { rendererErrors, rendererConsole, failedRequests, httpErrors, rendererTimeline }
   page.on('requestfailed', request => failedRequests.push({
+    at: Date.now(),
     method: request.method(), path: new URL(request.url()).pathname,
     failure: request.failure()?.errorText,
   }))
+  page.on('response', response => {
+    if (response.status() >= 400) httpErrors.push({ at: Date.now(), status: response.status(),
+      method: response.request().method(), path: new URL(response.url()).pathname })
+  })
   page.on('pageerror', error => rendererErrors.push(error.message))
   page.on('console', message => {
     if (message.type() === 'error' || message.type() === 'warning') {
       rendererConsole.push(`${message.type()}: ${message.text()}`)
+      rendererTimeline.push({ at: Date.now(), type: message.type(), text: message.text() })
     }
   })
   try {
@@ -285,6 +298,7 @@ async function waitForRenamedCheckpoint(page, sessionId) {
 }
 
 async function openSeededSession(page, sessionId) {
+  console.log('seeded session navigation', JSON.stringify({ at: Date.now(), sessionId }))
   const turns = page.locator('[data-chat-flow-kind="user"]')
   if (await turns.count() === messageCount) return
 
@@ -650,8 +664,10 @@ try {
     assert.match(await second.page.locator('[data-dsh-live-stats] summary').innerText(), /^≈¥[\d.,]+ · 明细$/u)
   }
   if (process.argv.includes('--native-tabs')) {
-    const { verifyNativeBrowserSessionIsolation } = await import('./native-browser-session-fixture.mjs')
-    await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession })
+    const { verifyNativeBrowserSessionIsolation, navigateNativeBrowserSession } = await import('./native-browser-session-fixture.mjs')
+    const nativeWindow = await activeApp.browserWindow(second.page)
+    await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession,
+      navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id) })
   }
   assert.deepEqual(second.rendererErrors, [])
   const taskBoardState = await second.page.evaluate(async () => {

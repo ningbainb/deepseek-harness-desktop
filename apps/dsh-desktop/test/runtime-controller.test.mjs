@@ -118,6 +118,52 @@ test('default startup budget tolerates first-run Windows scanning', () => {
   assert.equal(controller.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS)
 })
 
+test('Desktop HTTP startup waits for completion after the official Web URL before probing', async context => {
+  const child = new FakeChild()
+  const probes = []
+  const controller = new DshRuntimeController({
+    cliPath: '/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    cwd: process.cwd(), dshHome: '/isolated-home', platform: 'linux', autoRestart: false,
+    spawnProcess: () => child,
+    probeReady: async url => { probes.push(url) },
+    terminateProcessTree: async () => child.kill(),
+  })
+  context.after(() => controller.stop())
+  const pending = controller.start()
+  pending.catch(() => {})
+  child.stdout.write('dsh web: http://127.0.0.1:43125/?token=launch_token-123\n')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(controller.status.state, 'starting')
+  assert.deepEqual(probes, [])
+  child.stderr.write('dsh desktop web: ready\n')
+  child.stdout.write('prefix dsh desktop web: ready\n')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(probes, [])
+  child.stdout.write('dsh desktop web: rea')
+  child.stdout.write('dy\n')
+  assert.equal(await pending, 'http://127.0.0.1:43125/?token=launch_token-123')
+  assert.deepEqual(probes, ['http://127.0.0.1:43125/?token=launch_token-123'])
+})
+
+test('Desktop HTTP exit before completion cannot become successful readiness', async context => {
+  const child = new FakeChild()
+  const controller = new DshRuntimeController({
+    cliPath: '/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    cwd: process.cwd(), dshHome: '/isolated-home', platform: 'linux', autoRestart: false,
+    spawnProcess: () => child, probeReady: async () => {},
+    terminateProcessTree: async () => child.kill(),
+  })
+  context.after(() => controller.stop())
+  const pending = controller.start()
+  pending.catch(() => {})
+  child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+  await new Promise(resolve => setImmediate(resolve))
+  child.exitCode = 1
+  child.emit('exit', 1, null)
+  await assert.rejects(pending)
+  assert.equal(controller.status.state, 'crashed')
+})
+
 test('Windows runtime wrapper waits for the GUI child and preserves its hidden console host', () => {
   const invocation = createRuntimeInvocation({
     platform: 'win32',
@@ -381,7 +427,7 @@ test('Windows packaged controller preserves the private graceful shutdown channe
       await mkdir(scopeRoot, { recursive: true })
       const compatRoot = dirname(desktopRequire.resolve('@linxin666/dsh-desktop-compat/package.json'))
       await symlink(compatRoot, join(scopeRoot, 'dsh-desktop-compat'), 'junction')
-      for (const name of ['runtime-controller.mjs', 'best-effort-events.mjs', 'runtime-shutdown-control.mjs', 'startup-phase.mjs', 'runtime-pipe.mjs', 'runtime-pipe-framing.mjs']) {
+      for (const name of ['runtime-controller.mjs', 'runtime-readiness.mjs', 'best-effort-events.mjs', 'runtime-shutdown-control.mjs', 'startup-phase.mjs', 'runtime-pipe.mjs', 'runtime-pipe-framing.mjs']) {
         await copyFile(new URL(`../src/${name}`, import.meta.url), join(sourceRoot, name))
       }
       const packaged = await import(pathToFileURL(join(sourceRoot, 'runtime-controller.mjs')).href)
@@ -418,6 +464,7 @@ test('Windows packaged controller preserves the private graceful shutdown channe
           assert.match(control.path, /^\\\\\.\\pipe\\dsh-stop-[a-f0-9]{32}$/u)
           assert.match(control.token, /^[a-f0-9]{64}$/u)
           child.stdout.write('dsh web: http://127.0.0.1:43125\n')
+          child.stdout.write('dsh desktop web: ready\n')
           await ready
           if (available) dispose = await listenRuntimeShutdownControl(control, () => {
             cleanupCalls += 1

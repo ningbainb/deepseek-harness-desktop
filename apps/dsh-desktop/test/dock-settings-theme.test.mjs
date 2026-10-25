@@ -10,10 +10,12 @@ const darkPalette = { background: '#123456', foreground: '#ddeeff', accent: '#33
 
 function fixture() {
   const events = []
+  const bounds = []
+  let size = [960, 680]
   let selected = 'memory'
   let loads = 0
   const window = Object.assign(new EventEmitter(), {
-    isDestroyed: () => false, getContentSize: () => [960, 680], contentView: { addChildView() {} },
+    isDestroyed: () => false, getContentSize: () => size, contentView: { addChildView() {} },
   })
   const mainWindow = { webContents: { session: {} } }
   setWindowChromeTheme(mainWindow, 'light', lightPalette)
@@ -32,12 +34,22 @@ function fixture() {
       }),
     })
     setVisible() {}
-    setBounds() {}
+    setBounds(value) { bounds.push(value) }
     setBackgroundColor() {}
   }
   const control = createDockSettingsView({ WebContentsView: View, window, mainWindow, getRuntimeOrigin: () => 'http://127.0.0.1:1234' })
-  return { control, events, loads: () => loads }
+  return { control, events, bounds, loads: () => loads, resize: next => { size = next; window.emit('resize') } }
 }
+
+test('settings child view starts after the complete sidebar at every responsive breakpoint', async () => {
+  const { control, bounds, resize } = fixture()
+  await control.select('memory')
+  for (const [width, sidebar] of [[960, 200], [901, 200], [900, 180], [801, 180], [800, 180], [680, 180]]) {
+    resize([width, 680])
+    assert.equal(bounds.at(-1).x, sidebar, `sidebar boundary at ${width}`)
+    assert.equal(bounds.at(-1).width, width - sidebar)
+  }
+})
 
 test('theme-only updates clear stale palettes before warm settings navigation', async () => {
   const { control, events, loads } = fixture()
