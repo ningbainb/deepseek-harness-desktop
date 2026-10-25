@@ -50,6 +50,59 @@ test('pet clearance does not hide or shrink a pet when the viewport has no safe 
     [{ left: 0, top: 0, right: 200, bottom: 200 }], { width: 200, height: 200 }), { x: 0, y: 0 })
 })
 
+for (const initiallyOpen of [true, false]) {
+  test(initiallyOpen ? 'pet clearance preserves native right-panel guide pointer access'
+    : 'opening a retained native right panel refreshes pet clearance without resizing', async () => {
+    const dom = new JSDOM(`<aside data-sidebar-right-panel="push"${initiallyOpen ? ' data-sidebar-right-open' : ''}><button data-sidebar-right-guide-entry="dsh-browser">Browser preview</button></aside><div data-dsh-pet-root><div style="position:fixed;right:24px;bottom:120px"><div role="button" tabindex="0">Pet</div></div></div>`, { runScripts: 'outside-only' })
+    const { window } = dom
+    const panel = window.document.querySelector('aside')
+    const guide = panel.querySelector('button')
+    const floating = window.document.querySelector('[data-dsh-pet-root] > div')
+    const frames = new Map()
+    let serial = 0
+    let clicks = 0
+    window.requestAnimationFrame = callback => { frames.set(++serial, callback); return serial }
+    window.cancelAnimationFrame = identifier => frames.delete(identifier)
+    Object.defineProperties(window, { innerWidth: { value: 1024 }, innerHeight: { value: 768 } })
+    floating.getBoundingClientRect = () => {
+      const [horizontal = 0, vertical = 0] = (floating.style.translate || '0px 0px').split(' ').map(Number.parseFloat)
+      return { left: 800 + horizontal, top: 420 + vertical, width: 100, height: 160 }
+    }
+    guide.getBoundingClientRect = () => {
+      const left = panel.hasAttribute('data-sidebar-right-open') ? 700 : 1040
+      return { left, top: 450, right: left + 300, bottom: 510, width: 300, height: 60 }
+    }
+    guide.addEventListener('click', () => { clicks++ })
+    try {
+      window.eval(PET_CONTROL_CLEARANCE_SCRIPT)
+      if (!initiallyOpen) {
+        assert.equal(floating.style.translate, '')
+        panel.setAttribute('data-sidebar-right-open', '')
+        await new Promise(resolve => setImmediate(resolve))
+        assert.ok(frames.size > 0, 'retained native panel opening must schedule clearance')
+        for (const [identifier, callback] of frames) { frames.delete(identifier); callback() }
+      }
+      const pet = floating.getBoundingClientRect()
+      const control = guide.getBoundingClientRect()
+      assert.ok(pet.left + pet.width <= control.left - 8 || pet.left >= control.right + 8
+        || pet.top + pet.height <= control.top - 8 || pet.top >= control.bottom + 8,
+      'the complete pet hitbox must leave the native Browser guide clickable')
+      assert.equal(floating.style.right, '24px')
+      assert.equal(floating.style.bottom, '120px')
+      assert.equal(window.document.querySelector('[data-dsh-pet-root] [role="button"]').tabIndex, 0)
+      guide.click()
+      assert.equal(clicks, 1)
+      panel.removeAttribute('data-sidebar-right-open')
+      await new Promise(resolve => setImmediate(resolve))
+      for (const [identifier, callback] of frames) { frames.delete(identifier); callback() }
+      assert.equal(floating.style.translate, '', 'closing the panel restores saved pet placement')
+    } finally {
+      window.dshPetControlClearance?.dispose()
+      dom.window.close()
+    }
+  })
+}
+
 test('pet clearance avoids dedicated settings controls and refreshes when a retained panel is hidden', async () => {
   const dom = new JSDOM('<main data-dsh-dock-settings="memory"><section><button>New memory</button></section></main><div data-dsh-pet-root><div style="position:fixed;right:24px;bottom:120px"><div role="button">Pet</div></div></div>', { runScripts: 'outside-only' })
   const { window } = dom

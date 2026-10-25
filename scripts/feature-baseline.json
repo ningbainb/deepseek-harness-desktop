@@ -190,7 +190,8 @@
         "spritesheet-readback-canvas-preserves-frame-counts-without-performance-warnings",
         "installed-0.4.4-frames2d-readback-canvas-retains-image-fallback",
         "pet-settings-no-unbounded-batch-mutation",
-        "desktop-transient-control-clearance-preserves-pet-settings-and-dragging"
+        "desktop-transient-control-clearance-preserves-pet-settings-and-dragging",
+        "main-pet-clears-native-right-panel-controls-and-retained-panel-opening-without-changing-saved-placement"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,

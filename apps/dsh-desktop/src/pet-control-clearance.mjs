@@ -29,7 +29,7 @@ export function petRailOffset(surface, viewport) {
 
 export function installPetControlClearance(resolveOffset, resolveRailOffset) {
   globalThis.dshPetControlClearance?.dispose()
-  const selector = 'button[data-dsh-relay-model-entry], [data-pane="conversation"] button[aria-haspopup="menu"], [data-pane="conversation"] button[aria-label="回到底部"], [data-pane="conversation"] button[aria-label="Scroll to bottom"], [data-pane="conversation"] textarea, [data-pane="conversation"] [contenteditable="true"], [data-dsh-dock-settings] :is(button, input, textarea, select, summary, [role="button"], [role="switch"])'
+  const selector = 'button[data-dsh-relay-model-entry], [data-pane="conversation"] button[aria-haspopup="menu"], [data-pane="conversation"] button[aria-label="回到底部"], [data-pane="conversation"] button[aria-label="Scroll to bottom"], [data-pane="conversation"] textarea, [data-pane="conversation"] [contenteditable="true"], [data-dsh-dock-settings] :is(button, input, textarea, select, summary, [role="button"], [role="switch"]), [data-sidebar-right-panel] :is(button, input, textarea, select, summary, [role="button"], [role="switch"], [role="tab"], a[href], [contenteditable="true"])'
   let sprite, floating, previousTranslate, offset = { x: 0, y: 0 }, frame, dragging = false, disposed = false
   let settingsPage, previousRailWidth, previousRailPriority
   const watched = new Set()
@@ -117,7 +117,7 @@ export function installPetControlClearance(resolveOffset, resolveRailOffset) {
       || [...record.addedNodes, ...record.removedNodes].some(node => node.matches?.('[data-dsh-pet-root]')
         || node.matches?.(selector) || node.querySelector?.(selector)))) schedule()
   })
-  observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-dsh-dock-settings'] })
+  observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-dsh-dock-settings', 'data-sidebar-right-open', 'data-sidebar-right-panel', 'aria-hidden'] })
   const positionObserver = new MutationObserver(schedule)
   const surfaceObserver = new MutationObserver(schedule)
   const sizeObserver = globalThis.ResizeObserver ? new ResizeObserver(schedule) : undefined
