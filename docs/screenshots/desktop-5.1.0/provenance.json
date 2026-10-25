@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "version": "5.1.0",
+  "tag": "desktop-v5.1.0",
+  "commit": "eb1223ddfee78eccadd76d8022501cd1806d9d3d",
+  "runId": 40199647851,
+  "runUrl": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851",
+  "windowsJobUrl": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851/job/121187947949",
+  "sourceArtifact": "desktop-qa-5.1.0-windows-x64",
+  "collection": "formal-tag-qa",
+  "platform": "win32",
+  "architecture": "x64",
+  "runtimeSdk": "0.2.1-rc.2",
+  "electron": "44.0.0",
+  "imageTransform": "none; byte-for-byte copies of original PNG files",
+  "boundary": "Final tag Windows isolated QA only; not macOS/Linux screenshots, all-controls-visible, physical-device, real paid-flow or power-loss rollback acceptance. Image hashes are not installer checksums. No diagnostic composites or simulated-model conversation screenshots are included.",
+  "fixtureBoundary": "The Dock script stubs only the external market feed; that feed is not displayed in the selected settings pages. Test-created workspaces and unconfigured models remain labelled. Main-WebContents and settings-child captures are not represented as desktopCapturer whole-window images.",
+  "images": [
+    {
+      "file": "main.png",
+      "websiteAsset": "desktop-5.1.0-main.png",
+      "source": "dock/main-pet-preserved.png",
+      "captureMode": "electron-main-webcontents",
+      "script": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
+      "line": 647,
+      "state": "Isolated empty main conversation, unauthenticated bai and test-created workspace; main pet preserved; no paid-model task.",
+      "width": 1024,
+      "height": 720,
+      "bytes": 67692,
+      "sha256": "48f972a7f91c001472976402bc73381ddb3c2325d47e5ca8bd8d3176e8a0f6d4"
+    },
+    {
+      "file": "settings-light.png",
+      "websiteAsset": "desktop-5.1.0-settings-light.png",
+      "source": "dock/dock-light.png",
+      "captureMode": "native-window-desktop-capturer",
+      "script": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
+      "line": 459,
+      "state": "Actual light host and child together; unconfigured executor, unauthenticated controller; strategy text partially clipped at scroll edge.",
+      "width": 960,
+      "height": 680,
+      "bytes": 53263,
+      "sha256": "4c5d4e7f9c34f5e86be53c7d0102fe49c4c0945237e149b1df26c56e06e89c7d",
+      "captureRecord": "dock/dock-light-capture.json",
+      "captureReceipt": {
+        "mode": "native-window-desktop-capturer",
+        "platform": "win32",
+        "expectedTheme": "light",
+        "expectedColor": [
+          255,
+          255,
+          255
+        ],
+        "sampledColor": [
+          255,
+          255,
+          255
+        ]
+      }
+    },
+    {
+      "file": "settings-dark.png",
+      "websiteAsset": "desktop-5.1.0-settings-dark.png",
+      "source": "dock/dock-dark.png",
+      "captureMode": "native-window-desktop-capturer",
+      "script": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
+      "line": 459,
+      "state": "Actual dark host and child together; unconfigured executor, unauthenticated controller; strategy text partially clipped at scroll edge.",
+      "width": 960,
+      "height": 680,
+      "bytes": 53100,
+      "sha256": "b1ab693d29fa8b09dfa263d1e61bf952aff0cd2e1cc583dc49cae1d1ed17b7f1",
+      "captureRecord": "dock/dock-dark-capture.json",
+      "captureReceipt": {
+        "mode": "native-window-desktop-capturer",
+        "platform": "win32",
+        "expectedTheme": "dark",
+        "expectedColor": [
+          10,
+          20,
+          27
+        ],
+        "sampledColor": [
+          10,
+          20,
+          27
+        ]
+      }
+    },
+    {
+      "file": "sidebar-cards.png",
+      "websiteAsset": "desktop-5.1.0-sidebar-cards.png",
+      "source": "native-settings/sidebar-cards.png",
+      "captureMode": "electron-main-webcontents",
+      "script": "apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs",
+      "line": 115,
+      "state": "Actual sidebar-card settings after reversible ordinary clicks; scrolled content, not a full control inventory.",
+      "width": 1024,
+      "height": 720,
+      "bytes": 88503,
+      "sha256": "09ea315c12534373ade21f858ed1db8f8c47a7eda8ce06321c93cdddc23226a5"
+    },
+    {
+      "file": "control-center.png",
+      "websiteAsset": "desktop-5.1.0-control-center.png",
+      "source": "dock/control-center.png",
+      "captureMode": "electron-settings-child-webcontents",
+      "script": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
+      "line": 325,
+      "state": "Actual embedded Smart Control form, capabilities disabled; content capture only, not the whole OS window.",
+      "width": 760,
+      "height": 648,
+      "bytes": 60646,
+      "sha256": "5bbe460e23dc3a811e20b0ca77a1c0dc84c603f0f29924155c79370f51c7c569"
+    },
+    {
+      "file": "bai-models.png",
+      "websiteAsset": "desktop-5.1.0-bai-models.png",
+      "source": "dock/models.png",
+      "captureMode": "electron-settings-child-webcontents",
+      "script": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
+      "line": 325,
+      "state": "Actual unconfigured bai/third-party model settings before the separate model-catalog fixture suite; no real sign-in/payment proof.",
+      "width": 760,
+      "height": 648,
+      "bytes": 45118,
+      "sha256": "2bafb01760ffb5351c91c5758520f08803494a8c709e47024eb256bbda125305"
+    }
+  ]
+}

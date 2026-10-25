@@ -1,11 +1,13 @@
 # macOS unsigned preview install guide
 
+English | [中文](macos-preview.zh.md)
+
 This page covers installing the unsigned contributor preview of **DeepSeek Harness Desktop** on Apple Silicon. Official Windows install steps remain in the root [README.en.md](../README.en.md) and [desktop.md](desktop.md).
 
 ## Scope and limits
 
 - Apple Silicon (arm64) only. Intel Macs are not supported; Rosetta cannot run an arm64 build.
-- The 5.1.0 candidate requires **macOS 13 Ventura or later**, because [Electron 44 removes macOS 12 support](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support). This is a compatibility floor, not evidence that every supported macOS version was tested. 5.1.0 native macOS gates are still required; the published 5.0.1 release is separate historical evidence.
+- Desktop 5.1.0 requires **macOS 13 Ventura or later**, because [Electron 44 removes macOS 12 support](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support). This is a compatibility floor, not evidence that every supported macOS version was tested. Native arm64 packaging, integrity and launch smoke passed in [formal tag run 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851) at `eb1223ddfee78eccadd76d8022501cd1806d9d3d`.
 - This is an unsigned preview, not a stable distribution, and it is not on the Mac App Store.
 - macOS uses the system Git. MinGit is not bundled. If `git --version` fails, install Xcode Command Line Tools with `xcode-select --install`.
 - Preview builds have no in-app auto-update. **Help > Check for Updates** explains this. Download the matching version from [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases). A three-platform release includes macOS Preview assets alongside Windows and Linux; the release being marked Latest does not make the macOS package a stable or signed build.
@@ -23,6 +25,8 @@ xattr -dr com.apple.quarantine "/Applications/DeepSeek Harness Desktop.app"
 
 4. If Gatekeeper still blocks it: open **System Settings > Privacy & Security** and choose **Open Anyway**. Do not expect a right-click Open shortcut.
 5. Launch **DeepSeek Harness Desktop**.
+
+The [5.1.0 DMG and ZIP](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) are public; both were independently downloaded and verified against actual bytes, GitHub digests and the combined `SHA256SUMS.txt`/`release-manifest.json`. Real physical-Mac installation, every supported OS release and paid-model flows are not implied by Runner smoke. Local betas already numbered 5.1.0 require a manual formal-package download and overlay, not a promised same-version auto-update. The actual public ZIP payload's telemetry endpoint and `officialBuild: true` were verified; production-event submission and storage were not tested.
 
 ## Contributor checklist
 

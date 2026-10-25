@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "kind": "desktop-formal-release-receipt",
+  "version": "5.1.0",
+  "tag": "desktop-v5.1.0",
+  "sourceSHA": "eb1223ddfee78eccadd76d8022501cd1806d9d3d",
+  "publishedAt": "2026-10-25T15:09:51Z",
+  "releaseId": 423475789,
+  "releaseUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0",
+  "draft": false,
+  "prerelease": false,
+  "manifest": "../launch/release-manifest-all-platforms.json",
+  "evidenceRoot": "E:\\DeepSeekHarnessDesktop-Build\\artifacts\\desktop-5.1.0-release-20261025",
+  "evidencePathConvention": "Receipt and snapshot paths are relative to evidenceRoot; runner paths inside original receipts are retained unchanged.",
+  "publicVerification": {
+    "receipt": "public-release-verified.json",
+    "releaseApi": "public-release-api.json",
+    "installationFiles": 5,
+    "actualBytesVerified": true,
+    "githubSizesAndDigestsVerified": true,
+    "combinedChecksumsVerified": true,
+    "windowsUpdaterSha512Verified": true,
+    "publicWindowsManifestVerified": true,
+    "preflightHashesUsed": false
+  },
+  "workflows": {
+    "preflight": {
+      "runId": "40193665045",
+      "url": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40193665045",
+      "receipt": "final-preflight.final.json",
+      "sameSourceSHA": true,
+      "conclusion": "success",
+      "nativeJobs": { "windows": "success", "macos": "success", "linux": "success" },
+      "publish": "skipped"
+    },
+    "formal": {
+      "runId": "40199647851",
+      "url": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851",
+      "receipt": "formal-tag-run.final.json",
+      "log": "formal-tag-complete.log",
+      "sameSourceSHA": true,
+      "conclusion": "success",
+      "nativeJobs": { "windows": "success", "macos": "success", "linux": "success" },
+      "publish": "success"
+    }
+  },
+  "windowsAcceptance": {
+    "sourceCore": {
+      "receipt": "formal-tag-qa/source-core.json",
+      "status": "passed",
+      "passedSuites": 28,
+      "totalSuites": 28,
+      "acceptedIssues": []
+    },
+    "packagedFull": {
+      "receipt": "formal-tag-qa/packaged-full.json",
+      "status": "passed",
+      "passedSuites": 44,
+      "totalSuites": 44,
+      "acceptedIssues": []
+    },
+    "realSetup": {
+      "environment": "disposable native GitHub Actions Windows runner",
+      "preservationContract": "Old Home is initialized by the previous release, then seeded with offline provider/session fixtures. Setup preserves snapshot bytes; new runtime launches preserve provider/session semantics while allowing valid migrations.",
+      "providerIds": ["openai-codex", "setup-upgrade-fixture"],
+      "sessionId": "setup-upgrade-preservation",
+      "sessionMessages": 1,
+      "upgrades": [
+        {
+          "previousVersion": "4.3.0",
+          "receipt": "formal-tag-qa/setup-from-4.3.0.json",
+          "snapshotDirectory": "formal-tag-qa/setup-from-4.3.0-old-home",
+          "freshProfilePreserved": true,
+          "upgradeProfilePreserved": true,
+          "installationBytesPreserved": true,
+          "runtimeDataPreserved": true
+        },
+        {
+          "previousVersion": "5.0.0",
+          "receipt": "formal-tag-qa/setup-from-5.0.0.json",
+          "snapshotDirectory": "formal-tag-qa/setup-from-5.0.0-old-home",
+          "freshProfilePreserved": true,
+          "upgradeProfilePreserved": true,
+          "installationBytesPreserved": true,
+          "runtimeDataPreserved": true
+        },
+        {
+          "previousVersion": "5.0.1",
+          "receipt": "formal-tag-qa/setup-from-5.0.1.json",
+          "snapshotDirectory": "formal-tag-qa/setup-from-5.0.1-old-home",
+          "freshProfilePreserved": true,
+          "upgradeProfilePreserved": true,
+          "installationBytesPreserved": true,
+          "runtimeDataPreserved": true
+        }
+      ]
+    }
+  },
+  "formalUnitTests": {
+    "log": "formal-tag-complete.log",
+    "desktop": {
+      "windows": { "tests": 1943, "passed": 1943, "failed": 0, "skipped": 0 },
+      "macos": { "tests": 1943, "passed": 1906, "failed": 0, "skipped": 37 },
+      "linux": { "tests": 1943, "passed": 1906, "failed": 0, "skipped": 37 }
+    },
+    "scripts": {
+      "windows": { "tests": 213, "passed": 213, "failed": 0, "skipped": 0 },
+      "macos": { "tests": 213, "passed": 213, "failed": 0, "skipped": 0 },
+      "linux": { "tests": 213, "passed": 213, "failed": 0, "skipped": 0 }
+    }
+  },
+  "historicalFailures": [
+    {
+      "runId": "40179041237",
+      "url": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40179041237",
+      "sourceSHA": "a3bb56148a44ef1bce3ae71059fc6820bbf8e86d",
+      "conclusion": "failure",
+      "currentGate": false,
+      "receipt": "preflight-failed-diagnostics/.tmp/release-qa/source-core.json",
+      "stage": "windows-source-core",
+      "passedSuites": 27,
+      "totalSuites": 28,
+      "failedSuites": ["Directory Picker & Workspace Import"],
+      "publish": "skipped"
+    },
+    {
+      "runId": "40181531589",
+      "url": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40181531589",
+      "sourceSHA": "57998820b1063c818e9fdd3a3daf2700319b8de4",
+      "conclusion": "failure",
+      "currentGate": false,
+      "receipt": "corrected-preflight-qa/packaged-full.json",
+      "stage": "windows-packaged-full",
+      "passedSuites": 41,
+      "totalSuites": 44,
+      "failedSuites": ["Packaged Model Preferences Card", "Packaged Session Message & Agent Tool Work", "Skin Center Live Apply & Relaunch Persistence"],
+      "publish": "skipped"
+    }
+  ],
+  "platformBoundaries": {
+    "windows-x64": { "status": "stable", "signature": "unsigned" },
+    "macos-arm64": { "status": "preview", "minimumSystemVersion": "13.0", "signature": "unsigned-unnotarized" },
+    "linux-x64": {
+      "status": "preview",
+      "signature": "unsigned",
+      "validatedEnvironment": "current native Ubuntu 22.04 GitHub Actions runner",
+      "sandboxEnforcement": "partial",
+      "verified": ["deny-write", "native packaged smoke"],
+      "fullSandboxVerified": false
+    }
+  },
+  "telemetry": {
+    "receipt": "formal-telemetry-payload-verified.json",
+    "verifiedFromActualPublicPayload": true,
+    "payloads": ["windows-setup", "macos-zip", "linux-deb"],
+    "officialBuild": true,
+    "endpoint": "https://guanli.1521003.xyz/v1/events",
+    "productionEventSubmitted": false,
+    "productionIngestionVerified": false
+  },
+  "compliance": {
+    "sdkSource": "official public NPM @deepseek-ai/*",
+    "sdkVersion": "0.2.1-rc.2",
+    "electronVersion": "44.0.0",
+    "officialSourceModified": false,
+    "npmPublished": false,
+    "signed": false,
+    "tagOverwritten": false
+  },
+  "unverified": ["physical-device acceptance", "power-loss recovery", "real paid-provider authorization and billing", "production telemetry ingestion"],
+  "pages": { "status": "pending", "deploymentVerified": false }
+}

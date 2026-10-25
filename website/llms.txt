@@ -1,57 +1,58 @@
 # DeepSeek Harness Desktop
 
-> Community-maintained open-source AI coding desktop. Desktop 5.0.1 uses public `@deepseek-ai/dsh@0.2.0-rc.2`, prioritizes reliable upgrades and is published as one version across Windows, macOS and Linux. Native tests, packaging and smoke checks passed on all three platforms.
+> Community-maintained open-source AI coding desktop. Published Desktop 5.1.0 uses official public NPM Runtime/SDK 0.2.1-rc.2 and Electron 44.0.0, without modifying official sources. Windows x64, macOS arm64 Preview and Linux x64 Preview assets share one verified Release.
 
 ## Canonical identity
 
-- Product: DeepSeek Harness Desktop
-- Version: 5.0.1, published 2026-10-06 UTC
-- Platforms: Windows 10/11 x64 stable; macOS Apple Silicon arm64 Preview; Linux x64 Preview
-- License: BSD-3-Clause
-- Maintainer: ningbai牛逼
-- Not an official DeepSeek product
+- Product: DeepSeek Harness Desktop; not an official DeepSeek client
+- Version: 5.1.0; tag desktop-v5.1.0; published 2026-10-25T15:09:51Z
+- Source commit: eb1223ddfee78eccadd76d8022501cd1806d9d3d
+- Platforms: Windows 10/11 x64; macOS 13+ Apple Silicon arm64 Preview; Linux x64 Preview
+- Linux 5.1.0 native CI: Ubuntu 22.04 only; Ubuntu 24 historical evidence does not establish current-version acceptance
+- All platforms unsigned; macOS unnotarized; Preview does not imply physical-device acceptance
+- License: BSD-3-Clause; maintainer: ningbai牛逼
 
 ## Official links
 
-- Product website: https://1521003.xyz/
-- Source repository: https://github.com/ningbainb/deepseek-harness-desktop
+- Website: https://1521003.xyz/
+- Repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe
-- macOS arm64 Preview DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-5.0.1-arm64.dmg
-- Linux x64 Preview AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/DeepSeek-Harness-Desktop-5.0.1-x86_64.AppImage
-- v5.0.1 release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.0.1
-- SHA-256 list: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/SHA256SUMS.txt
-- Release manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.0.1/release-manifest.json
-- Privacy policy: https://1521003.xyz/privacy.html
+- Release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0
+- Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe
+- macOS arm64 DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-arm64.dmg
+- macOS arm64 ZIP: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-arm64.zip
+- Linux x64 AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-x86_64.AppImage
+- Linux x64 DEB: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-amd64.deb
+- Combined checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/SHA256SUMS.txt
+- Manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/release-manifest.json
+- Formal tag workflow: https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851
+- Release notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes.md
+- Screenshot provenance: https://1521003.xyz/assets/desktop-5.1.0-provenance.json
+- Privacy: https://1521003.xyz/privacy.html
 
-## 5.1.0 candidate preparation — not published
+## Published 5.1.0
 
-- Status: local unsigned Windows x64 beta evidence only, dated 2026-10-23. Public stable downloads and global homepage release metadata remain 5.0.1. Authorization for an unsigned three-platform release is not proof that publication or its native gates have completed.
-- Candidate stack: official NPM Runtime/SDK 0.2.1-rc.2 and Electron 44.0.0, without official-source changes. macOS candidate requires Apple Silicon arm64 and macOS 13 Ventura or later, remains unsigned/unnotarized Preview; Linux x64 remains Preview. Windows evidence does not establish either platform's acceptance.
-- Changes: consumer-acknowledged streaming backpressure without truncation; asynchronous authorized frontend reads; prompt HMR graph rescans; installation-directory discovery and transactional registry recovery; first-use market consent and recoverable source replacement. Market feedback, translation, automatic updates and project-layout scanning default off; translation may send documents to a model, feedback may open a public GitHub Issue, and activation consent is not a sandbox.
-- Simplified frameless Dock/settings retain all 15 destinations, search, controls, advanced details, critical risk notices, selection, keyboard focus and saved configuration. Dedicated settings documents exclude the floating pet and rail; the main conversation pet and its settings remain available. Existing chat, plugins, Skills, model access, independent APIs, tray behavior and 15 skins remain.
-- Local beta evidence: actual Setup-extracted payload core regression 28/28, streaming tests 99/99, settings tests 314/314; Desktop unit tests 1884 total, 1882 passed, zero failed, two existing skips. These are candidate records, not final release-commit verification. No general speedup or cold-start percentage is established.
-- Still required: clean-runner real Setup fresh installation, separate 4.3.0/5.0.0/5.0.1 upgrades, same-version overlay and data preservation; native macOS/Linux checks; final Release assets and exact checksums. Local isolated fixtures do not prove physical installation/rollback, and Electron-boundary consent simulation does not prove physical-dialog clicks. No 5.1.0 formal installer hash or publication date is claimed here.
-- Candidate notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes.md
-- Candidate screenshot provenance: https://1521003.xyz/assets/desktop-5.1.0-candidate-sources.json (local Windows native-window images, not cloud/final-release or other-platform captures; image hashes are not installer hashes).
+- Consumer-read acknowledgements bound normal streaming by count and serialized bytes, preserving complete ordered text, code, history and tool output through pause/resume and cancellation. Oversized-history/lookahead exceptions mean this is not a process-wide memory cap or a general percentage speedup claim.
+- Frontend reads are asynchronous and coalesced per file while retaining per-request authorization, SPA/HEAD/cache and Windows path protections. HMR rescans after graph refresh without dropping generation/concurrency protections.
+- Installation-directory candidates are validated individually, with per-entry registry recovery, backups and foreign-edit protection.
+- Frameless settings retain all 15 destinations, search, controls, advanced details, critical risk notices, selection and keyboard focus. Only dedicated Dock/settings windows exclude the floating pet; the main conversation pet and configuration remain.
+- First-use skill-market activation requires informed consent, which is not an execution sandbox. Feedback, translation, automatic updates and project-layout scanning default off. Translation may send documents to a selected model and incur costs; feedback may create a public GitHub Issue. Managed source replacement is staged and recoverable; local Skill Center entries remain.
+- Official default appearance, saved upgrade skins/backgrounds, 15 skins, collapsible keyboard-accessible sidebar tools, footer Dock, Today spending, tray restoration/quit, bai authorization, independent APIs, plugins, Skills, complete history and existing settings remain.
+- Task Board, Git/Worktree, SSH, Browser Use, Computer Use, QQ Bot, paired remote access, reasoning controls, memory and optional manually reviewed context summaries remain available. No automatic top-ups or paid message resends are introduced.
 
-## Published 5.0.1
+## Verified release evidence and limits
 
-- New profiles use the official appearance while upgrades retain skins and explicit preferences. Streaming avoids repeated sidebar scans without truncating text, code or tool output; this is not a guarantee of stall-free behavior on every device.
-- Sidebar tools collapse, expand by keyboard and persist across restart; the footer Dock and Today spending are the sole primary shortcuts. Opaque light/dark Dock panels clear stale palettes and retain all 15 destinations, search and focus.
-- The App menu supports tray minimization, restoration, explicit exit and taskbar fallback. Windows updates recognize existing installation directories and retain transactional backup and rollback.
-- Current screenshots are isolated Windows captures of the same-release-commit candidate, not macOS/Linux screenshots or physical-device acceptance; configuration captures combine simultaneous real host and embedded WebContents views.
+- Tag workflow 40199647851 passed all three native platform jobs and publication on the exact commit. Windows source core passed 28/28 and full packaged regression 44/44 without accepted failures.
+- Windows Desktop tests passed 1943/1943 with zero skips. macOS/Linux each passed 1906 with 37 existing platform skips and zero failures out of 1943. Scripts passed 213/213 on each platform; do not describe all three as 1943 passing.
+- Disposable Windows Runner real Setup covered fresh installation, separate 4.3.0/5.0.0/5.0.1 upgrades, same-version overlays, relaunch, uninstall and old provider/session data preservation using pre-upgrade snapshots. This is not physical-machine power-loss rollback acceptance.
+- All five public installation files were independently downloaded and verified against actual byte sizes, SHA-256, GitHub digests and combined receipts; Windows updater SHA-512 and manifest were also checked. Windows installer: 332646913 bytes; SHA-256 6cb86ddc8f93c8b61f29ec404f44660d9bc91acb99973d193b094e91db1d26f7.
+- Website/docs images use final tag QA Windows originals. Native Dock captures include host and actual child together; main/embedded WebContents captures are separately labelled. No diagnostic composites or simulated-model conversation images are presented as ordinary pages. Unconfigured states and real scroll-edge clipping remain visible; no macOS/Linux screenshot, paid-flow or all-controls-visible claim is made.
+- Anonymous opt-out product metrics retain the existing policy and exclude conversations, prompts, code, paths and credentials. Actual public Windows Setup, macOS ZIP and Linux DEB payloads were inspected for the official telemetry endpoint and officialBuild=true. No production event was submitted and production ingestion/storage was not verified. Diagnostics remain explicit-consent local exports.
+- Local betas already numbered 5.1.0 require manually downloading and overlay-installing the formal package; same-version automatic updates are not promised.
+- Historical 5.0.1 notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes-5.0.1.md
 
-- Desktop 5.0.1 uses official NPM Runtime 0.2.0-rc.2 with public dsh-web-all 0.4.4 and reviewed Desktop adapters. Release run 37499057103 passed all three native platform jobs; Windows packaged regression passed 43/43, source regression 27/27, with fresh installation, 4.3.0 and 5.0.0 upgrades, same-version overlays and data-preserving relaunch on disposable runners. Other installed versions and physical macOS/Linux devices are not covered by those checks.
-- bai authorization discovers and refreshes the actual model catalog, preferring available deepseek-flash. Authentication errors offer browser sign-in; there is no automatic payment or resend.
-- Official builds include anonymous, opt-out product metrics; conversation content, prompts, code, paths and API keys are not collected.
-- Large histories use authenticated fragmentation and complete reassembly without truncating messages or tool output. A logical message exceeding 32 MiB fails explicitly.
-- Configuration preservation, Skin Center stylesheet ownership and 4.4.0 branding are included. Dock, third-party model integration and Skills remain available.
-- Optional manual context summaries require user review; history is not uploaded automatically and no paid model is called automatically.
-- Historical 4.0.0 screenshots and release links below are retained as version-labelled evidence. Confirm the actual GitHub Release before downloading; installer size and SHA-256 must come from that exact artifact.
-
-## What is new in 4.0.0
+## Historical 4.0.0 capabilities
 
 - The manual terminal offers PowerShell, PowerShell 7, WSL, and CMD on Windows; Agent WSL is a separate opt-in tool with per-command approval by default.
 - Agent Team, Browser Use, and Computer Use changes preflight the plugin environment and report restart or rollback progress.
@@ -67,4 +68,4 @@
 
 ## Release boundary
 
-Windows is intentionally unsigned. macOS is unsigned and unnotarized. macOS and Linux are Preview platforms. One GitHub Release is created only after all three platform jobs succeed; GitHub Pages is deployed only after its download URLs are verified.
+The GitHub Release and public installer-byte verification are complete; website source preparation is not proof of a Pages deployment or external site acceptance. macOS/Linux retain Preview limits, and physical-device, real paid-model and production-telemetry acceptance are not implied.

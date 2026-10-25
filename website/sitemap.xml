@@ -3,18 +3,30 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://1521003.xyz/</loc>
-    <lastmod>2026-10-06</lastmod>
+    <lastmod>2026-10-25</lastmod>
     <image:image>
-      <image:loc>https://1521003.xyz/assets/desktop-5.0.1-control-center.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 5.0.1 Windows 智能操控中心</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-control-center.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 智能操控内嵌设置页</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://1521003.xyz/assets/desktop-5.0.1-skills.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 5.0.1 Windows 会话 Skills 与技能中心</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-settings-dark.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 暗色原生拓展坞</image:title>
     </image:image>
     <image:image>
-      <image:loc>https://1521003.xyz/assets/desktop-5.0.1-bai-models.webp</image:loc>
-      <image:title>DeepSeek Harness Desktop 5.0.1 Windows bai 模型接入</image:title>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-bai-models.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 模型接入内嵌设置页</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-main.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 默认官方外观与空会话</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-settings-light.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 浅色原生拓展坞</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://1521003.xyz/assets/desktop-5.1.0-sidebar-cards.png</image:loc>
+      <image:title>DeepSeek Harness Desktop 5.1.0 Windows 侧边卡片设置</image:title>
     </image:image>
     <image:image>
       <image:loc>https://1521003.xyz/assets/desktop-3.2.0-value-mode-setup.webp</image:loc>
@@ -31,6 +43,6 @@
   </url>
   <url>
     <loc>https://1521003.xyz/privacy.html</loc>
-    <lastmod>2026-10-03</lastmod>
+    <lastmod>2026-10-25</lastmod>
   </url>
 </urlset>

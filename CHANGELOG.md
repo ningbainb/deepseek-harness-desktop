@@ -1,20 +1,22 @@
 # Changelog
 
-## 5.1.0 - Unreleased candidate
+## 5.1.0 - 2026-10-25
 
-- 候选使用官方 NPM Runtime/SDK `0.2.1-rc.2`、Electron `44.0.0`；macOS arm64 要求 macOS 13 Ventura 及以上，macOS/Linux 仍为 Preview。当前公开下载仍为 5.0.1，不声明 5.1.0 三端发布完成。
+- 三端同版发布，官方 NPM Runtime/SDK `0.2.1-rc.2`、Electron `44.0.0`；macOS arm64 要求 macOS 13 Ventura 及以上，未签名、未公证，macOS/Linux 仍为 Preview。Linux 本版仅 Ubuntu 22.04 原生 Runner 验证，Ubuntu 24 历史证据不冒充新版。
 - 消费确认与有界流式背压保留顺序和完整内容；异步前端资源读取保留逐请求授权及缓存语义，HMR 图刷新后及时重扫剩余变更，不宣传普遍加速百分比。
 - 安装目录候选逐项校验，注册表失败逐项恢复，保留备份与外来替换保护；修复真实 NSIS 严格编译的 include 顺序。
 - 技能市场首次启用说明执行风险，取消不改配置；反馈、翻译、自动更新及项目布局扫描默认关闭，受管来源采用可恢复替换事务。确认不是沙箱，保留本地技能入口。
 - 无框设置去除装饰竖线、隔板和章节框，保留全部 15 导航、搜索、控件、高级详情、风险提示和焦点；独立设置不挂载宠物，主宠物、聊天、配置和既有工作台功能保全。
-- 本地 Windows 候选实际 Setup 提取载荷核心回归 28/28，流式 99/99，设置 314/314；不是正式发布提交、真实 Setup 新装/升级/卸载或 macOS/Linux 原生验收。正式门禁与资产校验仍须完成，原始失败及后续复测分别记录。
+- 正式标签工作流 40199647851 在 `eb1223ddfee78eccadd76d8022501cd1806d9d3d` 三端与 publish 全成功：Windows core 28/28、packaged-full 44/44 无豁免，Windows Desktop 1943/1943 零跳过，macOS/Linux 各 1906 通过、37 项既有平台跳过、零失败（各 1943），scripts 三端均 213/213；真实 Setup 新装、4.3.0/5.0.0/5.0.1 分别升级、同版覆盖、重启、卸载与旧 provider/会话数据保全通过。五个公开安装文件实际字节、SHA-256、GitHub digest 与合并清单独立核验，Windows updater SHA-512 与 manifest 同步验证；旧失败单列保留。
+- 三端均未签名；同号 5.1.0 本地内测须手动下载正式包覆盖。三端公开 Setup/ZIP/DEB 载荷已核实正式 telemetry 配置，保留匿名统计与 opt-out；未提交生产事件或验收入库。最终 QA 截图仅代表 Windows 隔离界面，不代表物理跨平台、真人付费或断电回滚验收。
 
-- Candidate uses official NPM Runtime/SDK `0.2.1-rc.2` and Electron `44.0.0`; macOS arm64 requires macOS 13 Ventura or later, and macOS/Linux remain Preview. Public downloads remain 5.0.1; no completed 5.1.0 three-platform release is claimed.
+- Published one version across three platforms with official NPM Runtime/SDK `0.2.1-rc.2` and Electron `44.0.0`. macOS arm64 requires macOS 13 Ventura or later, unsigned/unnotarized; macOS/Linux remain Preview. Linux 5.1.0 native verification is Ubuntu 22.04 only, not historical Ubuntu 24 evidence.
 - Consumer acknowledgements and bounded streaming backpressure retain order and complete content. Async frontend reads preserve per-request authorization/caching, and HMR promptly rescans after graph refresh, without claiming general percentage speedups.
 - Installation candidates are validated individually, with per-entry registry recovery, backups and foreign-replacement protection; installer include ordering supports actual strict NSIS compilation.
 - First-use market activation explains execution risks and cancellation preserves configuration. Feedback, translation, automatic updates and project-layout scanning default off; managed source replacements use recoverable transactions. Consent is not a sandbox, and local skill entries remain.
 - Frameless settings remove decorative rules, dividers and section frames while retaining all 15 destinations, search, controls, advanced details, risk notices and focus. Dedicated settings exclude the pet; the main pet, chat, configuration and existing workbench remain.
-- Local Windows candidate Setup-extracted payload passed core regression 28/28, streaming 99/99 and settings 314/314. This is not formal release-commit verification, real Setup fresh/upgrade/uninstall or native macOS/Linux acceptance. Formal gates and asset verification remain required; original failures and later reruns stay separate.
+- Formal tag workflow 40199647851 passed all three platforms and publication at `eb1223ddfee78eccadd76d8022501cd1806d9d3d`: Windows core 28/28 and packaged-full 44/44 without waivers, Windows Desktop 1943/1943 with zero skips; macOS/Linux each 1906 passed, 37 existing platform skips and zero failures out of 1943; scripts 213/213 on each platform. Real Setup covered fresh installation, separate 4.3.0/5.0.0/5.0.1 upgrades, overlay, restart, uninstall and old provider/session preservation. All five public installation files matched independently downloaded bytes, SHA-256, GitHub digests and the combined receipt; Windows updater SHA-512 and manifest were also verified. Earlier failures remain separate.
+- All platforms are unsigned; same-version 5.1.0 local beta users must manually download and overlay the formal package. Actual public Setup/ZIP/DEB payloads contain verified formal telemetry configuration, retaining anonymous opt-out metrics; no production event was submitted or stored as an acceptance check. Final QA screenshots represent isolated Windows UI only, not physical cross-platform, real paid-flow or power-loss rollback acceptance.
 
 ## 5.0.1 - 2026-10-06
 

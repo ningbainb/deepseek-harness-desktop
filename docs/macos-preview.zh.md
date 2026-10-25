@@ -1,11 +1,13 @@
 # macOS 未签名预览版安装说明
 
+[English](macos-preview.md) | 中文
+
 本文说明如何在 Apple Silicon Mac 上安装 **DeepSeek Harness Desktop** 的未签名贡献者预览包。正式 Windows 安装仍见根目录 [README.md](../README.md) 与 [desktop.md](desktop.md)。
 
 ## 适用与限制
 
 - 只支持 Apple Silicon（arm64）。Intel Mac 不能用，Rosetta 也无法反向兼容。
-- 5.1.0 候选要求 **macOS 13 Ventura 及以上**，因为 [Electron 44 已移除 macOS 12 支持](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support)。这是兼容下限，不是所有支持系统版本均已实测的结论；5.1.0 仍须完成原生 macOS 门禁，已发布的 5.0.1 证据单独保留。
+- Desktop 5.1.0 要求 **macOS 13 Ventura 及以上**，因为 [Electron 44 已移除 macOS 12 支持](https://www.electronjs.org/blog/electron-44-0#removed-macos-12-support)。这是兼容下限，不是所有支持系统版本均已实测的结论；提交 `eb1223ddfee78eccadd76d8022501cd1806d9d3d` 已在[正式标签运行 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851)通过原生 arm64 打包、完整性与启动冒烟。
 - 这是未签名预览包，不是正式发行版。不上 Mac App Store。
 - mac 端使用系统 Git，不内置 MinGit。若 `git --version` 不可用，请安装 Xcode Command Line Tools：`xcode-select --install`。
 - 预览版没有自动更新。应用内「检查更新」会说明原因；请到 [GitHub Releases](https://github.com/ningbainb/deepseek-harness-desktop/releases) 手动下载对应版本。三端发布会把 macOS Preview 与 Windows、Linux 放在同一个 Release 中；Release 标为 Latest 并不代表 macOS 包已稳定或已签名。
@@ -23,6 +25,8 @@ xattr -dr com.apple.quarantine "/Applications/DeepSeek Harness Desktop.app"
 
 4. 若仍被拦截：打开 **系统设置 -> 隐私与安全性**，在被拦记录处选择 **仍要打开**。不要指望右键打开。
 5. 启动 **DeepSeek Harness Desktop**。
+
+[5.1.0 DMG 与 ZIP](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) 已公开，两者均独立下载，实际字节、GitHub digest 与合并 `SHA256SUMS.txt`/`release-manifest.json` 一致。Runner 冒烟不代表物理 Mac 安装、每个支持的系统版本或付费模型流程均已验收。同号 5.1.0 本地内测包须手动下载正式包覆盖，不承诺同号自动更新。已核实公开 ZIP 真实载荷的 telemetry endpoint 与 `officialBuild: true`，未测试生产事件提交或存储。
 
 ## 贡献者自检
 
