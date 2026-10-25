@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -10,6 +11,7 @@ import electronPath from 'electron'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
+import { assertModelCatalogProjection, createModelPreferencesFixture } from './model-catalog-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
@@ -26,6 +28,7 @@ let app
 let latestPage
 let fixtureWorkspaceId
 const lifecycleErrors = []
+const modelFixture = createModelPreferencesFixture()
 
 async function dismissStartup(page) {
   for (let attempt = 0; attempt < 16; attempt += 1) {
@@ -63,12 +66,12 @@ async function launch() {
     cwd: appDir,
     env: {
       ...process.env,
+      ...modelFixture.environment,
       DSH_DESKTOP_USER_DATA: userData,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_HOME: dshHome,
       DSH_AGENTS_HOME: join(userData, 'agents'),
-      PROJECT_RELAY_API_KEY: 'model-preferences-test-key',
     },
   })
   await useChineseFixtureLocale(instance)
@@ -190,7 +193,19 @@ async function configurePreferences(card) {
   const openaiRow = providerRows(card).filter({ hasText: 'openai-codex' }).first()
   const deepseekRow = providerRows(card).filter({ hasText: 'deepseek-official' }).first()
   const modelRows = openaiRow.locator('[class*="modelRow"]')
-  assert.equal(await modelRows.count(), 8)
+  const catalog = await card.page().evaluate(async rpcId => {
+    const response = await fetch('/api/session/modelCatalog', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ type: 'client-request', rpcId, method: 'session/modelCatalog', payload: { args: {} } }),
+    })
+    return { status: response.status, body: await response.json() }
+  }, randomUUID())
+  assert.equal(catalog.status, 200)
+  assert.equal(catalog.body?.type, 'server-response')
+  assert.equal(catalog.body?.result?.ok, true)
+  const group = catalog.body.result.value.groups.find(provider => provider.id === 'openai-codex')
+  assertModelCatalogProjection(await modelRows.locator('code').allTextContents(), group)
   const expectedPins = await modelRows.evaluateAll((rows) => ({
     modelIds: rows.slice(0, 2).map((row) => row.querySelector('code')?.textContent?.trim() || ''),
     labels: rows.slice(0, 2).map((row) => row.querySelector('span')?.textContent?.trim() || ''),
@@ -303,19 +318,7 @@ function assertOfficialModelCommand(rows) {
 try {
   await mkdir(workspace, { recursive: true })
   await mkdir(dshHome, { recursive: true })
-  await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify({
-    'llm-pi-ai': {
-      providers: {
-        'project-relay': {
-          baseURL: 'https://api.1521003.xyz/v1',
-          apiKeyEnv: 'PROJECT_RELAY_API_KEY',
-          api: 'openai-completions',
-          displayName: 'bai供应商',
-          models: [{ id: 'model-preferences-test', name: 'bai 测试模型' }],
-        },
-      },
-    },
-  }))
+  await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify(modelFixture.settings))
   const first = await launch()
   app = first.instance
   const firstPage = first.page

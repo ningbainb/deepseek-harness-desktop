@@ -5686,13 +5686,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs",
-      "line": 323,
+      "line": 303,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs",
-      "line": 415,
+      "line": 401,
       "operation": "DSH_HOME"
     },
     {
@@ -5710,7 +5710,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs",
-      "line": 69,
+      "line": 73,
       "operation": "DSH_HOME"
     },
     {
@@ -6016,7 +6016,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-skin-center.mjs",
-      "line": 66,
+      "line": 67,
       "operation": "DSH_HOME"
     },
     {

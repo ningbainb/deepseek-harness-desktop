@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
+import { waitForBackgroundSettings } from './skin-state-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -110,16 +111,6 @@ async function skinState(page) {
     const response = await fetch('/api/skin-center/v2/active', { cache: 'no-store' })
     return { status: response.status, payload: await response.json() }
   })
-}
-
-async function waitForBackgroundSettings(page, expected) {
-  await waitForAsyncPageFunction(page, async values => {
-    const response = await fetch('/api/dsh-web-ui-settings/describe', { method: 'POST' })
-    const payload = await response.json().catch(() => null)
-    const namespace = payload?.value?.namespaces?.find(entry => entry.ns === 'ui-skin-center')
-    if (!response.ok || payload?.ok !== true || namespace?.value === undefined) return false
-    return Object.entries(values).every(([field, value]) => namespace.value[field] === value)
-  }, expected, { timeout: 30_000 })
 }
 
 async function assertCssVariableRemains(page, property, expected, quietMs = 500) {

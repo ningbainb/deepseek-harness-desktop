@@ -13,6 +13,7 @@ import { _electron as electron } from 'playwright'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
+import { createSessionInWorkspace, reenterSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -234,27 +235,6 @@ async function openCreatedSession(page, sessionId, workspaceId) {
     sessionId, { timeout: 30_000 })
 }
 
-async function createSessionInWorkspace(page, workspaceId) {
-  const group = page.locator(`[role="treeitem"][data-row-key="workspace:${workspaceId}"]`)
-  await group.waitFor({ state: 'visible', timeout: 30_000 })
-  await group.hover()
-  const newSession = group.locator('button').last()
-  assert.match(await newSession.getAttribute('aria-label') ?? '', /会话|session/iu)
-  const [createdResponse] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname === '/api/session/create'
-      && response.request().postDataJSON()?.payload?.args?.request?.workspaceId === workspaceId,
-    { timeout: 30_000 }),
-    newSession.click(),
-  ])
-  const createdEnvelope = await createdResponse.json()
-  assert.equal(createdEnvelope.result?.ok, true)
-  const sessionId = createdEnvelope.result.value.sessionId
-  assert.equal(typeof sessionId, 'string')
-  await page.locator(`[role="treeitem"][data-row-key="session:${sessionId}"][aria-selected="true"]`)
-    .waitFor({ state: 'visible', timeout: 30_000 })
-  return sessionId
-}
-
 async function assertLargeHistory(page) {
   await page.waitForFunction(({ begin, end }) => {
     const text = document.body.textContent ?? ''
@@ -339,6 +319,7 @@ try {
   const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
   const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
   assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
+  const canonicalWorkspacePath = workspace?.workspace?.path ?? workspace?.path ?? workspacePath
   const sessionId = await createSessionInWorkspace(page, workspaceId)
   const selected = await rpc(page, 'session.selectModel', {
     sessionId,
@@ -354,7 +335,7 @@ try {
   assert.equal(typeof alternateWorkspaceId, 'string')
   const blankAlternateSessionId = await createSessionInWorkspace(page, alternateWorkspaceId)
   assert.notEqual(blankAlternateSessionId, sessionId)
-  assert.equal(await createSessionInWorkspace(page, workspaceId), sessionId,
+  assert.equal(await reenterSessionInWorkspace(page, workspaceId, sessionId, canonicalWorkspacePath), sessionId,
     'the official blank-session reentry must select the original empty session')
 
   const composer = page.locator(
@@ -386,8 +367,13 @@ try {
   await observeHistorySnapshots(page)
   const alternateSessionId = await createSessionInWorkspace(page, workspaceId)
   assert.notEqual(alternateSessionId, sessionId)
+  let previousAlternateWorkspaceSessionId = blankAlternateSessionId
   for (let iteration = 0; iteration < 2; iteration += 1) {
-    assert.equal(await createSessionInWorkspace(page, workspaceId), alternateSessionId,
+    const freshAlternateWorkspaceSessionId = await createSessionInWorkspace(page, alternateWorkspaceId)
+    assert.notEqual(freshAlternateWorkspaceSessionId, previousAlternateWorkspaceSessionId,
+      'the native New Session action must create a fresh identity even while another blank session exists')
+    previousAlternateWorkspaceSessionId = freshAlternateWorkspaceSessionId
+    assert.equal(await reenterSessionInWorkspace(page, workspaceId, alternateSessionId, canonicalWorkspacePath), alternateSessionId,
       'the official blank-session reentry must retain the same alternate session')
     assert.equal(await page.getByRole('paragraph').filter({ hasText: finalText }).count(), 0,
       'another session must not display the completed session history')
