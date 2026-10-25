@@ -29,5 +29,9 @@
 
 - Windows x64 为 unsigned Stable；macOS arm64 为 macOS 13+、unsigned/unnotarized Preview。
 - Linux x64 为 Preview；仅有当前原生 Ubuntu 22.04 runner 证据，sandbox enforcement 为 partial，仅验证 deny-write 与 native packaged smoke，不代表完整沙箱或其他发行版验收。
-- 实体机验收、断电恢复、真实付费授权/计费、生产埋点 ingestion 均未验证。Pages 无当前发布记录，归档为 pending，不预填部署成功。
+- 实体机验收、断电恢复、真实付费授权/计费、生产埋点 ingestion 均未验证。
 - 使用官方公开 NPM SDK `0.2.1-rc.2` 与 Electron `44.0.0`，官方源码零改动；本次未发布 NPM、未签名、未覆盖标签。
+
+## 官网部署
+
+[Pages 40208163862](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40208163862) 已成功部署提交 `1ebe1bd086521b532d2f5c249717de8f4872e7e2`。`pages-final.json` 与 `public-site-verified.json` 记录 [https://1521003.xyz/](https://1521003.xyz/) 的公网版本 `5.1.0`、Windows/macOS/Linux 三个平台下载链接 HTTP 200 与实际资产长度、六张原图及来源文件的逐字节核验、隐私页 HTTP 200，以及 1440×1000 和 390×844 两种浏览器视口的渲染验收，无脚本异常或横向溢出，未提交生产事件。浏览器验收不替代各平台原生应用验收；该提交只更新网站和文档，不改变已发布标签及安装资产。

@@ -168,5 +168,24 @@
     "tagOverwritten": false
   },
   "unverified": ["physical-device acceptance", "power-loss recovery", "real paid-provider authorization and billing", "production telemetry ingestion"],
-  "pages": { "status": "pending", "deploymentVerified": false }
+  "pages": {
+    "status": "passed",
+    "deploymentVerified": true,
+    "runId": "40208163862",
+    "runUrl": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40208163862",
+    "deployedCommit": "1ebe1bd086521b532d2f5c249717de8f4872e7e2",
+    "url": "https://1521003.xyz/",
+    "deploymentReceipt": "pages-final.json",
+    "publicVerificationReceipt": "public-site-verified.json",
+    "verifiedAt": "2026-10-25T15:46:05.030Z",
+    "publishedVersion": "5.1.0",
+    "platformDownloadHttpStatuses": { "windows-x64": 200, "macos-arm64": 200, "linux-x64": 200 },
+    "downloadContentLengthsVerified": true,
+    "deployedImageAndProvenanceBytesVerified": true,
+    "privacyHttpStatus": 200,
+    "browserViewports": [{ "width": 1440, "height": 1000 }, { "width": 390, "height": 844 }],
+    "browserExceptions": 0,
+    "horizontalOverflow": false,
+    "productionEventSubmitted": false
+  }
 }
