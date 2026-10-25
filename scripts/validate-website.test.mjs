@@ -57,6 +57,29 @@ test('website fallback installer matches the desktop release version', async () 
   assert.deepEqual(await collectWebsiteErrors(websiteHtml, expectedWebsiteVersion), [])
 })
 
+test('homepage hero uses one short introduction instead of a technical release report', () => {
+  const hero = /<section class="hero"[^>]*>([\s\S]*?)<\/section>/u.exec(websiteHtml)?.[1]
+  assert.ok(hero)
+  const introduction = hero.slice(0, hero.indexOf('<div class="hero-buttons">'))
+  const summaries = [...introduction.matchAll(/<p class="hero-summary">([^<]*)<\/p>/gu)]
+  assert.equal(summaries.length, 1)
+  assert.ok([...summaries[0][1]].length <= 36, 'the hero introduction stays within 36 characters')
+  assert.doesNotMatch(introduction, /Runtime|SDK|Electron|\d+\/\d+|背压|能力边界/u)
+})
+
+test('concise hero preserves its actions and keeps release details below the fold', () => {
+  const hero = /<section class="hero"[^>]*>([\s\S]*?)<\/section>/u.exec(websiteHtml)?.[0]
+  assert.ok(hero)
+  assert.match(hero, /data-download-source="hero"/u)
+  assert.match(hero, /https:\/\/qm\.qq\.com\//u)
+  assert.match(hero, /data-star-cta/u)
+  assert.match(hero, /href="#features"/u)
+  const details = websiteHtml.slice(websiteHtml.indexOf(hero) + hero.length)
+  assert.match(details, /SDK/u)
+  assert.match(details, /SHA-256/u)
+  assert.match(details, /Preview/u)
+})
+
 test('website validation rejects stale fallback installers', async () => {
   const html = websiteHtml.replaceAll(expectedWebsiteVersion, '0.1.9')
   const errors = await collectWebsiteErrors(html, expectedWebsiteVersion)
