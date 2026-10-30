@@ -170,9 +170,9 @@ try {
         const shortcutPath = join(install, 'isolated-launch.lnk')
         const shortcutBytes = await readFile(shortcutPath).catch(error => ({ error: error.code ?? error.message }))
         const creationStatus = await readFile(join(install, 'shortcut-status.txt'), 'utf16le')
-        const { stdout, stderr } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
-          '$ErrorActionPreference="Stop"; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $shell=[Activator]::CreateInstance([Type]::GetTypeFromProgID("WScript.Shell")); try { $link=$shell.CreateShortcut($env:DSH_TEST_LINK); try { [Console]::Write((@{ path=$env:DSH_TEST_LINK; exists=[IO.File]::Exists($env:DSH_TEST_LINK); workingDirectory=$link.WorkingDirectory; targetPath=$link.TargetPath; systemLocale=(Get-WinSystemLocale).Name; ansiCodePage=[Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage } | ConvertTo-Json -Compress)) } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) } } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }'], {
-          windowsHide: true, timeout: 30_000, env: { ...process.env, DSH_TEST_LINK: shortcutPath },
+        const { stdout, stderr } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', join(desktop, 'test/fixtures/read-installer-shortcut.ps1'), '-ShortcutPath', shortcutPath], {
+          windowsHide: true, timeout: 30_000,
         }).catch(error => {
           console.error('NSIS shortcut read failure', JSON.stringify({ scenario, install, creationStatus, shortcutBytes: Buffer.isBuffer(shortcutBytes) ? shortcutBytes.toString('base64') : shortcutBytes, stdout: error.stdout, stderr: error.stderr }))
           throw error
@@ -184,6 +184,7 @@ try {
         }
         assert.equal(creationStatus, 'created', 'NSIS must report successful shortcut creation')
         assert.equal(shortcut.exists, true, 'shortcut must exist before COM opens it')
+        assert.deepEqual(await readFile(shortcutPath), shortcutBytes, 'COM readback must not rewrite the shortcut')
         assert.equal(shortcut.workingDirectory.toLowerCase(), install.toLowerCase(), 'shortcut Start In must remain the installed application directory')
       }
       if (['custom-location', 'conflicting-location'].includes(scenario)) {
