@@ -5635,7 +5635,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/installed-upgrade-state-fixture.mjs",
-      "line": 192,
+      "line": 225,
       "operation": "DSH_HOME"
     },
     {

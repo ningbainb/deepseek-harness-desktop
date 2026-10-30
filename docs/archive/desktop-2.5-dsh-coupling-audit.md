@@ -673,7 +673,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/direct-start-matrix-runner.mjs | 184 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/direct-start-matrix-runner.mjs | 225 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/history-host-probe.mjs | 70 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/installed-upgrade-state-fixture.mjs | 192 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/installed-upgrade-state-fixture.mjs | 225 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/measure-packaged-memory.mjs | 86 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 6 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 6 | resolveRuntimePackages |

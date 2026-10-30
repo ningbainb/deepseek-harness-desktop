@@ -87,7 +87,8 @@ test('a blank old session is opened by its native workspace action without requi
   const { createOpenedInstalledSession } = await import('../scripts/installed-upgrade-state-fixture.mjs')
   assert.equal(typeof createOpenedInstalledSession, 'function')
   const events = []
-  let resolveResponse
+  let observeResponse, selectedWaits = 0
+  const seats = []
   const response = { url: () => 'dsh-runtime://app/api/session/create',
     request: () => ({ postDataJSON: () => ({ payload: { args: { request: { workspaceId: 'workspace-A' } } } }) }),
     json: async () => ({ type: 'server-response', result: { ok: true, value: { sessionId: 'blank-old-session' } } }),
@@ -96,19 +97,28 @@ test('a blank old session is opened by its native workspace action without requi
     async waitFor() {}, async hover() { events.push('hover-workspace') }, async getAttribute() { return 'true' },
     getByRole(role, { name }) {
       assert.equal(role, 'button'); assert.ok(name.test('在“project”中新建会话'))
-      return { async click() { events.push('native-create-and-open'); resolveResponse(response) } }
+      return { async click() {
+        events.push('native-create-and-open')
+        observeResponse({ ...response, request: () => ({ postDataJSON: () => ({ payload: { args: { request: { workspaceId: 'another-workspace' } } } }) }),
+          json: async () => { assert.fail('the create response from another workspace must be ignored') } })
+        observeResponse(response)
+        seats.push({ sessionId: 'blank-old-session', blank: true, cwd: '/isolated/project' })
+      } }
     },
   }
-  const page = { getByRole(role) { assert.equal(role, 'treeitem'); return group },
-    waitForResponse(predicate) {
-      assert.equal(predicate(response), true)
-      assert.equal(predicate({ ...response, request: () => ({ postDataJSON: () => ({ payload: { args: { request: { workspaceId: 'another-workspace' } } } }) }) }), false)
+  const selected = { filter({ hasText }) { assert.ok(hasText.test('新会话')); return this }, async waitFor() { selectedWaits++ } }
+  const page = { getByRole(role, options) { assert.equal(role, 'treeitem'); return options?.selected ? selected : group },
+    on(event, listener) {
+      assert.equal(event, 'response')
       events.push('listen-for-native-create')
-      return new Promise(resolve => { resolveResponse = resolve })
+      observeResponse = listener
     },
+    off(event, listener) { assert.equal(event, 'response'); assert.equal(listener, observeResponse); observeResponse = undefined },
   }
-  assert.equal(await createOpenedInstalledSession(page, '/isolated/project', 'workspace-A', { readSessions: async () => [] }), 'blank-old-session')
+  assert.equal(await createOpenedInstalledSession(page, '/isolated/project', 'workspace-A', { readSessions: async () => [...seats] }), 'blank-old-session')
   assert.deepEqual(events, ['hover-workspace', 'listen-for-native-create', 'native-create-and-open'])
+  assert.equal(selectedWaits, 1)
+  assert.equal(observeResponse, undefined)
 })
 
 test('native reuse of the one old blank does not wait for a nonexistent create response', async () => {
@@ -127,6 +137,45 @@ test('native reuse of the one old blank does not wait for a nonexistent create r
   const id = await createOpenedInstalledSession(page, '/isolated/project', 'workspace-A', { readSessions: async () => seats })
   assert.equal(id, 'old-reusable')
   assert.deepEqual(events, ['native-open', 'selected-native-blank'])
+})
+
+test('native reuse of a blank appearing after the list snapshot keeps its exact workspace identity', async () => {
+  const { createOpenedInstalledSession } = await import('../scripts/installed-upgrade-state-fixture.mjs')
+  const seats = [], openings = [], listeners = new Set()
+  let selectedWaits = 0, clicks = 0
+  const selected = { filter({ hasText }) { assert.ok(hasText.test('新会话')); return this }, async waitFor() { selectedWaits++ } }
+  const group = { filter() { return this }, first() { return this }, async waitFor() {}, async getAttribute() { return 'true' }, async hover() {},
+    getByRole() { return { async click() { clicks++; seats.push({ sessionId: 'late-blank', blank: true, cwd: '/isolated/project' }) } } } }
+  const page = { getByRole(_role, options) { return options?.selected ? selected : group },
+    on(event, listener) { assert.equal(event, 'response'); listeners.add(listener) },
+    off(event, listener) { assert.equal(event, 'response'); listeners.delete(listener) },
+    waitForResponse() { return Promise.reject(new Error('A late native blank reuse emits no new session/create response')) } }
+  assert.equal(await createOpenedInstalledSession(page, '/isolated/project', 'workspace-A', {
+    readSessions: async () => [...seats], onOpened: entry => openings.push(entry),
+  }), 'late-blank')
+  assert.equal(clicks, 1)
+  assert.equal(selectedWaits, 1)
+  assert.deepEqual(openings, [{ id: 'late-blank', mode: 'native-reused-late-blank' }])
+  assert.equal(listeners.size, 0, 'The response observer must be disposed after successful native reuse')
+})
+
+test('a failed native create arriving during the official list read cannot certify a reused blank', async () => {
+  const { createOpenedInstalledSession } = await import('../scripts/installed-upgrade-state-fixture.mjs')
+  let observer, reads = 0
+  const selected = { filter() { return this }, async waitFor() {} }
+  const group = { filter() { return this }, first() { return this }, async waitFor() {}, async getAttribute() { return 'true' }, async hover() {},
+    getByRole() { return { async click() {} } } }
+  const page = { getByRole(_role, options) { return options?.selected ? selected : group },
+    on(event, listener) { assert.equal(event, 'response'); observer = listener },
+    off(event, listener) { assert.equal(event, 'response'); assert.equal(observer, listener); observer = undefined } }
+  await assert.rejects(createOpenedInstalledSession(page, '/isolated/project', 'workspace-A', { readSessions: async () => {
+    if (++reads === 1) return []
+    observer({ url: () => 'dsh-runtime://app/api/session/create',
+      request: () => ({ postDataJSON: () => ({ payload: { args: { request: { workspaceId: 'workspace-A' } } } }) }),
+      json: async () => ({ type: 'server-response', result: { ok: false } }) })
+    return [{ sessionId: 'late-blank', blank: true, cwd: '/isolated/project' }]
+  } }), { code: 'ERR_ASSERTION' })
+  assert.equal(observer, undefined, 'A failed native response must dispose the observer too')
 })
 
 test('an earlier cross-session leak sent to another model cannot hide behind a later clean expected-model request', async context => {

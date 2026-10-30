@@ -5,6 +5,7 @@ import { createServer } from 'node:http'
 import { basename, dirname, join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright'
 import { parseDocument } from 'yaml'
+import { setTimeout as delay } from 'node:timers/promises'
 
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
@@ -78,20 +79,52 @@ export async function createOpenedInstalledSession(page, workspace, workspaceId,
     options.onOpened?.({ id: identity(seat), mode: created.length ? 'native-created' : 'native-reused-blank' })
     return identity(seat)
   }
-  // Old SDKs hide unselected blank sessions and display the selected one as
-  // New session regardless of its saved title. Let the native action open it.
-  const [response] = await Promise.all([
-    page.waitForResponse(response => new URL(response.url()).pathname === '/api/session/create'
-      && response.request().postDataJSON()?.payload?.args?.request?.workspaceId === workspaceId, { timeout: 60_000 }),
-    group.getByRole('button', { name: /中新建会话|^New session in /u }).click(),
-  ])
-  const envelope = await response.json()
-  assert.equal(envelope.type, 'server-response')
-  assert.equal(envelope.result?.ok, true)
-  const sessionId = envelope.result.value.sessionId
-  assert.ok(typeof sessionId === 'string' && sessionId, 'native old/new action must return its exact opened session')
-  options.onOpened?.({ id: sessionId, mode: 'native-created' })
-  return sessionId
+  // The native SDK can reuse a blank that appeared after the list snapshot,
+  // including an in-flight workspace connection. Observe real create replies
+  // when present, but require the selected UI and exact official list identity
+  // for both outcomes. Later authenticated markers prove the UI opened this ID.
+  const creations = [], pending = [], original = new Set(before.map(identity))
+  let responseError
+  const observeCreate = response => {
+    if (new URL(response.url()).pathname !== '/api/session/create') return
+    try {
+      if (response.request().postDataJSON()?.payload?.args?.request?.workspaceId !== workspaceId) return
+      pending.push(response.json().then(envelope => {
+        assert.equal(envelope.type, 'server-response')
+        assert.equal(envelope.result?.ok, true)
+        const id = envelope.result.value.sessionId
+        assert.ok(typeof id === 'string' && id, 'native old/new create reply must contain its exact opened session')
+        creations.push(id)
+      }).catch(error => { responseError = error }))
+    } catch (error) { responseError = error }
+  }
+  const deadline = Date.now() + 60_000
+  page.on('response', observeCreate)
+  try {
+    await group.getByRole('button', { name: /中新建会话|^New session in /u }).click()
+    await page.getByRole('treeitem', { selected: true }).filter({ hasText: /新会话|New session/u })
+      .waitFor({ state: 'visible', timeout: Math.max(1, deadline - Date.now()) })
+    while (Date.now() < deadline) {
+      await Promise.all(pending)
+      if (responseError) throw responseError
+      assert.ok(creations.length <= 1, 'one native action must not issue multiple fixture creates')
+      const after = await readSessions()
+      await Promise.all(pending)
+      if (responseError) throw responseError
+      assert.ok(creations.length <= 1, 'one native action must not issue multiple fixture creates')
+      const created = after.filter(item => inWorkspace(item) && !original.has(identity(item)))
+      assert.ok(created.length <= 1, 'the native action must open only one fixture session')
+      if (created.length === 1) {
+        const sessionId = identity(created[0])
+        assert.ok(typeof sessionId === 'string' && sessionId, 'the opened session must have an exact official identity')
+        if (creations.length) assert.equal(sessionId, creations[0], 'the native create reply and durable workspace list must identify the same session')
+        options.onOpened?.({ id: sessionId, mode: creations.length ? 'native-created' : 'native-reused-late-blank' })
+        return sessionId
+      }
+      await delay(50)
+    }
+    assert.fail('the native action did not expose one selected blank in the expected workspace within 60000ms')
+  } finally { page.off('response', observeCreate) }
 }
 
 async function prepareIsolatedHome(dshHome, userData, versions) {
