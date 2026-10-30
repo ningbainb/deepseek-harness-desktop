@@ -39,6 +39,7 @@ jobs:
       DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
       DSH_DESKTOP_BETA_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/usability
       DSH_DESKTOP_E2E_RECEIPT: ${{ github.workspace }}/.tmp/release-qa/source-core.json
+      DSH_DESKTOP_SMOKE_DIAGNOSTICS: ${{ github.workspace }}/.tmp/release-qa/packaged-smoke
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
@@ -138,7 +139,9 @@ jobs:
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: 14
-          path: .tmp/release-qa/**
+          path: |
+            .tmp/release-qa/**
+            !.tmp/release-qa/packaged-smoke/**/electron.raw.log
 
       - name: Preserve native source and companion evidence
         if: always()
@@ -169,6 +172,7 @@ jobs:
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
             apps/dsh-desktop/dist/SHA256SUMS.txt
             apps/dsh-desktop/dist/release-manifest.json
+            !.tmp/release-qa/packaged-smoke/**/electron.raw.log
 
   macos:
     needs: metadata

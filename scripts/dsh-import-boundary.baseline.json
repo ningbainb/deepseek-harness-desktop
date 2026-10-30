@@ -47,6 +47,7 @@
     "apps/dsh-desktop/test/runtime-client-hmr.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/test/runtime-config-editor.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/test/runtime-legacy-settings.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
+    "apps/dsh-desktop/test/runtime-permission-presets.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/test/runtime-profile-composition.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/test/runtime-profile-recovery-order.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/test/sidebar-runtime-compatibility.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,

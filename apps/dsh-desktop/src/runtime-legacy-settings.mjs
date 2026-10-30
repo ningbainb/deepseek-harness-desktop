@@ -11,6 +11,8 @@ const SDK_SETTINGS = '@deepseek-ai/dsh-settings'
 const ADAPTER_SETTINGS = import.meta.url
 const SDK_CONFIG_EDITOR = '@deepseek-ai/dsh-config-editor'
 const ADAPTER_CONFIG_EDITOR = new URL('./runtime-config-editor.mjs', import.meta.url).href
+const SDK_PERMISSION_PRESETS = '@deepseek-ai/dsh-permission-presets'
+const ADAPTER_PERMISSION_PRESETS = new URL('./runtime-permission-presets.mjs', import.meta.url).href
 const TRANSACTION_DIRECTORY = '.desktop-legacy-settings-transaction'
 const migrationHealthTargets = new WeakMap()
 const SECTION_ENTRIES = {
@@ -104,6 +106,7 @@ export function adaptRuntimeLegacySettingsPatches(patches) {
     const result = { ...row }
     if (row.name === SDK_SETTINGS) result.name = ADAPTER_SETTINGS
     if (row.name === SDK_CONFIG_EDITOR) result.name = ADAPTER_CONFIG_EDITOR
+    if (row.name === SDK_PERMISSION_PRESETS) result.name = ADAPTER_PERMISSION_PRESETS
     if (Array.isArray(row.insert)) result.insert = row.insert.map(adapt)
     if (row.group && Array.isArray(row.config)) result.config = row.config.map(adapt)
     return result

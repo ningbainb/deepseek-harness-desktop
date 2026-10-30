@@ -236,7 +236,6 @@ async function run() {
     enabled: profile.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
   })
   const configurationGuard = createDesktopConfigurationGuard()
-  configurationGuard.record(rawPatches, allPatches)
   markStartup('patches')
   if (invocation.dumpConfig) {
     process.stdout.write(stringify(composeEntries(allPatches)))
@@ -249,6 +248,7 @@ async function run() {
     profilePatchPath: profile.patchPath,
     patches: allPatches,
   })
+  configurationGuard.record(rawPatches, legacySettings.patches)
   markStartup('legacy-settings')
   let migrationCommitted = false
   const composeLive = () => {
@@ -257,8 +257,9 @@ async function run() {
     const mapped = adaptDesktopClientHmrPatches(raw, {
       enabled: current.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
     })
-    configurationGuard.record(raw, mapped)
-    return adaptRuntimeLegacySettingsPatches(mapped)
+    const adapted = adaptRuntimeLegacySettingsPatches(mapped)
+    configurationGuard.record(raw, adapted)
+    return adapted
   }
   let ctx
   let pipeServer

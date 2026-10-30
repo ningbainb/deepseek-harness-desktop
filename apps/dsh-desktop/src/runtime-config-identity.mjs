@@ -1,30 +1,37 @@
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 
-const ROW_ID = 'client-hmr'
-const OFFICIAL_PACKAGE = '@deepseek-ai/dsh-client-hmr'
-const DESKTOP_PACKAGE = '@linxin666/dsh-desktop-client-hmr'
+const ALIASES = [
+  { id: 'client-hmr', official: '@deepseek-ai/dsh-client-hmr', desktop: '@linxin666/dsh-desktop-client-hmr' },
+  { id: 'permission', official: '@deepseek-ai/dsh-permission-presets', desktop: new URL('./runtime-permission-presets.mjs', import.meta.url).href },
+]
 
-function matchingRows(entries) {
+function matchingRows(entries, id) {
   return entries.flatMap(entry => [
-    ...(entry.id === ROW_ID ? [entry] : []),
-    ...(entry.group && Array.isArray(entry.config) ? matchingRows(entry.config) : []),
+    ...(entry.id === id ? [entry] : []),
+    ...(entry.group && Array.isArray(entry.config) ? matchingRows(entry.config, id) : []),
   ])
 }
 
 export function createDesktopConfigurationGuard() {
-  let aliased = false
+  const aliased = new Map()
   return {
     record(rawPatches, mappedPatches) {
-      aliased = false
+      aliased.clear()
       if (!Array.isArray(rawPatches) || !Array.isArray(mappedPatches)) throw new TypeError('Configuration guard requires patch arrays')
-      const raw = matchingRows(composeEntries(rawPatches))
-      const mapped = matchingRows(composeEntries(mappedPatches))
-      aliased = raw.length === 1 && mapped.length === 1
-        && raw[0].name === OFFICIAL_PACKAGE && mapped[0].name === DESKTOP_PACKAGE
+      const rawEntries = composeEntries(rawPatches)
+      const mappedEntries = composeEntries(mappedPatches)
+      for (const alias of ALIASES) {
+        const raw = matchingRows(rawEntries, alias.id)
+        const mapped = matchingRows(mappedEntries, alias.id)
+        if (raw.length === 1 && mapped.length === 1 && raw[0].name === alias.official && mapped[0].name === alias.desktop) {
+          aliased.set(alias.id, alias)
+        }
+      }
     },
     nameFor(entry) {
       const { id, name } = entry.options
-      return aliased && id === ROW_ID && name === DESKTOP_PACKAGE ? OFFICIAL_PACKAGE : name
+      const alias = aliased.get(id)
+      return alias && name === alias.desktop ? alias.official : name
     },
   }
 }

@@ -336,6 +336,15 @@
       "controlled": false
     },
     {
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-app-boot",
+      "line": 1,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "apps/dsh-desktop/test/runtime-profile-composition.test.mjs",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-app-boot",
@@ -5695,7 +5704,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/packaged-smoke-runner.mjs",
-      "line": 63,
+      "line": 226,
       "operation": "DSH_HOME"
     },
     {
@@ -12667,12 +12676,6 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 453,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
       "line": 454,
       "operation": "profileDir"
     },
@@ -12685,49 +12688,55 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 458,
+      "line": 456,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
+      "line": 459,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 460,
+      "line": 461,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 467,
+      "line": 468,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 472,
+      "line": 473,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 478,
+      "line": 479,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 525,
+      "line": 526,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 527,
+      "line": 528,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 628,
+      "line": 629,
       "operation": "resolveDshCliPath"
     },
     {
@@ -12764,6 +12773,42 @@
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/runtime-legacy-settings.test.mjs",
       "line": 488,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 129,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 130,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 131,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 132,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 142,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/runtime-permission-presets.test.mjs",
+      "line": 147,
       "operation": "profileDir"
     },
     {
@@ -14863,25 +14908,25 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 484,
+      "line": 485,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 533,
+      "line": 534,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 626,
+      "line": 627,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-integration.test.mjs",
-      "line": 635,
+      "line": 636,
       "operation": "start"
     },
     {

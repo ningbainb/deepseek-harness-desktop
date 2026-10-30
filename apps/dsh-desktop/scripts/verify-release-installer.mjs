@@ -319,7 +319,7 @@ async function main() {
         }
         let newRuntimeState
         const launch = async () => {
-          const first = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
+          const first = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false, requirePermissionPresets: true })
           if (oldRuntimeState) newRuntimeState = await modelFixture.exercise({ appPath: executable, userData, dshHome,
             expectedVersion: version, phase: 'new-upgrade', previousWitness: oldRuntimeState.witness, evidenceDirectory: stateEvidence })
           return first
@@ -339,7 +339,7 @@ async function main() {
         if (overlay) await assertUpgradeInstallationPreserved(overlay)
         assert.deepEqual(await readFile(profile), profileBytes, 'overlay Setup preserves the existing runtime Profile byte-for-byte')
         assert.deepEqual(await readFile(sentinel), original)
-        const second = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
+        const second = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false, requirePermissionPresets: true })
         const restartRuntimeState = oldRuntimeState && await modelFixture.exercise({ appPath: executable, userData, dshHome,
           expectedVersion: version, phase: 'new-restart', previousWitness: oldRuntimeState.witness, evidenceDirectory: stateEvidence })
         if (upgrade) await assertUpgradeRuntimePreserved(upgrade.snapshot)

@@ -64,3 +64,24 @@ test('invalid composition fails closed instead of retaining an earlier alias', (
   assert.throws(() => guard.record(null, patches(desktop)), TypeError)
   assert.equal(guard.nameFor(entry()), desktop)
 })
+
+test('permission projection recognizes only a unique composed official-to-Desktop adapter owner', () => {
+  const guard = createDesktopConfigurationGuard()
+  const permissionOfficial = '@deepseek-ai/dsh-permission-presets'
+  const permissionDesktop = new URL('../src/runtime-permission-presets.mjs', import.meta.url).href
+  const permissionRows = name => [{ insert: [{ id: 'permission', name }] }]
+  const actual = entry(permissionDesktop, 'permission')
+  guard.record([...patches(official), ...permissionRows(permissionOfficial)], [...patches(desktop), ...permissionRows(permissionDesktop)])
+  assert.equal(guard.nameFor(actual), permissionOfficial)
+  assert.equal(guard.nameFor(entry()), official, 'both aliases coexist')
+  for (const raw of [[], permissionRows('@other/permission'), [{ insert: [
+    { id: 'group-a', group: true, config: [{ id: 'permission', name: permissionOfficial }] },
+    { id: 'group-b', group: true, config: [{ id: 'permission', name: permissionOfficial }] },
+  ] }]]) {
+    guard.record(raw, permissionRows(permissionDesktop))
+    assert.equal(guard.nameFor(actual), permissionDesktop, 'a missing, foreign or duplicate source never acquires official identity')
+  }
+  guard.record(permissionRows(permissionOfficial), permissionRows(permissionDesktop))
+  assert.equal(guard.nameFor(entry(permissionDesktop, 'other-id')), permissionDesktop)
+  assert.equal(guard.nameFor(entry('@other/permission', 'permission')), '@other/permission')
+})

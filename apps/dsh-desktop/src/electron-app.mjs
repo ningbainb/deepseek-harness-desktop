@@ -2960,7 +2960,7 @@ export async function startElectronApp(metadata) {
   const finalizeRendererIpc = () => {
     if (rendererIpcFinalized) return
     rendererIpcFinalized = true
-    unregisterRuntimeStreamIpc()
+    unregisterRuntimeStreamIpc.shutdown()
     unregisterMainSurface()
     unregisterIpc()
     void unregisterExtensionIpc().catch((error) => {

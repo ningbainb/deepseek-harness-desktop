@@ -193,3 +193,108 @@ test('runtime stream IPC quiesce sends EOF before cancellation', async () => {
   assert.equal(sender.frames.filter(({ frame }) => frame.type === 'lifecycle').length, 2)
   dispose()
 })
+
+for (const operation of ['write', 'end']) {
+  test(`runtime stream ${operation} resolves false when quiesce cancels a pending operation`, async () => {
+    const handlers = new Map()
+    const sender = new EventEmitter()
+    sender.send = () => {}
+    sender.isDestroyed = () => false
+    let entered
+    const started = new Promise(resolve => { entered = resolve })
+    const provider = {
+      status: { state: 'ready' },
+      openDuplex: (_endpoint, _payload, signal) => {
+        const pending = () => new Promise((_resolve, reject) => {
+          entered()
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+        return {
+          write: pending, close: pending,
+          async *[Symbol.asyncIterator]() { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) },
+        }
+      },
+    }
+    const scheduled = []
+    const dispose = registerDesktopRuntimeStreamIpc({
+      ipcMain: { handle: (name, handler) => handlers.set(name, handler), removeHandler: name => handlers.delete(name) },
+      getProvider: () => provider, schedule: action => scheduled.push(action),
+    })
+    const id = handlers.get('desktop:runtime-stream-open')({ sender }, { endpoint: 'session/observe', payload: {} })
+    scheduled.shift()()
+    const result = handlers.get(`desktop:runtime-stream-${operation}`)({ sender }, id, {})
+    // Attach before cancellation so the test also detects unhandled rejections.
+    const completed = result.then(value => ({ value }), error => ({ error }))
+    await started
+    await dispose.quiesce()
+    assert.deepEqual(await completed, { value: false })
+    dispose()
+  })
+
+  test(`runtime stream ${operation} preserves genuine provider failures`, async () => {
+    const handlers = new Map()
+    const sender = new EventEmitter()
+    sender.send = () => {}
+    sender.isDestroyed = () => false
+    const failure = new Error('provider failed before cancellation')
+    const scheduled = []
+    const dispose = registerDesktopRuntimeStreamIpc({
+      ipcMain: { handle: (name, handler) => handlers.set(name, handler), removeHandler: name => handlers.delete(name) },
+      getProvider: () => ({ status: { state: 'ready' }, openDuplex: (_endpoint, _payload, signal) => ({
+        write: async () => { throw failure }, close: async () => { throw failure },
+        async *[Symbol.asyncIterator]() { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) },
+      }) }), schedule: action => scheduled.push(action),
+    })
+    const id = handlers.get('desktop:runtime-stream-open')({ sender }, { endpoint: 'session/observe', payload: {} })
+    scheduled.shift()()
+    await assert.rejects(handlers.get(`desktop:runtime-stream-${operation}`)({ sender }, id, {}), error => error === failure)
+    dispose()
+  })
+}
+
+test('final application shutdown retains inert handlers for already queued ACK and cancel', async () => {
+  const handlers = new Map()
+  const dispose = registerDesktopRuntimeStreamIpc({
+    ipcMain: { handle: (name, handler) => handlers.set(name, handler), removeHandler: name => handlers.delete(name) },
+    getProvider: () => { throw new Error('final shutdown must not query Runtime') },
+  })
+  await dispose.shutdown()
+  assert.equal(handlers.get('desktop:runtime-stream-ack')({ sender: {} }, 'late', 1), false)
+  assert.equal(handlers.get('desktop:runtime-stream-cancel')({ sender: {} }, 'late'), false)
+  assert.equal(await handlers.get('desktop:runtime-stream-write')({ sender: {} }, 'late', {}), false)
+  assert.equal(await handlers.get('desktop:runtime-stream-end')({ sender: {} }, 'late'), false)
+  dispose()
+  assert.equal(handlers.size, 0, 'reusable instances still support explicit unregistration')
+})
+
+test('quiesce waits for a registered writer to finish native cleanup before reporting completion', async () => {
+  const handlers = new Map()
+  const sender = new EventEmitter()
+  sender.send = () => {}
+  sender.isDestroyed = () => false
+  let release
+  let entered
+  const started = new Promise(resolve => { entered = resolve })
+  const cleanup = new Promise(resolve => { release = resolve })
+  const scheduled = []
+  const dispose = registerDesktopRuntimeStreamIpc({
+    ipcMain: { handle: (name, handler) => handlers.set(name, handler), removeHandler: name => handlers.delete(name) },
+    getProvider: () => ({ status: { state: 'ready' }, openDuplex: (_endpoint, _payload, signal) => ({
+      write: async () => { entered(); await cleanup },
+      async *[Symbol.asyncIterator]() { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })) },
+    }) }), schedule: action => scheduled.push(action),
+  })
+  const id = handlers.get('desktop:runtime-stream-open')({ sender }, { endpoint: 'session/observe', payload: {} })
+  scheduled.shift()()
+  const pending = handlers.get('desktop:runtime-stream-write')({ sender }, id, {})
+  await started
+  let settled = false
+  const stopped = dispose.quiesce().then(() => { settled = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(settled, false, 'one event-loop turn is not a drain barrier')
+  release()
+  assert.equal(await pending, false)
+  await stopped
+  assert.equal(settled, true)
+  dispose()
+})

@@ -12,7 +12,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 341 |
+| public-stable | 342 |
 | public-experimental | 190 |
 | compatibility-patch | 48 |
 | private-high-risk | 0 |
@@ -57,6 +57,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | apps/dsh-desktop/test/runtime-client-hmr.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
 | apps/dsh-desktop/test/runtime-config-editor.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
 | apps/dsh-desktop/test/runtime-legacy-settings.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
+| apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
 | apps/dsh-desktop/test/runtime-profile-composition.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
 | apps/dsh-desktop/test/runtime-profile-recovery-order.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
 | apps/dsh-desktop/test/sidebar-runtime-compatibility.test.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
@@ -683,7 +684,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 44 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/measure-profile.mjs | 50 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/measure-startup-fps.mjs | 23 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/packaged-smoke-runner.mjs | 63 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/packaged-smoke-runner.mjs | 226 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/preset-deep-link-runner.mjs | 65 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/release-plugins-host-fixture.mjs | 9 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/release-plugins-host-fixture.mjs | 36 | DSH_HOME |
@@ -1845,23 +1846,29 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 137 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 142 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 149 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 453 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 454 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 455 | profileDir |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 458 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 460 | profileDir |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 467 | profileDir |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 472 | profileDir |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 478 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 525 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 527 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 628 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 456 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 459 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 461 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 468 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 473 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 479 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 526 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 528 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/runtime-integration.test.mjs | 629 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/runtime-integrity-audit.test.mjs | 11 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-integrity-audit.test.mjs | 19 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-legacy-settings.test.mjs | 473 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-legacy-settings.test.mjs | 474 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-legacy-settings.test.mjs | 475 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-legacy-settings.test.mjs | 488 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 129 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 130 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 131 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 132 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 142 | profileDir |
+| profile-home | apps/dsh-desktop/test/runtime-permission-presets.test.mjs | 147 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 53 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 129 | profileDir |
 | profile-home | apps/dsh-desktop/test/runtime-provider.test.mjs | 135 | profileDir |
@@ -2211,10 +2218,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1258 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1384 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-controller.test.mjs | 1387 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 484 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 533 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 626 | stop |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 635 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 485 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 534 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 627 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 636 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-shutdown-control.test.mjs | 93 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-shutdown-control.test.mjs | 104 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 56 | start |

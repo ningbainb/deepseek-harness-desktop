@@ -112,7 +112,21 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
   const active = new Map()
   const senderWatches = new Map()
   const suspendedSenders = new Set()
+  const pendingOperations = new Set()
   let quiescing = false
+  const finishSourceOperation = async (entry, action) => {
+    const pending = Promise.resolve().then(() => controllerAborted(entry) ? undefined : action())
+    pendingOperations.add(pending)
+    try {
+      await pending
+      return !controllerAborted(entry)
+    } catch (error) {
+      if (controllerAborted(entry) && error === entry.controller.signal.reason) return false
+      throw error
+    } finally {
+      pendingOperations.delete(pending)
+    }
+  }
   const suspend = sender => {
     if (sender.isDestroyed?.() || suspendedSenders.has(sender)) return
     suspendedSenders.add(sender)
@@ -250,8 +264,7 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     }
     const source = entry.source ?? await entry.sourceReady
     if (typeof source?.write !== 'function' || controllerAborted(entry)) return false
-    await source.write(structuredClone(value))
-    return true
+    return finishSourceOperation(entry, () => source.write(structuredClone(value)))
   })
 
   ipcMain.handle(STREAM_END_CHANNEL, async (event, id) => {
@@ -260,18 +273,29 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     if (entry?.sender !== event.sender) return false
     const source = entry.source ?? await entry.sourceReady
     if (typeof source?.close !== 'function' || controllerAborted(entry)) return false
-    await source.close()
-    return true
+    return finishSourceOperation(entry, () => source.close())
   })
 
-  const quiesce = async () => {
+  const beginQuiesce = () => {
     quiescing = true
     for (const entry of active.values()) suspend(entry.sender)
     for (const [id, entry] of active) {
       if (!entry.sender.isDestroyed?.()) entry.sender.send(STREAM_FRAME_CHANNEL, { id, type: 'end' })
       cancel(id, new Error('runtime stream IPC quiesced'))
     }
+  }
+  const quiesce = async () => {
+    beginQuiesce()
     await new Promise(resolve => setImmediate(resolve))
+    let timer
+    try {
+      await Promise.race([
+        Promise.allSettled([...pendingOperations]),
+        new Promise((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('runtime stream IPC shutdown timed out')), 5_000)
+        }),
+      ])
+    } finally { clearTimeout(timer) }
   }
   const dispose = () => {
     ipcMain.removeHandler?.(STREAM_OPEN_CHANNEL)
@@ -279,10 +303,17 @@ export function registerDesktopRuntimeStreamIpc({ ipcMain, getProvider, schedule
     ipcMain.removeHandler?.(STREAM_WRITE_CHANNEL)
     ipcMain.removeHandler?.(STREAM_END_CHANNEL)
     ipcMain.removeHandler?.(STREAM_ACK_CHANNEL)
-    void quiesce()
+    beginQuiesce()
     suspendedSenders.clear()
   }
   dispose.quiesce = quiesce
+  // App termination can still deliver queued renderer messages. Keep the
+  // quiesced handlers available until the process ends; reusable hosts can
+  // still explicitly dispose and unregister every handler.
+  dispose.shutdown = () => {
+    beginQuiesce()
+    suspendedSenders.clear()
+  }
   dispose.resume = () => {
     quiescing = false
     for (const sender of suspendedSenders) {

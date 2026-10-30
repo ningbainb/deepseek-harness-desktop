@@ -301,7 +301,8 @@ test('Runtime stream handlers stay registered until every renderer is gone', asy
   const disposal = source.slice(source.indexOf('disposeResources: async () => {'), source.indexOf('let rendererIpcFinalized = false'))
   const finalization = source.slice(source.indexOf('const finalizeRendererIpc = () => {'), source.indexOf('const closeBypassReason = () => {'))
   assert.doesNotMatch(disposal, /unregisterRuntimeStreamIpc/u)
-  assert.match(finalization, /unregisterRuntimeStreamIpc\(\)/u)
+  assert.match(finalization, /unregisterRuntimeStreamIpc\.shutdown\(\)/u)
+  assert.doesNotMatch(finalization, /unregisterRuntimeStreamIpc\(\)/u)
   assert.match(source, /app\.on\('quit', finalizeRendererIpc\)/u)
 })
 
