@@ -734,9 +734,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs | 35 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs | 57 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-personalization.mjs | 62 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 198 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 454 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 623 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 200 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 456 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 625 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-remote-lan.mjs | 68 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-ssh.mjs | 66 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-particle-theme.mjs | 45 | DSH_HOME |

@@ -4,6 +4,7 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assertNativeFixtureStorage, nativeFixtureStoragePolicy, prepareNativeFixtureStorage } from '../scripts/native-fixture-storage.mjs'
+import * as nativeStorage from '../scripts/native-fixture-storage.mjs'
 
 // Pure path-policy tests. These do not launch Setup or establish native CI acceptance.
 const hosted = {
@@ -100,9 +101,31 @@ test('CI preparation rejects foreign command files and incomplete context before
   await assert.rejects(access(join(fixture.runner, 'dsh-native-fixtures')), { code: 'ENOENT' })
 })
 
+test('CI preparation rejects incomplete hosted identity before interpreting its non-E runner path', nativeWindows, async () => {
+  await assert.rejects(prepareNativeFixtureStorage({ env: {
+    ...hosted, CI: 'false', GITHUB_ENV: 'D:\\a\\_temp\\github-env',
+  } }), /hosted/u)
+})
+
 test('CI preparation refuses a linked dedicated root before exporting any environment', nativeWindows, async t => {
   const fixture = await preparationFixture(t), outside = join(fixture.root, 'outside')
   await mkdir(outside); await symlink(outside, join(fixture.runner, 'dsh-native-fixtures'), 'junction')
   await assert.rejects(prepareNativeFixtureStorage({ env: fixture.env }), /link/u)
   assert.equal(await readFile(fixture.environmentFile, 'utf8'), 'EXISTING=value\n')
+})
+
+test('packaged QA permits only a physical workspace executable on hosted Windows', nativeWindows, async t => {
+  assert.equal(typeof nativeStorage.assertNativeFixtureExecutable, 'function')
+  const fixture = await preparationFixture(t)
+  const temporaryDirectory = join(fixture.runner, 'dsh-native-fixtures')
+  const workspace = join(fixture.root, 'workspace'), outside = join(fixture.root, 'outside')
+  await mkdir(temporaryDirectory); await mkdir(workspace); await mkdir(outside)
+  const executable = join(workspace, 'app.exe'), foreign = join(outside, 'app.exe')
+  await writeFile(executable, 'fixture'); await writeFile(foreign, 'retain')
+  const options = { env: { ...fixture.env, GITHUB_WORKSPACE: workspace }, temporaryDirectory }
+  assert.equal(await nativeStorage.assertNativeFixtureExecutable(executable, options), executable)
+  await assert.rejects(nativeStorage.assertNativeFixtureExecutable(foreign, options), /workspace/u)
+  await symlink(outside, join(workspace, 'escape'), 'junction')
+  await assert.rejects(nativeStorage.assertNativeFixtureExecutable(join(workspace, 'escape', 'app.exe'), options), /workspace/u)
+  assert.equal(await readFile(foreign, 'utf8'), 'retain')
 })

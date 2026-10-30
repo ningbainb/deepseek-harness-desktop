@@ -52,6 +52,8 @@ jobs:
       - name: Prepare confined native Windows fixture storage
         shell: pwsh
         run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Check native installer cancellation before full verification
+        run: node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs
       - run: pnpm verify
       - run: pnpm feature-baseline:check
       - run: pnpm desktop:regression:e2e --source --collect-failures
@@ -150,6 +152,7 @@ jobs:
             ${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**
             ${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**
             ${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**
 
       - name: Preserve failed Windows candidate diagnostics
         if: failure()

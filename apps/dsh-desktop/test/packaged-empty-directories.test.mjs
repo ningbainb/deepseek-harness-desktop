@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import afterPack from '../scripts/after-pack.cjs'
+import { assertNativeFixtureStorage } from '../scripts/native-fixture-storage.mjs'
 
 async function fixture(t) {
   const parent = await realpath(tmpdir())
-  if (process.platform === 'win32') assert.match(parent, /^e:\\/iu, 'Use the E-drive build environment')
+  if (process.platform === 'win32') await assertNativeFixtureStorage({ temporaryDirectory: parent })
   const container = await realpath(await mkdtemp(join(parent, 'dsh-empty-directories-')))
   const root = join(container, 'node_modules')
   await mkdir(root)
@@ -16,6 +17,7 @@ async function fixture(t) {
     assert.ok(basename(container).startsWith('dsh-empty-directories-'))
     await rm(container, { recursive: true, force: true })
   })
+  if (process.platform === 'win32') await assertNativeFixtureStorage({ temporaryDirectory: parent, outputDirectory: container })
   return { root, container }
 }
 const exists = path => lstat(path).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error })

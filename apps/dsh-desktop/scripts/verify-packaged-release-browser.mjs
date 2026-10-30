@@ -18,18 +18,18 @@ import { chromium } from 'playwright'
 import { parse, stringify } from 'yaml'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses } from './packaged-browser-owners.mjs'
+import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './native-fixture-storage.mjs'
 
 const { values } = parseArgs({ options: {
   'desktop-exe': { type: 'string' }, output: { type: 'string' },
   'startup-timeout-ms': { type: 'string', default: '600000' },
 }, allowPositionals: false })
 assert.equal(process.platform, 'win32', 'Run on native Windows; this script is not Darwin acceptance')
-const onE = path => /^[eE]:[\\/]/u.test(resolve(path))
-assert.ok(onE(tmpdir()), 'Dot-source scripts/use-e-build-env.ps1; temporary files must stay on E:')
+await assertNativeFixtureStorage()
 const suppliedExe = values['desktop-exe'] ?? process.env.DSH_DESKTOP_E2E_EXECUTABLE
 assert.ok(suppliedExe && isAbsolute(suppliedExe), 'Provide an absolute --desktop-exe pointing at the FINAL win-unpacked EXE')
-const exe = await realpath(suppliedExe)
-assert.ok(onE(exe) && /\.exe$/iu.test(exe) && basename(dirname(exe)).toLowerCase() === 'win-unpacked', 'Require a final E: win-unpacked executable')
+const exe = await assertNativeFixtureExecutable(suppliedExe)
+assert.ok(/\.exe$/iu.test(exe) && basename(dirname(exe)).toLowerCase() === 'win-unpacked', 'Require a final confined win-unpacked executable')
 const startupTimeout = Number(values['startup-timeout-ms'])
 assert.ok(Number.isSafeInteger(startupTimeout) && startupTimeout >= 30000 && startupTimeout <= 600000, 'Startup deadline must be 30000..600000ms')
 const within = (root, path) => {
@@ -38,8 +38,10 @@ const within = (root, path) => {
 }
 const payload = dirname(exe)
 const output = resolve(values.output ?? join(tmpdir(), 'dsh-packaged-release-browser-results', `${new Date().toISOString().replaceAll(':', '-')}-${randomUUID()}`))
-assert.ok(onE(output) && !within(payload, output) && output !== payload, 'Evidence must be on E: outside the immutable payload')
+await assertNativeFixtureStorage({ outputDirectory: output })
+assert.ok(!within(payload, output) && output !== payload, 'Evidence must remain outside the immutable payload')
 await mkdir(output, { recursive: true })
+await assertNativeFixtureStorage({ outputDirectory: output })
 assert.equal(await access(join(output, 'result.json')).then(() => true, () => false), false, 'Refuse to overwrite earlier evidence')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-release-browser-'))
 const home = join(temporary, 'dsh-home'), userData = join(temporary, 'user-data'), agents = join(temporary, 'agents')
@@ -751,7 +753,8 @@ document.querySelector('#fixture-trusted-submit').addEventListener('click',event
     await new Promise(accept => server.close(() => accept()))
   }
   if (phases.every(owner => owner.stopped)) {
-    assert.ok(within(tmpdir(), temporary) && onE(temporary) && !within(temporary, output), 'Refuse cleanup outside isolated E: temporary root')
+    await assertNativeFixtureStorage({ temporaryDirectory: temporary, outputDirectory: output })
+    assert.ok(within(tmpdir(), temporary) && output !== temporary && !within(temporary, output), 'Refuse cleanup outside the isolated temporary root or over its evidence')
     try { await rm(temporary, { recursive: true, force: true }); report.cleanup.profileRemoved = true }
     catch (error) { report.cleanup.errors.push(redact(error.message)) }
   } else report.cleanup.errors.push('Owned processes remain; isolated profile retained for diagnosis')

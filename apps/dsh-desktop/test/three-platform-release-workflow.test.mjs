@@ -18,6 +18,14 @@ test('Windows CI prepares confined native storage in its own step before verific
   assert.equal(steps[prepare].shell, 'pwsh')
 })
 
+test('native installer cancellation runs after confined storage and before complete verification', async () => {
+  const steps = YAML.parse(await readFile(workflowPath, 'utf8')).jobs.windows.steps
+  const prepare = steps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
+  const installer = steps.findIndex(step => step.run?.trim() === 'node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs')
+  const verify = steps.findIndex(step => step.run?.trim() === 'pnpm verify')
+  assert.ok(prepare >= 0 && installer > prepare && verify > installer)
+})
+
 test('native QA uploads only result directories and preserves existing acceptance evidence', async () => {
   const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
   const step = workflow.jobs.windows.steps.find(step => step.with?.name === 'desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64')
@@ -28,6 +36,7 @@ test('native QA uploads only result directories and preserves existing acceptanc
     '${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**',
     '${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**',
     '${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**',
+    '${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**',
   ])
   assert.ok(workflow.jobs.windows.steps.some(step => step.with?.name === 'desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64'))
 })

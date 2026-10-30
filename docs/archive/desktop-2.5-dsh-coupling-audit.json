@@ -6001,19 +6001,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs",
-      "line": 198,
+      "line": 200,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs",
-      "line": 454,
+      "line": 456,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs",
-      "line": 623,
+      "line": 625,
       "operation": "ensureDesktopProfile"
     },
     {

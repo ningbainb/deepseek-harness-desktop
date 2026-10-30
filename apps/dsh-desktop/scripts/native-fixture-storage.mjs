@@ -4,6 +4,9 @@ import { win32 } from 'node:path'
 
 const absolute = value => typeof value === 'string' && !/[\0\r\n]/u.test(value)
   && (/^[a-z]:[\\/]/iu.test(value) || /^\\\\[^\\]+\\[^\\]+[\\/]?/u.test(value))
+const hostedWindows = env => env.CI === 'true' && env.GITHUB_ACTIONS === 'true' && env.RUNNER_OS === 'Windows'
+  && env.RUNNER_ENVIRONMENT === 'github-hosted' && /^GitHub Actions(?:\s|$)/u.test(env.RUNNER_NAME ?? '')
+  && absolute(env.RUNNER_TEMP) && absolute(env.GITHUB_WORKSPACE)
 const within = (root, value) => {
   const relative = win32.relative(root, value)
   return relative === '' || (!relative.startsWith('..\\') && relative !== '..' && !win32.isAbsolute(relative))
@@ -12,9 +15,7 @@ const within = (root, value) => {
 /** This policy controls fixture storage only; it never authorizes production Setup. */
 export function nativeFixtureStoragePolicy({ env = process.env, temporaryDirectory = tmpdir(), outputDirectory = temporaryDirectory } = {}) {
   if (!absolute(temporaryDirectory) || !absolute(outputDirectory)) throw new Error('Native fixture paths must be fully qualified absolute paths')
-  const hosted = env.CI === 'true' && env.GITHUB_ACTIONS === 'true' && env.RUNNER_OS === 'Windows'
-    && env.RUNNER_ENVIRONMENT === 'github-hosted' && /^GitHub Actions(?:\s|$)/u.test(env.RUNNER_NAME ?? '')
-    && absolute(env.RUNNER_TEMP) && absolute(env.GITHUB_WORKSPACE)
+  const hosted = hostedWindows(env)
   const root = hosted ? win32.join(env.RUNNER_TEMP, 'dsh-native-fixtures') : 'E:\\'
   const temporary = win32.normalize(temporaryDirectory), output = win32.normalize(outputDirectory)
   if (!within(root, temporary) || !within(root, output)) {
@@ -52,10 +53,23 @@ export async function assertNativeFixtureStorage(options = {}) {
   return policy
 }
 
+/** A hosted fixture may run only the current workspace's packaged executable. */
+export async function assertNativeFixtureExecutable(executablePath, options = {}) {
+  if (!absolute(executablePath)) throw new Error('Packaged fixture executable must be absolute')
+  const policy = await assertNativeFixtureStorage(options)
+  const env = options.env ?? process.env
+  const root = await realpath(policy.mode === 'github-hosted-windows' ? env.GITHUB_WORKSPACE : policy.root)
+  const executable = await realpath(executablePath)
+  if (!within(root, executable)) throw new Error('Packaged fixture executable escapes its workspace or local E: storage')
+  if (!(await lstat(executable)).isFile()) throw new Error('Packaged fixture executable must be a regular file')
+  return executable
+}
+
 /** Export only QA paths to the current hosted Windows job's command file. */
 export async function prepareNativeFixtureStorage({ env = process.env } = {}) {
   if (process.platform !== 'win32') throw new Error('Fixture preparation requires native hosted Windows')
   if (!absolute(env.RUNNER_TEMP) || !absolute(env.GITHUB_ENV)) throw new Error('Fixture preparation requires an absolute runner command file')
+  if (!hostedWindows(env)) throw new Error('Fixture preparation requires complete hosted Windows context')
   const policy = nativeFixtureStoragePolicy({ env, temporaryDirectory: win32.join(env.RUNNER_TEMP, 'dsh-native-fixtures') })
   if (policy.mode !== 'github-hosted-windows') throw new Error('Fixture preparation requires complete hosted Windows context')
   const runner = await realpath(env.RUNNER_TEMP)

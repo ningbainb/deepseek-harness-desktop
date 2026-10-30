@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -22,6 +22,9 @@ const require = createRequire(import.meta.url)
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
 
 test('stock CopyFiles failure followed by its real Cancel button immediately restores old install and registry', { ...windowsOnly, timeout: 60_000 }, async t => {
+  const started = Date.now(), timeline = []
+  const observe = phase => timeline.push({ phase, at: new Date().toISOString(), elapsedMs: Date.now() - started })
+  observe('case-start')
   await assertInstallerFixtureProcessIsolation()
   let removeFixture
   const f = await payloadFixture({ after: fn => { removeFixture = fn } })
@@ -35,7 +38,21 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\Install`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', install, '/f'], { windowsHide: true })
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', 'old', '/f'], { windowsHide: true })
   let child, exited, staged
+  async function observation() {
+    const files = {}
+    for (const name of ['prepared.txt', 'lock-ready.txt', 'fixture-context.txt', 'fixture-phases.txt']) {
+      try {
+        const path = join(temporary, name), info = await stat(path)
+        files[name] = { modifiedAt: info.mtime.toISOString(), text: (await readFile(path, 'utf8')).slice(0, 8192) }
+      } catch (error) { files[name] = { error: error.code ?? error.message } }
+    }
+    return { at: new Date().toISOString(), timeline, files, target: { pid: child?.pid,
+      exitCode: child?.exitCode, signalCode: child?.signalCode },
+    unexpectedSuccess: await present(join(install, 'unexpected-success.txt')) }
+  }
   t.after(async () => {
+    observe('before-cleanup')
+    console.log('native fixture before cleanup', JSON.stringify(await observation()))
     if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await exited }
     await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper,
       '-Mode', 'Rollback', '-InstallDirectory', install, '-InstallRegistryKey', `${key}\\Install`, '-UninstallRegistryKey', `${key}\\Uninstall`],
@@ -58,17 +75,24 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
     `/DSTOCK_INCLUDE=${join(templates, 'include')}`, `/DTEST_PLUGIN_DIR=${join(plugins, 'x86-unicode')}`,
     `/DADAPTED_INSTALLER=${join(adapter.directory, 'installer.nsh')}`, join(desktop, 'test/fixtures/installer-hardening-extract.nsi')],
   { env: compiler.env, windowsHide: true, timeout: 30_000 })
+  observe('compiled')
   child = spawn(fixtureExe, [], { windowsHide: true, stdio: 'ignore', env: { ...process.env, TEMP: temporary, TMP: temporary } })
   exited = once(child, 'exit')
+  child.once('exit', () => observe('target-exit'))
   await once(child, 'spawn')
+  observe('target-spawned')
+  observe('observer-starting')
   const { stdout } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', join(desktop, 'test/fixtures/installer-hardening-cancel.ps1'), '-TargetProcessId', String(child.pid), '-ExpectedExecutable', fixtureExe,
     '-LockFile', join(install, 'collision.txt'), '-TemporaryDirectory', temporary],
   { windowsHide: true, timeout: 25_000 }).catch(async error => {
-    console.error('native fixture observation', JSON.stringify({ unexpectedSuccess: await present(join(install, 'unexpected-success.txt')),
-      stdout: error.stdout, stderr: error.stderr }))
+    observe('observer-failed')
+    console.error('native fixture observation', JSON.stringify({ ...await observation(),
+      stdout: error.stdout, stderr: error.stderr, observerExit: { code: error.code, signal: error.signal, killed: error.killed } }))
     throw error
   })
+  observe('observer-completed')
+  console.log('native fixture observation', JSON.stringify({ ...await observation(), stdout }))
   assert.match(stdout, /native-copy-dialog-cancelled/u)
   const [code] = await exited
   assert.notEqual(code, 0, 'native cancellation must report installation failure')
