@@ -10,7 +10,7 @@ import {
 } from '../src/browser-host-bootstrap.mjs'
 
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'desktop-browser-bootstrap-'))
+  const root = mkdtempSync(join(realpathSync(tmpdir()), 'desktop-browser-bootstrap-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const trusted = join(root, 'lib', 'browser-electron', 'host-main.js')
   mkdirSync(join(root, 'lib', 'browser-electron'), { recursive: true })

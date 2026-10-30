@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -23,7 +23,7 @@ export function tinyPE(resource = 'generic', text = 0x42) {
   return buffer
 }
 export async function payloadFixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-electron-payload-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-electron-payload-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const app = join(root, 'app')
   const electron = join(app, 'resources/app.asar.unpacked/node_modules/electron')

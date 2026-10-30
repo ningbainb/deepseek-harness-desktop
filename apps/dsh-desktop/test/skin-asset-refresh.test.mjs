@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { link, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
@@ -10,7 +11,7 @@ const buildRoot = new URL('../build/', import.meta.url)
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 
 async function temporary(t) {
-  const directory = await mkdtemp('E:/DeepSeekHarnessDesktop-Build/temp/skin-asset-refresh-')
+  const directory = await mkdtemp(join(await realpath(tmpdir()), 'skin-asset-refresh-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
   return directory
 }
