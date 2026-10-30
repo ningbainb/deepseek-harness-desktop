@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
-import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import test from 'node:test'
 import { resolveNsisCompiler } from '../scripts/nsis-compiler.mjs'
@@ -46,20 +47,37 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
         files[name] = { modifiedAt: info.mtime.toISOString(), text: (await readFile(path, 'utf8')).slice(0, 8192) }
       } catch (error) { files[name] = { error: error.code ?? error.message } }
     }
-    return { at: new Date().toISOString(), timeline, files, target: { pid: child?.pid,
+    const installerLogs = []
+    for (const name of await readdir(temporary).catch(() => [])) {
+      if (!/^dsh-desktop-install-.*\.log$/u.test(name)) continue
+      installerLogs.push({ name, text: await readFile(join(temporary, name), 'utf16le').catch(error => `<unreadable: ${error.code ?? error.message}>`) })
+    }
+    const result = { at: new Date().toISOString(), timeline, files, installerLogs, target: { pid: child?.pid,
       exitCode: child?.exitCode, signalCode: child?.signalCode },
     unexpectedSuccess: await present(join(install, 'unexpected-success.txt')) }
+    // Independent artifact survives fixture cleanup even when log downloads fail.
+    const evidence = resolve(desktop, '../../.tmp/release-qa/installer-cancel')
+    try {
+      await mkdir(evidence, { recursive: true })
+      await writeFile(join(evidence, `${process.pid}-${started}-${timeline.at(-1)?.phase}.json`), JSON.stringify(result, null, 2) + '\n')
+    } catch (error) {
+      result.evidenceWriteError = error.code ?? error.message
+    }
+    return result
   }
   t.after(async () => {
     observe('before-cleanup')
-    console.log('native fixture before cleanup', JSON.stringify(await observation()))
-    if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await exited }
-    await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper,
-      '-Mode', 'Rollback', '-InstallDirectory', install, '-InstallRegistryKey', `${key}\\Install`, '-UninstallRegistryKey', `${key}\\Uninstall`],
-    { windowsHide: true, env: { ...process.env, TEMP: temporary, TMP: temporary } }).catch(() => {})
-    await exec('reg.exe', ['DELETE', `HKCU\\${key}`, '/f'], { windowsHide: true }).catch(() => {})
-    await staged?.restore()
-    await removeFixture()
+    try {
+      console.log('native fixture before cleanup', JSON.stringify(await observation()))
+    } finally {
+      if (child && child.exitCode === null && child.signalCode === null) { child.kill(); await exited }
+      await exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper,
+        '-Mode', 'Rollback', '-InstallDirectory', install, '-InstallRegistryKey', `${key}\\Install`, '-UninstallRegistryKey', `${key}\\Uninstall`],
+      { windowsHide: true, env: { ...process.env, TEMP: temporary, TMP: temporary } }).catch(() => {})
+      await exec('reg.exe', ['DELETE', `HKCU\\${key}`, '/f'], { windowsHide: true }).catch(() => {})
+      await staged?.restore()
+      await removeFixture()
+    }
   })
   staged = await prepareInstallerElectronPayload(f.app)
   const adapter = JSON.parse(await readFile(staged.builderArguments[0].slice(staged.builderArguments[0].indexOf('=') + 1), 'utf8'))
@@ -81,6 +99,21 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   child.once('exit', () => observe('target-exit'))
   await once(child, 'spawn')
   observe('target-spawned')
+  // Preparation and the native Cancel interaction are different phases. Keep
+  // the observer's original 20s interaction budget and the enclosing 60s test
+  // bound, but do not spend the interaction budget on cold preflight startup.
+  observe('waiting-prepared')
+  const preparationDeadline = performance.now() + 20_000
+  while (!(await present(join(temporary, 'prepared.txt')))) {
+    assert.equal(child.exitCode, null, 'fixture must remain alive until preparation completes')
+    assert.equal(child.signalCode, null, 'fixture must not be terminated during preparation')
+    assert.ok(performance.now() < preparationDeadline, 'fixture did not prepare the upgrade within 20 seconds')
+    await delay(100)
+  }
+  assert.ok(performance.now() < preparationDeadline, 'fixture preparation must complete within 20 seconds')
+  assert.equal(child.exitCode, null, 'fixture must remain alive before the native observer starts')
+  assert.equal(child.signalCode, null, 'fixture must not be terminated before native observation')
+  observe('prepared-before-observer')
   observe('observer-starting')
   const { stdout } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', join(desktop, 'test/fixtures/installer-hardening-cancel.ps1'), '-TargetProcessId', String(child.pid), '-ExpectedExecutable', fixtureExe,
