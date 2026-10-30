@@ -55,6 +55,8 @@ jobs:
         run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
       - name: Check native installer cancellation before full verification
         run: node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs
+      - name: Diagnose compiled installer shortcut lifecycle before full verification
+        run: node apps/dsh-desktop/scripts/verify-installer-lifecycle.mjs
       - run: pnpm verify
       - run: pnpm feature-baseline:check
       - run: pnpm desktop:regression:e2e --source --collect-failures

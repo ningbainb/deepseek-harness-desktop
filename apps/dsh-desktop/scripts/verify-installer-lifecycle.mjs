@@ -167,11 +167,24 @@ try {
       else await assert.rejects(readFile(join(install, 'completed.txt')), { code: 'ENOENT' })
       if (success) {
         assert.equal(await readFile(join(install, 'restore-outdir.txt'), 'utf16le'), install, 'runtime restoration must preserve the installer output directory used for shortcuts')
-        const { stdout: workingDirectory } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
-          '[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $shell=[Activator]::CreateInstance([Type]::GetTypeFromProgID("WScript.Shell")); $link=$shell.CreateShortcut($env:DSH_TEST_LINK); [Console]::Write($link.WorkingDirectory); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)'], {
-          windowsHide: true, env: { ...process.env, DSH_TEST_LINK: join(install, 'isolated-launch.lnk') },
+        const shortcutPath = join(install, 'isolated-launch.lnk')
+        const shortcutBytes = await readFile(shortcutPath).catch(error => ({ error: error.code ?? error.message }))
+        const creationStatus = await readFile(join(install, 'shortcut-status.txt'), 'utf16le')
+        const { stdout, stderr } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+          '$ErrorActionPreference="Stop"; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $shell=[Activator]::CreateInstance([Type]::GetTypeFromProgID("WScript.Shell")); try { $link=$shell.CreateShortcut($env:DSH_TEST_LINK); try { [Console]::Write((@{ path=$env:DSH_TEST_LINK; exists=[IO.File]::Exists($env:DSH_TEST_LINK); workingDirectory=$link.WorkingDirectory; targetPath=$link.TargetPath; systemLocale=(Get-WinSystemLocale).Name; ansiCodePage=[Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage } | ConvertTo-Json -Compress)) } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) } } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }'], {
+          windowsHide: true, timeout: 30_000, env: { ...process.env, DSH_TEST_LINK: shortcutPath },
+        }).catch(error => {
+          console.error('NSIS shortcut read failure', JSON.stringify({ scenario, install, creationStatus, shortcutBytes: Buffer.isBuffer(shortcutBytes) ? shortcutBytes.toString('base64') : shortcutBytes, stdout: error.stdout, stderr: error.stderr }))
+          throw error
         })
-        assert.equal(workingDirectory.toLowerCase(), install.toLowerCase(), 'shortcut Start In must remain the installed application directory')
+        const shortcut = JSON.parse(stdout)
+        console.log('NSIS shortcut observation', JSON.stringify({ scenario, creationStatus, ...shortcut, stderr }))
+        if (shortcut.workingDirectory.toLowerCase() !== install.toLowerCase() || creationStatus !== 'created' || !shortcut.exists) {
+          console.error('NSIS shortcut binary', JSON.stringify({ scenario, install, compiler: compiler.path, shortcutBytes: Buffer.isBuffer(shortcutBytes) ? shortcutBytes.toString('base64') : shortcutBytes }))
+        }
+        assert.equal(creationStatus, 'created', 'NSIS must report successful shortcut creation')
+        assert.equal(shortcut.exists, true, 'shortcut must exist before COM opens it')
+        assert.equal(shortcut.workingDirectory.toLowerCase(), install.toLowerCase(), 'shortcut Start In must remain the installed application directory')
       }
       if (['custom-location', 'conflicting-location'].includes(scenario)) {
         assert.equal(await pathExists(join(directory, 'default-location', 'DeepSeek Harness Desktop.exe')), false)

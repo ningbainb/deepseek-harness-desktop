@@ -57,7 +57,14 @@ Section
   FileOpen $4 "$INSTDIR\restore-outdir.txt" w
   FileWriteUTF16LE $4 "$OUTDIR"
   FileClose $4
+  ClearErrors
   CreateShortCut "$INSTDIR\isolated-launch.lnk" "$INSTDIR\DeepSeek Harness Desktop.exe"
+  StrCpy $5 "created"
+  IfErrors 0 +2
+    StrCpy $5 "create-error"
+  FileOpen $4 "$INSTDIR\shortcut-status.txt" w
+  FileWriteUTF16LE $4 "$5"
+  FileClose $4
   WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" DisplayVersion "new"
   WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" UninstallString '$\"$INSTDIR\Uninstall DeepSeek Harness Desktop.exe$\" /currentuser'
