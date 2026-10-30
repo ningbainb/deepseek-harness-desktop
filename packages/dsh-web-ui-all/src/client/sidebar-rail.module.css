@@ -46,6 +46,15 @@
    dock icons share one center line. Do not infer the state from descendant
    data-wide/data-rail markers: those markers are updated during the shell's
    animation and can remain stale after the sidebar has opened again. */
+:global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] div:has(> div > [data-slot='sidebar.footer.action']):has(> div > [data-slot='sidebar.settings'])) {
+  /* Older skins reserve one short horizontal footer. A rail needs enough
+     height for every action and the account menu, including late plugins. */
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
+}
+
 :global([data-dsh-frame][data-sidebar-collapsed] [data-pane='sidebar'] > div > [class*='footArea'] > [class*='footerActions']),
 :global([data-sidebar-collapsed] [data-pane='sidebar'] [class*='footArea'] > [class*='footerActions']) {
   box-sizing: border-box;

@@ -109,13 +109,49 @@ test('Windows shutdown terminates the complete runtime process tree', async () =
 })
 
 test('default startup budget tolerates first-run Windows scanning', () => {
-  assert.equal(DEFAULT_STARTUP_TIMEOUT_MS, 180_000)
+  assert.equal(DEFAULT_STARTUP_TIMEOUT_MS, 600_000)
   const controller = new DshRuntimeController({
     cliPath: 'dsh-bin.js',
     cwd: process.cwd(),
     dshHome: 'C:\\isolated-home',
   })
   assert.equal(controller.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS)
+})
+
+test('cold startup still loading after three minutes reaches readiness without killing or respawning its Runtime', async context => {
+  const child = new FakeChild()
+  const timers = new Set()
+  let elapsed = 0, spawns = 0, terminations = 0
+  const controller = new DshRuntimeController({
+    cliPath: '/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+    cwd: process.cwd(), dshHome: '/isolated-home', platform: 'linux', autoRestart: false,
+    now: () => elapsed,
+    spawnProcess: () => { spawns++; return child },
+    probeReady: async () => {},
+    terminateProcessTree: async () => { terminations++; child.kill() },
+    schedule: (callback, delay) => {
+      const timer = { callback, deadline: elapsed + delay }
+      timers.add(timer)
+      return timer
+    },
+    cancelSchedule: timer => timers.delete(timer),
+  })
+  context.after(() => controller.stop())
+  const pending = controller.start()
+  pending.catch(() => {})
+  elapsed = 240_000
+  for (const timer of [...timers]) {
+    if (timer.deadline <= elapsed) { timers.delete(timer); timer.callback() }
+  }
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(controller.status.state, 'starting', 'Disk loading after the old deadline must retain its Runtime')
+  assert.equal(terminations, 0)
+  child.stdout.write('dsh web: http://127.0.0.1:43125\ndsh desktop web: ready\n')
+  assert.equal(await pending, 'http://127.0.0.1:43125/')
+  assert.equal(controller.status.state, 'ready')
+  assert.equal(spawns, 1)
+  assert.equal(terminations, 0)
+  assert.equal(timers.size, 0, 'Successful readiness cancels its bounded startup timer')
 })
 
 test('Desktop HTTP startup waits for completion after the official Web URL before probing', async context => {

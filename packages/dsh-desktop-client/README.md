@@ -9,6 +9,7 @@ English | [中文](README.zh.md)
 - Reads Desktop information, Contract capabilities, and runtime status.
 - Subscribes to runtime status and validated Deep Links.
 - Shows Desktop notifications and opens the Extensions or Updates surface when available.
+- Opens an installed plugin's native settings with `setting: 'plugin-options'` and its exact `plugin` package name. This navigation grants no plugin management authority.
 - Exposes the narrow `extensions.open` surface plus the bounded first-three-launch Dock hint state; it never grants extension management authority to the main page.
 - Opens a workspace-relative file through the Desktop validator and the platform default application.
 - Reads, configures, and subscribes to the opt-in local LAN gateway through the `lan-gateway.manage` capability.

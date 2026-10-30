@@ -16,7 +16,6 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-agent'
-import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 
 import {
   isConfigured,
@@ -38,6 +37,7 @@ import {
 import { createConsultExpertTool } from './core/expert.ts'
 import { valueModeState } from './core/state.ts'
 import { assessValueModeHealth } from './core/model-selection.ts'
+import { routedCallConfig } from './core/routed-call.ts'
 import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters, type RouteParameters } from './core/runtime-telemetry.ts'
 import { dshHome } from './dsh-home.ts'
 import { syncPresetTrees } from './sync.ts'
@@ -207,12 +207,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
       event: 'cost_mode_route', params, timestamp: new Date().toISOString(),
     })
 
-    return {
-      ...resolved,
-      provider: route.provider,
-      model: route.model,
-      ...(route.reasoningEffort ? { reasoningEffort: route.reasoningEffort as LlmCallConfig['reasoningEffort'] } : {}),
-    }
+    return routedCallConfig(resolved, route, ctx.llm, payload.signal)
   })
 
   ctx.on('agent/request-error', async (payload, next) => {

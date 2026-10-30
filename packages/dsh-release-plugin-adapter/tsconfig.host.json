@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "ES2024", "module": "ESNext", "moduleResolution": "bundler", "allowImportingTsExtensions": true, "rewriteRelativeImportExtensions": true, "strict": true, "skipLibCheck": true, "composite": true, "declaration": true, "rootDir": "src", "outDir": "lib/types", "types": ["node"] },
+  "include": ["src/index.ts", "src/core/**/*.ts"]
+}

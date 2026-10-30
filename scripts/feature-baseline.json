@@ -4,6 +4,46 @@
   "description": "DeepSeek Harness Desktop & dsh-web-ui 核心功能与内置插件保全基线清单",
   "plugins": [
     {
+      "id": "release-prompt-pilot",
+      "package": "@local/dsh-prompt-pilot",
+      "path": "vendor/plugins-20261026/dsh-prompt-pilot-1.2.3.tgz",
+      "description": "按当前会话预测下一条提示词，保留输入与显式接受行为",
+      "features": ["conversation-scoped-prompt-prediction", "explicit-tab-acceptance", "preserve-existing-composer-tools", "auto-prediction-default-on-and-explicit-disable-preserved", "prediction-shortcut-visibility-preserves-context-hover-geometry"],
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "release-dafeiyu-pet",
+      "package": "dsh-dafeiyu-pet",
+      "path": "vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz",
+      "description": "默认全身桌宠优先显示，保留原桌宠配置和切换能力",
+      "features": ["full-body-companion", "independent-companion-visibility", "preserve-existing-pet-and-settings-window-clarity", "desktop-default-on-explicit-off-preserved-and-settings-do-not-initialize-widget-resources", "widget-private-resource-disposal-aborts-requests-and-fences-late-callbacks", "single-widget-reenable-preserves-vendor-preferences-and-original-pet", "full-body-renderer-priority-stops-original-client-polling-without-config-writes", "idle-frames-preserve-animation-without-redundant-status-or-motion-dom-writes", "readback-canvases-declare-will-read-frequently", "unconfigured-balance-is-distinct-from-real-failures"],
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "release-builtin-browser",
+      "package": "dsh-builtin-browser",
+      "path": "vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz",
+      "description": "可见浏览器与 CDP 工具，保留既有浏览器提供方和配置入口",
+      "features": ["visible-browser-and-cdp-tools", "authenticated-desktop-browser-host", "isolated-browser-sessions-and-cookie-persistence"],
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "release-plugin-adapter",
+      "package": "@linxin666/dsh-release-plugin-adapter",
+      "path": "packages/dsh-release-plugin-adapter",
+      "description": "发布插件的官方 SDK 契约适配与独立配置入口",
+      "features": ["official-npm-sdk-only", "release-plugin-settings-and-prerequisites", "preserve-existing-plugin-capabilities"],
+      "requiredInAggregate": false,
+      "requiredInCordisPatch": false,
+      "requiredInDesktop": true
+    },
+    {
       "id": "ui-web-ui-compat",
       "package": "@linxin666/dsh-web-ui-all",
       "path": "packages/dsh-web-ui-all",
@@ -42,6 +82,7 @@
         "conversation-extension-dock-brand-entry",
         "wide-sidebar-extension-dock-label",
         "desktop-control-actions-require-approval",
+        "full-filesystem-permission-preserves-browser-one-shot-approval-and-explicit-session-denial",
         "desktop-plugin-center-single-destination",
         "management-routing-ignores-streamed-text-and-restores-replaced-sidebar",
         "conversation-plugin-management-entry",
@@ -127,7 +168,9 @@
       "description": "AionUI 桌面多端管理侧边面板",
       "patchId": "ui-dsh-aionui-panel",
       "features": [
-        "aionui-render-failure-isolation"
+        "aionui-render-failure-isolation",
+        "optional-panels-stay-in-content-row-without-implicit-footer-space",
+        "native-collapse-state-remains-authoritative-across-skins"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -191,7 +234,10 @@
         "installed-0.4.4-frames2d-readback-canvas-retains-image-fallback",
         "pet-settings-no-unbounded-batch-mutation",
         "desktop-transient-control-clearance-preserves-pet-settings-and-dragging",
-        "main-pet-clears-native-right-panel-controls-and-retained-panel-opening-without-changing-saved-placement"
+        "main-pet-clears-native-right-panel-controls-and-retained-panel-opening-without-changing-saved-placement",
+        "published-pet-keeps-visible-composer-and-send-controls-clear-without-writing-automatic-displacement",
+        "manual-drag-starts-from-current-visible-position-and-ordinary-click-does-not-save-displacement",
+        "published-pet-display-mutations-await-serialized-profile-mirrors-and-restore-without-late-reversion"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -338,6 +384,10 @@
     }
   ],
   "desktopBuiltins": [
+    "@local/dsh-prompt-pilot",
+    "dsh-dafeiyu-pet",
+    "dsh-builtin-browser",
+    "@linxin666/dsh-release-plugin-adapter",
     "@deepseek-ai/dsh-base",
     "@linxin666/dsh-desktop-compat",
     "@deepseek-ai/dsh-web-app",
@@ -357,6 +407,32 @@
   ],
   "desktopSurfaces": [
     {
+      "id": "sidebar-footer-geometry",
+      "name": "Shared sidebar footer geometry across official and bundled skins",
+      "uiSelector": "[data-slot=\"sidebar.footer.action\"]",
+      "e2eScript": "scripts/verify-sidebar-footer.mjs",
+      "features": [
+        "native-bottom-row-remains-at-frame-edge-without-phantom-panel-row",
+        "expanded-collapsed-and-reopened-footers-retain-reachable-controls",
+        "maid-hook-handoff-retains-composer-artwork-in-every-layout-state",
+        "all-fifteen-skins-and-official-default-at-two-window-sizes"
+      ]
+    },
+    {
+      "id": "release-plugin-integration",
+      "name": "Prompt Pilot, Dafeiyu and built-in browser integration",
+      "uiSelector": "[data-dsh-plugin-options]",
+      "e2eScript": "scripts/verify-release-plugins.mjs",
+      "features": [
+        "immutable-reviewed-release-plugin-inputs",
+        "native-settings-pages-remain-reachable",
+        "protected-release-plugins-are-listed-with-native-settings-buttons",
+        "new-companion-opt-in-preserves-original-companion",
+        "prompt-predictions-are-isolated-by-conversation",
+        "vendor-browser-uses-visible-authenticated-electron-host"
+      ]
+    },
+    {
       "id": "desktop-sidebar-adaptation",
       "name": "桌面侧栏终端与既有布局配置保全",
       "uiSelector": "[data-dsh-panel-host]",
@@ -370,6 +446,7 @@
         "sidebar-layout-anchors-follow-panels-and-clean-up-only-owned-attributes",
         "optional-tools-collapse-without-moving-native-react-nodes",
         "persistent-accessible-tools-toggle-keeps-workspaces-and-session-actions-visible",
+        "skin-rail-footer-grows-to-retain-every-action-and-account-menu",
         "startup-package-resolution-prefers-physical-unpacked-sdk-tree",
         "startup-host-identity-checks-remain-complete-and-bounded-parallel",
         "chat-recovery-joins-native-chat-history-and-session-lifecycle",
@@ -531,6 +608,7 @@
         "official-dsh-0.1.5-exact-pin",
         "immutable-application-runtime-baseline",
         "offline-startup-runtime-integrity-audit",
+        "profile-parent-directory-preparation-shared-only-within-one-reconciliation",
         "silent-legacy-managed-link-drift-repair",
         "post-migration-protected-graph-proof",
         "isolated-pnpm-linker-validated-with-local-fixtures",
@@ -567,6 +645,8 @@
         "post-activation-graph-validation-before-runtime-health-commit",
         "sdk-composed-runtime-launcher",
         "legacy-settings-transaction-before-sdk-boot",
+        "interrupted-legacy-transaction-recovers-before-profile-snapshot-read",
+        "recovered-provider-config-remains-durable-through-subsequent-live-profile-reload",
         "unknown-scalar-array-boolean-null-settings-deferred-with-original-bytes",
         "registered-migratable-settings-reject-non-object-before-mutation",
         "settings-imported-and-live-source-byte-preservation",
@@ -579,6 +659,7 @@
         "ambiguous-managed-patch-fails-closed-without-data-loss",
         "bounded-runtime-startup-phase-timings",
         "slow-cold-start-runtime-grace-period-180-seconds",
+        "mechanical-disk-cold-start-bounded-600-seconds-without-premature-runtime-restart",
         "production-client-compression-preserves-names-and-source-maps",
         "official-cli-install-anchor",
         "startup-token-cookie-isolation",
@@ -625,12 +706,18 @@
       "e2eScript": "scripts/verify-package.mjs",
       "features": [
         "normal-installer-compression",
+        "nested-windows-electron-locales-match-explicit-desktop-languages-with-en-US-fallback-and-link-guards",
         "windows-package-runtime-evidence-preflight-before-dist-cleanup",
         "packaged-critical-runtime-owner-resolution-contained-in-payload",
         "deferred-committed-backup-cleanup",
         "isolated-per-generation-committed-cleanup",
         "locked-legacy-committed-backup-does-not-block-next-upgrade",
         "stable-installer-transaction-helper",
+        "stock-extraction-cancel-rolls-back-before-quitting",
+        "installer-process-ownership-excludes-prefix-siblings-and-unrelated-command-line-references",
+        "offline-runtime-restoration-bytes-rounded-up-in-native-disk-space-gates",
+        "marked-install-adoption-from-real-uninstall-command-without-installlocation",
+        "production-setup-upgrade-witnesses-old-runtime-file-key-and-two-nonempty-isolated-session-contexts",
         "explicit-64-and-32-bit-uninstall-registry-transaction",
         "updater-passes-running-windows-install-directory",
         "explicit-directory-and-registered-uninstall-location-survive-upgrades",
@@ -749,6 +836,7 @@
       "desktopLocation": "extension-dock/value-mode",
       "e2eScript": "scripts/verify-dock-settings.mjs",
       "features": [
+        "routed-inherited-reasoning-effort-revalidated-against-exact-destination",
         "canonical-cost-mode-events",
         "dock-only-collaboration-details-preserve-direct-model-controls-and-ordinary-settings-presentation",
         "official-sdk-persona-prefix-suffix",
@@ -800,6 +888,7 @@
         "relay-new-user-prefers-discovered-deepseek-flash",
         "relay-runtime-auth-and-http401-open-login-without-key-deletion-or-other-provider-takeover",
         "relay-initial-default-write-waits-for-official-startup-commit",
+        "custom-provider-key-confirmed-before-profile-creation-and-failed-save-retains-draft",
         "relay-isolated-first-user-browser-handoff-e2e",
         "relay-new-user-default-preserves-existing-selection",
         "relay-five-minute-authenticated-catalog-refresh",
@@ -905,6 +994,7 @@
       "e2eScript": "scripts/verify-skin-center.mjs",
       "features": [
         "fresh-profile-official-skin-without-particle-overlay",
+        "overlapping-maid-hook-instances-preserve-active-artwork-and-restore-original-styles",
         "appearance-initialization-does-not-overwrite-existing-skin-background-or-settings"
       ]
     },
@@ -915,6 +1005,7 @@
       "e2eScript": "scripts/verify-beta-usability.mjs",
       "features": [
         "real-local-provider-progressive-chinese-and-code-output",
+        "usage-card-reuses-live-footer-without-global-stream-time-sidebar-rescans",
         "collapsed-tools-preserve-workspaces-sessions-dock-and-keyboard-access",
         "single-footer-dock-entry-with-legacy-shell-fallback",
         "retained-skin-context-hover-remains-stable",
@@ -1094,6 +1185,8 @@
         "dock-native-pages-use-owned-alias-slots-without-redeclaring-official-slots",
         "official-plugin-manager-roster-survives-community-update-patch",
         "native-plugin-forms-preserve-inject-store-locale-and-nested-slot-lifecycle",
+        "release-plugin-native-settings-are-reachable-through-the-exact-owner",
+        "plugin-options-retains-row-forms-drafts-and-live-section-disposal",
         "dock-plugin-roster-refreshes-on-runtime-generation-with-draft-protection",
         "declarative-palette-sync-and-reset",
         "theme-only-update-clears-stale-palette-without-losing-drafts",
@@ -1148,6 +1241,8 @@
         "rc2-typed-stream-events-ready-and-bidirectional-uplink",
         "packaged-runtime-sdk-module-identity-preserved",
           "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
+          "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
+          "windows-installer-compaction-restores-verified-full-directory-even-on-compression-failure",
           "packaged-integrity-canonicalizes-payload-paths-and-rejects-symlink-escapes",
         "builder-generated-windows-update-provider-channel-cache-and-signature-metadata-gated-before-compression",
         "no-http-ready-address",

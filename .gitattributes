@@ -4,4 +4,7 @@ apps/dsh-desktop/test/fixtures/direct-start/** -text
 # Unified diffs prefix context lines with a space, including empty/tabbed lines.
 # Preserve that required patch syntax; normal source whitespace checks remain.
 patches/*.patch whitespace=-blank-at-eol,-space-before-tab
+# Preserve intentional patch CR bytes and the pnpm checksum on every checkout.
+patches/@linxin666__dsh-pet@0.4.4.patch -text
+patches/dsh-dafeiyu-pet@0.2.0.patch text eol=lf
 apps/dsh-desktop/build/skin-center-v2-assets/** -text

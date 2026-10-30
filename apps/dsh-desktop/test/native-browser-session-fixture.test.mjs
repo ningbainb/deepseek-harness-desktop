@@ -26,7 +26,9 @@ async function browserFixture(context, options = {}) {
     { sessionId: 'old-draft-2', cwd: workspacePath, blank: true },
     { sessionId: 'unrelated', cwd: 'E:/other-workspace', blank: true },
   ]
-  const state = { current: 'session-a', newClicks: 0, navigation: [], unrouted: 0, browsers: new Map() }
+  const state = { current: 'session-a', newClicks: 0, navigation: [], unrouted: 0, browsers: new Map(),
+    archived: new Set(['old-draft-2']), archiveCalls: [] }
+  let seatReads = 0
   const browser = () => state.browsers.get(state.current)
   const visible = () => browser()?.visible === true
   const input = {
@@ -77,7 +79,7 @@ async function browserFixture(context, options = {}) {
   }
   const page = {
     url: () => 'dsh-runtime://app/',
-    route: async () => {},
+    route: async () => { if (options.failRoute) throw new Error('fixture route setup failed') },
     unroute: async () => { state.unrouted += 1 },
     locator: selector => {
       if (selector === '[data-aionui-native-panel="browser"]') return body
@@ -111,9 +113,20 @@ async function browserFixture(context, options = {}) {
   }
   const run = () => fixture.verifyNativeBrowserSessionIsolation({
     page, logPath, sessionId: 'session-a', workspacePath,
-    rpc: async (_page, method) => {
-      assert.equal(method, 'session.list')
-      return { items: structuredClone(options.legacyIds ? seats.map(({ sessionId, ...seat }) => ({ id: sessionId, ...seat })) : seats) }
+    readWorkspace: async () => ({ archivedSessionIds: [...state.archived], pinnedSessionIds: ['pinned-unrelated'] }),
+    rpc: async (_page, method, request) => {
+      if (method === 'session.list') {
+        if (++seatReads === 3 && options.failInitialSeats) throw new Error('fixture initial seats failed')
+        return { items: structuredClone(options.legacyIds ? seats.map(({ sessionId, ...seat }) => ({ id: sessionId, ...seat })) : seats) }
+      }
+      if (method === 'workspace.list') return { archivedSessionIds: [...state.archived], pinnedSessionIds: ['pinned-unrelated'] }
+      state.archiveCalls.push({ method, id: request.sessionId })
+      if (method === 'workspace.archiveSession') state.archived.add(request.sessionId)
+      else {
+        assert.equal(method, 'workspace.unarchiveSession')
+        state.archived.delete(request.sessionId)
+      }
+      return {}
     },
     openSeededSession: async (_page, id) => { assert.equal(id, 'session-a'); state.current = id },
     navigateToSession: async id => {
@@ -132,6 +145,11 @@ test('binds exactly one clicked B alongside old drafts and returns through the r
   assert.equal(scenario.state.unrouted, 1)
   assert.equal(scenario.state.current, 'session-a')
   assert.deepEqual(scenario.seats.map(seat => seat.sessionId), ['session-a', 'old-draft-1', 'old-draft-2', 'unrelated', 'session-b'])
+  assert.deepEqual([...scenario.state.archived], ['old-draft-2'])
+  assert.deepEqual(scenario.state.archiveCalls, [
+    { method: 'workspace.archiveSession', id: 'old-draft-1' },
+    { method: 'workspace.unarchiveSession', id: 'old-draft-1' },
+  ], 'The rc.4 fresh-creation precondition must restore drafts and leave unrelated/prior archives unchanged')
   assert.deepEqual(await readFile(scenario.logPath), scenario.originalLog)
 })
 
@@ -172,3 +190,14 @@ test('retains explicit legacy id compatibility without relying on list order', a
   assert.equal(scenario.state.newClicks, 1)
   assert.deepEqual(scenario.state.navigation, ['session-b'])
 })
+
+for (const options of [{ failRoute: true }, { failInitialSeats: true }]) {
+  test(`restores temporary archives when post-preparation setup fails: ${Object.keys(options)[0]}`, async context => {
+    const scenario = await browserFixture(context, options)
+    await assert.rejects(scenario.run(), /fixture (route setup|initial seats) failed/u)
+    assert.deepEqual([...scenario.state.archived], ['old-draft-2'])
+    assert.ok(scenario.state.archiveCalls.some(call => call.method === 'workspace.unarchiveSession'))
+    assert.equal(scenario.state.newClicks, 0)
+    assert.deepEqual(await readFile(scenario.logPath), scenario.originalLog)
+  })
+}

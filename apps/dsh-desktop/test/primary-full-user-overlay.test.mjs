@@ -14,7 +14,7 @@ test('the primary full-user overlay has the fixed sandbox and approval rows', as
   assert.match(FULL_USER_RUNTIME_OVERLAY, /id: sandbox-policy/u)
   assert.match(FULL_USER_RUNTIME_OVERLAY, /mode: danger-full-access/u)
   assert.match(FULL_USER_RUNTIME_OVERLAY, /id: approval/u)
-  assert.match(FULL_USER_RUNTIME_OVERLAY, /policy: never/u)
+  assert.match(FULL_USER_RUNTIME_OVERLAY, /policy: ask/u)
   const userData = await mkdtemp(join(tmpdir(), 'dsh-primary-overlay-'))
   try {
     const path = await writePrimaryFullUserOverlay({ userData, idFactory: () => 'primary-test' })

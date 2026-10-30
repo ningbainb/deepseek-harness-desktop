@@ -72,7 +72,8 @@ function setup(t, options = {}) {
   const dom = new JSDOM('<html><head></head><body></body></html>', { url: `http://127.0.0.1/${options.search ?? ''}` })
   const { window } = dom
   Object.assign(window, { setTimeout, clearTimeout, setInterval, clearInterval })
-  let visibility = 'visible', enabled = true, exported
+  let visibility = 'visible', enabled = options.enabled ?? true, exported
+  if (options.companion !== undefined) window.document.documentElement.setAttribute('data-desktop-dafeiyu-visible', String(options.companion))
   Object.defineProperty(window.document, 'visibilityState', { get: () => visibility })
   const requests = [], roots = [], disposers = [], subscriptions = new Set(), stores = []
   const snapshotStore = initial => {
@@ -131,10 +132,63 @@ function setup(t, options = {}) {
   const dispose = () => { for (const cleanup of [...disposers].reverse()) cleanup() }
   t.after(() => { dispose(); dom.window.close() })
   return { requests, roots, stores, subscriptions, opened, registered, writes, dispose,
+    liveRoots: () => window.document.querySelectorAll('[data-dsh-pet-root]').length,
+    setCompanion(value, updateAttribute = true) {
+      if (updateAttribute) window.document.documentElement.setAttribute('data-desktop-dafeiyu-visible', String(value))
+      window.dispatchEvent(new window.CustomEvent('dsh-dafeiyu-visibility', { detail: value }))
+    },
     setEnabled(value) { enabled = value; for (const callback of [...subscriptions]) callback() },
     setVisible(value) { visibility = value ? 'visible' : 'hidden'; window.document.dispatchEvent(new window.Event('visibilitychange')) },
   }
 }
+
+test('installed bundle yields to full-body companion, aborts late reads and restores original without settings writes', async t => {
+  const state = setup(t)
+  t.mock.timers.tick(0); await flush()
+  const first = pollStateRequests(state.requests)[0]
+  assert.equal(state.liveRoots(), 1)
+  state.setCompanion(true)
+  assert.equal(state.liveRoots(), 0)
+  assert.equal(first.signal.aborted, true)
+  const reads = pollStateRequests(state.requests).length
+  t.mock.timers.tick(6000); await flush()
+  assert.equal(pollStateRequests(state.requests).length, reads)
+  first.resolve({ name: 'late original snapshot' }); await flush()
+  assert.equal(state.stores[0].getSnapshot().snapshot, null)
+  state.setCompanion(false); await flush()
+  assert.equal(state.liveRoots(), 1)
+  assert.equal(pollStateRequests(state.requests).length, reads + 1)
+  state.setCompanion(true)
+  assert.equal(state.liveRoots(), 0)
+  assert.deepEqual(state.writes, [])
+  state.dispose()
+  state.setCompanion(false); state.setEnabled(true)
+  t.mock.timers.tick(6000); await flush()
+  assert.equal(state.liveRoots(), 0, 'Disposed fibers must never remount from a late lifecycle event')
+})
+
+test('initial full-body priority preserves original disable and retained settings section', async t => {
+  const state = setup(t, { companion: true, enabled: false })
+  t.mock.timers.tick(0); await flush()
+  assert.equal(state.liveRoots(), 0)
+  assert.equal(pollStateRequests(state.requests).length, 0)
+  assert.equal(state.registered.filter(entry => entry.id === 'pet').length, 1)
+  state.setCompanion(false)
+  assert.equal(state.liveRoots(), 0, 'An original disabled choice is never overridden')
+  state.setEnabled(true)
+  assert.equal(state.liveRoots(), 1)
+  state.setCompanion(true); state.setEnabled(true)
+  assert.equal(state.liveRoots(), 0, 'Settings callbacks must still obey full-body priority')
+  assert.deepEqual(state.writes, [])
+})
+
+test('installed bundle restores original on adapter disposal even before the old visibility attribute is restored', async t => {
+  const state = setup(t, { companion: true })
+  assert.equal(state.liveRoots(), 0)
+  state.setCompanion(false, false)
+  assert.equal(state.liveRoots(), 1)
+  assert.deepEqual(state.writes, [])
+})
 
 for (const setting of ['value-mode', 'models', 'memory', 'skill-market', 'plugin-options']) {
   for (const visible of [true, false]) {

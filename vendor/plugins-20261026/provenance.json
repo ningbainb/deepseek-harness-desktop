@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "release": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026",
+  "checkedAt": "2026-10-26",
+  "note": "Original public npm-format tarballs are preserved byte-for-byte. Hash verification is provenance, not behavioral acceptance. Desktop-owned compatibility belongs in the separate SDK adapter.",
+  "artifacts": [
+    { "file": "dsh-prompt-pilot-1.2.3.tgz", "name": "@local/dsh-prompt-pilot", "version": "1.2.3", "size": 19612, "sha256": "9941974e4175a2854b54a09a6966bde1cd2c9557e407b70b2e66ba7274fb0d2a" },
+    { "file": "dsh-dafeiyu-pet-0.2.0.tgz", "name": "dsh-dafeiyu-pet", "version": "0.2.0", "size": 4398911, "sha256": "9759c153bef8b95284a380cddfa3d686d86aef4d5a28e2c00619f0d203d8b39e" },
+    { "file": "dsh-builtin-browser-0.4.14.tgz", "name": "dsh-builtin-browser", "version": "0.4.14", "size": 582131, "sha256": "3f37f0664288a8ce2ec9c01d9d763d68bf5454e642cbd4a153fac27d2dc70f2a" }
+  ]
+}

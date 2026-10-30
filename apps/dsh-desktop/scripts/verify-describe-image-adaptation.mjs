@@ -52,17 +52,17 @@ async function installClientProbe() {
   await writeFile(join(target, 'package.json'), JSON.stringify({
     name: fixtureName, version: '0.0.0-test', type: 'module', main: 'index.mjs',
     exports: { '.': './index.mjs', './client': './client.js', './package.json': './package.json' },
-    dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web', inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation', '@linxin666/dsh-tool-describe-image'] } },
+    dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web', inject: ['@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation', '@deepseek-ai/dsh-client-ui-workspace', '@linxin666/dsh-tool-describe-image'] } },
   }))
   await writeFile(join(target, 'index.mjs'), 'export function apply() {}\n')
   await writeFile(join(target, 'cordis.patch.yml'), `- insert:\n    - id: image-adaptation-fixture\n      name: '${fixtureName}'\n`)
   // This test-only package exposes public services, without replacing any
   // browser factory, settings implementation, Host route or model verdict.
   await writeFile(join(target, 'client.js'), `window.__ModuleLoader__.load({ id: ${JSON.stringify(fixtureName)}, factory: () => ({
-    inject: ['sessions', 'conversation'],
+    inject: ['sessions', 'conversation', 'uiWorkspace'],
     apply(ctx) {
       globalThis.__imageAdaptation = {
-        async create(workspaceId) { const id = await ctx.sessions.create({ workspaceId }); ctx.sessions.open(id); return id; },
+        async create(workspaceId) { const id = await ctx.sessions.create({ workspaceId }); ctx.uiWorkspace.openSession(id); return id; },
         hookInstalled() { return ctx.conversation.__dshDescribeImageSendHooked === true; },
         snapshot(sessionId) { return ctx.sessions.binding(sessionId)?.session.getSnapshot(); },
         async send(sessionId, text) {

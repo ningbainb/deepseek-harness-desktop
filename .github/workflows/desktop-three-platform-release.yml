@@ -7,7 +7,7 @@ on:
       - desktop-v*
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: desktop-three-platform-${{ github.ref }}
@@ -21,18 +21,11 @@ jobs:
       publish: ${{ steps.meta.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - id: meta
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./apps/dsh-desktop/package.json').version")"
-          publish=false
-          if [[ "${GITHUB_REF}" == refs/tags/desktop-v* ]]; then
-            tag_version="${GITHUB_REF_NAME#desktop-v}"
-            test "$tag_version" = "$version"
-            publish=true
-          fi
-          printf 'version=%s\npublish=%s\n' "$version" "$publish" >> "$GITHUB_OUTPUT"
+        run: node scripts/desktop-release-metadata.mjs
 
   windows:
     needs: metadata
@@ -58,7 +51,7 @@ jobs:
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - run: pnpm feature-baseline:check
-      - run: pnpm desktop:regression:e2e --collect-failures
+      - run: pnpm desktop:regression:e2e --source --collect-failures
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -94,6 +87,12 @@ jobs:
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.0.1.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.0.1 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.1.0'
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.1.0'
+          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.1.0.json'
+          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+          gh release download desktop-v5.1.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
           node apps/dsh-desktop/scripts/verify-release-installer.mjs
       - name: Run packaged Windows regression
         shell: pwsh
@@ -258,10 +257,113 @@ jobs:
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-amd64.deb
             apps/dsh-desktop/dist/SHA256SUMS-linux.txt
 
-  publish:
+  verify-artifacts:
     needs: [metadata, windows, macos, linux]
-    if: needs.metadata.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DSH_DESKTOP_VERSION: ${{ needs.metadata.outputs.version }}
+      DSH_DESKTOP_PUBLISH: ${{ needs.metadata.outputs.publish }}
+      DSH_DESKTOP_NATIVE_RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-${{ needs.metadata.outputs.version }}-*
+          path: preflight-assets
+          merge-multiple: true
+      - name: Verify native artifacts and write QA receipt
+        working-directory: preflight-assets
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { createHash } from 'node:crypto'
+          import { createReadStream } from 'node:fs'
+          import { copyFile, readFile, stat, writeFile } from 'node:fs/promises'
+          import { finalizeThreePlatformReceipts } from '../scripts/finalize-three-platform-receipts.mjs'
+
+          const version = process.env.DSH_DESKTOP_VERSION
+          const results = JSON.parse(process.env.DSH_DESKTOP_NATIVE_RESULTS)
+          const nativeJobs = {}
+          for (const platform of ['windows', 'macos', 'linux']) {
+            assert.equal(results[platform]?.result, 'success', `${platform}: native job must succeed`)
+            nativeJobs[platform] = results[platform].result
+          }
+          const names = [
+            `DeepSeek-Harness-Desktop-Setup-${version}-x64.exe`,
+            `DeepSeek-Harness-Desktop-${version}-arm64.dmg`,
+            `DeepSeek-Harness-Desktop-${version}-arm64.zip`,
+            `DeepSeek-Harness-Desktop-${version}-x86_64.AppImage`,
+            `DeepSeek-Harness-Desktop-${version}-amd64.deb`,
+          ]
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+          const files = []
+          for (const file of names) {
+            const info = await stat(file)
+            assert.ok(info.isFile() && info.size > 0, `${file}: native installation asset must be a nonempty file`)
+            const digest = createHash('sha256')
+            for await (const chunk of createReadStream(file)) digest.update(chunk)
+            files.push({ file, size: info.size, sha256: digest.digest('hex') })
+          }
+          const nativeReceipts = []
+          for (const [file, expected] of [
+            ['SHA256SUMS.txt', names.slice(0, 1)],
+            ['SHA256SUMS-macos.txt', names.slice(1, 3)],
+            ['SHA256SUMS-linux.txt', names.slice(3, 5)],
+          ]) {
+            const bytes = await readFile(file)
+            const rows = bytes.toString('utf8').trimEnd().split(/\r?\n/u)
+            assert.equal(rows.length, expected.length, `${file}: native checksum entry count mismatch`)
+            const seen = new Set()
+            for (const row of rows) {
+              const match = /^([a-f0-9]{64})\s+\*?(.+)$/iu.exec(row)
+              assert.ok(match && expected.includes(match[2]), `${file}: unexpected native checksum entry`)
+              assert.equal(seen.has(match[2]), false, `${file}: duplicate native checksum entry`)
+              seen.add(match[2])
+              assert.equal(match[1].toLowerCase(), files.find(asset => asset.file === match[2]).sha256, `${match[2]}: native checksum mismatch`)
+            }
+            nativeReceipts.push({ file: file === 'SHA256SUMS.txt' ? 'SHA256SUMS-windows.txt' : file, size: bytes.length, sha256: hash(bytes) })
+          }
+          await copyFile('SHA256SUMS.txt', 'SHA256SUMS-windows.txt')
+          const combined = Buffer.from(files.map(({ file, sha256 }) => `${sha256}  ${file}\n`).join(''))
+          await writeFile('SHA256SUMS.txt', combined)
+          await finalizeThreePlatformReceipts('.', version)
+          const manifest = await readFile('release-manifest.json')
+          const receipt = {
+            schemaVersion: 1, kind: 'desktop-three-platform-preflight', status: 'passed', version,
+            sourceCommit: process.env.GITHUB_SHA, eventName: process.env.GITHUB_EVENT_NAME, ref: process.env.GITHUB_REF,
+            runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            publish: process.env.DSH_DESKTOP_PUBLISH === 'true', nativeJobs, files, nativeReceipts,
+            combinedChecksums: { file: 'SHA256SUMS.txt', size: combined.length, sha256: hash(combined) },
+            releaseManifest: { file: 'release-manifest.json', size: manifest.length, sha256: hash(manifest) },
+          }
+          await writeFile('preflight-receipt.json', JSON.stringify(receipt, null, 2) + '\n')
+          console.log(JSON.stringify(receipt, null, 2))
+          NODE
+      - name: Preserve three-platform preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-qa-${{ needs.metadata.outputs.version }}-three-platform
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            preflight-assets/preflight-receipt.json
+            preflight-assets/SHA256SUMS-windows.txt
+            preflight-assets/SHA256SUMS-macos.txt
+            preflight-assets/SHA256SUMS-linux.txt
+            preflight-assets/SHA256SUMS.txt
+            preflight-assets/release-manifest.json
+
+  publish:
+    needs: [metadata, windows, macos, linux, verify-artifacts]
+    if: github.event_name == 'push' && needs.metadata.outputs.publish == 'true' && needs.verify-artifacts.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

@@ -22,6 +22,9 @@ const runner: GitRunner = {
       return { exitCode: 0, stdout: result.stdout, stderr: result.stderr }
     } catch (error) {
       const value = error as { code?: number | string; stdout?: string; stderr?: string }
+      if (process.env.DSH_GIT_GRAPH_TEST_DIAGNOSTICS === '1') {
+        console.error('fixture git invocation failed', JSON.stringify({ argv, code: value.code, stderr: value.stderr }))
+      }
       return { exitCode: typeof value.code === 'number' ? value.code : 1, stdout: value.stdout ?? '', stderr: value.stderr ?? '' }
     }
   },
@@ -66,7 +69,7 @@ describe('WorktreeHostService', () => {
     const diff = await service.diffWorktree(created.value.worktreeId, { maxPreviewBytes: 16 })
     expect(diff.ok && diff.value.finalRevision).toBe('WORKTREE')
     expect(diff.ok && Buffer.byteLength(diff.value.preview, 'utf8')).toBeLessThanOrEqual(16)
-    expect(diff.ok && diff.value.previewTruncated).toBe(true)
+    expect(diff.ok && diff.value.previewTruncated, JSON.stringify(diff)).toBe(true)
     const blocked = await service.removeWorktree({ worktreeId: created.value.worktreeId })
     expect(!blocked.ok && blocked.error.code).toBe('worktree-dirty')
     const mergeBlocked = await service.mergeWorktree(created.value.worktreeId, 'main')

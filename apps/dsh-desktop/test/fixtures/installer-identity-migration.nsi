@@ -17,10 +17,27 @@ Var hasPerMachineInstallation
 
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
 !define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
+!ifdef TEST_MODE_RESET
+  Var installMode
+  ; Advertise the same stock hook boundary; simulate its registry-only reset below.
+  !macro setInstallModePerUser
+  !macroend
+  !insertmacro customHeader
+!endif
 
 Section
   SetRegView 64
   !insertmacro customInit
+  !ifdef TEST_MODE_RESET
+    !ifmacrodef customInstallMode
+      !insertmacro customInstallMode
+    !endif
+    StrCpy $installMode "CurrentUser"
+    StrCpy $INSTDIR "${TEST_FRESH_INSTALL}"
+    !ifmacrodef customInstallMode
+      Call DshRestoreModeDirectory
+    !endif
+  !endif
   CreateDirectory "$INSTDIR"
   FileOpen $0 "$INSTDIR\selected-install.txt" w
   FileWriteUTF16LE $0 "$INSTDIR"

@@ -150,6 +150,10 @@ export class PanelLayoutController {
     const previewCol = document.createElement('div')
     previewCol.dataset.aionuiPreviewCol = ''
     previewCol.className = 'aionui-preview-col'
+    // The native frame also owns a full-width bottom row. Auto-placement can
+    // put appended panels after it, creating an implicit row even at width 0.
+    previewCol.style.gridRow = '1'
+    previewCol.style.gridColumn = '4'
     previewCol.style.minWidth = '0'
     previewCol.style.overflow = 'hidden'
     previewCol.style.display = 'flex'
@@ -159,6 +163,8 @@ export class PanelLayoutController {
     const explorerCol = document.createElement('div')
     explorerCol.dataset.aionuiExplorerCol = ''
     explorerCol.className = 'aionui-explorer-col'
+    explorerCol.style.gridRow = '1'
+    explorerCol.style.gridColumn = '5'
     explorerCol.style.minWidth = '0'
     explorerCol.style.overflow = 'hidden'
     explorerCol.style.display = 'flex'

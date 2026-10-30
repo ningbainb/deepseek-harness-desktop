@@ -6,7 +6,7 @@
 import { EventEmitter } from 'node:events'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { cloudflaredRuntimePath, TunnelManager, type TunnelHandle, type TunnelPhase } from '../src/tunnel.ts'
+import { cloudflaredRuntimePath, TunnelManager, type TunnelHandle, type TunnelPhase, type TunnelManagerOptions } from '../src/tunnel.ts'
 
 /** A fake tunnel process: an EventEmitter the test drives by hand. */
 class FakeTunnel extends EventEmitter implements TunnelHandle {
@@ -49,7 +49,7 @@ interface Harness {
   fireOne: () => void
 }
 
-function makeHarness(overrides: { urlTimeoutMs?: number; restartBaseMs?: number } = {}): Harness {
+function makeHarness(overrides: Pick<TunnelManagerOptions, 'urlTimeoutMs' | 'restartBaseMs' | 'restartMaxMs'> = {}): Harness {
   const tunnels: FakeTunnel[] = []
   const ensure = vi.fn(async () => {})
   const { timer, fireOne } = makeTimers()

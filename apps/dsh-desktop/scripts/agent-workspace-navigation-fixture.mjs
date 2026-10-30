@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { prepareFreshNativeSession } from './native-session-blank-fixture.mjs'
 
 async function selectCreatedSession(page, workspaceId, click, expectedSessionId) {
   const [createdResponse] = await Promise.all([
@@ -29,6 +30,29 @@ export async function createSessionInWorkspace(page, workspaceId) {
   const newSession = group.locator('button').last()
   assert.match(await newSession.getAttribute('aria-label') ?? '', /会话|session/iu)
   return selectCreatedSession(page, workspaceId, () => newSession.click())
+}
+
+export async function createIsolatedFreshSessionInWorkspace({ page, workspaceId, workspacePath, rpc, readWorkspace }) {
+  assert.equal(typeof workspacePath, 'string')
+  assert.ok(workspacePath.length > 0)
+  const readSeats = async () => {
+    const items = (await rpc(page, 'session.list', {})).items
+    assert.ok(Array.isArray(items))
+    const seats = items.map(item => ({ id: item.id ?? item.sessionId, cwd: item.cwd, blank: item.blank }))
+    assert.ok(seats.every(seat => typeof seat.id === 'string' && seat.id.length > 0))
+    assert.equal(new Set(seats.map(seat => seat.id)).size, seats.length)
+    return seats.sort((a, b) => a.id.localeCompare(b.id))
+  }
+  const restore = await prepareFreshNativeSession({ rpc, page, workspacePath, readSeats, readWorkspace })
+  let failure
+  try { return await createSessionInWorkspace(page, workspaceId) }
+  catch (error) { failure = error; throw error }
+  finally {
+    try { await restore() } catch (error) {
+      if (failure) throw new AggregateError([failure, error], 'Fresh Agent navigation and draft archive restoration failed')
+      throw error
+    }
+  }
 }
 
 export async function reenterSessionInWorkspace(page, workspaceId, sessionId, workspacePath) {

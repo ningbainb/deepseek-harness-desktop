@@ -1,0 +1,42 @@
+diff --git a/src/client/foot-card-mount.tsx b/src/client/foot-card-mount.tsx
+--- a/src/client/foot-card-mount.tsx
++++ b/src/client/foot-card-mount.tsx
+@@ -213,10 +213,13 @@
+   const root: Root = createRoot(container)
+   root.render(createElement(UsageFootCard, props))
+ 
+-  /** Keep the container directly above the Settings seat inside the foot area. */
+-  const place = (): void => {
+-    const foot = footArea()
+-    if (foot === undefined) return
++  // Keep the live footer reference while streaming changes the conversation.
++  let mountedFoot: HTMLElement | undefined
++  /** Keep the container directly above the Settings seat inside the foot area. */
++  const place = (): void => {
++    const foot = mountedFoot?.isConnected ? mountedFoot : footArea()
++    if (foot === undefined) return
++    mountedFoot = foot
+     const settings = foot.querySelector<HTMLElement>(SETTINGS_AREA_SELECTOR)
+     if (settings !== null) {
+       if (container.nextElementSibling !== settings) foot.insertBefore(container, settings)
+diff --git a/lib/client.js b/lib/client.js
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -2719,10 +2719,13 @@
+ 			container.setAttribute("data-dsh-usage-foot-card", "");
+ 			const root = (0, react_dom_client.createRoot)(container);
+ 			root.render((0, react.createElement)(UsageFootCard, props));
+-			/** Keep the container directly above the Settings seat inside the foot area. */
+-			const place = () => {
+-				const foot = footArea();
+-				if (foot === void 0) return;
++			// Keep the live footer reference while streaming changes the conversation.
++			let mountedFoot;
++			/** Keep the container directly above the Settings seat inside the foot area. */
++			const place = () => {
++				const foot = mountedFoot?.isConnected ? mountedFoot : footArea();
++				if (foot === void 0) return;
++				mountedFoot = foot;
+ 				const settings = foot.querySelector(SETTINGS_AREA_SELECTOR);
+ 				if (settings !== null) {
+ 					if (container.nextElementSibling !== settings) foot.insertBefore(container, settings);

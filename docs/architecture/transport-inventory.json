@@ -4,6 +4,22 @@
   "defaultTarget": "desktop-private-pipe",
   "records": [
     {
+      "pluginId": "release-plugin-adapter",
+      "sourcePath": "packages/dsh-release-plugin-adapter/src/index.ts",
+      "endpoint": "/api/desktop-release-plugins",
+      "method": "GET",
+      "requestSchema": "no body; read-only prerequisite inspection",
+      "responseSchema": "schemaVersion and fixed plugin IDs, contract status and missing methods",
+      "kind": "JSON",
+      "authPrincipal": "official authenticated Connection peer over private carrier",
+      "workspaceScope": "none; no session, model or browser operations",
+      "callerSurfaces": ["main-window", "dock-settings"],
+      "cancellationAndLimits": "synchronous service-shape snapshot; no-store response; no credentials or paths",
+      "v4Target": "official carrier-neutral Fetch registry over authenticated OS pipe",
+      "migrationTest": "packages/dsh-release-plugin-adapter/tests/route.spec.ts",
+      "owner": "desktop-release-plugin-adapter"
+    },
+    {
       "pluginId": "official-connection",
       "sourcePath": "@deepseek-ai/dsh-client-connection",
       "endpoint": "/api/*",

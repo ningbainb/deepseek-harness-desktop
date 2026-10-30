@@ -28,7 +28,9 @@ import {
 
 const READY_LINE = /^dsh web:\s+(http:\/\/\S+)/u
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
-export const DEFAULT_STARTUP_TIMEOUT_MS = 180_000
+// Cold dependency/profile reads on a mechanical disk can exceed three minutes
+// while making progress. Keep a bounded deadline without restarting that work.
+export const DEFAULT_STARTUP_TIMEOUT_MS = 600_000
 export const DESKTOP_PROFILE_NAME = 'desktop'
 export const DESKTOP_REMOTE_HOST_ENV = 'DSH_DESKTOP_REMOTE_HOST'
 export const DESKTOP_RUNTIME_TRANSPORTS = Object.freeze(['http', 'pipe'])

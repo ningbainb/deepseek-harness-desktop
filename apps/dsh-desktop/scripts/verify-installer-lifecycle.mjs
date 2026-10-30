@@ -7,6 +7,9 @@ import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { resolveNsisCompiler } from './nsis-compiler.mjs'
+import { prepareInstallerElectronPayload, sha256 } from './installer-electron-payload.mjs'
+import { tinyPE } from '../test/fixtures/electron-payload.mjs'
+import { assertInstallerFixtureProcessIsolation } from './installer-fixture-process-guard.mjs'
 
 // Compiles and executes the production NSIS macros with tiny isolated payloads.
 // This exercises callbacks and extraction, not a full Desktop overlay upgrade.
@@ -43,7 +46,8 @@ async function collectFailureEvidence({ scenario, exitCode, temporary, install, 
   }, null, 2)
 }
 try {
-  for (const scenario of ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock']) {
+  for (const scenario of ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock', 'runtime-fresh', 'runtime-upgrade', 'runtime-corrupt', 'runtime-fresh-corrupt']) {
+    await assertInstallerFixtureProcessIsolation()
     const directory = join(root, scenario)
     const install = join(directory, "用户's Desktop")
     const temporary = join(directory, '张律师 临时')
@@ -54,7 +58,7 @@ try {
     await mkdir(temporary, { recursive: true })
     await writeFile(payload, 'new')
     await writeFile(sentinel, 'original-session')
-    if (scenario !== 'fresh') {
+    if (!['fresh', 'runtime-fresh', 'runtime-fresh-corrupt'].includes(scenario)) {
       if (scenario !== 'stale-registration') {
         await mkdir(join(install, 'resources'), { recursive: true })
         await writeFile(join(install, 'DeepSeek Harness Desktop.exe'), 'old')
@@ -66,8 +70,19 @@ try {
       await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', 'old', '/f'], { windowsHide: true })
       await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'UninstallString', '/t', 'REG_SZ', '/d', `"${join(install, 'missing-uninstaller.exe')}" /currentuser`, '/f'], { windowsHide: true })
     }
-    let locker
+    let locker, runtimeStaged, runtimePayload, runtimeManifestSHA256
     try {
+      if (scenario.startsWith('runtime-')) {
+        runtimePayload = join(directory, 'runtime-payload')
+        const electronDirectory = join(runtimePayload, 'resources/app.asar.unpacked/node_modules/electron')
+        await mkdir(join(electronDirectory, 'dist'), { recursive: true })
+        await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('desktop'))
+        await writeFile(join(electronDirectory, 'package.json'), JSON.stringify({ name: 'electron', version: '44.0.0' }))
+        await writeFile(join(electronDirectory, 'dist/electron.exe'), tinyPE())
+        runtimeStaged = await prepareInstallerElectronPayload(runtimePayload)
+        runtimeManifestSHA256 = sha256(await readFile(join(runtimePayload, 'resources/runtime-reconstruction/manifest.json')))
+        if (scenario.endsWith('corrupt')) await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('damaged', 0x11))
+      }
       await exec(compiler.path, [
         '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_INSTALL=${install}`,
@@ -78,8 +93,10 @@ try {
         ...(scenario === 'uninstall-failure' ? ['/DTEST_UNINSTALL_FAILURE'] : []),
         ...(scenario === 'uninstall-launch-failure' ? ['/DTEST_UNINSTALL_LAUNCH_FAILURE'] : []),
         ...(scenario === 'unwritable-log' ? ['/DTEST_UNWRITABLE_LOG'] : []),
+        ...(runtimePayload ? [`/DTEST_RUNTIME_PAYLOAD=${runtimePayload}`, `/DDSH_RUNTIME_MANIFEST_SHA256=${runtimeManifestSHA256}`] : []),
         join(desktop, 'test', 'fixtures', 'installer-lifecycle.nsi'),
       ], { windowsHide: true, timeout: 30_000, env: compiler.env })
+      await runtimeStaged?.restore()
       if (scenario === 'preflight-lock') {
         locker = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
           '$stream = [IO.File]::Open($env:DSH_LOCK_FILE, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None); Write-Output ready; try { Start-Sleep -Seconds 60 } finally { $stream.Dispose() }'], {
@@ -93,6 +110,7 @@ try {
         assert.match(ready, /ready/u)
       }
       let exitCode = 0
+      await assertInstallerFixtureProcessIsolation()
       try {
         await exec(installer, ['/S'], {
           windowsHide: true, timeout: 60_000,
@@ -107,16 +125,24 @@ try {
         locker.kill()
         await exited
       }
-      const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log'].includes(scenario)
+      const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log', 'runtime-fresh', 'runtime-upgrade'].includes(scenario)
       if ((exitCode === 0) !== success) {
         const evidence = await collectFailureEvidence({ scenario, exitCode, temporary, install, key })
         assert.equal(exitCode === 0, success, `${scenario}: unexpected installer exit ${exitCode}\n${evidence}`)
       }
-      const expected = success ? 'new' : 'old'
-      assert.equal(await readFile(join(install, 'resources', 'app.asar'), 'utf8'), expected)
-      assert.equal(await readFile(join(install, 'DeepSeek Harness Desktop.exe'), 'utf8'), expected)
-      const { stdout } = await exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion'], { windowsHide: true })
-      assert.match(stdout, new RegExp(`REG_SZ\\s+${expected}\\s`))
+      const expected = scenario === 'runtime-fresh-corrupt' ? 'absent' : success ? 'new' : 'old'
+      if (expected === 'absent') {
+        assert.equal(await pathExists(install), false, 'failed fresh restoration must remove only its owned payload')
+        await assert.rejects(exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`], { windowsHide: true }))
+      } else {
+        assert.equal(await readFile(join(install, 'resources', 'app.asar'), 'utf8'), expected)
+        if (runtimePayload && success) {
+          assert.deepEqual(await readFile(join(install, 'DeepSeek Harness Desktop.exe')), tinyPE('desktop'))
+          assert.deepEqual(await readFile(join(install, 'resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')), tinyPE())
+        } else assert.equal(await readFile(join(install, 'DeepSeek Harness Desktop.exe'), 'utf8'), expected)
+        const { stdout } = await exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion'], { windowsHide: true })
+        assert.match(stdout, new RegExp(`REG_SZ\\s+${expected}\\s`))
+      }
       assert.equal(await readFile(sentinel, 'utf8'), 'original-session')
       const logs = (await readdir(temporary)).filter(name => /^dsh-desktop-install-.*\.log$/u.test(name))
       if (scenario === 'unwritable-log') {
@@ -134,10 +160,19 @@ try {
         if (scenario === 'commit-failure') assert.match(diagnostic, /stage=commit code=(?!0)[^\r\n]+[\s\S]*upgrade marker/u)
         if (scenario === 'uninstall-failure') assert.match(diagnostic, /stage=old-uninstaller code=41/u)
         if (scenario === 'uninstall-launch-failure') assert.match(diagnostic, /stage=old-uninstaller code=launch-error/u)
+        if (scenario.endsWith('corrupt')) assert.match(diagnostic, /stage=runtime-restore code=(?!0)[^\r\n]+[\s\S]*source integrity/u)
         assert.doesNotMatch(diagnostic, /original-session/u)
       }
       if (success) assert.equal(await readFile(join(install, 'completed.txt'), 'utf8'), 'committed')
       else await assert.rejects(readFile(join(install, 'completed.txt')), { code: 'ENOENT' })
+      if (success) {
+        assert.equal(await readFile(join(install, 'restore-outdir.txt'), 'utf16le'), install, 'runtime restoration must preserve the installer output directory used for shortcuts')
+        const { stdout: workingDirectory } = await exec('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+          '[Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $shell=[Activator]::CreateInstance([Type]::GetTypeFromProgID("WScript.Shell")); $link=$shell.CreateShortcut($env:DSH_TEST_LINK); [Console]::Write($link.WorkingDirectory); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)'], {
+          windowsHide: true, env: { ...process.env, DSH_TEST_LINK: join(install, 'isolated-launch.lnk') },
+        })
+        assert.equal(workingDirectory.toLowerCase(), install.toLowerCase(), 'shortcut Start In must remain the installed application directory')
+      }
       if (['custom-location', 'conflicting-location'].includes(scenario)) {
         assert.equal(await pathExists(join(directory, 'default-location', 'DeepSeek Harness Desktop.exe')), false)
         assert.equal(await pathExists(join(directory, 'stale-location')), false)
@@ -148,6 +183,7 @@ try {
       results.push({ scenario, exitCode, application: expected, registry: expected, sessionPreserved: true })
       console.log(`PASS NSIS ${scenario}: application and registry=${expected}, session preserved`)
     } finally {
+      await runtimeStaged?.restore()
       if (locker?.exitCode === null && locker.signalCode === null) {
         const exited = once(locker, 'exit')
         locker.kill()

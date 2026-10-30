@@ -1,4 +1,4 @@
-const { cp, mkdir, readFile, readdir, realpath, rm, stat, writeFile } = require('node:fs/promises')
+const { cp, lstat, mkdir, readFile, readdir, realpath, rm, rmdir, stat, writeFile } = require('node:fs/promises')
 const { createHash } = require('node:crypto')
 const { dirname, extname, isAbsolute, join, relative, resolve } = require('node:path')
 
@@ -448,8 +448,110 @@ async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32
 
   await pruneRetiredSkinCarrierAssets(nodeModulesRoot, report)
   await optimizePackagedSkinPreviews(nodeModulesRoot, report)
+  if (normalizePackingTarget(target).platform === 'win32') {
+    report.removedEmptyDirectories = await pruneEmptyMaterialDirectories(nodeModulesRoot, target)
+  }
 
   return report
+}
+
+/** Remove only empty material trees; never follow links or delete their files. */
+async function pruneEmptyMaterialDirectories(nodeModulesRoot, target = DEFAULT_PACKING_TARGET, removeDirectory = rmdir) {
+  const packingTarget = normalizePackingTarget(target)
+  if (packingTarget.platform !== 'win32') return []
+  const root = resolve(nodeModulesRoot)
+  if (dirname(root) === root) return []
+
+  async function plainDirectoryChain(directory) {
+    let current = resolve(directory)
+    while (true) {
+      const metadata = await lstat(current).catch(error => {
+        if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return undefined
+        throw error
+      })
+      if (!metadata?.isDirectory() || metadata.isSymbolicLink()) return false
+      const parent = dirname(current)
+      if (parent === current) return true
+      current = parent
+    }
+  }
+
+  if (!await plainDirectoryChain(root)) return []
+  const removed = []
+  const materialCategories = new Set([
+    'development-material', 'published-source', 'first-party-source',
+    'foreign-native-binary', 'duplicate-runtime-artifact',
+  ])
+  async function visit(directory) {
+    const metadata = await lstat(directory).catch(error => {
+      if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return undefined
+      throw error
+    })
+    if (!metadata?.isDirectory() || metadata.isSymbolicLink()) return
+    const entries = await readdir(directory, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.isSymbolicLink()) await visit(join(directory, entry.name))
+    }
+    if (directory === root) return
+    const relativePath = relative(root, directory)
+    const category = classifyPrunableFile(join(relativePath, '__dsh_empty_directory__'), packingTarget)
+    if (!materialCategories.has(category)) return
+    // Check the whole chain again before writing: a plain leaf may sit below
+    // a junction at resources, app.asar.unpacked or a package directory.
+    if (!await plainDirectoryChain(directory)) return
+    try {
+      // Atomic nonrecursive removal preserves any file that arrived after
+      // traversal. There is deliberately no recursive deletion fallback.
+      await removeDirectory(directory)
+      removed.push(relativePath)
+    } catch (error) {
+      if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) throw error
+    }
+  }
+  await visit(root)
+  return removed
+}
+
+/** Align the nested Windows carrier with the Desktop's explicit supported locales. */
+async function pruneNestedElectronLocales(nodeModulesRoot, report, target, languages) {
+  if (target?.platform !== 'win32' || !Array.isArray(languages) || languages.length === 0) return
+  if (!languages.every(language => typeof language === 'string' && /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*$/u.test(language))) return
+  const keep = new Set(['en-US', ...languages])
+  const root = join(nodeModulesRoot, 'electron', 'dist', 'locales')
+  let entries
+  try {
+    // Check the entire ancestor chain: an ordinary node_modules directory can
+    // still live below a junction at resources or app.asar.unpacked.
+    const directories = []
+    for (let directory = resolve(root); ; directory = dirname(directory)) {
+      directories.push(directory)
+      if (dirname(directory) === directory) break
+    }
+    for (const directory of directories.reverse()) {
+      const metadata = await lstat(directory)
+      if (!metadata.isDirectory() || metadata.isSymbolicLink()) return
+    }
+    entries = await readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  // If a configured locale or the Chromium fallback is absent, retain the
+  // complete carrier. Never turn a configuration mismatch into missing data.
+  const present = new Set(entries.filter(entry => entry.isFile()).map(entry => entry.name))
+  if ([...keep].some(language => !present.has(`${language}.pak`))) return
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+    const match = /^([A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*)\.pak$/u.exec(entry.name)
+    if (!match || keep.has(match[1])) continue
+    const path = join(root, entry.name)
+    const metadata = await lstat(path)
+    if (!metadata.isFile() || metadata.isSymbolicLink()) continue
+    await rm(path)
+    report.removedFiles += 1
+    report.removedBytes += metadata.size
+    report.categories['unused-electron-locale'] = (report.categories['unused-electron-locale'] ?? 0) + 1
+  }
 }
 
 async function restoreRequiredPackagedPeers(nodeModulesRoot) {
@@ -538,7 +640,61 @@ async function restoreRequiredNativeBindings(nodeModulesRoot, target = DEFAULT_P
   return restored
 }
 
-async function restoreBundledSkinAssets(nodeModulesRoot) {
+function auditedPreviousSkinHashes(entry) {
+  const hashPattern = /^[a-f0-9]{64}$/u
+  if (entry.previousSha256s !== undefined && !Array.isArray(entry.previousSha256s)) {
+    throw new Error('bundled Skin Center asset refresh audit is invalid')
+  }
+  const hashes = [entry.previousSha256, ...(entry.previousSha256s ?? [])]
+  if (hashes.some(hash => typeof hash !== 'string' || !hashPattern.test(hash) || hash === entry.sha256)) {
+    throw new Error('bundled Skin Center asset refresh audit is invalid')
+  }
+  return new Set(hashes)
+}
+
+async function refreshAuditedSkinAsset(assetsRoot, skinRoot, entry) {
+  const hashPattern = /^[a-f0-9]{64}$/u
+  const previousHashes = auditedPreviousSkinHashes(entry)
+  if (typeof entry.path !== 'string' || !/^[a-z0-9-]+\/.+/u.test(entry.path)
+    || entry.path.includes('..') || entry.path.includes('\\')
+    || !hashPattern.test(entry.sha256)) {
+    throw new Error('bundled Skin Center asset refresh audit is invalid')
+  }
+  const source = resolve(assetsRoot, entry.path)
+  const bytes = await readFile(source)
+  const digest = value => createHash('sha256').update(value).digest('hex')
+  if (digest(bytes) !== entry.sha256) throw new Error(`bundled Skin Center asset hash mismatch: ${entry.path}`)
+  const destination = resolve(skinRoot, entry.path)
+  // Package roots may be pnpm links, but a skin must not redirect this refresh
+  // outside its physical skin root or through a linked destination file.
+  if (!(await lstat(skinRoot)).isDirectory()) throw new Error('bundled Skin Center refresh requires a directory skin root')
+  const difference = relative(await realpath(skinRoot), await realpath(dirname(destination)))
+  if (difference.startsWith('..') || isAbsolute(difference)) {
+    throw new Error(`bundled Skin Center asset refresh escapes its skin root: ${entry.path}`)
+  }
+  let installed
+  try {
+    installed = await lstat(destination)
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+    await writeFile(destination, bytes, { flag: 'wx' })
+    return true
+  }
+  if (!installed.isFile()) throw new Error(`refusing bundled Skin Center asset refresh of a non-regular file: ${entry.path}`)
+  if (installed.nlink > 1) throw new Error(`refusing bundled Skin Center asset refresh of a hard-linked file: ${entry.path}`)
+  const currentHash = digest(await readFile(destination))
+  if (currentHash === entry.sha256) return false
+  if (!previousHashes.has(currentHash)) {
+    throw new Error(`refusing bundled Skin Center asset refresh of unrecognized content: ${entry.path} (${currentHash})`)
+  }
+  await writeFile(destination, bytes)
+  return true
+}
+
+async function restoreBundledSkinAssets(nodeModulesRoot, {
+  assetsRoot = BUNDLED_SKIN_ASSETS_ROOT,
+  manifestPath = BUNDLED_SKIN_ASSETS_MANIFEST,
+} = {}) {
   const packageRoot = join(nodeModulesRoot, '@linxin666', 'dsh-client-ui-skin-center')
   let packageManifest
   try {
@@ -550,7 +706,7 @@ async function restoreBundledSkinAssets(nodeModulesRoot) {
   if (packageManifest.version !== '0.4.4') {
     throw new Error(`Skin Center asset supplement requires version 0.4.4, found ${packageManifest.version}`)
   }
-  const manifest = JSON.parse(await readFile(BUNDLED_SKIN_ASSETS_MANIFEST, 'utf8'))
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   if (!Array.isArray(manifest.files)) throw new Error('bundled Skin Center asset manifest is invalid')
   const expectedFiles = []
   const skinIds = new Set()
@@ -559,29 +715,40 @@ async function restoreBundledSkinAssets(nodeModulesRoot) {
       || !/^[a-z0-9-]+\/.+/u.test(entry.path) || entry.path.includes('..') || entry.path.includes('\\')) {
       throw new Error('bundled Skin Center asset path is invalid')
     }
-    const source = resolve(BUNDLED_SKIN_ASSETS_ROOT, entry.path)
-    const difference = relative(BUNDLED_SKIN_ASSETS_ROOT, source)
+    if (entry.previousSha256 !== undefined || entry.previousSha256s !== undefined) auditedPreviousSkinHashes(entry)
+    const source = resolve(assetsRoot, entry.path)
+    const difference = relative(assetsRoot, source)
     if (difference.startsWith('..') || isAbsolute(difference)) throw new Error('bundled Skin Center asset escapes source root')
     const actualHash = createHash('sha256').update(await readFile(source)).digest('hex')
     if (actualHash !== entry.sha256) throw new Error(`bundled Skin Center asset hash mismatch: ${entry.path}`)
     expectedFiles.push(entry.path)
     skinIds.add(entry.path.split('/')[0])
   }
-  const actualFiles = (await listFiles(BUNDLED_SKIN_ASSETS_ROOT))
-    .map(path => relative(BUNDLED_SKIN_ASSETS_ROOT, path).replaceAll('\\', '/')).sort()
+  const actualFiles = (await listFiles(assetsRoot))
+    .map(path => relative(assetsRoot, path).replaceAll('\\', '/')).sort()
   if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles.toSorted())) {
     throw new Error('bundled Skin Center asset inventory differs from its hash manifest')
   }
   const restored = []
   for (const skinId of [...skinIds].sort()) {
     const destination = join(packageRoot, 'skins', skinId)
+    let exists = false
     try {
       await stat(destination)
-      continue
+      exists = true
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error
     }
-    await cp(join(BUNDLED_SKIN_ASSETS_ROOT, skinId), destination, {
+    if (exists) {
+      let refreshed = false
+      for (const entry of manifest.files) {
+        if (entry.previousSha256 === undefined || entry.path.split('/')[0] !== skinId) continue
+        if (await refreshAuditedSkinAsset(assetsRoot, join(packageRoot, 'skins'), entry)) refreshed = true
+      }
+      if (refreshed) restored.push(skinId)
+      continue
+    }
+    await cp(join(assetsRoot, skinId), destination, {
       recursive: true, force: false, errorOnExist: true,
     })
     restored.push(skinId)
@@ -619,6 +786,7 @@ async function afterPack(context) {
   const restoredNativeBindings = await restoreRequiredNativeBindings(nodeModulesRoot, target)
   const restoredSkinAssets = await restoreAllBundledSkinAssets(nodeModulesRoot)
   const report = await prunePackagedRuntime(nodeModulesRoot, target)
+  await pruneNestedElectronLocales(nodeModulesRoot, report, target, context.packager?.config?.electronLanguages)
   report.restoredPeers = restoredPeers
   report.restoredNativeBindings = restoredNativeBindings
   report.restoredSkinAssets = restoredSkinAssets
@@ -633,9 +801,12 @@ module.exports = afterPack
 module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
+module.exports.pruneEmptyMaterialDirectories = pruneEmptyMaterialDirectories
+module.exports.pruneNestedElectronLocales = pruneNestedElectronLocales
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers
 module.exports.restoreRequiredNativeBindings = restoreRequiredNativeBindings
 module.exports.restoreBundledSkinAssets = restoreBundledSkinAssets
+module.exports.refreshAuditedSkinAsset = refreshAuditedSkinAsset
 module.exports.restoreAllBundledSkinAssets = restoreAllBundledSkinAssets
 module.exports.packingTargetFromContext = packingTargetFromContext
 module.exports.packagedNodeModulesRoot = packagedNodeModulesRoot

@@ -1,0 +1,3 @@
+- insert:
+    - id: release-plugin-adapter
+      name: '@linxin666/dsh-release-plugin-adapter'

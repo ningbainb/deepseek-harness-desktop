@@ -14,6 +14,7 @@ import { _electron as electron } from 'playwright'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
+import { prepareWorkspaceStateProbe, readWorkspaceStateProbe } from './workspace-state-probe-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
@@ -477,6 +478,7 @@ try {
     '    compression: none',
     '',
   ].join('\n'))
+  if (process.argv.includes('--native-tabs')) await prepareWorkspaceStateProbe({ home: dshHome })
 
   const first = await launch()
   activeApp = first.instance
@@ -664,10 +666,12 @@ try {
     assert.match(await second.page.locator('[data-dsh-live-stats] summary').innerText(), /^≈¥[\d.,]+ · 明细$/u)
   }
   if (process.argv.includes('--native-tabs')) {
-    const { verifyNativeBrowserSessionIsolation, navigateNativeBrowserSession } = await import('./native-browser-session-fixture.mjs')
+    const { verifyNativeBrowserSessionIsolation, verifyNativeBlankDraftReuse, navigateNativeBrowserSession } = await import('./native-browser-session-fixture.mjs')
     const nativeWindow = await activeApp.browserWindow(second.page)
     await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession,
-      navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id) })
+      navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id), readWorkspace: () => readWorkspaceStateProbe(second.page) })
+    await verifyNativeBlankDraftReuse({ page: second.page, rpc, sessionId, workspacePath, openSeededSession,
+      navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id), readWorkspace: () => readWorkspaceStateProbe(second.page) })
   }
   assert.deepEqual(second.rendererErrors, [])
   const taskBoardState = await second.page.evaluate(async () => {

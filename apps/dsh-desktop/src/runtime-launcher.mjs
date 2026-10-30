@@ -44,6 +44,7 @@ import {
   adaptRuntimeLegacySettingsPatches,
   diagnoseRuntimeLegacySettingsHealth,
   prepareRuntimeLegacySettings,
+  readRecoveredRuntimeProfile,
 } from './runtime-legacy-settings.mjs'
 
 const NAME = 'dsh-desktop'
@@ -205,7 +206,10 @@ async function run() {
   const installAnchor = resolveInstallAnchor(invocation.dshCliPath)
   const runtimeManifest = JSON.parse(readFileSync(installAnchor, 'utf8'))
   const pipeIdentity = runtimePipeIdentityFromEnvironment()
-  const profile = loadProfileDirectory(NAME, profileDir, installAnchor)
+  const profile = await readRecoveredRuntimeProfile({
+    home: dshHome,
+    read: () => loadProfileDirectory(NAME, profileDir, installAnchor),
+  })
   const resolution = await createRuntimeResolution({ installAnchor, profile, home: dshHome })
   const profileContext = {
     name: invocation.profile,

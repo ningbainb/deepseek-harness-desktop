@@ -2036,7 +2036,9 @@ export async function startElectronApp(metadata) {
       } catch {}
       try {
         const window = await createExtensionWindow()
-        if (options.setting) window.webContents.send('extensions:navigate', { setting: options.setting })
+        if (options.setting) window.webContents.send('extensions:navigate', {
+          setting: options.setting, ...(options.plugin === undefined ? {} : { plugin: options.plugin }),
+        })
         else if (options.tab) window.webContents.send('extensions:navigate', { tab: options.tab })
         productMetrics.recordDockOpened(true)
         return true

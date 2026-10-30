@@ -55,3 +55,41 @@ test('Windows does not verify or compress a directory whose build failed', async
   }), error => error === failure)
   assert.deepEqual(calls, [['--win', '--dir']])
 })
+
+test('installer compaction is bounded by full verification and restoration', async () => {
+  const calls = []
+  await buildVerifiedWindowsInstaller({
+    appDirectory: 'desktop', builderArguments: ['--publish', 'never'],
+    runBuilder: async args => { calls.push(args.includes('--prepackaged') ? 'compress' : 'build') },
+    verifyDirectory: async () => { calls.push('verify-complete') },
+    prepareArchive: async path => {
+      assert.equal(path, join('desktop', 'dist', 'win-unpacked'))
+      calls.push('compact')
+      return { restore: async () => { calls.push('restore') } }
+    },
+  })
+  assert.deepEqual(calls, ['build', 'verify-complete', 'compact', 'compress', 'restore', 'verify-complete'])
+})
+
+test('failed installer compression always restores the complete directory and preserves the error', async () => {
+  const failure = new Error('compression failed')
+  let restored = false
+  await assert.rejects(buildVerifiedWindowsInstaller({
+    appDirectory: 'desktop', builderArguments: [],
+    runBuilder: async args => { if (args.includes('--prepackaged')) throw failure },
+    verifyDirectory: async () => {},
+    prepareArchive: async () => ({ restore: async () => { restored = true } }),
+  }), error => error === failure)
+  assert.equal(restored, true)
+})
+
+test('explicit installer-only reuse still verifies before compaction and after restoration', async () => {
+  const calls = []
+  await buildVerifiedWindowsInstaller({
+    appDirectory: 'desktop', builderArguments: ['--publish', 'never'], reuseVerifiedDirectory: true,
+    runBuilder: async args => { assert.ok(args.includes('--prepackaged')); calls.push('compress') },
+    verifyDirectory: async () => { calls.push('verify') },
+    prepareArchive: async () => { calls.push('compact'); return { restore: async () => { calls.push('restore') } } },
+  })
+  assert.deepEqual(calls, ['verify', 'compact', 'compress', 'restore', 'verify'])
+})

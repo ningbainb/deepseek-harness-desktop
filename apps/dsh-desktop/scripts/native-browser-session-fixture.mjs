@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { desktopDeepLink } from '../src/distribution-identity.mjs'
+import { prepareFreshNativeSession } from './native-session-blank-fixture.mjs'
 
 export async function navigateNativeBrowserSession(window, sessionId) {
   assert.equal(typeof sessionId, 'string')
@@ -23,16 +24,66 @@ function sessionSeats(items) {
   }).sort((first, second) => first.id.localeCompare(second.id))
 }
 
+/** The other rc.4 branch must reopen an eligible blank with its own unsent draft. */
+export async function verifyNativeBlankDraftReuse({ page, rpc, sessionId, workspacePath, openSeededSession, navigateToSession, readWorkspace }) {
+  const seats = async () => sessionSeats((await rpc(page, 'session.list', {})).items)
+  const before = await seats()
+  const archives = (await readWorkspace()).archivedSessionIds
+  assert.ok(Array.isArray(archives))
+  const eligible = before.filter(seat => seat.cwd === workspacePath && seat.blank && !archives.includes(seat.id))
+  assert.ok(eligible.length > 0, 'The reuse scenario must include real retained blank drafts')
+  const editor = page.locator('[data-composer-card] [data-composer-input][contenteditable="true"]').first()
+  const originals = new Map()
+  const markers = new Map()
+  const select = async id => {
+    await navigateToSession(id)
+    await page.locator(`[data-row-key="session:${id}"][aria-selected="true"]`).waitFor()
+    await editor.waitFor({ state: 'visible' })
+  }
+  try {
+    for (const seat of eligible) {
+      await select(seat.id)
+      const original = await editor.innerText()
+      originals.set(seat.id, original)
+      const marker = `${original}${original ? '\n' : ''}Retained unsent draft ${seat.id}`
+      markers.set(seat.id, marker)
+      await editor.fill(marker)
+    }
+    await openSeededSession(page, sessionId)
+    const action = page.getByRole('button', { name: '新建会话', exact: true }).filter({ hasText: '新会话' })
+    assert.equal(await action.count(), 1)
+    for (let round = 0; round < 2; round++) {
+      await action.click()
+      await page.waitForFunction(ids => [...document.querySelectorAll('[data-row-key][aria-selected="true"]')]
+        .some(row => ids.includes(row.getAttribute('data-row-key')?.slice('session:'.length))), eligible.map(seat => seat.id))
+      const selected = await page.locator('[data-row-key^="session:"][aria-selected="true"]').getAttribute('data-row-key')
+      const id = selected.slice('session:'.length)
+      assert.ok(markers.has(id), 'Native reuse must select a known eligible blank')
+      assert.equal(await editor.innerText(), markers.get(id), 'Native reuse must preserve the selected blank\'s exact unsent draft')
+      assert.deepEqual(await seats(), before, 'Reusing a draft must not create C, delete another seat, or mark a blank nonblank')
+      await openSeededSession(page, sessionId)
+    }
+    console.log('verified native retained-blank reuse and exact unsent drafts through A/B/A without creating C')
+  } finally {
+    for (const [id, original] of originals) {
+      await select(id)
+      await editor.fill(original)
+    }
+    await openSeededSession(page, sessionId)
+    assert.deepEqual(await seats(), before, 'Draft cleanup must preserve the complete original seat set')
+  }
+}
+
 /** Two real session seats, including a floating old-session tab; no model call. */
-export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId, workspacePath, logPath, openSeededSession, navigateToSession }) {
+export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId, workspacePath, logPath, openSeededSession, navigateToSession, readWorkspace }) {
   assert.equal(typeof navigateToSession, 'function', 'an explicit public session navigator is required')
   const initialLog = await readFile(logPath)
   const body = page.locator('[data-aionui-native-panel="browser"]')
   const floatingBrowser = page.locator('[data-sidebar-right-float-host], [data-sidebar-right-session] [data-dockkit-float]:not([hidden], [hidden] *)').filter({ has: body })
   const readSeats = async () => sessionSeats((await rpc(page, 'session.list', {})).items)
-  const initialSeats = await readSeats()
+  const restoreDraftArchives = await prepareFreshNativeSession({ rpc, page, workspacePath, sessionId, readSeats, readWorkspace })
+  let failure
   const routePattern = 'https://native-session-browser.test/**'
-  await page.route(routePattern, route => route.fulfill({ contentType: 'text/html', body: '<p>Isolated session browser</p>' }))
   const openBrowser = async () => {
     const expand = page.locator('[data-sidebar-right-expand]:visible, [data-aionui-sidebar-return-button]:visible')
     if (await expand.count()) await expand.click()
@@ -50,6 +101,8 @@ export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId
     await body.frameLocator('iframe').getByText('Isolated session browser').waitFor()
   }
   try {
+    const initialSeats = await readSeats()
+    await page.route(routePattern, route => route.fulfill({ contentType: 'text/html', body: '<p>Isolated session browser</p>' }))
     await openBrowser()
     await navigate('a')
     await body.locator('input').fill('session A pending address')
@@ -109,6 +162,7 @@ export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId
     assert.deepEqual(await readFile(logPath), initialLog, 'native browser placement and navigation must not rewrite history')
     console.log('verified native browser session isolation, floating restore, independent close and unchanged history')
   } catch (error) {
+    failure = error
     const sessions = await rpc(page, 'session.list', {}).then(
       value => value.items.map(item => ({ id: item.id ?? item.sessionId, title: item.title, displayTitle: item.displayTitle, blank: item.blank })),
       diagnosticError => ({ error: diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError) }),
@@ -121,6 +175,10 @@ export async function verifyNativeBrowserSessionIsolation({ page, rpc, sessionId
     }))
     throw error
   } finally {
-    await page.unroute(routePattern)
+    const cleanupErrors = []
+    try { await restoreDraftArchives() } catch (error) { cleanupErrors.push(error) }
+    try { await page.unroute(routePattern) } catch (error) { cleanupErrors.push(error) }
+    if (cleanupErrors.length) throw new AggregateError([failure, ...cleanupErrors].filter(Boolean),
+      `${failure ? `${failure.message}; ` : ''}native browser fixture archive/route restoration failed`)
   }
 }

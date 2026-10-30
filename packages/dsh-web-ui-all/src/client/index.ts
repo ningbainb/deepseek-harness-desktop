@@ -72,22 +72,21 @@ function applyShims(): boolean {
     changed = true
   }
 
-  // Only use stable state owned by the shell itself. Descendant rail markers
-  // are written during the collapse animation and may survive one or more
-  // React commits after the sidebar has already widened again; using them as
-  // the source of truth is what made the footer drift persistently.
+  // Current shells own the frame's collapse state, including a zero-width
+  // Windows sidebar and widths in flight during animation. Mirror that state
+  // without writing it back. Older shells still need geometry/class fallback.
+  const nativeFrame = frame !== null && document.querySelector('[data-rightbar-col]')?.parentElement === frame
   const sidebarClassName = typeof sidebarEl?.className === 'string' ? sidebarEl.className : ''
-  const isCollapsed = sidebarEl !== null && (
+  const isCollapsed = sidebarEl !== null && (nativeFrame ? frame.hasAttribute('data-sidebar-collapsed') : (
     (sidebarEl.offsetWidth > 0 && sidebarEl.offsetWidth <= 80) ||
-    sidebarEl.classList.contains('hHd-Xa_collapsed') ||
-    /(?:^|\s)collapsed(?:\s|$)/u.test(sidebarClassName)
-  )
+    /(?:^|\s)(?:[^\s]+_)?collapsed(?:\s|$)/u.test(sidebarClassName)
+  ))
 
   if (sidebarEl !== null) {
     changed = resetExpandedFooterActionStyles(sidebarEl, isCollapsed) || changed
   }
 
-  if (frame !== null) {
+  if (frame !== null && !nativeFrame) {
     if (isCollapsed && !frame.hasAttribute('data-sidebar-collapsed')) {
       frame.setAttribute('data-sidebar-collapsed', '')
       changed = true
@@ -162,7 +161,7 @@ export function apply(ctx: Context): void {
     const observer = new MutationObserver(records => {
       if (needsShimPass(records, sidebar, columns)) schedulePass()
     })
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-wide', 'data-rail'] })
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-wide', 'data-rail', 'data-sidebar-collapsed'] })
 
     let resizeObserver: ResizeObserver | undefined
     if (typeof ResizeObserver !== 'undefined') {

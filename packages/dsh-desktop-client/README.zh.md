@@ -9,6 +9,7 @@
 - 读取 Desktop 信息、Contract capability 与 Runtime 状态。
 - 订阅 Runtime 状态和已验证的 Deep Link。
 - 在可用时展示 Desktop 通知，并打开扩展或更新界面。
+- 用 `setting: 'plugin-options'` 和准确的 `plugin` 包名打开已安装插件的原生设置；此导航不会授予插件管理权限。
 - 提供窄权限 `extensions.open` 和受限的前三次启动拓展坞提示状态，但不会向主页面授予扩展管理权限。
 - 通过 Desktop 验证器和系统默认应用打开工作区相对文件。
 - 通过 `lan-gateway.manage` capability 读取、配置和订阅需主动启用的本地局域网网关。

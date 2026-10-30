@@ -47,6 +47,8 @@ files:
 win:
   icon: build/icon.ico
   extraResources:
+    - from: build/installer-runtime-restore.ps1
+      to: runtime-reconstruction/restore.ps1
     - from: build/bundled-managed-git/managed-git/current
       to: managed-git/current
   target:

@@ -15,6 +15,7 @@
 
 /** Bridge route prefix (same-origin, loopback-only). */
 export const WEB_UI_SETTINGS_BRIDGE_PREFIX = '/api/dsh-web-ui-settings'
+export const CUSTOM_PROVIDER_KEY_PREFLIGHT_PATH = WEB_UI_SETTINGS_BRIDGE_PREFIX + '/provider-key/preflight'
 
 /** One path-addressed settings edit, mirroring the official mutate op. */
 export interface BridgeSettingsOp {

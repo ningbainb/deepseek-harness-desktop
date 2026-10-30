@@ -359,6 +359,24 @@ function pluginDetailMarkup(plugin) {
 
 const NATIVE_PLUGINS = [
   {
+    id: 'prompt-pilot', name: 'Prompt Pilot 输入建议', packageName: '@local/dsh-prompt-pilot',
+    settingsOwner: '@local/dsh-prompt-pilot', category: 'ai', categoryLabel: 'AI 核心',
+    description: '根据当前会话给出下一句建议，支持指定模型与预算，并可随时关闭自动预测。',
+    features: ['会话建议', '预算选择', '跨窗口同步'], icon: 'text',
+  },
+  {
+    id: 'dafeiyu-pet', name: '大肥鱼挂件', packageName: 'dsh-dafeiyu-pet',
+    settingsOwner: '@linxin666/dsh-release-plugin-adapter', category: 'ui', categoryLabel: '界面主题',
+    description: '可选的角色、动作和任务联动挂件；默认不显示，与原有桌宠独立设置。',
+    features: ['默认关闭', '角色与动作', '独立显示开关'], icon: 'smile',
+  },
+  {
+    id: 'builtin-browser', name: '共享浏览器', packageName: 'dsh-builtin-browser',
+    settingsOwner: 'dsh-builtin-browser', category: 'tools', categoryLabel: '工具协同',
+    description: '通过可见浏览器完成网页操作，支持页面接管，并可配置允许执行的动作。',
+    features: ['可见浏览器', '页面交互', '动作权限'], icon: 'layout',
+  },
+  {
     id: 'agent-team',
     name: 'Agent Team（实验）',
     packageName: '@deepseek-ai/dsh-experimental-agent-team-profile',
@@ -621,7 +639,9 @@ function nativeIconSvg(icon) {
 
 function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
-  const settingsLink = ['value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
+  const settingsLink = item.settingsOwner
+    ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
+    : ['value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
   return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>随桌面版维护 (${escapeHtml(version)})</span></div>${settingsLink}<span class="native-safe-badge" title="受保护的桌面级原生能力">内置</span></div></article>`
 }
@@ -1395,6 +1415,11 @@ dockSearch.addEventListener('keydown', event => {
 })
 
 nativePluginGrid?.addEventListener('click', event => {
+  const pluginOptions = event.target.closest('[data-open-native-plugin-options]')
+  if (pluginOptions) {
+    void activateTab(document.getElementById('plugin-options-tab'), true, undefined, pluginOptions.dataset.openNativePluginOptions)
+    return
+  }
   const button = event.target.closest('[data-open-dock-setting]')
   if (!button) return
   const id = button.dataset.openDockSetting
@@ -1417,9 +1442,13 @@ document.querySelectorAll('.native-chip').forEach((chip) => {
 })
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
-  if (['control-center', 'value-mode', 'models', 'usage'].includes(payload?.setting)) {
+  if (['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(payload?.setting)) {
     const tab = tabs.find((item) => item.dataset.setting === payload.setting)
       ?? tabs.find((item) => item.dataset.tab === 'dock-settings')
+    if (payload.setting === 'plugin-options') {
+      void activateTab(document.querySelector('#plugin-options-tab'), true, undefined, payload.plugin)
+      return
+    }
     if (tab) activateTab(tab)
     document.querySelector(`[data-setting="${payload.setting}"]`)?.click()
     return

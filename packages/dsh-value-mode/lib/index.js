@@ -524,6 +524,31 @@ async function assessValueModeHealth(config, llm) {
 	};
 }
 //#endregion
+//#region src/core/routed-call.ts
+/** Reapply source reasoning controls only when the exact destination supports them. */
+async function routedCallConfig(source, route, llm, signal) {
+	signal?.throwIfAborted();
+	const result = {
+		...source,
+		provider: route.provider,
+		model: route.model
+	};
+	if (route.reasoningEffort) {
+		result.reasoningEffort = route.reasoningEffort;
+		return result;
+	}
+	if (source.reasoningEffort === void 0 || source.provider === route.provider && source.model === route.model) return result;
+	delete result.reasoningEffort;
+	try {
+		const info = await llm.resolveModelInfo(route.provider, route.model, signal);
+		signal?.throwIfAborted();
+		if (info.reasoning?.efforts.some((effort) => effort.id === source.reasoningEffort)) result.reasoningEffort = source.reasoningEffort;
+	} catch {
+		signal?.throwIfAborted();
+	}
+	return result;
+}
+//#endregion
 //#region src/core/runtime-telemetry.ts
 const VALUE_MODE_RUNTIME_TELEMETRY_PREFIX = "DSH_VALUE_MODE_METRIC ";
 function routeErrorType(failure) {
@@ -1058,12 +1083,7 @@ function apply(ctx, initialConfig = {}) {
 			params,
 			timestamp: (/* @__PURE__ */ new Date()).toISOString()
 		});
-		return {
-			...resolved,
-			provider: route.provider,
-			model: route.model,
-			...route.reasoningEffort ? { reasoningEffort: route.reasoningEffort } : {}
-		};
+		return routedCallConfig(resolved, route, ctx.llm, payload.signal);
 	});
 	ctx.on("agent/request-error", async (payload, next) => {
 		const key = requestKey(payload);

@@ -19,6 +19,7 @@ import { normalizeFeatureEvent } from './feature-telemetry.mjs'
 import { normalizeWindowPalette } from './window-palette.mjs'
 import { DESKTOP_LAN_GATEWAY_STATES, isPrivateLanIpv4 } from './local-lan-gateway.mjs'
 import { DESKTOP_DISTRIBUTION_IDENTITY } from './distribution-identity.mjs'
+import { assertDockPlugin } from './dock-pages.mjs'
 
 // 'launch-builtins' was accepted here through 3.0.x. It had no implementation
 // and no caller, so it fell through to the exit branch below - sending it quit
@@ -403,14 +404,18 @@ export function normalizeDesktopDockOpenOptions(value) {
   }
   const keys = Object.keys(value)
   if (
-    keys.some(key => key !== 'setting' && key !== 'tab')
-    || (value.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage'].includes(value.setting))
+    keys.some(key => key !== 'setting' && key !== 'tab' && key !== 'plugin')
+    || (value.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(value.setting))
     || (value.tab !== undefined && !['plugins', 'market', 'skills'].includes(value.tab))
     || (value.setting !== undefined && value.tab !== undefined)
   ) {
     throw new TypeError('invalid Extension Dock navigation target')
   }
-  return Object.freeze(value.setting !== undefined ? { setting: value.setting } : value.tab !== undefined ? { tab: value.tab } : {})
+  assertDockPlugin(value.setting, value.plugin)
+  if (value.plugin !== undefined && value.plugin.length > 214) throw new TypeError('invalid Dock plugin configuration target')
+  return Object.freeze(value.setting !== undefined
+    ? { setting: value.setting, ...(value.plugin === undefined ? {} : { plugin: value.plugin }) }
+    : value.tab !== undefined ? { tab: value.tab } : {})
 }
 
 /** Narrow clone-safe projection of the optional Desktop-owned LAN listener. */

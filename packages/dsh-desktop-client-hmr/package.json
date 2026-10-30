@@ -26,16 +26,16 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
     "@deepseek-ai/schemastery": "3.18.5",
-    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.2"
+    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.4"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
     "@deepseek-ai/schemastery": "3.18.5",
-    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-client-modules": "0.2.1-rc.4",
+    "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.4",
     "@types/node": "^22.20.0",
     "tsdown": "0.22.2",
     "typescript": "~5.7.2",

@@ -27,11 +27,13 @@ try {
   }))
   await writeFile(resolve(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
-  app = await electron.launch({ executablePath: process.env.DSH_DESKTOP_E2E_EXECUTABLE || electronPath,
+  app = await electron.launch({ executablePath: process.env.DSH_DESKTOP_E2E_EXECUTABLE || electronPath, timeout: 600_000,
     args: process.env.DSH_DESKTOP_E2E_EXECUTABLE ? [] : [resolve(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_USER_DATA: userData, DSH_HOME: dshHome, DSH_DESKTOP_DISABLE_UPDATES: '1', NATIVE_PAGE_TEST_KEY: 'synthetic-native-key', DSH_DESKTOP_VERIFY_UPDATER: '0', DSH_DESKTOP_OPEN_EXTENSIONS: '1' } })
-  const main = await app.firstWindow()
-  await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 180_000 })
+  const main = await app.firstWindow({ timeout: 600_000 })
+  // Profile projection precedes Runtime's own startup budget on a cold HDD.
+  // Wait for the real page without closing an otherwise still-starting app.
+  await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
   const errors = []
   main.on('pageerror', error => errors.push(error.message))
   for (const [id, text] of [['appearance', /皮肤|Skin/], ['models', /模型|Models/], ['usage', /用量|Usage/], ['sessions', /归档|Archive/]]) {

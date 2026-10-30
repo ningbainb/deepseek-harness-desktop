@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
   "status": "supported",
-  "verifiedAt": "2026-10-23",
+  "verifiedAt": "2026-10-27",
   "desktopRange": "current",
-  "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
+  "matrixArtifact": "docs/archive/2026-10-27-desktop-5.2.0-prediction-guide.md",
   "knownIssues": [
-    "Local Windows test-package validation only; macOS and Linux native acceptance is pending.",
-    "The preceding 5.0.1 source regression collection recorded one settings-reload timeout; its unchanged isolated retry passed.",
-    "The preceding 5.0.1 Desktop test run recorded one Host request timeout; the unchanged runtime-integration file passed in isolation.",
-    "Clean-account Setup installation, overlay upgrade and rollback are not accepted by this local run."
+    "Local Windows Runtime/SDK compatibility evidence only; macOS and Linux require separate native acceptance.",
+    "The companion-default snapshot passed Windows source-core 30/30; the subsequent presentation-only Tab guide passed its own 13 native checks and 880x640 geometry acceptance. The full source-core gate was not repeated for the guide; no rebuilt installer is certified.",
+    "Final repository and packaged acceptance receipts are tracked separately from these installed-input identities.",
+    "The prior local 5.2.0 installer has its own historical packaged acceptance; it predates these companion-default changes. No installer was rebuilt for the current source inputs.",
+    "Clean-account Setup installation, overlay upgrade and rollback are not certified by isolated executable acceptance."
   ]
 }

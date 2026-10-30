@@ -45,15 +45,24 @@ Section
   File /oname=app.asar "${TEST_PAYLOAD}"
   SetOutPath "$INSTDIR"
   File "/oname=DeepSeek Harness Desktop.exe" "${TEST_PAYLOAD}"
+  !ifdef TEST_RUNTIME_PAYLOAD
+    File /r "${TEST_RUNTIME_PAYLOAD}\*.*"
+  !endif
+  !ifndef TEST_BAD_MARKER
+    SetOutPath "$INSTDIR\resources"
+    File /oname=installer-upgrade-v3 "${BUILD_RESOURCES_DIR}\installer-upgrade-v3"
+  !endif
+  SetOutPath "$INSTDIR"
+  !insertmacro customRestoreRuntime
+  FileOpen $4 "$INSTDIR\restore-outdir.txt" w
+  FileWriteUTF16LE $4 "$OUTDIR"
+  FileClose $4
+  CreateShortCut "$INSTDIR\isolated-launch.lnk" "$INSTDIR\DeepSeek Harness Desktop.exe"
   WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" DisplayVersion "new"
   WriteRegStr HKCU "${UNINSTALL_REGISTRY_KEY}" UninstallString '$\"$INSTDIR\Uninstall DeepSeek Harness Desktop.exe$\" /currentuser'
   !ifdef TEST_ABORT
     Abort
-  !endif
-  !ifndef TEST_BAD_MARKER
-    SetOutPath "$INSTDIR\resources"
-    File /oname=installer-upgrade-v3 "${BUILD_RESOURCES_DIR}\installer-upgrade-v3"
   !endif
   !insertmacro customInstall
   FileOpen $4 "$INSTDIR\completed.txt" w

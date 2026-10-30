@@ -1,0 +1,75 @@
+diff --git a/client-source.js b/client-source.js
+--- a/client-source.js
++++ b/client-source.js
+@@ -35,6 +35,21 @@
+         const subscribe=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};
+         const snapshot=()=>preference;
+         const updatePrefs=patch=>{preference=normalizePreferences({...preference,...patch});try{localStorage.setItem('dsh-prompt-pilot-v1',JSON.stringify(preference));}catch{}for(const fn of listeners)fn();};
++        ctx.effect(() => {
++          const syncPreferences = event => {
++            if (event.key !== null && event.key !== 'dsh-prompt-pilot-v1') return;
++            let next;
++            try {
++              if (event.storageArea !== window.localStorage) return;
++              next = normalizePreferences(JSON.parse(window.localStorage.getItem('dsh-prompt-pilot-v1') || '{}'));
++            } catch { return; }
++            if (next.enabled === preference.enabled && next.route === preference.route && next.budget === preference.budget) return;
++            preference = next;
++            for (const fn of listeners) fn();
++          };
++          window.addEventListener('storage', syncPreferences);
++          return () => window.removeEventListener('storage', syncPreferences);
++        });
+         function Settings() {
+           React.useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot());
+           const prefs=React.useSyncExternalStore(subscribe,snapshot);
+diff --git a/client.js b/client.js
+--- a/client.js
++++ b/client.js
+@@ -51,6 +51,21 @@
+         const subscribe=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};
+         const snapshot=()=>preference;
+         const updatePrefs=patch=>{preference=normalizePreferences({...preference,...patch});try{localStorage.setItem('dsh-prompt-pilot-v1',JSON.stringify(preference));}catch{}for(const fn of listeners)fn();};
++        ctx.effect(() => {
++          const syncPreferences = event => {
++            if (event.key !== null && event.key !== 'dsh-prompt-pilot-v1') return;
++            let next;
++            try {
++              if (event.storageArea !== window.localStorage) return;
++              next = normalizePreferences(JSON.parse(window.localStorage.getItem('dsh-prompt-pilot-v1') || '{}'));
++            } catch { return; }
++            if (next.enabled === preference.enabled && next.route === preference.route && next.budget === preference.budget) return;
++            preference = next;
++            for (const fn of listeners) fn();
++          };
++          window.addEventListener('storage', syncPreferences);
++          return () => window.removeEventListener('storage', syncPreferences);
++        });
+         function Settings() {
+           React.useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot());
+           const prefs=React.useSyncExternalStore(subscribe,snapshot);
+diff --git a/client-inline.js b/client-inline.js
+--- a/client-inline.js
++++ b/client-inline.js
+@@ -51,6 +51,21 @@
+         const subscribe=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};
+         const snapshot=()=>preference;
+         const updatePrefs=patch=>{preference=normalizePreferences({...preference,...patch});try{localStorage.setItem('dsh-prompt-pilot-v1',JSON.stringify(preference));}catch{}for(const fn of listeners)fn();};
++        ctx.effect(() => {
++          const syncPreferences = event => {
++            if (event.key !== null && event.key !== 'dsh-prompt-pilot-v1') return;
++            let next;
++            try {
++              if (event.storageArea !== window.localStorage) return;
++              next = normalizePreferences(JSON.parse(window.localStorage.getItem('dsh-prompt-pilot-v1') || '{}'));
++            } catch { return; }
++            if (next.enabled === preference.enabled && next.route === preference.route && next.budget === preference.budget) return;
++            preference = next;
++            for (const fn of listeners) fn();
++          };
++          window.addEventListener('storage', syncPreferences);
++          return () => window.removeEventListener('storage', syncPreferences);
++        });
+         function Settings() {
+           React.useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot());
+           const prefs=React.useSyncExternalStore(subscribe,snapshot);

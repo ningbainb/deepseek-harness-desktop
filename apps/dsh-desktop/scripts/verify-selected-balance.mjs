@@ -158,6 +158,13 @@ try {
   await page.getByTestId('llm-balance-overview').waitFor({ state: 'visible' })
   const reopened = await openDockSetting(app, page, 'usage')
   const restored = reopened.settings.getByRole('checkbox', { name: '启用插件', exact: true })
+  // The official SettingsRow renders a disabled default while its settings
+  // snapshot is loading. Read persistence only after that public ready state;
+  // do not poll for the expected value, which must still fail if it is wrong.
+  await reopened.settings.waitForFunction(() => {
+    const input = document.querySelector('[data-dsh-plugin="usage"] input[type="checkbox"]')
+    return input instanceof HTMLInputElement && !input.disabled
+  }, undefined, { polling: 100, timeout: 60_000 })
   assert.equal(await restored.isChecked(), false)
   await restored.click()
   await reopened.settings.waitForFunction(() => document.querySelector('[data-dsh-plugin="usage"] input[type="checkbox"]')?.checked === true,

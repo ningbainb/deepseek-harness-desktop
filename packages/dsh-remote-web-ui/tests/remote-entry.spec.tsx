@@ -2,6 +2,10 @@
 /** The sidebar entry + panel: issue flow, status stream, and the three actions. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+import type { RemoteSettings } from '../src/client/RemoteSettingsCard.tsx'
 // The npm SDK's client half is a closure-factory bundle for the GUI's
 // __ModuleLoader__ (not importable under vitest); provide the one value
 // member the apply chain needs.
@@ -14,18 +18,40 @@ vi.mock('@deepseek-ai/dsh-client-store', () => ({
 }))
 import { RemoteEntry, type RemoteEntryProps } from '../src/client/RemoteEntry.tsx'
 import { FooterRemoteEntry } from '../src/client/FooterRemoteEntry.tsx'
-import { en, type RemoteKey } from '../src/client/locales.ts'
+import { en } from '../src/client/locales.ts'
+import { apply } from '../src/client/index.ts'
 
 // English dictionary translate stub with {param} interpolation.
+const messages: Readonly<Record<string, string>> = en
 const t: RemoteEntryProps['t'] = (key, params) => {
-  let text = (en as Record<string, string>)[key] ?? key
+  let text = messages[key] ?? key
   for (const [name, value] of Object.entries(params ?? {})) {
     text = text.replaceAll(`{${name}}`, String(value))
   }
   return text
 }
 
-const neverHook = (() => { throw new Error('shell must not read this hook') }) as never
+const neverHook = (): never => { throw new Error('shell must not read this hook') }
+const unusedStandardHooks: Omit<GlobalStandardProps, 'useWorkspaces'> = {
+  useSessions: neverHook,
+  useRemoteAccess: neverHook,
+  usePanelInfo: neverHook,
+  useSessionStatus: neverHook,
+  useSessionRetainInfo: neverHook,
+  useSessionAccess: neverHook,
+  useWorkspaceAccess: neverHook,
+}
+
+/** Full rc4 snapshot plus the legacy current-workspace field consumed by the entry. */
+function workspaceHook(recentWorkspaceId: string): NonNullable<RemoteEntryProps['useWorkspaces']> {
+  const snapshot: WorkspaceSnapshot & { recentWorkspaceId: string } = {
+    items: [], archivedSessionIds: [], pinnedSessionIds: [],
+    state: 'idle', phase: 'ready', error: null, recentWorkspaceId,
+  }
+  return function useWorkspaces<T>(selector: (state: typeof snapshot) => T): T {
+    return selector(snapshot)
+  }
+}
 
 /** Minimal EventSource stub: instances record messages for manual dispatch. */
 class FakeEventSource {
@@ -64,8 +90,8 @@ function mount(issue: { ok: boolean; status?: number; code?: string; url?: strin
   const view = render(
     <RemoteEntry
       wide={true}
-      useSessions={neverHook}
-      useWorkspaces={(selector: (s: { recentWorkspaceId: string }) => unknown) => selector({ recentWorkspaceId: 'ws-1' })}
+      {...unusedStandardHooks}
+      useWorkspaces={workspaceHook('ws-1')}
       t={t}
     />,
   )
@@ -108,8 +134,8 @@ describe('RemoteEntry', () => {
     render(
       <FooterRemoteEntry
         wide={true}
-        useSessions={neverHook}
-        useWorkspaces={(selector: (s: { recentWorkspaceId: string }) => unknown) => selector({ recentWorkspaceId: 'ws-footer' })}
+        {...unusedStandardHooks}
+        useWorkspaces={workspaceHook('ws-footer')}
         t={t}
       />,
     )
@@ -207,7 +233,6 @@ describe('RemoteEntry', () => {
 
 describe('apply registration', () => {
   it('registers the sidebar entry and the plugin settings card', async () => {
-    const { apply } = await import('../src/client/index.ts')
     const injected: string[] = []
     const ctx = {
       effect: (fn: () => unknown) => fn(),
@@ -234,10 +259,12 @@ describe('apply registration', () => {
   })
 
   it('waits for the settings snapshot before mounting the sidebar entry and runtime', async () => {
-    const { apply } = await import('../src/client/index.ts')
     const injected: string[] = []
     const registered: string[] = []
-    let snapshot = { status: 'loading' as const, writable: false, value: undefined }
+    let snapshot: ConfigFormSnapshot<RemoteSettings> = {
+      status: 'loading', writable: false, value: undefined,
+      base: { enabled: true }, user: undefined, revision: undefined,
+    }
     const listeners = new Set<() => void>()
     const notify = (): void => { for (const fn of [...listeners]) fn() }
     const ctx = {
@@ -270,11 +297,11 @@ describe('apply registration', () => {
     apply(ctx as never)
     expect(registered).toEqual(['web-ui.plugin.item'])
 
-    snapshot = { status: 'ready' as const, writable: true, value: { enabled: false } }
+    snapshot = { ...snapshot, status: 'ready', writable: true, value: { enabled: false }, user: { enabled: false }, revision: 1 }
     notify()
     expect(registered).toEqual(['web-ui.plugin.item'])
 
-    snapshot = { status: 'ready' as const, writable: true, value: { enabled: true } }
+    snapshot = { ...snapshot, status: 'ready', writable: true, value: { enabled: true }, user: { enabled: true }, revision: 2 }
     notify()
     expect(registered).toEqual(['web-ui.plugin.item', 'sidebar.remote', 'sidebar.footer.action'])
   })

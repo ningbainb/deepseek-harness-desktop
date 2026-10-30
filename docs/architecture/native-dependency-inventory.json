@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "platformBaseline": "windows-x64",
   "records": [
+    { "module": "Electron shared browser host", "capability": "visible vendor browser and CDP operations", "process": "isolated authenticated Electron child", "version": "44.0.0", "abiPolicy": "reuse the reviewed Desktop executable and exact dsh-builtin-browser host entry; preserve explicit user Electron overrides", "acceptance": "verify-release-plugins source-native Windows; packaged browser startup separately required" },
     { "module": "node-pty", "capability": "terminal PTY", "process": "Electron main", "version": "1.2.0-beta.15", "abiPolicy": "Electron ABI rebuild or packaged prebuild verification", "acceptance": "test:terminal:e2e and process cleanup" },
     { "module": "koffi", "capability": "Windows native integration", "process": "Electron main", "version": "3.1.4", "abiPolicy": "N-API package inventory for target platform", "acceptance": "pack:verify and system integration tests" },
     { "module": "@deepseek-ai/node-addon-system", "capability": "official Host system operations", "process": "upstream Node Host", "version": "resolved by runtime lock", "abiPolicy": "exact platform package and Node ABI", "acceptance": "runtime graph and packaged Host smoke" },

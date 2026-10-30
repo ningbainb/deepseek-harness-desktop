@@ -1,0 +1,316 @@
+diff --git a/assets/whale-widget.js b/assets/whale-widget.js
+index 48df676..479860e 100644
+--- a/assets/whale-widget.js
++++ b/assets/whale-widget.js
+@@ -1 +1,189 @@
++// Desktop compatibility: all resource wrappers below are lexical to this widget.
++(function (hostWindow, hostDocument) {
++function createWidgetScope(w, d) {
++  let alive = true;
++  const cleanups = [], nodes = new Set(), owned = new WeakSet(), ownedListeners = new WeakMap(), listeners = [], globals = new Map();
++  const animations = new Set(), readers = new Set(), audio = new Set();
++  const timers = new Map(), frames = new Set(), controllers = new Map();
++  const NativePromise = w.Promise;
++  const parked = () => new NativePromise(() => {});
++  const guard = fn => function (...args) { if (alive) return fn.apply(this, args); };
++  class WidgetPromise extends NativePromise {
++    then(ok, fail) {
++      return super.then(value => !alive ? parked() : typeof ok === 'function' ? ok(value) : value,
++        error => { if (!alive) return parked(); if (typeof fail === 'function') return fail(error); throw error; });
++    }
++  }
++  function add(target, type, fn, options) {
++    if (!alive || !fn) return;
++    const capture = typeof options === 'boolean' ? options : !!options?.capture;
++    const rows = ownedListeners.get(target) ?? listeners;
++    if (rows.some(row => row.target === target && row.type === type && row.fn === fn && row.capture === capture)) return;
++    const wrapped = guard(typeof fn === 'function' ? fn : event => fn.handleEvent(event));
++    rows.push({ target, type, fn, capture, wrapped });
++    w.EventTarget.prototype.addEventListener.call(target, type, wrapped, options);
++  }
++  function remove(target, type, fn, options) {
++    const capture = typeof options === 'boolean' ? options : !!options?.capture;
++    const rows = ownedListeners.get(target) ?? listeners;
++    for (let i = rows.length - 1; i >= 0; i--) {
++      const row = rows[i];
++      if (row.target === target && row.type === type && row.fn === fn && row.capture === capture) {
++        w.EventTarget.prototype.removeEventListener.call(target, type, row.wrapped, capture); rows.splice(i, 1);
++      }
++    }
++  }
++  function eventProxy(target, extra = {}) {
++    if (!target) return target;
++    return new Proxy(target, { get(object, key) {
++      if (key in extra) return extra[key];
++      if (key === 'addEventListener') return (type, fn, options) => add(object, type, fn, options);
++      if (key === 'removeEventListener') return (type, fn, options) => remove(object, type, fn, options);
++      const value = Reflect.get(object, key, object);
++      return typeof value === 'function' ? value.bind(object) : value;
++    } });
++  }
++  function own(target) {
++    if (!target || owned.has(target)) return target;
++    owned.add(target);
++    ownedListeners.set(target, []);
++    nodes.add(new WeakRef(target));
++    if (nodes.size % 128 === 0) for (const ref of nodes) if (!ref.deref()) nodes.delete(ref);
++    target.addEventListener = (type, fn, options) => add(target, type, fn, options);
++    target.removeEventListener = (type, fn, options) => remove(target, type, fn, options);
++    for (const key of ['onload', 'onerror', 'onloadend', 'onabort', 'onended', 'onfinish', 'oncancel']) {
++      let proto = target, descriptor;
++      while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, key))) proto = Object.getPrototypeOf(proto);
++      if (!descriptor?.set) continue;
++      Object.defineProperty(target, key, { configurable: true,
++        get() { return descriptor.get?.call(target); },
++        set(fn) { descriptor.set.call(target, typeof fn === 'function' ? guard(fn) : fn); },
++      });
++    }
++    if (typeof target.animate === 'function') {
++      const animate = target.animate.bind(target);
++      target.animate = (...args) => {
++        if (!alive) return { cancel() {} };
++        const animation = own(animate(...args)); animations.add(animation);
++        for (const event of ['finish', 'cancel']) w.EventTarget.prototype.addEventListener.call(animation, event, () => animations.delete(animation), { once: true });
++        return animation;
++      };
++    }
++    return target;
++  }
++  function timer(repeat, fn, delay, ...args) {
++    if (!alive) return 0;
++    const schedule = repeat ? w.setInterval.bind(w) : w.setTimeout.bind(w);
++    const id = schedule(() => { if (!repeat) timers.delete(id); if (alive) fn(...args); }, delay);
++    timers.set(id, repeat); return id;
++  }
++  function clearTimer(id) { if (!timers.has(id)) return; const repeat = timers.get(id); (repeat ? w.clearInterval : w.clearTimeout).call(w, id); timers.delete(id); }
++  function raf(fn) {
++    if (!alive) return 0;
++    const id = w.requestAnimationFrame(ts => { frames.delete(id); if (alive) fn(ts); }); frames.add(id); return id;
++  }
++  function fetchOwned(input, options = {}) {
++    if (!alive) return WidgetPromise.resolve(parked());
++    const controller = new w.AbortController();
++    const caller = options.signal;
++    const abort = () => controller.abort();
++    if (caller?.aborted) abort(); else caller?.addEventListener('abort', abort, { once: true });
++    const release = () => { controllers.delete(controller); caller?.removeEventListener('abort', abort); };
++    controllers.set(controller, release);
++    const response = value => new Proxy(value, { get(target, key) {
++      if (['json', 'text', 'arrayBuffer', 'blob', 'formData'].includes(key)) return (...args) => WidgetPromise.resolve(
++        NativePromise.resolve(target[key](...args)).then(data => { release(); return data; }, error => { release(); throw error; }));
++      const item = Reflect.get(target, key, target); return typeof item === 'function' ? item.bind(target) : item;
++    } });
++    return new WidgetPromise((resolve, reject) => {
++      NativePromise.resolve().then(() => {
++        if (!alive) return parked();
++        return w.fetch(input, { ...options, signal: controller.signal });
++      }).then(value => { if (alive) resolve(response(value)); }, error => { release(); if (alive) reject(error); });
++    });
++  }
++  const document = eventProxy(d, {
++    createElement: (...args) => own(d.createElement(...args)),
++    createElementNS: (...args) => own(d.createElementNS(...args)),
++  });
++  const aliases = {
++    document, Promise: WidgetPromise,
++    setTimeout: (...args) => timer(false, ...args), setInterval: (...args) => timer(true, ...args),
++    clearTimeout: clearTimer, clearInterval: clearTimer,
++    requestAnimationFrame: raf, cancelAnimationFrame: id => { if (frames.delete(id)) w.cancelAnimationFrame(id); },
++    fetch: fetchOwned,
++    AbortSignal: { timeout(ms) { const controller = new w.AbortController(); timer(false, () => controller.abort(), ms); return controller.signal; } },
++    Image: function (...args) { return own(new w.Image(...args)); },
++    FileReader: function (...args) {
++      const reader = own(new w.FileReader(...args)); readers.add(reader);
++      w.EventTarget.prototype.addEventListener.call(reader, 'loadend', () => readers.delete(reader), { once: true }); return reader;
++    },
++    MutationObserver: function (fn) { const observer = new w.MutationObserver(guard(fn)); cleanups.push(() => observer.disconnect()); return observer; },
++    matchMedia: query => eventProxy(w.matchMedia(query)),
++    navigator: new Proxy(w.navigator, { get(target, key) {
++      if (key === 'windowControlsOverlay') return eventProxy(target[key]);
++      const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;
++    } }),
++  };
++  for (const key of ['AudioContext', 'webkitAudioContext']) if (w[key]) aliases[key] = function (...args) {
++    const context = new w[key](...args); audio.add(context);
++    const close = context.close.bind(context); context.close = () => { audio.delete(context); return close(); };
++    if (typeof context.decodeAudioData === 'function') {
++      const decode = context.decodeAudioData.bind(context);
++      context.decodeAudioData = (...args) => {
++        if (!alive) return WidgetPromise.resolve(parked());
++        const parameters = args.map((value, index) => (index === 1 || index === 2) && typeof value === 'function' ? guard(value) : value);
++        const result = decode(...parameters);
++        if (!result || typeof result.then !== 'function') return result;
++        return new WidgetPromise((resolve, reject) => {
++          NativePromise.resolve(result).then(
++            value => { if (alive) resolve(value); },
++            error => { if (alive) reject(error); }
++          );
++        });
++      };
++    }
++    for (const method of ['createBufferSource', 'createOscillator']) if (context[method]) {
++      const create = context[method].bind(context); context[method] = (...params) => own(create(...params));
++    }
++    return context;
++  };
++  const window = new Proxy(eventProxy(w, aliases), { set(_target, key, value) {
++    if (key === 'dfyRegisterMask' || /^(?:__dfy|__dafeiyu|Dafeiyu)/.test(String(key))) {
++      if (!globals.has(key)) globals.set(key, { before: Object.getOwnPropertyDescriptor(w, key) });
++    }
++    const result = Reflect.set(w, key, value, w);
++    if (globals.has(key)) globals.get(key).after = Object.getOwnPropertyDescriptor(w, key);
++    return result;
++  } });
++  return { ...aliases, window, isAlive: () => alive, dispose() {
++    if (!alive) return;
++    alive = false;
++    for (const [controller, release] of controllers) { controller.abort(); release(); } controllers.clear();
++    for (const [id, repeat] of timers) (repeat ? w.clearInterval : w.clearTimeout).call(w, id); timers.clear();
++    for (const id of frames) w.cancelAnimationFrame(id); frames.clear();
++    for (const row of listeners) w.EventTarget.prototype.removeEventListener.call(row.target, row.type, row.wrapped, row.capture);
++    listeners.length = 0;
++    for (const animation of animations) animation.cancel(); animations.clear();
++    for (const reader of readers) if (reader.readyState === 1) reader.abort(); readers.clear();
++    for (const context of audio) NativePromise.resolve(context.close()).catch(() => {}); audio.clear();
++    for (const cleanup of cleanups.reverse()) { try { cleanup(); } catch {} } cleanups.length = 0;
++    for (const ref of [...nodes].reverse()) {
++      const node = ref.deref(); if (!node) continue;
++      for (const row of ownedListeners.get(node) ?? []) w.EventTarget.prototype.removeEventListener.call(node, row.type, row.wrapped, row.capture);
++      if (['IMG', 'AUDIO', 'VIDEO'].includes(node.tagName)) { node.onload = node.onerror = null; node.pause?.(); node.removeAttribute('src'); }
++      node.remove?.();
++    }
++    nodes.clear();
++    for (const [key, { before, after }] of globals) {
++      const current = Object.getOwnPropertyDescriptor(w, key);
++      if (!current || !after || !['value', 'get', 'set', 'writable', 'enumerable', 'configurable'].every(field => current[field] === after[field])) continue;
++      if (before) Object.defineProperty(w, key, before); else delete w[key];
++    }
++    globals.clear();
++  } };
++}
++function mountWidget(scope) {
++  const { window, document, navigator, Promise, fetch, Image, FileReader, MutationObserver, AbortSignal,
++    setTimeout, setInterval, clearTimeout, clearInterval, requestAnimationFrame, cancelAnimationFrame } = scope;
+ (function(){
+@@ -214,5 +402,7 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+     const effect=now<landingUntil?'landing':action&&now<action.until?action.effect:null;
+-    img.dataset.cuteMotion=motionFor(state,effect,dragging,{paused:manualPaused,reduced:media.matches,cute:cuteEnabled});
++    const nextMotion=motionFor(state,effect,dragging,{paused:manualPaused,reduced:media.matches,cute:cuteEnabled});
++    if(img.dataset.cuteMotion!==nextMotion)img.dataset.cuteMotion=nextMotion;
+     const display=state.startsWith('look:')?'look':state;
+-    status.textContent='大肥鱼 · '+LABELS[display]+(snapshot.workingCount?' · '+snapshot.workingCount+' 个任务':'')+(!connected&&!preview?' · 正在重连':'');
++    const nextStatus='大肥鱼 · '+LABELS[display]+(snapshot.workingCount?' · '+snapshot.workingCount+' 个任务':'')+(!connected&&!preview?' · 正在重连':'');
++    if(status.textContent!==nextStatus)status.textContent=nextStatus;
+     if(state==='sleeping'){
+@@ -260,3 +450,3 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+   async function poll(){
+-   if(inflight||disposed)return;
++   if(inflight||disposed||!scope.isAlive())return;
+    inflight=true;const id=++requestId,controller=new AbortController();requestController=controller;
+@@ -268,5 +458,5 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+     ]);
+-    if(!disposed&&id===requestId)accept(data);
++    if(scope.isAlive()&&!disposed&&id===requestId)accept(data);
+    }catch{
+-    if(!disposed&&id===requestId){connected=false;hadSnapshot=false;seenSeq=0;hostGeneration=null;action=null;snapshot={state:'idle',workingCount:0};}
++    if(scope.isAlive()&&!disposed&&id===requestId){connected=false;hadSnapshot=false;seenSeq=0;hostGeneration=null;action=null;snapshot={state:'idle',workingCount:0};}
+    }finally{clearTimeout(timeout);if(id===requestId){inflight=false;requestController=null;}}
+@@ -15620,3 +15810,3 @@ function frameSafeEstimateFromCanvas(frame) {
+     cv.height = FRAME_SAFE_SH
+-    var ctx = cv.getContext ? cv.getContext('2d') : null
++    var ctx = cv.getContext ? cv.getContext('2d', { willReadFrequently: true }) : null
+     if (!ctx) return { safe: null, why: '取不到画布（无法测量）' }
+@@ -15819,3 +16009,3 @@ function frameEditImageOpaqueRaw(id, cb) {
+         cv.height = ch
+-        var cx = cv.getContext('2d')
++        var cx = cv.getContext('2d', { willReadFrequently: true })
+         cx.drawImage(im, 0, 0, cw, ch)
+@@ -19356,3 +19546,6 @@ function render() {
+   var amount, hint
+-  if (state.status === 'error') {
++  if (state.status === 'unconfigured') {
++    amount = '--'
++    hint = '未配置账号或 API key'
++  } else if (state.status === 'error') {
+     amount = shown !== null ? fmt(shown, state.currency) : '--'
+@@ -19577,2 +19770,6 @@ function refresh(manual) {
+         }
++      } else if (data && data.unconfigured === true) {
++        state.status = 'unconfigured'
++        state.message = String(data.error || '未配置账号或 API key')
++        render()
+       } else {
+@@ -21836,3 +22033,3 @@ function setupHitTest(url) {
+       try {
+-        var ctx = hitCanvas.getContext('2d')
++        var ctx = hitCanvas.getContext('2d', { willReadFrequently: true })
+         // 按 object-fit:contain + object-position:right bottom 的实际几何绘制，
+@@ -21918,3 +22115,3 @@ function buildHitClipPath() {
+   try {
+-    var c = hitCanvas && hitCanvas.getContext ? hitCanvas.getContext('2d') : null
++    var c = hitCanvas && hitCanvas.getContext ? hitCanvas.getContext('2d', { willReadFrequently: true }) : null
+     if (!c) return ''
+@@ -21959,3 +22156,3 @@ function isWhaleHit(e) {
+     try {
+-      data = hitCanvas.getContext('2d').getImageData(Math.floor(lx), Math.floor(ly), 1, 1).data
++      data = hitCanvas.getContext('2d', { willReadFrequently: true }).getImageData(Math.floor(lx), Math.floor(ly), 1, 1).data
+     } catch (err) {
+@@ -22615 +22812,39 @@ try { dfyTryStart(true) } catch (err) {}
+ })()
++
++}
++// Only this low-cost gate exists while Desktop is off. The original widget body
++// (and its timers, observers, canvas readback and requests) has not executed.
++if (hostWindow.DafeiyuDesktopLifecycle) return;
++let scope = null, stopped = false;
++const key = 'dsh-release-plugin-adapter.dafeiyu-visible';
++const eventName = 'dsh-dafeiyu-visibility';
++const settings = new URLSearchParams(hostWindow.location.search).has('desktop-dock-setting');
++function reconcile(override) {
++  if (stopped) return;
++  let visible = true;
++  const attribute = hostDocument.documentElement.getAttribute('data-desktop-dafeiyu-visible');
++  const desktop = !!hostWindow.dshDesktop || hostWindow.location.protocol === 'dsh-runtime:' || attribute !== null;
++  if (desktop) {
++    visible = false;
++    try { visible = hostWindow.localStorage.getItem(key) === 'true'; } catch {}
++    if (attribute !== null) visible = attribute === 'true';
++    if (typeof override === 'boolean') visible = override;
++  }
++  visible = visible && !settings;
++  if (!visible) { scope?.dispose(); scope = null; return; }
++  if (scope) return;
++  scope = createWidgetScope(hostWindow, hostDocument);
++  try { mountWidget(scope); } catch (error) { scope.dispose(); scope = null; throw error; }
++}
++const changed = event => reconcile(typeof event.detail === 'boolean' ? event.detail : undefined);
++const stored = event => { if ((event.key === key || event.key === null) && event.storageArea === hostWindow.localStorage) reconcile(); };
++function dispose() {
++  if (stopped) return;
++  stopped = true; scope?.dispose(); scope = null;
++  hostWindow.removeEventListener(eventName, changed); hostWindow.removeEventListener('storage', stored); hostWindow.removeEventListener('pagehide', dispose);
++  delete hostWindow.DafeiyuDesktopLifecycle;
++}
++hostWindow.DafeiyuDesktopLifecycle = { setVisible: reconcile, dispose };
++hostWindow.addEventListener(eventName, changed); hostWindow.addEventListener('storage', stored); hostWindow.addEventListener('pagehide', dispose);
++reconcile();
++})(window, document);
+diff --git a/lib/index.js b/lib/index.js
+index afcb9a9..28e78a8 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1227,3 +1227,4 @@ export default {
+       //   以前只有一个笼统的"账号余额不可用"，用户/支持方分不清"没登录"和"接口失败"。
+-      if (!result) { accountDiag = '未登录 DeepSeek 账号（没有账号凭据）'; return null }
++      if (result === null) { accountDiag = '未登录 DeepSeek 账号（没有账号凭据）'; return { ok: false, unconfigured: true } }
++      if (!result) { accountDiag = '账号余额接口未返回状态'; return null }
+       if (result.status !== 'ready') { accountDiag = '账号余额接口未就绪（' + String(result.status || 'unknown') + '）'; return null }
+@@ -1291,3 +1292,3 @@ export default {
+       }
+-      if (acc) return acc
++      if (acc && acc.ok) return acc
+       const keyPart = keyErr
+@@ -1298,2 +1299,3 @@ export default {
+         code: keyErr ? 'BOTH_FAILED' : 'NO_KEY',
++        ...(!keyErr && acc && acc.unconfigured === true ? { unconfigured: true } : {}),
+         error: keyPart + '；账号登录路：' + (accountDiag || '拿不到余额'),

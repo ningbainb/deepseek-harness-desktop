@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 import { prepareReleaseDirectory } from './prepare-release-directory.mjs'
 import { buildVerifiedWindowsInstaller } from './package-win-stages.mjs'
+import { prepareInstallerElectronPayload, stageInstallerRestorationHelper } from './installer-electron-payload.mjs'
+import { verifyInstallerReuseInputs } from './installer-reuse-verification.mjs'
+import { invalidateNsisArchiveCache } from './nsis-archive-cache.mjs'
 import { verifyPackagedRuntimeSdkIdentity } from './packaged-runtime-sdk-identity.mjs'
 import { verifyAsarIntegrity } from './verify-asar-integrity.mjs'
 import { verifyBrandingAssets } from './verify-branding-assets.mjs'
@@ -21,6 +24,8 @@ const RELEASE_CHANNEL = defaultReleaseChannel({
   configuredChannel: process.env.DSH_DESKTOP_UPDATE_CHANNEL,
 })
 const UPDATER_CHANNEL = RELEASE_CHANNEL === 'beta' ? 'beta' : 'latest'
+const INSTALLER_ONLY = process.argv.includes('--installer-only')
+const BUILDER_ARGUMENTS = process.argv.slice(2).filter(arg => arg !== '--installer-only')
 
 export function packEnvironment(env = process.env) {
   const userAgent = env.npm_config_user_agent
@@ -77,25 +82,39 @@ await run(process.execPath, [
   '--check',
 ])
 await verifyBrandingAssets(APP_DIRECTORY)
-await prepareReleaseDirectory()
+if (!INSTALLER_ONLY) await prepareReleaseDirectory()
 // prepare:bundled-git
 const prepareGitScript = resolve(APP_DIRECTORY, 'scripts/prepare-bundled-git.mjs')
-await run(process.execPath, [prepareGitScript])
+if (!INSTALLER_ONLY) await run(process.execPath, [prepareGitScript])
 await run(process.execPath, ['src/release-manifest.mjs', '--assert-signing'])
+if (INSTALLER_ONLY) {
+  // Explicit packaging-only reuse must pass the same current-source/SDK gates.
+  // The normal release command still builds the complete directory from scratch.
+  await run(process.execPath, ['scripts/verify-package.mjs', '--allow-missing-update-metadata'])
+  const inputs = await verifyInstallerReuseInputs(APP_DIRECTORY, join(APP_DIRECTORY, 'dist/win-unpacked/resources'))
+  process.stdout.write(`verified current installer-only runtime inputs: ${JSON.stringify(inputs)}\n`)
+  await stageInstallerRestorationHelper(join(APP_DIRECTORY, 'dist/win-unpacked'), join(APP_DIRECTORY, 'build/installer-runtime-restore.ps1'))
+}
 const electronBuilderCli = resolve(APP_DIRECTORY, 'node_modules/electron-builder/cli.js')
 await buildVerifiedWindowsInstaller({
   appDirectory: APP_DIRECTORY,
+  reuseVerifiedDirectory: INSTALLER_ONLY,
   builderArguments: [
     '--publish',
     'never',
     `--config.publish.channel=${UPDATER_CHANNEL}`,
-    ...process.argv.slice(2),
+    ...BUILDER_ARGUMENTS,
   ],
   runBuilder: async args => {
+    if (args.some(arg => arg.startsWith('--dsh-runtime-nsis-adapter='))) {
+      await run(process.execPath, [resolve(APP_DIRECTORY, 'scripts/runtime-nsis-builder.mjs'), ...args])
+      return
+    }
     if (existsSync(electronBuilderCli)) await run(process.execPath, [electronBuilderCli, ...args])
     else await run(PNPM_COMMAND, ['exec', 'electron-builder', ...args])
   },
   verifyDirectory: async resources => {
+    if (INSTALLER_ONLY) await verifyInstallerReuseInputs(APP_DIRECTORY, resources)
     await assertPackagedUpdateIdentity(join(resources, 'app-update.yml'))
     const identity = await verifyPackagedRuntimeSdkIdentity(resources, {
       expectedManifest: PACKAGE_MANIFEST,
@@ -105,6 +124,12 @@ await buildVerifiedWindowsInstaller({
       requiredFiles: ['runtime-support/community-plugin-known-issues.json'],
     })
     process.stdout.write(`verified directory before installer compression: ${identity.runtimeFiles.length} unpacked files, ${packedFiles} packed files, ${identity.consumers.length} SDK consumers\n`)
+  },
+  prepareArchive: async appOutDir => {
+    await invalidateNsisArchiveCache(dirname(appOutDir), PACKAGE_MANIFEST.version)
+    const payload = await prepareInstallerElectronPayload(appOutDir)
+    process.stdout.write(`offline Electron payload: ${JSON.stringify(payload.summary)}\n`)
+    return payload
   },
 })
 await run(process.execPath, ['src/release-manifest.mjs', '--write', '--directory', 'dist', '--channel', RELEASE_CHANNEL])

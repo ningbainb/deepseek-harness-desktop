@@ -57,6 +57,7 @@ let originalSkill
 let sharedMcp
 let sessionId
 const installRequests = []
+const marketRequests = []
 
 function markStage(next) {
   stage = next
@@ -88,6 +89,22 @@ async function openMarket() {
 async function installed() {
   const state = JSON.parse(await readFile(statePath, 'utf8'))
   return state.installed?.['desktop-fixture/desktop-market-suite']
+}
+
+async function assertRefreshedSourceCheckouts(sources) {
+  const state = JSON.parse(await readFile(statePath, 'utf8'))
+  assert.equal(state.sources.length, sources.length, 'all configured sources, including the preset, must remain registered')
+  for (const source of sources) {
+    const entries = state.sources.filter(entry => entry.id === source.id)
+    assert.equal(entries.length, 1, `source ID must be unique: ${source.id}`)
+    assert.equal(entries[0].url, source.url, `persisted source URL: ${source.id}`)
+    assert.equal(entries[0].kind, 'git')
+    const options = { windowsHide: true, timeout: 30_000 }
+    const head = (await run('git', ['-C', source.checkout, 'rev-parse', 'HEAD'], options)).stdout.trim()
+    const origin = (await run('git', ['-C', source.checkout, 'remote', 'get-url', 'origin'], options)).stdout.trim()
+    assert.equal(head, source.head, `refresh must acquire the new upstream commit: ${source.id}`)
+    assert.equal(origin, source.url, `checkout origin must stay local: ${source.id}`)
+  }
 }
 
 async function waitForActivationReceipt() {
@@ -206,6 +223,24 @@ try {
   await git(['-c', 'user.name=Desktop Fixture', '-c', 'user.email=fixture@invalid.test', '-C', source, 'commit', '--no-gpg-sign', '-m', 'isolated fixture'])
   await mkdir(join(home, 'agent-plugins', '.sources'), { recursive: true })
   await git(['clone', '--depth', '1', '--', sourceUrl, checkout])
+  const presetRepository = join(temporary, 'fixture-preset-source')
+  await mkdir(join(presetRepository, '.claude-plugin'), { recursive: true })
+  await mkdir(join(presetRepository, 'skills', 'desktop-preset-control'), { recursive: true })
+  await writeFile(join(presetRepository, '.claude-plugin', 'plugin.json'), JSON.stringify({
+    name: 'desktop-preset-control-suite', version: '1.0.0', description: 'Isolated preset source control',
+  }))
+  await writeFile(join(presetRepository, 'skills', 'desktop-preset-control', 'SKILL.md'), skill('desktop-preset-control'))
+  await git(['init', '--initial-branch=main', presetRepository])
+  await git(['-C', presetRepository, 'add', '.'])
+  await git(['-c', 'user.name=Desktop Fixture', '-c', 'user.email=fixture@invalid.test', '-C', presetRepository, 'commit', '--no-gpg-sign', '-m', 'isolated preset fixture'])
+  const presetSource = { id: 'dsh-agent-plugins', url: pathToFileURL(presetRepository).href, kind: 'git' }
+  // 0.11.1 appends the preset after config seeds. Retain its ID in user state so
+  // refresh-all covers it without reaching GitHub/gh-proxy or duplicating IDs.
+  await writeFile(statePath, JSON.stringify({ version: 1, sources: [presetSource], installed: {} }), { flag: 'wx' })
+  const fixtureSources = [
+    { id: 'desktop-fixture', url: sourceUrl, repository: source, checkout },
+    { id: presetSource.id, url: presetSource.url, repository: presetRepository, checkout: join(home, 'agent-plugins', '.sources', presetSource.id) },
+  ]
   originalSkill = Buffer.from(skill(localName))
   await writeFile(join(home, 'skills', localName, 'SKILL.md'), originalSkill)
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
@@ -288,7 +323,17 @@ try {
   assert.equal(receipt.packageVersion, '0.11.1')
   const marketPage = market.page()
   marketPage.on('request', request => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/agent-plugins/install') installRequests.push(request.postDataJSON())
+    const path = new URL(request.url()).pathname
+    if (path.startsWith('/api/agent-plugins/')) marketRequests.push({ event: 'request', at: Date.now(), path, method: request.method() })
+    if (request.method() === 'POST' && path === '/api/agent-plugins/install') installRequests.push(request.postDataJSON())
+  })
+  marketPage.on('response', response => {
+    const path = new URL(response.url()).pathname
+    if (path.startsWith('/api/agent-plugins/')) marketRequests.push({ event: 'response', at: Date.now(), path, method: response.request().method(), status: response.status() })
+  })
+  marketPage.on('requestfailed', request => {
+    const path = new URL(request.url()).pathname
+    if (path.startsWith('/api/agent-plugins/')) marketRequests.push({ event: 'failed', at: Date.now(), path, method: request.method(), failure: request.failure()?.errorText })
   })
   const search = market.getByPlaceholder('搜索插件…', { exact: true })
   await search.fill('desktop-market-suite')
@@ -343,10 +388,24 @@ try {
   await market.locator('#agent-plugins-tab-skills').click()
   await market.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
   await market.locator('#agent-plugins-tab-market').click()
+  // Advance both upstreams so a stale checkout or a refresh of just one source cannot pass.
+  for (const source of fixtureSources) {
+    await writeFile(join(source.repository, 'refresh-proof.txt'), `Refresh-all positive control: ${source.id}\n`, { flag: 'wx' })
+    await git(['-C', source.repository, 'add', 'refresh-proof.txt'])
+    await git(['-c', 'user.name=Desktop Fixture', '-c', 'user.email=fixture@invalid.test', '-C', source.repository, 'commit', '--no-gpg-sign', '-m', 'refresh positive control'])
+    source.head = (await git(['-C', source.repository, 'rev-parse', 'HEAD'])).stdout.trim()
+  }
   const refreshed = marketPage.waitForResponse(response => new URL(response.url()).pathname === '/api/agent-plugins/sources/refresh'
     && response.request().method() === 'POST')
-  await market.getByRole('button', { name: '刷新全部', exact: true }).click()
+  const refreshButton = market.getByRole('button', { name: '刷新全部', exact: true })
+  console.log('Skill market refresh button', JSON.stringify(await refreshButton.evaluate(button => ({
+    at: Date.now(), disabled: button.disabled, text: button.textContent, connected: button.isConnected,
+    busy: button.getAttribute('aria-busy'),
+  }))))
+  await refreshButton.click()
+  console.log('Skill market refresh click completed', Date.now())
   assert.equal((await refreshed).ok(), true)
+  await assertRefreshedSourceCheckouts(fixtureSources)
   await market.locator('#agent-plugins-tab-skills').click()
   await market.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
   if (screenshotDirectory) {
@@ -394,6 +453,7 @@ try {
   await restarted.market.locator('#agent-plugins-tab-skills').click()
   await restarted.market.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
   assert.equal((await installed()).enabled, true)
+  await assertRefreshedSourceCheckouts(fixtureSources)
   assert.deepEqual(await readFile(join(home, 'skills', localName, 'SKILL.md')), originalSkill)
   assert.ok((await waitForSharedMcpTool()).length >= 2, 'the real shared Agent process must start again only after retained activation on restart')
   const probe = await page.evaluate(async () => {
@@ -413,6 +473,7 @@ try {
   failure = error
   console.error(`Skill market failed at ${stage}; isolated fixture: ${temporary}`)
   console.error('Skill market primary failure', error.stack ?? error.message)
+  console.error('Skill market HTTP timeline', JSON.stringify(marketRequests.slice(-80)))
   for (const candidate of app?.windows() ?? []) {
     if (!candidate.url().includes('desktop-dock-setting=')) continue
     console.error('Market settings diagnostics', JSON.stringify(await candidate.evaluate(() => ({

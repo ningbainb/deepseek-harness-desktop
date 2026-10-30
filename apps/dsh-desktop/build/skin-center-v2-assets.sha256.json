@@ -203,7 +203,11 @@
     },
     {
       "path": "maid-atelier/hooks.mjs",
-      "sha256": "54394436db0a9dfd51972adbc31c567b1871632cb599e1a8440b87b98401a2d4"
+      "sha256": "2a1fdecbfa046a80ac85fc4cde08e73469ab7c3fb5bbb1f0412f67e83873bd49",
+      "previousSha256": "54394436db0a9dfd51972adbc31c567b1871632cb599e1a8440b87b98401a2d4",
+      "previousSha256s": [
+        "e8a9569198f4f2a42970c56810d62cc7f90d4fe153c50b55d8a9c8234219ec3a"
+      ]
     },
     {
       "path": "maid-atelier/LICENSE",

@@ -13,10 +13,16 @@ import { _electron as electron } from 'playwright'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
-import { createSessionInWorkspace, reenterSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createIsolatedFreshSessionInWorkspace, reenterSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { prepareWorkspaceStateProbe, readWorkspaceStateProbe } from './workspace-state-probe-fixture.mjs'
+import { verifyPetComposerClearance } from './pet-composer-clearance-fixture.mjs'
+import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const mainEntry = resolve(appDir, 'src', 'main.mjs')
+// Cold packaged starts on a mechanical disk include dependency discovery and
+// profile compilation. Keep readiness assertions, with the suite's 10m budget.
+const startupTimeout = 600_000
 const configuredExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const packagedExecutable = configuredExecutable === undefined ? undefined : resolve(configuredExecutable)
 if (packagedExecutable !== undefined && !existsSync(packagedExecutable)) {
@@ -53,6 +59,7 @@ const requests = []
 let contextProbeDetected = false
 let contextProbeSawHistory = false
 let app
+let restoreCompanionPreference
 
 async function readRequest(request) {
   const chunks = []
@@ -190,6 +197,11 @@ async function rpc(page, method, payload) {
   return response.body.result.value
 }
 
+function createFixtureFreshSession(page, workspaceId, workspacePath) {
+  return createIsolatedFreshSessionInWorkspace({ page, workspaceId, workspacePath, rpc,
+    readWorkspace: () => readWorkspaceStateProbe(page) })
+}
+
 async function dismissStartup(page) {
   for (let attempt = 0; attempt < 240; attempt += 1) {
     await page.waitForTimeout(250)
@@ -292,8 +304,10 @@ try {
       },
     },
   }))
+  await prepareWorkspaceStateProbe({ home: dshHome })
   await seedPrimaryRuntimePermissionForTest({ userData })
   app = await electron.launch({
+    timeout: startupTimeout,
     executablePath: packagedExecutable ?? electronPath,
     args: packagedExecutable === undefined ? [mainEntry] : [],
     cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
@@ -305,22 +319,24 @@ try {
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
+      DSH_TELEMETRY_DISABLED: '1',
       DSH_AGENT_FIXTURE_KEY: 'synthetic-agent-fixture-key',
     },
   })
   await useChineseFixtureLocale(app)
-  const page = await app.firstWindow()
+  const page = await app.firstWindow({ timeout: startupTimeout })
   const rendererErrors = []
   page.on('pageerror', error => rendererErrors.push(error.message))
-  await page.waitForURL(/^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/)/u, { timeout: 120_000 })
-  await page.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
+  await page.waitForURL(/^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/)/u, { timeout: startupTimeout })
+  await page.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: startupTimeout })
   await dismissStartup(page)
+  restoreCompanionPreference = await useOriginalPetForTest(page)
 
   const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
   const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
   assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
   const canonicalWorkspacePath = workspace?.workspace?.path ?? workspace?.path ?? workspacePath
-  const sessionId = await createSessionInWorkspace(page, workspaceId)
+  const sessionId = await createFixtureFreshSession(page, workspaceId, canonicalWorkspacePath)
   const selected = await rpc(page, 'session.selectModel', {
     sessionId,
     provider: 'agent-fixture',
@@ -333,7 +349,8 @@ try {
   const alternateWorkspace = await rpc(page, 'workspace.create', { path: alternateWorkspacePath })
   const alternateWorkspaceId = alternateWorkspace?.workspace?.workspaceId ?? alternateWorkspace?.workspaceId
   assert.equal(typeof alternateWorkspaceId, 'string')
-  const blankAlternateSessionId = await createSessionInWorkspace(page, alternateWorkspaceId)
+  const canonicalAlternateWorkspacePath = alternateWorkspace?.workspace?.path ?? alternateWorkspace?.path ?? alternateWorkspacePath
+  const blankAlternateSessionId = await createFixtureFreshSession(page, alternateWorkspaceId, canonicalAlternateWorkspacePath)
   assert.notEqual(blankAlternateSessionId, sessionId)
   assert.equal(await reenterSessionInWorkspace(page, workspaceId, sessionId, canonicalWorkspacePath), sessionId,
     'the official blank-session reentry must select the original empty session')
@@ -343,10 +360,18 @@ try {
   ).first()
   await composer.waitFor({ state: 'visible', timeout: 30_000 })
   await composer.fill(`Create ${markerPath} and report completion.`)
+  await verifyPetComposerClearance({ app, page, sessionId })
   const requestCountBeforePrompt = requests.length
-  const promptRequest = page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt')
-  await page.getByRole('button', { name: '发送消息', exact: true }).click()
-  const prompted = await promptRequest
+  // Attach both rejection handlers immediately so a failed click still reaches
+  // the existing diagnostics and owned-process cleanup instead of terminating
+  // Node on the concurrently rejected request waiter.
+  const sendResults = await Promise.allSettled([
+    page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt'),
+    page.getByRole('button', { name: '发送消息', exact: true }).click(),
+  ])
+  const sendErrors = sendResults.filter(result => result.status === 'rejected').map(result => result.reason)
+  if (sendErrors.length) throw new AggregateError(sendErrors, 'Agent prompt request and native click must both complete')
+  const prompted = sendResults[0].value
   assert.equal(prompted.postDataJSON()?.payload?.args?.request?.sessionId, sessionId,
     'the composer must send to the exact session whose model was selected')
   await page.getByRole('paragraph').filter({ hasText: finalText }).last().waitFor({ state: 'visible', timeout: 60_000 })
@@ -365,11 +390,11 @@ try {
   assert.deepEqual(rendererErrors, [])
 
   await observeHistorySnapshots(page)
-  const alternateSessionId = await createSessionInWorkspace(page, workspaceId)
+  const alternateSessionId = await createFixtureFreshSession(page, workspaceId, canonicalWorkspacePath)
   assert.notEqual(alternateSessionId, sessionId)
   let previousAlternateWorkspaceSessionId = blankAlternateSessionId
   for (let iteration = 0; iteration < 2; iteration += 1) {
-    const freshAlternateWorkspaceSessionId = await createSessionInWorkspace(page, alternateWorkspaceId)
+    const freshAlternateWorkspaceSessionId = await createFixtureFreshSession(page, alternateWorkspaceId, canonicalAlternateWorkspacePath)
     assert.notEqual(freshAlternateWorkspaceSessionId, previousAlternateWorkspaceSessionId,
       'the native New Session action must create a fresh identity even while another blank session exists')
     previousAlternateWorkspaceSessionId = freshAlternateWorkspaceSessionId
@@ -392,6 +417,7 @@ try {
   app = undefined
 
   app = await electron.launch({
+    timeout: startupTimeout,
     executablePath: reopenExecutable ?? electronPath,
     args: reopenExecutable === undefined ? [mainEntry] : [],
     cwd: packagedExecutable === undefined ? appDir : dirname(packagedExecutable),
@@ -403,17 +429,18 @@ try {
       DSH_DESKTOP_DISABLE_UPDATES: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
+      DSH_TELEMETRY_DISABLED: '1',
       DSH_AGENT_FIXTURE_KEY: 'synthetic-agent-fixture-key',
     },
   })
   await useChineseFixtureLocale(app)
-  const reopenedPage = await app.firstWindow()
+  const reopenedPage = await app.firstWindow({ timeout: startupTimeout })
   const reopenedRendererErrors = []
   reopenedPage.on('pageerror', error => reopenedRendererErrors.push(error.message))
-  await reopenedPage.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
-  await reopenedPage.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: 120_000 })
+  await reopenedPage.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
+  await reopenedPage.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: startupTimeout })
   await dismissStartup(reopenedPage)
-  const reopenedAlternateSessionId = await createSessionInWorkspace(reopenedPage, workspaceId)
+  const reopenedAlternateSessionId = await createFixtureFreshSession(reopenedPage, workspaceId, canonicalWorkspacePath)
   assert.notEqual(reopenedAlternateSessionId, sessionId,
     'snapshot observation must start from a different session, not the automatically restored selection')
   assert.equal(await reopenedPage.getByRole('paragraph').filter({ hasText: finalText }).count(), 0,
@@ -478,6 +505,30 @@ try {
       expanded: row.getAttribute('aria-expanded'), text: row.textContent?.slice(0, 100),
       buttons: [...row.querySelectorAll('button')].map(button => button.getAttribute('aria-label')),
     })),
+    composers: [...document.querySelectorAll('[data-composer-card]')].map(card => ({
+      sessionId: card.closest('[data-conversation-session]')?.getAttribute('data-conversation-session'),
+      visible: Boolean(card.getClientRects().length),
+      inputs: [...card.querySelectorAll('textarea, [contenteditable="true"]')].map(input => ({
+        visible: Boolean(input.getClientRects().length),
+        characters: (input.value ?? input.textContent ?? '').length,
+        disabled: input.disabled ?? input.getAttribute('aria-disabled'),
+      })),
+      buttons: [...card.querySelectorAll('button')].map(button => ({
+        name: button.getAttribute('aria-label'), text: button.textContent?.slice(0, 120),
+        disabled: button.disabled, visible: Boolean(button.getClientRects().length),
+        hit: (() => {
+          const box = button.getBoundingClientRect()
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+          return hit ? { tag: hit.tagName, name: hit.getAttribute('aria-label'),
+            classes: typeof hit.className === 'string' ? hit.className : '',
+            isButton: hit === button || button.contains(hit), text: hit.textContent?.slice(0, 160) } : null
+        })(),
+      })),
+    })),
+    dialogs: [...document.querySelectorAll('[role="dialog"], #dsh-desktop-star-prompt')]
+      .filter(dialog => dialog.getClientRects().length).map(dialog => ({
+        label: dialog.getAttribute('aria-label'), text: dialog.textContent?.slice(0, 600),
+      })),
   })).catch(() => undefined)))
   const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
   console.error(JSON.stringify({
@@ -503,6 +554,7 @@ try {
   }, null, 2))
   throw error
 } finally {
+  await restoreCompanionPreference?.(app?.windows().find(candidate => candidate.url().startsWith('dsh-runtime://app/')))
   await app?.close()
   await new Promise(resolveClose => server.close(resolveClose))
   if (process.env.DSH_DESKTOP_KEEP_E2E === '1') console.error(`preserved E2E state: ${temporary}`)

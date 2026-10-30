@@ -233,7 +233,7 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         },
         async openDesktopSurface(surface, options) {
             if (surface === 'extensions' && typeof bridge?.openExtensionDock === 'function') {
-                if (options?.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage'].includes(options.setting)) {
+                if (options?.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(options.setting)) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Unsupported Extension Dock setting');
                 }
                 if (options?.tab !== undefined && !['plugins', 'market', 'skills'].includes(options.tab)) {
@@ -241,6 +241,11 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
                 }
                 if (options?.setting !== undefined && options?.tab !== undefined) {
                     throw new DesktopClientError('desktop-invalid-argument', 'Extension Dock navigation accepts one target');
+                }
+                if (options?.plugin !== undefined && (options.setting !== 'plugin-options'
+                    || typeof options.plugin !== 'string' || options.plugin.length > 214
+                    || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/u.test(options.plugin))) {
+                    throw new DesktopClientError('desktop-invalid-argument', 'Invalid Extension Dock plugin owner');
                 }
                 if (!await hasBridgeCapability('extensions.open'))
                     return false;

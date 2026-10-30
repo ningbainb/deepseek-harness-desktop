@@ -4,7 +4,7 @@
 
 > 移动端远程控制 + 一键远程更新：扫码配对后用手机远程使用当前 dsh web 工作区；点击侧边栏更新按钮自动检查并更新 dsh-web-ui 全家桶。
 
-本仓库是 DeepSeek Harness（DSH）的外部插件包：为 dsh web GUI 提供扫码配对式移动端远程控制，外加 dsh-web-ui 全家桶的一键自更新。它是单一双半区包——host 半区持有配对令牌、设备会话、`/api/pair` 路由族与 `/api/update` 面板；浏览器半区渲染侧边栏底部入口（下载触发按钮与设置按钮旁的手机图标）、带二维码的配对面板、实时设备状态，以及停止/刷新/复制操作，还渲染探测并执行更新的更新面板。
+本仓库是 DeepSeek Harness（DSH）的外部插件包：为 dsh web GUI 提供扫码配对式移动端远程控制，外加 dsh-web-ui 全家桶的一键自更新。它是单一双半区包——host 半区持有配对令牌、设备会话、`/api/pair` 路由族，默认还持有 `/api/update` 接口；浏览器半区渲染侧边栏底部入口（下载触发按钮与设置按钮旁的手机图标）、带二维码的配对面板、实时设备状态，以及停止/刷新/复制操作，还渲染探测并执行更新的更新面板。
 
 ## 功能
 
@@ -14,6 +14,23 @@
 - **安全**：一个有效的一次性令牌（刷新会使旧链接失效；已接受的令牌不可复用；令牌会过期）。停止会同步撤销每一台已配对设备与当前令牌，并立即关闭该设备的移动端实时流。当插件 `requirePairingForLan` 门开启（默认）时，每个非 loopback 的完整 `/api` 请求必须携带有效的已配对设备 cookie；默认 `remoteApiMode: mobile-only` 仍拒绝完整 `/api`，手机只进入逐请求做 Workspace/Session 归属检查的 `/m/api` 通道。
 - **实时状态**：桌面面板经 SSE 流实时镜像配对状态（等待 → 已连接 → 已断开）。
 - **远程更新**：侧边栏底部的下载触发按钮（手机图标左侧）打开更新面板，它探测 npm registry 上已安装的 `@linxin666/dsh-*` 全家桶版本。当存在较新版本时，面板自动执行更新（在所属 dsh profile 内 `pnpm update`；pnpm 缺失时依次回退 `corepack pnpm`、`npx --yes pnpm`，Windows 上经 `cmd.exe` 执行以解析 npm 安装的 `.cmd` shim；由仅 loopback 的 `/api/update/status` + `/api/update/run` 端点驱动）并请求重启 dsh web 以生效。本地 link 安装（开发模式）会被探测到，只报告 npm 状态而不更新。
+
+## 配置
+
+| 选项 | 默认值 | 契约 |
+| --- | --- | --- |
+| `embeddedUpdateRoutes` | `true` | 注册本插件的 `/api/update/status` 和 `/api/update/run`。profile 已挂载独立的 `@linxin666/dsh-update` 插件并由其独占这些路由时，设为 `false`。 |
+
+这是启动组合选项：修改后需重挂插件。独立安装默认保留内置更新能力。
+同时挂载 `dsh-update` 的 Desktop profile 必须在现有
+`web-ui-remote-web-ui` 节点设置 `embeddedUpdateRoutes: false`，保留节点
+其他配置和 `web-ui-update` 挂载。浏览器继续通过相同的 `/api/update/*`
+路径使用独立更新插件；配对和移动端路由仍可用。Desktop 原生应用更新是
+独立能力，不受此选项影响。
+
+路由 owner 校验保持严格：重复注册仍失败。remote 批量路由注册任一项
+失败时，已注册项目按逆序回滚；清理会尝试每个 disposer 并报告清理失败。
+更新接口的 loopback 围栏和配对授权规则保持原样。
 
 ## 截图
 

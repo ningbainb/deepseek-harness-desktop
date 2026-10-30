@@ -47,6 +47,20 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 
 const CORE_SUITES = [
+  ...(SOURCE_ONLY && process.platform === 'win32' ? [{
+    name: 'Release Plugins: Native Settings, Prompt Session Isolation and Visible Browser',
+    script: 'scripts/verify-release-plugins.mjs',
+    args: [],
+  }, {
+    name: 'All Skins: Native Footer Geometry and Reachable Collapsed Actions',
+    script: 'scripts/verify-sidebar-footer.mjs',
+    args: [],
+  }] : []),
+  {
+    name: 'Prediction Shortcut Layout and Visibility (Isolated Chromium Component)',
+    script: 'scripts/verify-prediction-hint-layout.mjs',
+    args: [],
+  },
   {
     name: 'Background Tray Residency, Restoration, Restart and Safe Quit',
     script: 'scripts/verify-background-residency.mjs',
@@ -72,6 +86,11 @@ const CORE_SUITES = [
     script: 'scripts/verify-native-plugin-pages.mjs',
     args: [],
   },
+  ...(process.platform === 'win32' ? [{
+    name: 'Browser Control One-shot Approval under Full Filesystem Permission',
+    script: 'scripts/verify-control-approval.mjs',
+    args: [],
+  }] : []),
   {
     name: 'Settings Availability Before Slow Resources Complete',
     script: 'scripts/verify-settings-readiness.mjs',
@@ -204,6 +223,10 @@ const CORE_SUITES = [
       'test/runtime-pipe-framing.test.mjs',
       'test/runtime-history-transport.test.mjs',
       'test/pet-client-polling.test.mjs',
+      'test/usage-foot-card.test.mjs',
+      'test/maid-hook-handoff.test.mjs',
+      'test/skin-asset-refresh.test.mjs',
+      'test/packaged-browser-owners.test.mjs',
       'test/pet-installed-canvas.test.mjs',
       'test/model-capabilities-installed.test.mjs',
       'test/async-page-predicate.test.mjs',
@@ -212,6 +235,8 @@ const CORE_SUITES = [
       'test/regression-process-lifecycle.test.mjs',
       'test/bai-host-probe.test.mjs',
       'test/native-browser-session-fixture.test.mjs',
+      'test/native-session-blank-fixture.test.mjs',
+      'test/skill-market-local-sources.test.mjs',
       'test/sidebar-sdk-contract.test.mjs',
       'test/runtime-sdk-cohort.test.mjs',
       'test/runtime-wire-stream.test.mjs',
@@ -248,6 +273,11 @@ const CORE_SUITES = [
 ]
 
 const PACKAGED_SUITES = [
+  ...(process.platform === 'win32' ? [{
+    name: 'Packaged Browser: Normal Main, Trusted Self EXE, Visible DOM and Cookie Isolation',
+    script: 'scripts/verify-packaged-release-browser.mjs',
+    args: [],
+  }] : []),
   {
     name: 'Real Plugin-owned Configuration, Detail Click and Persisted Options',
     script: 'scripts/verify-plugin-options.mjs',

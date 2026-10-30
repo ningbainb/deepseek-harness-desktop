@@ -11,6 +11,28 @@ const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/p
 const source = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
 const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
 
+test('bundled release plugins expose their original configuration through the native capability catalog', () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const selected = []
+  const context = vm.createContext({ document: dom.window.document, nativePluginGrid: dom.window.document.querySelector('#native-plugin-grid'),
+    escapeHtml: value => String(value), activateTab: (...args) => selected.push(args),
+  })
+  vm.runInContext(section('const NATIVE_PLUGINS =', 'let currentNativeCategory'), context)
+  const owners = ['@local/dsh-prompt-pilot', 'dsh-builtin-browser', '@linxin666/dsh-release-plugin-adapter']
+  const markup = vm.runInContext('NATIVE_PLUGINS.map(item => nativePluginMarkup(item, { version: "fixture" })).join("")', context)
+  dom.window.document.querySelector('#native-plugin-grid').innerHTML = markup
+  vm.runInContext(section("nativePluginGrid?.addEventListener('click'", 'nativeSearch?.addEventListener'), context)
+  for (const owner of owners) {
+    const button = [...dom.window.document.querySelectorAll('[data-open-native-plugin-options]')].find(item => item.dataset.openNativePluginOptions === owner)
+    assert.ok(button, `native settings entry for ${owner}`)
+    button.click()
+    assert.equal(selected.at(-1)[0].id, 'plugin-options-tab')
+    assert.equal(selected.at(-1)[3], owner)
+  }
+  assert.equal(dom.window.document.querySelector('[data-id="pet"]') !== null, true, 'the existing companion remains listed')
+  dom.window.close()
+})
+
 test('skill market entry confirms only user navigation and leaves local skills intact on cancel', async () => {
   const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
   const selected = []

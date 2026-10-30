@@ -20,7 +20,7 @@ test('session log fixture reads and appends plain JSONL', async () => {
     await mkdir(directory, { recursive: true })
     await writeFile(path, '{"id":"session-plain"}\n')
     await appendSessionLogText(path, '{"seq":0}\n')
-    await waitForSessionLog(root, 'session-plain', 1_000)
+    assert.equal(await waitForSessionLog(root, 'session-plain', 1_000), path)
     assert.deepEqual(await findSessionLogs(root), [path])
     assert.equal(await readSessionLogText(path), '{"id":"session-plain"}\n{"seq":0}\n')
   } finally {
@@ -39,7 +39,7 @@ test('session log fixture reads every Zstandard frame and appends another frame'
       zstdCompressSync(Buffer.from('{"seq":0}\n')),
     ]))
     await appendSessionLogText(path, '{"seq":1}\n')
-    await waitForSessionLog(root, 'session-zstd', 1_000)
+    assert.equal(await waitForSessionLog(root, 'session-zstd', 1_000), path)
     assert.deepEqual(await findSessionLogs(root), [path])
     assert.equal(await readSessionLogText(path), '{"id":"session-zstd"}\n{"seq":0}\n{"seq":1}\n')
   } finally {

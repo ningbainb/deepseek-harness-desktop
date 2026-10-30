@@ -12,6 +12,7 @@ import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { SIDEBAR_TOOLS_SCRIPT } from '../src/sidebar-tools.mjs'
+import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -29,6 +30,7 @@ const paragraph = chunks.join('')
 const ending = '\n\n```js\nconst complete = true;\n```\n\nSTREAM-COMPLETE'
 let app
 let page
+let restoreCompanionPreference
 let requests = 0
 const modelRequests = []
 const promptRequests = []
@@ -105,7 +107,8 @@ async function launch() {
       DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_BETA_FIXTURE_KEY: 'synthetic-test-key' } })
   await useChineseFixtureLocale(app)
-  page = await app.firstWindow()
+  // Profile/package discovery can precede the first native window on a cold HDD.
+  page = await app.firstWindow({ timeout: 600_000 })
   page.setDefaultTimeout(60_000)
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
   await page.locator('[data-pane="sidebar"]').waitFor({ state: 'visible', timeout: 600_000 })
@@ -169,18 +172,97 @@ async function verifyContextHover(label) {
   const meter = page.locator('button[aria-haspopup="dialog"]').filter({ has: page.locator('svg[viewBox="0 0 14 14"]') })
   await meter.waitFor({ state: 'visible' })
   const initial = await meter.boundingBox()
+  await meter.evaluate(button => {
+    const dock = button.closest('[data-composer-dock]') ?? button.parentElement
+    const identities = new WeakMap(), records = []
+    let identity = 0, pointer
+    const identify = node => {
+      if (!node || typeof node !== 'object') return null
+      if (!identities.has(node)) identities.set(node, ++identity)
+      return identities.get(node)
+    }
+    const save = record => { records.push({ at: performance.now(), ...record }); if (records.length > 160) records.shift() }
+    const sample = () => {
+      const current = dock.querySelector('button[aria-haspopup="dialog"]:has(svg[viewBox="0 0 14 14"])')
+      const tooltip = current?.parentElement.querySelector('[role="tooltip"]')
+      const hint = dock.querySelector('[data-dsh-prompt-shortcut]')
+      const style = tooltip && getComputedStyle(tooltip)
+      const hit = pointer && document.elementFromPoint(pointer.x, pointer.y)
+      const record = { kind: 'sample', anchor: identify(current), originalAnchor: identify(button),
+        originalConnected: button.isConnected, dock: identify(dock), dockConnected: dock.isConnected,
+        currentDock: identify(document.querySelector('[data-conversation-session][data-phase="active"] [data-composer-dock]')),
+        rect: current?.getBoundingClientRect().toJSON(),
+        tooltip: identify(tooltip), tooltipRect: tooltip?.getBoundingClientRect().toJSON(),
+        visibility: style?.visibility, opacity: style?.opacity, display: style?.display,
+        animations: tooltip?.getAnimations().map(animation => ({ state: animation.playState, time: animation.currentTime })),
+        inlineStyle: tooltip?.getAttribute('style'),
+        hovered: current?.matches(':hover'), expanded: current?.getAttribute('aria-expanded'),
+        pointer, hit: identify(hit), hitTag: hit?.tagName, hitClass: hit?.className,
+        hintRect: hint?.getBoundingClientRect().toJSON(), hintDisplay: hint && getComputedStyle(hint).display,
+        hidden: document.hidden, focused: document.hasFocus() }
+      save(record)
+      return record
+    }
+    const onEvent = event => {
+      if ('clientX' in event) pointer = { x: event.clientX, y: event.clientY }
+      if ((event.target instanceof Node && dock.contains(event.target))
+        || (event.relatedTarget instanceof Node && dock.contains(event.relatedTarget))) save({ kind: event.type,
+        target: identify(event.target), related: identify(event.relatedTarget), pointer })
+    }
+    const eventTypes = ['pointermove', 'pointerover', 'pointerout', 'mouseover', 'mouseout', 'focusin', 'focusout']
+    for (const type of eventTypes) document.addEventListener(type, onEvent, true)
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations.slice(0, 8)) save({ kind: 'mutation', type: mutation.type,
+        target: identify(mutation.target), attribute: mutation.attributeName,
+        added: [...mutation.addedNodes].slice(0, 4).map(identify), removed: [...mutation.removedNodes].slice(0, 4).map(identify) })
+    })
+    observer.observe(dock, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
+    globalThis.betaContextHoverDiagnostic = { sample, dispose() {
+      observer.disconnect()
+      for (const type of eventTypes) document.removeEventListener(type, onEvent, true)
+      return records
+    } }
+    sample()
+  })
+  const samples = []
+  try {
   await meter.hover()
   await page.waitForTimeout(500)
-  const samples = []
   for (let index = 0; index < 25; index++) {
     const sample = await meter.evaluate(button => {
       const tooltip = button.parentElement.querySelector('[role="tooltip"]')
       const rect = button.getBoundingClientRect()
       const style = tooltip && getComputedStyle(tooltip)
-      return { top: rect.top, visible: Boolean(tooltip && style.visibility === 'visible' && Number(style.opacity) === 1),
-        scroll: button.closest('[data-conversation-scroll]').scrollTop }
+      return { left: rect.left, top: rect.top, visible: Boolean(tooltip && style.visibility === 'visible' && Number(style.opacity) === 1),
+        scroll: button.closest('[data-conversation-scroll]').scrollTop,
+        observation: globalThis.betaContextHoverDiagnostic?.sample() }
     })
+    if (!sample.visible || Math.abs(sample.top - initial.y) > 1 || Math.abs(sample.left - initial.x) > 1) {
+      try {
+      const diagnostic = await meter.evaluate(button => {
+        const tooltip = button.parentElement.querySelector('[role="tooltip"]')
+        const describe = element => {
+          const style = getComputedStyle(element)
+          return { tag: element.tagName, className: element.className, slot: element.getAttribute('data-slot'),
+            rect: element.getBoundingClientRect().toJSON(), visibility: style.visibility, opacity: style.opacity,
+            position: style.position, transform: style.transform, filter: style.filter,
+            backdropFilter: style.backdropFilter, overflow: style.overflow, pointerEvents: style.pointerEvents,
+            hovered: element.matches(':hover') }
+        }
+        const ancestors = []
+        for (let element = button; element; element = element.parentElement) ancestors.push(describe(element))
+        const rect = button.getBoundingClientRect()
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+        return { trigger: button.outerHTML, tooltip: tooltip?.outerHTML, tooltipStyle: tooltip && describe(tooltip),
+          ancestors, hit: hit?.outerHTML.slice(0, 4000),
+          dock: button.closest('[data-composer-dock]')?.outerHTML.slice(0, 24000),
+          viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio } }
+      })
+      await writeFile(join(output, `context-hover-failure-${label}.json`), JSON.stringify({ label, initial, samples, sample, diagnostic }, null, 2) + '\n')
+      } catch (diagnosticError) { console.error('Context hover failure capture failed:', diagnosticError.message) }
+    }
     assert.equal(sample.visible, true, `${label}: tooltip must stay visible without blinking`)
+    assert.ok(Math.abs(sample.left - initial.x) <= 1, `${label}: context trigger must not move horizontally: ${JSON.stringify(sample)}`)
     assert.ok(Math.abs(sample.top - initial.y) <= 1, `${label}: context trigger must not jump: ${JSON.stringify(sample)}`)
     samples.push(sample)
     await page.waitForTimeout(100)
@@ -191,6 +273,16 @@ async function verifyContextHover(label) {
   assert.equal(await meter.getAttribute('aria-expanded'), 'false')
   await page.mouse.move(400, 100)
   return { label, samples }
+  } finally {
+    try {
+      const records = await page.evaluate(() => {
+        const records = globalThis.betaContextHoverDiagnostic?.dispose()
+        delete globalThis.betaContextHoverDiagnostic
+        return records
+      })
+      await writeFile(join(output, `context-hover-trace-${label}.json`), JSON.stringify({ label, initial, samples, records }, null, 2) + '\n')
+    } catch (diagnosticError) { console.error('Context hover trace capture failed:', diagnosticError.message) }
+  }
 }
 
 async function switchFixtureSkin(active, sessionId) {
@@ -219,6 +311,7 @@ try {
       models: [{ id: 'beta-fixture', name: 'Beta Fixture', contextWindow: 100_000, maxTokens: 8000 }] } } },
   }))
   await launch()
+  restoreCompanionPreference = await useOriginalPetForTest(page)
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   page.on('request', request => {
@@ -249,7 +342,37 @@ try {
   await page.evaluate(() => {
     const originalQuery = document.querySelector
     const samples = [], queryOrigins = new Map()
-    let frame, previous, shimQueries = 0, partial = false, textUpdates = 0
+    const frameGaps = [], longFrames = [], longTasks = [], visibilityEvents = [], performanceObservationErrors = []
+    const supportedPerformanceEntries = PerformanceObserver.supportedEntryTypes ?? []
+    const collectPerformanceEntry = entry => {
+      const target = entry.entryType === 'long-animation-frame' ? longFrames : longTasks
+      target.push({ startTime: entry.startTime, duration: entry.duration, blockingDuration: entry.blockingDuration,
+        renderStart: entry.renderStart, styleAndLayoutStart: entry.styleAndLayoutStart,
+        scripts: entry.scripts?.slice(0, 8).map(script => ({ invoker: script.invoker, invokerType: script.invokerType,
+          sourceURL: script.sourceURL, sourceFunctionName: script.sourceFunctionName, duration: script.duration,
+          forcedStyleAndLayoutDuration: script.forcedStyleAndLayoutDuration, pauseDuration: script.pauseDuration })) })
+      if (target.length > 24) target.shift()
+    }
+    const timingObservers = []
+    for (const type of ['long-animation-frame', 'longtask']) if (supportedPerformanceEntries.includes(type)) {
+      let timingObserver
+      try {
+        timingObserver = new PerformanceObserver(list => list.getEntries().forEach(collectPerformanceEntry))
+        timingObserver.observe({ type })
+        timingObservers.push(timingObserver)
+      } catch (error) {
+        timingObserver?.disconnect()
+        performanceObservationErrors.push({ type, name: error.name, message: error.message })
+      }
+    }
+    const recordVisibility = event => {
+      visibilityEvents.push({ at: performance.now(), type: event.type, hidden: document.hidden, focused: document.hasFocus() })
+      if (visibilityEvents.length > 24) visibilityEvents.shift()
+    }
+    document.addEventListener('visibilitychange', recordVisibility)
+    window.addEventListener('focus', recordVisibility)
+    window.addEventListener('blur', recordVisibility)
+    let frame, previous, disposed = false, shimQueries = 0, partial = false, textUpdates = 0
     document.querySelector = function(selector) {
       if (selector === '[data-pane="sidebar"], [class*="sidebarCol"]') {
         shimQueries++
@@ -265,16 +388,40 @@ try {
       if (text.includes('片段001') && !text.includes('STREAM-COMPLETE')) partial = true
     })
     observer.observe(flow, { childList: true, characterData: true, subtree: true })
-    const tick = now => { if (previous !== undefined) samples.push(now - previous); previous = now; frame = requestAnimationFrame(tick) }
+    const tick = now => {
+      if (previous !== undefined) {
+        const duration = now - previous
+        samples.push(duration)
+        if (duration > 50) {
+          frameGaps.push({ startTime: previous, duration, hidden: document.hidden, focused: document.hasFocus() })
+          frameGaps.sort((left, right) => right.duration - left.duration)
+          if (frameGaps.length > 12) frameGaps.pop()
+        }
+      }
+      previous = now; frame = requestAnimationFrame(tick)
+    }
     frame = requestAnimationFrame(tick)
-    window.betaPerformance = { stop() {
+    const dispose = () => {
+      if (disposed) return
+      disposed = true
       cancelAnimationFrame(frame)
       observer.disconnect()
+      for (const timingObserver of timingObservers) {
+        timingObserver.takeRecords().forEach(collectPerformanceEntry)
+        timingObserver.disconnect()
+      }
+      document.removeEventListener('visibilitychange', recordVisibility)
+      window.removeEventListener('focus', recordVisibility)
+      window.removeEventListener('blur', recordVisibility)
       document.querySelector = originalQuery
+    }
+    window.betaPerformance = { dispose, stop() {
+      dispose()
       const sorted = [...samples].sort((left, right) => left - right)
       return { shimQueries, queryOrigins: Object.fromEntries(queryOrigins), partial, textUpdates, frames: samples.length,
         frameP50Ms: sorted[Math.floor(sorted.length * 0.5)], frameP95Ms: sorted[Math.floor(sorted.length * 0.95)],
-        maxFrameMs: Math.max(...samples) }
+        maxFrameMs: Math.max(...samples), timeOrigin: performance.timeOrigin,
+        supportedPerformanceEntries, performanceObservationErrors, frameGaps, longFrames, longTasks, visibilityEvents }
     } }
   })
   const composer = page.locator('[data-composer-card] [data-composer-input][contenteditable="true"]').first()
@@ -444,6 +591,10 @@ try {
   console.error(runtimeLog.slice(-5000))
   throw error
 } finally {
+  if (page && !page.isClosed()) await page.evaluate(() => window.betaPerformance?.dispose?.()).catch(error => {
+    console.error('Beta performance diagnostic cleanup failed:', error.message)
+  })
+  await restoreCompanionPreference?.(page)
   console.log('Beta fixture transport timeline', JSON.stringify({ cleanupStart: performance.now(), modelTimeline }))
   server.closeAllConnections()
   await new Promise(resolveClose => server.close(resolveClose))

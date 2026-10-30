@@ -1,65 +1,51 @@
-# DeepSeek Harness Desktop 5.1.0
+# DeepSeek Harness Desktop 5.2.0
 
 ## 中文
 
-[DeepSeek Harness Desktop 5.1.0](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) 已于 2026-10-25 15:09:51 UTC 三端同版发布。正式标签 `desktop-v5.1.0` 对应提交 `eb1223ddfee78eccadd76d8022501cd1806d9d3d`；[标签工作流 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851)的 Windows x64、macOS arm64、Linux x64 与发布 job 全部成功。五个公开安装文件已独立下载，实际字节大小、SHA-256、GitHub digest 与合并校验清单一致；Windows 更新 SHA-512 与公开 manifest 也已核验。
+5.2.0 正在完成发版前测试，尚未发布。公共官网与正式下载继续指向已发布的 5.1.0；各候选包的证据分别记录，不混用验收结果。
 
 ### 本次亮点
 
-5.1.0 使用官方 NPM Runtime/SDK `0.2.1-rc.2` 和 Electron `44.0.0`，通过 Desktop 适配与插件机制集成，不修改官方源码。重点是慢消费者下的完整流式输出、异步资源读取、安装恢复、技能市场的明确授权，以及更简洁的设置界面。macOS Preview 仅面向 Apple Silicon arm64、macOS 13 Ventura 及以上；Electron 44 已移除 macOS 12 支持，详见[安装边界](../macos-preview.zh.md)。
-
-- **流式背压**：按消费者实际读取确认推进发送，常规每流窗口为 64 帧、1 MiB 序列化数据；暂停后恢复保持顺序和完整内容，保留取消、导航与窗口销毁清理。允许一个超大历史项及最多一个预读项，不是全进程内存硬上限，也不截断历史或工具结果。
-- **异步资源与 HMR**：前端资源异步读取并合并同时到达的同文件读取，保留逐请求授权、SPA 回退、HEAD、缓存及 Windows 路径保护。热更新在依赖图刷新后及时重扫剩余变更，保留世代失效、并发四与非重叠扫描，不宣称消除磁盘扫描成本。
-- **安装目录与恢复**：逐项验证安装目录候选，失效安装键不遮蔽有效卸载注册路径，显式 `/D` 优先。注册表变更失败逐项恢复，保留备份、不覆盖外来替换项；安装器 include 顺序兼容真实 NSIS 严格编译。
-- **技能市场先确认**：保留本地 Skill Center、导入和目录入口；首次启用市场前说明本地进程、hooks 与已有 Agent 声明的执行风险，取消不修改配置。沿用明确保存的启停选择，反馈、翻译、自动更新和项目布局扫描默认关闭，需用户主动选择；翻译可能发送文档并产生模型费用，反馈可能创建公开 GitHub Issue。确认不是沙箱。
-- **来源事务恢复**：市场受管来源替换先获取、校验和暂存，再提交来源与状态；失败保留可恢复副本，保护本地及接管来源，不把界面请求超时误报为后台操作取消。
-- **简洁设置 UI**：去除拓展坞侧栏竖线、区域隔板、章节套框和重复装饰，用留白、字重与对齐组织内容，折叠解释性文字。保留全部 15 个导航、搜索、设置控件、高级详情、关键风险提示、选中态、键盘焦点和窄窗操作。
-- **只移除独立设置页宠物**：拓展坞/独立设置窗口不挂载浮动宠物或预留宠物栏；主会话宠物、其配置入口和既有配置保持可用。官方主聊天、历史会话、模型接入、bai 授权、第三方 API、Skills、插件、托盘与 15 套皮肤继续保留。
+- 官方 NPM Runtime/SDK 使用 `0.2.1-rc.4`；本次适配观察时它是 `next` 候选，`latest` 为 `0.2.1-rc.2`，不称为官方稳定版。保留官方皮肤默认值、用户已保存的皮肤、会话、模型提供方和扩展配置。
+- 集中修复桌面共用侧栏布局，针对所有皮肤出现的左下角空栏，保留底部功能入口与侧栏展开、折叠能力。
+- 接入 GitHub 插件合集中的预测下一句、鲸鱼娘全身桌宠与操控浏览器。三个原始 tgz 的大小与 SHA-256 均匹配公开资产；适配代码独立放在自有插件和桌面宿主中，不修改官方源码或原始插件压缩包。
+- 既有桌宠、AionUI、官方浏览器提供方、技能入口、第三方 API 和托盘驻留继续保留。浏览器增加受校验的专用子进程入口，避免打包后重复启动主工作台。
+- 桌宠自动避让输入区，保留用户原始位置，修复位置镜像异步乱序；修复 profile 合并时配对服务挂载和中断迁移恢复晚于配置读取的问题。机械盘冷启使用有界等待，避免过早重试。
+- 自定义供应商先确认首次 Key 保存再提交配置；写入失败时保留草稿并明确提示，避免留下没有 Key 的供应商。已经丢失且没有备份的 Key 仍需重新填写。
 
 ### 验证
 
-[正式标签运行 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851)在同一提交完成三端与发布门禁：Windows core 28/28、packaged-full 44/44，无 accepted failures 或豁免。Windows Desktop 单测 1943/1943、零跳过；macOS/Linux 各 1906 通过、37 项既有平台跳过、零失败（各 1943），scripts 三端均 213/213。
-
-一次性 Windows Runner 的真实 Setup 验证新装、4.3.0/5.0.0/5.0.1 分别升级至 5.1.0、同版覆盖、启动与重启、卸载及用户数据保全；升级前旧 provider/会话快照同时核对安装阶段字节与重启后运行时数据。macOS arm64 原生打包、完整性与启动冒烟通过；Linux x64 在 Ubuntu 22.04 原生 Runner 完成打包、沙箱与 Xvfb 启动验证，Ubuntu 24 历史记录不作为本版验收。详细结果见[正式发布档案](../archive/desktop-5.1.0-formal-release.md)；此前预检失败不倒填为成功，不拼接不同提交的结果。
-
-官网与文档使用正式标签 QA 的 Windows 隔离运行原图，见[来源与图片哈希](../screenshots/desktop-5.1.0/provenance.json)。Dock 深浅色图为宿主与真实子视图同窗原生采集，其他图分别标注主 WebContents 或内嵌设置页采集，不使用合成 diagnostic 或模拟模型会话冒充普通页。保留未配置状态和真实滚动截断，不表示全部控件同时可见，也不证明 macOS/Linux UI、物理设备、真人付费、全沙箱或断电回滚均已验收。不宣传普遍性能百分比，图片哈希不属于安装包校验和。
+Key 修复候选完成设置测试 354 项、源码核心回归 32 套和实际新包隔离验收 9 项，包括真实凭据写入拒绝、重启后模拟模型鉴权及 5.1.0 数据保全，见 [Key 修复验收记录](../archive/2026-10-29-custom-provider-credential-save-validation.md)。更早的皮肤、新插件及候选回归归 [初版适配记录](../archive/2026-10-26-desktop-5.2.0-local-validation.md)，不替代本轮发版前加固后的完整门禁。正式 Setup、macOS 和 Linux 原生预检尚须以同一冻结提交的运行记录为准；历史正式证据归 [5.1.0 发布档案](../archive/desktop-5.1.0-formal-release.md)。
 
 ### 下载与校验
 
-本版提供 Windows x64 EXE、macOS arm64 DMG/ZIP、Linux x64 AppImage/DEB，下载后核对同 Release 的 [SHA256SUMS.txt](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/SHA256SUMS.txt) 与 [release-manifest.json](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/release-manifest.json)。公开 Windows 安装包为 332,646,913 字节，SHA-256 为 `6cb86ddc8f93c8b61f29ec404f44660d9bc91acb99973d193b094e91db1d26f7`；其他资产及签名边界见[三端资产清单](release-manifest-all-platforms.json)。不复用内测包或 5.0.1 的哈希，发布与部署流程见[三端发布流程](desktop-release-workflow.md)。
+各本地候选的实际安装包大小、SHA-256 和签名状态保存在对应验收记录中；最终下载应核对同一构建产物的 `SHA256SUMS.txt` 与 `release-manifest.json`，不沿用较早候选或中间归档的哈希。5.2.0 尚未上传或正式发布；正式下载仍使用 [5.1.0 Release](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0)。
 
 ### 说明
 
-这是社区维护的开源桌面端，不是 DeepSeek 官方客户端。三端均未签名，macOS 未公证，macOS/Linux 保持 Preview。升级前备份重要会话与配置；已安装同号 5.1.0 本地内测包的用户须手动下载正式包覆盖安装，不承诺同号自动更新。正式构建保留匿名产品统计及退出机制，不采集对话、代码、路径、截图、模型密钥或账号凭据；诊断仅主动确认后本地导出，开发与测试不发送生产事件。已从公开 Windows Setup、macOS ZIP 与 Linux DEB 的实际载荷核实三端 `telemetry-config.json` 的正式 endpoint 和 `officialBuild: true`；没有提交生产事件或验收生产入库。原生 Runner 不代表所有物理设备、真实付费流程或断电回滚均已验收。
+这是社区维护的开源桌面宿主。所有适配只使用官方公开 NPM SDK 与 profile/Cordis patch 机制。Windows 本地结果仅代表本地 Windows；macOS 与 Linux 需要各自原生 GitHub Actions 验证。构建和测试使用隔离数据，保留匿名统计与退出选项，不向生产端点提交合成测试事件；本次适配不包含 NPM 发布、签名或自动正式发布。
 
 ## English
 
-[DeepSeek Harness Desktop 5.1.0](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) was published for all three platforms on 2026-10-25 at 15:09:51 UTC. Tag `desktop-v5.1.0` identifies commit `eb1223ddfee78eccadd76d8022501cd1806d9d3d`; Windows x64, macOS arm64, Linux x64 and publication jobs all succeeded in [tag workflow 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851). All five public installation files were independently downloaded; actual byte sizes, SHA-256 and GitHub digests match the combined receipt. Windows updater SHA-512 and the public manifest were also verified.
+5.2.0 is undergoing pre-release testing and is not published. The public website and stable downloads continue to identify 5.1.0; each candidate keeps its own acceptance evidence.
 
 ### Highlights
 
-5.1.0 uses official NPM Runtime/SDK `0.2.1-rc.2` and Electron `44.0.0`, integrated through Desktop adapters and plugins without modifying official sources. It focuses on complete output under slow consumption, asynchronous resource reads, installation recovery, informed market activation and clearer settings. macOS Preview targets Apple Silicon arm64 on macOS 13 Ventura or later; Electron 44 removes macOS 12 support. See the [installation boundary](../macos-preview.md).
-
-- **Streaming backpressure**: consumer-read acknowledgements advance transmission within a normal per-stream window of 64 frames and 1 MiB of serialized data. Pause/resume retains order and complete content, with cancellation, navigation and window-destruction cleanup. One oversized history item and at most one lookahead item are allowed; this is not a process-wide memory cap and does not truncate history or tool output.
-- **Async resources and HMR**: asynchronous frontend reads coalesce concurrent reads of the same file, retaining per-request authorization, SPA fallback, HEAD, caching and Windows path protection. HMR promptly rescans remaining changes after graph refresh, retaining generation invalidation, concurrency four and non-overlapping scans, not eliminating disk-stat costs.
-- **Installation and recovery**: installation candidates are validated individually so stale install keys do not mask valid uninstall paths; explicit `/D` wins. Failed registry changes are restored individually with backups and foreign-replacement protection. Installer include ordering supports actual strict NSIS compilation.
-- **Confirm market activation first**: local Skill Center, import and directory entries remain. First activation explains local-process, hook and existing Agent-declaration risks; cancellation does not change configuration. Explicit saved enable/disable choices survive. Feedback, translation, automatic updates and project-layout scanning default off and require user choice; translation may send documents and incur model charges, while feedback may create a public GitHub Issue. Confirmation is not a sandbox.
-- **Source transactions and recovery**: managed market-source replacements are acquired, validated and staged before source/state commit. Failures retain recoverable copies and protect local/adopted sources; a UI request timeout is not reported as cancellation of an ongoing host operation.
-- **Simpler settings**: whitespace, weight and alignment replace Dock sidebar rules, dividers, nested section frames and repeated decoration; explanatory prose folds away. All 15 destinations, search, settings controls, advanced details, critical risk notices, selection, keyboard focus and narrow-window operation remain.
-- **Pet exclusion only in dedicated settings**: Dock/settings windows mount neither the floating pet nor its reserved rail. The main conversation pet, its configuration entries and saved settings remain available. Official main chat, history, model access, bai authorization, independent APIs, Skills, plugins, tray behavior and all 15 skins remain.
+- Use public official NPM Runtime/SDK `0.2.1-rc.4`. At the adaptation observation it was the `next` candidate while `latest` was `0.2.1-rc.2`; this is not an official stable-runtime claim. Keep the official default skin and saved skin choices, conversations, providers and plugin preferences.
+- Address the shared Desktop sidebar layout behind the reported lower-left empty strip across skins while preserving footer actions and expanded or collapsed navigation.
+- Integrate Prompt Pilot, the full-body companion and the visible browser from the public GitHub plugin bundle. Original tarball sizes and SHA-256 digests match the release assets. Compatibility code remains separate from the immutable archives and official source.
+- Retain the existing companion, AionUI, official browser providers, skill controls, third-party API configuration and background residency. A validated browser subprocess entry prevents a packaged executable from launching another main workbench.
+- Keep companions clear of the composer without overwriting intended positions, and serialize asynchronous position mirrors. Restore pairing-service composition and recover interrupted migration before reading configuration. A bounded disk-startup budget avoids premature retries.
+- Confirm a new custom provider's first Key save before committing its configuration. A refused write retains the draft and shows a clear error rather than leaving a provider without its Key. An already lost Key with no backup still needs to be entered again.
 
 ### Verification
 
-[Formal tag run 40199647851](https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851) completed native platform and publication gates on the same commit: Windows core 28/28 and packaged-full 44/44 without accepted failures or waivers. Windows Desktop tests passed 1943/1943 with zero skips; macOS/Linux each passed 1906 with 37 existing platform skips and zero failures out of 1943. Scripts passed 213/213 on each platform.
-
-Disposable Windows Runner real Setup verified fresh installation, separate 4.3.0/5.0.0/5.0.1-to-5.1.0 upgrades, same-version overlays, startup/restart, uninstall and user-data preservation. Pre-upgrade provider/session snapshots checked installation-time bytes and runtime data after relaunch. Native macOS arm64 packaging, integrity and launch smoke passed; Linux x64 packaging, sandbox and Xvfb startup passed on an Ubuntu 22.04 native Runner, not historical Ubuntu 24 evidence. Detailed results are in the [formal release archive](../archive/desktop-5.1.0-formal-release.md). Earlier preflight failures remain failures; results from different commits are not combined.
-
-Website/docs images use original isolated Windows captures from formal tag QA; see [provenance and image hashes](../screenshots/desktop-5.1.0/provenance.json). Dock images capture the actual host and child together in one native window; main-WebContents and embedded-settings captures are separately identified. Diagnostic composites and simulated-model conversations are not ordinary-page promotion. Unconfigured states and real scroll-edge clipping remain visible, not all controls simultaneously. These images do not establish macOS/Linux UI, physical-device, real paid-flow, full-sandbox or power-loss rollback acceptance. No general percentage speedup is claimed; image hashes are not installer checksums.
+The Key-fix candidate passed 354 settings tests, 32 source-core suites and nine acceptance steps against the actual new package, including genuine credential-write refusal, authenticated simulated chat after restart and 5.1.0 data preservation. See the [Key-fix acceptance](../archive/2026-10-29-custom-provider-credential-save-validation.md). Earlier skin, plugin and candidate rounds remain in the [initial adaptation record](../archive/2026-10-26-desktop-5.2.0-local-validation.md) and do not certify the current release hardening. Production Setup, macOS and Linux native preflight still require one frozen commit's run evidence. Historical formal evidence remains in the [5.1.0 release archive](../archive/desktop-5.1.0-formal-release.md).
 
 ### Download and verification
 
-The Release provides Windows x64 EXE, macOS arm64 DMG/ZIP and Linux x64 AppImage/DEB. Verify [SHA256SUMS.txt](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/SHA256SUMS.txt) and [release-manifest.json](https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/release-manifest.json) from that same Release. The public Windows installer is 332,646,913 bytes with SHA-256 `6cb86ddc8f93c8b61f29ec404f44660d9bc91acb99973d193b094e91db1d26f7`; see the [three-platform asset receipt](release-manifest-all-platforms.json) for other assets and signature boundaries. Never reuse beta or 5.0.1 hashes. Publication and deployment procedures are in the [three-platform release guide](desktop-release-workflow.md).
+Each local candidate's acceptance record holds its actual installer size, SHA-256 and signature state. Verify final downloads against `SHA256SUMS.txt` and `release-manifest.json` from the same build; do not reuse an earlier candidate or intermediate archive's digest. 5.2.0 has not been uploaded or formally published. Stable downloads remain on the [5.1.0 Release](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0).
 
 ### Notice
 
-This is a community-maintained open-source application, not an official DeepSeek client. All platforms are unsigned, macOS is unnotarized and macOS/Linux remain Preview. Back up important conversations and configuration before upgrading. Users of a local beta already numbered 5.1.0 must manually download and overlay-install the formal package; same-version automatic updates are not promised. Official builds retain anonymous opt-out product metrics, excluding conversations, code, paths, screenshots, model keys and account credentials. Diagnostics are locally exported only after explicit consent; development/tests do not send production events. The actual public Windows Setup, macOS ZIP and Linux DEB payloads were inspected to verify their formal telemetry endpoint and `officialBuild: true` in `telemetry-config.json`; no production event was submitted and production ingestion was not verified. Native Runners do not establish acceptance on every physical device, real paid flows or power-loss rollback.
+This is a community-maintained open-source Desktop host. Adaptation uses the official public NPM SDK and profile/Cordis patches only. Local Windows results establish Windows behavior only; macOS and Linux require native GitHub Actions evidence. Isolated tests retain anonymous metrics and opt-out behavior without submitting synthetic production events. NPM publication, signing and automatic formal publication are outside this adaptation run.

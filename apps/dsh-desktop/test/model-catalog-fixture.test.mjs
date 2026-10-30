@@ -6,30 +6,50 @@ import { assertModelCatalogProjection, createModelPreferencesFixture } from '../
 
 const desktopRequire = createRequire(new URL('../package.json', import.meta.url))
 const baseRequire = createRequire(desktopRequire.resolve('@deepseek-ai/dsh-base/package.json'))
-const deepseek = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-llm-deepseek-api-key')).href)
+const adapterEntry = baseRequire.resolve('@deepseek-ai/dsh-llm-deepseek-api-key')
+const adapterRequire = createRequire(adapterEntry)
+const deepseek = await import(pathToFileURL(adapterEntry).href)
+const { Context } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/cordis')).href)
+const { ModelListingCache } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/dsh-llm-deepseek')).href)
 
 async function discoverDeepseekModels(context, fixture, withCredential = true) {
-  context.mock.method(globalThis, 'fetch', () => { throw new Error('fixture catalog discovery must stay offline') })
+  const offlineFetch = context.mock.method(globalThis, 'fetch', () => { throw new Error('fixture catalog discovery must stay offline') })
+  // No replacement implementation: Node's mock calls the real SDK disposer.
+  const disposal = context.mock.method(ModelListingCache.prototype, 'dispose')
   let adapter
   const environment = withCredential ? fixture.environment : {}
   const credentials = { resolve: async reference => environment[reference] === undefined
     ? undefined : { value: environment[reference], source: 'env' } }
-  const ctx = {
-    fiber: { entry: { options: { id: 'llm-deepseek' } } },
-    get: name => name === 'credentials' ? credentials : undefined,
-    inject: () => {},
-    on: () => {},
-    llm: {
-      registerConfigurableProviders: () => {},
-      registerAdapter: (providers, registered) => {
-        assert.deepEqual(providers, ['deepseek-official'])
-        adapter = registered
-        return { replace: () => {} }
-      },
+  const ctx = new Context()
+  ctx.provide('credentials', credentials)
+  ctx.provide('llm', {
+    registerConfigurableProviders: () => {},
+    registerAdapter: (providers, registered) => {
+      assert.deepEqual(providers, ['deepseek-official'])
+      adapter = registered
+      return { replace: () => {} }
     },
+  })
+  let activated = false
+  try {
+    deepseek.apply(ctx, deepseek.Config(fixture.settings['llm-deepseek'] ?? {}))
+    activated = true
+    assert.equal(disposal.mock.callCount(), 0, 'Keep the real listing cache alive until discovery settles')
+    return await adapter.listModels('deepseek-official')
+  } finally {
+    await ctx.fiber.dispose()
+    if (activated) {
+      assert.equal(disposal.mock.callCount(), 1, 'Real Context teardown must execute the SDK listing disposer')
+      const listing = disposal.mock.calls[0].this
+      assert.ok(listing instanceof ModelListingCache)
+      const before = listing.current()
+      await ctx.fiber.dispose()
+      assert.equal(disposal.mock.callCount(), 1, 'Repeated teardown must not replay the disposer')
+      assert.deepEqual(await listing.view({ url: 'http://127.0.0.1:9/models', timeoutMs: 100, maxAgeMs: 0 }), before,
+        'A disposed cache must not load or change its last published view')
+      assert.equal(offlineFetch.mock.callCount(), 0, 'Discovery and post-disposal access must remain offline')
+    }
   }
-  deepseek.apply(ctx, deepseek.Config(fixture.settings['llm-deepseek'] ?? {}))
-  return adapter.listModels('deepseek-official')
 }
 
 const catalog = count => ({ id: 'openai-codex', models: Array.from({ length: count }, (_, index) => ({ id: `model-${index}` })) })

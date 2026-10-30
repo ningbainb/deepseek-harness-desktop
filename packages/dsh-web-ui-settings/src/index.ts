@@ -25,6 +25,7 @@ import { ChatGptAuthorizationController } from './chatgpt-auth.ts'
 import { mountOnce } from './mount-once.ts'
 import { makeRelayRoutes, type RelayDefaultModel } from './relay-routes.ts'
 import { initializeRelayDefaultOnReady } from './relay-default-on-ready.ts'
+import { makeCustomProviderKeyPreflight } from './custom-provider-key-sdk-adapter.ts'
 
 /** Default environment variable holding the reverse-proxy shared token. */
 export const DEFAULT_PROXY_TOKEN_ENV = 'DSH_WEB_UI_SETTINGS_PROXY_TOKEN'
@@ -132,6 +133,8 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
   // guard so a remote browser cannot turn this into a general secret writer.
   ctx.inject(['settings', 'credentials'], (relayCtx) => {
     relayCtx.effect(() => {
+      const keyPreflight = makeCustomProviderKeyPreflight(relayCtx.credentials, access)
+      const unmountKeyPreflight = relayCtx.webServer.register(keyPreflight)
       const routes = makeRelayRoutes({
         settings: relayCtx.settings,
         credentials: relayCtx.credentials,
@@ -144,6 +147,8 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
           () => defaultCtx.logger.warn('web-ui-settings: bai initial default save failed')), 'web-ui-settings: first-user bai default')
       })
       return () => {
+        keyPreflight.dispose()
+        unmountKeyPreflight()
         routes.dispose()
         for (const dispose of disposers) dispose()
       }

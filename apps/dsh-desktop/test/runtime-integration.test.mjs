@@ -8,6 +8,7 @@ import test from 'node:test'
 import { chromium } from 'playwright'
 import afterPack from '../scripts/after-pack.cjs'
 import { dismissRuntimeOnboarding } from '../scripts/dismiss-onboarding-fixture.mjs'
+import { useOriginalPetForTest } from '../scripts/original-pet-preference-fixture.mjs'
 
 import { BoundedLogStore, sanitizeLogLine } from '../src/log-store.mjs'
 import {
@@ -722,6 +723,9 @@ test('official DSH host serves the complete desktop profile', { timeout: 360_000
     page.on('requestfinished', request => recordResource(request, 'finished'))
     page.on('requestfailed', request => recordResource(request, 'failed', request.failure()?.errorText))
     await page.goto(url, { waitUntil: 'domcontentloaded' })
+    // This scenario exercises the retained original companion explicitly;
+    // new-user defaults select the full-body companion in a separate gate.
+    await useOriginalPetForTest(page)
     const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
     try {
       await continueButton.waitFor({ state: 'visible', timeout: 5_000 })

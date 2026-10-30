@@ -15,7 +15,8 @@ import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
-const runtimeReadyTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS
+// Page readiness also includes cold profile projection before Runtime starts.
+const runtimeReadyTimeoutMs = Math.max(DEFAULT_STARTUP_TIMEOUT_MS, 600_000)
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
 const screenshot = screenshotArgument ? resolve(screenshotArgument) : undefined
 const temporary = await mkdtemp(resolve(tmpdir(), 'dsh-skill-discovery-e2e-'))
@@ -38,12 +39,14 @@ try {
   )
 
   electronApp = await electron.launch({
+    timeout: runtimeReadyTimeoutMs,
     executablePath: packagedExecutable || electronPath,
     args: packagedExecutable ? [] : [resolve(appDir, 'src', 'main.mjs')],
     cwd: appDir,
     env: {
       ...process.env,
       DSH_DESKTOP_DISABLE_UPDATES: '1',
+      DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1',
       DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_DESKTOP_USER_DATA: userData,
       DSH_HOME: dshHome,
@@ -51,7 +54,7 @@ try {
     },
   })
   await useChineseFixtureLocale(electronApp)
-  const page = await electronApp.firstWindow()
+  const page = await electronApp.firstWindow({ timeout: runtimeReadyTimeoutMs })
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
   } catch (error) {

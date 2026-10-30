@@ -14,6 +14,7 @@ import { buildSystemPromptGuidance, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_
 import { createConsultExpertTool } from "./core/expert.js";
 import { valueModeState } from "./core/state.js";
 import { assessValueModeHealth } from "./core/model-selection.js";
+import { routedCallConfig } from "./core/routed-call.js";
 import { emitValueModeRuntimeTelemetry, routeErrorType, routeParameters } from "./core/runtime-telemetry.js";
 import { dshHome } from "./dsh-home.js";
 import { syncPresetTrees } from "./sync.js";
@@ -160,12 +161,7 @@ export function apply(ctx, initialConfig = {}) {
         emitValueModeRuntimeTelemetry({
             event: 'cost_mode_route', params, timestamp: new Date().toISOString(),
         });
-        return {
-            ...resolved,
-            provider: route.provider,
-            model: route.model,
-            ...(route.reasoningEffort ? { reasoningEffort: route.reasoningEffort } : {}),
-        };
+        return routedCallConfig(resolved, route, ctx.llm, payload.signal);
     });
     ctx.on('agent/request-error', async (payload, next) => {
         const key = requestKey(payload);

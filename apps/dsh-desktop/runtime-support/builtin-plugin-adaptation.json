@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "policy": "desktop-first",
-  "runtimeVersion": "0.2.1-rc.2",
+  "runtimeVersion": "0.2.1-rc.4",
   "notes": [
-    "The selection records the candidate Desktop packages resolved with official DSH 0.2.1-rc.2; interactive acceptance is recorded separately.",
+    "The selection records Desktop 5.2.0 candidate packages targeting official NPM DSH 0.2.1-rc.4 (next); interactive acceptance is recorded separately.",
     "Public registry snapshots below are historical and must be refreshed before a new package upgrade decision.",
     "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts; validation.results records executed checks separately.",
     "A selected version is not a packaged or user-data migration acceptance result."
@@ -23,7 +23,11 @@
       "@linxin666/dsh-usage",
       "@linxin666/dsh-session-archive",
       "@tencent-connect/dsh-qqbot",
-      "reasoning-slider"
+      "reasoning-slider",
+      "@local/dsh-prompt-pilot",
+      "dsh-dafeiyu-pet",
+      "dsh-builtin-browser",
+      "@linxin666/dsh-release-plugin-adapter"
     ],
     "dependencyOnly": [
       "@linxin666/dsh-client-ui-mode-switcher",
@@ -112,6 +116,38 @@
   },
   "plugins": [
     {
+      "name": "@linxin666/dsh-release-plugin-adapter",
+      "selection": { "version": "0.1.0", "source": "workspace", "path": "packages/dsh-release-plugin-adapter" },
+      "publicSnapshot": { "status": "not-found", "checkedAt": "2026-10-26T14:34:56.1246129Z", "url": "https://registry.npmjs.org/@linxin666%2Fdsh-release-plugin-adapter" },
+      "reason": "Keep release-specific SDK adaptation in a private workspace package, separate from immutable plugin tarballs and the official Runtime.",
+      "desktopContracts": ["Profile and Cordis patch mounting only", "Actionable prerequisite status without claiming behavioral acceptance", "Independent additional-pet settings preserve existing configuration"],
+      "validation": { "automatedChecks": ["packages/dsh-release-plugin-adapter/tests/contracts.spec.ts", "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts"], "desktopAcceptance": ["Open and operate release plugin settings in the actual isolated Desktop, then restart and verify persistence."], "results": [] }
+    },
+    {
+      "name": "@local/dsh-prompt-pilot",
+      "selection": { "version": "1.2.3", "source": "vendor", "path": "vendor/plugins-20261026/dsh-prompt-pilot-1.2.3.tgz", "sha256": "9941974e4175a2854b54a09a6966bde1cd2c9557e407b70b2e66ba7274fb0d2a", "patch": "patches/@local__dsh-prompt-pilot@1.2.3.patch" },
+      "publicSnapshot": { "status": "available", "latest": "1.2.3", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "reason": "Preserve the verified public tarball and mount prediction through the official SDK profile; share the reviewed Zod identity with the Runtime.",
+      "desktopContracts": ["Predictions belong to the current conversation", "Tab acceptance preserves typed input and composition", "Existing skill and attachment controls remain available"],
+      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "packages/dsh-release-plugin-adapter/tests/contracts.spec.ts"], "desktopAcceptance": ["Configure prediction, generate a real simulated-model suggestion, accept and cancel it, and change conversations without leaking stale text."], "results": [] }
+    },
+    {
+      "name": "dsh-dafeiyu-pet",
+      "selection": { "version": "0.2.0", "source": "vendor", "path": "vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz", "sha256": "9759c153bef8b95284a380cddfa3d686d86aef4d5a28e2c00619f0d203d8b39e", "patch": "patches/dsh-dafeiyu-pet@0.2.0.patch" },
+      "publicSnapshot": { "status": "available", "latest": "0.2.0", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "reason": "Ship the verified additional companion without replacing the existing Desktop pet or its saved preferences; keep independent settings windows free of floating pets.",
+      "desktopContracts": ["Preserve existing companion configuration", "Independent visibility and settings entry", "Widget assets and data stay profile-scoped", "Desktop off-first and independent settings create no widget resources", "Closing aborts pending requests and disposes widget-owned resources without changing global APIs", "Re-enabling mounts one instance and preserves vendor preferences and the original pet", "Only explicit absent-key and logged-out account results are unconfigured; other failures retain warnings and retry"],
+      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts", "packages/dsh-release-plugin-adapter/tests/dafeiyu-lifecycle.test.mjs"], "desktopAcceptance": ["Show and hide the new companion, reopen its controls and restart while preserving the original pet and settings usability.", "After installing the community patch, verify off/on/off/on and independent settings produce no hidden widget requests or console warnings in the isolated native Desktop."], "results": [] }
+    },
+    {
+      "name": "dsh-builtin-browser",
+      "selection": { "version": "0.4.14", "source": "vendor", "path": "vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz", "sha256": "3f37f0664288a8ce2ec9c01d9d763d68bf5454e642cbd4a153fac27d2dc70f2a" },
+      "publicSnapshot": { "status": "available", "latest": "0.4.14", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "reason": "Mount the published browser and its tools through the profile; use the trusted installed host entry before Desktop single-instance startup instead of downloading a second Electron runtime.",
+      "desktopContracts": ["Authenticated visible browser host", "Preserve official browser providers and existing AionUI", "Keep settings, isolated sessions and durable cookies"],
+      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "apps/dsh-desktop/test/browser-host-bootstrap.test.mjs"], "desktopAcceptance": ["Open a visible browser, navigate and exercise DOM tools, then close and restart without losing its persisted session configuration."], "results": [] }
+    },
+    {
       "name": "dsh-agent-plugins-market",
       "selection": { "version": "0.11.1", "source": "npm", "patch": "patches/dsh-agent-plugins-market@0.11.1.patch" },
       "publicSnapshot": {
@@ -137,7 +173,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-agent-team",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -165,7 +201,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-agent-team-profile",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -196,7 +232,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-tool-agent-team",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1022,22 +1058,24 @@
     {
       "name": "@linxin666/dsh-usage",
       "selection": {
-        "version": "0.4.4",
-        "source": "npm"
+        "version": "0.4.10",
+        "source": "npm",
+        "patch": "patches/@linxin666__dsh-usage@0.4.10.patch"
       },
       "publicSnapshot": {
         "status": "available",
-        "latest": "0.3.20",
-        "checkedAt": "2026-09-12T07:04:27.856Z",
+        "latest": "0.4.10",
+        "checkedAt": "2026-10-26T17:38:01.630Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-usage/latest"
       },
-      "reason": "Select 0.4.4 for the new Runtime; real provider billing data remains a separate acceptance step.",
+      "reason": "Select the published rc.4-compatible 0.4.10 settings navigation and retain ledger/configuration identities. Cache the live footer through a reviewed Desktop patch; actual billing reconciliation remains separate acceptance.",
       "desktopContracts": [
         "Usage view and current SDK mounts"
       ],
       "validation": {
         "automatedChecks": [
-          "apps/dsh-desktop/test/profile.test.mjs"
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/usage-foot-card.test.mjs"
         ],
         "desktopAcceptance": [
           "Compare displayed usage with one configured provider response."
@@ -1303,7 +1341,7 @@
     {
       "name": "@deepseek-ai/dsh-browser-use",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1331,7 +1369,7 @@
     {
       "name": "@deepseek-ai/dsh-computer-use",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1359,7 +1397,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1386,7 +1424,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1413,7 +1451,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-runtime",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1440,7 +1478,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1467,7 +1505,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1494,7 +1532,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
       "selection": {
-        "version": "0.2.1-rc.2",
+        "version": "0.2.1-rc.4",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1531,7 +1569,7 @@
         "checkedAt": "2026-09-18T00:49:19.000Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-web-all/latest"
       },
-      "reason": "Use the publicly published 0.4.4 carrier for the official 0.2.0-rc.2 Runtime. Keep the archived alpha cohort provenance and preserve Desktop-only loaders and user configuration through the Profile patch.",
+      "reason": "Retain the published 0.4.4 carrier and its archived alpha cohort provenance while Desktop-owned SDK/Profile adapters target official 0.2.1-rc.4. Preserve Desktop-only loaders and user configuration; current interactive acceptance is recorded separately.",
       "desktopContracts": [
         "One aggregate owns each shared web-ui loader ID",
         "Nine Desktop-only loader rows and saved disable overrides survive",

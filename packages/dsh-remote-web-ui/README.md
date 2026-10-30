@@ -9,7 +9,7 @@ This repository is an external plugin package for DeepSeek Harness (DSH):
 scan-to-pair mobile remote control for the dsh web GUI, plus a one-click
 self-update for the dsh-web-ui family. It is a single dual-face package — the
 host half owns pairing tokens, device sessions, the `/api/pair` route family,
-and the `/api/update` surface; the browser half renders the sidebar-foot
+and, by default, the `/api/update` surface; the browser half renders the sidebar-foot
 entries (the download trigger and the phone icon beside the settings button),
 the pairing panel with a QR code, live device status, and stop/refresh/copy
 actions, and the update panel that probes and runs the update.
@@ -51,6 +51,26 @@ actions, and the update panel that probes and runs the update.
   a dsh web restart to pick it up. Local
   link installs (development mode) are detected and report the npm state
   without updating.
+
+## Configuration
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `embeddedUpdateRoutes` | `true` | Register this plugin's `/api/update/status` and `/api/update/run`. Set `false` when the profile mounts the dedicated `@linxin666/dsh-update` plugin as their sole owner. |
+
+This is a startup composition option: changing it requires remounting the
+plugin. Standalone installations keep the embedded updater by default. A
+Desktop profile that also mounts `dsh-update` must set
+`embeddedUpdateRoutes: false` on its `web-ui-remote-web-ui` node, preserving
+the existing node configuration and the `web-ui-update` mount. The browser
+continues to use the same `/api/update/*` paths through the dedicated owner;
+pairing and mobile routes remain available. Desktop's native application
+updater is a separate capability and is unaffected.
+
+Route ownership stays strict: duplicate registrations fail. If any route in
+the remote batch fails to register, earlier registrations are rolled back in
+reverse order; cleanup attempts every disposer and reports cleanup failures.
+The loopback update fence and pairing authorization rules are unchanged.
 
 ## Screenshots
 

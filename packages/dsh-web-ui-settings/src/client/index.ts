@@ -26,6 +26,7 @@ import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
 import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { DockSettingsOutlet, mirrorDockSlot } from './dock-slot-mirror.tsx'
+import { createPluginOptionsDirectory } from './plugin-options-directory.ts'
 import { projectCopy } from './ProjectDialog.tsx'
 import { installBrowserClose, installProjectDialog } from './desktop-interactions.tsx'
 import { protectDirectoryEditorFocus } from './directory-editor-focus.ts'
@@ -34,6 +35,7 @@ import { installAccountRelayRecommendation } from './account-relay-recommendatio
 import { installDesktopLinkOpening } from './desktop-link-opening.ts'
 import { installDesktopSkillsCommand } from './desktop-skills-command.ts'
 import { installDesktopUsageNavigation } from './desktop-usage-navigation.ts'
+import { confirmCustomProviderKey, installCustomProviderKeyPersistence } from './custom-provider-key-persistence.ts'
 import { CommunityPluginsSettingsCard } from './CommunityPluginsSettingsCard.tsx'
 import {
   chatGptAuthEn,
@@ -119,6 +121,13 @@ export function apply(ctx: ClientContext): void {
   }
   ctx.effect(() => ctx.locale.register('desktop-project', projectCopy), 'web-ui-settings: project dictionaries')
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
+  const desktopHost = window as Window & { dshDesktop?: unknown; dshDesktopTransport?: unknown }
+  if (desktopHost.dshDesktop || desktopHost.dshDesktopTransport) {
+    ctx.effect(() => installCustomProviderKeyPersistence(document, {
+      translate: ctx.locale.bind('web-ui-plugins'),
+      saveAndConfirm: confirmCustomProviderKey,
+    }), 'web-ui-settings: persist custom provider key before profile creation')
+  }
   ctx.effect(() => ctx.locale.register('chatgpt-auth', { zh: chatGptAuthZh, en: chatGptAuthEn }), 'web-ui-settings: ChatGPT dictionaries')
   ctx.effect(() => ctx.locale.register('relay-onboarding', { zh: relayZh, en: relayEn }), 'web-ui-settings: relay dictionaries')
   ctx.effect(() => installRelayModelEntrances(document, ctx.locale.bind('relay-onboarding')), 'web-ui-settings: relay model entrances')
@@ -219,10 +228,7 @@ export function apply(ctx: ClientContext): void {
         priority: -100,
         locale: 'web-ui-plugins',
         children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' }, 'desktop-dock.settings.section': { kind: 'list', scope: 'root' }, 'desktop-dock.plugins.row.config': { kind: 'keyed', scope: 'root' } },
-        inject: () => ({ pluginOptions: {
-          keys: () => ctx.slots.entriesOfSlot('plugins.row.config').flatMap(entry => typeof entry.options.key === 'string' ? [entry.options.key] : []),
-          subscribe: (listener: () => void) => ctx.slots.subscribe('plugins.row.config', listener),
-        } }),
+        inject: () => ({ pluginOptions: createPluginOptionsDirectory(ctx.slots) }),
       }, DockSettingsOutlet)
       const cleanups: Array<() => void> = [disposePage]
       try {

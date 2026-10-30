@@ -12,6 +12,45 @@ vi.mock('../src/client/components/ExplorerPanel.tsx', () => ({ ExplorerPanel: ()
 vi.mock('../src/client/preview/PreviewPanel.tsx', () => ({ PreviewPanel: () => <button data-preview-probe>Preview</button> }))
 afterEach(() => { panelFailure.explorer = false; document.body.innerHTML = ''; localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
+it('keeps optional columns in the content row without creating a trailing row after the native shell footer', () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const shell = document.createElement('div')
+  shell.dataset.dshFrame = ''
+  shell.style.gridTemplateColumns = '280px minmax(0px, 1fr) minmax(0px, 0px)'
+  shell.style.gridTemplateRows = 'minmax(0, 1fr) auto'
+  shell.getBoundingClientRect = () => ({ width: 1400, height: 800 } as DOMRect)
+  for (const name of ['sidebar', 'center', 'rightbar']) {
+    const column = document.createElement('div')
+    column.dataset[`${name}Col`] = ''
+    shell.append(column)
+  }
+  const bottom = document.createElement('div')
+  bottom.dataset.shellBottom = ''
+  bottom.style.gridColumn = '1 / -1'
+  shell.append(bottom)
+  document.body.append(shell)
+  const store = createLayoutStore()
+  store.update(previous => ({ ...previous, root: '/content-row', explorerCollapsed: false, previewOpen: true }))
+  const layout = new PanelLayoutController(store, vi.fn())
+  layout.setNativeAvailable(true)
+  layout.mount()
+  try {
+    const preview = shell.querySelector<HTMLElement>('[data-aionui-preview-col]')!
+    const explorer = shell.querySelector<HTMLElement>('[data-aionui-explorer-col]')!
+    for (const native of [true, false, true]) {
+      layout.setNativeAvailable(native)
+      expect([preview.style.gridRow, preview.style.gridColumn]).toEqual(['1', '4'])
+      expect([explorer.style.gridRow, explorer.style.gridColumn]).toEqual(['1', '5'])
+      expect(shell.style.gridTemplateRows).toBe('minmax(0, 1fr) auto')
+      expect(bottom.style.gridColumn).toBe('1 / -1')
+      expect(preview.isConnected && explorer.isConnected).toBe(true)
+    }
+  } finally { layout.dispose() }
+  expect(shell.querySelector('[data-aionui-preview-col]')).toBeNull()
+  expect(shell.querySelector('[data-aionui-explorer-col]')).toBeNull()
+  expect(bottom.isConnected).toBe(true)
+})
+
 it('gives an available native sidebar the initial layout without opening tabs or rewriting saved tools', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   const shell = document.createElement('div')

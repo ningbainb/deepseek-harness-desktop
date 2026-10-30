@@ -11,12 +11,12 @@ import {
   resolveDshCliPath,
   setAgentTeamProfileEnabled,
 } from '../src/profile.mjs'
-import { DshRuntimeController } from '../src/runtime-controller.mjs'
+import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from '../src/runtime-controller.mjs'
 
 // Actual official Host composition in an isolated Home, with no model request.
 // Creating a session forces Agent-scoped tool registration and catches the
 // duplicate tool-name failure that the official Agent Team profile replaces.
-test('Agent Team switch composes and creates an Agent session in the official runtime', { timeout: 180_000 }, async () => {
+test('Agent Team switch composes and creates an Agent session in the official runtime', { timeout: DEFAULT_STARTUP_TIMEOUT_MS + 60_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-agent-team-runtime-'))
   const logs = new BoundedLogStore({ directory: join(root, 'logs') })
   const profileDir = join(root, 'profiles', 'desktop')
@@ -33,7 +33,7 @@ test('Agent Team switch composes and creates an Agent session in the official ru
       cwd: process.cwd(),
       dshHome: root,
       logStore: logs,
-      startupTimeoutMs: 120_000,
+      startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
     })
     const url = await controller.start()
     const exchange = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5_000) })

@@ -12,6 +12,7 @@ import { parseDocument } from 'yaml'
 import { Context } from '@deepseek-ai/cordis'
 import { runPackagedDesktop } from './packaged-smoke-runner.mjs'
 import { readSessionLogText } from './session-log-fixture.mjs'
+import { createInstalledUpgradeFixture } from './installed-upgrade-state-fixture.mjs'
 
 const require = createRequire(import.meta.url)
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
@@ -86,7 +87,7 @@ async function homeSessionState(dshHome) {
 }
 
 async function snapshotUpgradeHome(dshHome, snapshotDirectory) {
-  const paths = ['settings.yaml', 'settings.yaml.imported', 'cordis.patch.yml', 'cordis.yml',
+  const paths = ['settings.yaml', 'settings.yaml.imported', 'cordis.patch.yml', 'cordis.yml', '.credentials.yaml',
     join('profiles', 'desktop', 'package.json'), join('profiles', 'desktop', 'cordis.patch.yml'), join('profiles', 'desktop', 'cordis.yml')]
   const files = []
   for (const path of paths) {
@@ -96,7 +97,7 @@ async function snapshotUpgradeHome(dshHome, snapshotDirectory) {
   const state = await homeSessionState(dshHome)
   files.push(...state.files)
   const patch = await readFile(join(dshHome, 'profiles', 'desktop', 'cordis.patch.yml'))
-  const providers = profileProviders(settingsDocument(patch).toJS())
+  const providers = await activeProviders(dshHome, patch)
   if (snapshotDirectory) {
     for (const file of files) {
       const target = join(snapshotDirectory, file.path)
@@ -104,7 +105,17 @@ async function snapshotUpgradeHome(dshHome, snapshotDirectory) {
       await writeFile(target, file.bytes, { flag: 'wx' })
     }
   }
-  return { dshHome, files, providers, sessions: state.sessions }
+  const credentialFile = files.find(file => file.path === '.credentials.yaml')
+  const credentials = credentialFile ? settingsDocument(credentialFile.bytes).toJS() : undefined
+  return { dshHome, files, providers, sessions: state.sessions, credentials }
+}
+
+export { snapshotUpgradeHome as snapshotInstalledUpgradeHome }
+
+async function activeProviders(dshHome, patch) {
+  const home = settingsDocument(await optionalBytes(join(dshHome, 'settings.yaml')), '{}\n').toJS()
+  const rootPatch = settingsDocument(await optionalBytes(join(dshHome, 'cordis.patch.yml')), '[]\n').toJS()
+  return { ...home?.['llm-pi-ai']?.providers, ...profileProviders(settingsDocument(patch).toJS()), ...profileProviders(rootPatch) }
 }
 
 async function assertUpgradeInstallationPreserved(snapshot) {
@@ -125,8 +136,16 @@ function assertPreservedFields(actual, expected, label) {
 
 async function assertUpgradeRuntimePreserved(snapshot) {
   const patch = await readFile(join(snapshot.dshHome, 'profiles', 'desktop', 'cordis.patch.yml'))
-  const providers = profileProviders(settingsDocument(patch).toJS())
+  const providers = await activeProviders(snapshot.dshHome, patch)
   for (const [id, config] of Object.entries(snapshot.providers)) assertPreservedFields(providers[id], config, `provider ${id}`)
+  if (snapshot.credentials) {
+    const credentials = settingsDocument(await readFile(join(snapshot.dshHome, '.credentials.yaml'))).toJS()
+    for (const section of ['refs', 'records']) {
+      for (const [name, value] of Object.entries(snapshot.credentials[section] ?? {})) {
+        assertPreservedFields(credentials?.[section]?.[name], value, `credential ${section}.${name}`)
+      }
+    }
+  }
   const current = await homeSessionState(snapshot.dshHome)
   for (const expected of snapshot.sessions) {
     const actual = current.sessions.find(session => session.id === expected.id)
@@ -171,8 +190,42 @@ async function seedUpgradeHome(dshHome) {
   } finally { await context.fiber.dispose() }
 }
 
-export async function verifyInstallerUpgrade({ dshHome, snapshotDirectory, install, launch }) {
-  if (snapshotDirectory) await snapshotUpgradeHome(dshHome, join(snapshotDirectory, 'before-fixture'))
+function messageText(message) {
+  if (typeof message?.content === 'string') return message.content
+  return (message?.content ?? []).filter(part => part?.type === 'text').map(part => part.text).join('\n')
+}
+
+export function assertPreviousRuntimeWitness(witness, snapshot, previousVersion) {
+  assert.ok(witness && typeof witness === 'object', 'an old-program witness is required before upgrade')
+  assert.equal(witness.kind, 'installed-runtime', 'previous data must come from the installed old Runtime')
+  assert.match(previousVersion ?? '', /^\d+\.\d+\.\d+$/u)
+  assert.equal(witness.version, previousVersion, 'the exact old executable version must produce the witness')
+  assert.equal(witness.credentialSource, 'file', 'the old Key must come from its managed file')
+  assert.equal(witness.authenticatedChat, true, 'the old Runtime must authenticate an actual synthetic chat')
+  assert.equal(witness.readBack, true, 'the old Runtime must visibly read its own nonempty conversations')
+  assert.ok(witness.providerId && witness.credentialRef && witness.workspace, 'old-program identities must be concrete')
+  assert.equal(snapshot.providers?.[witness.providerId]?.apiKeyEnv, witness.credentialRef)
+  assert.ok(Object.hasOwn(snapshot.credentials?.refs ?? {}, witness.credentialRef), 'old file credential is missing')
+  assert.ok(Array.isArray(witness.sessions) && witness.sessions.length >= 2, 'old A and B conversations must be nonempty')
+  assert.equal(new Set(witness.sessions.map(session => session.id)).size, witness.sessions.length)
+  for (const expected of witness.sessions) {
+    assert.ok(typeof expected.id === 'string' && expected.id && expected.userText?.trim() && expected.replyText?.trim())
+    const actual = snapshot.sessions.find(session => session.id === expected.id)
+    assert.ok(actual, 'the witnessed old session must exist before the current Setup runs')
+    assert.equal(actual.cwd, witness.workspace, 'the old session must remain bound to its exact workspace')
+    assert.ok(actual.messages.some(row => row.type === 'user/message' && messageText(row.message).includes(expected.userText)), 'old user content must already be persisted')
+    assert.ok(actual.messages.some(row => row.type === 'assistant/message' && messageText(row.message).includes(expected.replyText)), 'old authenticated assistant content must already be persisted')
+    for (const [kind, marker] of [['user/message', expected.userText], ['assistant/message', expected.replyText]]) {
+      const owners = snapshot.sessions.filter(session => session.messages.some(row => row.type === kind && messageText(row.message).includes(marker)))
+      assert.deepEqual(owners.map(session => session.id), [expected.id], 'old native content must prove one exact session identity, including reused blanks')
+    }
+  }
+}
+
+export async function verifyInstallerUpgrade({ dshHome, snapshotDirectory, install, launch,
+  requirePreviousRuntime = false, previousRuntimeWitness, previousVersion }) {
+  const previous = await snapshotUpgradeHome(dshHome, snapshotDirectory && join(snapshotDirectory, 'before-fixture'))
+  if (requirePreviousRuntime) assertPreviousRuntimeWitness(previousRuntimeWitness, previous, previousVersion)
   await seedUpgradeHome(dshHome)
   const snapshot = await snapshotUpgradeHome(dshHome, snapshotDirectory)
   await install()
@@ -182,6 +235,9 @@ export async function verifyInstallerUpgrade({ dshHome, snapshotDirectory, insta
   return { first, snapshot, preservation: {
     snapshotDirectory,
     installationBytesPreserved: true, runtimeDataPreserved: true,
+    previousRuntimeVerified: requirePreviousRuntime,
+    ...(requirePreviousRuntime ? { previousRuntimeWitness } : {}),
+    credentialRefs: Object.keys(snapshot.credentials?.refs ?? {}),
     files: snapshot.files.map(file => ({ path: file.path.replaceAll('\\', '/'), sha256: hash(file.bytes) })),
     providerIds: Object.keys(snapshot.providers),
     sessions: snapshot.sessions.map(session => ({ id: session.id, messages: session.messages.length, sha256: hash(JSON.stringify(session.messages)) })),
@@ -244,48 +300,68 @@ async function main() {
       const sentinel = join(userData, 'installation-data-sentinel.json')
       const original = Buffer.from(JSON.stringify({ scenario, marker: 'preserve-installed-user-data' }))
       await writeFile(sentinel, original, { flag: 'wx' })
-      if (scenario === 'previous-release-upgrade') {
-        await install(previousInstaller, previousVersion)
-        await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
-      }
-      const installCurrent = async () => {
+      let modelFixture
+      try {
+        let oldRuntimeState
+        const stateEvidence = process.env.DSH_DESKTOP_SETUP_RECEIPT
+          ? join(dirname(resolve(process.env.DSH_DESKTOP_SETUP_RECEIPT)), `setup-from-${previousVersion}-runtime-state`)
+          : join(root, scenario, 'runtime-state')
+        if (scenario === 'previous-release-upgrade') {
+          await install(previousInstaller, previousVersion)
+          await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
+          modelFixture = await createInstalledUpgradeFixture()
+          oldRuntimeState = await modelFixture.exercise({ appPath: executable, userData, dshHome,
+            expectedVersion: previousVersion, phase: 'old-create', evidenceDirectory: stateEvidence })
+        }
+        const installCurrent = async () => {
+          await install(currentInstaller, version)
+          assert.deepEqual(await readFile(sentinel), original, 'Setup preserves data outside the application directory')
+        }
+        let newRuntimeState
+        const launch = async () => {
+          const first = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
+          if (oldRuntimeState) newRuntimeState = await modelFixture.exercise({ appPath: executable, userData, dshHome,
+            expectedVersion: version, phase: 'new-upgrade', previousWitness: oldRuntimeState.witness, evidenceDirectory: stateEvidence })
+          return first
+        }
+        const upgrade = scenario === 'previous-release-upgrade'
+          ? await verifyInstallerUpgrade({ dshHome, snapshotDirectory: process.env.DSH_DESKTOP_SETUP_RECEIPT
+            ? join(dirname(resolve(process.env.DSH_DESKTOP_SETUP_RECEIPT)), `setup-from-${previousVersion}-old-home`)
+            : join(root, scenario, 'old-home-snapshot'), install: installCurrent, launch,
+            requirePreviousRuntime: true, previousVersion, previousRuntimeWitness: oldRuntimeState.witness })
+          : undefined
+        if (!upgrade) await installCurrent()
+        const first = upgrade?.first ?? await launch()
+        const profile = join(dshHome, 'profiles', 'desktop', 'package.json')
+        const profileBytes = await readFile(profile)
+        const overlay = upgrade && await snapshotUpgradeHome(dshHome)
         await install(currentInstaller, version)
-        assert.deepEqual(await readFile(sentinel), original, 'Setup preserves data outside the application directory')
-      }
-      const launch = () => runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
-      const upgrade = scenario === 'previous-release-upgrade'
-        ? await verifyInstallerUpgrade({ dshHome, snapshotDirectory: process.env.DSH_DESKTOP_SETUP_RECEIPT
-          ? join(dirname(resolve(process.env.DSH_DESKTOP_SETUP_RECEIPT)), `setup-from-${previousVersion}-old-home`)
-          : join(root, scenario, 'old-home-snapshot'), install: installCurrent, launch })
-        : undefined
-      if (!upgrade) await installCurrent()
-      const first = upgrade?.first ?? await launch()
-      const profile = join(dshHome, 'profiles', 'desktop', 'package.json')
-      const profileBytes = await readFile(profile)
-      const overlay = upgrade && await snapshotUpgradeHome(dshHome)
-      await install(currentInstaller, version)
-      if (overlay) await assertUpgradeInstallationPreserved(overlay)
-      assert.deepEqual(await readFile(profile), profileBytes, 'overlay Setup preserves the existing runtime Profile byte-for-byte')
-      assert.deepEqual(await readFile(sentinel), original)
-      const second = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
-      if (upgrade) await assertUpgradeRuntimePreserved(upgrade.snapshot)
-      evidence.results.push({ scenario, firstStartMs: first.elapsedMs, secondStartMs: second.elapsedMs, profilePreserved: true,
-        ...(upgrade ? { upgradePreservation: upgrade.preservation } : {}) })
-      await execute(uninstall, ['/S'], { windowsHide: true, timeout: 180_000 })
-      const uninstallDeadline = Date.now() + 90_000
-      let removed = false
-      while (Date.now() < uninstallDeadline) {
-        removed = await access(executable).then(() => false, error => {
-          if (error.code === 'ENOENT') return true
-          throw error
-        })
-        if (removed) break
-        await delay(250)
-      }
-      assert.equal(removed, true, 'the real uninstaller finishes before the next installation scenario')
-      assert.deepEqual(await readFile(sentinel), original, 'uninstall preserves the isolated user data')
-      if (upgrade) await assertUpgradeRuntimePreserved(upgrade.snapshot)
-      console.log(`PASS real production Setup: ${scenario}, overlay reinstall and installed relaunch`)
+        if (overlay) await assertUpgradeInstallationPreserved(overlay)
+        assert.deepEqual(await readFile(profile), profileBytes, 'overlay Setup preserves the existing runtime Profile byte-for-byte')
+        assert.deepEqual(await readFile(sentinel), original)
+        const second = await runPackagedDesktop({ appPath: executable, userData, dshHome, requireStartupTimings: false })
+        const restartRuntimeState = oldRuntimeState && await modelFixture.exercise({ appPath: executable, userData, dshHome,
+          expectedVersion: version, phase: 'new-restart', previousWitness: oldRuntimeState.witness, evidenceDirectory: stateEvidence })
+        if (upgrade) await assertUpgradeRuntimePreserved(upgrade.snapshot)
+        evidence.results.push({ scenario, firstStartMs: first.elapsedMs, secondStartMs: second.elapsedMs, profilePreserved: true,
+          ...(upgrade ? { upgradePreservation: upgrade.preservation, oldRuntimeState, newRuntimeState, restartRuntimeState,
+            modelRequests: modelFixture.requestEvidence(), paidRequests: 0 } : {}) })
+        await execute(uninstall, ['/S'], { windowsHide: true, timeout: 180_000 })
+        const uninstallDeadline = Date.now() + 90_000
+        let removed = false
+        while (Date.now() < uninstallDeadline) {
+          removed = await access(executable).then(() => false, error => {
+            if (error.code === 'ENOENT') return true
+            throw error
+          })
+          if (removed) break
+          await delay(250)
+        }
+        assert.equal(removed, true, 'the real uninstaller finishes before the next installation scenario')
+        assert.deepEqual(await readFile(sentinel), original, 'uninstall preserves the isolated user data')
+        if (upgrade) await assertUpgradeRuntimePreserved(upgrade.snapshot)
+        console.log(`PASS real production Setup: ${scenario}, overlay reinstall and installed relaunch`)
+      } finally { await modelFixture?.close() }
     }
   } finally {
     await writeFile(join(root, 'evidence.json'), JSON.stringify(evidence, null, 2))

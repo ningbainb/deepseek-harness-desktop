@@ -277,6 +277,14 @@ export async function recoverRuntimeLegacySettings({ home }) {
   return true
 }
 
+// Recovery can restore the profile patch itself. Never retain a snapshot read
+// before recovery: it could boot successfully but disappear on the next HMR.
+export async function readRecoveredRuntimeProfile({ home, read }) {
+  if (typeof read !== 'function') throw new TypeError('Runtime profile reader is required')
+  await recoverRuntimeLegacySettings({ home })
+  return read()
+}
+
 export async function prepareRuntimeLegacySettings({ home, profilePatchPath, patches }) {
   home = resolve(home)
   profilePatchPath = resolve(profilePatchPath)

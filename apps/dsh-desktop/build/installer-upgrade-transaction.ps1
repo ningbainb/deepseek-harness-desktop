@@ -10,7 +10,8 @@ param(
 
   [string] $UninstallRegistryKey = '',
 
-  [string] $CleanupTransactionDirectory = ''
+  [string] $CleanupTransactionDirectory = '',
+  [string] $RuntimeManifestSHA256 = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -436,7 +437,13 @@ function Invoke-Rollback([object] $journal) {
     }
   }
 
-  if ($hasBackup -and -not [bool] $journal.targetExisted -and
+  $freshOwnedTarget = $false
+  if (-not $hasBackup -and -not [bool] $journal.targetExisted -and (Test-ProductInstall $normalizedInstallDirectory)) {
+    $marker = Join-Path $normalizedInstallDirectory $upgradeMarkerRelativePath
+    $freshOwnedTarget = (Test-Path -LiteralPath $marker -PathType Leaf) -and
+      (Get-Content -LiteralPath $marker -Raw -Encoding UTF8).Trim() -ceq $upgradeMarkerValue
+  }
+  if (($hasBackup -or $freshOwnedTarget) -and -not [bool] $journal.targetExisted -and
     (Test-Path -LiteralPath $normalizedInstallDirectory -PathType Container)) {
     $targetIsRestoreRoot = $installs | Where-Object {
       $_.Root.Equals($normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)
@@ -506,10 +513,8 @@ function Begin-Transaction {
   $presentRegistryCount = @($registryEntries | Where-Object {
     $null -ne (Get-RegistryState $_)
   }).Count
-  if ($installPlans.Count -eq 0 -and $presentRegistryCount -eq 0) {
-    Write-Output 'upgrade-transaction-not-required'
-    return
-  }
+  # Fresh installations also need a journal so failed restoration cannot leave
+  # an owned partial application registered as successfully installed.
 
   [System.IO.Directory]::CreateDirectory($transactionRoot) | Out-Null
   $registryJournal = [System.Collections.Generic.List[object]]::new()
@@ -575,6 +580,9 @@ function Begin-Transaction {
 }
 
 function Commit-Transaction {
+  # Restoration is required even for fresh installs without an upgrade journal.
+  # A failure here propagates to NSIS's existing commit rollback path.
+  & (Join-Path $PSScriptRoot 'installer-runtime-restore.ps1') -InstallDirectory $normalizedInstallDirectory -ExpectedManifestSHA256 $RuntimeManifestSHA256
   $journal = Read-Journal
   if ($null -eq $journal) {
     Write-Output 'upgrade-transaction-not-required'

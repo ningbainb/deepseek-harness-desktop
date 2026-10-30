@@ -46,6 +46,73 @@ const CORDIS_PANEL_SELECTOR = '[data-cordis-panel]'
 const TERMINAL_SELECTOR = `${BETTER_SIDEBAR_SELECTOR} .xterm`
 
 const bodyAttributeLeases = new WeakMap()
+const bodyStyleLeases = new WeakMap()
+
+// Activations overlap while Skin Center installs the next hook before retiring
+// the previous one. Keep the first user snapshot and an ordered live owner chain
+// even when both activations write identical asset URLs.
+function createBodyStyleLease(body, properties) {
+  const snapshot = () => new Map(properties.map((property) => [property, {
+    value: body.style.getPropertyValue(property),
+    priority: body.style.getPropertyPriority(property),
+  }]))
+  let state = bodyStyleLeases.get(body)
+  if (state === undefined) {
+    state = {
+      hadStyleAttribute: body.hasAttribute('style'),
+      original: snapshot(),
+      owners: new Map(),
+    }
+    bodyStyleLeases.set(body, state)
+  }
+  const owner = Symbol('maid-body-style')
+  const values = snapshot()
+  const previousOwner = [...state.owners.values()].at(-1)
+  if (previousOwner !== undefined) {
+    for (const [property, current] of values) {
+      const written = previousOwner.get(property)
+      if (current.value === written.value && current.priority === written.priority) continue
+      // A user write between activations becomes the restoration baseline for
+      // every older owner, regardless of the order those owners are retired.
+      state.original.set(property, current)
+      for (const owned of state.owners.values()) owned.set(property, current)
+    }
+  }
+  state.owners.set(owner, values)
+  let active = true
+
+  return {
+    setProperty(property, value) {
+      if (!active) return
+      body.style.setProperty(property, value)
+      values.set(property, {
+        value: body.style.getPropertyValue(property),
+        priority: body.style.getPropertyPriority(property),
+      })
+    },
+    release() {
+      if (!active) return
+      active = false
+      const wasCurrent = [...state.owners.values()].at(-1) === values
+      state.owners.delete(owner)
+      if (wasCurrent) {
+        const restored = [...state.owners.values()].at(-1) ?? state.original
+        for (const [property, written] of values) {
+          // A later foreign write owns its value independently of this chain.
+          if (body.style.getPropertyValue(property) !== written.value
+            || body.style.getPropertyPriority(property) !== written.priority) continue
+          const previous = restored.get(property)
+          if (previous.value === '') body.style.removeProperty(property)
+          else body.style.setProperty(property, previous.value, previous.priority)
+        }
+      }
+      if (state.owners.size === 0) {
+        bodyStyleLeases.delete(body)
+        if (!state.hadStyleAttribute && body.style.length === 0) body.removeAttribute('style')
+      }
+    },
+  }
+}
 
 function createBodyAttributeLease(body, attribute, value = '') {
   const owner = Symbol(attribute)
@@ -184,13 +251,7 @@ export default function defineSkinHooks() {
       const originalTitle = document.title
       const viewportResizeLease = createBodyAttributeLease(body, 'data-maid-viewport-resizing')
       const lowPowerLease = createBodyAttributeLease(body, 'data-maid-low-power')
-      // Whether body carried an inline style attribute before apply; the
-      // cleanup drops an emptied attribute so teardown is byte-clean.
-      const hadStyleAttribute = body.hasAttribute('style')
-      const previous = new Map()
-      for (const property of BACKDROP_PROPERTIES) {
-        previous.set(property, body.style.getPropertyValue(property))
-      }
+      const bodyStyle = createBodyStyleLease(body, BACKDROP_PROPERTIES)
       const previousProjectedStates = new Map()
       for (const attribute of Object.values(PROJECTED_STATE_ATTRIBUTES)) {
         previousProjectedStates.set(attribute, body.getAttribute(attribute))
@@ -239,10 +300,7 @@ export default function defineSkinHooks() {
           titlebarOverlay.removeEventListener('geometrychange', syncTitlebarHeight)
         }
         resizeObserver?.disconnect()
-        for (const [property, value] of previous) {
-          body.style.setProperty(property, value)
-        }
-        if (!hadStyleAttribute && body.style.length === 0) body.removeAttribute('style')
+        bodyStyle.release()
         ownedNodes.forEach((element) => element.remove())
         decoratedElements.forEach((element) => {
           delete element.dataset.maidSidebarFooter
@@ -293,29 +351,29 @@ export default function defineSkinHooks() {
       // through these variables (v1 interpolated data URLs; v2 serves
       // files from assets/, so the URLs are absolute under assetBase —
       // relative URLs would break inside the inlined <style> pipeline).
-      body.style.setProperty('--maid-top-trim-art', `url(${asset('maid-top-trim-tile-v1.webp')})`)
-      body.style.setProperty('--maid-bottom-trim-art', `url(${asset('maid-bottom-trim-tile-v1.webp')})`)
-      body.style.setProperty('--maid-bottom-crest-art', `url(${asset('maid-bottom-crest-v1.webp')})`)
-      body.style.setProperty('--maid-bow-art', `url(${asset('maid-bow-v1.webp')})`)
-      body.style.setProperty('--maid-new-session-art', `url(${asset('maid-new-session-v1.webp')})`)
-      body.style.setProperty('--maid-sidebar-swag-art', `url(${asset('maid-sidebar-swag-v1.webp')})`)
-      body.style.setProperty('--maid-sidebar-corner-art', `url(${asset('maid-sidebar-corner-v1.webp')})`)
-      body.style.setProperty('--maid-composer-frame-art', `url(${asset('maid-composer-frame-v4.webp')})`)
-      body.style.setProperty('--maid-settings-frame-art', `url(${asset('maid-settings-frame-v1.webp')})`)
-      body.style.setProperty('--maid-workspace-crest-art', `url(${asset('maid-workspace-shield-v2.webp')})`)
-      body.style.setProperty('--maid-workspace-ribbon-art', `url(${asset('maid-workspace-ribbon-v2.webp')})`)
+      bodyStyle.setProperty('--maid-top-trim-art', `url(${asset('maid-top-trim-tile-v1.webp')})`)
+      bodyStyle.setProperty('--maid-bottom-trim-art', `url(${asset('maid-bottom-trim-tile-v1.webp')})`)
+      bodyStyle.setProperty('--maid-bottom-crest-art', `url(${asset('maid-bottom-crest-v1.webp')})`)
+      bodyStyle.setProperty('--maid-bow-art', `url(${asset('maid-bow-v1.webp')})`)
+      bodyStyle.setProperty('--maid-new-session-art', `url(${asset('maid-new-session-v1.webp')})`)
+      bodyStyle.setProperty('--maid-sidebar-swag-art', `url(${asset('maid-sidebar-swag-v1.webp')})`)
+      bodyStyle.setProperty('--maid-sidebar-corner-art', `url(${asset('maid-sidebar-corner-v1.webp')})`)
+      bodyStyle.setProperty('--maid-composer-frame-art', `url(${asset('maid-composer-frame-v4.webp')})`)
+      bodyStyle.setProperty('--maid-settings-frame-art', `url(${asset('maid-settings-frame-v1.webp')})`)
+      bodyStyle.setProperty('--maid-workspace-crest-art', `url(${asset('maid-workspace-shield-v2.webp')})`)
+      bodyStyle.setProperty('--maid-workspace-ribbon-art', `url(${asset('maid-workspace-ribbon-v2.webp')})`)
 
       const syncBackdrop = () => {
         const source = ctx.theme.get() === 'dark'
           ? asset('maid-atelier-palace-night-v4.webp')
           : asset('maid-atelier-palace-day-v4.webp')
-        body.style.setProperty('background-image', `url(${source})`)
+        bodyStyle.setProperty('background-image', `url(${source})`)
       }
       syncBackdrop()
-      body.style.setProperty('background-position', 'center top')
-      body.style.setProperty('background-size', 'cover')
-      body.style.setProperty('background-attachment', 'scroll')
-      body.style.setProperty('background-repeat', 'no-repeat')
+      bodyStyle.setProperty('background-position', 'center top')
+      bodyStyle.setProperty('background-size', 'cover')
+      bodyStyle.setProperty('background-attachment', 'scroll')
+      bodyStyle.setProperty('background-repeat', 'no-repeat')
 
       // 宽度联动写入独立的 <style> 规则而非 body style：CSSOM 修改不产生
       // attribute mutation，Chrome autofill 的 MutationObserver 不会逐帧触发，

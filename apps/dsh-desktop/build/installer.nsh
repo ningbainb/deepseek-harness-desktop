@@ -1,6 +1,7 @@
 !define DSH_UPGRADE_HELPER_DIR "$TEMP\dsh-desktop-installer-support"
 !include "FileFunc.nsh"
 !define DSH_UPGRADE_HELPER_SCRIPT "${DSH_UPGRADE_HELPER_DIR}\installer-upgrade-transaction.ps1"
+!define /ifndef DSH_RUNTIME_MANIFEST_SHA256 ""
 !define /ifndef DSH_LEGACY_APP_GUID "6d90015c-c2fd-5312-844b-e2226e35e28f"
 !define /ifndef DSH_LEGACY_INSTALL_REGISTRY_KEY "Software\${DSH_LEGACY_APP_GUID}"
 !define /ifndef DSH_LEGACY_UNINSTALL_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${DSH_LEGACY_APP_GUID}"
@@ -15,6 +16,7 @@ Var DshLegacyInstallDetected
 Var DshLegacyInstallDirectory
 Var DshCurrentInstallDirectory
 Var DshRequestedInstallDirectory
+Var DshModeDirectory
 
 ; Local-only diagnostics. No credentials/sessions are read or uploaded.
 Function WriteInstallerDiagnostic
@@ -46,10 +48,47 @@ Function StageUpgradeTransactionScript
   SetOutPath "${DSH_UPGRADE_HELPER_DIR}"
   SetOverwrite on
   File /oname=installer-upgrade-transaction.ps1 "${BUILD_RESOURCES_DIR}\installer-upgrade-transaction.ps1"
+  File /oname=installer-runtime-restore.ps1 "${BUILD_RESOURCES_DIR}\installer-runtime-restore.ps1"
+FunctionEnd
+
+; Parse the quoted executable written by stock NSIS without executing its command.
+; Ambiguous unquoted commands are deliberately not adopted.
+Function DshDirectoryFromUninstallString
+  Exch $0
+  Push $1
+  Push $2
+  StrCpy $1 $0 1
+  StrCmp $1 '$\"' 0 dsh_uninstall_path_invalid
+  StrCpy $2 1
+dsh_uninstall_quote_scan:
+  StrCpy $1 $0 1 $2
+  StrCmp $1 "" dsh_uninstall_path_invalid
+  StrCmp $1 '$\"' dsh_uninstall_quote_found
+  IntOp $2 $2 + 1
+  Goto dsh_uninstall_quote_scan
+dsh_uninstall_quote_found:
+  IntOp $2 $2 - 1
+  StrCpy $0 $0 $2 1
+  StrCpy $1 $0 2 1
+  StrCmp $1 ':\' dsh_uninstall_path_absolute
+  StrCpy $1 $0 2
+  StrCmp $1 '\\' 0 dsh_uninstall_path_invalid
+dsh_uninstall_path_absolute:
+  ${GetFileName} "$0" $1
+  StrCmp $1 "Uninstall DeepSeek Harness Desktop.exe" 0 dsh_uninstall_path_invalid
+  ${GetParent} "$0" $0
+  Goto dsh_uninstall_path_done
+dsh_uninstall_path_invalid:
+  StrCpy $0 ""
+dsh_uninstall_path_done:
+  Pop $2
+  Pop $1
+  Exch $0
 FunctionEnd
 
 Function RemoveUpgradeTransactionScript
   Delete "${DSH_UPGRADE_HELPER_SCRIPT}"
+  Delete "${DSH_UPGRADE_HELPER_DIR}\installer-runtime-restore.ps1"
   RMDir "${DSH_UPGRADE_HELPER_DIR}"
 FunctionEnd
 
@@ -77,6 +116,7 @@ current_directory_validated_${SUFFIX}:
   StrCpy $DshLegacyInstallDirectory ""
   StrCpy $DshCurrentInstallDirectory ""
   StrCpy $DshRequestedInstallDirectory ""
+  StrCpy $DshModeDirectory ""
   ClearErrors
   !ifmacrodef GetDParameter
     !insertmacro GetDParameter $DshRequestedInstallDirectory
@@ -120,12 +160,24 @@ registered_identity:
   ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
   !insertmacro DshValidateCurrentInstallDirectory current_uninstall
   StrCmp $DshCurrentInstallDirectory "" 0 current_identity_adopt
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" UninstallString
+  Push $DshCurrentInstallDirectory
+  Call DshDirectoryFromUninstallString
+  Pop $DshCurrentInstallDirectory
+  !insertmacro DshValidateCurrentInstallDirectory current_uninstall_command
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_adopt
   SetRegView 32
   ReadRegStr $DshCurrentInstallDirectory HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
   !insertmacro DshValidateCurrentInstallDirectory fallback_install
   StrCmp $DshCurrentInstallDirectory "" 0 current_identity_restore_view
   ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" InstallLocation
   !insertmacro DshValidateCurrentInstallDirectory fallback_uninstall
+  StrCmp $DshCurrentInstallDirectory "" 0 current_identity_restore_view
+  ReadRegStr $DshCurrentInstallDirectory HKCU "${UNINSTALL_REGISTRY_KEY}" UninstallString
+  Push $DshCurrentInstallDirectory
+  Call DshDirectoryFromUninstallString
+  Pop $DshCurrentInstallDirectory
+  !insertmacro DshValidateCurrentInstallDirectory fallback_uninstall_command
 current_identity_restore_view:
   SetRegView lastused
 current_identity_adopt:
@@ -149,6 +201,18 @@ legacy_identity_done:
 !macroend
 !endif
 
+; The stock install-mode leave handler re-reads only InstallLocation. Restore
+; the already selected directory afterwards, including a user's Back/Next choice.
+!macro customInstallMode
+  !ifndef BUILD_UNINSTALLER
+    StrCpy $DshModeDirectory $INSTDIR
+    !ifdef MUI_PAGE_CUSTOMFUNCTION_LEAVE
+      !error "An existing install-mode leave callback must be composed explicitly"
+    !endif
+    !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DshRestoreModeDirectory
+  !endif
+!macroend
+
 !include "${BUILD_RESOURCES_DIR}\installer-progress.nsh"
 
 !macro DshLog STAGE CODE DETAIL
@@ -159,6 +223,19 @@ legacy_identity_done:
     Call WriteInstallerDiagnostic
     DetailPrint "stage=$DshInstallerStage code=$DshInstallerCode $DshInstallerDetail"
   !endif
+!macroend
+
+; GUI Abort may wait on the failed page before .onInstFailed. Recover before Quit.
+!macro DshAbortExtraction
+  !insertmacro DshLog "extract-cancelled" "2" "Application file copy failed and the user cancelled"
+  !insertmacro DshLog "installation-aborted" "2" "Recovering immediately after extraction cancellation"
+  !insertmacro DshStopProgress
+  Call DshRollbackTransaction
+  StrCmp $0 "0" dsh_extraction_cancel_recovered
+  MessageBox MB_ICONSTOP|MB_OK "Automatic recovery failed. Keep the installation and previous-version backups. Recovery details: $DshInstallerLogPath" /SD IDOK
+dsh_extraction_cancel_recovered:
+  SetErrorLevel 2
+  Quit
 !macroend
 
 !macro customCheckAppRunning
@@ -236,11 +313,33 @@ old_uninstall_done_${SUFFIX}:
   !insertmacro DshCheckOldUninstaller currentuser
 !macroend
 
+; Called immediately after application extraction, before registration/shortcuts.
+!macro customRestoreRuntime
+  !define /ifndef DSH_RUNTIME_RESTORATION_HOOK 1
+  Push $OUTDIR
+  Call StageUpgradeTransactionScript
+  Pop $0
+  SetOutPath "$0"
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_DIR}\installer-runtime-restore.ps1" -InstallDirectory "$INSTDIR" -ExpectedManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
+  Pop $0
+  Pop $1
+  !insertmacro DshLog "runtime-restore" "$0" "$1"
+  StrCmp $0 "0" runtime_restore_done
+  SetErrorLevel 2
+  Abort
+runtime_restore_done:
+!macroend
+
 !macro customInstall
+  !if "${DSH_RUNTIME_MANIFEST_SHA256}" != ""
+    !ifndef DSH_RUNTIME_RESTORATION_HOOK
+      !error "Offline runtime restoration must execute before registration and shortcuts"
+    !endif
+  !endif
   !insertmacro DshLog "commit-start" "pending" "Validating the new installation"
   !insertmacro DshWorkingProgress "3 / 3  校验并完成安装" "正在校验新版本并提交安装结果，请勿关闭安装程序。"
   Call StageUpgradeTransactionScript
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
   Pop $0
   Pop $1
   !insertmacro DshLog "commit" "$0" "$1"
@@ -277,9 +376,30 @@ legacy_identity_retired:
 !macro customHeader
   !ifndef BUILD_UNINSTALLER
   ShowInstDetails hide
+  !ifmacrodef setInstallModePerUser
+  Function DshRestoreModeDirectory
+    StrCmp $installMode "CurrentUser" 0 dsh_mode_directory_done
+    StrCmp $DshModeDirectory "" dsh_mode_directory_done
+    StrCpy $INSTDIR $DshModeDirectory
+  dsh_mode_directory_done:
+  FunctionEnd
+  !endif
   Function .onInstFailed
     !insertmacro DshLog "installation-aborted" "$DshInstallerCode" "$DshInstallerDetail"
     !insertmacro DshStopProgress
+    Call DshRollbackTransaction
+    SetDetailsPrint both
+    SetDetailsView show
+    DetailPrint "安装失败详情已保留：$DshInstallerLogPath"
+    StrCmp $DshInstallerLogAvailable "1" upgrade_show_log_path
+    MessageBox MB_ICONINFORMATION|MB_OK "安装未完成，日志也无法写入。请勿删除旧版或会话，请截图反馈以下恢复结果：$\r$\n阶段：$DshInstallerStage$\r$\n错误码：$DshInstallerCode$\r$\n$DshInstallerDetail" /SD IDOK
+    Goto upgrade_failure_message_done
+  upgrade_show_log_path:
+    MessageBox MB_ICONINFORMATION|MB_OK "安装未完成。请保留旧版和升级备份，不要手动清理会话。失败阶段和恢复结果已记录在：$\r$\n$DshInstallerLogPath$\r$\n$\r$\n可将日志发给开发者排查；日志可能包含本机安装路径，请勿公开发布。" /SD IDOK
+  upgrade_failure_message_done:
+  FunctionEnd
+
+  Function DshRollbackTransaction
     Call StageUpgradeTransactionScript
     IfFileExists "${DSH_UPGRADE_HELPER_SCRIPT}" 0 upgrade_rollback_helper_missing
     nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Rollback -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
@@ -294,15 +414,6 @@ legacy_identity_retired:
     !insertmacro DshLog "failure-rollback" "helper-missing" "Recovery helper could not be extracted"
     DetailPrint "Upgrade transaction failure callback could not stage its recovery helper."
   upgrade_rollback_done:
-    SetDetailsPrint both
-    SetDetailsView show
-    DetailPrint "安装失败详情已保留：$DshInstallerLogPath"
-    StrCmp $DshInstallerLogAvailable "1" upgrade_show_log_path
-    MessageBox MB_ICONINFORMATION|MB_OK "安装未完成，日志也无法写入。请勿删除旧版或会话，请截图反馈以下恢复结果：$\r$\n阶段：$DshInstallerStage$\r$\n错误码：$DshInstallerCode$\r$\n$DshInstallerDetail" /SD IDOK
-    Goto upgrade_failure_message_done
-  upgrade_show_log_path:
-    MessageBox MB_ICONINFORMATION|MB_OK "安装未完成。请保留旧版和升级备份，不要手动清理会话。失败阶段和恢复结果已记录在：$\r$\n$DshInstallerLogPath$\r$\n$\r$\n可将日志发给开发者排查；日志可能包含本机安装路径，请勿公开发布。" /SD IDOK
-  upgrade_failure_message_done:
   FunctionEnd
   !endif
 !macroend

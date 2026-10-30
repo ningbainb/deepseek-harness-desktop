@@ -3,8 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { UpdateStatus } from '../src/update.ts'
-import { UpdateEntry } from '../src/client/UpdateEntry.tsx'
-import { en, type RemoteKey } from '../src/client/locales.ts'
+import { UpdateEntry, type UpdateEntryProps } from '../src/client/UpdateEntry.tsx'
+import { en } from '../src/client/locales.ts'
 
 // The npm SDK's client half is a closure-factory bundle (not importable
 // under vitest); the ui-primitives icons used by the panel resolve through
@@ -19,8 +19,9 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 }))
 
 // English dictionary translate stub with {param} interpolation.
-const t = (key: RemoteKey, params?: Record<string, string | number>): string => {
-  let text = (en as Record<string, string>)[key] ?? key
+const messages: Readonly<Record<string, string>> = en
+const t: UpdateEntryProps['t'] = (key, params) => {
+  let text = messages[key] ?? key
   for (const [name, value] of Object.entries(params ?? {})) {
     text = text.replaceAll(`{${name}}`, String(value))
   }

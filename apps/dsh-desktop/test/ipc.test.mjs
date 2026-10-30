@@ -375,10 +375,15 @@ test('Extension Dock deep links accept only the collaboration settings and plugi
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'models' }), { setting: 'models' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'usage' }), { setting: 'usage' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' }), { setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'plugin-options' }), { setting: 'plugin-options' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'market' }), { tab: 'market' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'plugins' }), { tab: 'plugins' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'skills' }), { tab: 'skills' })
   for (const value of [null, 'value-mode', { setting: 'plugins' }, { tab: 'settings' }, { setting: 'value-mode', tab: 'market' }, { setting: 'value-mode', url: 'https://example.com' }]) {
+    assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
+  }
+  for (const value of [{ plugin: 'search' }, { setting: 'models', plugin: 'search' }, { tab: 'plugins', plugin: 'search' }, { setting: 'plugin-options', plugin: '../other' }, { setting: 'plugin-options', plugin: 'https://example.com' }]) {
     assert.throws(() => normalizeDesktopDockOpenOptions(value), /Dock/u)
   }
 })

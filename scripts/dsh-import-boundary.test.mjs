@@ -105,6 +105,7 @@ test('SDK persistence adapters do not permit imports from adjacent application m
   const adapters = [
     'apps/dsh-desktop/src/atomic-write-adapter.mjs',
     'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
+    'packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts',
     'packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts',
     'packages/dsh-web-ui-settings/tests/settings-sdk-adapter.ts',
     'packages/dsh-model-preferences/src/client/persist-config.ts',

@@ -1,0 +1,17 @@
+{
+  "name": "@linxin666/dsh-release-plugin-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Original plugin settings navigation and independent Dafeiyu companion visibility, with a read-only support route.",
+  "type": "module",
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "main": "lib/index.js",
+  "exports": { ".": "./lib/index.js", "./client": "./lib/client.js", "./src/*": "./src/*", "./package.json": "./package.json" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" }, "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-ui-slots", "@deepseek-ai/dsh-client-ui-settings"] } },
+  "scripts": { "build": "tsdown", "typecheck": "tsc -b --force --pretty false", "test": "node --test tests/*.test.mjs && vitest run", "test:prompt-pilot": "node --test tests/prompt-pilot-storage.test.mjs" },
+  "dependencies": { "@linxin666/dsh-desktop-client": "workspace:*" },
+  "peerDependencies": { "@deepseek-ai/cordis": "4.0.5", "@deepseek-ai/dsh-client-connection": "0.2.1-rc.4", "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.4", "@deepseek-ai/dsh-client-locale": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-rc.4", "react": "^18.3.1" },
+  "devDependencies": { "@deepseek-ai/cordis": "4.0.5", "@deepseek-ai/dsh-client-connection": "0.2.1-rc.4", "@deepseek-ai/dsh-host-webserver": "0.2.1-rc.4", "@deepseek-ai/dsh-client-locale": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-slots": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-conversation": "0.2.1-rc.4", "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-rc.4", "@types/node": "^22.20.0", "@types/react": "~18.3.1", "typescript": "^6.0.3", "vitest": "^4.1.8", "react": "^18.3.1", "tsdown": "^0.22.2", "lightningcss": "^1.32.0" },
+  "files": ["lib", "src", "cordis.patch.yml", "README.md", "README.zh.md", "README.i18n.yaml"],
+  "license": "MIT"
+}

@@ -6,6 +6,8 @@ import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { makeMobileApiRoutes } from '../src/mobile-api.ts'
 import type { MobileApiProxy } from '../src/mobile-contract.ts'
 import type { PairingService } from '../src/pairing.ts'
+import type { MobileScopeAuthority } from '../src/mobile-authorization.ts'
+import { requirePrincipalId, requireSessionId, type AccessDecision } from '@ningbainb/dsh-user-scope'
 
 const cookieName = 'dsh_pair'
 
@@ -41,17 +43,21 @@ function makePairingFixture(): PairingFixture {
   }
 }
 
-function makeUserScope() {
+function accessDecision(allowed: boolean): AccessDecision {
+  return allowed ? { allowed: true, reason: 'allowed' } : { allowed: false, reason: 'other-principal' }
+}
+
+function makeUserScope(): MobileScopeAuthority {
   return {
-    principalForDevice: (deviceId: string) => deviceId === 'device-a' ? 'principal-a' : deviceId === 'device-b' ? 'principal-b' : undefined,
+    principalForDevice: (deviceId: string) => deviceId === 'device-a' ? requirePrincipalId('principal-a') : deviceId === 'device-b' ? requirePrincipalId('principal-b') : undefined,
     touchDevice: (deviceId: string) => deviceId === 'device-a' || deviceId === 'device-b',
-    canAccess: (scope: { principalId: string }, resource: { kind: string; workspaceId?: string; sessionId?: string; principalId?: string }) => {
-      if (resource.kind === 'principal') return { allowed: resource.principalId === scope.principalId, reason: 'allowed' as const }
+    canAccess: (scope, resource) => {
+      if (resource.kind === 'principal') return accessDecision(resource.principalId === scope.principalId)
       const suffix = scope.principalId === 'principal-a' ? 'a' : 'b'
-      if (resource.kind === 'workspace') return { allowed: resource.workspaceId === `ws-${suffix}`, reason: 'allowed' as const }
-      return { allowed: resource.sessionId === `s-${suffix}`, reason: 'allowed' as const }
+      if (resource.kind === 'workspace') return accessDecision(resource.workspaceId === `ws-${suffix}`)
+      return accessDecision(resource.sessionId === `s-${suffix}`)
     },
-    visibleSessions: (scope: { principalId: string }) => [{ sessionId: scope.principalId === 'principal-a' ? 's-a' : 's-b' }],
+    visibleSessions: scope => [{ sessionId: requireSessionId(scope.principalId === 'principal-a' ? 's-a' : 's-b') }],
     registerSession: async () => {},
     run: <T>(_scope: unknown, callback: () => T): T => callback(),
   }
@@ -250,7 +256,7 @@ describe('mobile owner isolation', () => {
     const calls: string[] = []
     const { service } = makePairingFixture()
     const visibleRows = Array.from({ length: 21 }, (_, index) => ({
-      sessionId: `s-a-${String(index).padStart(2, '0')}`,
+      sessionId: requireSessionId(`s-a-${String(index).padStart(2, '0')}`),
       updatedAt: 100 - index,
       running: false,
       blank: false,
@@ -284,7 +290,7 @@ describe('mobile owner isolation', () => {
         visibleSessions: () => visibleRows.map(item => ({ sessionId: item.sessionId })),
         canAccess: (scope, resource) => {
           if (resource.kind === 'session') {
-            return { allowed: resource.sessionId !== 's-b-hidden' && resource.sessionId.startsWith('s-a-'), reason: 'allowed' as const }
+            return accessDecision(resource.sessionId !== 's-b-hidden' && resource.sessionId.startsWith('s-a-'))
           }
           return makeUserScope().canAccess(scope, resource)
         },
@@ -400,9 +406,9 @@ describe('mobile owner isolation', () => {
     const { service } = makePairingFixture()
     const baseScope = makeUserScope()
     let sessionAllowed = true
-    const userScope = {
+    const userScope: MobileScopeAuthority = {
       ...baseScope,
-      canAccess: (scope: { principalId: string }, resource: { kind: string; workspaceId?: string; sessionId?: string; principalId?: string }) => {
+      canAccess: (scope, resource) => {
         if (resource.kind === 'session' && resource.sessionId === 's-a' && !sessionAllowed) {
           return { allowed: false, reason: 'other-principal' as const }
         }

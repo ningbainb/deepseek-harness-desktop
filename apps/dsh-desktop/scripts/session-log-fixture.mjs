@@ -38,7 +38,7 @@ export async function appendSessionLogText(path, text) {
   await appendFile(path, path.endsWith('.zstd') ? zstdCompressSync(source) : source)
 }
 
-/** Session creation can acknowledge before its queued JSONL write is durable. */
+/** Wait for the matching durable header and return its plain or compressed log path. */
 export async function waitForSessionLog(root, sessionId, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs
   let files = []
@@ -52,7 +52,7 @@ export async function waitForSessionLog(root, sessionId, timeoutMs = 15_000) {
         const text = await readSessionLogText(join(root, file))
         const end = text.indexOf('\n')
         if (end < 0) continue
-        if (JSON.parse(text.slice(0, end)).id === sessionId) return
+        if (JSON.parse(text.slice(0, end)).id === sessionId) return join(root, file)
       } catch {
         // The Runtime may still be appending the first compressed frame.
         // Retry until the complete, parseable header becomes durable.

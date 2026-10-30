@@ -11,7 +11,7 @@ export const FULL_USER_RUNTIME_OVERLAY = `- id: sandbox-policy
   name: '@deepseek-ai/dsh-user-approval'
   disabled: false
   config:
-    policy: never
+    policy: ask
 `
 
 function assertDesktopStateDirectory(value) {

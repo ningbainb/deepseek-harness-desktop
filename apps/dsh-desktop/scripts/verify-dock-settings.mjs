@@ -10,6 +10,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
+import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
@@ -23,6 +24,7 @@ let app
 let settings
 let dock
 let failure
+let restoreCompanionPreference
 
 async function assertPetFreeSettings() {
   const geometry = await settings.evaluate(() => ({
@@ -162,6 +164,8 @@ try {
   })
   const main = await app.firstWindow()
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
+  await main.waitForSelector('[data-dsh-frame]', { timeout: startupTimeout })
+  restoreCompanionPreference = await useOriginalPetForTest(main)
   for (let attempt = 0; attempt < 120; attempt++) {
     dock = app.windows().find(page => page.url().includes('/extensions.html'))
     if (dock) break
@@ -675,6 +679,7 @@ try {
   throw error
 } finally {
   const cleanupFailures = []
+  try { await restoreCompanionPreference?.() } catch (error) { cleanupFailures.push(error) }
   try { await closeIsolatedElectron(app) } catch (error) { cleanupFailures.push(error) }
   try {
     await rm(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })

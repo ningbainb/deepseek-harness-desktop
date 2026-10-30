@@ -97,6 +97,20 @@ describe('Desktop Client SDK v1', () => {
     expect(openWorkspaceFile).not.toHaveBeenCalled()
   })
 
+  it('routes native plugin settings by exact package owner and rejects malformed combinations', async () => {
+    const openExtensionDock = vi.fn(async () => ({ opened: true }))
+    const client = createDesktopClient({ globalObject: { dshDesktop: {
+      getContract: async () => ({ apiVersion: '1.2.0', surface: 'main', capabilities: ['extensions.open'] }),
+      openExtensionDock,
+    } } })
+    expect(await client.openDesktopSurface('extensions', { setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })).toBe(true)
+    expect(openExtensionDock).toHaveBeenCalledWith({ setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })
+    for (const options of [{ plugin: 'search' }, { setting: 'usage', plugin: 'search' }, { setting: 'plugin-options', plugin: '../other' }, { setting: 'plugin-options', plugin: 'https://example.com' }]) {
+      await expect(client.openDesktopSurface('extensions', options as never)).rejects.toMatchObject({ code: 'desktop-invalid-argument' })
+    }
+    expect(openExtensionDock).toHaveBeenCalledTimes(1)
+  })
+
   it('hands plugin install sources to the Desktop only after capability checks', async () => {
     const requestPluginInstall = vi.fn(async () => ({ accepted: true }))
     const client = createDesktopClient({

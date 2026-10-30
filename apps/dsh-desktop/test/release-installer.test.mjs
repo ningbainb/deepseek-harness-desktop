@@ -183,3 +183,94 @@ test('startup cannot truncate a conversation while retaining its session and mes
     },
   }), /session message order and full contents must be preserved/u)
 })
+
+function witnessedOldHome() {
+  const providerId = 'old-program-provider', credentialRef = 'OLD_PROGRAM_TEST_KEY'
+  const sessions = ['A', 'B'].map(letter => ({ id: `old-${letter}`, cwd: '/isolated/project', messages: [
+    { type: 'user/message', message: { id: `user-${letter}`, content: [{ type: 'text', text: `Old ${letter}\n完整内容` }] } },
+    { type: 'assistant/message', message: { id: `reply-${letter}`, content: [{ type: 'text', text: `Authenticated old reply ${letter}` }] } },
+  ] }))
+  const snapshot = { providers: { [providerId]: { apiKeyEnv: credentialRef } }, credentials: { refs: { [credentialRef]: 'synthetic-file-key' } }, sessions }
+  const witness = { kind: 'installed-runtime', version: '5.1.0', providerId, credentialRef, credentialSource: 'file',
+    authenticatedChat: true, readBack: true, workspace: '/isolated/project', sessions: sessions.map((session, index) => ({
+      id: session.id, userText: session.messages[0].message.content[0].text,
+      replyText: session.messages[1].message.content[0].text, title: `Old ${index}`,
+    })) }
+  return { snapshot, witness }
+}
+
+test('production upgrade requires nonempty authenticated state read back from the exact old executable version', () => {
+  assert.equal(typeof installerAcceptance.assertPreviousRuntimeWitness, 'function')
+  const { snapshot, witness } = witnessedOldHome()
+  assert.doesNotThrow(() => installerAcceptance.assertPreviousRuntimeWitness(witness, snapshot, '5.1.0'))
+  for (const invalid of [undefined, { ...witness, version: '5.0.1' }, { ...witness, authenticatedChat: false },
+    { ...witness, readBack: false }, { ...witness, credentialSource: 'environment' }, { ...witness, sessions: [] }]) {
+    assert.throws(() => installerAcceptance.assertPreviousRuntimeWitness(invalid, snapshot, '5.1.0'))
+  }
+})
+
+test('old-program proof cannot name invented, empty or different-workspace sessions or missing file credentials', () => {
+  assert.equal(typeof installerAcceptance.assertPreviousRuntimeWitness, 'function')
+  const { snapshot, witness } = witnessedOldHome()
+  for (const invalid of [
+    { ...snapshot, sessions: [] },
+    { ...snapshot, sessions: snapshot.sessions.map(session => ({ ...session, messages: [] })) },
+    { ...snapshot, sessions: snapshot.sessions.map(session => ({ ...session, cwd: '/another-project' })) },
+    { ...snapshot, credentials: { refs: {} } },
+    { ...snapshot, providers: {} },
+    { ...snapshot, sessions: [...snapshot.sessions, { ...snapshot.sessions[0], id: 'unrelated-duplicated-history' }] },
+  ]) assert.throws(() => installerAcceptance.assertPreviousRuntimeWitness(witness, invalid, '5.1.0'))
+})
+
+test('a missing old-program witness fails before synthetic fixture seeding or current Setup execution', async context => {
+  const fixture = await upgradeFixture(context)
+  const original = await readFile(join(fixture.profile, 'cordis.patch.yml'))
+  let installs = 0
+  await assert.rejects(installerAcceptance.verifyInstallerUpgrade({ ...fixture, requirePreviousRuntime: true,
+    previousVersion: '5.1.0', install: async () => { installs++ }, launch: async () => ({ elapsedMs: 1 }),
+  }), /old|witness|previous/iu)
+  assert.equal(installs, 0)
+  assert.deepEqual(await readFile(join(fixture.profile, 'cordis.patch.yml')), original)
+})
+
+for (const phase of ['install', 'startup']) {
+  test(`stored third-party Key deletion during ${phase} fails production upgrade preservation`, async context => {
+    const fixture = await upgradeFixture(context)
+    const keyPath = join(fixture.dshHome, '.credentials.yaml')
+    await writeFile(keyPath, stringify({ version: 1, records: {}, refs: { OLD_PROVIDER_KEY: 'synthetic-retained-key' } }))
+    let launches = 0
+    await assert.rejects(installerAcceptance.verifyInstallerUpgrade({ ...fixture,
+      install: async () => { if (phase === 'install') await rm(keyPath) },
+      launch: async () => { launches++; if (phase === 'startup') await rm(keyPath); return { elapsedMs: 1 } },
+    }), /credential|preserv|ENOENT/iu)
+    assert.equal(launches, phase === 'install' ? 0 : 1)
+  })
+}
+
+test('old SDK providers stored only in active Home settings participate in the pre-upgrade witness', async context => {
+  const fixture = await upgradeFixture(context)
+  await writeFile(join(fixture.profile, 'cordis.patch.yml'), '[]\n')
+  assert.equal(typeof installerAcceptance.snapshotInstalledUpgradeHome, 'function')
+  const snapshot = await installerAcceptance.snapshotInstalledUpgradeHome(fixture.dshHome)
+  assert.deepEqual(snapshot.providers['existing-provider'], fixture.existingProvider)
+})
+
+test('an imported backup alone is never evidence that an old provider is active', async context => {
+  const fixture = await upgradeFixture(context)
+  await writeFile(join(fixture.dshHome, 'settings.yaml.imported'), await readFile(join(fixture.dshHome, 'settings.yaml')))
+  await writeFile(join(fixture.dshHome, 'settings.yaml'), '{}\n')
+  await writeFile(join(fixture.profile, 'cordis.patch.yml'), '[]\n')
+  assert.equal(typeof installerAcceptance.snapshotInstalledUpgradeHome, 'function')
+  assert.deepEqual((await installerAcceptance.snapshotInstalledUpgradeHome(fixture.dshHome)).providers, {})
+})
+
+test('an active Home Cordis provider is captured without manufacturing a profile entry', async context => {
+  const fixture = await upgradeFixture(context)
+  await writeFile(join(fixture.dshHome, 'settings.yaml'), '{}\n')
+  await writeFile(join(fixture.profile, 'cordis.patch.yml'), '[]\n')
+  await writeFile(join(fixture.dshHome, 'cordis.patch.yml'), stringify([{ id: 'llm-pi-ai', config: { providers: {
+    'root-provider': { apiKeyEnv: 'ROOT_FILE_KEY', baseURL: 'http://127.0.0.1:9/v1' },
+  } } }]))
+  const snapshot = await installerAcceptance.snapshotInstalledUpgradeHome(fixture.dshHome)
+  assert.equal(snapshot.providers['root-provider']?.apiKeyEnv, 'ROOT_FILE_KEY')
+})

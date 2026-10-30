@@ -7,6 +7,9 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
+import { windowsInstallerTestOptions } from './fixtures/installer-platform.mjs'
+
+const windowsOnly = windowsInstallerTestOptions()
 
 const desktopRoot = join(import.meta.dirname, '..')
 const execFileAsync = promisify(execFile)
@@ -209,7 +212,8 @@ test('NSIS preflight cleans only stale processes owned by the previous install',
   assert.match(transaction, /\[System\.IO\.Directory\]::Move/u)
   assert.match(transaction, /\.dsh-desktop-update-old-/u)
   assert.doesNotMatch(transaction, /[^\x00-\x7F]/u)
-  assert.match(cleanup, /IndexOf\(\$root, \$comparison\)/u)
+  assert.match(cleanup, /Test-RunnerArguments/u)
+  assert.doesNotMatch(cleanup, /IndexOf\(\$root, \$comparison\)/u)
   assert.match(cleanup, /Get-CommandLineVariants/u)
   assert.match(cleanup, /\\u62D2\\u7EDD\\u8BBF\\u95EE/u)
   assert.doesNotMatch(cleanup, /[^\x00-\x7F]/u)
@@ -648,6 +652,7 @@ test('Windows upgrade transaction helper survives NSIS plugin cleanup for commit
   try {
     await mkdir(supportDirectory, { recursive: true })
     await copyFile(upgradeTransactionScript, stableTransactionScript)
+    await copyFile(join(desktopRoot, 'build', 'installer-runtime-restore.ps1'), join(supportDirectory, 'installer-runtime-restore.ps1'))
     await writeInstall('3.3.0')
 
     await beginFromEphemeralPlugin('nsm51FB.tmp')
@@ -766,6 +771,91 @@ test('Windows installer transaction commits two upgrades and restores the prior 
   }
 })
 
+test('independent Node and encoded PowerShell processes only mentioning an install survive cleanup', { ...windowsOnly, timeout: 30_000 }, async t => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-cleanup-reference-'))
+  const install = join(temporary, 'desktop')
+  const sibling = join(temporary, 'desktop-tools', 'worker.js')
+  const children = []
+  const externalChildPids = []
+  t.after(async () => {
+    for (const processId of externalChildPids) { try { process.kill(processId) } catch {} }
+    for (const child of children) if (child.exitCode === null && child.signalCode === null) child.kill()
+    await Promise.all(children.map(child => child.exitCode !== null || child.signalCode !== null ? undefined : once(child, 'exit')))
+    await rm(temporary, { recursive: true, force: true })
+  })
+  await mkdir(install)
+  await mkdir(join(sibling, '..'))
+  await writeFile(sibling, 'setInterval(() => {}, 1000)\n')
+  const cli = join(install, 'resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh/lib/bin.js')
+  await mkdir(join(cli, '..'), { recursive: true })
+  await writeFile(cli, 'setInterval(() => {}, 1000)\n')
+  for (const args of [['-e', 'setInterval(() => {}, 1000)', install], [sibling],
+    ['-e', 'setInterval(() => {}, 1000)', cli, '--profile', 'desktop', '--port', '0']]) {
+    const child = spawn(process.execPath, args, { windowsHide: true, stdio: 'ignore' })
+    children.push(child)
+    await once(child, 'spawn')
+  }
+  const powershell = join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe')
+  const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(`Write-Output '${install.replaceAll("'", "''")}'; Start-Sleep -Seconds 300`, 'utf16le').toString('base64')],
+  { windowsHide: true, stdio: 'ignore' })
+  children.push(child)
+  await once(child, 'spawn')
+  const literal = value => "'" + value.replaceAll("'", "''") + "'"
+  const decoyArguments = `--expose-internals "${cli}" --profile desktop --port 0`
+  const overrideScript = [
+    "$ErrorActionPreference = 'Stop'", '$startInfo = New-Object System.Diagnostics.ProcessStartInfo',
+    `$startInfo.FileName = ${literal(process.execPath)}`, `$startInfo.Arguments = ${literal(decoyArguments)}`,
+    // The SDK arguments are data only: this actual write starts an unrelated Node.
+    `$startInfo.Arguments = ${literal('-e "setInterval(() => {}, 1000)"')}`,
+    '$startInfo.CreateNoWindow = $false', '$startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden',
+    '$runtime = New-Object System.Diagnostics.Process', '$runtime.StartInfo = $startInfo', '[void] $runtime.Start()',
+    "[Console]::Out.WriteLine('fixture-independent-pid:' + $runtime.Id)", '$runtime.WaitForExit()', 'exit $runtime.ExitCode',
+  ].join('\n')
+  const decoy = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(overrideScript, 'utf16le').toString('base64')], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+  children.push(decoy)
+  await once(decoy, 'spawn')
+  const [pidLine] = await once(decoy.stdout, 'data')
+  const independentChild = Number(/fixture-independent-pid:(\d+)/u.exec(pidLine.toString())?.[1])
+  assert.ok(independentChild > 0)
+  externalChildPids.push(independentChild)
+  await waitForWindowsProcessCommandLines(children.map(child => child.pid))
+  await execFileAsync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', join(desktopRoot, 'build/cleanup-stale-processes.ps1'), '-InstallDirectory', install], { windowsHide: true, timeout: 15_000 })
+  for (const child of children) assert.doesNotThrow(() => process.kill(child.pid, 0), `independent PID ${child.pid} was killed for only mentioning an install`)
+})
+
+for (const mode of ['-File', '-f', '-Command', '-c']) test(`PowerShell ${mode} script arguments cannot impersonate a host EncodedCommand runner`, { ...windowsOnly, timeout: 30_000 }, async t => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-cleanup-file-boundary-'))
+  const install = join(temporary, 'desktop')
+  const cli = join(install, 'resources/app.asar.unpacked/node_modules/@deepseek-ai/dsh/lib/bin.js')
+  const audit = join(temporary, 'audit.ps1'), receipt = join(temporary, 'received-base64.txt')
+  await mkdir(join(cli, '..'), { recursive: true })
+  await writeFile(cli, 'setInterval(() => {}, 1000)\n')
+  const literal = value => "'" + value.replaceAll("'", "''") + "'"
+  const script = `& ${literal(process.execPath)} '--expose-internals' ${literal(cli)} '--profile' 'desktop' '--port' '0' | ForEach-Object { [Console]::Out.WriteLine($_) }\nexit $LASTEXITCODE`
+  const base64 = Buffer.from(script, 'utf16le').toString('base64')
+  await writeFile(audit, `param([string] $EncodedCommand)\n[IO.File]::WriteAllText(${literal(receipt)}, $EncodedCommand)\nStart-Sleep -Seconds 300\n`)
+  const powershell = join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe')
+  const entry = mode.toLowerCase().startsWith('-c') ? `& ${literal(audit)}` : audit
+  const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', mode, entry, '-EncodedCommand', base64],
+    { windowsHide: true, stdio: 'ignore' })
+  const exited = once(child, 'exit')
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) { child.kill(); await exited }
+    await rm(temporary, { recursive: true, force: true })
+  })
+  await once(child, 'spawn')
+  await waitUntil(() => readFile(receipt, 'utf8').then(value => value === base64, () => false), 8_000, 'independent audit script did not save its argument')
+  assert.equal(await readFile(receipt, 'utf8'), base64, `The real ${mode} script must receive the encoded text only as data`)
+  await waitForWindowsProcessCommandLines([child.pid])
+  await execFileAsync(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', join(desktopRoot, 'build/cleanup-stale-processes.ps1'), '-InstallDirectory', install], { windowsHide: true, timeout: 15_000 })
+  assert.doesNotThrow(() => process.kill(child.pid, 0), `Independent ${mode} script was killed because its data parameter resembled a host flag`)
+  assert.equal(await readFile(receipt, 'utf8'), base64)
+})
+
 test('Windows 2.2 installer check terminates owned processes and legacy same-name app copies without killing unrelated runtimes', {
   skip: process.platform !== 'win32',
   timeout: 30_000,
@@ -828,10 +918,11 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
     pluginDescendantPid = Number.parseInt(pidChunk.toString('utf8').trim(), 10)
     assert.equal(Number.isInteger(pluginDescendantPid), true)
     assert.doesNotThrow(() => process.kill(pluginDescendantPid, 0))
+    const legacyCli = join(installDirectory, 'resources', 'app.asar.unpacked', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+    await mkdir(join(legacyCli, '..'), { recursive: true })
+    await writeFile(legacyCli, 'setInterval(() => {}, 1000)\n')
     const attributedProcess = spawn(process.execPath, [
-      '-e',
-      'setInterval(() => {}, 1000)',
-      installDirectory,
+      '--expose-internals', legacyCli, '--profile', 'desktop', '--port', '0',
     ], {
       windowsHide: true,
       stdio: 'ignore',
@@ -853,7 +944,7 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
       '-WindowStyle',
       'Hidden',
       '-EncodedCommand',
-      Buffer.from(`Write-Host "${installDirectory}"; Start-Sleep -Seconds 300`, 'utf16le').toString('base64'),
+      Buffer.from(`& '${process.execPath.replaceAll("'", "''")}' '--expose-internals' '${legacyCli.replaceAll("'", "''")}' '--profile' 'desktop' '--port' '0' | ForEach-Object { [Console]::Out.WriteLine($_) }\nexit $LASTEXITCODE`, 'utf16le').toString('base64'),
     ], {
       windowsHide: true,
       stdio: 'ignore',
@@ -861,6 +952,24 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
     const encodedAttributedExit = once(encodedAttributed, 'exit')
     ownedProcesses.push({ child: encodedAttributed, exit: encodedAttributedExit })
     await once(encodedAttributed, 'spawn')
+    const psLiteral = value => "'" + value.replaceAll("'", "''") + "'"
+    const modernArguments = ['--expose-internals', legacyCli, '--profile', 'desktop', '--port', '0']
+      .map(value => /\s/u.test(value) ? '"' + value + '"' : value).join(' ')
+    const modernScript = [
+      "$ErrorActionPreference = 'Stop'",
+      '$startInfo = New-Object System.Diagnostics.ProcessStartInfo',
+      `$startInfo.FileName = ${psLiteral(process.execPath)}`,
+      `$startInfo.Arguments = ${psLiteral(modernArguments)}`,
+      '$startInfo.UseShellExecute = $false', '$startInfo.CreateNoWindow = $false',
+      '$startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden',
+      '$runtime = New-Object System.Diagnostics.Process', '$runtime.StartInfo = $startInfo',
+      '[void] $runtime.Start()', "[Console]::Out.WriteLine('dsh desktop runtime pid aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ' + $runtime.Id)",
+      '$runtime.WaitForExit()', 'exit $runtime.ExitCode',
+    ].join('\n')
+    const modernWrapper = spawn(powershellExecutable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+      Buffer.from(modernScript, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore' })
+    ownedProcesses.push({ child: modernWrapper, exit: once(modernWrapper, 'exit') })
+    await once(modernWrapper, 'spawn')
     encodedUnrelatedProcess = spawn(powershellExecutable, [
       '-NoLogo',
       '-NoProfile',
@@ -886,6 +995,7 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
     await waitForWindowsProcessCommandLines([
       attributedProcess.pid,
       encodedAttributed.pid,
+      modernWrapper.pid,
       encodedUnrelatedProcess.pid,
       officialWebProcess.pid,
     ])

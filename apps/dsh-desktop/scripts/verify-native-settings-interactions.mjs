@@ -8,6 +8,7 @@ import { parse } from 'yaml'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { installSidebarLedgerDiagnostic, captureSidebarLedgerDiagnostic } from './sidebar-ledger-diagnostic-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const startupTimeout = Math.max(120000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120000)
@@ -20,9 +21,12 @@ await mkdir(screenshots, { recursive: true })
 await seedPrimaryRuntimePermissionForTest({ userData })
 await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
 await writeFile(join(home, 'cordis.patch.yml'), '- id: ui-settings-account\n  config:\n    step: done\n    completion: skipped\n')
+const sidebarDiagnostic = process.env.DSH_DESKTOP_SIDEBAR_LEDGER_DIAGNOSTIC === '1'
+if (sidebarDiagnostic) await installSidebarLedgerDiagnostic(home)
 let app
 let page
 const rendererErrors = []
+const consoleEvents = []
 
 async function waitForSavedLinkOpening(expected) {
   const deadline = Date.now() + 15000
@@ -38,11 +42,16 @@ async function waitForSavedLinkOpening(expected) {
 try {
   const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
   app = await electron.launch({ executablePath: executable || electronPath,
+    ...(sidebarDiagnostic ? { timeout: startupTimeout } : {}),
     args: executable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_DESKTOP_USER_DATA: userData, DSH_HOME: home, DSH_AGENTS_HOME: join(temporary, 'agents'),
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0' } })
+  if (sidebarDiagnostic) console.log('sidebar diagnostic Electron root', app.process().pid)
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
+  if (sidebarDiagnostic) page.on('console', message => {
+    if (['error', 'warning'].includes(message.type())) consoleEvents.push({ type: message.type(), text: message.text().slice(0, 8000) })
+  })
   page.on('pageerror', error => rendererErrors.push(error.message))
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
   await page.getByRole('button', { name: '标准模式', exact: true }).waitFor({ timeout: startupTimeout })
@@ -103,6 +112,7 @@ try {
   await page.screenshot({ path: join(screenshots, 'shortcuts.png') })
   await page.keyboard.press('Escape')
   const settings = await dialog.isVisible() ? dialog : await openSettings()
+  if (sidebarDiagnostic) await captureSidebarLedgerDiagnostic(page, join(screenshots, 'sidebar-ledger-before-wait.json'), consoleEvents)
   await settings.getByRole('button', { name: '侧边卡片', exact: true }).click()
   const card = settings.locator('button[aria-pressed]').first()
   await card.waitFor()
@@ -152,6 +162,7 @@ try {
   console.log('PASS ordinary usage footer click opens the shared official usage section in the existing Dock')
   console.log(JSON.stringify({ temporary, screenshots }))
 } catch (error) {
+  if (sidebarDiagnostic && page) await captureSidebarLedgerDiagnostic(page, join(screenshots, 'sidebar-ledger-failure.json'), [...consoleEvents, ...rendererErrors.map(text => ({ type: 'pageerror', text }))]).catch(probeError => console.error('sidebar diagnostic capture failed', probeError.message))
   await page?.screenshot({ path: join(screenshots, 'failure.png') }).catch(() => {})
   console.error(JSON.stringify({ temporary, screenshots, error: error.message }))
   throw error

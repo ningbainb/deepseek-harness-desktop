@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { DockPluginOptions, pluginOptionsKeys } from '../src/client/DockPluginOptions.tsx'
+import { createPluginOptionsDirectory } from '../src/client/plugin-options-directory.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -52,4 +53,41 @@ it('shows an explicit unavailable state instead of another package configuration
   render(<DockPluginOptions directory={{ keys: () => ['other#entry'], subscribe: () => () => {} }} plugin="search" renderSlot={renderSlot as never} t={translate} />)
   expect(screen.getByRole('status').textContent).toBe(zh.pluginOptionsUnavailable)
   expect(renderSlot).not.toHaveBeenCalled()
+})
+
+it('opens a native settings section alongside existing row configuration and retains drafts', async () => {
+  const renderSlot = vi.fn((name: string, _owner: unknown, options: { only?: string; entryKey?: string }) =>
+    <input aria-label={`${name}:${options.only ?? options.entryKey}`} />)
+  render(<DockPluginOptions directory={{ keys: () => ['dsh-builtin-browser#row', 'dsh-builtin-browser#section:dsh-builtin-browser'], subscribe: () => () => {} }} plugin="dsh-builtin-browser" renderSlot={renderSlot as never} t={translate} />)
+  const row = await screen.findByLabelText('plugins.row.config:dsh-builtin-browser#row')
+  fireEvent.change(row, { target: { value: 'unsaved' } })
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: 'dsh-builtin-browser#section:dsh-builtin-browser' } })
+  await screen.findByLabelText('settings.section:dsh-builtin-browser')
+  expect(renderSlot).toHaveBeenCalledWith('settings.section', { close: expect.any(Function) }, expect.objectContaining({ only: 'dsh-builtin-browser' }))
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: 'dsh-builtin-browser#row' } })
+  expect((screen.getByLabelText('plugins.row.config:dsh-builtin-browser#row') as HTMLInputElement).value).toBe('unsaved')
+})
+
+it('tracks live native sections and both slot subscriptions without exposing another owner', () => {
+  const entries = new Map<string, Array<{ options: { key?: string; id?: string } }>>([
+    ['plugins.row.config', [{ options: { key: 'search#main' } }]],
+    ['settings.section', [{ options: { id: 'prompt-pilot' } }, { options: { id: 'models' } }]],
+  ])
+  const listeners = new Map<string, () => void>()
+  const dispose = vi.fn()
+  const directory = createPluginOptionsDirectory({
+    entriesOfSlot: key => entries.get(key) ?? [],
+    subscribe: (key, listener) => { listeners.set(key, listener); return dispose },
+  })
+  expect(directory.keys()).toEqual(['search#main', '@local/dsh-prompt-pilot#section:prompt-pilot'])
+  const notify = vi.fn()
+  const unsubscribe = directory.subscribe(notify)
+  expect([...listeners.keys()]).toEqual(['plugins.row.config', 'settings.section'])
+  entries.set('settings.section', [{ options: { id: 'dsh-builtin-browser' } }])
+  listeners.get('settings.section')!()
+  expect(notify).toHaveBeenCalledOnce()
+  expect(pluginOptionsKeys(directory.keys(), '@local/dsh-prompt-pilot')).toEqual([])
+  expect(pluginOptionsKeys(directory.keys(), 'dsh-builtin-browser')).toEqual(['dsh-builtin-browser#section:dsh-builtin-browser'])
+  unsubscribe()
+  expect(dispose).toHaveBeenCalledTimes(2)
 })

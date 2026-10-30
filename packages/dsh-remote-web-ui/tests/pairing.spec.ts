@@ -244,14 +244,14 @@ describe('PairingService', () => {
     expect(stoppedService.snapshot().deviceCount).toBe(0)
     expect(revoked.some(value => value.startsWith('revoked:'))).toBe(true)
 
-    resolveBind = undefined
+    let resolveRefreshedBind: ((value: { principalId: string }) => void) | undefined
     markStarted = undefined
     const refreshedStarted = new Promise<void>(resolve => { markStarted = resolve })
     const refreshedService = makeService({}, {
       bindDevice: async (deviceId) => {
         markStarted?.()
         return await new Promise<{ principalId: string }>(resolve => {
-          resolveBind = resolve
+          resolveRefreshedBind = resolve
         })
       },
       revokeDevice: async () => true,
@@ -260,7 +260,7 @@ describe('PairingService', () => {
     const refreshedAccept = refreshedService.acceptAsync(oldToken)
     await refreshedStarted
     refreshedService.issue()
-    resolveBind?.({ principalId: 'principal-late-refresh' })
+    resolveRefreshedBind?.({ principalId: 'principal-late-refresh' })
     expect(await refreshedAccept).toEqual({ ok: false, code: 'invalid' })
     expect(refreshedService.snapshot().deviceCount).toBe(0)
   })

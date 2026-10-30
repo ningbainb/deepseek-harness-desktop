@@ -123,6 +123,51 @@ describe('ValueMode Request Routing', () => {
     expect(result.reasoningEffort).toBe('high')
   })
 
+  it.each(['controller', 'subagent'])('does not carry source effort into an undeclared %s target', async role => {
+    apply(ctx, {
+      enabled: true,
+      executor: { provider: 'deepseek', model: 'deepseek-chat' },
+      expert: { provider: 'openai', model: 'gpt-4o' },
+    })
+    const source = Object.freeze({ provider: 'source', model: 'reasoner', reasoningEffort: 'high', temperature: 0.3 })
+    const result = await ctx.bail('agent/request', {
+      agent: { id: `effort-${role}`, session: { header: {
+        agentPreset: 'value-mode', ...(role === 'subagent' ? { origin: 'subagent' } : {}),
+      } } }, turn: 1, step: 1, signal: new AbortController().signal,
+    } as never, async () => source as LlmCallConfig)
+    expect(result.provider).toBe(role === 'subagent' ? 'deepseek' : 'openai')
+    expect(result.model).toBe(role === 'subagent' ? 'deepseek-chat' : 'gpt-4o')
+    expect(Object.hasOwn(result, 'reasoningEffort')).toBe(false)
+    expect(result.temperature).toBe(0.3)
+    expect(source.reasoningEffort).toBe('high')
+  })
+
+  it.each([
+    { efforts: ['high'], want: 'high' },
+    { efforts: ['low'], want: undefined },
+    { efforts: [], want: undefined },
+  ])('uses the exact target declared efforts $efforts', async ({ efforts, want }) => {
+    ctx.llm.resolveModelInfo = async () => ({ provider: 'openai', id: 'gpt-4o', name: 'Target model',
+      reasoning: { efforts: efforts.map(id => ({ id, name: id })) } }) as never
+    apply(ctx, { enabled: true, executor: { provider: 'deepseek', model: 'deepseek-chat' },
+      expert: { provider: 'openai', model: 'gpt-4o' } })
+    const result = await ctx.bail('agent/request', {
+      agent: { id: 'declared-effort', session: { header: { agentPreset: 'value-mode' } } },
+      turn: 1, step: 1, signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'source', model: 'reasoner', reasoningEffort: 'high' }))
+    expect(result.reasoningEffort).toBe(want)
+  })
+
+  it('preserves effort when the resolved request already has the exact target route', async () => {
+    apply(ctx, { enabled: true, executor: { provider: 'deepseek', model: 'deepseek-chat' },
+      expert: { provider: 'openai', model: 'gpt-4o' } })
+    const result = await ctx.bail('agent/request', {
+      agent: { id: 'same-route', session: { header: { agentPreset: 'value-mode' } } },
+      turn: 1, step: 1, signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'openai', model: 'gpt-4o', reasoningEffort: 'high' }))
+    expect(result.reasoningEffort).toBe('high')
+  })
+
   it('safely degrades and does not crash when provider is unavailable', async () => {
     // LLM runtime has only 'deepseek' provider, but executor is configured for 'missing-prov'
     ctx.llm = {

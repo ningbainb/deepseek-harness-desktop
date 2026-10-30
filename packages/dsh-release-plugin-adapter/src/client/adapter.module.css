@@ -1,0 +1,11 @@
+.panel { display: grid; gap: 28px; padding: 16px; color: inherit; }
+.section { display: grid; gap: 10px; }
+.section h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.section p { margin: 0; line-height: 1.6; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.control { display: flex; gap: 8px; align-items: center; }
+.notice { font-size: .875rem; opacity: .8; }
+.predictionHint { display: inline; visibility: hidden; flex-shrink: 0; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 18px; pointer-events: none; user-select: none; }
+:global([data-conversation-session]:has([data-composer-card] .pp-inline-active):not(:has([data-composer-composing="true"]))) .predictionHint { visibility: visible; }
+@media (max-width: 640px) { .predictionHint { flex-shrink: 1; } }
+:global(html:not([data-desktop-dafeiyu-visible="true"]) .dfy-root) { display: none !important; }

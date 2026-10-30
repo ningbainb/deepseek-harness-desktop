@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.2.1-rc.2",
+      "upstreamVersion": "0.2.1-rc.4",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.1.0",
+      "desktopRange": "=5.2.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,28 +55,29 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-10-23",
-      "matrixArtifact": "apps/dsh-desktop/runtime-support/known-good.json",
+      "verifiedAt": "2026-10-27",
+      "matrixArtifact": "docs/archive/2026-10-27-desktop-5.2.0-prediction-guide.md",
       "knownIssues": [
-        "Clean-account Setup installation, overlay upgrade and rollback are not accepted by this local run.",
-        "Local Windows test-package validation only; macOS and Linux native acceptance is pending.",
-        "The preceding 5.0.1 Desktop test run recorded one Host request timeout; the unchanged runtime-integration file passed in isolation.",
-        "The preceding 5.0.1 source regression collection recorded one settings-reload timeout; its unchanged isolated retry passed."
+        "Clean-account Setup installation, overlay upgrade and rollback are not certified by isolated executable acceptance.",
+        "Final repository and packaged acceptance receipts are tracked separately from these installed-input identities.",
+        "Local Windows Runtime/SDK compatibility evidence only; macOS and Linux require separate native acceptance.",
+        "The companion-default snapshot passed Windows source-core 30/30; the subsequent presentation-only Tab guide passed its own 13 native checks and 880x640 geometry acceptance. The full source-core gate was not repeated for the guide; no rebuilt installer is certified.",
+        "The prior local 5.2.0 installer has its own historical packaged acceptance; it predates these companion-default changes. No installer was rebuilt for the current source inputs."
       ],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.2.1-rc.2",
-          "integrity": "sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==",
+          "version": "0.2.1-rc.4",
+          "integrity": "sha512-8gxl6zOi6vx1sDolH+vjh9txrpbXD+t74Z2YfWkEBtR3xP2YEtk0bbLkgLZRnYQgDxCoXitXyXDKn5k0+6iXrg==",
           "files": {
-            "package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+            "package.json": "ab0994ef7fc70a9974d39735d6e30b500b4be3435012b53cab1df149f39bbc5c",
             "lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "523bdc773ae54efc188075a74ff5fb5f755a9248d81552d54ab21fb302e24d72"
+          "sha256": "4d5b511390a9065b9f6aeb5311998c8934f8d7bd2f5655581bc067ff14cbb5e3"
         },
         "slots": [
           "conversation.composer.dock",

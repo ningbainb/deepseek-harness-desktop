@@ -55,6 +55,18 @@ test('Desktop mounts its nonblocking client HMR adapter after the official Web b
     'the bundle must opt in through the profile without a misleading SDK name-guard patch or duplicate insert')
 })
 
+test('Desktop keeps the aggregate update owner while disabling only duplicate embedded update routes', () => {
+  const patch = parse(DESKTOP_PATCH_CONFIG)
+  assert.equal(patch.find(row => row.id === 'web-ui-remote-web-ui')?.config?.embeddedUpdateRoutes, false)
+  assert.notEqual(patch.find(row => row.id === 'web-ui-remote-web-ui')?.disabled, true)
+  assert.notEqual(patch.find(row => row.id === 'web-ui-update')?.disabled, true)
+  const roots = resolveRuntimePackages(['@linxin666/dsh-web-all'])
+  const aggregate = parse(readFileSync(join(roots.get('@linxin666/dsh-web-all'), 'cordis.patch.yml'), 'utf8'))
+  const rows = aggregate.flatMap(row => row.insert ?? [])
+  assert.equal(rows.filter(row => row.id === 'web-ui-update' && row.config?.plugin === '@linxin666/dsh-update').length, 1)
+  assert.equal(rows.filter(row => row.id === 'web-ui-remote-web-ui' && row.config?.plugin === '@linxin666/dsh-remote-web-ui').length, 1)
+})
+
 test('published rc.2 Web aggregate cannot silently remove Desktop-only profile rows', () => {
   const legacy = '@linxin666/dsh-web-ui-all'
   const alpha = '@linxin666/dsh-web-all'

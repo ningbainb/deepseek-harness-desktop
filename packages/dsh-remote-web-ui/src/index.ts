@@ -35,6 +35,7 @@ import {
   type UpdateRunResult,
 } from './update.ts'
 import { makeUpdateRoutes } from './update-routes.ts'
+import { registerRoutesAtomically } from './register-routes.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -132,6 +133,12 @@ export interface Config {
    * sends (Shift+Enter keeps inserting a newline).
    */
   mobileEnterToSend?: boolean
+  /**
+   * Register the embedded /api/update routes (default true for standalone).
+   * Set false when the profile mounts dsh-update as their sole owner.
+   * Composition option: changing it requires a plugin remount.
+   */
+  embeddedUpdateRoutes?: boolean
   /** Master switch for the plugin (browser half + host pairing surfaces). */
   enabled?: boolean
 }
@@ -146,6 +153,7 @@ export const Config = z.object({
   publicBaseUrl: z.string().volatile(),
   autoTunnel: z.boolean().default(false).volatile(),
   mobileEnterToSend: z.boolean().default(true).volatile(),
+  embeddedUpdateRoutes: z.boolean().default(true),
   enabled: z.boolean().default(true).volatile(),
 })
 
@@ -183,6 +191,7 @@ const DEFAULTS: ResolvedConfig = {
   publicBaseUrl: undefined,
   autoTunnel: false,
   mobileEnterToSend: true,
+  embeddedUpdateRoutes: true,
   enabled: true,
 }
 
@@ -203,6 +212,7 @@ export function apply(ctx: Context, config?: LiveConfig): void {
       publicBaseUrl: optionalFieldValue(config?.publicBaseUrl),
       autoTunnel: fieldValue(config?.autoTunnel, DEFAULTS.autoTunnel),
       mobileEnterToSend: fieldValue(config?.mobileEnterToSend, DEFAULTS.mobileEnterToSend),
+      embeddedUpdateRoutes: fieldValue(config?.embeddedUpdateRoutes, DEFAULTS.embeddedUpdateRoutes),
       enabled: fieldValue(config?.enabled, DEFAULTS.enabled),
     }
   }
@@ -367,7 +377,7 @@ export function apply(ctx: Context, config?: LiveConfig): void {
     ...(userScope !== undefined
       ? makeMobileApiRoutes({ service, apiProxy, userScope, sessionSearch, mobileEnterToSend: () => resolve().mobileEnterToSend })
       : []),
-    ...updateRoutes,
+    ...(resolved.embeddedUpdateRoutes ? updateRoutes : []),
   ]
   const gate = makeGateListener(service, {
     remoteApiMode: () => resolve().remoteApiMode,
@@ -407,10 +417,7 @@ export function apply(ctx: Context, config?: LiveConfig): void {
     if (!enabled) service.stop()
     if (disposeRoutes === undefined && enabled) {
       disposeRoutes = ctx.effect(
-        () => {
-          const disposers = routes.map(route => ctx.webServer.register(route))
-          return () => { for (const dispose of disposers) dispose() }
-        },
+        () => registerRoutesAtomically(route => ctx.webServer.register(route), routes),
         'remote-web-ui: pairing routes',
       )
     } else if (disposeRoutes !== undefined && !enabled) {

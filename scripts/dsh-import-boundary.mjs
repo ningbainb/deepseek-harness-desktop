@@ -18,6 +18,7 @@ const CONTROLLED_PREFIXES = Object.freeze([
   'packages/dsh-desktop-compat/src/',
   'packages/dsh-desktop-repair/src/',
   'packages/dsh-web-ui-settings/src/chatgpt-auth',
+  'packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts',
   'packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts',
   'packages/dsh-web-ui-settings/tests/settings-sdk-adapter.ts',
   'packages/dsh-model-preferences/src/client/persist-config.ts',

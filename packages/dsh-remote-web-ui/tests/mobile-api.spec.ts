@@ -113,7 +113,7 @@ describe('mobile api envelope', () => {
         ['session.models', { sessionId: 's-test' }],
         ['session.selectModel', { sessionId: 's-test', provider: 'fx', model: 'fx-1' }],
         ['session.rename', { sessionId: 's-test', title: 'hello' }],
-      ]) {
+      ] as const) {
         const { status, body } = await call(server.port, method, payload)
         expect(status).toBe(200)
         const envelope = JSON.parse(body) as { type?: string; rpcId?: string; result?: { ok?: boolean } }

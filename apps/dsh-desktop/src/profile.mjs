@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
 import { ControlCenterStore, createDefaultControlCenterConfiguration } from './control-center.mjs'
+import { createProfileDirectoryPreparer } from './profile-directory-preparation.mjs'
 import { mergeQqBotPatch, readQqBotPatchEnabled, reconcileManagedPatch } from './extensions/qqbot.mjs'
 
 const DESKTOP_DEPENDENCIES = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dependencies
@@ -43,6 +44,10 @@ export const BUILTIN_BUNDLES = Object.freeze([
   '@linxin666/dsh-session-archive',
   '@tencent-connect/dsh-qqbot',
   'reasoning-slider',
+  '@local/dsh-prompt-pilot',
+  'dsh-dafeiyu-pet',
+  'dsh-builtin-browser',
+  '@linxin666/dsh-release-plugin-adapter',
 ])
 
 export const AGENT_TEAM_PROFILE_BUNDLE = '@deepseek-ai/dsh-experimental-agent-team-profile'
@@ -168,6 +173,10 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
+  '@local/dsh-prompt-pilot',
+  'dsh-dafeiyu-pet',
+  'dsh-builtin-browser',
+  '@linxin666/dsh-release-plugin-adapter',
   'dsh-agent-plugins-market',
   '@linxin666/dsh-desktop-client-hmr',
   ...AGENT_TEAM_RUNTIME_PACKAGES,
@@ -451,6 +460,10 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
   disabled: true
 - id: web-ui-ssh
   disabled: true
+- id: web-ui-remote-web-ui
+  config:
+    plugin: '@linxin666/dsh-remote-web-ui'
+    embeddedUpdateRoutes: false
 - insert:
     - id: desktop-web-ui-settings
       name: '@linxin666/dsh-client-ui-web-ui-settings'
@@ -1287,11 +1300,12 @@ async function linkManagedPackage({
   sourceDir,
   previous,
   legacyDependencySpec,
+  prepareDirectory,
 }) {
   const target = join(profileDir, 'node_modules', ...packagePathSegments(packageName))
   let targetExists
   try {
-    await mkdir(dirname(target), { recursive: true })
+    await prepareDirectory(dirname(target))
     targetExists = await pathExists(target)
   } catch (error) {
     throwProfileNodeModulesBootstrapError('desktop profile managed package path is invalid', error)
@@ -1517,6 +1531,7 @@ export async function ensureDesktopProfile({
     }),
   ))
   changed = retired.some(Boolean) || changed
+  const prepareDirectory = createProfileDirectoryPreparer()
   const linked = await Promise.all(
     [...activePackageRoots]
       .toSorted(([left], [right]) => left.localeCompare(right))
@@ -1528,6 +1543,7 @@ export async function ensureDesktopProfile({
           sourceDir,
           previous: previousRecords[packageName],
           legacyDependencySpec: existing?.dependencies?.[packageName],
+          prepareDirectory,
         }),
       })),
   )

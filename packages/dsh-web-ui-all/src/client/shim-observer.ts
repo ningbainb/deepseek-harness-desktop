@@ -8,7 +8,8 @@ export function needsShimPass(
     const target = record.target
     if (record.type === 'attributes') {
       if (target === sidebar) return true
-      if (record.attributeName === 'class' && (target.contains(sidebar) || columns.includes(target as Element))) return true
+      if ((record.attributeName === 'class' || record.attributeName === 'data-sidebar-collapsed')
+        && (target.contains(sidebar) || columns.includes(target as Element))) return true
       return sidebar.contains(target) && Boolean((target as Element).matches?.('[data-slot="sidebar.footer.action"]'))
     }
     if (target === sidebar || target.contains(sidebar)) return true

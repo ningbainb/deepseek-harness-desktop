@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
+import { nativePluginSettingsSection } from './plugin-options-directory.ts'
 import css from './dock-settings.module.css'
 
 export interface PluginOptionsDirectory {
@@ -15,7 +16,7 @@ export function pluginOptionsKeys(keys: readonly string[], plugin?: string): str
 export function DockPluginOptions({ directory, plugin, renderSlot, t }: {
   directory?: PluginOptionsDirectory
   plugin?: string
-} & PropsRenderSlots<'plugins.row.config'> & PropsLocale<'web-ui-plugins'>) {
+} & PropsRenderSlots<'plugins.row.config' | 'settings.section'> & PropsLocale<'web-ui-plugins'>) {
   const [keys, setKeys] = useState<string[]>([])
   const [selected, setSelected] = useState('')
   const [visited, setVisited] = useState<string[]>([])
@@ -25,6 +26,11 @@ export function DockPluginOptions({ directory, plugin, renderSlot, t }: {
     return directory?.subscribe(update)
   }, [directory, plugin])
   const active = keys.includes(selected) ? selected : keys[0]
+  const label = (key: string) => {
+    const section = nativePluginSettingsSection(key)
+    return section === 'prompt-pilot' ? t('pluginOptionsPrompt') : section === 'dsh-builtin-browser'
+      ? t('pluginOptionsBrowser') : section === 'release-plugin-adapter' ? t('pluginOptionsExtensions') : key
+  }
   useEffect(() => {
     if (active) setVisited(previous => previous.includes(active) ? previous : [...previous, active])
   }, [active])
@@ -34,11 +40,13 @@ export function DockPluginOptions({ directory, plugin, renderSlot, t }: {
     <p>{t('pluginOptionsDescription')}</p>
     {!active ? <p role="status">{t('pluginOptionsUnavailable')}</p> : <>
       <label>{t('pluginOptionsEntry')} <select value={active} onChange={event => setSelected(event.target.value)}>
-        {keys.map(key => <option key={key} value={key}>{key}</option>)}
+        {keys.map(key => <option key={key} value={key}>{label(key)}</option>)}
       </select></label>
       {visited.filter(key => keys.includes(key)).map(key => <section key={key} hidden={key !== active} data-dsh-plugin-options={key}>
         <SafePluginBoundary pluginName={key} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
-          {renderSlot('plugins.row.config', { view: 'page' }, { entryKey: key, fallback: <p role="status">{t('pluginOptionsUnavailable')}</p> })}
+          {nativePluginSettingsSection(key)
+            ? renderSlot('settings.section', { close: () => {} }, { only: nativePluginSettingsSection(key), fallback: <p role="status">{t('pluginOptionsUnavailable')}</p> })
+            : renderSlot('plugins.row.config', { view: 'page' }, { entryKey: key, fallback: <p role="status">{t('pluginOptionsUnavailable')}</p> })}
         </SafePluginBoundary>
       </section>)}
     </>}

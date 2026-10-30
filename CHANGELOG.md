@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.2.0 - Development candidate
+
+- 适配官方公开 NPM Runtime/SDK `0.2.1-rc.4` 候选内核，保留全部既有功能与用户配置；Windows 本地测试包已验收，尚未正式发布。
+- 接入已校验原字节的 Prompt Pilot 1.2.3、全身桌宠 0.2.0、操控浏览器 0.4.14；自有适配与原包分离，保留原桌宠和浏览器能力。
+- 集中处理跨皮肤的桌面共用侧栏底部布局，保留折叠、设置与全部底部入口。
+- 修复完整 profile 合并时的配对服务挂载，及中断迁移恢复晚于配置读取导致后续重载丢失模型的问题；机械盘冷启动使用有界 10 分钟等待，避免正常加载被过早重试。
+- 修复桌宠遮挡输入与位置保存镜像竞态，自动避让保留用户原始位置偏好。Windows 新整轮成品 45/45、全部皮肤布局 160/160、旧 5.1.0→新 5.2.0 隔离 EXE 升级 17/17 通过；macOS/Linux 和当前账号真实 Setup 覆盖安装未认证。
+
+- Target official public NPM Runtime/SDK `0.2.1-rc.4`, preserving existing capabilities and preferences. The local Windows test package is validated; formal publication is incomplete.
+- Integrate original hash-verified Prompt Pilot 1.2.3, full-body companion 0.2.0 and visible browser 0.4.14 through separate Desktop-owned adaptation, retaining existing companions and browser providers.
+- Address the shared sidebar footer layout across skins while retaining collapse behavior, settings and footer controls.
+- Restore pairing-service mounting through full profile composition and recover interrupted migration before reading configuration so later reloads retain models. A bounded ten-minute cold-start budget avoids restarting normal disk loading prematurely.
+- Fix companion/composer overlap and asynchronous position-save races while preserving the user's intended position. A fresh Windows packaged round passed 45/45, the skin geometry matrix passed 160/160, and isolated actual 5.1.0-to-5.2.0 EXE upgrade checks passed 17/17. macOS/Linux and current-account real Setup overlay installation are not certified.
+
 ## 5.1.0 - 2026-10-25
 
 - 三端同版发布，官方 NPM Runtime/SDK `0.2.1-rc.2`、Electron `44.0.0`；macOS arm64 要求 macOS 13 Ventura 及以上，未签名、未公证，macOS/Linux 仍为 Preview。Linux 本版仅 Ubuntu 22.04 原生 Runner 验证，Ubuntu 24 历史证据不冒充新版。

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createSessionInWorkspace, reenterSessionInWorkspace } from '../scripts/agent-workspace-navigation-fixture.mjs'
+import { createSessionInWorkspace, createIsolatedFreshSessionInWorkspace, reenterSessionInWorkspace } from '../scripts/agent-workspace-navigation-fixture.mjs'
 
 const workspaceId = 'workspace-original'
 const workspacePath = 'E:\\fixture\\original'
@@ -109,6 +109,33 @@ test('fresh rejects a request that silently reuses an existing blank', async () 
   const { page } = fixture({ request: { sessionId: originalSessionId } })
   await assert.rejects(createSessionInWorkspace(page, workspaceId))
 })
+
+for (const fail of [false, true]) {
+  test(`isolated fresh navigation restores existing drafts and exact archive/pin metadata on ${fail ? 'failure' : 'success'}`, async () => {
+    const { page, state } = fixture({ ok: !fail })
+    const originals = [{ id: originalSessionId, cwd: workspacePath, blank: true }]
+    const archived = new Set(['already-archived'])
+    const calls = []
+    const rpc = async (_page, method, request) => {
+      calls.push({ method, request })
+      if (method === 'session.list') return { items: [...originals,
+        ...(state.selected === freshSessionId ? [{ id: freshSessionId, cwd: workspacePath, blank: true }] : [])] }
+      if (method === 'workspace.archiveSession') archived.add(request.sessionId)
+      else { assert.equal(method, 'workspace.unarchiveSession'); archived.delete(request.sessionId) }
+      return {}
+    }
+    const pending = createIsolatedFreshSessionInWorkspace({ page, workspaceId, workspacePath, rpc,
+      readWorkspace: async () => ({ archivedSessionIds: [...archived], pinnedSessionIds: ['untouched-pin'] }) })
+    if (fail) await assert.rejects(pending)
+    else assert.equal(await pending, freshSessionId)
+    assert.deepEqual([...archived], ['already-archived'])
+    assert.deepEqual(calls.filter(call => call.method !== 'session.list'), [
+      { method: 'workspace.archiveSession', request: { sessionId: originalSessionId } },
+      { method: 'workspace.unarchiveSession', request: { sessionId: originalSessionId } },
+    ])
+    assert.deepEqual(originals, [{ id: originalSessionId, cwd: workspacePath, blank: true }])
+  })
+}
 
 test('reentry rejects a create request naming a different session', async () => {
   const { page } = fixture({ request: { sessionId: 'session-wrong' } })

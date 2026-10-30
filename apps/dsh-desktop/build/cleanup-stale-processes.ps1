@@ -178,13 +178,8 @@ try {
     })
   }
 
-  # Old runtimes may host descendants (hidden PowerShell/CMD/Node) outside the install
-  # directory. They still block file replacement through working-directory handles or
-  # loaded modules, so attribute them by an install-root reference on the command line.
-  # 2.2 hosts its runtime through powershell -EncodedCommand, where the install path
-  # only exists inside the Base64 payload, so decode those payloads before matching.
-  # Path-only attribution keeps unrelated same-host processes (an official web runtime
-  # using ~/.dsh, same-name apps elsewhere, this script) untouched.
+  # External hosts are owned only when their actual entry point is an installed
+  # SDK runner. A path occurring in an argument or encoded message proves nothing.
   function Get-AncestorProcessIds([uint32] $processId) {
     $ancestors = [System.Collections.Generic.HashSet[uint32]]::new()
     $parents = @{}
@@ -212,28 +207,182 @@ try {
     [void] $excludedProcessIds.Add($ancestorId)
   }
 
-  function Get-CommandLineVariants([string] $commandLine) {
-    $variants = [System.Collections.Generic.List[string]]::new()
-    if ([string]::IsNullOrWhiteSpace($commandLine)) {
-      return , $variants
+  function Split-WindowsArguments([string] $commandLine) {
+    $result = [Collections.Generic.List[string]]::new()
+    $word = [Text.StringBuilder]::new()
+    $quoted = $false
+    $started = $false
+    for ($index = 0; $index -lt $commandLine.Length; $index++) {
+      $character = $commandLine[$index]
+      if (-not $quoted -and [char]::IsWhiteSpace($character)) {
+        if ($started) { $result.Add($word.ToString()); [void] $word.Clear(); $started = $false }
+        continue
+      }
+      $started = $true
+      if ($character -eq '\') {
+        $slashes = 0
+        while ($index -lt $commandLine.Length -and $commandLine[$index] -eq '\') { $slashes++; $index++ }
+        if ($index -lt $commandLine.Length -and $commandLine[$index] -eq '"') {
+          [void] $word.Append(('\' * [int] [math]::Floor($slashes / 2)))
+          if ($slashes % 2) { [void] $word.Append('"') } else { $quoted = -not $quoted }
+        } else { [void] $word.Append(('\' * $slashes)); $index-- }
+      } elseif ($character -eq '"') {
+        if ($quoted -and $index + 1 -lt $commandLine.Length -and $commandLine[$index + 1] -eq '"') {
+          [void] $word.Append('"'); $index++
+        } else { $quoted = -not $quoted }
+      } else { [void] $word.Append($character) }
     }
-    $variants.Add($commandLine)
-    foreach ($match in [System.Text.RegularExpressions.Regex]::Matches(
-      $commandLine,
-      '(?i)-e(?:c|nc(?:odedcommand)?)?\s+"?([A-Za-z0-9+/=]{16,})"?'
-    )) {
-      try {
-        $decoded = [System.Text.Encoding]::Unicode.GetString(
-          [System.Convert]::FromBase64String($match.Groups[1].Value)
-        )
-        if (-not [string]::IsNullOrWhiteSpace($decoded)) {
-          $variants.Add($decoded)
-        }
-      } catch {
-        # Not a Base64 encoded command; the plaintext variant already covers it.
+    if ($quoted) { return , @() }
+    if ($started) { $result.Add($word.ToString()) }
+    return , $result.ToArray()
+  }
+
+  function Test-RunnerArguments([string[]] $arguments) {
+    $index = 0
+    while ($index -lt $arguments.Count -and $arguments[$index] -eq '--expose-internals') { $index++ }
+    $preload = $null
+    if ($index -lt $arguments.Count -and $arguments[$index] -in @('--require', '-r')) {
+      $index++
+      if ($index -ge $arguments.Count) { return $null }
+      $preload = $arguments[$index++]
+    }
+    if ($index -ge $arguments.Count -or -not [IO.Path]::IsPathRooted($arguments[$index])) { return $null }
+    $entry = Get-CanonicalPath $arguments[$index++]
+    $matchedRoot = $null
+    foreach ($root in $rootVariants) {
+      foreach ($relative in @(
+        'resources\app.asar.unpacked\node_modules\@deepseek-ai\dsh\lib\bin.js',
+        'resources\app.asar.unpacked\src\runtime-launcher.mjs',
+        'resources\app.asar.unpacked\dsh\bin.js', 'resources\dsh\bin.js'
+      )) {
+        if ($entry.Equals((Join-Path $root $relative), $comparison) -and (Test-Path -LiteralPath $entry -PathType Leaf)) { $matchedRoot = $root }
       }
     }
+    if ($null -eq $matchedRoot) { return $null }
+    if ($null -ne $preload -and -not (Get-CanonicalPath $preload).Equals(
+      (Join-Path $matchedRoot 'resources\app.asar.unpacked\src\windows-console-preload.cjs'), $comparison)) { return $null }
+    $profileSeen = $false
+    while ($index -lt $arguments.Count) {
+      $option = $arguments[$index++]
+      if ($option -eq '--no-open') { continue }
+      if ($index -ge $arguments.Count) { return $null }
+      $value = $arguments[$index++]
+      switch ($option) {
+        '--profile' {
+          if ($profileSeen -or $value -cnotmatch '^[a-z0-9][a-z0-9._-]{0,63}$') { return $null }
+          $profileSeen = $true
+        }
+        '--port' { if ($value -notmatch '^\d{1,5}$' -or [int] $value -gt 65535) { return $null } }
+        '--host' { if ($value -notin @('127.0.0.1', 'localhost', '0.0.0.0')) { return $null } }
+        '--patch' { if (-not [IO.Path]::IsPathRooted($value)) { return $null } }
+        '--dsh-cli' {
+          if (-not (Get-CanonicalPath $value).Equals((Join-Path $matchedRoot 'resources\app.asar.unpacked\node_modules\@deepseek-ai\dsh\lib\bin.js'), $comparison)) { return $null }
+        }
+        default { return $null }
+      }
+    }
+    if ($profileSeen) { return $matchedRoot }
+    return $null
+  }
+
+  function Get-CommandLineVariants([string] $commandLine) {
+    $variants = [Collections.Generic.List[string]]::new()
+    $arguments = Split-WindowsArguments $commandLine
+    for ($index = 1; $index -lt $arguments.Count; $index++) {
+      $option = $arguments[$index]
+      # File/Command select the host's execution mode. Everything after that
+      # boundary belongs to the script, even if it looks like a host option.
+      if ($option -in @('-f', '-fi', '-fil', '-file', '-c', '-co', '-com', '-comm', '-comma', '-comman', '-command', '-commandwithargs')) {
+        return , $variants
+      }
+      if ($option -in @('-e', '-ec', '-enc', '-encodedcommand')) {
+        if ($index + 1 -ge $arguments.Count) { return , $variants }
+        try {
+          $bytes = [Convert]::FromBase64String($arguments[$index + 1])
+          if ($bytes.Length -le 65536 -and $bytes.Length % 2 -eq 0) { $variants.Add([System.Text.Encoding]::Unicode.GetString($bytes)) }
+        } catch { }
+        return , $variants
+      }
+      if ($option -in @('-nologo', '-noprofile', '-noninteractive', '-noexit', '-mta', '-sta')) { continue }
+      if ($option -in @('-windowstyle', '-w', '-executionpolicy', '-ep', '-ex', '-inputformat', '-outputformat', '-version', '-v', '-psconsolefile', '-configurationname', '-encodedarguments')) {
+        $index++
+        if ($index -ge $arguments.Count) { return , $variants }
+        continue
+      }
+      # An implicit script path or an unrecognized option is not proof that
+      # subsequent tokens are host flags. Fail closed without killing it.
+      return , $variants
+    }
     return , $variants
+  }
+
+  function Get-LiteralString($expression) {
+    $strings = @($expression.FindAll({ param($node) $node -is [Management.Automation.Language.StringConstantExpressionAst] }, $false))
+    if ($strings.Count -eq 1 -and $strings[0].Extent.Text -ceq $expression.Extent.Text.Trim()) { return $strings[0].Value }
+    return $null
+  }
+
+  function Get-PowerShellRunner([string] $script) {
+    $tokens = $null; $parseErrors = $null
+    $ast = [Management.Automation.Language.Parser]::ParseInput($script, [ref] $tokens, [ref] $parseErrors)
+    if ($parseErrors.Count -or $null -ne $ast.ParamBlock -or $null -ne $ast.BeginBlock -or $null -ne $ast.ProcessBlock) { return $null }
+    $statements = @($ast.EndBlock.Statements)
+    $invocation = $null
+    # Released 2.2: a literal call-operator invocation piped to stdout forwarding.
+    if ($statements.Count -eq 2 -and $statements[0] -is [Management.Automation.Language.PipelineAst] -and
+        $statements[1].Extent.Text -match '^exit\s+\$LASTEXITCODE$') {
+      $command = $statements[0].PipelineElements[0]
+      if ($command -isnot [Management.Automation.Language.CommandAst] -or $command.InvocationOperator -ne 'Ampersand') { return $null }
+      $values = [Collections.Generic.List[string]]::new()
+      foreach ($element in $command.CommandElements) {
+        if ($element -isnot [Management.Automation.Language.StringConstantExpressionAst]) { return $null }
+        $values.Add($element.Value)
+      }
+      $invocation = $values.ToArray()
+    # Current Desktop: literal ProcessStartInfo executable/argv, Start and WaitForExit.
+    } elseif ($statements.Count -eq 13 -and
+        $statements[0].Extent.Text -match '^\$ErrorActionPreference\s*=\s*''Stop''$' -and
+        $statements[1].Extent.Text -match '^\$startInfo\s*=\s*New-Object System.Diagnostics.ProcessStartInfo$' -and
+        $statements[2] -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $statements[2].Left.Extent.Text -ceq '$startInfo.FileName' -and
+        $statements[3] -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $statements[3].Left.Extent.Text -ceq '$startInfo.Arguments' -and
+        $statements[4].Extent.Text -match '^\$startInfo.UseShellExecute\s*=\s*\$false$' -and
+        $statements[5].Extent.Text -match '^\$startInfo.CreateNoWindow\s*=\s*\$false$' -and
+        $statements[6].Extent.Text -match '^\$startInfo.WindowStyle\s*=\s*\[System.Diagnostics.ProcessWindowStyle\]::Hidden$' -and
+        $statements[7].Extent.Text -match '^\$runtime\s*=\s*New-Object System.Diagnostics.Process$' -and
+        $statements[8].Extent.Text -match '^\$runtime.StartInfo\s*=\s*\$startInfo$' -and
+        $statements[9].Extent.Text -match '^\[void\]\s*\$runtime.Start\(\)$' -and
+        $statements[10].Extent.Text -match '^\[Console\]::Out.WriteLine\(''dsh desktop runtime pid [a-f0-9]{48}: '' \+ \$runtime.Id\)$' -and
+        $statements[11].Extent.Text -ceq '$runtime.WaitForExit()' -and
+        $statements[12].Extent.Text -ceq 'exit $runtime.ExitCode') {
+      $executable = Get-LiteralString $statements[2].Right
+      $arguments = Get-LiteralString $statements[3].Right
+      if ($null -eq $executable -or $null -eq $arguments) { return $null }
+      $invocation = @($executable) + (Split-WindowsArguments $arguments)
+    }
+    if ($null -eq $invocation -or $invocation.Count -lt 2) { return $null }
+    $root = Test-RunnerArguments $invocation[1..($invocation.Count - 1)]
+    if ($null -ne $root -and ([IO.Path]::GetFileName($invocation[0]) -in @('node.exe', 'electron.exe') -or
+        $invocation[0].Equals((Join-Path $root $mainExecutableName), $comparison))) { return $root }
+    return $null
+  }
+
+  function Get-ExternalRunnerRoot($process) {
+    if ([string]::IsNullOrWhiteSpace($process.CommandLine)) { return $null }
+    if ([IO.Path]::GetFileName([string] $process.ExecutablePath) -in @('node.exe', 'electron.exe')) {
+      $arguments = Split-WindowsArguments $process.CommandLine
+      if ($arguments.Count -gt 1) { return Test-RunnerArguments $arguments[1..($arguments.Count - 1)] }
+    }
+    foreach ($relative in @('System32\WindowsPowerShell\v1.0\powershell.exe', 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe')) {
+      if ([string]::Equals([string] $process.ExecutablePath, (Join-Path $env:SystemRoot $relative), $comparison)) {
+        foreach ($script in (Get-CommandLineVariants $process.CommandLine)) {
+          $root = Get-PowerShellRunner $script
+          if ($null -ne $root) { return $root }
+        }
+      }
+    }
+    return $null
   }
 
   function Get-AttributedInstallProcesses([System.Collections.Generic.HashSet[uint32]] $directProcessIds) {
@@ -268,23 +417,14 @@ try {
         }
         continue
       }
-      foreach ($variant in (Get-CommandLineVariants $cim.CommandLine)) {
-        $matchedRoot = $null
-        foreach ($root in $rootVariants) {
-          if ($variant.IndexOf($root, $comparison) -ge 0) {
-            $matchedRoot = $root
-            break
-          }
-        }
-        if ($null -ne $matchedRoot) {
+      $matchedRoot = Get-ExternalRunnerRoot $cim
+      if ($null -ne $matchedRoot) {
           [pscustomobject]@{
             ProcessId = $processId
             ExecutablePath = if ($cim.ExecutablePath) { $cim.ExecutablePath } else { $cim.Name }
             Kind = 'attributed'
             Root = $matchedRoot
           }
-          break
-        }
       }
     })
   }

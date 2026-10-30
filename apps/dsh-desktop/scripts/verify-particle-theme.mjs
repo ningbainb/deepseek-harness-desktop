@@ -10,6 +10,7 @@ import { openNativeSettings } from './native-settings-fixture.mjs'
 import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
+import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 
@@ -22,6 +23,7 @@ const runtimeFetchGate = resolve(temporary, 'runtime-fetch-gate.txt')
 const runtimeReadyTimeoutMs = 150_000
 let electronApp
 let primaryFailure
+let restoreCompanionPreference
 const pendingHttp = new Map()
 
 try {
@@ -255,6 +257,7 @@ try {
   // Real browser requests: a stalled decorative read must not accumulate on
   // every tick, nor block unrelated settings reads across Runtime views.
   const petReadCounts = [0, 0]
+  restoreCompanionPreference = await useOriginalPetForTest(page)
   const petReadPaths = [[], []]
   const petPages = [page, dockPage]
   const petHandlers = petPages.map((_petPage, index) => request => {
@@ -341,6 +344,7 @@ try {
   throw error
 } finally {
   try {
+    await restoreCompanionPreference?.()
     await closeIsolatedElectron(electronApp)
   } catch (cleanupFailure) {
     if (primaryFailure) throw new AggregateError([primaryFailure, cleanupFailure], 'particle acceptance and cleanup failed', { cause: primaryFailure })
