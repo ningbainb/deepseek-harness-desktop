@@ -430,6 +430,7 @@
         "new-companion-opt-in-preserves-original-companion",
         "full-body-companion-clears-visible-composer-without-saving-automatic-displacement",
         "full-body-companion-keeps-ordinary-send-clicks-and-explicit-dragging",
+        "full-body-companion-clears-native-turn-navigation-and-return-to-bottom-controls",
         "prompt-predictions-are-isolated-by-conversation",
         "vendor-browser-uses-visible-authenticated-electron-host"
       ]

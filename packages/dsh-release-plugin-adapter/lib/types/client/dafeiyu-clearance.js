@@ -33,7 +33,11 @@ export function projectDafeiyuPosition(position, viewport, obstacles) {
         }
     return best ? { left: best.left, top: best.top } : origin;
 }
-const COMPOSER = '[data-composer-card]', WIDGET = '.dfy-root';
+const OBSTACLE = '[data-composer-card], [data-pane="conversation"] nav[aria-label], '
+    + '[data-pane="conversation"] button[aria-label="回到底部"], '
+    + '[data-pane="conversation"] button[aria-label="Back to bottom"], '
+    + '[data-pane="conversation"] button[aria-label="Scroll to bottom"]';
+const WIDGET = '.dfy-root';
 /** One disposable observer lease. The vendor's render path reads cached geometry. */
 export function installDafeiyuClearance(host, document) {
     const previous = Object.getOwnPropertyDescriptor(host, '__dshDafeiyuProjectPosition');
@@ -50,7 +54,7 @@ export function installDafeiyuClearance(host, document) {
             return;
         if (membership) {
             membership = false;
-            composers = [...document.querySelectorAll(COMPOSER)];
+            composers = [...document.querySelectorAll(OBSTACLE)];
             widget = document.querySelector(WIDGET);
             resize?.disconnect();
             for (const element of composers)
@@ -90,14 +94,14 @@ export function installDafeiyuClearance(host, document) {
             if (!target)
                 continue;
             if (record.type === 'attributes') {
-                membersChanged ||= record.attributeName === 'data-composer-card';
+                membersChanged ||= record.attributeName === 'data-composer-card' || record.attributeName === 'aria-label';
                 relevant ||= composers.some(element => element.contains(target) || target.contains(element));
             }
             else {
                 // History can move a same-size composer without resizing the card itself.
                 relevant ||= composers.some(element => (element.closest('[data-pane="conversation"]') ?? element.parentElement)?.contains(target));
                 for (const node of [...record.addedNodes, ...record.removedNodes]) {
-                    if (node instanceof host.Element && (node.matches(`${COMPOSER}, ${WIDGET}`) || node.querySelector(`${COMPOSER}, ${WIDGET}`)))
+                    if (node instanceof host.Element && (node.matches(`${OBSTACLE}, ${WIDGET}`) || node.querySelector(`${OBSTACLE}, ${WIDGET}`)))
                         membersChanged = true;
                 }
             }
@@ -106,7 +110,7 @@ export function installDafeiyuClearance(host, document) {
             schedule(membersChanged);
     });
     mutation.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true,
-        attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'data-composer-card'] });
+        attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'data-composer-card', 'aria-label'] });
     const changed = () => schedule();
     host.addEventListener('resize', changed);
     host.visualViewport?.addEventListener('resize', changed);

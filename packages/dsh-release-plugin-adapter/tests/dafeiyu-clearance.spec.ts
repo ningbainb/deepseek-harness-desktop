@@ -111,6 +111,40 @@ describe('Dafeiyu observer lease', () => {
     f.dispose()
     expect(f.w.__dshDafeiyuProjectPosition).toBe(replacement)
   })
+  it('keeps the visible native turn rail free and releases its space when hidden', async () => {
+    const f = documentFixture()
+    f.card.parentElement!.setAttribute('data-pane', 'conversation')
+    const rail = f.w.document.createElement('nav')
+    rail.setAttribute('aria-label', '轮次导航')
+    const bounds = { left: 720, top: 160, width: 60, height: 220, right: 780, bottom: 380 }
+    rail.getBoundingClientRect = () => bounds as DOMRect
+    rail.getClientRects = () => [bounds] as unknown as DOMRectList
+    f.card.parentElement!.append(rail)
+    await f.measure()
+    expect(f.w.__dshDafeiyuProjectPosition?.(raw)).toEqual({ left: 528, top: 188 })
+    rail.style.display = 'none'
+    await f.measure()
+    expect(f.w.__dshDafeiyuProjectPosition?.(raw)).toEqual({ left: 600, top: 188 })
+  })
+  it('keeps the native bottom button reachable as it appears and its label changes', async () => {
+    const f = documentFixture()
+    f.card.parentElement!.setAttribute('data-pane', 'conversation')
+    await f.measure()
+    const button = f.w.document.createElement('button')
+    button.setAttribute('aria-label', '回到底部')
+    const bounds = { left: 680, top: 380, width: 40, height: 32, right: 720, bottom: 412 }
+    button.getBoundingClientRect = () => bounds as DOMRect
+    button.getClientRects = () => [bounds] as unknown as DOMRectList
+    f.card.parentElement!.append(button)
+    await f.measure()
+    expect(f.w.__dshDafeiyuProjectPosition?.(raw)).toEqual({ left: 600, top: 148 })
+    button.setAttribute('aria-label', 'Back to bottom')
+    await f.measure()
+    expect(f.w.__dshDafeiyuProjectPosition?.(raw)).toEqual({ left: 600, top: 148 })
+    button.remove()
+    await f.measure()
+    expect(f.w.__dshDafeiyuProjectPosition?.(raw)).toEqual({ left: 600, top: 188 })
+  })
   it('remeasures a same-size composer moving from the empty center to the history footer', async () => {
     const f = documentFixture()
     await f.measure()

@@ -34,6 +34,26 @@ const runtimeReadyTimeoutMs = Math.max(process.env.CI ? 180_000 : 120_000, Numbe
 const messageCount = 20
 const fixtureTitle = 'G02.5 turn 01'
 const nativeTurns = process.argv.includes('--native-turns')
+
+async function verifyCompanionPointerClearance(page, control) {
+  const element = await control.elementHandle()
+  assert.ok(element, 'The original native navigation control must exist')
+  try {
+    await page.waitForFunction(button => {
+      const root = document.querySelector('.dfy-root'), image = root?.querySelector('.dfy-img')
+      if (!(button instanceof HTMLElement) || !(root instanceof HTMLElement) || !(image instanceof HTMLImageElement)) return false
+      const pet = root.getBoundingClientRect(), target = button.getBoundingClientRect()
+      const visible = node => { const style = getComputedStyle(node); return style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0 }
+      const hit = document.elementFromPoint(target.left + target.width / 2, target.top + target.height / 2)
+      return image.complete && image.naturalWidth > 0 && pet.width > 0 && pet.height > 0 && target.width > 0 && target.height > 0
+        && visible(root) && visible(image) && visible(button)
+        && !(pet.left < target.right && pet.right > target.left && pet.top < target.bottom && pet.bottom > target.top)
+        && Boolean(hit && (hit === button || button.contains(hit)))
+    }, element, { timeout: 30_000 })
+    console.log('full-body navigation clearance', await control.evaluate(button => ({ label: button.getAttribute('aria-label'),
+      control: button.getBoundingClientRect().toJSON(), pet: document.querySelector('.dfy-root').getBoundingClientRect().toJSON() })))
+  } finally { await element.dispose() }
+}
 let activeApp
 let activeDiagnostics
 
@@ -536,6 +556,7 @@ try {
   const beforeWheel = await conversationGeometry(second.page)
   const nativeBottom = second.page.getByRole('button', { name: '回到底部', exact: true })
   await nativeBottom.waitFor({ state: 'visible' })
+  await verifyCompanionPointerClearance(second.page, nativeBottom)
   console.log('native bottom control', await nativeBottom.evaluate(button => ({
     label: button.getAttribute('aria-label'),
     conversationOwned: Boolean(button.closest('[data-pane="conversation"]')),
@@ -586,6 +607,10 @@ try {
   if (nativeTurns) {
     const rail = second.page.getByRole('navigation', { name: '轮次导航', exact: true })
     assert.equal(await rail.getByRole('button').count(), messageCount, 'native rail includes every real turn')
+    const pointerTurn = rail.getByRole('button', { name: '跳转到第 2 轮', exact: true })
+    await verifyCompanionPointerClearance(second.page, pointerTurn)
+    await pointerTurn.click()
+    await second.page.waitForFunction(() => document.querySelector('nav[aria-label="轮次导航"] button[aria-label="跳转到第 2 轮"]')?.getAttribute('aria-current') === 'true')
     for (const turn of [2, 3, 2, 20, 1]) {
       const mark = rail.getByRole('button', { name: `跳转到第 ${turn} 轮`, exact: true })
       await mark.focus()
@@ -593,6 +618,7 @@ try {
       await second.page.waitForFunction(turn => document.querySelector(`nav[aria-label="轮次导航"] button[aria-label="跳转到第 ${turn} 轮"]`)?.getAttribute('aria-current') === 'true', turn)
       assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'fallback stays unmounted during native navigation')
     }
+    await verifyCompanionPointerClearance(second.page, nativeBottom)
     await second.page.getByRole('button', { name: '回到底部', exact: true }).click()
     await second.page.waitForFunction(() => {
       const scroll = document.querySelector('[data-conversation-scroll]')
@@ -614,6 +640,7 @@ try {
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0, 'narrow Desktop stays free of the removed pager')
     await second.page.evaluate(() => { document.querySelector('[data-conversation-scroll]').scrollTop = 0 })
     await nativeBottom.waitFor({ state: 'visible' })
+    await verifyCompanionPointerClearance(second.page, nativeBottom)
     await nativeBottom.click()
     await second.page.waitForFunction(() => {
       const scroll = document.querySelector('[data-conversation-scroll]')
@@ -628,6 +655,7 @@ try {
     // navigation owner. Its standalone-web behavior remains in Vitest.
     // Check the actual replacement contract: scroll, native bottom, and no
     // overlay even when opening menus or switching color schemes.
+    await verifyCompanionPointerClearance(second.page, nativeBottom)
     await nativeBottom.click()
     await second.page.waitForFunction(() => {
       const scroll = document.querySelector('[data-conversation-scroll]')
