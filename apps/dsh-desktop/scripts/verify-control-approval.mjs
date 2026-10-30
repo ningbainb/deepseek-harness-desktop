@@ -13,6 +13,7 @@ import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
+import { verifyDafeiyuComposerClearance } from './dafeiyu-composer-clearance-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-control-approval-'))
@@ -21,7 +22,7 @@ const workspace = join(temporary, 'workspace'), documents = join(temporary, 'doc
 const toolName = 'mcp__playwright-mcp__browser_navigate'
 let attempt = 0, port, app, page, failure
 const hits = [], requests = [], serverErrors = []
-const report = { passed: false, temporary, checks: [], errors: [], cleanupPassed: false,
+const report = { passed: false, temporary, checks: [], errors: [], fullBodyClearance: [], cleanupPassed: false,
   boundary: 'Native Windows Electron UI, real official Playwright MCP and isolated browser. Synthetic model on loopback; no live provider credential.' }
 function chunk(delta, finishReason = null) {
   return { id: `control-${attempt}`, object: 'chat.completion.chunk', created: 0,
@@ -112,6 +113,7 @@ try {
   for (const [choice, outcome] of [['拒绝', 'rejected'], ['允许一次', 'allowed-once']]) {
     attempt++
     console.log(`control approval attempt ${attempt}: ${outcome}`)
+    report.fullBodyClearance.push(await verifyDafeiyuComposerClearance({ app, page, sessionId, exerciseDrag: attempt === 2 }))
     const composer = page.locator('[data-composer-card] textarea:not([disabled]), [data-composer-card] [contenteditable="true"]:not([aria-disabled="true"])').first()
     await composer.fill(`Navigate to the local fixture for approval attempt ${attempt}.`)
     await page.getByRole('button', { name: '发送消息', exact: true }).click()

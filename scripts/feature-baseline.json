@@ -428,6 +428,8 @@
         "native-settings-pages-remain-reachable",
         "protected-release-plugins-are-listed-with-native-settings-buttons",
         "new-companion-opt-in-preserves-original-companion",
+        "full-body-companion-clears-visible-composer-without-saving-automatic-displacement",
+        "full-body-companion-keeps-ordinary-send-clicks-and-explicit-dragging",
         "prompt-predictions-are-isolated-by-conversation",
         "vendor-browser-uses-visible-authenticated-electron-host"
       ]

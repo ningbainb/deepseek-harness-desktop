@@ -37,6 +37,7 @@ test('native QA uploads only result directories and preserves existing acceptanc
     '${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**',
     '${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**',
     '${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**',
+    '${{ runner.temp }}/dsh-native-fixtures/dsh-dafeiyu-clearance-results-*/**',
   ])
   assert.ok(workflow.jobs.windows.steps.some(step => step.with?.name === 'desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64'))
 })

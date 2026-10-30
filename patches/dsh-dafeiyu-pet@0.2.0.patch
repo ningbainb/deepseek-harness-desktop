@@ -1,5 +1,4 @@
 diff --git a/assets/whale-widget.js b/assets/whale-widget.js
-index 48df676..479860e 100644
 --- a/assets/whale-widget.js
 +++ b/assets/whale-widget.js
 @@ -1 +1,189 @@
@@ -192,7 +191,7 @@ index 48df676..479860e 100644
 +  const { window, document, navigator, Promise, fetch, Image, FileReader, MutationObserver, AbortSignal,
 +    setTimeout, setInterval, clearTimeout, clearInterval, requestAnimationFrame, cancelAnimationFrame } = scope;
  (function(){
-@@ -214,5 +402,7 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+@@ -214,5 +402,7 @@
      const effect=now<landingUntil?'landing':action&&now<action.until?action.effect:null;
 -    img.dataset.cuteMotion=motionFor(state,effect,dragging,{paused:manualPaused,reduced:media.matches,cute:cuteEnabled});
 +    const nextMotion=motionFor(state,effect,dragging,{paused:manualPaused,reduced:media.matches,cute:cuteEnabled});
@@ -202,12 +201,12 @@ index 48df676..479860e 100644
 +    const nextStatus='大肥鱼 · '+LABELS[display]+(snapshot.workingCount?' · '+snapshot.workingCount+' 个任务':'')+(!connected&&!preview?' · 正在重连':'');
 +    if(status.textContent!==nextStatus)status.textContent=nextStatus;
      if(state==='sleeping'){
-@@ -260,3 +450,3 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+@@ -260,3 +450,3 @@
    async function poll(){
 -   if(inflight||disposed)return;
 +   if(inflight||disposed||!scope.isAlive())return;
     inflight=true;const id=++requestId,controller=new AbortController();requestController=controller;
-@@ -268,5 +458,5 @@ window.DafeiyuCute={greetingAction,PettingGesture,motionFor};
+@@ -268,5 +458,5 @@
      ]);
 -    if(!disposed&&id===requestId)accept(data);
 +    if(scope.isAlive()&&!disposed&&id===requestId)accept(data);
@@ -215,17 +214,17 @@ index 48df676..479860e 100644
 -    if(!disposed&&id===requestId){connected=false;hadSnapshot=false;seenSeq=0;hostGeneration=null;action=null;snapshot={state:'idle',workingCount:0};}
 +    if(scope.isAlive()&&!disposed&&id===requestId){connected=false;hadSnapshot=false;seenSeq=0;hostGeneration=null;action=null;snapshot={state:'idle',workingCount:0};}
     }finally{clearTimeout(timeout);if(id===requestId){inflight=false;requestController=null;}}
-@@ -15620,3 +15810,3 @@ function frameSafeEstimateFromCanvas(frame) {
+@@ -15620,3 +15810,3 @@
      cv.height = FRAME_SAFE_SH
 -    var ctx = cv.getContext ? cv.getContext('2d') : null
 +    var ctx = cv.getContext ? cv.getContext('2d', { willReadFrequently: true }) : null
      if (!ctx) return { safe: null, why: '取不到画布（无法测量）' }
-@@ -15819,3 +16009,3 @@ function frameEditImageOpaqueRaw(id, cb) {
+@@ -15819,3 +16009,3 @@
          cv.height = ch
 -        var cx = cv.getContext('2d')
 +        var cx = cv.getContext('2d', { willReadFrequently: true })
          cx.drawImage(im, 0, 0, cw, ch)
-@@ -19356,3 +19546,6 @@ function render() {
+@@ -19356,3 +19546,6 @@
    var amount, hint
 -  if (state.status === 'error') {
 +  if (state.status === 'unconfigured') {
@@ -233,29 +232,91 @@ index 48df676..479860e 100644
 +    hint = '未配置账号或 API key'
 +  } else if (state.status === 'error') {
      amount = shown !== null ? fmt(shown, state.currency) : '--'
-@@ -19577,2 +19770,6 @@ function refresh(manual) {
+@@ -19378,3 +19571,2 @@
+   root.style.bottom = 'auto'
+-  root.style.left = state.left + 'px'
+   // v785：最后一道保险 —— 所有"写 state.top"的路径最终都会走到这里，统一把顶边夹出"窗口控件带"
+@@ -19383,5 +19575,17 @@
+   state.top = clampWidgetTop(state.top)
+-  root.style.top = state.top + 'px'
++  var displayed = { left: state.left, top: state.top }
++  if (!(drag && drag.active) && typeof window.__dshDafeiyuProjectPosition === 'function') {
++    try {
++      var bounds = root.getBoundingClientRect()
++      var projected = window.__dshDafeiyuProjectPosition({ left: state.left, top: state.top,
++        width: bounds.width, height: bounds.height, minTop: widgetTopMin() })
++      if (projected && typeof projected.left === 'number' && typeof projected.top === 'number' &&
++          isFinite(projected.left) && isFinite(projected.top)) displayed = projected
++    } catch (err) {}
++  }
++  root.style.left = displayed.left + 'px'
++  root.style.top = displayed.top + 'px'
+   root.classList.toggle('dfy-left', !!state.flip)
+ }
++window.addEventListener('dsh-dafeiyu-clearance-refresh', express)
+ function settle() {
+@@ -19577,2 +19781,6 @@
          }
 +      } else if (data && data.unconfigured === true) {
 +        state.status = 'unconfigured'
 +        state.message = String(data.error || '未配置账号或 API key')
 +        render()
        } else {
-@@ -21836,3 +22033,3 @@ function setupHitTest(url) {
+@@ -19839,4 +20047,4 @@
+   // its corner while scaling.
+-  var fx = state.flip ? rect.left : rect.right
+-  var fy = rect.bottom
++  var fx = state.flip ? state.left : state.left + rect.width
++  var fy = state.top + rect.height
+   state.scale = next
+@@ -19845,3 +20053,2 @@
+   scaleNumber.value = String(scaleToDisplay(next))
+-  saveConfig()
+   // keep the corner fixed while resizing; the position correction applies
+@@ -19857,2 +20064,3 @@
+   express()
++  saveConfig()
+   // 恢复过渡必须延迟到下一帧：本帧 left/top 已在 none 下设置并提交，
+@@ -20189,3 +20397,3 @@
+   var w = rect.width, h = rect.height
+-  var left = rect.left, top = rect.top
++  var left = state.left, top = state.top
+   // 判定点：左右吸附/翻转 = 图像中心 x，下吸附 = 图像中心 y，上吸附 = 挂件盒中心 y
+@@ -21836,3 +22044,3 @@
        try {
 -        var ctx = hitCanvas.getContext('2d')
 +        var ctx = hitCanvas.getContext('2d', { willReadFrequently: true })
          // 按 object-fit:contain + object-position:right bottom 的实际几何绘制，
-@@ -21918,3 +22115,3 @@ function buildHitClipPath() {
+@@ -21918,3 +22126,3 @@
    try {
 -    var c = hitCanvas && hitCanvas.getContext ? hitCanvas.getContext('2d') : null
 +    var c = hitCanvas && hitCanvas.getContext ? hitCanvas.getContext('2d', { willReadFrequently: true }) : null
      if (!c) return ''
-@@ -21959,3 +22156,3 @@ function isWhaleHit(e) {
+@@ -21959,3 +22167,3 @@
      try {
 -      data = hitCanvas.getContext('2d').getImageData(Math.floor(lx), Math.floor(ly), 1, 1).data
 +      data = hitCanvas.getContext('2d', { willReadFrequently: true }).getImageData(Math.floor(lx), Math.floor(ly), 1, 1).data
      } catch (err) {
-@@ -22615 +22812,39 @@ try { dfyTryStart(true) } catch (err) {}
+@@ -22004,3 +22212,4 @@
+   var rect = root.getBoundingClientRect()
+-  drag = { active: true, startX: e.clientX, startY: e.clientY, origLeft: rect.left, origTop: rect.top, w: rect.width, h: rect.height, moved: false, vp: vp }
++  drag = { active: true, startX: e.clientX, startY: e.clientY, rawLeft: state.left, rawTop: state.top, origLeft: rect.left, origTop: rect.top, w: rect.width, h: rect.height, moved: false, vp: vp }
++  state.left = rect.left; state.top = rect.top
+   root.classList.add('dfy-dragging')
+@@ -22258,5 +22467,5 @@
+   if (cancelled || noCoord || zeroBoth) {
+-    try { state.left = drag.origLeft; state.top = drag.origTop } catch (err) {}
++    try { state.left = drag.rawLeft; state.top = drag.rawTop } catch (err) {}
+     setWidgetCursor('')
+-    settle()
++    express()
+     return
+@@ -22265,2 +22474,4 @@
+   if (clickAllowed && !drag.moved) {
++    state.left = drag.rawLeft; state.top = drag.rawTop
++    express()
+     // 长按刚唤出菜单:这次抬手不再当作点击(避免顺带弹出余额泡)
+@@ -22615 +22826,39 @@
  })()
 +
 +}
@@ -296,21 +357,20 @@ index 48df676..479860e 100644
 +reconcile();
 +})(window, document);
 diff --git a/lib/index.js b/lib/index.js
-index afcb9a9..28e78a8 100644
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -1227,3 +1227,4 @@ export default {
+@@ -1227,3 +1227,4 @@
        //   以前只有一个笼统的"账号余额不可用"，用户/支持方分不清"没登录"和"接口失败"。
 -      if (!result) { accountDiag = '未登录 DeepSeek 账号（没有账号凭据）'; return null }
 +      if (result === null) { accountDiag = '未登录 DeepSeek 账号（没有账号凭据）'; return { ok: false, unconfigured: true } }
 +      if (!result) { accountDiag = '账号余额接口未返回状态'; return null }
        if (result.status !== 'ready') { accountDiag = '账号余额接口未就绪（' + String(result.status || 'unknown') + '）'; return null }
-@@ -1291,3 +1292,3 @@ export default {
+@@ -1291,3 +1292,3 @@
        }
 -      if (acc) return acc
 +      if (acc && acc.ok) return acc
        const keyPart = keyErr
-@@ -1298,2 +1299,3 @@ export default {
+@@ -1298,2 +1299,3 @@
          code: keyErr ? 'BOTH_FAILED' : 'NO_KEY',
 +        ...(!keyErr && acc && acc.unconfigured === true ? { unconfigured: true } : {}),
          error: keyPart + '；账号登录路：' + (accountDiag || '拿不到余额'),

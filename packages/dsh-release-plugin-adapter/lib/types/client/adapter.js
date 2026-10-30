@@ -3,6 +3,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { NS, zh, en } from "./locales.js";
 import { VISIBILITY_KEY, readVisible, writeVisible, installVisibility, companionVisibleInDocument, notifyCompanionLifecycle } from "./visibility.js";
 import { openPluginSettings } from "./settings-navigation.js";
+import { installDafeiyuClearance } from "./dafeiyu-clearance.js";
 import css from './adapter.module.css';
 /** The existing suggestion marker controls CSS visibility within this session. */
 function PredictionShortcut({ t }) {
@@ -26,6 +27,7 @@ export function ReleasePluginsPanel({ t, preference }) {
 export const inject = ['slots', 'locale'];
 export function apply(ctx) {
     ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'release plugins: dictionaries');
+    ctx.effect(() => installDafeiyuClearance(window, document), 'release plugins: companion composer clearance');
     const storage = {
         getItem: (key) => window.localStorage.getItem(key),
         setItem: (key, value) => window.localStorage.setItem(key, value),

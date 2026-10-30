@@ -67,7 +67,7 @@ test('community patch applies to the pinned archive with Git and both complete e
   assert.equal(selection.sha256, createHash('sha256').update(archive).digest('hex'))
 })
 
-function browser(t, { visible = false, settings = false, audioDecode, webkitAudio = false, role = 'retained-role' } = {}) {
+function browser(t, { visible = false, settings = false, audioDecode, webkitAudio = false, role = 'retained-role', geometry = false } = {}) {
   const dom = new JSDOM('<html><head></head><body><div id="root"><textarea></textarea></div><div id="original-pet"></div></body></html>', {
     url: `https://desktop.invalid/${settings ? '?desktop-dock-setting=plugin-options' : ''}`, runScripts: 'outside-only',
   })
@@ -75,6 +75,17 @@ function browser(t, { visible = false, settings = false, audioDecode, webkitAudi
   const w = dom.window, timers = new Map(), frames = new Map(), requests = [], images = [], readbacks = [], warnings = [], holds = [], registrations = []
   const decodes = [], alerts = [], canvasWrites = []
   let next = 0
+  if (geometry) {
+    const rectangle = w.Element.prototype.getBoundingClientRect
+    w.Element.prototype.getBoundingClientRect = function () {
+      const root = this.closest('.dfy-root')
+      if (!root) return rectangle.call(this)
+      const left = parseFloat(root.style.left || '750'), top = parseFloat(root.style.top || '500')
+      const scale = Number(root.style.getPropertyValue('--dfy-scale') || 1.1)
+      const width = geometry === 'scaled' ? 200 * scale : 180, height = geometry === 'scaled' ? 200 * scale : 220
+      return { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top }
+    }
+  }
   w.dshDesktop = {}; w.localStorage.setItem(key, String(visible)); w.localStorage.setItem('dfy-role', role); w.localStorage.setItem('pet', 'retained-original')
   const nativeAdd = w.EventTarget.prototype.addEventListener
   w.EventTarget.prototype.addEventListener = function (type, listener, options) {
@@ -143,6 +154,158 @@ function browser(t, { visible = false, settings = false, audioDecode, webkitAudi
 }
 
 const decodedAudio = () => ({ duration: 1, getChannelData: () => new Float32Array(480) })
+
+async function projectedWidget(t, { geometry = true, offset = { x: 0, y: -140 } } = {}) {
+  const f = browser(t, { geometry }), inputs = []
+  f.w.__dshDafeiyuProjectPosition = input => { inputs.push({ ...input }); return { left: input.left + offset.x, top: input.top + offset.y } }
+  f.toggle(true); await flush()
+  for (const ready of f.holds.splice(0)) ready()
+  await flush()
+  for (const image of [...f.images].reverse()) image.onload?.()
+  await flush()
+  const root = f.w.document.querySelector('.dfy-root'), image = root.querySelector('.dfy-img')
+  assert.ok(inputs.length > 0, 'The complete patched widget must project its own express() display')
+  assert.equal(parseFloat(root.style.top), inputs.at(-1).top + offset.y)
+  const pointer = (type, x, y) => {
+    const event = new f.w.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0,
+      buttons: type === 'pointerdown' || type === 'pointermove' ? 1 : 0 })
+    Object.defineProperty(event, 'pointerType', { value: 'mouse' })
+    const target = type === 'pointerdown' ? root.querySelector('.dfy-img') : f.w.document
+    target.dispatchEvent(event)
+  }
+  return { ...f, root, inputs, pointer, refresh: () => f.w.dispatchEvent(new f.w.Event('dsh-dafeiyu-clearance-refresh')) }
+}
+
+test('display projection and refresh never change the saved anchor or raw position and unload with the widget', async t => {
+  const f = await projectedWidget(t), raw = { ...f.inputs.at(-1) }
+  const saved = f.w.localStorage.getItem('dfy-pos'), writes = f.requests.filter(row => /^(PUT|POST)$/.test(row.options.method)).length
+  for (let step = 0; step < 5; step++) f.refresh()
+  assert.deepEqual(f.inputs.at(-1), raw, 'A displayed offset must never feed back into the next raw position')
+  assert.equal(f.w.localStorage.getItem('dfy-pos'), saved)
+  assert.equal(f.requests.filter(row => /^(PUT|POST)$/.test(row.options.method)).length, writes)
+  delete f.w.__dshDafeiyuProjectPosition; f.refresh()
+  assert.equal(parseFloat(f.root.style.left), raw.left)
+  assert.equal(parseFloat(f.root.style.top), raw.top)
+  f.w.__dshDafeiyuProjectPosition = () => assert.fail('disposed refresh listener ran')
+  f.toggle(false); f.refresh()
+})
+
+test('drag follows the displayed start without projection and cancel restores the original raw anchor', async t => {
+  const f = await projectedWidget(t), raw = { ...f.inputs.at(-1) }, display = f.root.getBoundingClientRect()
+  const saved = f.w.localStorage.getItem('dfy-pos')
+  const x = display.left + 70, y = display.top + 70
+  f.pointer('pointerdown', x, y)
+  assert.equal(f.root.classList.contains('dfy-dragging'), true)
+  const calls = f.inputs.length
+  f.refresh()
+  assert.equal(parseFloat(f.root.style.top), display.top, 'A geometry refresh while held must not jump to the raw anchor')
+  f.pointer('pointermove', x - 25, y - 20)
+  assert.equal(parseFloat(f.root.style.left), display.left - 25)
+  assert.equal(parseFloat(f.root.style.top), display.top - 20)
+  assert.equal(f.inputs.length, calls, 'Dragging must suspend automatic projection')
+  f.pointer('pointercancel', 0, 0)
+  delete f.w.__dshDafeiyuProjectPosition; f.refresh()
+  assert.equal(parseFloat(f.root.style.left), raw.left)
+  assert.equal(parseFloat(f.root.style.top), raw.top)
+  assert.equal(f.w.localStorage.getItem('dfy-pos'), saved)
+})
+
+test('a real drop retains vendor anchor persistence while a click does not adopt the projected offset', async t => {
+  const f = await projectedWidget(t), display = f.root.getBoundingClientRect(), raw = { ...f.inputs.at(-1) }
+  const x = display.left + 70, y = display.top + 70, saved = f.w.localStorage.getItem('dfy-pos')
+  f.pointer('pointerdown', x, y); f.pointer('pointerup', x, y)
+  delete f.w.__dshDafeiyuProjectPosition; f.refresh()
+  assert.equal(parseFloat(f.root.style.top), raw.top)
+  assert.equal(f.w.localStorage.getItem('dfy-pos'), saved)
+  f.w.__dshDafeiyuProjectPosition = input => { f.inputs.push({ ...input }); return { left: input.left, top: input.top - 140 } }
+  f.refresh()
+  f.pointer('pointerdown', x, y)
+  assert.equal(f.root.classList.contains('dfy-dragging'), true)
+  f.pointer('pointermove', x - 60, y - 30)
+  assert.equal(parseFloat(f.root.style.top), display.top - 30)
+  f.pointer('pointerup', x - 60, y - 30)
+  const anchor = JSON.parse(f.w.localStorage.getItem('dfy-pos'))
+  assert.equal(anchor.v, 2)
+  const dropped = f.inputs.at(-1)
+  const savedTop = anchor.vAnchor === 'top' ? anchor.vDist : f.w.innerHeight - 220 - anchor.vDist
+  assert.equal(savedTop, Math.round(dropped.top), 'Explicit drop persists the raw anchor, not its display projection')
+  assert.notEqual(savedTop, Math.round(parseFloat(f.root.style.top)))
+})
+
+test('consecutive full-widget scaling preserves the raw bottom-right corner and never saves automatic offsets', async t => {
+  const f = await projectedWidget(t, { geometry: 'scaled', offset: { x: -80, y: -140 } })
+  const slider = f.w.document.querySelector('input[type="range"][min="0.6"]')
+  assert.ok(slider, 'Exercise the original vendor scale control')
+  const samples = [], beforeWrites = f.requests.filter(row => row.options.method === 'PUT').length
+  for (const scale of [1.1, 1.2, 1.3]) {
+    slider.value = String(scale); slider.dispatchEvent(new f.w.Event('input'))
+    f.refresh()
+    samples.push({ scale, anchor: JSON.parse(f.w.localStorage.getItem('dfy-pos')), raw: { ...f.inputs.at(-1) } })
+  }
+  assert.deepEqual(samples.map(sample => sample.anchor.vDist), [0, 0, 0], 'Only the raw bottom anchor may be persisted across consecutive scales')
+  assert.deepEqual(samples.map(sample => sample.anchor.hDist), [0, 0, 0], 'Horizontal display clearance must not enter the right anchor')
+  for (const sample of samples) {
+    assert.equal(sample.raw.left + sample.raw.width, 1024)
+    assert.equal(sample.raw.top + sample.raw.height, 768)
+  }
+  await flush()
+  const writes = f.requests.filter(row => row.options.method === 'PUT').slice(beforeWrites)
+  assert.deepEqual(writes.map(row => JSON.parse(row.options.body).scale), [1.1, 1.2, 1.3], 'Retain exactly the original user-requested configuration saves')
+})
+
+test('full-widget scale round-trip saves final raw anchors with exactly one PUT per user change', async t => {
+  const f = await projectedWidget(t, { geometry: 'scaled', offset: { x: -80, y: -140 } })
+  const slider = f.w.document.querySelector('input[type="range"][min="0.6"]')
+  const scales = [1.2, 1.3, 1.4, 1.3, 1.2, 1.1], anchors = []
+  for (const scale of scales) {
+    const beforeWrites = f.requests.filter(row => row.options.method === 'PUT').length
+    slider.value = String(scale); slider.dispatchEvent(new f.w.Event('input'))
+    f.refresh()
+    const raw = f.inputs.at(-1)
+    assert.equal(raw.left + raw.width, 1024)
+    assert.equal(raw.top + raw.height, 768)
+    anchors.push(JSON.parse(f.w.localStorage.getItem('dfy-pos')))
+    await flush()
+    const writes = f.requests.filter(row => row.options.method === 'PUT').slice(beforeWrites)
+    assert.deepEqual(writes.map(row => JSON.parse(row.options.body).scale), [scale], 'Each user scale change retains exactly one configuration PUT')
+  }
+  assert.deepEqual(anchors.map(anchor => [anchor.hAnchor, anchor.hDist, anchor.vAnchor, anchor.vDist]),
+    Array.from({ length: 6 }, () => ['right', 0, 'bottom', 0]),
+    'Growing and shrinking must save the corrected raw geometry, never the prior-size anchor')
+})
+
+test('full-widget scaling keeps the flipped raw bottom-left corner after an explicit drag', async t => {
+  const f = await projectedWidget(t, { geometry: 'scaled', offset: { x: 80, y: -100 } })
+  const box = f.root.getBoundingClientRect(), x = box.left + 70, y = box.top + 70
+  f.pointer('pointerdown', x, y); f.pointer('pointermove', 70, y); f.pointer('pointerup', 70, y)
+  assert.equal(f.root.classList.contains('dfy-left'), true, 'Use the vendor left-side drag/flip behavior')
+  const before = { ...f.inputs.at(-1) }, samples = []
+  const slider = f.w.document.querySelector('input[type="range"][min="0.6"]')
+  for (const scale of [1.2, 1.3]) {
+    slider.value = String(scale); slider.dispatchEvent(new f.w.Event('input')); f.refresh()
+    samples.push({ ...f.inputs.at(-1) })
+  }
+  for (const sample of samples) {
+    assert.equal(sample.left, 0, 'The left raw corner must not absorb the positive display offset')
+    assert.equal(sample.top + sample.height, before.top + before.height)
+  }
+  assert.equal(f.root.classList.contains('dfy-left'), true)
+})
+
+test('closing the original menu computes snap anchors from raw geometry before later scaling saves them', async t => {
+  const f = await projectedWidget(t, { geometry: 'scaled' }), before = { ...f.inputs.at(-1) }
+  f.root.querySelector('.dfy-menu-btn').click()
+  assert.equal(f.w.document.querySelector('.dfy-menu').classList.contains('dfy-menu-open'), true)
+  f.w.document.getElementById('root').dispatchEvent(new f.w.MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 20, button: 0, buttons: 1 }))
+  assert.equal(f.w.document.querySelector('.dfy-menu').classList.contains('dfy-menu-open'), false)
+  const afterClose = { ...f.inputs.at(-1) }
+  f.w.dispatchEvent(new f.w.Event('resize'))
+  const slider = f.w.document.querySelector('input[type="range"][min="0.6"]')
+  slider.value = '1.2'; slider.dispatchEvent(new f.w.Event('input'))
+  assert.equal(afterClose.left, before.left)
+  assert.equal(afterClose.top, before.top, 'Closing a menu must not adopt its projected screen position as a new raw anchor')
+  assert.equal(JSON.parse(f.w.localStorage.getItem('dfy-pos')).vDist, 0)
+})
 
 test('unchanged full-body animation frames do not rewrite status or motion; real state changes still render', async t => {
   const f = browser(t, { visible: true, role: 'default' })

@@ -4,7 +4,7 @@ Authoritative Desktop version: 5.2.0.
 
 Stable DSH package version: 0.2.1-rc.4.
 
-Lockfile SHA-256: `4d5b511390a9065b9f6aeb5311998c8934f8d7bd2f5655581bc067ff14cbb5e3`.
+Lockfile SHA-256: `2b326cd9798423b610ae25dcf1972e57f9d3b8a07d4e22fd3d409ab8b3e26e2a`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -636,7 +636,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-personal-prompt/src/client/index.ts | 36 | locale |
 | host-service | packages/dsh-personal-prompt/src/index.ts | 23 | sessions |
 | host-service | packages/dsh-pet/src/client/index.ts | 76 | remote |
-| host-service | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 52 | locale |
+| host-service | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 53 | locale |
 | host-service | packages/dsh-release-plugin-adapter/src/index.ts | 7 | connection |
 | host-service | packages/dsh-remote-web-ui/src/client/index.ts | 100 | workspaces |
 | host-service | packages/dsh-remote-web-ui/src/index.ts | 62 | connection |
@@ -699,7 +699,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 69 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-bai-onboarding.mjs | 35 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-beta-usability.mjs | 106 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 91 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 92 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 31 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 117 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 469 | profileDir |
@@ -2308,8 +2308,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-particle-theme/src/client/index.ts | 81 | web-ui.plugin.item |
 | slot | packages/dsh-personal-prompt/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-pet/src/client/index.ts | 134 | web-ui.plugin.item |
-| slot | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 81 | settings.section |
-| slot | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 85 | conversation.composer.dock |
+| slot | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 83 | settings.section |
+| slot | packages/dsh-release-plugin-adapter/src/client/adapter.tsx | 87 | conversation.composer.dock |
 | slot | packages/dsh-remote-web-ui/src/client/index.ts | 124 | sidebar.remote |
 | slot | packages/dsh-remote-web-ui/src/client/index.ts | 150 | sidebar.footer.action |
 | slot | packages/dsh-remote-web-ui/src/client/index.ts | 176 | web-ui.plugin.item |

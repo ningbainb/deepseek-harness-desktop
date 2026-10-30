@@ -9,6 +9,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { NS, zh, en, type LocaleKey } from './locales.ts'
 import { VISIBILITY_KEY, readVisible, writeVisible, installVisibility, companionVisibleInDocument, notifyCompanionLifecycle } from './visibility.ts'
 import { openPluginSettings } from './settings-navigation.ts'
+import { installDafeiyuClearance } from './dafeiyu-clearance.ts'
 import css from './adapter.module.css'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -53,6 +54,7 @@ export const inject = ['slots', 'locale']
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'release plugins: dictionaries')
+  ctx.effect(() => installDafeiyuClearance(window, document), 'release plugins: companion composer clearance')
   const storage = {
     getItem: (key: string) => window.localStorage.getItem(key),
     setItem: (key: string, value: string) => window.localStorage.setItem(key, value),

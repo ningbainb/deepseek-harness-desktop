@@ -63,7 +63,7 @@ patchedDependencies:
   '@local/dsh-prompt-pilot@1.2.3': e97059ce3c1c794e02aa086b01a5cae5513448c0519bfdda3c1d57315be831af
   dsh-agent-plugins-market@0.11.1: 407bb88b4f383e53b61a66aab396a09b7877d31cf1084f0f7e329f656959d4eb
   dsh-better-sidebar@0.24.1: 723b3671adcb7d1b9ef9d7a197ffee9f04581c9d61ddd1dead1f25e70a500439
-  dsh-dafeiyu-pet@0.2.0: e8f32e8bf6f312128764a1e01ea2f7c341b8c850486ef3168f3054f1cb0d2998
+  dsh-dafeiyu-pet@0.2.0: b84af98ebe49446bd072b5d2acfafb719e95b39dd7154b8ae9f753290651348a
 
 importers:
 
@@ -500,7 +500,7 @@ importers:
         version: file:vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz(@deepseek-ai/cordis@4.0.5)(@deepseek-ai/dsh-client-locale@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5))(@deepseek-ai/dsh-client-ui-settings@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5))(@deepseek-ai/dsh-client-ui-slots@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5))(@deepseek-ai/dsh-llm@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5))(@deepseek-ai/dsh-system-prompt@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5)(@deepseek-ai/dsh-llm@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5))(@deepseek-ai/dsh-scope@0.2.1-rc.4(@deepseek-ai/cordis@4.0.5)))(@deepseek-ai/dsh-tools@0.2.1-rc.4(cc529effceda4a9130f684509f68fe87))(@deepseek-ai/schemastery@3.18.5)(supports-color@7.2.0)
       dsh-dafeiyu-pet:
         specifier: file:../../vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz
-        version: file:vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz(patch_hash=e8f32e8bf6f312128764a1e01ea2f7c341b8c850486ef3168f3054f1cb0d2998)
+        version: file:vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz(patch_hash=b84af98ebe49446bd072b5d2acfafb719e95b39dd7154b8ae9f753290651348a)
       electron-updater:
         specifier: 6.8.9
         version: 6.8.9(supports-color@7.2.0)
@@ -18647,7 +18647,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dsh-dafeiyu-pet@file:vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz(patch_hash=e8f32e8bf6f312128764a1e01ea2f7c341b8c850486ef3168f3054f1cb0d2998): {}
+  dsh-dafeiyu-pet@file:vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz(patch_hash=b84af98ebe49446bd072b5d2acfafb719e95b39dd7154b8ae9f753290651348a): {}
 
   dts-resolver@3.0.0: {}
 

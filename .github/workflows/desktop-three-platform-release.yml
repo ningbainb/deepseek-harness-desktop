@@ -153,6 +153,7 @@ jobs:
             ${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**
             ${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**
             ${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-dafeiyu-clearance-results-*/**
 
       - name: Preserve failed Windows candidate diagnostics
         if: failure()
