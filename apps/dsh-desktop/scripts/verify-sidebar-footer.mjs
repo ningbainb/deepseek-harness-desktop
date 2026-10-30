@@ -14,6 +14,7 @@ import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { closeIsolatedElectron, ownedProcessIds, ownedProcessesStopped } from './electron-cleanup-fixture.mjs'
+import { assertNativeFixtureStorage } from './native-fixture-storage.mjs'
 
 // Run serially after the maintainer's source install/build. This harness never
 // builds, installs, patches CSS, replaces app.whenReady, or seeds renderer DOM.
@@ -22,12 +23,13 @@ const args = process.argv.slice(2)
 assert.ok(args.every(argument => argument.startsWith('--output=')), 'Usage: node scripts/verify-sidebar-footer.mjs [--output=E:\\absolute-directory]')
 assert.equal(process.platform, 'win32', 'This harness records native Windows source evidence')
 assert.equal(process.env.DSH_DESKTOP_E2E_EXECUTABLE, undefined, 'Source-native evidence must not be reported as packaged acceptance')
-assert.equal(resolve(tmpdir()).slice(0, 3).toLowerCase(), 'e:\\', 'Dot-source scripts/use-e-build-env.ps1 first')
+await assertNativeFixtureStorage()
 assert.equal(BUILTIN_SKIN_IDS.length, 15, 'Review the measurement matrix if the preserved skin catalog changes')
 const output = resolve(args.find(argument => argument.startsWith('--output='))?.slice(9)
   ?? join(tmpdir(), 'dsh-sidebar-footer-results', new Date().toISOString().replaceAll(':', '-')))
-assert.equal(output.slice(0, 3).toLowerCase(), 'e:\\', 'Evidence must remain on E:')
+await assertNativeFixtureStorage({ outputDirectory: output })
 await mkdir(output, { recursive: true })
+await assertNativeFixtureStorage({ outputDirectory: output })
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-sidebar-footer-'))
 const home = join(temporary, 'home')
 const userData = join(temporary, 'user-data')

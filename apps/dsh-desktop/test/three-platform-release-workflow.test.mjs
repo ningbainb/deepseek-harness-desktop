@@ -9,6 +9,42 @@ import YAML from 'yaml'
 
 const workflowPath = join(import.meta.dirname, '..', '..', '..', '.github', 'workflows', 'desktop-three-platform-release.yml')
 
+test('Windows CI prepares confined native storage in its own step before verification', async () => {
+  const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
+  const steps = workflow.jobs.windows.steps
+  const prepare = steps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
+  const verify = steps.findIndex(step => step.run?.trim() === 'pnpm verify')
+  assert.ok(prepare >= 0 && prepare < verify, 'GITHUB_ENV must be prepared in a preceding step')
+  assert.equal(steps[prepare].shell, 'pwsh')
+})
+
+test('native QA uploads only result directories and preserves existing acceptance evidence', async () => {
+  const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
+  const step = workflow.jobs.windows.steps.find(step => step.with?.name === 'desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64')
+  assert.ok(step, 'native source and companion evidence needs its own artifact')
+  assert.equal(step.if, 'always()')
+  assert.equal(step.with['include-hidden-files'], true)
+  assert.deepEqual(step.with.path.trim().split(/\r?\n/u), [
+    '${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**',
+    '${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**',
+    '${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**',
+  ])
+  assert.ok(workflow.jobs.windows.steps.some(step => step.with?.name === 'desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64'))
+})
+
+test('all Windows-only geometry fixtures use the shared storage boundary before writing output', async () => {
+  for (const [name, outputCall] of [
+    ['verify-release-plugins.mjs', 'await mkdir(output'],
+    ['verify-sidebar-footer.mjs', 'await mkdir(output'],
+    ['pet-composer-clearance-fixture.mjs', 'await mkdtemp'],
+  ]) {
+    const source = await readFile(join(import.meta.dirname, '..', 'scripts', name), 'utf8')
+    assert.match(source, /import \{ assertNativeFixtureStorage \} from '\.\/native-fixture-storage\.mjs'/u)
+    assert.ok(source.indexOf('await assertNativeFixtureStorage(') < source.indexOf(outputCall), `${name} must validate storage before making output`)
+    assert.doesNotMatch(source, /assert\.equal\(resolve\(tmpdir\(\)\)\.slice|assert\.match\(tmpdir\(\),/u)
+  }
+})
+
 test('three-platform release delegates the stable updater channel to the Windows packer once', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
 

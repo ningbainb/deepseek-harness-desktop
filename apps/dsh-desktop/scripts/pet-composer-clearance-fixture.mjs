@@ -2,12 +2,14 @@ import assert from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { assertNativeFixtureStorage } from './native-fixture-storage.mjs'
 
 // Native pointer/geometry checks. Never hide the pet, force a click, or rewrite
 // renderer layout. All preferences belong to this test's isolated profile.
 export async function verifyPetComposerClearance({ app, page, sessionId }) {
-  assert.match(tmpdir(), /^[eE]:[\\/]/u, 'Keep native pet evidence on E:')
+  await assertNativeFixtureStorage()
   const output = await mkdtemp(join(tmpdir(), 'dsh-pet-clearance-results-'))
+  await assertNativeFixtureStorage({ outputDirectory: output })
   const native = await app.browserWindow(page)
   const windowState = await native.evaluate(window => ({ bounds: window.getBounds(), normalBounds: window.getNormalBounds(), maximized: window.isMaximized() }))
   const theme = await page.evaluate(() => document.body.getAttribute('data-ds-dark-theme'))

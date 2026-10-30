@@ -6163,13 +6163,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-plugins.mjs",
-      "line": 158,
+      "line": 160,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-plugins.mjs",
-      "line": 309,
+      "line": 311,
       "operation": "DSH_HOME"
     },
     {
@@ -6295,7 +6295,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-sidebar-footer.mjs",
-      "line": 209,
+      "line": 211,
       "operation": "DSH_HOME"
     },
     {

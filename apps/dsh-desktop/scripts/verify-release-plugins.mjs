@@ -17,6 +17,7 @@ import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { closeIsolatedElectron, ownedProcessIds, ownedProcessesStopped } from './electron-cleanup-fixture.mjs'
 import { CLIENT_SOURCE, FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
+import { assertNativeFixtureStorage } from './native-fixture-storage.mjs'
 
 // Native Windows source acceptance, deliberately separate from packaged acceptance.
 // Run only after the maintainer's serialized install/build. This file never builds
@@ -37,12 +38,13 @@ const args = process.argv.slice(2)
 if (args.some(argument => !argument.startsWith('--output='))) throw new Error('Usage: node scripts/verify-release-plugins.mjs [--output=absolute-directory]')
 assert.equal(process.platform, 'win32', 'This fixture records native Windows window visibility; other platforms require native equivalents')
 assert.equal(process.env.DSH_DESKTOP_E2E_EXECUTABLE, undefined, 'This source-native fixture must not be reported as packaged acceptance')
-assert.equal(resolve(tmpdir()).slice(0, 3).toLowerCase(), 'e:\\', 'Dot-source scripts/use-e-build-env.ps1 before this fixture; do not use C: temporary storage')
+await assertNativeFixtureStorage()
 const output = resolve(args.find(argument => argument.startsWith('--output='))?.slice(9)
   ?? process.env.DSH_DESKTOP_RELEASE_PLUGIN_OUTPUT
   ?? join(tmpdir(), 'dsh-release-plugins-results', new Date().toISOString().replaceAll(':', '-')))
-assert.equal(output.slice(0, 3).toLowerCase(), 'e:\\', 'Evidence must remain on E:')
+await assertNativeFixtureStorage({ outputDirectory: output })
 await mkdir(output, { recursive: true })
+await assertNativeFixtureStorage({ outputDirectory: output })
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-release-plugins-'))
 const home = join(temporary, 'home')
 const userData = join(temporary, 'user-data')

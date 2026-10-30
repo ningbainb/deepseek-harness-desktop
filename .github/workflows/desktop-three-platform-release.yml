@@ -49,6 +49,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare confined native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
       - run: pnpm verify
       - run: pnpm feature-baseline:check
       - run: pnpm desktop:regression:e2e --source --collect-failures
@@ -134,6 +137,19 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: .tmp/release-qa/**
+
+      - name: Preserve native source and companion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**
 
       - name: Preserve failed Windows candidate diagnostics
         if: failure()

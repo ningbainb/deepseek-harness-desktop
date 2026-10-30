@@ -761,8 +761,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-profile-migration.mjs | 245 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-proxy-routing.mjs | 91 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 12 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 158 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 309 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 160 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 311 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | resolveRuntimePackages |
@@ -783,7 +783,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 321 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-selected-balance.mjs | 45 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-settings-window.mjs | 70 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-sidebar-footer.mjs | 209 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-sidebar-footer.mjs | 211 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-installed-profile.mjs | 7 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-installed-profile.mjs | 13 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-installed-profile.mjs | 14 | profileDir |
