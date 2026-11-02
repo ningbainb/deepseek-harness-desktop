@@ -19,7 +19,7 @@ peerDependencyRules:
 # Desktop resolves the aggregate and Desktop-owned plugin fixes from this
 # workspace so the built bundles are the same ones the runtime loads.
 overrides:
-  'dsh-builtin-browser>electron': '44.1.0'
+  'dsh-builtin-browser>electron': '44.7.0'
   '@local/dsh-prompt-pilot>zod': '4.5.4'
   'dsh-agent-plugins-market>@deepseek-ai/dsh-atomic-write': '0.2.1-rc.4'
   'dsh-agent-plugins-market>@deepseek-ai/dsh-home-paths': '0.2.1-rc.4'

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "desktopVersion": "5.2.0",
   "upstreamVersion": "0.2.1-rc.4",
-  "lockfileSha256": "2b326cd9798423b610ae25dcf1972e57f9d3b8a07d4e22fd3d409ab8b3e26e2a",
+  "lockfileSha256": "2afbda28bc2f44ababe3a89cfd965d1555e296a3b4382e08a703b6d638ae0c44",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",

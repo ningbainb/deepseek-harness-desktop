@@ -246,7 +246,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-session-projection": "0.2.1-rc.4",
-    "electron": "44.1.0",
+    "electron": "44.7.0",
     "electron-builder": "26.15.3",
     "electron-builder-squirrel-windows": "26.15.3",
     "playwright": "1.62.1",
