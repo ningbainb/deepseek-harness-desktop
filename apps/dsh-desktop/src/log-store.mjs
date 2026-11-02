@@ -50,9 +50,12 @@ export class BoundedLogStore {
     this.directoryReady = undefined
     this.currentSize = undefined
     this.lastWriteError = undefined
+    this.accepting = true
+    this.closePromise = undefined
   }
 
   append(value) {
+    if (!this.accepting) return Promise.resolve(false)
     const operation = this.queue.then(() => this.#append(value)).then(
       () => {
         this.lastWriteError = undefined
@@ -67,6 +70,18 @@ export class BoundedLogStore {
     )
     this.queue = operation
     return operation
+  }
+
+  close() {
+    if (this.closePromise) return this.closePromise
+    this.accepting = false
+    this.closePromise = this.queue.then(() => this.lastWriteError === undefined)
+    return this.closePromise
+  }
+
+  resume() {
+    this.accepting = true
+    this.closePromise = undefined
   }
 
   async #append(value) {

@@ -317,6 +317,90 @@ test('failed quit keeps every window available and never claims a completed exit
   assert.deepEqual(calls, ['save', 'shutdown'])
 })
 
+test('quit waits for the final state barrier before destroying windows and drains finalizers before exit', async () => {
+  const calls = []
+  let releaseState, releaseFinalizer
+  const state = new Promise(resolve => { releaseState = resolve })
+  const finalizer = new Promise(resolve => { releaseFinalizer = resolve })
+  const operation = completeDesktopQuit({
+    saveState: async () => { calls.push('save') },
+    shutdown: async () => { calls.push('shutdown') },
+    prepareDestroy: async () => { calls.push('state-barrier'); await state },
+    destroyWindows: () => { calls.push('destroy') },
+    finalize: async () => { calls.push('finalize'); await finalizer },
+    quit: () => { calls.push('quit') },
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(calls, ['save', 'state-barrier'])
+  releaseState()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(calls, ['save', 'state-barrier', 'shutdown', 'finalize'])
+  releaseFinalizer()
+  await operation
+  assert.deepEqual(calls, ['save', 'state-barrier', 'shutdown', 'finalize', 'destroy', 'quit'])
+})
+
+test('a failed final state barrier leaves windows intact and propagates the original error', async () => {
+  const calls = [], failure = new Error('final atomic rename failed')
+  await assert.rejects(completeDesktopQuit({
+    saveState: async () => {}, shutdown: async () => { calls.push('shutdown') },
+    prepareDestroy: async () => { throw failure },
+    destroyWindows: () => { calls.push('destroy') },
+    finalize: async () => { calls.push('finalize') }, quit: () => { calls.push('quit') },
+  }), error => error === failure)
+  assert.deepEqual(calls, [])
+})
+
+test('finalizer deadline leaves windows present and never treats later I/O completion as permission to quit', async () => {
+  const calls = []
+  let finish
+  const pending = new Promise(resolve => { finish = resolve })
+  const timer = setTimeout(finish, 30)
+  try {
+    await assert.rejects(completeDesktopQuit({
+      saveState: async () => {}, shutdown: async () => { calls.push('shutdown') },
+      destroyWindows: () => { calls.push('destroy') },
+      finalize: () => pending, quit: () => { calls.push('quit') },
+      finalizationTimeoutMs: 1,
+    }), error => error.code === 'DESKTOP_SHUTDOWN_DRAIN_PENDING')
+    assert.deepEqual(calls, ['shutdown'])
+    finish()
+    await pending
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(calls, ['shutdown'])
+  } finally { clearTimeout(timer); finish() }
+})
+
+test('initial snapshot deadline leaves runtime and windows untouched after late I/O completion', async () => {
+  const calls = []
+  let finish
+  const pending = new Promise(resolve => { finish = resolve })
+  const timer = setTimeout(finish, 30)
+  try {
+    await assert.rejects(completeDesktopQuit({
+      saveState: () => pending, shutdown: async () => { calls.push('shutdown') },
+      destroyWindows: () => { calls.push('destroy') }, quit: () => { calls.push('quit') },
+      finalizationTimeoutMs: 1,
+    }), error => error.code === 'DESKTOP_SHUTDOWN_DRAIN_PENDING')
+    assert.deepEqual(calls, [])
+    finish(); await pending
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(calls, [])
+  } finally { clearTimeout(timer); finish() }
+})
+
+test('renderer finalization is synchronous and happens after window destruction and before the final quit', async () => {
+  const calls = []
+  await completeDesktopQuit({
+    saveState: async () => {}, shutdown: async () => {},
+    finalize: async () => { calls.push('async-drained') },
+    destroyWindows: () => { calls.push('destroy') },
+    afterDestroy: () => { calls.push('renderer-finalized') },
+    quit: () => { calls.push('quit') },
+  })
+  assert.deepEqual(calls, ['async-drained', 'destroy', 'renderer-finalized', 'quit'])
+})
+
 test('pending extension mutations retain their transport until they settle', async () => {
   const calls = []
   let finishMutation

@@ -75,3 +75,56 @@ test('bounded log store reuses directory and size metadata between appends', asy
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('terminal log close rejects late producers and waits for every accepted write', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-log-terminal-'))
+  let release, entered
+  const gate = new Promise(resolve => { release = resolve })
+  const writing = new Promise(resolve => { entered = resolve })
+  let writes = 0
+  const store = new BoundedLogStore({ directory: root, fileSystem: {
+    mkdir, readFile, rename, rm, stat,
+    writeFile: async (...args) => { writes += 1; entered(); await gate; return writeFile(...args) },
+  } })
+  try {
+    const append = store.append('last accepted runtime stderr')
+    await writing
+    assert.equal(typeof store.close, 'function', 'a logger needs a terminal drain barrier')
+    let closed = false
+    const closing = store.close()
+    assert.equal(store.close(), closing, 'terminal close must be idempotent')
+    void closing.then(() => { closed = true })
+    assert.equal(await store.append('late renderer callback'), false)
+    await Promise.resolve()
+    assert.equal(closed, false, 'the pending native write still belongs to the application')
+    release()
+    assert.equal(await append, true)
+    assert.equal(await closing, true)
+    assert.equal(writes, 1)
+    assert.equal(await readFile(store.path, 'utf8'), 'last accepted runtime stderr\n')
+    store.resume()
+    assert.equal(await store.append('quit was cancelled'), true)
+    assert.equal(writes, 2)
+    await store.close()
+  } finally { release(); await store.queue; await rm(root, { recursive: true, force: true }) }
+})
+
+test('terminal log close reports a settled write failure separately from pending I/O and can resume', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-log-terminal-error-'))
+  const directory = join(root, 'occupied')
+  try {
+    await writeFile(directory, 'not a directory')
+    const store = new BoundedLogStore({ directory })
+    assert.equal(await store.append('failed'), false)
+    const failure = store.lastWriteError
+    assert.ok(failure)
+    assert.equal(await store.close(), false, 'failure is settled, not a successful write')
+    assert.equal(store.lastWriteError, failure)
+    assert.equal(await store.append('late'), false)
+    await rm(directory)
+    store.resume()
+    assert.equal(await store.append('recovered'), true)
+    assert.equal(await store.close(), true)
+    assert.equal(await readFile(store.path, 'utf8'), 'recovered\n')
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

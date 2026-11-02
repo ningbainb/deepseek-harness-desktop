@@ -66,8 +66,11 @@ export async function loadWindowStateForRestore(path, displays) {
   return { state, restoredBounds }
 }
 
-export function attachWindowStatePersistence(window, path, { restoredBounds, visibleBounds } = {}) {
+export function attachWindowStatePersistence(window, path, { restoredBounds, visibleBounds, writeState = writeFileAtomic } = {}) {
+  if (typeof writeState !== 'function') throw new TypeError('window state writer must be a function')
   let timer
+  let accepting = true
+  let closePromise
   let restoreSettling = false
   let writeQueue = Promise.resolve()
   let latestWrite = writeQueue
@@ -100,13 +103,14 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
   }
   const persist = (content) => {
     if (content === undefined) return latestWrite
-    const operation = writeQueue.then(() => writeFileAtomic(path, content, { mode: 0o600 }))
+    const operation = writeQueue.then(() => writeState(path, content, { mode: 0o600 }))
     writeQueue = operation.catch(() => {})
     latestWrite = operation
     return operation
   }
   const save = () => {
     clearTimeout(timer)
+    if (!accepting) return latestWrite
     return persist(capture())
   }
   const saveFromEvent = () => {
@@ -116,6 +120,7 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     })
   }
   const schedule = () => {
+    if (!accepting) return
     clearTimeout(timer)
     timer = setTimeout(saveFromEvent, 250)
   }
@@ -135,14 +140,34 @@ export function attachWindowStatePersistence(window, path, { restoredBounds, vis
     restoreSettling = true
     schedule()
   }
-  window.on('resize', schedule)
-  window.on('move', schedule)
-  window.on('maximize', scheduleMaximize)
-  window.on('unmaximize', scheduleUnmaximize)
-  window.on('close', () => {
+  const closing = () => {
     clearTimeout(timer)
     saveFromEvent()
-  })
-  window.on('closed', () => clearTimeout(timer))
+  }
+  const closed = () => clearTimeout(timer)
+  const listeners = [['resize', schedule], ['move', schedule], ['maximize', scheduleMaximize],
+    ['unmaximize', scheduleUnmaximize], ['close', closing], ['closed', closed]]
+  const attach = () => { for (const [event, listener] of listeners) window.on(event, listener) }
+  const detach = () => { for (const [event, listener] of listeners) window.removeListener(event, listener) }
+  save.resume = () => {
+    if (accepting) return
+    accepting = true
+    closePromise = undefined
+    if (window.isDestroyed?.() !== true) attach()
+  }
+  save.close = () => {
+    if (closePromise) return closePromise
+    accepting = false
+    clearTimeout(timer)
+    detach()
+    try {
+      closePromise = Promise.resolve(persist(capture())).catch(error => { save.resume(); throw error })
+    } catch (error) {
+      save.resume()
+      return Promise.reject(error)
+    }
+    return closePromise
+  }
+  attach()
   return save
 }

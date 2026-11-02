@@ -42,6 +42,69 @@ test('window state save is a no-op after the Electron window is destroyed', asyn
   }
 })
 
+test('terminal window state close drains its final snapshot and rejects late geometry events until resumed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-terminal-'))
+  const path = join(root, 'window-state.json'), window = new EventEmitter()
+  let bounds = { x: 20, y: 30, width: 960, height: 700 }, release, entered
+  const gate = new Promise(resolve => { release = resolve })
+  const writing = new Promise(resolve => { entered = resolve })
+  let writes = 0
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  const save = attachWindowStatePersistence(window, path, {
+    writeState: async (destination, content) => { writes += 1; entered(); await gate; await writeFile(destination, content) },
+  })
+  try {
+    assert.equal(typeof save.close, 'function', 'window persistence needs a final drain barrier')
+    let closed = false
+    const closing = save.close()
+    assert.equal(save.close(), closing)
+    void closing.then(() => { closed = true })
+    await writing
+    bounds = { ...bounds, x: 999 }
+    window.emit('move'); window.emit('close')
+    void save()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(closed, false)
+    assert.equal(writes, 1)
+    release()
+    await closing
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).x, 20)
+    save.resume()
+    await save()
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).x, 999)
+    assert.equal(writes, 2)
+    await save.close()
+  } finally { release(); await save(); await rm(root, { recursive: true, force: true }) }
+})
+
+test('failed final window write restores event ownership without duplicate listeners', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-window-terminal-error-'))
+  const path = join(root, 'window-state.json'), window = new EventEmitter()
+  let bounds = { x: 20, y: 30, width: 960, height: 700 }, attempt = 0
+  const failure = new Error('atomic rename unavailable')
+  window.isDestroyed = () => false
+  window.getNormalBounds = () => ({ ...bounds })
+  window.isMaximized = () => false
+  const save = attachWindowStatePersistence(window, path, { writeState: async (destination, content) => {
+    if (++attempt === 1) throw failure
+    await writeFile(destination, content)
+  } })
+  try {
+    await assert.rejects(save.close(), error => error === failure)
+    assert.equal(window.listenerCount('move'), 1)
+    assert.equal(window.listenerCount('close'), 1)
+    save.resume()
+    assert.equal(window.listenerCount('move'), 1)
+    bounds = { ...bounds, x: 77 }
+    await save()
+    await save.close()
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).x, 77)
+    assert.equal(window.listenerCount('move'), 0)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test('window state readers never observe partial JSON during queued saves', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-window-state-atomic-'))
   const statePath = join(root, 'window-state.json')

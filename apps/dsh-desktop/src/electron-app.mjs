@@ -24,7 +24,7 @@ import {
 } from './community-links.mjs'
 import { promptForDownloadDestination } from './download-destination.mjs'
 import { DockNudgeStore } from './dock-nudge-state.mjs'
-import { BoundedLogStore } from './log-store.mjs'
+import { BoundedLogStore, sanitizeLogLine } from './log-store.mjs'
 import {
   DESKTOP_LAN_GATEWAY_BASE_ENV,
   DesktopLanGateway,
@@ -579,10 +579,41 @@ export async function prepareDesktopRuntimeStop({ quiesceExtensions, stopGateway
   await quiesceStreams()
 }
 
-export async function completeDesktopQuit({ saveState, shutdown, destroyWindows, quit }) {
-  await saveState()
+export async function completeDesktopQuit({ saveState, shutdown, prepareDestroy,
+  destroyWindows, finalize, afterDestroy = () => {}, quit, finalizationTimeoutMs = 30_000 }) {
+  const drain = async (operation, phase) => {
+    let timer
+    try {
+      await Promise.race([
+        Promise.resolve().then(operation),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            const error = new Error(`Desktop quit is still waiting for ${phase}; pending I/O was not cancelled`)
+            error.code = 'DESKTOP_SHUTDOWN_DRAIN_PENDING'
+            reject(error)
+          }, finalizationTimeoutMs)
+        }),
+      ])
+    } finally { clearTimeout(timer) }
+  }
+  let saveTimer
+  try {
+    await Promise.race([
+      saveState(),
+      new Promise((_, reject) => {
+        saveTimer = setTimeout(() => {
+          const error = new Error('Desktop quit is still waiting for the initial window snapshot; pending I/O was not cancelled')
+          error.code = 'DESKTOP_SHUTDOWN_DRAIN_PENDING'
+          reject(error)
+        }, finalizationTimeoutMs)
+      }),
+    ])
+  } finally { clearTimeout(saveTimer) }
+  if (prepareDestroy) await drain(prepareDestroy, 'the final window snapshot')
   await shutdown()
+  if (finalize) await drain(finalize, 'accepted diagnostics and extension cleanup')
   destroyWindows()
+  afterDestroy()
   quit()
 }
 
@@ -605,6 +636,9 @@ export async function startElectronApp(metadata) {
   const runtimePresentation = createRuntimePresentationGuard()
   let quitInProgress = false
   let appQuitStarted = false
+  let terminalQuitReady = false
+  let terminalBuffersDrained = false
+  let terminalExtensionIpcFinalization
   const setQuitInProgress = value => {
     quitInProgress = value
     if (value) runtimePresentation.suspend()
@@ -2959,15 +2993,10 @@ export async function startElectronApp(metadata) {
   let rendererIpcFinalized = false
   const finalizeRendererIpc = () => {
     if (rendererIpcFinalized) return
-    rendererIpcFinalized = true
     unregisterRuntimeStreamIpc.shutdown()
     unregisterMainSurface()
     unregisterIpc()
-    void unregisterExtensionIpc().catch((error) => {
-      void logStore.append(
-        `[shutdown] ${error instanceof Error ? error.message : String(error)}`,
-      ).catch(() => {})
-    })
+    rendererIpcFinalized = true
   }
 
   const closeBypassReason = () => {
@@ -3224,7 +3253,7 @@ export async function startElectronApp(metadata) {
     const wasQuitting = appQuitStarted
     appQuitStarted = true
     closeBehaviorController?.beginExplicitQuit()
-    if (shutdownLifecycle.runtimeStopped && shutdownLifecycle.resourcesDisposed) return
+    if (terminalQuitReady) return
     event.preventDefault()
     if (wasQuitting) return
     setQuitInProgress(true)
@@ -3233,19 +3262,43 @@ export async function startElectronApp(metadata) {
         `[shutdown] ${error instanceof Error ? error.message : String(error)}`,
       )),
       shutdown: () => shutdownLifecycle.shutdown(),
+      prepareDestroy: () => saveWindowState.close(),
       destroyWindows: () => {
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.destroy()
         }
       },
-      quit: () => app.quit(),
+      finalize: async () => {
+        terminalExtensionIpcFinalization ??= Promise.resolve().then(() => unregisterExtensionIpc())
+        await terminalExtensionIpcFinalization
+        if (!await logStore.close()) console.error('[shutdown] diagnostic writes settled with a write error')
+        terminalBuffersDrained = true
+      },
+      afterDestroy: finalizeRendererIpc,
+      quit: () => {
+        terminalQuitReady = true
+        app.quit()
+      },
     })
       .catch((error) => {
         appQuitStarted = false
-        setQuitInProgress(false)
-        closeBehaviorController?.cancelExplicitQuit()
-        const message = error instanceof Error ? error.message : String(error)
-        void logStore.append(`[shutdown] quit deferred because runtime stop failed: ${message}`).catch(() => {})
+        const message = sanitizeLogLine(error instanceof Error ? error.message : String(error))
+        if (terminalBuffersDrained && BrowserWindow.getAllWindows().every(window => window.isDestroyed())) {
+          console.error(`[shutdown] final renderer cleanup failed after drained I/O: ${message}`)
+          app.exit(1)
+          return
+        }
+        if (!shutdownLifecycle.resourcesDisposed) {
+          saveWindowState.resume()
+          logStore.resume()
+          setQuitInProgress(false)
+          closeBehaviorController?.cancelExplicitQuit()
+          void logStore.append(`[shutdown] quit deferred before resource disposal: ${message}`).catch(() => {})
+        } else {
+          // Keep the visible window and the explicit quit intent. A timed-out
+          // drain is still owned, not cancelled; another quit can retry it.
+          console.error(`[shutdown] quit pending after resource disposal: ${message}`)
+        }
       })
   })
   app.on('will-quit', () => {
