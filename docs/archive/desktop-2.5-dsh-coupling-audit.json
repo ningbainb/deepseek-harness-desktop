@@ -5782,7 +5782,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-background-residency.mjs",
-      "line": 69,
+      "line": 94,
       "operation": "DSH_HOME"
     },
     {

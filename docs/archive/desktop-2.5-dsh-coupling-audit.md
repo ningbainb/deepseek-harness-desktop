@@ -697,7 +697,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 21 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 75 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 76 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 69 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 94 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-bai-onboarding.mjs | 35 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-beta-usability.mjs | 106 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 92 | DSH_HOME |
