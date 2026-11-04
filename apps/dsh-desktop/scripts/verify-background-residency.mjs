@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron, ownedProcessIds, ownedProcessesStopped } from './electron-cleanup-fixture.mjs'
@@ -10,13 +12,36 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
-const output = resolve(process.argv.find(argument => argument.startsWith('--output='))?.slice(9) ?? join(tmpdir(), 'dsh-background-residency-result'))
+const receiptOutput = process.env.DSH_DESKTOP_E2E_RECEIPT
+  ? join(dirname(resolve(process.env.DSH_DESKTOP_E2E_RECEIPT)), 'background-residency', basename(process.env.DSH_DESKTOP_E2E_RECEIPT, '.json'))
+  : undefined
+const output = resolve(process.argv.find(argument => argument.startsWith('--output='))?.slice(9)
+  ?? process.env.DSH_DESKTOP_BACKGROUND_OUTPUT ?? receiptOutput ?? join(tmpdir(), 'dsh-background-residency-result'))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-background-residency-'))
 const home = join(temporary, 'home')
 const userData = join(temporary, 'user-data')
 const preferencePath = join(userData, 'desktop-preferences.json')
 const checks = []
+const quitDiagnostics = []
+const run = promisify(execFile)
 let application, applicationChild, page, failure
+
+async function captureQuitDiagnostics(phase, owned) {
+  try {
+    const child = { pid: applicationChild?.pid, exitCode: applicationChild?.exitCode, signalCode: applicationChild?.signalCode }
+    let processes
+    if (process.platform === 'win32') {
+      const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        "$ErrorActionPreference = 'Stop'; ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId,ParentProcessId,Name,CreationDate) -Compress"],
+      { windowsHide: true, timeout: 5_000, maxBuffer: 4 * 1024 * 1024 })
+      processes = JSON.parse(stdout)
+    }
+    quitDiagnostics.push({ phase, at: new Date().toISOString(), child, owned, processes })
+    await writeFile(join(output, 'quit-processes.json'), `${JSON.stringify(quitDiagnostics, null, 2)}\n`)
+  } catch (error) {
+    console.error(`Quit diagnostic capture failed: ${error.message}`)
+  }
+}
 
 const delay = milliseconds => new Promise(resolveWait => setTimeout(resolveWait, milliseconds))
 async function readStatus() {
@@ -121,13 +146,20 @@ async function verifyHiddenRuntime(previous) {
 
 async function quitFromTray() {
   const owned = await ownedProcessIds(applicationChild.pid)
+  await captureQuitDiagnostics('before-quit', owned)
   console.log(`Native tray quit tracking owned PIDs: ${JSON.stringify(owned)}`)
   await application.evaluate(() => {
     const item = globalThis.__dshResidencyProbe.menu?.items.find(item => item.label === '退出 / Quit')
     if (!item) throw new Error('native tray quit action missing')
     item.click()
   })
-  await waitUntil(() => ownedProcessesStopped(owned), 'explicit quit reaps the owned process tree', 90_000)
+  try {
+    await waitUntil(() => ownedProcessesStopped(owned), 'explicit quit reaps the owned process tree', 90_000)
+  } catch (error) {
+    await captureQuitDiagnostics('quit-failed', owned)
+    throw error
+  }
+  await captureQuitDiagnostics('quit-passed', owned)
   checks.push({ action: 'explicit-tray-quit', ownedProcessesStopped: owned.length })
   console.log(`Native tray quit stopped ${owned.length} owned processes`)
   application = undefined
@@ -220,6 +252,9 @@ try {
   console.error(error)
   process.exitCode = 1
 } finally {
+  try {
+    await writeFile(join(output, 'runtime.log'), await readFile(join(userData, 'logs', 'runtime.log'), 'utf8'))
+  } catch (error) { console.error(`Runtime diagnostic capture failed: ${error.message}`) }
   try { await closeIsolatedElectron(application, { child: applicationChild }) } catch (error) {
     failure ??= error
     process.exitCode = 1
