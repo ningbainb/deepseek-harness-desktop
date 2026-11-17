@@ -11,6 +11,7 @@ import { desktopDeepLink } from './distribution-identity.mjs'
 import { assertOptionalContextPluginActivation, getOptionalContextPluginStatus } from './runtime-optional-context-safety.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 import { createSkillMarketActivation } from './skill-market-activation.mjs'
+import { createPromptCustomizerFeature } from './prompt-customizer-feature.mjs'
 import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
 import { normalizeFeatureEvent } from './feature-telemetry.mjs'
@@ -188,6 +189,8 @@ const CHANNELS = [
   'extensions:qqbot-unbind',
   'dock-settings:agent-team-status',
   'dock-settings:agent-team-set',
+  'dock-settings:prompt-customizer-status',
+  'dock-settings:prompt-customizer-set',
   'dock-settings:bai-acquisition-event',
   'dock-settings:control-center-state',
   'dock-settings:browser-use-set',
@@ -417,6 +420,29 @@ export function registerExtensionIpc({
     },
     runMutation: plan => enqueuePluginMutation(async () => {
       await preflightFeatureMutation('skill-market')
+      return mutation().run(plan)
+    }),
+  })
+
+  let promptCustomizerFeature
+  const promptCustomizer = () => promptCustomizerFeature ??= createPromptCustomizerFeature({
+    dshHome,
+    stopRuntime: () => controller.stop(),
+    verifyHealth: async enabled => {
+      const response = await controller.fetch(new URL('/api/prompt-customizer/config', controller.status?.url ?? 'dsh-runtime://app/').href,
+        { signal: AbortSignal.timeout(10_000) })
+      if (!enabled) {
+        await response.body?.cancel()
+        if (response.status !== 404) throw new Error('P2 停用后服务仍在运行，正在恢复原配置。')
+        return
+      }
+      const body = await response.json()
+      if (!response.ok || body?.ok !== true || body.config === null || typeof body.config !== 'object' || Array.isArray(body.config)) {
+        throw new Error('P2 服务尚未就绪，正在恢复原配置。')
+      }
+    },
+    runMutation: plan => enqueuePluginMutation(async () => {
+      await preflightFeatureMutation('prompt-customizer')
       return mutation().run(plan)
     }),
   })
@@ -1105,6 +1131,14 @@ export function registerExtensionIpc({
     })
   }
   handleDockSettings('dock-settings:agent-team-status', () => agentTeamFeature.status())
+  handleDockSettings('dock-settings:prompt-customizer-status', () => promptCustomizer().status())
+  handleDockSettings('dock-settings:prompt-customizer-set', (event, enabled) => {
+    if (typeof enabled !== 'boolean') throw new TypeError('P2 enabled state must be a boolean')
+    event?.sender?.send?.('dock-settings:prompt-customizer-progress', { phase: 'saving' })
+    return promptCustomizer().setEnabled(enabled, { onRuntimeEvent: phase => {
+      if (isDockSettingsSender(event?.sender)) event.sender.send?.('dock-settings:prompt-customizer-progress', { phase })
+    } })
+  })
   handleDockSettings('dock-settings:bai-acquisition-event', (_event, value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TypeError('invalid bai acquisition event')
     return recordFeatureEvent(normalizeFeatureEvent({ feature: 'bai-connect', ...value }))

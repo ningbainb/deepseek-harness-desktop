@@ -16,7 +16,7 @@ import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses, qualifyElectronMainProcess } from './packaged-browser-owners.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './native-fixture-storage.mjs'
 
@@ -48,18 +48,41 @@ const prefix = '/api/desktop/browser-component'
 const factsPath = '/api/browser-component-qa-facts'
 const probeName = '@fixture/dsh-browser-component-qa'
 const report = { schemaVersion: 1, passed: false, mode: 'native-windows-final-packaged-component', exe, output,
-  scope: 'Automated API, activation integrity, independent vendor process, DOM, chat isolation and download-network-denied restart evidence; pending UI and whole-machine-offline gates remain explicit',
+  scope: 'Automated native UI prepare/cancel/retry, API, activation integrity, independent vendor process, DOM, chat isolation and download-network-denied restart evidence; whole-machine-offline gate remains explicit',
   startedAt: new Date().toISOString(), checks: [], launches: [], progress: [], cleanup: [],
   downloadEvidence: { mode: 'local-official-zip-http-replay-through-public-global-dispatcher', actualInternetDownloads: 0,
     pinnedUndici: '7.30.2', cacheServerRequests: 0, sourceBytesStreamed: 0, completedReplayStreams: 0, transportServerErrors: [] },
-  pending: ['Manual UI prepare/cancel/retry button interaction and visible byte counter acceptance',
-    'Whole-machine network disconnection, including all vendor Chromium background networking; the automated offline phase enforces Runtime fetch denial and renderer external request denial only'],
+  pending: ['Whole-machine network disconnection, including all vendor Chromium background networking; the automated offline phase enforces Runtime fetch denial and renderer external request denial only'],
 }
 const run = promisify(execFile)
 const owners = []
 let origin, failure
 const within = (root, path) => { const rel = relative(resolve(root), resolve(path)); return rel && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel) }
 const check = (name, facts = {}) => report.checks.push({ name, passed: true, ...facts })
+
+async function browserCard(owner) {
+  // This journey also asserts the real user-facing dock entry. Do not use the
+  // fixture's bridge fallback when the sidebar action is missing.
+  await owner.page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first().click()
+  await until(() => owner.application.windows().find(page => page.url().includes('/extensions.html')), 'visible dock entry opens its native window')
+  const { dock, settings } = await openDockSetting(owner.application, owner.page, 'shared-browser')
+  assert.equal(await dock.locator('#shared-browser-tab.active').isVisible(), true)
+  const card = settings.locator('[data-browser-component-card]')
+  await card.waitFor({ state: 'visible' })
+  return { settings, card }
+}
+
+async function visibleDownload(card) {
+  const progress = card.getByRole('progressbar', { name: '浏览器组件下载进度', exact: true })
+  if (!await progress.isVisible()) return undefined
+  const value = await progress.evaluate(element => ({ receivedBytes: element.value, totalBytes: element.max }))
+  if (!(value.receivedBytes > 0 && value.receivedBytes < artifact.size)) return undefined
+  assert.equal(value.totalBytes, artifact.size)
+  const text = await card.innerText()
+  assert.ok(text.includes(`组件大小：${(artifact.size / 1024 / 1024).toFixed(1)} MB`))
+  assert.ok(text.includes(`已接收 ${(value.receivedBytes / 1024 / 1024).toFixed(1)} MB`))
+  return { ...value, text }
+}
 
 async function fileHash(path) {
   const hash = createHash('sha256')
@@ -292,9 +315,9 @@ const server = createServer((request, response) => {
     report.downloadEvidence.cacheServerRequests++
     response.writeHead(200, { 'content-type': 'application/zip', 'content-length': String(artifact.size), 'cache-control': 'no-store' })
     const input = createReadStream(archive, { highWaterMark: 1024 * 1024 })
-    const throttled = Readable.from((async function* () { for await (const chunk of input) { await delay(10); report.downloadEvidence.sourceBytesStreamed += chunk.length; yield chunk } })())
+    const throttled = Readable.from((async function* () { for await (const chunk of input) { await delay(40); if (response.destroyed) break; report.downloadEvidence.sourceBytesStreamed += chunk.length; yield chunk } })())
     void pipeline(throttled, response).then(() => { report.downloadEvidence.completedReplayStreams++ }, error => {
-      input.destroy(); report.downloadEvidence.transportServerErrors.push(error.message)
+      input.destroy(); report.downloadEvidence.transportServerErrors.push({ code: error.code, message: error.message })
     })
   } else if (request.method === 'GET' && request.url === '/visiblewindow') {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" })
@@ -328,14 +351,32 @@ try {
   await stop(owner)
   if (values['initialization-only']) {
     report.initializationOnly = true
-    report.pending.push('Full component preparation, browser DOM, close/crash isolation and offline-restart journey was not run in initialization-only mode')
+    report.pending.push('Native UI prepare/cancel/retry, full component preparation, browser DOM, close/crash isolation and offline-restart journey was not run in initialization-only mode')
   } else {
   await installProbe()
   owner = await start('component-cache-replay')
   const before = await api(owner, factsPath)
   assert.equal(before.homeMatches, true); assert.equal(before.cacheReplays, 0); assert.equal(before.dispatcherActive, true)
   report.runtimeTransport = before
-  await api(owner, `${prefix}/prepare`, 'POST')
+  const { settings, card } = await browserCard(owner)
+  await card.getByRole('button', { name: '准备浏览器组件', exact: true }).waitFor({ state: 'visible' })
+  await card.getByRole('button', { name: '准备浏览器组件', exact: true }).dblclick()
+  const cancelledProgress = await until(() => visibleDownload(card), 'native UI displays partial received bytes before cancel')
+  assert.equal((await api(owner, factsPath)).cacheReplays, 1, 'Repeated native prepare input starts only one download')
+  await settings.screenshot({ path: join(output, 'component-ui-before-cancel.png') })
+  await card.getByRole('button', { name: '取消下载', exact: true }).click()
+  await until(async () => (await api(owner, `${prefix}/status`)).phase === 'cancelled', 'native cancel reaches non-ready manager state')
+  await card.getByRole('button', { name: '重试下载', exact: true }).waitFor({ state: 'visible' })
+  await assert.rejects(stat(componentExe), { code: 'ENOENT' })
+  await until(() => report.downloadEvidence.transportServerErrors.length === 1, 'cancelled replay stream closes')
+  assert.equal(report.downloadEvidence.completedReplayStreams, 0)
+  check('native-ui-repeat-prepare-single-download-and-cancel', cancelledProgress)
+  const cancelledBytes = report.downloadEvidence.sourceBytesStreamed
+  const cancelledErrors = [...report.downloadEvidence.transportServerErrors]
+  assert.equal(cancelledErrors[0].code, 'ERR_STREAM_PREMATURE_CLOSE', 'Only the intentional native cancel may abort the first replay')
+  await card.getByRole('button', { name: '重试下载', exact: true }).click()
+  const retryProgress = await until(() => visibleDownload(card), 'native UI retry displays partial received bytes')
+  await settings.screenshot({ path: join(output, 'component-ui-retry-progress.png') })
   await until(async () => {
     const status = await api(owner, `${prefix}/status`)
     report.progress.push(status)
@@ -344,11 +385,14 @@ try {
   }, 'real manager completes fixed-size/hash component preparation', 180000)
   assert.ok(report.progress.some(state => state.phase === 'downloading' && state.receivedBytes > 0 && state.receivedBytes < artifact.size), 'Actual byte progress must be observed')
   const activated = await verifyActivation()
-  assert.equal((await api(owner, factsPath)).cacheReplays, 1)
-  assert.equal(report.downloadEvidence.cacheServerRequests, 1)
-  assert.equal(report.downloadEvidence.sourceBytesStreamed, artifact.size)
+  assert.equal((await api(owner, factsPath)).cacheReplays, 2)
+  assert.equal(report.downloadEvidence.cacheServerRequests, 2)
+  assert.equal(report.downloadEvidence.sourceBytesStreamed - cancelledBytes, artifact.size)
   assert.equal(report.downloadEvidence.completedReplayStreams, 1)
-  assert.deepEqual(report.downloadEvidence.transportServerErrors, [])
+  assert.deepEqual(report.downloadEvidence.transportServerErrors, cancelledErrors, 'Successful retry adds no transport errors')
+  await until(async () => (await card.getByRole('status').innerText()).startsWith('可用'), 'native component card shows ready')
+  await settings.screenshot({ path: join(output, 'component-ui-ready.png') })
+  check('native-ui-retry-visible-bytes-and-ready', retryProgress)
   check('real-manager-progress-and-complete-persistent-activation', activated)
   const workspace = await rpc(owner, 'workspace.create', { path: join(temporary, 'workspace') })
   const workspaceId = workspace.workspace?.workspaceId ?? workspace.workspaceId

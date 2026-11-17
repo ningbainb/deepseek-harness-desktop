@@ -569,10 +569,11 @@ try {
   await dock.locator('.recovery-advanced > summary').click()
   await dock.locator('#run-network-diagnostics').waitFor()
   await dock.locator('#dock-search').fill('记忆')
-  assert.equal(await dock.locator('.settings-sidebar > nav').isVisible(), false, 'search results do not duplicate navigation')
+  assert.equal(await dock.locator('.settings-sidebar > nav:visible').count(), 0, 'search hides primary and secondary navigation')
   await dock.locator('#dock-search-results').getByRole('button', { name: '记忆', exact: true }).click()
   await settings.locator('[data-dsh-dock-settings="memory"]').waitFor()
-  assert.equal(await dock.locator('.settings-sidebar > nav').isVisible(), true, 'navigation returns after search selection')
+  assert.deepEqual(await dock.locator('.settings-sidebar > nav:visible').evaluateAll(items => items.map(item => item.dataset.tabGroup ?? 'primary')),
+    ['primary', 'desktop-settings', 'desktop-settings'], 'selection restores only its containing group')
   await memory.getByRole('listitem').filter({ hasText: 'Dock memory verification.' }).waitFor()
   assert.equal(await memory.getByRole('listitem').filter({ hasText: 'Dock memory verification.' }).count(), 1)
   await (await app.browserWindow(dock)).evaluate(window => window.setSize(960, 680))

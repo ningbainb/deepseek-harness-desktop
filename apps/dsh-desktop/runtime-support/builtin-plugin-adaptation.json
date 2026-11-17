@@ -250,6 +250,17 @@
     },
     {
       "name": "dsh-agent-plugins-market",
+      "desktopCompatibility": {
+        "adapter": "apps/dsh-desktop/src/runtime-market-team-compat.mjs",
+        "reviewedEntry": {
+          "package": "dsh-agent-plugins-market",
+          "version": "0.11.1",
+          "entry": "lib/index.js",
+          "byteLength": 143,
+          "sha256": "e6039f4cee7d4cf377db3721b4fe841f46c9c70e8ea029f5d41f2dbc3f3b9218"
+        },
+        "unknownEntryPolicy": "Load the original module unchanged when package identity, exact version or original entry bytes do not match the audited pin."
+      },
       "selection": {
         "version": "0.11.1",
         "source": "npm",
@@ -267,13 +278,18 @@
         "Show suite capabilities before installation and keep market state inside DSH_HOME",
         "Use the same official SDK cohort as Desktop",
         "Native activation owns confirmation, serializes profile writes and retains exact-byte recovery snapshots",
-        "Managed source replacement keeps the last complete checkout until durable state commit"
+        "Managed source replacement keeps the last complete checkout until durable state commit",
+        "Desktop projects legacy market Team membership and role creation onto official rc3 rootOf/namesOf/startActivation; Team mode remains a dynamic permission gate",
+        "New role activations release only through their exact disposal receipts. The public rc3 API has no targeted-dispose receipt for cold-resumed members: market disable interrupts those members with ancestor authority and waits for idle while preserving resident state, queued input and durable persona/model until agent disposal. Logs identify the session and teammate-role-binding journal record. Reenable restores the vendor role composition without duplicate persona text."
       ],
       "validation": {
         "automatedChecks": [
           "apps/dsh-desktop/test/skill-market.test.mjs",
           "apps/dsh-desktop/test/skill-market-activation.test.mjs",
           "apps/dsh-desktop/test/skill-market-recovery.test.mjs",
+          "apps/dsh-desktop/test/market-team-compat.test.mjs",
+          "apps/dsh-desktop/test/market-team-runtime.test.mjs",
+          "apps/dsh-desktop/test/market-team-entry-identity.test.mjs",
           "apps/dsh-desktop/scripts/verify-skill-market.mjs"
         ],
         "desktopAcceptance": [
@@ -1305,6 +1321,18 @@
     },
     {
       "name": "dsh-better-sidebar",
+      "desktopCompatibility": {
+        "adapter": "apps/dsh-desktop/src/runtime-market-team-compat.mjs",
+        "reviewedEntry": {
+          "package": "dsh-better-sidebar",
+          "version": "0.24.1",
+          "entry": "lib/index.js",
+          "byteLength": 174661,
+          "sha256": "59633da266535fca2fef926d44285b45981cf3423d4b8c158043924c90b3db6e"
+        },
+        "unknownEntryPolicy": "Load the original module unchanged for unknown package versions or entry bytes; preserve the package URL, other exports and client discovery.",
+        "teamContract": "Only sidebar's context receives tryMembership projected from exact live official Agent identity, rootOf/namesOf and isEnabled. Team-off and missing roots retain 404, native task services retain revision conflict and member authorization."
+      },
       "selection": {
         "version": "0.24.1",
         "source": "npm",
@@ -1327,6 +1355,8 @@
           "apps/dsh-desktop/test/profile.test.mjs",
           "apps/dsh-desktop/test/sidebar-terminal-routing.test.mjs",
           "apps/dsh-desktop/test/sidebar-desktop-compat.test.mjs",
+          "apps/dsh-desktop/test/sidebar-team-compat.test.mjs",
+          "apps/dsh-desktop/test/sidebar-team-entry-identity.test.mjs",
           "apps/dsh-desktop/test/panel-layout-menu.test.mjs",
           "apps/dsh-desktop/scripts/verify-terminal.mjs"
         ],

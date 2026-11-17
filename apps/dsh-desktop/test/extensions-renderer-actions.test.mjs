@@ -30,6 +30,12 @@ test('bundled release plugins expose their original configuration through the na
     assert.equal(selected.at(-1)[3], owner)
   }
   assert.equal(dom.window.document.querySelector('[data-id="pet"]') !== null, true, 'the existing companion remains listed')
+  const p2 = dom.window.document.querySelector('[data-id="prompt-customizer"] [data-open-dock-setting="value-mode"]')
+  assert.ok(p2, 'P2 configuration links to the existing model advanced page')
+  p2.click()
+  assert.equal(selected.at(-1)[0].id, 'value-mode-tab')
+  assert.equal(selected.at(-1)[2], 'value-mode')
+  assert.equal(dom.window.document.querySelector('[data-id="context-memory"] [data-open-dock-setting]'), null, 'M2 remains blocked')
   dom.window.close()
 })
 
@@ -392,5 +398,36 @@ test('legacy shortcut and settings-open requests select their new containing gro
     assert.equal(document.getElementById(`${root}-tab`).getAttribute('aria-selected'), 'true')
     assert.equal(document.querySelector(`[data-setting="${setting}"]`).closest('[hidden]'), null)
   }
+  dom.window.close()
+})
+
+test('feature search hides every navigation and restores only the primary plus selected secondary groups', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const { document } = dom.window
+  const context = vm.createContext({ document, localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
+    dockSearch: document.querySelector('#dock-search'), searchResults: document.querySelector('#dock-search-results'),
+    window: { dshDesktop: { selectDockSetting: async () => {} } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  await vm.runInContext("activateTab(document.getElementById('models-tab'))", context)
+  vm.runInContext(section('const searchEntries =', "nativePluginGrid?.addEventListener('click'"), context)
+  const search = document.querySelector('#dock-search')
+  search.value = '记忆'
+  search.dispatchEvent(new dom.window.Event('input'))
+  assert.equal([...document.querySelectorAll('.settings-sidebar > nav')].filter(nav => !nav.hidden).length, 0)
+  search.value = ''
+  search.dispatchEvent(new dom.window.Event('input'))
+  const visible = [...document.querySelectorAll('.settings-sidebar > nav')].filter(nav => !nav.hidden)
+  assert.equal(visible.length, 3, 'one primary and both Desktop settings secondary groups return')
+  assert.equal(visible.filter(nav => nav.dataset.tabGroup).every(nav => nav.dataset.tabGroup === 'desktop-settings'), true)
+  search.value = '外观与动效'
+  search.dispatchEvent(new dom.window.Event('input'))
+  document.querySelector('#dock-search-results button').click()
+  await tick()
+  const after = [...document.querySelectorAll('.settings-sidebar > nav')].filter(nav => !nav.hidden)
+  assert.equal(after.length, 2)
+  assert.equal(after.find(nav => nav.dataset.tabGroup)?.dataset.tabGroup, 'appearance')
+  assert.equal(document.querySelector('#particle-theme-tab').getAttribute('aria-selected'), 'true')
   dom.window.close()
 })

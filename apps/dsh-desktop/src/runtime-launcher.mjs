@@ -44,6 +44,7 @@ import { adaptDesktopBrowserComponentPatches } from './runtime-browser-component
 import { adaptRuntimeOptionalContextSafety } from './runtime-optional-context-safety.mjs'
 import { adaptDesktopCommunityIndexPatches } from './runtime-community-index.mjs'
 import { installDesktopSubagentListCompatibility } from './runtime-subagent-list-compat.mjs'
+import { installDesktopMarketTeamCompatibility } from './runtime-market-team-compat.mjs'
 import { createDesktopConfigurationGuard } from './runtime-config-identity.mjs'
 import {
   adaptRuntimeLegacySettingsPatches,
@@ -322,6 +323,7 @@ async function run() {
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
       installDesktopSubagentListCompatibility(hostCtx)
+      installDesktopMarketTeamCompatibility(hostCtx)
       installDesktopProfileComposition(hostCtx, {
         rootUrl: pathToFileURL(rootConfig).href,
         compose: () => migrationCommitted ? composeLive() : legacySettings.patches,

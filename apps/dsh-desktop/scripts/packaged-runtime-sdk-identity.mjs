@@ -10,6 +10,7 @@ const APP_BOOT_PACKAGE = '@deepseek-ai/dsh-app-boot'
 export const REQUIRED_UNPACKED_RUNTIME_FILES = Object.freeze([
   'package.json',
   ...['runtime-launcher.mjs', 'runtime-account-callback.mjs', 'runtime-renderer-bootstrap.mjs', 'runtime-wire-stream.mjs', 'runtime-legacy-settings.mjs', 'window-chrome.mjs', 'navigation-policy.mjs', 'runtime-startup-timing.mjs', 'runtime-shutdown-control.mjs', 'runtime-stream-drain.mjs', 'modal-reveal.mjs'].map(name => `src/${name}`),
+  'src/runtime-market-team-compat.mjs',
 ])
 
 function assertWithinPayload(root, target) {

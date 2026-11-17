@@ -619,11 +619,13 @@ export function createDesktopProfileManifest(existing = {}, { isNewInstallation 
     : {}
   const existingBundles = existingProfile.bundles
   const agentTeamEnabled = isAgentTeamProfileEnabled(existing)
-  const optionalPlugins = Object.fromEntries(['dsh-context-memory', 'dsh-prompt-customizer'].map(name => [
+  const retainedOptionalPlugins = existingProfile.desktopOptionalPlugins !== null && typeof existingProfile.desktopOptionalPlugins === 'object'
+    && !Array.isArray(existingProfile.desktopOptionalPlugins) ? existingProfile.desktopOptionalPlugins : {}
+  const optionalPlugins = { ...retainedOptionalPlugins, ...Object.fromEntries(['dsh-context-memory', 'dsh-prompt-customizer'].map(name => [
     name, typeof existingProfile.desktopOptionalPlugins?.[name] === 'boolean'
       ? existingProfile.desktopOptionalPlugins[name]
       : Array.isArray(existingBundles) && existingBundles.includes(name),
-  ]))
+  ])) }
   const existingDependencies = existing.dependencies ?? {}
   const managedBundles = new Set([
     ...BUILTIN_BUNDLES,

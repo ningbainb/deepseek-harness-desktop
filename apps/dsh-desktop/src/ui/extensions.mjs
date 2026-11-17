@@ -669,7 +669,9 @@ function nativeIconSvg(icon) {
 
 function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
-  const settingsLink = item.settingsOwner
+  const settingsLink = item.id === 'prompt-customizer'
+    ? '<button type="button" class="secondary" data-open-dock-setting="value-mode">打开高级设置</button>'
+    : item.settingsOwner
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
     : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
@@ -1319,7 +1321,9 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   activeSettingsPlugin = plugin
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting)
-  for (const nav of document.querySelectorAll('[data-tab-group]')) nav.hidden = nav.dataset.tabGroup !== tab.dataset.group
+  for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
+    nav.hidden = Boolean(document.querySelector('#dock-search')?.value.trim()) || Boolean(nav.dataset.tabGroup && nav.dataset.tabGroup !== tab.dataset.group)
+  }
   const storageLocations = document.querySelector('#desktop-storage-locations')
   if (storageLocations) storageLocations.hidden = tab.dataset.group !== 'desktop-settings'
   const [group, title] = groupTitles[tab.dataset.group] ?? ['', '']
@@ -1419,17 +1423,22 @@ const searchEntries = [
 ]
 const dockSearch = document.querySelector('#dock-search')
 const searchResults = document.querySelector('#dock-search-results')
-const sidebarNavigation = document.querySelector('.settings-sidebar > nav')
+function syncFeatureSearchNavigation() {
+  const group = document.querySelector('.settings-sidebar > nav:not([data-tab-group]) [data-group][aria-selected="true"]')?.dataset.group
+  for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
+    nav.hidden = Boolean(dockSearch.value.trim()) || Boolean(nav.dataset.tabGroup && nav.dataset.tabGroup !== group)
+  }
+}
 function resetFeatureSearch() {
   searchResults.hidden = true
   dockSearch.value = ''
-  sidebarNavigation.hidden = false
+  syncFeatureSearchNavigation()
 }
 dockSearch.addEventListener('input', () => {
   const query = dockSearch.value.trim().toLocaleLowerCase()
   searchResults.replaceChildren()
   searchResults.hidden = !query
-  sidebarNavigation.hidden = Boolean(query)
+  syncFeatureSearchNavigation()
   if (!query) return
   for (const [title, aliases, id, setting] of searchEntries.filter(entry => entry.slice(0, 2).join(' ').toLocaleLowerCase().includes(query))) {
     const button = document.createElement('button')

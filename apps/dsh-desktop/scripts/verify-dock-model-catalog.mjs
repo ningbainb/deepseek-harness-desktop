@@ -17,6 +17,7 @@ const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE?.trim()
 const fetchGate = join(temporary, 'runtime-fetch-gate.txt')
 const timings = {}
 const errors = []
+const catalogDiagnostics = []
 let app
 let settings
 let failed = false
@@ -40,6 +41,19 @@ try {
   const opened = await openDockSetting(app, main, 'value-mode')
   const dock = opened.dock
   settings = opened.settings
+  // Preserve Chromium's public initiator evidence without altering the fetch,
+  // cache lifetime, invalidation events, or the exact repeat-open assertion.
+  const network = await app.context().newCDPSession(settings)
+  await network.send('Network.enable')
+  network.on('Network.requestWillBeSent', event => {
+    if (!isCatalog({ url: () => event.request.url, postData: () => event.request.postData })) return
+    let method
+    try { method = JSON.parse(event.request.postData ?? '{}').method } catch {}
+    catalogDiagnostics.push({ path: new URL(event.request.url).pathname, method, timestamp: event.timestamp,
+      initiator: event.initiator.type,
+      frames: event.initiator.stack?.callFrames?.slice(0, 8).map(frame => ({ functionName: frame.functionName, url: frame.url, lineNumber: frame.lineNumber })),
+    })
+  })
   timings.coldDockMs = Math.round(performance.now() - start)
   settings.on('pageerror', error => errors.push(error.message))
   const requests = []
@@ -133,6 +147,7 @@ try {
   console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
 } catch (error) {
   failed = true
+  console.error('Dock catalog request initiators', JSON.stringify(catalogDiagnostics))
   console.error('Dock catalog runtime evidence', temporary,
     (await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')).slice(-8000))
   console.error('Dock catalog window surfaces', app?.windows().map(page => page.url()))

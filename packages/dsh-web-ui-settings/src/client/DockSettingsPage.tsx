@@ -4,6 +4,7 @@ import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-s
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
 import { BrowserComponentCard } from './BrowserComponentCard.tsx'
 import { AgentTeamSettingsCard } from './AgentTeamSettingsCard.tsx'
+import { PromptCustomizerSettingsCard } from './PromptCustomizerSettingsCard.tsx'
 import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
 import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
@@ -149,6 +150,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
         {id === 'shared-browser' && <BrowserComponentCard active={id === selected} />}
         {id === 'control-center' && <ControlCenterSettingsCard />}
         {id === 'agent-team' && <AgentTeamSettingsCard detailsLabel={t('dockDetails')} cautionLabel={t('dockAgentTeamCaution')} />}
+        {id === 'value-mode' && <PromptCustomizerSettingsCard />}
         {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'shared-browser' || id === 'control-center' || id === 'agent-team' ? null : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
             {id === 'appearance'

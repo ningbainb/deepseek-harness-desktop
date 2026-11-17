@@ -15,6 +15,15 @@ const hosted = {
 const temporaryDirectory = 'D:\\a\\_temp\\dsh-native-fixtures'
 const nativeWindows = { skip: process.platform === 'win32' ? false : 'Requires native Windows filesystem paths; Windows must run this case', timeout: 30_000 }
 
+test('Desktop CI prepares the dedicated hosted fixture root before native lifecycle and GUI gates', async () => {
+  const workflow = await readFile(new URL('../../../.github/workflows/desktop-ci.yml', import.meta.url), 'utf8')
+  const prepare = workflow.indexOf('run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
+  assert.ok(prepare >= 0, 'Hosted native gates require their storage preparation step')
+  for (const command of ['test:installer-lifecycle:e2e', 'run: pnpm desktop:regression:e2e']) {
+    assert.ok(workflow.indexOf(command) > prepare, `${command} must use the prepared fixture environment`)
+  }
+})
+
 test('local native fixtures require the dedicated D workspace temporary and output paths', () => {
   const policy = nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'D:\\dshshequ\\.desktop-build\\temp', outputDirectory: 'D:\\dshshequ\\.desktop-build\\artifacts\\screens' })
   assert.equal(policy.mode, 'local-d-workspace')

@@ -13,6 +13,12 @@ ipcRenderer.on('desktop:runtime-stream-frame', (_event, frame) => {
 })
 
 const progressListeners = new Set()
+const promptCustomizerProgressListeners = new Set()
+ipcRenderer.on('dock-settings:prompt-customizer-progress', (_event, progress) => {
+  for (const listener of [...promptCustomizerProgressListeners]) {
+    try { listener(progress) } catch {}
+  }
+})
 ipcRenderer.on('dock-settings:agent-team-progress', (_event, progress) => {
   for (const listener of [...progressListeners]) {
     try { listener(progress) } catch {}
@@ -51,6 +57,13 @@ contextBridge.exposeInMainWorld('dshDesktopTransport', Object.freeze({
 }))
 
 contextBridge.exposeInMainWorld('dshDockSettings', Object.freeze({
+  getPromptCustomizerStatus: () => ipcRenderer.invoke('dock-settings:prompt-customizer-status'),
+  setPromptCustomizerEnabled: (enabled) => ipcRenderer.invoke('dock-settings:prompt-customizer-set', enabled),
+  onPromptCustomizerProgress: (listener) => {
+    if (typeof listener !== 'function') throw new TypeError('P2 progress listener must be a function')
+    promptCustomizerProgressListeners.add(listener)
+    return () => promptCustomizerProgressListeners.delete(listener)
+  },
   recordBaiAcquisitionEvent: (outcome, detail) => ipcRenderer.invoke('dock-settings:bai-acquisition-event', { outcome, detail }),
   getAgentTeamStatus: () => ipcRenderer.invoke('dock-settings:agent-team-status'),
   setAgentTeamEnabled: (enabled) => ipcRenderer.invoke('dock-settings:agent-team-set', enabled),

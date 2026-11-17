@@ -72,6 +72,8 @@ jobs:
         env:
           DSH_BROWSER_COMPONENT_CARRIER: ${{ github.workspace }}/apps/dsh-desktop/dist/mac-arm64/DeepSeek Harness Desktop.app/Contents/MacOS/DeepSeek Harness Desktop
         run: node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
+      - name: Verify rc3 market and opt-in prompt compatibility
+        run: node --test apps/dsh-desktop/test/market-team-compat.test.mjs apps/dsh-desktop/test/market-team-runtime.test.mjs apps/dsh-desktop/test/market-team-entry-identity.test.mjs apps/dsh-desktop/test/sidebar-team-compat.test.mjs apps/dsh-desktop/test/sidebar-team-entry-identity.test.mjs apps/dsh-desktop/test/prompt-customizer-feature.test.mjs apps/dsh-desktop/test/skill-market-activation.test.mjs
       - name: Verify the user DMG and internal updater ZIP
         run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs darwin
       - name: Verify packaged bundle

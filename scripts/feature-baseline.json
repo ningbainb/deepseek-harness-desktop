@@ -586,6 +586,10 @@
         "dedicated-settings-use-full-document-width-without-unused-pet-rail-or-partition",
         "skill-market-source-replacement-staged-with-durable-restart-recovery",
         "market-runtime-sdk-cohort-matches-desktop",
+        "market-legacy-team-roles-use-official-rc3-live-tree-identity-and-dynamic-team-permission",
+        "market-team-compatibility-only-wraps-reviewed-version-and-exact-entry-bytes-with-unknown-packages-preserved",
+        "sidebar-team-task-writes-preserve-official-rc3-team-mode-revision-conflicts-and-member-authority-through-reviewed-entry-only",
+        "market-role-replay-preserves-durable-persona-model-and-queued-input-with-exact-activation-cleanup-boundary",
         "extension-dock-and-skill-center-share-dsh-home-skills",
         "conversation-skills-mount-on-rc2-plus-and-legacy-command-controls",
         "native-plus-command-menu-preserves-commands-and-opens-shared-skills",
@@ -762,6 +766,8 @@
         "isolated-per-generation-committed-cleanup",
         "locked-legacy-committed-backup-does-not-block-next-upgrade",
         "stable-installer-transaction-helper",
+        "stock-finish-launch-behavior-preserved-with-readonly-scrollable-program-data-and-cache-paths",
+        "finish-path-discovery-is-readonly-and-labels-unselected-or-unconfirmed-home-without-assuming-defaults",
         "stock-extraction-cancel-rolls-back-before-quitting",
         "installer-process-ownership-excludes-prefix-siblings-and-unrelated-command-line-references",
         "offline-runtime-restoration-bytes-rounded-up-in-native-disk-space-gates",
@@ -966,6 +972,9 @@
         "relay-content-only-collapse",
         "relay-top-left-up-down-toggle",
         "search-results-replace-navigation",
+        "search-hides-primary-and-secondary-navigation-and-restores-only-the-current-group",
+        "advanced-p2-explicit-switch-uses-owner-checked-serialized-backed-up-profile-mutations-and-runtime-health",
+        "p2-disable-preserves-sqlite-p1-and-m2-with-one-native-prompt-editor",
         "dedicated-settings-form-default-expanded",
         "thirteen-sidebar-destinations-fit-default-window",
         "fourteen-sidebar-destinations-fit-default-window",
@@ -1431,7 +1440,7 @@
       "version": "2.2.0",
       "defaultEnabled": false,
       "sourceAcceptance": "authenticated-save-preview-backup-restore-and-model-input-passed",
-      "desktopAcceptance": "pending"
+      "desktopAcceptance": "source-electron-ui-opt-in-preview-save-restart-restore-disable-passed-packaged-pending"
     }
   }
 }

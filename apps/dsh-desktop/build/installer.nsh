@@ -21,6 +21,7 @@ Var DshLegacyInstallDirectory
 Var DshCurrentInstallDirectory
 Var DshRequestedInstallDirectory
 Var DshModeDirectory
+!include "${BUILD_RESOURCES_DIR}\installer-finish-paths.nsh"
 
 ; Local-only diagnostics. No credentials/sessions are read or uploaded.
 Function WriteInstallerDiagnostic
@@ -425,6 +426,7 @@ upgrade_commit_done:
   Call RetireLegacyInstallerIdentity
   !insertmacro DshLog "legacy-identity" "0" "Retired the owned 3.x installer registry identity"
 legacy_identity_retired:
+  Call DshReadFinishPaths
   !insertmacro DshLog "completed" "0" "Installation committed"
   !insertmacro DshStopProgress
   SendMessage $DshProgressBar 0x401 0 0x00640000
