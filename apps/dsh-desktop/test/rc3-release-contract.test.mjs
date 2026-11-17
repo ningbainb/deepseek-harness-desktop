@@ -7,7 +7,7 @@ import { parse } from 'yaml'
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)))
 
 test('next Desktop has an unambiguous candidate version and exact official rc.3 core', () => {
-  assert.equal(manifest.version, '5.3.0-rc.1')
+  assert.equal(manifest.version, '5.3.0-rc.2')
   assert.equal(manifest.dependencies['@deepseek-ai/dsh'], '0.2.2-rc.3')
   assert.equal(manifest.dependencies['@deepseek-ai/dsh-web-app'], '0.2.2-rc.3')
   assert.equal(manifest.dependencies['@deepseek-ai/cordis'], '4.1.0')

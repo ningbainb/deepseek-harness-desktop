@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
@@ -10,6 +9,7 @@ import { resolveNsisCompiler } from './nsis-compiler.mjs'
 import { prepareInstallerElectronPayload, sha256 } from './installer-electron-payload.mjs'
 import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from '../test/fixtures/browser-preflight-resources.mjs'
 import { tinyPE } from '../test/fixtures/electron-payload.mjs'
+import { createInstallerLifecycleRoot } from '../test/fixtures/installer-lifecycle-root.mjs'
 import { assertInstallerFixtureProcessIsolation } from './installer-fixture-process-guard.mjs'
 
 // Compiles and executes the production NSIS macros with tiny isolated payloads.
@@ -20,7 +20,7 @@ const exec = promisify(execFile)
 const desktop = resolve(import.meta.dirname, '..')
 if (process.platform !== 'win32') throw new Error('Installer lifecycle verification requires Windows')
 const compiler = await resolveNsisCompiler()
-const root = await mkdtemp(join(tmpdir(), 'dsh-nsis-lifecycle-'))
+const root = await createInstallerLifecycleRoot()
 const results = []
 
 async function pathExists(path) {

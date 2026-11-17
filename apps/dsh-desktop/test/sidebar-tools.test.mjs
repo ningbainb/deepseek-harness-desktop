@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createRequire } from 'node:module'
+import { readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { SIDEBAR_TOOLS_CSS, SIDEBAR_TOOLS_SCRIPT } from '../src/sidebar-tools.mjs'
 
@@ -146,4 +149,44 @@ test('only owned tool rows are hidden, expanded lists scroll and workspace space
   assert.match(SIDEBAR_TOOLS_CSS, /flex: 1 1 min\(160px, 25vh\)/u)
   assert.match(SIDEBAR_TOOLS_CSS, /min-block-size: min\(120px, 20vh\)/u)
   assert.match(SIDEBAR_TOOLS_CSS, /:focus-visible/u)
+})
+
+
+test('rc3 grid sidebar gives tools a content-column row without covering the native workspace header', async () => {
+  const require = createRequire(import.meta.url)
+  const sdk = createRequire(require.resolve('@deepseek-ai/dsh/package.json'))
+  const sidebarRoot = dirname(sdk.resolve('@deepseek-ai/dsh-client-ui-sidebar/package.json'))
+  const nativeCss = await readFile(join(sidebarRoot, 'src/client/SidebarRoot.module.css'), 'utf8')
+  const rules = ['scrollArea', 'panelList', 'regionArea'].map(name => {
+    const declarations = nativeCss.match(new RegExp(`^\\.${name}\\s*\\{([^}]+)\\}`, 'mu'))?.[1]
+    assert.ok(declarations, `official ${name} layout must be present`)
+    return `.${name} {${declarations}}`
+  }).join('\n')
+  const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/package.json', import.meta.url))('jsdom')
+  const dom = new JSDOM(`<!doctype html><html lang="zh-CN"><head><style>${rules}</style><style>${SIDEBAR_TOOLS_CSS}</style></head><body>
+    <aside data-pane="sidebar"><div class="scrollArea" data-sidebar-scrollport>
+      <nav class="panelList" aria-label="全局面板"><button>插件</button><button>技能</button></nav>
+      <div class="regionArea"><div data-slot="sidebar.workspaces"><div data-sidebar-workspace-header>工作区</div><button>原会话</button></div></div>
+    </div></aside></body></html>`, { url: 'https://desktop.invalid', runScripts: 'outside-only', pretendToBeVisual: true })
+  try {
+    const { window } = dom, { document } = window
+    window.eval(SIDEBAR_TOOLS_SCRIPT)
+    const root = document.querySelector('.scrollArea'), toggle = document.querySelector('[data-dsh-tools-toggle]')
+    const panels = document.querySelector('.panelList'), region = document.querySelector('.regionArea'), header = document.querySelector('[data-sidebar-workspace-header]')
+    assert.equal(window.getComputedStyle(root).display, 'grid', 'keep the official grid and gutter contract')
+    for (const element of [toggle, panels, region]) {
+      const style = window.getComputedStyle(element)
+      assert.equal(style.gridColumn, '2', `${element.tagName} must use the content column rather than the 4px gutter`)
+      assert.equal(style.gridRow, 'auto', 'native fixed rows must not overlap a newly inserted toggle')
+    }
+    assert.equal(window.getComputedStyle(panels).display, 'none')
+    toggle.click()
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true')
+    assert.equal(window.getComputedStyle(panels).display, 'flex')
+    assert.equal(region.querySelector('[data-sidebar-workspace-header]'), header, 'retain the native header and its actions')
+    assert.equal(window.getComputedStyle(header).pointerEvents, 'auto')
+    toggle.click()
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false')
+    assert.equal(window.getComputedStyle(panels).display, 'none')
+  } finally { dom.window.dshSidebarToolsController?.dispose(); dom.window.close() }
 })

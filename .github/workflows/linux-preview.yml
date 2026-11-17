@@ -199,7 +199,23 @@ jobs:
           mapfile -d '' executables < <(find "$inspection" -type f -name deepseek-harness-desktop -print0)
           test "${#executables[@]}" = 1
           test -x "${executables[0]}"
-          app="$(dirname "${executables[0]}")"
+          # Extraction alone never runs the packaged postinst: Ubuntu 24 needs
+          # its exact-path AppArmor userns profile. Install the same verified
+          # DEB and exercise its real /opt path, including the product spaces.
+          package="$(dpkg-deb --field "$deb" Package)"
+          sudo apt-get install -y --no-install-recommends "./$deb"
+          test "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed'
+          mapfile -t installedExecutables < <(dpkg-query -L "$package" | grep '/deepseek-harness-desktop$')
+          test "${#installedExecutables[@]}" = 1
+          test -x "${installedExecutables[0]}"
+          cmp "${executables[0]}" "${installedExecutables[0]}"
+          app="$(dirname "${installedExecutables[0]}")"
+          test "$app" = '/opt/DeepSeek Harness Desktop'
+          cmp "$(dirname "${executables[0]}")/resources/apparmor-profile" "$app/resources/apparmor-profile"
+          sudo cmp "$app/resources/apparmor-profile" /etc/apparmor.d/deepseek-harness-desktop
+          grep -F "\"${installedExecutables[0]}\"" "$app/resources/apparmor-profile"
+          sudo apparmor_status --enabled
+          sudo grep -Fx 'deepseek-harness-desktop (unconfined)' /sys/kernel/security/apparmor/profiles
           test -f "$app/resources/app.asar"
           test "$(cat "$app/resources/package-type")" = deb
           ln -s "$app" linux-unpacked
@@ -237,7 +253,7 @@ jobs:
           await writeFile('linux-ubuntu24-qa/result.json', JSON.stringify({
             schemaVersion: 1, status: 'passed', sourceCommit: receipt.sourceCommit,
             runner: 'ubuntu-24.04', installer: receipt.files[0],
-            checks: ['packaged-runtime', 'Office-preview-conversion-recalculation', 'Landlock', 'sandbox-enabled-Xvfb-startup'],
+            checks: ['native-deb-install-postinst', 'AppArmor-userns-profile-loaded', 'packaged-runtime', 'Office-preview-conversion-recalculation', 'Landlock', 'sandbox-enabled-Xvfb-startup'],
           }, null, 2) + '\n')
           NODE
       - uses: actions/upload-artifact@v4

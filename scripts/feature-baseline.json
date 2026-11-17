@@ -1062,6 +1062,7 @@
         "real-local-provider-progressive-chinese-and-code-output",
         "usage-card-reuses-live-footer-without-global-stream-time-sidebar-rescans",
         "collapsed-tools-preserve-workspaces-sessions-dock-and-keyboard-access",
+        "rc3-grid-owned-tool-rows-use-content-column-with-normal-click-targets",
         "single-footer-dock-entry-with-legacy-shell-fallback",
         "retained-skin-context-hover-remains-stable",
         "dark-dock-skin-palette-meets-text-contrast",
@@ -1332,7 +1333,8 @@
         "sha256-platform-architecture-version-and-file-integrity",
         "cancel-retry-and-coalesced-preparation",
         "preflight-before-upgrade-shutdown",
-        "complete-core-nsis-archive-without-nested-electron"
+        "complete-core-nsis-archive-without-nested-electron",
+        "electron-original-fs-preserves-component-asar-as-ordinary-files"
       ],
       "e2eScript": "scripts/verify-packaged-browser-component.mjs",
       "unitTests": ["test/runtime-nsis-archive.test.mjs"]

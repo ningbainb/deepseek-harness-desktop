@@ -4,13 +4,16 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { parseArgs, promisify } from 'node:util'
 import { _electron as electron } from 'playwright'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
-import { sameProcess, updateOwnedProcesses } from './packaged-browser-owners.mjs'
+import { sameProcess, updateOwnedProcesses, qualifyElectronMainProcess } from './packaged-browser-owners.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
@@ -19,7 +22,7 @@ import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './nat
 
 // QA only: normal final packaged main, a temporary public-browser probe, no
 // source profile generation, Electron override, dependency install or build.
-const { values } = parseArgs({ options: { output: { type: 'string' }, archive: { type: 'string' } } })
+const { values } = parseArgs({ options: { output: { type: 'string' }, archive: { type: 'string' }, 'initialization-only': { type: 'boolean', default: false } } })
 assert.equal(process.platform, 'win32', 'Native Windows packaged acceptance only')
 assert.ok(isAbsolute(process.env.DSH_DESKTOP_E2E_EXECUTABLE ?? ''), 'Set DSH_DESKTOP_E2E_EXECUTABLE to the final packaged EXE')
 assert.ok(isAbsolute(values.output ?? ''), '--output requires a new absolute evidence directory')
@@ -32,6 +35,9 @@ const manifest = JSON.parse(await readFile(new URL('../runtime-support/browser-c
 const artifact = manifest.artifacts.find(item => item.platform === 'win32' && item.arch === 'x64')
 const archive = values.archive ?? process.env.DSH_BROWSER_COMPONENT_QA_ARCHIVE
 assert.ok(isAbsolute(archive ?? ''), 'Provide --archive or DSH_BROWSER_COMPONENT_QA_ARCHIVE with the cached official ZIP; this driver does not claim a network download')
+const qaDeps = process.env.DSH_BROWSER_COMPONENT_QA_DEPS ?? 'D:/dshshequ/.desktop-build/qa-deps/browser-component'
+const qaRequire = createRequire(join(qaDeps, 'package.json'))
+assert.equal(qaRequire('undici/package.json').version, '7.30.2', 'Install the fixed public Undici only in the isolated D: QA dependency directory')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-browser-component-'))
 const home = join(temporary, 'home'), userData = join(temporary, 'user-data'), profile = join(home, 'profiles', 'desktop')
 const componentRoot = join(home, 'desktop-components', 'browser-electron')
@@ -44,7 +50,8 @@ const probeName = '@fixture/dsh-browser-component-qa'
 const report = { schemaVersion: 1, passed: false, mode: 'native-windows-final-packaged-component', exe, output,
   scope: 'Automated API, activation integrity, independent vendor process, DOM, chat isolation and download-network-denied restart evidence; pending UI and whole-machine-offline gates remain explicit',
   startedAt: new Date().toISOString(), checks: [], launches: [], progress: [], cleanup: [],
-  downloadEvidence: { mode: 'local-official-zip-replay-through-real-manager-fetch', actualInternetDownloads: 0 },
+  downloadEvidence: { mode: 'local-official-zip-http-replay-through-public-global-dispatcher', actualInternetDownloads: 0,
+    pinnedUndici: '7.30.2', cacheServerRequests: 0, sourceBytesStreamed: 0, completedReplayStreams: 0, transportServerErrors: [] },
   pending: ['Manual UI prepare/cancel/retry button interaction and visible byte counter acceptance',
     'Whole-machine network disconnection, including all vendor Chromium background networking; the automated offline phase enforces Runtime fetch denial and renderer external request denial only'],
 }
@@ -66,13 +73,17 @@ async function until(predicate, label, timeout = 60000) {
 }
 async function processes() {
   const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    "$ErrorActionPreference='Stop'; ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CreationDate,ExecutablePath,CommandLine) -Compress"],
+    "$ErrorActionPreference='Stop'; ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,@{Name='CreationDate';Expression={$_.CreationDate.ToUniversalTime().ToString('o')}},ExecutablePath,CommandLine) -Compress"],
   { windowsHide: true, timeout: 10000, maxBuffer: 8 * 1024 * 1024 })
   const rows = JSON.parse(stdout)
   assert.ok(Array.isArray(rows) && rows.length)
   return rows
 }
-async function inventory(owner) { return updateOwnedProcesses(owner, await processes(), exe) }
+async function inventory(owner) {
+  const rows = await processes()
+  if (!rows.some(row => sameProcess(row, owner.qualification.mainIdentity))) owner.mainExited = true
+  return updateOwnedProcesses(owner, rows, exe)
+}
 function identity(row) { return { pid: row.ProcessId, parentPid: row.ParentProcessId, created: row.CreationDate, executable: row.ExecutablePath } }
 async function terminateKnown(owner, row) {
   const fresh = (await processes()).find(candidate => sameProcess(candidate, row))
@@ -81,6 +92,21 @@ async function terminateKnown(owner, row) {
 }
 async function stop(owner) {
   if (!owner || owner.stopped) return
+  if (!owner.qualification) {
+    // Binding failures must still quit only the evaluated main with this exact
+    // QA data identity. No shell PID or unqualified PID tree is signalled.
+    const facts = await owner.application.evaluate(({ app }) => ({ pid: process.pid, execPath: process.execPath, home: process.env.DSH_HOME, userData: app.getPath('userData') }))
+    assert.equal(facts.execPath.toLowerCase(), exe.toLowerCase())
+    assert.equal(facts.home, home); assert.equal(facts.userData, userData)
+    const root = (await processes()).find(row => row.ProcessId === facts.pid)
+    assert.ok(root && Date.parse(root.CreationDate) >= owner.launchStartedAt)
+    assert.equal(root.ExecutablePath.toLowerCase(), exe.toLowerCase())
+    await owner.application.evaluate(({ app }) => app.quit()).catch(() => {})
+    await until(async () => !(await processes()).some(row => sameProcess(row, root)), 'verified exact-QA main quits after qualification failure', 45000)
+    owner.stopped = true
+    report.cleanup.push({ launch: owner.name, passed: true, action: 'exact-QA-main-only exit after ownership qualification failure', root: identity(root) })
+    return
+  }
   clearInterval(owner.tracker)
   if (owner.polling) await owner.polling
   await inventory(owner)
@@ -113,9 +139,20 @@ function environment(offline) {
 async function start(name, offline = false) {
   const env = environment(offline)
   assert.equal(env.ELECTRON_PATH, undefined, 'Never bypass the real manager with an Electron override')
+  const launchStartedAt = Date.now()
   const application = await electron.launch({ executablePath: exe, args: ['--enable-automation', '--disable-background-networking'], cwd: dirname(exe), env, timeout: 600000 })
-  const owner = { name, application, child: application.process(), owned: new Map(), stopped: false, inventoryErrors: [] }
+  const owner = { name, application, launcher: application.process(), launchStartedAt, owned: new Map(), stopped: false, inventoryErrors: [] }
   owners.push(owner)
+  const main = await application.evaluate(({ app }) => ({ pid: process.pid, execPath: process.execPath,
+    home: process.env.DSH_HOME, userData: app.getPath('userData'), packaged: app.isPackaged }))
+  const rows = await processes()
+  const launcherIdentity = rows.find(row => row.ProcessId === owner.launcher.pid)
+  owner.qualification = qualifyElectronMainProcess({ launcher: owner.launcher, launcherIdentity, main, rows,
+    expectedExe: exe, expectedHome: home, expectedUserData: userData, launchStartedAt })
+  owner.mainExited = false
+  // This lifecycle represents only the creation-qualified evaluated main.
+  // cmd.exe remains evidence for initial causality, never an ownership root.
+  owner.child = { pid: main.pid, get exitCode() { return owner.mainExited ? 0 : null }, get signalCode() { return null } }
   await inventory(owner)
   owner.tracker = setInterval(() => {
     if (owner.polling) return
@@ -138,7 +175,8 @@ async function start(name, offline = false) {
   assert.equal(info.platform, 'win32')
   const packaged = await application.evaluate(({ app }) => app.isPackaged)
   assert.equal(packaged, true)
-  report.launches.push({ name, packaged, version: info.version, offlineRuntimeFetchGuard: offline, root: identity(owner.rootIdentity) })
+  report.launches.push({ name, packaged, version: info.version, offlineRuntimeFetchGuard: offline, root: identity(owner.rootIdentity),
+    launcher: identity(owner.qualification.launcherIdentity), qualifiedAncestry: owner.qualification.ancestry.map(identity), exactQaHomeVerified: true })
   return owner
 }
 async function api(owner, path, method = 'GET', body) {
@@ -209,28 +247,34 @@ async function installProbe() {
   const source = await readFile(new URL('./release-plugins-host-fixture.mjs', import.meta.url), 'utf8')
   await writeFile(join(target, 'public-browser.mjs'), source)
   await writeFile(join(target, 'host.mjs'), `import { apply as install, inject } from './public-browser.mjs';
-import { createReadStream } from 'node:fs'; import { Readable } from 'node:stream'; import { setTimeout as delay } from 'node:timers/promises';
+import { createRequire } from 'node:module';
+const require = createRequire(${JSON.stringify(join(qaDeps, 'package.json'))});
+const { Dispatcher, getGlobalDispatcher, setGlobalDispatcher } = require('undici');
 export { inject }; export const name = 'browser-component-qa';
 export function apply(ctx) {
+ const capturedFetch = globalThis.fetch;
  install(ctx);
- const previous = globalThis.fetch; let cacheReplays = 0; let offlineDenials = 0;
- const guarded = async (input, init) => {
-  const url = new URL(input instanceof Request ? input.url : String(input));
-  if (url.href === ${JSON.stringify(artifact.url)}) {
-   if (process.env.DSH_BROWSER_COMPONENT_QA_OFFLINE === '1') { offlineDenials++; throw Error('QA offline: component download network denied'); }
-   cacheReplays++;
-   const bytes = createReadStream(${JSON.stringify(archive)}, { highWaterMark: 1024 * 1024, signal: init?.signal });
-   const stream = Readable.from((async function* () { for await (const chunk of bytes) { await delay(10, undefined, { signal: init?.signal }); yield chunk; } })());
-   return new Response(Readable.toWeb(stream), { headers: { 'content-length': '${artifact.size}', 'content-type': 'application/zip' } });
+ const previous = getGlobalDispatcher(); let cacheReplays = 0; let offlineDenials = 0; let otherExternalDenials = 0;
+ class QaDispatcher extends Dispatcher {
+  dispatch(options, handler) {
+   const url = new URL(options.path, String(options.origin));
+   if (url.href === ${JSON.stringify(artifact.url)}) {
+    if (process.env.DSH_BROWSER_COMPONENT_QA_OFFLINE === '1') { offlineDenials++; throw Error('QA offline: component download network denied'); }
+    cacheReplays++;
+    return previous.dispatch({ ...options, origin: ${JSON.stringify(origin)}, path: '/component.zip' }, handler);
+   }
+   if (['127.0.0.1', 'localhost', '[::1]', 'dsh.internal'].includes(url.hostname)) return previous.dispatch(options, handler);
+   otherExternalDenials++; throw Error('QA dispatcher denied external network');
   }
-  return previous(input, init);
- };
- globalThis.fetch = guarded; ctx.effect(() => () => { if (globalThis.fetch === guarded) globalThis.fetch = previous; });
+ }
+ const dispatcher = new QaDispatcher(); setGlobalDispatcher(dispatcher);
+ ctx.effect(() => () => { if (getGlobalDispatcher() === dispatcher) setGlobalDispatcher(previous); });
  ctx.effect(() => ctx.connection.fetch.register({ path: ${JSON.stringify(factsPath)}, methods: ['GET', 'POST'], requestBody: 'buffered',
   async fetch(request) {
-   if (globalThis.fetch !== guarded) throw Error('QA Runtime download guard was displaced');
-   if (request.method === 'POST') { try { await globalThis.fetch(${JSON.stringify(artifact.url)}); throw Error('Offline negative control unexpectedly succeeded'); } catch (error) { if (!String(error.message).includes('QA offline:')) throw error; } }
-   return Response.json({ homeMatches: process.env.DSH_HOME === ${JSON.stringify(home)}, cacheReplays, offlineDenials, offline: process.env.DSH_BROWSER_COMPONENT_QA_OFFLINE === '1' });
+   if (getGlobalDispatcher() !== dispatcher) throw Error('QA Runtime download dispatcher was displaced');
+   if (request.method === 'POST') { try { await capturedFetch(${JSON.stringify(artifact.url)}); throw Error('Offline negative control unexpectedly succeeded'); } catch (error) { if (!String(error.cause?.message ?? error.message).includes('QA offline:')) throw error; } }
+   return Response.json({ homeMatches: process.env.DSH_HOME === ${JSON.stringify(home)}, cacheReplays, offlineDenials, otherExternalDenials,
+    offline: process.env.DSH_BROWSER_COMPONENT_QA_OFFLINE === '1', dispatcherActive: true, runtimeNode: process.version, bundledUndici: process.versions.undici, pinnedUndici: require('undici/package.json').version });
   }
  }));
 }
@@ -244,7 +288,15 @@ export function apply(ctx) {
 }
 
 const server = createServer((request, response) => {
-  if (request.method === 'GET' && request.url === '/visiblewindow') {
+  if (request.method === 'GET' && request.url === '/component.zip') {
+    report.downloadEvidence.cacheServerRequests++
+    response.writeHead(200, { 'content-type': 'application/zip', 'content-length': String(artifact.size), 'cache-control': 'no-store' })
+    const input = createReadStream(archive, { highWaterMark: 1024 * 1024 })
+    const throttled = Readable.from((async function* () { for await (const chunk of input) { await delay(10); report.downloadEvidence.sourceBytesStreamed += chunk.length; yield chunk } })())
+    void pipeline(throttled, response).then(() => { report.downloadEvidence.completedReplayStreams++ }, error => {
+      input.destroy(); report.downloadEvidence.transportServerErrors.push(error.message)
+    })
+  } else if (request.method === 'GET' && request.url === '/visiblewindow') {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'" })
     response.end(`<!doctype html><title>Release plugins visiblewindow</title><h1>Packaged component browser</h1>
 <input id="fixture-name"><button id="fixture-submit">Apply local value</button><output id="fixture-result">not-applied</output>
@@ -262,7 +314,7 @@ try {
   report.exeSha256 = await fileHash(exe)
   await new Promise((accept, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', accept) })
   origin = `http://127.0.0.1:${server.address().port}`
-  await Promise.all([home, userData, join(temporary, 'workspace')].map(path => mkdir(path, { recursive: true })))
+  await Promise.all([home, userData, join(temporary, 'workspace'), join(temporary, 'user-profile'), join(temporary, 'roaming'), join(temporary, 'local'), join(temporary, 'agents')].map(path => mkdir(path, { recursive: true })))
   await writeFile(join(home, 'settings.yaml'), JSON.stringify({ 'llm-pi-ai': { providers: { 'browser-qa': { displayName: 'Browser QA only',
     apiKeyEnv: 'DSH_BROWSER_QA_MODEL_KEY', api: 'openai-completions', baseURL: `${origin}/v1`, models: [{ id: 'browser-qa', name: 'Browser QA only', contextWindow: 32768, maxTokens: 128 }] } } } }))
   await mkdir(join(home, 'dsh-builtin-browser-host'))
@@ -274,10 +326,15 @@ try {
   await assert.rejects(stat(componentExe), { code: 'ENOENT' })
   check('initial-authenticated-api-is-not-ready', initial)
   await stop(owner)
+  if (values['initialization-only']) {
+    report.initializationOnly = true
+    report.pending.push('Full component preparation, browser DOM, close/crash isolation and offline-restart journey was not run in initialization-only mode')
+  } else {
   await installProbe()
   owner = await start('component-cache-replay')
   const before = await api(owner, factsPath)
-  assert.equal(before.homeMatches, true); assert.equal(before.cacheReplays, 0)
+  assert.equal(before.homeMatches, true); assert.equal(before.cacheReplays, 0); assert.equal(before.dispatcherActive, true)
+  report.runtimeTransport = before
   await api(owner, `${prefix}/prepare`, 'POST')
   await until(async () => {
     const status = await api(owner, `${prefix}/status`)
@@ -288,6 +345,10 @@ try {
   assert.ok(report.progress.some(state => state.phase === 'downloading' && state.receivedBytes > 0 && state.receivedBytes < artifact.size), 'Actual byte progress must be observed')
   const activated = await verifyActivation()
   assert.equal((await api(owner, factsPath)).cacheReplays, 1)
+  assert.equal(report.downloadEvidence.cacheServerRequests, 1)
+  assert.equal(report.downloadEvidence.sourceBytesStreamed, artifact.size)
+  assert.equal(report.downloadEvidence.completedReplayStreams, 1)
+  assert.deepEqual(report.downloadEvidence.transportServerErrors, [])
   check('real-manager-progress-and-complete-persistent-activation', activated)
   const workspace = await rpc(owner, 'workspace.create', { path: join(temporary, 'workspace') })
   const workspaceId = workspace.workspace?.workspaceId ?? workspace.workspaceId
@@ -340,6 +401,7 @@ try {
   assert.equal(await fileHash(exe), report.exeSha256, 'The final packaged executable was not modified')
   const finalProfile = JSON.parse(await readFile(join(profile, 'package.json'), 'utf8'))
   assert.deepEqual(finalProfile.dsh.profile.bundles.filter(name => name !== probeName), report.originalBundles)
+  }
 } catch (error) {
   failure = error
   report.failure = error.stack ?? String(error)

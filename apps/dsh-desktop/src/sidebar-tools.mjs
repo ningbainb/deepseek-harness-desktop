@@ -1,4 +1,12 @@
 export const SIDEBAR_TOOLS_CSS = `
+/* rc3's scrollport is a grid with a 4px leading gutter. Additive rows must
+   join its content column in DOM order instead of reusing native fixed rows. */
+[data-dsh-tool-host] > [data-dsh-tools-toggle],
+[data-dsh-tool-host] > [data-dsh-collapsible-tool],
+[data-dsh-tool-host] > [data-dsh-workspace-region] {
+  grid-column: 2;
+  grid-row: auto;
+}
 [data-dsh-tool-host][data-dsh-tools-collapsed="true"] > [data-dsh-collapsible-tool] {
   display: none !important;
 }

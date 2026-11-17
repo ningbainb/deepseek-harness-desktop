@@ -1,11 +1,20 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync, openSync, writeSync, closeSync, mkdirSync, chmodSync, createReadStream } from 'node:fs'
-import { mkdir, readFile, writeFile, rename, rm, stat, lstat, readlink, symlink } from 'node:fs/promises'
+import { readFileSync as readBundledManifest } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve, relative, isAbsolute, sep } from 'node:path'
 import { setTimeout as delay, setImmediate as nextTurn } from 'node:timers/promises'
 import { Unzip, UnzipInflate } from 'fflate'
 
-export const browserComponentManifest = JSON.parse(readFileSync(new URL('../runtime-support/browser-component.json', import.meta.url), 'utf8'))
+// Component .asar resources are opaque payload files, including while incomplete
+// or damaged. Electron's documented original-fs bypasses its virtual archive
+// filesystem for every component operation without changing process.noAsar.
+const componentFs = createRequire(import.meta.url)(process.versions.electron ? 'original-fs' : 'node:fs')
+const { openSync, writeSync, closeSync, mkdirSync, chmodSync, createReadStream } = componentFs
+const { mkdir, readFile, writeFile, rename, rm, stat, lstat, readlink, symlink } = componentFs.promises
+
+// Keep the application's own support manifest ASAR-aware when this module is
+// imported from the packaged app archive.
+export const browserComponentManifest = JSON.parse(readBundledManifest(new URL('../runtime-support/browser-component.json', import.meta.url), 'utf8'))
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const receiptName = '.desktop-component.json'
 

@@ -4,6 +4,10 @@ import { mkdtemp, readFile, writeFile, rm, readdir, readlink, stat, mkdir } from
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { dirname } from 'node:path'
 import { zipSync } from 'fflate'
 
 // Removing archive integrity, atomic activation or the provider's prepare barrier
@@ -128,4 +132,58 @@ test('archive extractor preserves ordinary framework link metadata', { skip: pro
   await extractBrowserComponentArchive(archive, stage)
   assert.equal(await readlink(join(stage, 'Versions/Current')), 'A')
   assert.equal((await stat(join(stage, 'Versions/A/binary'))).mode & 0o777, 0o755)
+})
+
+test('native Electron Node carrier prepares, repairs and validates opaque ASAR resources without changing process.noAsar', async t => {
+  const require = createRequire(import.meta.url)
+  const electronRoot = dirname(require.resolve('electron/package.json'))
+  // Read the prepared official dependency directly; importing electron's NPM
+  // loader can silently download a missing distribution during a test.
+  const electronExecutable = join(electronRoot, 'dist', (await readFile(join(electronRoot, 'path.txt'), 'utf8')).trim())
+  assert.ok((await stat(electronExecutable)).isFile(), 'Prepare the declared official native Electron dependency before running this carrier regression')
+  const root = await mkdtemp(join(tmpdir(), 'dsh-browser-electron-carrier-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const executable = process.platform === 'win32' ? 'electron.exe' : process.platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron' : 'electron'
+  const resource = process.platform === 'darwin' ? 'Electron.app/Contents/Resources/default_app.asar' : 'resources/default_app.asar'
+  const bytes = Buffer.from(zipSync({ [executable]: Buffer.from('fixture executable'), version: Buffer.from('44.7.0'), [resource]: Buffer.from('opaque ASAR bytes') }))
+  const archive = join(root, 'fixture.zip')
+  await writeFile(archive, bytes)
+  const artifact = { platform: process.platform, arch: process.arch, version: '44.7.0', executable, required: [executable, 'version', resource],
+    url: 'https://github.com/electron/electron/releases/download/v44.7.0/test.zip', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
+  const carrier = join(root, 'carrier.mjs')
+  await writeFile(carrier, `import assert from 'node:assert/strict';
+import {createRequire} from 'node:module'; import {join,dirname} from 'node:path';
+const raw=createRequire(import.meta.url)('original-fs');
+assert.ok(process.versions.electron, 'Use a real native Electron carrier');
+const originalNoAsar=process.noAsar;
+const {createBrowserComponentManager}=await import(${JSON.stringify(modulePath.href)});
+const root=${JSON.stringify(root)}, artifact=${JSON.stringify(artifact)};
+let downloads=0;
+const options={componentRoot:join(root,'components'),cacheRoot:join(root,'cache'),platform:process.platform,arch:process.arch,
+ manifest:{schemaVersion:1,artifacts:[artifact]},fetch:async()=>{downloads++;return new Response(raw.readFileSync(${JSON.stringify(archive)}))}};
+const initial=await createBrowserComponentManager(options).prepare();
+const resource=join(initial.componentPath,${JSON.stringify(resource)});
+assert.equal(raw.readFileSync(resource,'utf8'),'opaque ASAR bytes');
+assert.equal((await raw.promises.stat(resource)).isFile(),true);
+await raw.promises.writeFile(resource,'damaged ASAR resource');
+await createBrowserComponentManager(options).prepare();
+assert.equal(downloads,2,'A second manager must detect ASAR corruption and repair it');
+assert.equal(raw.readFileSync(resource,'utf8'),'opaque ASAR bytes');
+assert.deepEqual((await raw.promises.readdir(options.componentRoot)),[artifact.version+'-'+process.platform+'-'+process.arch], 'Replacement/temporary payloads containing ASAR must be cleaned');
+await raw.promises.rm(options.cacheRoot,{recursive:true,force:true});
+const offline=await createBrowserComponentManager({...options,fetch:()=>{throw Error('offline')}}).prepare();
+assert.equal(offline.executablePath,initial.executablePath);
+assert.equal(process.noAsar,originalNoAsar,'Never toggle the process-wide ASAR policy');
+console.log(JSON.stringify({passed:true,electron:process.versions.electron,node:process.version,platform:process.platform,downloads,opaqueAsarValidated:true,offlineReady:true,noAsarUnchanged:true}));
+`)
+  const { stdout } = await promisify(execFile)(electronExecutable, [carrier], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true, timeout: 30000, maxBuffer: 1024 * 1024,
+  }).catch(error => {
+    const diagnostic = String(error.stderr ?? error.message).split(/\r?\n/u).filter(line => /^Error:|^\s+at file:/u.test(line)).join('\n')
+    throw Error(`Native Electron component carrier failed: ${diagnostic || String(error.message).slice(0, 2000)}`)
+  })
+  const evidence = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1))
+  assert.equal(evidence.passed, true)
+  assert.equal(evidence.platform, process.platform)
+  assert.equal(evidence.downloads, 2)
 })

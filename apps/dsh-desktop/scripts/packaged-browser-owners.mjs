@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { win32 } from 'node:path'
 
 // Pure snapshot bookkeeping. No process discovery, signalling or termination.
 function creationTime(value) {
@@ -13,6 +14,34 @@ function usableIdentity(row) {
 }
 export function sameProcess(left, right) {
   return Boolean(usableIdentity(left) && usableIdentity(right) && left.ProcessId === right.ProcessId && left.CreationDate === right.CreationDate)
+}
+
+/** Qualify Playwright's evaluated Electron main when its ChildProcess is a Windows shell wrapper. */
+export function qualifyElectronMainProcess({ launcher, launcherIdentity, main, rows, expectedExe, expectedHome, expectedUserData, launchStartedAt }) {
+  assert.ok(launcher?.exitCode === null && !launcher.signalCode, 'The launcher must not have exited before main qualification')
+  const samePath = (left, right) => typeof left === 'string' && typeof right === 'string'
+    && win32.normalize(left).toLowerCase() === win32.normalize(right).toLowerCase()
+  assert.ok(main?.packaged === true && samePath(main.execPath, expectedExe), 'Evaluated main executable must be the final packaged executable')
+  assert.ok(samePath(main.home, expectedHome), 'Evaluated main Home must be the exact isolated QA Home')
+  assert.ok(samePath(main.userData, expectedUserData), 'Evaluated main userData must be the exact isolated QA userData')
+  const byPid = new Map(rows.map(row => [row.ProcessId, row]))
+  const observedLauncher = byPid.get(launcher.pid)
+  assert.ok(usableIdentity(observedLauncher), 'A live launcher creation identity is required')
+  if (launcherIdentity) assert.ok(sameProcess(launcherIdentity, observedLauncher), 'The launcher creation identity must not have been reused')
+  assert.ok(Number.isFinite(launchStartedAt) && creationTime(observedLauncher.CreationDate) >= launchStartedAt, 'Launcher creation must follow this launch invocation')
+  const mainIdentity = byPid.get(main.pid)
+  assert.ok(usableIdentity(mainIdentity) && samePath(mainIdentity.ExecutablePath, expectedExe), 'Observed main executable and creation identity must match the evaluated main')
+  assert.ok(creationTime(mainIdentity.CreationDate) >= launchStartedAt, 'Main creation must follow this launch invocation')
+  const ancestry = [mainIdentity]
+  const seen = new Set([mainIdentity.ProcessId])
+  let child = mainIdentity
+  while (child.ProcessId !== observedLauncher.ProcessId) {
+    const parent = byPid.get(child.ParentProcessId)
+    assert.ok(usableIdentity(parent) && !seen.has(parent.ProcessId), 'Main must have a live causal ancestry to this launcher')
+    assert.ok(creationTime(parent.CreationDate) <= creationTime(child.CreationDate), 'Launcher ancestry creation must precede its child')
+    ancestry.push(parent); seen.add(parent.ProcessId); child = parent
+  }
+  return { mainIdentity, launcherIdentity: observedLauncher, ancestry }
 }
 
 export function updateOwnedProcesses(owner, rows, expectedExe) {

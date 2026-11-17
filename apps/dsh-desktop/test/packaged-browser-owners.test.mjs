@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { sameProcess, updateOwnedProcesses } from '../scripts/packaged-browser-owners.mjs'
+import * as identityFixture from '../scripts/packaged-browser-owners.mjs'
 
 const exe = 'E:\\fixture\\win-unpacked\\Desktop.exe'
 const row = (pid, parent, seconds = 0, executable = exe) => ({
@@ -104,4 +105,35 @@ test('an unrecognized initial executable fails before any ownership is recorded'
   const state = owner()
   assert.throws(() => updateOwnedProcesses(state, [row(100, 1, 1, 'C:\\foreign.exe')], exe), /final executable/)
   assert.equal(state.owned.size, 0)
+})
+
+function mainQualification() {
+  const launcherIdentity = row(90, 1, 0, 'C:\\Windows\\System32\\cmd.exe')
+  const mainIdentity = row(100, 90, 1)
+  return { launcher: { pid: 90, exitCode: null, signalCode: null }, launcherIdentity,
+    main: { pid: 100, execPath: exe, home: 'D:\\qa\\home', userData: 'D:\\qa\\user-data', packaged: true },
+    rows: [mainIdentity, launcherIdentity], expectedExe: exe, expectedHome: 'D:\\qa\\home', expectedUserData: 'D:\\qa\\user-data',
+    launchStartedAt: Date.UTC(2026, 9, 26) }
+}
+test('qualifies the actual evaluated Electron main through a live creation-qualified cmd launcher', () => {
+  assert.equal(typeof identityFixture.qualifyElectronMainProcess, 'function')
+  const facts = mainQualification()
+  const qualified = identityFixture.qualifyElectronMainProcess(facts)
+  assert.equal(qualified.mainIdentity.ProcessId, 100)
+  assert.equal(qualified.launcherIdentity.ProcessId, 90)
+  assert.deepEqual(qualified.ancestry.map(row => row.ProcessId), [100, 90])
+  const state = { child: { pid: 100, exitCode: null }, owned: new Map() }
+  assert.deepEqual(pids(updateOwnedProcesses(state, facts.rows, exe)), [100])
+  assert.equal(state.owned.has(90), false, 'The cmd launcher is not an Electron main or an owned descendant')
+})
+test('launcher exit or PID reuse cannot qualify a main process by stale numeric ancestry', () => {
+  const facts = mainQualification()
+  assert.throws(() => identityFixture.qualifyElectronMainProcess({ ...facts, launcher: { ...facts.launcher, exitCode: 0 } }), /launcher.*exit/)
+  assert.throws(() => identityFixture.qualifyElectronMainProcess({ ...facts, rows: [facts.rows[0], row(90, 1, 10, 'C:\\foreign.exe')] }), /launcher.*identity/)
+})
+test('main qualification rejects foreign Home, foreign executable and noncausal creation', () => {
+  const facts = mainQualification()
+  assert.throws(() => identityFixture.qualifyElectronMainProcess({ ...facts, main: { ...facts.main, home: 'D:\\daily-home' } }), /Home/)
+  assert.throws(() => identityFixture.qualifyElectronMainProcess({ ...facts, main: { ...facts.main, execPath: 'C:\\foreign.exe' } }), /executable/)
+  assert.throws(() => identityFixture.qualifyElectronMainProcess({ ...facts, rows: [row(100, 90, 0), row(90, 1, 1, 'C:\\Windows\\System32\\cmd.exe')], launcherIdentity: undefined }), /creation|ancestry/)
 })

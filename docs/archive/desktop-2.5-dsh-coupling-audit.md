@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.0-rc.1.
+Authoritative Desktop version: 5.3.0-rc.2.
 
 Stable DSH package version: 0.2.2-rc.3.
 
@@ -745,8 +745,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs | 47 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 317 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 427 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 107 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 233 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 98 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 133 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 147 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 276 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-image-drop.mjs | 415 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-local-lan-gateway.mjs | 80 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs | 73 | DSH_HOME |

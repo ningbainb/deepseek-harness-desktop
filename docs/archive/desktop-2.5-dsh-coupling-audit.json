@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.0-rc.1",
+  "desktopVersion": "5.3.0-rc.2",
   "upstreamVersion": "0.2.2-rc.3",
   "lockfileSha256": "f3585cd37b7f1a8c4051ab1f7e55396fbd69bc72b19a67967e9d2f0017824fec",
   "policy": {
@@ -6115,13 +6115,25 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs",
-      "line": 107,
+      "line": 98,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs",
-      "line": 233,
+      "line": 133,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs",
+      "line": 147,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs",
+      "line": 276,
       "operation": "DSH_HOME"
     },
     {
