@@ -35,6 +35,7 @@
     "apps/dsh-desktop/src/runtime-legacy-settings.mjs\u0000static-import\u0000@deepseek-ai/dsh-app-boot": 1,
     "apps/dsh-desktop/src/runtime-legacy-settings.mjs\u0000static-import\u0000@deepseek-ai/dsh-settings": 1,
     "apps/dsh-desktop/src/runtime-market-team-compat.mjs\u0000static-import\u0000@deepseek-ai/dsh-agent": 1,
+    "apps/dsh-desktop/test/conversation-history-fixture.test.mjs\u0000dynamic-import\u0000@deepseek-ai/dsh-session": 1,
     "apps/dsh-desktop/test/conversation-import/session-bridge-transaction.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
     "apps/dsh-desktop/test/conversation-import/transcript-protocol-events.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-session": 1,
     "apps/dsh-desktop/test/custom-presets-runtime.test.mjs\u0000static-import\u0000@deepseek-ai/dsh-scope": 1,

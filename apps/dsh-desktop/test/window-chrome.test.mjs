@@ -141,6 +141,9 @@ test('caption inset ownership ends in normal flow and preserves existing positio
 
 function chromeObserverFixture() {
   let callback, queries = 0, disconnected = false
+  let frameId = 0
+  const frames = new Map()
+  const flushFrame = () => { const batch = [...frames.values()]; frames.clear(); for (const run of batch) run() }
   const listeners = new Map(), marked = [], themeCalls = [], rootCalls = []
   const document = { documentElement: {}, candidates: [], querySelectorAll() { queries++; return this.candidates } }
   const chrome = { isConnected: true }
@@ -156,6 +159,8 @@ function chromeObserverFixture() {
     },
     addEventListener: (key, fn) => listeners.set(key, fn),
     removeEventListener: key => listeners.delete(key),
+    requestAnimationFrame: run => { const id = ++frameId; frames.set(id, run); return id },
+    cancelAnimationFrame: id => frames.delete(id),
   }
   const node = (matches = true, children = []) => ({ nodeType: 1, isConnected: true, ownerDocument: document, matched: matches,
     firstElementChild: children[0], matches() { return this.matched }, querySelectorAll: () => children.filter(child => child.matched) })
@@ -164,8 +169,37 @@ function chromeObserverFixture() {
   const start = () => install({ document, window, chrome, syncTheme: () => themeCalls.push(1),
     markViewportRoot: () => rootCalls.push(1), markModalLayer: element => marked.push(element) })
   return { document, chrome, listeners, marked, themeCalls, rootCalls, node, start,
-    mutate: records => callback(records), state: () => ({ queries, disconnected }) }
+    mutate: (records, { flush = true } = {}) => { callback(records); if (flush) flushFrame() },
+    flushFrame, state: () => ({ queries, disconnected, pendingFrames: frames.size }) }
 }
+
+test('streaming mutation bursts share one geometry sync before the next frame', () => {
+  const f = chromeObserverFixture(), dispose = f.start()
+  for (let index = 0; index < 100; index++) {
+    f.mutate([{ type: 'childList', addedNodes: [{ nodeType: 3 }] }], { flush: false })
+  }
+  assert.equal(f.rootCalls.length, 1, 'streaming mutations do not synchronously force document layout')
+  assert.equal(f.themeCalls.length, 1)
+  assert.equal(f.state().pendingFrames, 1, 'a mutation burst queues exactly one pre-paint sync')
+  f.flushFrame()
+  assert.equal(f.rootCalls.length, 2)
+  assert.equal(f.themeCalls.length, 2)
+  assert.equal(f.state().pendingFrames, 0)
+  f.mutate([{ type: 'attributes', attributeName: 'style', target: f.node(false) }])
+  assert.equal(f.rootCalls.length, 3, 'a later frame still applies current style and caption geometry')
+  dispose()
+})
+
+test('disposing a document cancels its queued geometry sync', () => {
+  const f = chromeObserverFixture(), dispose = f.start()
+  f.mutate([{ type: 'childList', addedNodes: [f.node()] }], { flush: false })
+  assert.equal(f.state().pendingFrames, 1)
+  dispose()
+  assert.equal(f.state().pendingFrames, 0)
+  f.flushFrame()
+  assert.equal(f.rootCalls.length, 1)
+  assert.deepEqual(f.marked, [], 'a disposed document never receives deferred modal changes')
+})
 
 test('window chrome indexes initial and added dialogs without full history queries on style updates', () => {
   const f = chromeObserverFixture(), initial = f.node()

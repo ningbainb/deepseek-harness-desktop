@@ -8,6 +8,7 @@ import electronPath from 'electron'
 import { openDockSetting, useChineseFixtureLocale, visitDockDestination } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { isValueModeCatalogInitiator } from './model-catalog-origin-fixture.mjs'
 
 const appDir = fileURLToPath(new URL('..', import.meta.url))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-dock-catalog-'))
@@ -18,6 +19,10 @@ const fetchGate = join(temporary, 'runtime-fetch-gate.txt')
 const timings = {}
 const errors = []
 const catalogDiagnostics = []
+const requests = []
+const nativeCatalogRequests = []
+const configurationDiagnostics = []
+const diagnosticOutput = process.env.DSH_DESKTOP_DOCK_CATALOG_DIAGNOSTICS
 let app
 let settings
 let failed = false
@@ -45,19 +50,24 @@ try {
   // cache lifetime, invalidation events, or the exact repeat-open assertion.
   const network = await app.context().newCDPSession(settings)
   await network.send('Network.enable')
+  await network.send('Debugger.enable')
+  await network.send('Debugger.setAsyncCallStackDepth', { maxDepth: 32 })
   network.on('Network.requestWillBeSent', event => {
     if (!isCatalog({ url: () => event.request.url, postData: () => event.request.postData })) return
     let method
     try { method = JSON.parse(event.request.postData ?? '{}').method } catch {}
+    const advisory = isValueModeCatalogInitiator(event.initiator.stack)
+    if (advisory) requests.push(new URL(event.request.url).pathname)
+    else nativeCatalogRequests.push(new URL(event.request.url).pathname)
     catalogDiagnostics.push({ path: new URL(event.request.url).pathname, method, timestamp: event.timestamp,
+      advisory,
       initiator: event.initiator.type,
-      frames: event.initiator.stack?.callFrames?.slice(0, 8).map(frame => ({ functionName: frame.functionName, url: frame.url, lineNumber: frame.lineNumber })),
+      frames: event.initiator.stack?.callFrames?.slice(0, diagnosticOutput ? 32 : 8).map(frame => ({ functionName: frame.functionName, url: frame.url, lineNumber: frame.lineNumber, ...(diagnosticOutput ? { columnNumber: frame.columnNumber } : {}) })),
+      ...(diagnosticOutput ? { parentStack: event.initiator.stack?.parent } : {}),
     })
   })
   timings.coldDockMs = Math.round(performance.now() - start)
   settings.on('pageerror', error => errors.push(error.message))
-  const requests = []
-  settings.on('request', request => { if (isCatalog(request)) requests.push(new URL(request.url()).pathname) })
   const picker = settings.locator('[data-value-mode-model-picker]')
   const relay = picker.locator('[data-model-provider="dock-test"][data-model-id="dock-test-model"]')
   assert.equal(await settings.locator('[data-dsh-pet-root]').count(), 0, 'the Dock model page does not mount a pet')
@@ -81,11 +91,17 @@ try {
     return Math.round(performance.now() - started)
   }
   timings.firstPickerMs = await open('更换专家主控模型')
+  if (diagnosticOutput) configurationDiagnostics.push({ stage: 'first-picker', at: Date.now(),
+    settings: await readFile(join(dshHome, 'settings.yaml'), 'utf8'),
+    patch: await readFile(join(dshHome, 'profiles/desktop/cordis.patch.yml'), 'utf8') })
   assert.ok(requests.length > 0, 'real native model catalog was requested')
   assert.equal(await picker.locator('[role="alert"]').count(), 0)
   const firstCount = requests.length
   await picker.getByRole('button', { name: '关闭模型选择器', exact: true }).click()
   timings.repeatPickerMs = await open('更换专家主控模型')
+  if (diagnosticOutput) configurationDiagnostics.push({ stage: 'repeat-picker', at: Date.now(),
+    settings: await readFile(join(dshHome, 'settings.yaml'), 'utf8'),
+    patch: await readFile(join(dshHome, 'profiles/desktop/cordis.patch.yml'), 'utf8') })
   assert.equal(requests.length, firstCount, 'opening the same catalog again reuses the advisory read')
   await relay.click()
   await picker.waitFor({ state: 'hidden' })
@@ -144,10 +160,11 @@ try {
   await picker.getByRole('button', { name: '关闭模型选择器', exact: true }).click()
   await dockWindow.evaluate((window, bounds) => window.setBounds(bounds), originalBounds)
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
+  console.log(JSON.stringify({ passed: true, mode: executable ? 'packaged-electron' : 'development-electron', timings, modelCatalogRequests: requests.length, nativeModelCatalogRequests: nativeCatalogRequests.length, initiatorBoundary: 'Actual Chromium async fetchModels frame in the Value Mode bundle; native read/readCatalog/refresh tracked separately', warmNavigations: navigations, timeoutRetry: true, paidRequests: 0 }))
 } catch (error) {
   failed = true
   console.error('Dock catalog request initiators', JSON.stringify(catalogDiagnostics))
+  console.error('Dock catalog configuration snapshots', JSON.stringify(configurationDiagnostics))
   console.error('Dock catalog runtime evidence', temporary,
     (await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')).slice(-8000))
   console.error('Dock catalog window surfaces', app?.windows().map(page => page.url()))
@@ -164,6 +181,7 @@ try {
   }
   throw error
 } finally {
+  if (diagnosticOutput) await writeFile(diagnosticOutput, JSON.stringify({ failed, timings, catalogDiagnostics, configurationDiagnostics }, null, 2) + '\n')
   await writeFile(fetchGate, 'open').catch(() => {})
   await app?.close()
   if (!failed) await rm(temporary, { recursive: true, force: true })

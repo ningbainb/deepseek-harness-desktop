@@ -13,10 +13,13 @@ import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { SIDEBAR_TOOLS_SCRIPT } from '../src/sidebar-tools.mjs'
 import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
+import { installObserverAttribution } from './observer-attribution-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
 const baseline = process.argv.includes('--baseline')
+const diagnoseObservers = process.env.DSH_DESKTOP_DIAGNOSE_OBSERVERS === '1'
+const observerAttributions = []
 const output = resolve(process.argv.find(argument => argument.startsWith('--output='))?.slice(9)
   ?? process.env.DSH_DESKTOP_BETA_SCREENSHOTS
   ?? join(tmpdir(), `dsh-beta-usability-${baseline ? 'baseline' : 'candidate'}`))
@@ -106,16 +109,28 @@ async function launch() {
       DSH_HOME: dshHome, DSH_AGENTS_HOME: join(temporary, 'agents'),
       DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0',
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_BETA_FIXTURE_KEY: 'synthetic-test-key' } })
+  if (diagnoseObservers) await app.context().addInitScript(installObserverAttribution)
   await useChineseFixtureLocale(app)
   // Profile/package discovery can precede the first native window on a cold HDD.
   page = await app.firstWindow({ timeout: 600_000 })
   page.setDefaultTimeout(60_000)
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
+  // Electron may create/load its first document before launch resolves. Reload
+  // only in explicit diagnostic mode so all renderer observers have provenance.
+  if (diagnoseObservers) await page.reload({ waitUntil: 'domcontentloaded', timeout: 600_000 })
   await page.locator('[data-pane="sidebar"]').waitFor({ state: 'visible', timeout: 600_000 })
   const expand = page.getByRole('button', { name: /^(打开侧边栏|Open sidebar)$/u })
   if (await expand.count()) await expand.click()
   await page.locator('[data-row-key^="workspace:"]').first().waitFor({ state: 'visible', timeout: 600_000 })
   await page.waitForTimeout(1500)
+}
+
+async function captureObserverAttribution(stage) {
+  if (!diagnoseObservers || !page || page.isClosed()) return
+  const attribution = await page.evaluate(() => globalThis.betaObserverAttribution?.snapshot())
+  observerAttributions.push({ stage, document: page.url(), diagnosticReload: true, attribution })
+  await writeFile(join(output, 'observer-attribution.json'), JSON.stringify(observerAttributions, null, 2) + '\n')
+  console.log('Beta observer attribution', JSON.stringify({ stage, attribution }))
 }
 
 async function recordFrame(label) {
@@ -440,6 +455,7 @@ try {
     'the composer sends to the selected workspace session')
   await page.getByText('STREAM-COMPLETE', { exact: true }).waitFor({ state: 'visible', timeout: 90_000 })
   const performance = await page.evaluate(() => window.betaPerformance.stop())
+  await captureObserverAttribution('stream-complete')
   const columns = await page.locator('[data-pane], [class*="sidebarCol"], [class*="centerCol"], [class*="detailsCol"]')
     .evaluateAll(elements => elements.map(element => ({ pane: element.getAttribute('data-pane'), className: element.className })))
   await writeFile(join(output, 'performance.json'), JSON.stringify({ performance, columns }, null, 2) + '\n')
@@ -594,6 +610,9 @@ try {
   console.error(runtimeLog.slice(-5000))
   throw error
 } finally {
+  await captureObserverAttribution(failure ? 'failure' : 'final').catch(error => {
+    console.error('Beta observer attribution capture failed:', error.message)
+  })
   if (page && !page.isClosed()) await page.evaluate(() => window.betaPerformance?.dispose?.()).catch(error => {
     console.error('Beta performance diagnostic cleanup failed:', error.message)
   })

@@ -6,6 +6,8 @@
 
 修复首轮预览发现的侧栏工具遮挡，补齐外置浏览器载荷与官方清单原字节校验，并在 Ubuntu 24 验收中执行真实 DEB 安装脚本。
 
+流式输出期间的桌面标题栏布局检查合并为每帧一次，页面释放时取消待处理检查；保留弹窗层级、皮肤边距和拖动行为。
+
 此版本是基于官方 DSH 0.2.2-rc.3 的桌面候选版。每个平台和架构保留一个面向用户的安装包。Office 继续随包提供；共享浏览器的独立 Electron 改为按需准备，提供大小、进度、取消和重试。已启用浏览器的升级先准备资源，再替换程序。
 
 新装采用精简默认值，升级保留现有配置与明确关闭的功能。模型协作、智能操控和桌面工具整合到相关设置及更多工具，原有入口保留跳转。上下文洞察固定为 dsh-context 0.85.1，基础记忆和回复偏好保留，高级提示词 2.2.0 默认关闭。项目经验 1.2.0 因用户隔离验证发现问题暂停新启用，原配置和文件保留。
@@ -27,6 +29,8 @@
 ### Highlights
 
 This revision fixes the sidebar tool overlap found in the first preview, completes external-browser payload and original-manifest validation, and installs the actual DEB before Ubuntu 24 acceptance.
+
+Desktop caption geometry checks now share one pre-paint pass per frame during streaming. Disposing a page cancels pending work while retaining modal layering, skin insets, and dragging behavior.
 
 This desktop candidate uses official DSH 0.2.2-rc.3 and keeps one user installer for each supported platform and architecture. Office remains bundled. The shared browser prepares its separate Electron component on demand with size, progress, cancellation and retry controls. Upgrades prepare an enabled browser component before replacing the existing application.
 

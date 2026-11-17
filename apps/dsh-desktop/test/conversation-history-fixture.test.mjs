@@ -26,5 +26,14 @@ test('the shared scroll/context history seed uses SDK events and preserves every
     assert.match(JSON.stringify(events), /Context retained history 01/u)
     assert.match(JSON.stringify(events), /Context retained history 20/u)
     assert.deepEqual(await readFile(unrelated), retained)
+    const { Session, SessionId } = await import('@deepseek-ai/dsh-session')
+    const restored = Session.create(SessionId('fixture-history'), events).snapshotEvents()
+    assert.deepEqual(restored.slice(0, events.length), events, 'official SDK replay preserves the complete seeded prefix')
+    assert.equal(restored.length, events.length + 1)
+    assert.equal(restored.at(-1).type, 'session/end-seed')
+    assert.equal(restored.at(-1).seq, seeded.asOfSeq + 1)
+    assert.deepEqual(restored.at(-1).data, {})
+    assert.deepEqual(Session.create(SessionId('fixture-history'), restored).snapshotEvents(), restored,
+      'a completed SDK replay does not append another end-seed marker')
   } finally { await rm(home, { recursive: true, force: true }) }
 })

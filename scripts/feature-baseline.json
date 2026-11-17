@@ -518,6 +518,7 @@
         "native-browser-cross-session-close-and-history-isolation",
         "native-browser-close-owner-with-legacy-and-keyboard-fallback",
         "incremental-modal-layer-tracking-with-document-lifecycle",
+        "mutation-layout-reads-batched-once-per-frame-with-cancelled-disposal",
         "application-root-and-frame-never-promoted-to-modal-stacking",
         "compact-dialog-observer-settles-without-rewriting-absent-classes",
         "active-settings-gestures-preserve-modal-classification-without-layout-reads",

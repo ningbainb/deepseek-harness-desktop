@@ -7,6 +7,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { navigateNativeBrowserSession } from './native-browser-session-fixture.mjs'
+import { reopenNativeSession } from './native-session-navigation-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { assertNativeFixtureStorage } from './native-fixture-storage.mjs'
@@ -17,6 +18,7 @@ import { createContextP2ProviderProbe } from './context-p2-provider-fixture.mjs'
 import { waitForSessionLog, readSessionLogText } from './session-log-fixture.mjs'
 import { seedConversationHistory } from './conversation-history-fixture.mjs'
 import { waitForNativeSidebarCollapsed } from './panel-layout-fixture.mjs'
+import { disableNativePromptPrediction } from './native-prompt-prediction-fixture.mjs'
 
 // This script launches only its own isolated Windows Desktop. It does not use
 // a live provider, pre-enable P2, change vendor code, or call a fictional API.
@@ -81,8 +83,9 @@ const json = async (path, init) => main.evaluate(async ({ path, init }) => {
 }, { path, init })
 const rpc = async (method, request) => {
   const endpoint = method.replace('.', '/')
+  const field = method === 'session.list' ? '_request' : 'request'
   const body = await json(`/api/${endpoint}`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: endpoint, payload: { args: { request } } }) })
+    body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: endpoint, payload: { args: { [field]: request } } }) })
   assert.equal(body.result?.ok, true, JSON.stringify(body))
   return body.result.value
 }
@@ -229,6 +232,9 @@ try {
   assert.deepEqual(report.errors, [])
   report.checks.push('p2-disable-preserves-database')
 
+  stage = 'prediction-explicit-disable'
+  report.predictionIsolation = await disableNativePromptPrediction(app, main)
+  assert.equal(report.modelRequests, 0, 'preparing the no-inference history scenario must not generate a model turn')
   stage = 'long-history-sdk-seed'
   await waitForAsyncPageFunction(main, async () => (await fetch('/api/prompt-customizer/config')).status === 404)
   const historyWorkspace = join(temporary, 'long-history-workspace')
@@ -244,13 +250,35 @@ try {
   const originalFreshLog = await readSessionLogText(contextLog)
   const seeded = await seedConversationHistory({ dshHome: home, workspacePath: historyWorkspace, sessionId: longSessionId,
     messageCount: 40, nativeTurns: true, markerPrefix })
-  const historyBytes = await readFile(seeded.logPath)
+  const seededHistoryBytes = await readFile(seeded.logPath)
+  const seededHistoryText = await readSessionLogText(seeded.logPath)
   assert.equal(await readSessionLogText(contextLog), originalFreshLog)
   report.history = { sessionId: longSessionId, seededTurns: 40, seededMessages: 40, asOfSeq: seeded.asOfSeq,
     provenance: 'Existing G02.5 official Session/createUserMessage/assistant-stream SDK fixture, appended only while Runtime is stopped; no provider generation.' }
   await launch()
-  await navigateNativeBrowserSession(await app.browserWindow(main), longSessionId)
-  await main.locator(`[data-row-key="session:${longSessionId}"][aria-selected="true"]`).waitFor()
+  await reopenNativeSession({ page: main, workspaceId: longWorkspace.workspaceId, sessionId: longSessionId,
+    listSessions: () => rpc('session.list', {}) })
+  // The official Session constructor completes a replay with one end-seed
+  // event. Establish the read-only Context baseline after ordinary Session
+  // projection loading, separately verifying this exact lifecycle append.
+  const restoredProjection = await rpc('session.projections', { sessionId: longSessionId })
+  assert.equal(restoredProjection.asOfSeq, seeded.asOfSeq + 1)
+  let restoredHistoryText
+  for (let attempt = 0; attempt < 100; attempt++) {
+    restoredHistoryText = await readSessionLogText(seeded.logPath)
+    if (restoredHistoryText !== seededHistoryText) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  assert.ok(restoredHistoryText.startsWith(seededHistoryText), 'ordinary SDK replay preserves every seeded history byte in decoded order')
+  const replayEvents = restoredHistoryText.slice(seededHistoryText.length).trim().split('\n').map(JSON.parse)
+  assert.equal(replayEvents.length, 1, 'ordinary SDK replay adds only its end-seed marker')
+  assert.equal(replayEvents[0].type, 'session/end-seed')
+  assert.equal(replayEvents[0].seq, seeded.asOfSeq + 1)
+  assert.deepEqual(replayEvents[0].data, {})
+  assert.ok(Number.isFinite(replayEvents[0].time))
+  const historyBytes = await readFile(seeded.logPath)
+  assert.deepEqual(historyBytes.subarray(0, seededHistoryBytes.length), seededHistoryBytes, 'SDK replay appends a frame without rewriting the compressed seed')
+  report.history.sdkReplayEndSeed = replayEvents[0]
   await main.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 40)
   const historyMessages = main.locator('[data-chat-flow-kind="user"]')
   assert.match(await historyMessages.first().innerText(), /Context long history 01/u)
@@ -309,7 +337,8 @@ try {
 
   stage = 'original-session-reopen'
   await navigateNativeBrowserSession(await app.browserWindow(main), sessionId)
-  await main.locator(`[data-row-key="session:${sessionId}"][aria-selected="true"]`).waitFor()
+  await reopenNativeSession({ page: main, workspaceId: createdWorkspace.workspaceId, sessionId,
+    listSessions: () => rpc('session.list', {}) })
   await openContextSidebar()
   assert.equal(await readSessionLogText(contextLog), originalFreshLog, 'original session stays intact and can reopen after long-history Context')
   assert.equal(report.modelRequests, 0)

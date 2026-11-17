@@ -12,6 +12,7 @@ import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.m
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { reopenNativeSession as reopenRetainedNativeSession } from './native-session-navigation-fixture.mjs'
 
 const options = {}
 for (let i = 2; i < process.argv.length; i++) {
@@ -158,15 +159,8 @@ async function dismissStartup(page, sample) {
 }
 
 async function reopenNativeSession(page, workspaceId, sessionId) {
-  const listed = await rpc(page, 'session.list', {})
-  assert.ok(listed.items?.some(item => (item.id ?? item.sessionId) === sessionId), 'Cold session must remain in the official session list')
-  const group = page.locator(`[role="treeitem"][data-row-key="workspace:${workspaceId}"]`)
-  await group.waitFor({ state: 'visible', timeout: modelTimeout })
-  if (await group.getAttribute('aria-expanded') !== 'true') await group.click()
-  const row = page.locator(`[role="treeitem"][data-row-key="session:${sessionId}"]`)
-  await row.waitFor({ state: 'visible', timeout: modelTimeout })
-  if (await row.getAttribute('aria-selected') !== 'true') await row.click()
-  await page.locator(`[data-row-key="session:${sessionId}"][aria-selected="true"]`).waitFor({ state: 'visible', timeout: modelTimeout })
+  await reopenRetainedNativeSession({ page, workspaceId, sessionId,
+    listSessions: () => rpc(page, 'session.list', {}), timeoutMs: modelTimeout })
 }
 
 function isolatedEnvironment(paths) {
@@ -205,6 +199,15 @@ async function measure(paths, mode, session) {
     await page.locator('[data-dsh-frame]').first().waitFor({ state: 'visible', timeout })
     sample.runtimeFrameVisibleMs = performance.now() - started
     await dismissStartup(page, sample)
+    // As in the cross-version journey, the optional Star prompt can arrive
+    // after readiness. Use its real continuation rather than hiding UI or
+    // recording an editable input as a successful submission.
+    await page.addLocatorHandler(page.locator('#dsh-desktop-star-prompt[data-open="true"]'), async overlay => {
+      await overlay.getByRole('button', { name: /^(先继续使用|Continue using)$/iu }).click()
+      sample.firstRunControlsDismissed++
+      sample.lateFirstRunDismissals ??= []
+      sample.lateFirstRunDismissals.push({ control: 'star-continue', at: new Date().toISOString() })
+    })
     const navigationStarted = performance.now()
     if (mode === 'cold') {
       const workspace = await rpc(page, 'workspace.create', { path: paths.workspace })
@@ -244,7 +247,10 @@ async function measure(paths, mode, session) {
       send.click({ timeout: modelTimeout }),
     ])
     const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
-    if (failures.length) throw new AggregateError(failures, 'Native send and actual session.prompt transport must both complete')
+    if (failures.length) {
+      sample.nativeSubmissionFailures = failures.map(error => error.stack ?? String(error))
+      throw new AggregateError(failures, 'Native send and actual session.prompt transport must both complete')
+    }
     assert.equal(results[0].value.postDataJSON()?.payload?.args?.request?.sessionId, session.id, 'Native submission must target the exact configured or restored session')
     const abort = new AbortController()
     try {
@@ -262,6 +268,8 @@ async function measure(paths, mode, session) {
     sample.failure = error.stack ?? String(error)
     sample.comparisonStatus = 'unavailable: required native journey did not complete; no comparable successful-send measurement'
     sample.failureKind = error.code === 'SESSION_COMPARISON_INTERFACE_UNAVAILABLE' ? 'official-rpc-interface-unavailable' : 'native-journey-failed'
+    sample.failureScreenshot = options.output.replace(/\.json$/u, '') + `-${sample.mode}-failure.png`
+    await app?.windows()[0]?.screenshot({ path: sample.failureScreenshot }).catch(() => {})
     throw error
   } finally {
     active = undefined
@@ -314,7 +322,8 @@ try {
   await new Promise(resolve => server.close(resolve))
   const rel = relative(temporaryBase, root)
   assert.ok(rel && !rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel), 'Refuse cleanup outside the isolated benchmark directory')
-  await rm(root, { recursive: true, force: true })
+  if (evidence.passed) await rm(root, { recursive: true, force: true })
+  else evidence.retainedFixtureRoot = root
   await mkdir(dirname(options.output), { recursive: true })
   await writeFile(options.output, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8')
   console.log(JSON.stringify({ passed: evidence.passed, output: options.output, samples: evidence.samples.length }))

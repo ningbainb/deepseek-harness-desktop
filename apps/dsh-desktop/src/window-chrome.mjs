@@ -436,11 +436,16 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
   const dialogs = new Set(document.querySelectorAll(selector))
   let disposed = false
   let resizeObserver
+  let pendingFrame
   const dispose = () => {
     if (disposed) return
     disposed = true
     observer.disconnect()
     resizeObserver?.disconnect?.()
+    if (pendingFrame !== undefined) {
+      window.cancelAnimationFrame(pendingFrame)
+      pendingFrame = undefined
+    }
     dialogs.clear()
     window.removeEventListener('resize', sync)
     window.removeEventListener('pagehide', pagehide)
@@ -460,6 +465,18 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
       else markModalLayer(dialog)
     }
   }
+  const scheduleSync = () => {
+    if (disposed) return
+    if (!chrome.isConnected) { dispose(); return }
+    if (pendingFrame !== undefined) return
+    // Streaming and our own caption writes can produce several mutation
+    // deliveries in one frame. Keep dialog indexing incremental, then read
+    // current skin/modal geometry once before the next paint.
+    pendingFrame = window.requestAnimationFrame(() => {
+      pendingFrame = undefined
+      sync()
+    })
+  }
   const observer = new window.MutationObserver(records => {
     if (disposed) return
     for (const record of records) {
@@ -471,7 +488,7 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
         if (node.firstElementChild) for (const dialog of node.querySelectorAll(selector)) dialogs.add(dialog)
       }
     }
-    sync()
+    scheduleSync()
   })
   observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
     attributeFilter: ['class', 'style', 'hidden', 'data-open', 'data-skin-chrome', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })

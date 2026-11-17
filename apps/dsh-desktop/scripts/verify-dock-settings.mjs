@@ -141,6 +141,16 @@ async function captureDockSnapshot(name, expectedTheme) {
 }
 try {
   await mkdir(output, { recursive: true })
+  // This suite exercises the original pet's controls and preservation when
+  // closing the Dock. Opt it in explicitly in this isolated profile; fresh
+  // installations intentionally leave both pet mounts disabled.
+  const profileDirectory = resolve(temporary, 'dsh-home/profiles/desktop')
+  await mkdir(profileDirectory, { recursive: true })
+  await writeFile(resolve(profileDirectory, 'package.json'), JSON.stringify({
+    name: 'dsh-profile-desktop', private: true,
+    dsh: { profile: { bundles: [], desktopDefaults: 'minimal-v1' } },
+  }))
+  await writeFile(resolve(profileDirectory, 'cordis.patch.yml'), '- id: pet\n  disabled: false\n')
   app = await electron.launch({ executablePath, args: packaged ? [] : [resolve(appDir, 'src/main.mjs')], cwd: appDir,
     env: { ...process.env, DSH_DESKTOP_USER_DATA: resolve(temporary, 'user-data'), DSH_HOME: resolve(temporary, 'dsh-home'), DSH_DESKTOP_VERIFY_UPDATER: '0', DSH_DESKTOP_OPEN_EXTENSIONS: '1', DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1' } })
   // Install the locale override before the collaboration deep link creates the

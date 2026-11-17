@@ -210,6 +210,15 @@
       "controlled": true
     },
     {
+      "path": "apps/dsh-desktop/test/conversation-history-fixture.test.mjs",
+      "kind": "dynamic-import",
+      "specifier": "@deepseek-ai/dsh-session",
+      "line": 29,
+      "typeOnly": false,
+      "classification": "public-stable",
+      "controlled": false
+    },
+    {
       "path": "apps/dsh-desktop/test/conversation-import/session-bridge-transaction.test.mjs",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session",
@@ -5854,7 +5863,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/measure-session-startup.mjs",
-      "line": 175,
+      "line": 169,
       "operation": "DSH_HOME"
     },
     {
@@ -5956,13 +5965,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-beta-usability.mjs",
-      "line": 106,
+      "line": 109,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs",
-      "line": 51,
+      "line": 53,
       "operation": "DSH_HOME"
     },
     {
@@ -6040,13 +6049,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-dock-model-catalog.mjs",
-      "line": 36,
+      "line": 41,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-dock-settings.mjs",
-      "line": 145,
+      "line": 155,
       "operation": "DSH_HOME"
     },
     {
