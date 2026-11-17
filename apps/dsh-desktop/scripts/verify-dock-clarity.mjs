@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { useChineseFixtureLocale, visitDockDestination } from './dock-settings-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
@@ -47,80 +47,87 @@ try {
   const capture = async (theme, width, height) => {
     await nativeDock.evaluate((window, size) => window.setSize(size.width, size.height), { width, height })
     await dock.waitForFunction(expected => document.documentElement.dataset.dshDesktopTheme === expected, theme, { timeout: 60_000 })
-    await dock.locator('#plugins-hub-tab').hover()
-    await dock.waitForTimeout(300)
-    const sample = await dock.evaluate(ids => {
-      const sidebar = document.querySelector('.settings-sidebar')
-      const style = getComputedStyle(sidebar)
-      const canvas = document.createElement('canvas')
-      canvas.width = 1
-      canvas.height = 1
-      const context = canvas.getContext('2d', { willReadFrequently: true })
-      const rgba = color => {
-        context.clearRect(0, 0, 1, 1)
-        context.fillStyle = color
-        context.fillRect(0, 0, 1, 1)
-        return [...context.getImageData(0, 0, 1, 1).data]
+    const visited = new Set()
+    for (const destination of destinationIds) {
+      await visitDockDestination(dock, destination)
+      await dock.locator(`#${destination}`).hover()
+      await dock.waitForTimeout(300)
+      const sample = await dock.evaluate(ids => {
+        const sidebar = document.querySelector('.settings-sidebar')
+        const style = getComputedStyle(sidebar)
+        const canvas = document.createElement('canvas')
+        canvas.width = 1
+        canvas.height = 1
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        const rgba = color => {
+          context.clearRect(0, 0, 1, 1)
+          context.fillStyle = color
+          context.fillRect(0, 0, 1, 1)
+          return [...context.getImageData(0, 0, 1, 1).data]
+        }
+        const luminance = channels => channels.map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+          .reduce((total, value, index) => total + value * [.2126, .7152, .0722][index], 0)
+        const sidebarColor = rgba(style.backgroundColor)
+        const rows = ids.map(id => {
+          const button = document.getElementById(id)
+          const bounds = button.getBoundingClientRect()
+          const rowStyle = getComputedStyle(button)
+          const rowColor = rgba(rowStyle.backgroundColor)
+          const background = luminance(rowColor.slice(0, 3).map((channel, index) =>
+            channel * rowColor[3] / 255 + sidebarColor[index] * (1 - rowColor[3] / 255)))
+          const foreground = luminance(rgba(rowStyle.color).slice(0, 3))
+          return { id, visible: bounds.height > 0, insideViewport: bounds.top >= 0 && bounds.bottom <= innerHeight,
+            height: bounds.height, fontSize: Number.parseFloat(rowStyle.fontSize), transform: rowStyle.transform,
+            top: bounds.top, bottom: bounds.bottom,
+            foreground: rowStyle.color, background: rowStyle.backgroundColor,
+            contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) }
+        })
+        return { theme: document.documentElement.dataset.dshDesktopTheme, width: innerWidth, height: innerHeight,
+          backdrop: style.backdropFilter, background: style.backgroundColor, opacity: sidebarColor[3] / 255, rows,
+          sidebarBorder: style.borderRightWidth,
+          activeNavigation: (() => {
+            const active = document.querySelector('.settings-sidebar button.tab.active')
+            const inactive = document.querySelector('.settings-sidebar button.tab:not(.active)')
+            const selectedStyle = getComputedStyle(active)
+            return { shadow: selectedStyle.boxShadow, border: selectedStyle.borderLeftWidth,
+              weight: selectedStyle.fontWeight, background: selectedStyle.backgroundColor,
+              inactiveBackground: getComputedStyle(inactive).backgroundColor }
+          })(),
+          framedSections: [...document.querySelectorAll('.panel.active, .native-card, .native-masthead, .native-controls, .native-metrics, .native-card-footer')]
+            .filter(element => element.getClientRects().length > 0)
+            .filter(element => ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']
+              .some(property => Number.parseFloat(getComputedStyle(element)[property]) > 0))
+            .map(element => element.className),
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
+          sidebarOverflow: sidebar.scrollWidth > sidebar.clientWidth,
+          translucentPanels: [...document.querySelectorAll('.settings-sidebar, .content-toolbar, .native-card, .list, .dock-search input')]
+            .filter(element => element.getClientRects().length > 0)
+            .filter(element => getComputedStyle(element).backdropFilter !== 'none').length }
+      }, [destination])
+      assert.equal(sample.horizontalOverflow, false)
+      assert.equal(sample.rows.length, 1)
+      assert.ok(sample.rows.every(row => row.visible), 'all existing destinations remain available')
+      if (!baseline) {
+        assert.equal(sample.backdrop, 'none')
+        assert.equal(sample.sidebarOverflow, false, 'sidebar navigation has no horizontal overflow')
+        assert.equal(sample.translucentPanels, 0)
+        assert.equal(sample.opacity, 1, 'sidebar has an opaque surface')
+        assert.equal(sample.sidebarBorder, '0px', 'sidebar does not draw a region partition')
+        assert.equal(sample.activeNavigation.shadow, 'none', 'selection does not draw an inset rail')
+        assert.equal(sample.activeNavigation.border, '0px')
+        assert.ok(Number(sample.activeNavigation.weight) >= 600)
+        assert.notEqual(sample.activeNavigation.background, sample.activeNavigation.inactiveBackground, 'selection remains distinguishable without a rail')
+        assert.deepEqual(sample.framedSections, [], 'chapter surfaces do not recreate card frames')
+        assert.ok(sample.rows.every(row => row.contrast >= 4.5), JSON.stringify(sample.rows))
+        assert.ok(sample.rows.every(row => row.transform === 'none'), 'navigation never lifts on hover')
+        assert.ok(sample.rows.every(row => row.insideViewport), `all destinations fit default and compact Dock sizes: ${JSON.stringify(sample.rows)}`)
       }
-      const luminance = channels => channels.map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
-        .reduce((total, value, index) => total + value * [.2126, .7152, .0722][index], 0)
-      const sidebarColor = rgba(style.backgroundColor)
-      const rows = ids.map(id => {
-        const button = document.getElementById(id)
-        const bounds = button.getBoundingClientRect()
-        const rowStyle = getComputedStyle(button)
-        const rowColor = rgba(rowStyle.backgroundColor)
-        const background = luminance(rowColor.slice(0, 3).map((channel, index) =>
-          channel * rowColor[3] / 255 + sidebarColor[index] * (1 - rowColor[3] / 255)))
-        const foreground = luminance(rgba(rowStyle.color).slice(0, 3))
-        return { id, visible: bounds.height > 0, insideViewport: bounds.top >= 0 && bounds.bottom <= innerHeight,
-          height: bounds.height, fontSize: Number.parseFloat(rowStyle.fontSize), transform: rowStyle.transform,
-          top: bounds.top, bottom: bounds.bottom,
-          foreground: rowStyle.color, background: rowStyle.backgroundColor,
-          contrast: (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) }
-      })
-      return { theme: document.documentElement.dataset.dshDesktopTheme, width: innerWidth, height: innerHeight,
-        backdrop: style.backdropFilter, background: style.backgroundColor, opacity: sidebarColor[3] / 255, rows,
-        sidebarBorder: style.borderRightWidth,
-        activeNavigation: (() => {
-          const active = document.querySelector('.settings-sidebar button.tab.active')
-          const inactive = document.querySelector('.settings-sidebar button.tab:not(.active)')
-          const selectedStyle = getComputedStyle(active)
-          return { shadow: selectedStyle.boxShadow, border: selectedStyle.borderLeftWidth,
-            weight: selectedStyle.fontWeight, background: selectedStyle.backgroundColor,
-            inactiveBackground: getComputedStyle(inactive).backgroundColor }
-        })(),
-        framedSections: [...document.querySelectorAll('.panel.active, .native-card, .native-masthead, .native-controls, .native-metrics, .native-card-footer')]
-          .filter(element => element.getClientRects().length > 0)
-          .filter(element => ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth']
-            .some(property => Number.parseFloat(getComputedStyle(element)[property]) > 0))
-          .map(element => element.className),
-        horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
-        sidebarOverflow: sidebar.scrollWidth > sidebar.clientWidth,
-        translucentPanels: [...document.querySelectorAll('.settings-sidebar, .content-toolbar, .native-card, .list, .dock-search input')]
-          .filter(element => element.getClientRects().length > 0)
-          .filter(element => getComputedStyle(element).backdropFilter !== 'none').length }
-    }, destinationIds)
-    assert.equal(sample.horizontalOverflow, false)
-    assert.equal(sample.rows.length, 15)
-    assert.ok(sample.rows.every(row => row.visible), 'all existing destinations remain available')
-    if (!baseline) {
-      assert.equal(sample.backdrop, 'none')
-      assert.equal(sample.sidebarOverflow, false, 'sidebar navigation has no horizontal overflow')
-      assert.equal(sample.translucentPanels, 0)
-      assert.equal(sample.opacity, 1, 'sidebar has an opaque surface')
-      assert.equal(sample.sidebarBorder, '0px', 'sidebar does not draw a region partition')
-      assert.equal(sample.activeNavigation.shadow, 'none', 'selection does not draw an inset rail')
-      assert.equal(sample.activeNavigation.border, '0px')
-      assert.ok(Number(sample.activeNavigation.weight) >= 600)
-      assert.notEqual(sample.activeNavigation.background, sample.activeNavigation.inactiveBackground, 'selection remains distinguishable without a rail')
-      assert.deepEqual(sample.framedSections, [], 'chapter surfaces do not recreate card frames')
-      assert.ok(sample.rows.every(row => row.contrast >= 4.5), JSON.stringify(sample.rows))
-      assert.ok(sample.rows.every(row => row.transform === 'none'), 'navigation never lifts on hover')
-      assert.ok(sample.rows.every(row => row.insideViewport), `all destinations fit default and compact Dock sizes: ${JSON.stringify(sample.rows)}`)
+      samples.push(sample)
+      visited.add(sample.rows[0].id)
+      await dock.screenshot({ path: join(output, `${theme}-${width}-${destination}.png`) })
     }
-    samples.push(sample)
-    await dock.screenshot({ path: join(output, `${theme}-${width}.png`) })
+    assert.equal(visited.size, 15)
+    assert.deepEqual([...visited], destinationIds, 'every retained destination remains clickable through its visible group')
   }
 
   const selectTheme = async (label, theme) => {

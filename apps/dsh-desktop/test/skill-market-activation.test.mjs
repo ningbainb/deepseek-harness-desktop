@@ -123,6 +123,48 @@ const reconcileNativePatch = patch => mergeQqBotPatch(mergeDesktopPatch(patch), 
 const nativeSavedPatch = () => reconcileNativePatch(originalPatch).replace(QQBOT_PATCH_END,
   `- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n  config:\n    provider: retained\n    model: retained-model\n${QQBOT_PATCH_END}`)
 
+const minimalSidebarOptions = { minimalDefaults: true, contextDefaults: true, agentTeamEnabled: true,
+  optionalPlugins: { 'dsh-context-memory': true, 'dsh-prompt-customizer': true } }
+const reconcileMinimalSidebarPatch = patch => mergeQqBotPatch(mergeDesktopPatch(patch, undefined, minimalSidebarOptions), readQqBotPatchEnabled(patch) ?? false)
+async function seedMinimalSidebarPreferences({ patchPath, profileDir }) {
+  await writeFile(join(profileDir, 'package.json'), JSON.stringify({ dsh: { profile: {
+    desktopDefaults: 'minimal-v1', desktopContextDefaults: 'sidebar', desktopAgentTeamEnabled: true,
+    desktopOptionalPlugins: minimalSidebarOptions.optionalPlugins,
+  } } }))
+  await writeFile(patchPath, reconcileMinimalSidebarPatch(originalPatch).replace(QQBOT_PATCH_END,
+    `- id: agent-default-model\n  name: '@deepseek-ai/dsh-agent-default-model'\n  config:\n    provider: retained\n    model: retained-model\n${QQBOT_PATCH_END}`))
+}
+
+test('minimal-v1 sidebar activation accepts native SDK preference reconciliation without losing opt-in configuration', async () => fixture(async ({ service, patchPath, profileDir }) => {
+  await seedMinimalSidebarPreferences({ patchPath, profileDir })
+  await service.activate({ confirmed: true, expectedRevision: (await service.describe()).revision })
+  const patch = await readFile(patchPath, 'utf8')
+  assert.equal(patch, reconcileMinimalSidebarPatch(patch))
+  assert.match(patch, /model: retained-model/u)
+  assert.match(patch, /apiKey: keep-local-fixture/u)
+  assert.match(patch, /defaultEnabled: true/u)
+  assert.equal(JSON.parse(await readFile(join(profileDir, '.desktop-skill-market-activation.json'), 'utf8')).revision,
+    (await service.describe()).revision)
+}, { ensureProfile: async ({ patchPath }) => writeFile(patchPath, reconcileMinimalSidebarPatch(await readFile(patchPath, 'utf8'))) }))
+
+test('minimal-v1 reconciliation still rolls back unhealthy activation without committing a receipt', async () => fixture(async ({ service, patchPath, profileDir }) => {
+  await seedMinimalSidebarPreferences({ patchPath, profileDir })
+  const before = await readFile(patchPath, 'utf8')
+  await assert.rejects(service.activate({ confirmed: true, expectedRevision: (await service.describe()).revision }), /unavailable/u)
+  assert.equal(await readFile(patchPath, 'utf8'), reconcileMinimalSidebarPatch(before))
+  assert.equal((await service.describe()).enabled, false)
+  await assert.rejects(readFile(join(profileDir, '.desktop-skill-market-activation.json')), { code: 'ENOENT' })
+}, { ensureProfile: async ({ patchPath }) => writeFile(patchPath, reconcileMinimalSidebarPatch(await readFile(patchPath, 'utf8'))),
+  verifyHealth: async () => { throw new Error('market unavailable') } }))
+
+test('minimal-v1 reconciliation never accepts or overwrites a foreign provider edit', async () => fixture(async ({ service, patchPath, profileDir }) => {
+  await seedMinimalSidebarPreferences({ patchPath, profileDir })
+  await assert.rejects(service.activate({ confirmed: true, expectedRevision: (await service.describe()).revision }), /changed|restore|recovery/u)
+  assert.match(await readFile(patchPath, 'utf8'), /foreign-provider-save/u)
+  await assert.rejects(readFile(join(profileDir, '.desktop-skill-market-activation.json')), { code: 'ENOENT' })
+}, { ensureProfile: async ({ patchPath }) => writeFile(patchPath,
+  reconcileMinimalSidebarPatch(await readFile(patchPath, 'utf8')).replace('keep-local-fixture', 'foreign-provider-save')) }))
+
 test('activation accepts the exact native managed-section reconciliation of SDK-saved model preferences', async () => fixture(async ({ service, patchPath, profileDir }) => {
   await writeFile(patchPath, nativeSavedPatch())
   const revision = (await service.describe()).revision

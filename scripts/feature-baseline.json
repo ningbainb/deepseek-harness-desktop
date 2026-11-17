@@ -574,6 +574,7 @@
         "skill-center-market-native-consent-cancel-without-profile-mutation",
         "skill-market-activation-serialized-with-provider-edits-and-recoverable-snapshot",
         "skill-market-native-reconciliation-accepts-only-exact-owned-postimages-with-foreign-provider-edits-preserved",
+        "skill-market-reconciliation-preserves-persisted-minimal-sidebar-team-and-optional-plugin-policy",
         "shared-agent-mcp-starts-only-after-market-consent-with-positive-process-control-and-exact-declaration-bytes",
         "market-disabled-translation-keeps-fields-and-documents-local-with-positive-loopback-http-control",
         "market-real-sdk-settings-catalog-and-installed-machine-providers-obey-opt-in-with-controlled-transport-and-disabled-queue-observation",

@@ -14,6 +14,7 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 import { readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { verifyDafeiyuComposerClearance } from './dafeiyu-composer-clearance-fixture.mjs'
+import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-control-approval-'))
@@ -79,7 +80,7 @@ try {
   await new Promise(done => server.listen(0, '127.0.0.1', done))
   port = server.address().port
   await seedPrimaryRuntimePermissionForTest({ userData })
-  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: ['5.2.0'] }))
+  await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await writeFile(join(home, 'desktop-control-center.json'), JSON.stringify({ version: 1,
     browser: { enabled: true, provider: 'playwright' }, computer: { enabled: false, provider: 'cua-native' } }))
   await writeFile(join(home, 'cordis.patch.yml'), `- id: workspace-controller\n  config:\n    documentsDirectory: ${JSON.stringify(documents)}\n- id: ui-settings-account\n  config:\n    step: done\n    completion: skipped\n`)

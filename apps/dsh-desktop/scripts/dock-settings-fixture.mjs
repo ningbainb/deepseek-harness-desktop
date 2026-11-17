@@ -1,5 +1,17 @@
 const localizedContexts = new WeakSet()
 
+/** Reach retained destinations through their visible group using normal input. */
+export async function visitDockDestination(dock, id) {
+  const tab = dock.locator(`#${id}`)
+  const primaryId = await tab.evaluate(element => [...element.ownerDocument.querySelectorAll('.settings-sidebar > nav:not([data-tab-group]) [data-group]')]
+    .find(candidate => candidate.dataset.group === element.dataset.group)?.id)
+  if (!primaryId) throw new Error(`Dock destination ${id} has no primary group`)
+  if (primaryId !== id) await dock.locator(`#${primaryId}`).click()
+  await tab.scrollIntoViewIfNeeded()
+  await tab.click()
+  await dock.locator(`#${id}.active`).waitFor({ timeout: 60_000 })
+}
+
 export async function useChineseFixtureLocale(app) {
   const context = app.context()
   if (!localizedContexts.has(context)) {

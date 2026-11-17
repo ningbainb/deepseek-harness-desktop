@@ -6,6 +6,7 @@ import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import { readPresetFile } from '../src/presets/preset-archive.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
+import { visitDockDestination } from './dock-settings-fixture.mjs'
 
 const appDir = join(import.meta.dirname, '..')
 const parent = await realpath(tmpdir())
@@ -44,7 +45,7 @@ try {
   dock.setDefaultTimeout(10_000)
   const errors = []
   dock.on('pageerror', error => errors.push(error.message))
-  await dock.locator('#backup-tab').click()
+  await visitDockDestination(dock, 'backup-tab')
   await dock.locator('#presets-tab').click()
   const button = dock.locator('#export-preset')
   const status = dock.locator('#preset-export-status')

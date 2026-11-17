@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
-import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { openDockSetting, useChineseFixtureLocale, visitDockDestination } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 
@@ -97,7 +97,7 @@ try {
   timings.warmTabsMs = []
   for (const id of ['personal-prompt', 'particle-theme', 'value-mode', 'personal-prompt', 'value-mode']) {
     start = performance.now()
-    await dock.locator('#' + id + '-tab').click()
+    await visitDockDestination(dock, id + '-tab')
     await settings.locator('[data-dsh-dock-settings="' + id + '"]').waitFor()
     await dock.locator('#dock-settings-state').waitFor({ state: 'hidden' })
     timings.warmTabsMs.push(Math.round(performance.now() - start))

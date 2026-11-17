@@ -11,6 +11,7 @@ import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { useOriginalPetForTest } from './original-pet-preference-fixture.mjs'
+import { assertAgentTeamProfile } from './agent-team-profile-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
@@ -441,14 +442,11 @@ try {
   await agentTeamSwitch.click()
   await settings.getByRole('status').filter({ hasText: '已开启' }).waitFor({ timeout: 90_000 })
   const enabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
-  assert.equal(enabledProfile.dsh.profile.desktopAgentTeamEnabled, true)
-  assert.equal(enabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-agent-team'), true)
-  assert.equal(enabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'), false)
+  assertAgentTeamProfile(enabledProfile, await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'cordis.patch.yml'), 'utf8'), true)
   await agentTeamSwitch.click()
   await settings.getByRole('status').filter({ hasText: '已关闭' }).waitFor({ timeout: 90_000 })
   const disabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
-  assert.equal(disabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'), false)
-  assert.equal(disabledProfile.dsh.profile.desktopAgentTeamEnabled, false)
+  assertAgentTeamProfile(disabledProfile, await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'cordis.patch.yml'), 'utf8'), false)
   await dock.locator('#models-tab').click()
   await dock.locator('#value-mode-tab').click()
   await settings.locator('[data-dsh-dock-settings="value-mode"]').waitFor()

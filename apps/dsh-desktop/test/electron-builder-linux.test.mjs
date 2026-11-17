@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -172,4 +173,62 @@ test('Linux preview builds once on Ubuntu 22 and verifies the same hashed deb on
   for (const upload of validationSteps.filter(step => step.uses === 'actions/upload-artifact@v4')) {
     assert.doesNotMatch(upload.with.path, /\.(?:deb|AppImage)/u, 'Ubuntu 24 uploads evidence only, never a second installer')
   }
+})
+
+for (const scenario of ['unique', 'none', 'duplicate']) {
+  test(`installed executable selector executes source fixture with same-name docs and alias: ${scenario}`, async t => {
+    const workflow = YAML.parse(await readFile(join(repositoryDirectory, '.github', 'workflows', 'linux-preview.yml'), 'utf8'))
+    const step = workflow.jobs['validate-ubuntu24'].steps.find(step => step.name === 'Extract the same deb for Ubuntu 24 acceptance')
+    const selector = /node --input-type=module - linux-ubuntu24-qa\/installed-files\.txt <<'NODE' > linux-ubuntu24-qa\/installed-executables\.txt\n([\s\S]+?)\nNODE/u.exec(step.run)?.[1]
+    assert.ok(selector, 'Run the actual portable source selector, without simulating Linux installation or changing process.platform')
+    const root = await mkdtemp(join(tmpdir(), 'dsh-installed-executable-selector-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const doc = join(root, 'usr', 'share', 'doc', 'deepseek-harness-desktop')
+    const app = join(root, 'opt', 'DeepSeek Harness Desktop')
+    const alias = join(root, 'usr', 'bin', 'deepseek-harness-desktop')
+    const binary = join(app, 'deepseek-harness-desktop')
+    await Promise.all([mkdir(doc, { recursive: true }), mkdir(app, { recursive: true }), mkdir(dirname(alias), { recursive: true })])
+    await writeFile(binary, Buffer.from('source selector fixture, never executed'))
+    await chmod(binary, 0o755)
+    await symlink(app, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    const paths = [doc, alias, ...(scenario === 'none' ? [] : [binary])]
+    if (scenario === 'duplicate') {
+      const second = join(root, 'another', 'deepseek-harness-desktop')
+      await mkdir(dirname(second)); await writeFile(second, 'another source fixture'); await chmod(second, 0o755)
+      paths.push(second)
+    }
+    const list = join(root, 'installed-files.txt')
+    await writeFile(list, paths.map(path => path.replaceAll('\\', '/')).join('\n') + '\n')
+    const result = spawnSync(process.execPath, ['--input-type=module', '-', list], { input: selector, encoding: 'utf8', windowsHide: true })
+    assert.match(result.stderr, /"kind":"directory"/u, 'The real same-name doc directory must be classified')
+    assert.match(result.stderr, /"kind":"symbolic-link"/u, 'The real alias must be rejected without following it')
+    if (scenario === 'unique') {
+      assert.equal(result.status, 0, result.stderr)
+      assert.deepEqual(result.stdout.trim().split(/\r?\n/u), [binary.replaceAll('\\', '/')])
+    } else {
+      assert.notEqual(result.status, 0, 'Zero or multiple regular executable files must block native acceptance')
+      assert.match(result.stderr, /Expected exactly one installed regular non-link executable/u)
+    }
+  })
+}
+
+test('Ubuntu 24 installation assertions diagnose failure and match the pinned builder AppArmor template and hook', async () => {
+  const workflow = YAML.parse(await readFile(join(repositoryDirectory, '.github', 'workflows', 'linux-preview.yml'), 'utf8'))
+  const step = workflow.jobs['validate-ubuntu24'].steps.find(step => step.name === 'Extract the same deb for Ubuntu 24 acceptance')
+  assert.match(step.run, /set -Eeuo pipefail/u)
+  assert.match(step.run, /trap .*BASH_COMMAND.* ERR/u)
+  assert.match(step.run, /checkpoint 'loaded exact AppArmor profile'/u)
+  assert.match(step.run, /checkpoint 'compare installed ELF with the same extracted deb'/u)
+  assert.match(step.run, /test -f "\$\{installedExecutables\[0\]\}"/u)
+  assert.match(step.run, /test ! -L "\$\{installedExecutables\[0\]\}"/u)
+  assert.match(step.run, /test -x "\$\{installedExecutables\[0\]\}"/u)
+  const appRequire = createRequire(join(appDirectory, 'package.json'))
+  const builderRequire = createRequire(appRequire.resolve('electron-builder/package.json'))
+  const builderRoot = dirname(builderRequire.resolve('app-builder-lib/package.json'))
+  const template = await readFile(join(builderRoot, 'templates', 'linux', 'apparmor-profile.tpl'), 'utf8')
+  const hook = await readFile(join(builderRoot, 'templates', 'linux', 'after-install.tpl'), 'utf8')
+  assert.match(template, /profile "\$\{executable\}" "\/opt\/\$\{sanitizedProductName\}\/\$\{executable\}" flags=\(unconfined\)/u)
+  assert.match(hook, /APPARMOR_PROFILE_SOURCE='\/opt\/\$\{sanitizedProductName\}\/resources\/apparmor-profile'/u)
+  assert.match(hook, /APPARMOR_PROFILE_TARGET='\/etc\/apparmor\.d\/\$\{executable\}'/u)
+  assert.match(hook, /apparmor_parser --replace --write-cache --skip-read-cache "\$APPARMOR_PROFILE_TARGET"/u)
 })

@@ -61,9 +61,14 @@ function enablePatch(bytes) {
   return Buffer.from(String(document))
 }
 
-function reconciledPatch(bytes) {
+function reconciledPatch(bytes, profile = {}) {
   let patch = bytes.toString('utf8')
-  if (patch.includes(DESKTOP_PATCH_START)) patch = mergeDesktopPatch(patch)
+  if (patch.includes(DESKTOP_PATCH_START)) patch = mergeDesktopPatch(patch, undefined, {
+    minimalDefaults: profile.desktopDefaults === 'minimal-v1',
+    contextDefaults: profile.desktopContextDefaults === 'sidebar',
+    agentTeamEnabled: profile.desktopAgentTeamEnabled,
+    optionalPlugins: profile.desktopOptionalPlugins,
+  })
   if (patch.includes(QQBOT_PATCH_START)) patch = mergeQqBotPatch(patch, readQqBotPatchEnabled(patch))
   return Buffer.from(patch)
 }
@@ -129,7 +134,12 @@ export function createSkillMarketActivation({ dshHome, profileDir = join(dshHome
       apply: async () => withFileLock(writerPath, async () => {
         const state = await check(request.expectedRevision)
         const next = enablePatch(state.patch)
-        const reconciled = reconciledPatch(next)
+        // Match the same persisted profile policy used by ensureDesktopProfile.
+        // Default-only rendering mistakes its valid native normalization for a
+        // foreign edit when minimal/sidebar or opt-in settings are retained.
+        const manifest = await regularBytes(writerPath, true)
+        const profilePolicy = manifest === undefined ? {} : JSON.parse(manifest.toString('utf8')).dsh?.profile
+        const reconciled = reconciledPatch(next, profilePolicy)
         const ownedPatch = bytes => bytes.equals(next) || bytes.equals(reconciled)
         const snapshot = join(profile, `.desktop-skill-market-backup-${randomUUID()}`)
         await mkdir(snapshot, { mode: 0o700 })

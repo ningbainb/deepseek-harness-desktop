@@ -193,56 +193,106 @@ jobs:
         shell: bash
         working-directory: apps/dsh-desktop/dist
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          check='initialize installed-package acceptance'
+          trap 'status=$?; printf "::error::Ubuntu 24 check=%s line=%s status=%s command=%s\n" "$check" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
+          checkpoint() { check=$1; printf '[ubuntu24] %s\n' "$check"; }
+          mkdir -p linux-ubuntu24-qa
+          checkpoint 'inspect and extract the same verified deb'
           version="$(node -p "require('../package.json').version")"
           deb="DeepSeek-Harness-Desktop-${version}-amd64.deb"
           dpkg-deb --info "$deb" >/dev/null
           inspection="$(mktemp -d "$RUNNER_TEMP/dsh-deb-ubuntu24.XXXXXX")"
           dpkg-deb --extract "$deb" "$inspection"
           mapfile -d '' executables < <(find "$inspection" -type f -name deepseek-harness-desktop -print0)
+          checkpoint 'unique extracted executable'
+          printf 'Extracted executable count=%s\n' "${#executables[@]}"
           test "${#executables[@]}" = 1
           test -x "${executables[0]}"
           # Extraction alone never runs the packaged postinst: Ubuntu 24 needs
           # its exact-path AppArmor userns profile. Install the same verified
           # DEB and exercise its real /opt path, including the product spaces.
           package="$(dpkg-deb --field "$deb" Package)"
+          checkpoint 'install the same verified deb and run its real postinst'
           sudo apt-get install -y --no-install-recommends "./$deb"
+          checkpoint 'verify dpkg reports fully installed'
           test "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed'
-          mapfile -t installedExecutables < <(dpkg-query -L "$package" | grep '/deepseek-harness-desktop$')
+          checkpoint 'classify installed package paths without following aliases'
+          dpkg-query -L "$package" > linux-ubuntu24-qa/installed-files.txt
+          node --input-type=module - linux-ubuntu24-qa/installed-files.txt <<'NODE' > linux-ubuntu24-qa/installed-executables.txt
+          import assert from 'node:assert/strict'
+          import { accessSync, constants, lstatSync, readFileSync } from 'node:fs'
+          const selected = []
+          for (const path of readFileSync(process.argv[2], 'utf8').split(/\r?\n/u)) {
+            if (!path.endsWith('/deepseek-harness-desktop')) continue
+            const info = lstatSync(path)
+            const regular = info.isFile() && !info.isSymbolicLink()
+            let executable = false
+            if (regular) { try { accessSync(path, constants.X_OK); executable = true } catch {} }
+            console.error(JSON.stringify({ check: 'installed-executable-candidate', path,
+              kind: info.isSymbolicLink() ? 'symbolic-link' : info.isDirectory() ? 'directory' : 'file', regular, executable }))
+            if (regular && executable) selected.push(path)
+          }
+          assert.equal(selected.length, 1, `Expected exactly one installed regular non-link executable; found ${selected.length}: ${JSON.stringify(selected)}`)
+          console.log(selected[0])
+          NODE
+          mapfile -t installedExecutables < linux-ubuntu24-qa/installed-executables.txt
+          checkpoint 'unique installed regular non-link executable'
+          printf 'Installed executable count=%s paths=%s\n' "${#installedExecutables[@]}" "${installedExecutables[*]}"
           test "${#installedExecutables[@]}" = 1
+          test -f "${installedExecutables[0]}"
+          test ! -L "${installedExecutables[0]}"
           test -x "${installedExecutables[0]}"
+          checkpoint 'compare installed ELF with the same extracted deb'
           cmp "${executables[0]}" "${installedExecutables[0]}"
+          checkpoint 'actual installed product path with spaces'
           app="$(dirname "${installedExecutables[0]}")"
+          printf 'Installed application directory=%s\n' "$app"
           test "$app" = '/opt/DeepSeek Harness Desktop'
+          checkpoint 'bundled AppArmor bytes match the extracted installer'
           cmp "$(dirname "${executables[0]}")/resources/apparmor-profile" "$app/resources/apparmor-profile"
+          checkpoint 'postinst deployed the same AppArmor profile'
           sudo cmp "$app/resources/apparmor-profile" /etc/apparmor.d/deepseek-harness-desktop
+          checkpoint 'AppArmor attachment uses the actual installed executable'
           grep -F "\"${installedExecutables[0]}\"" "$app/resources/apparmor-profile"
+          checkpoint 'AppArmor enforcement service is enabled'
           sudo apparmor_status --enabled
-          sudo grep -Fx 'deepseek-harness-desktop (unconfined)' /sys/kernel/security/apparmor/profiles
+          checkpoint 'loaded exact AppArmor profile'
+          sudo grep -Fx 'deepseek-harness-desktop (unconfined)' /sys/kernel/security/apparmor/profiles | tee linux-ubuntu24-qa/loaded-apparmor-profile.txt
+          checkpoint 'installed application archive and deb identity'
           test -f "$app/resources/app.asar"
           test "$(cat "$app/resources/package-type")" = deb
+          checkpoint 'link only the installed product into the existing verifier path'
           ln -s "$app" linux-unpacked
-          mkdir -p linux-ubuntu24-qa
+          printf '[ubuntu24] installed-package acceptance passed\n'
       - name: Verify the downloaded packaged runtime on Ubuntu 24
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'status=$?; printf "::error::Ubuntu 24 packaged-runtime line=%s status=%s command=%s\n" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
+          printf '[ubuntu24] verify the real installed packaged runtime\n'
           pnpm --filter @linxin666/dsh-desktop pack:verify:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/package.log
       - name: Verify the same bundled Office engines on Ubuntu 24
         run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/linux-unpacked/resources --output apps/dsh-desktop/dist/linux-ubuntu24-qa/office-runtime-verification
       - name: Verify the downloaded Landlock engine on Ubuntu 24
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'status=$?; printf "::error::Ubuntu 24 Landlock line=%s status=%s command=%s\n" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
+          printf '[ubuntu24] verify the installed Landlock engine\n'
           pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/sandbox.log
       - name: Run the downloaded Electron under Ubuntu 24 Xvfb
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          trap 'status=$?; printf "::error::Ubuntu 24 sandbox-smoke line=%s status=%s command=%s\n" "$LINENO" "$status" "$BASH_COMMAND" >&2; exit "$status"' ERR
           sandbox=apps/dsh-desktop/dist/linux-unpacked/chrome-sandbox
+          printf '[ubuntu24] set and verify installed sandbox ownership/mode: %s\n' "$sandbox"
           sudo chown root:root "$sandbox"
           sudo chmod 4755 "$sandbox"
+          printf 'Installed sandbox ownership/mode=%s\n' "$(stat -c '%U:%G %a' "$sandbox")"
           test "$(stat -c '%U:%G %a' "$sandbox")" = 'root:root 4755'
+          printf '[ubuntu24] launch the installed application under native Xvfb with its sandbox enabled\n'
           xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/smoke.log
       - name: Record Ubuntu 24 acceptance for the shared installer
         shell: bash
