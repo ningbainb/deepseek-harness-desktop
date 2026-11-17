@@ -4,7 +4,7 @@ import { lstat, readFile, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { configureNormalNsisBuild } from './runtime-nsis-options.mjs'
+import { configureNormalNsisBuild, verifyNormalNsisArchive } from './runtime-nsis-options.mjs'
 
 const flag = '--dsh-runtime-nsis-adapter='
 const matches = process.argv.slice(2).filter(arg => arg.startsWith(flag))
@@ -37,12 +37,7 @@ configured.effectiveOptionComputed = async values => {
   const sevenZip = await builderRequire('app-builder-lib/out/toolsets/7zip.js').getPath7za()
   const { stdout } = await promisify(execFile)(sevenZip, ['l', '-slt', '-ba', defines.APP_64], { windowsHide: true, maxBuffer: 32 * 1024 * 1024 })
   const archivePaths = new Set([...stdout.matchAll(/^Path = (.+)\r?$/gmu)].map(match => match[1].replaceAll('\\', '/').trim()))
-  if (!archivePaths.has('resources/runtime-reconstruction/manifest.json')) throw new Error('NSIS archive has no offline reconstruction metadata')
-  for (const target of adapter.omittedTargets) if (archivePaths.has(target)) throw new Error('NSIS reused a stale complete-runtime archive')
-  if (adapter.fullRuntime === true) {
-    if (adapter.omittedTargets.length !== 0 || !Array.isArray(adapter.requiredTargets) || !adapter.requiredTargets.includes('resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')) throw new Error('Incomplete full-runtime adapter')
-    for (const target of adapter.requiredTargets) if (!archivePaths.has(target)) throw new Error(`Complete NSIS runtime target missing: ${target}`)
-  }
+  verifyNormalNsisArchive(adapter, archivePaths)
   console.log(`Verified readable NSIS payload before installer assembly; ${adapter.omittedTargets.length} duplicate targets omitted`)
   return normalOptions(values)
 }

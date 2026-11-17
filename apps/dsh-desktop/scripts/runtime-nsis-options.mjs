@@ -1,3 +1,30 @@
+const EXTERNAL_BROWSER_CORE_TARGETS = Object.freeze([
+  'DeepSeek Harness Desktop.exe',
+  'resources/app.asar',
+  'resources/app.asar.unpacked/package.json',
+  'resources/app.asar.unpacked/runtime-support/browser-component.json',
+])
+
+/** Inspect the real compressed payload, preserving the legacy nested-runtime contract. */
+export function verifyNormalNsisArchive(adapter, archivePaths) {
+  if (!archivePaths.has('resources/runtime-reconstruction/manifest.json')) throw new Error('NSIS archive has no offline reconstruction metadata')
+  if (!Array.isArray(adapter.omittedTargets)) throw new Error('Missing verified Windows NSIS payload')
+  for (const target of adapter.omittedTargets) if (archivePaths.has(target)) throw new Error('NSIS reused a stale complete-runtime archive')
+  if (adapter.externalBrowserRuntime === true && adapter.fullRuntime !== true) throw new Error('Incomplete external-browser adapter')
+  if (adapter.fullRuntime !== true) return
+  const required = adapter.requiredTargets
+  if (adapter.omittedTargets.length !== 0 || !Array.isArray(required)) throw new Error('Incomplete full-runtime adapter')
+  if (adapter.externalBrowserRuntime === true) {
+    if (required.length !== EXTERNAL_BROWSER_CORE_TARGETS.length
+      || new Set(required).size !== required.length
+      || EXTERNAL_BROWSER_CORE_TARGETS.some(target => !required.includes(target))) throw new Error('Incomplete external-browser core adapter')
+    for (const target of archivePaths) if (/(?:^|\/)node_modules\/electron\//u.test(target)) throw new Error('External-browser archive includes a nested Electron runtime')
+  } else if (!required.includes('resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')) {
+    throw new Error('Incomplete full-runtime adapter')
+  }
+  for (const target of required) if (!archivePaths.has(target)) throw new Error(`Complete NSIS runtime target missing: ${target}`)
+}
+
 export function configureNormalNsisBuild(options, adapter) {
   if (adapter.schemaVersion !== 2 || !/^[a-f0-9]{64}$/u.test(adapter.manifestSHA256)) throw new Error('Invalid NSIS adapter identity')
   if (!/^[a-z]:[\\/]/iu.test(adapter.directory) || /["$\r\n]/u.test(adapter.directory)) throw new Error('Invalid NSIS include path')

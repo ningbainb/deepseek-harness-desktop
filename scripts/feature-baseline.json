@@ -1331,9 +1331,11 @@
         "independent-cache-and-persistent-activation",
         "sha256-platform-architecture-version-and-file-integrity",
         "cancel-retry-and-coalesced-preparation",
-        "preflight-before-upgrade-shutdown"
+        "preflight-before-upgrade-shutdown",
+        "complete-core-nsis-archive-without-nested-electron"
       ],
-      "e2eScript": "scripts/verify-release-plugins.mjs"
+      "e2eScript": "scripts/verify-packaged-browser-component.mjs",
+      "unitTests": ["test/runtime-nsis-archive.test.mjs"]
     }
   ],
   "skinCatalog": [
