@@ -7,14 +7,13 @@ export const CLOSE_BEHAVIORS = Object.freeze({
   ASK: 'ask',
 })
 
-export const DEFAULT_CLOSE_BEHAVIOR = CLOSE_BEHAVIORS.QUIT
+export const DEFAULT_CLOSE_BEHAVIOR = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
 
 const CLOSE_BEHAVIOR_VALUES = new Set(Object.values(CLOSE_BEHAVIORS))
 
 /**
  * Read a persisted close preference defensively. A missing or legacy value
- * must never turn background mode on by surprise, so it deliberately falls
- * back to the historical quit-on-close behavior.
+ * defaults to tray residency. Valid explicit quit/ask choices remain intact.
  */
 export function normalizeCloseBehavior(value) {
   return typeof value === 'string' && CLOSE_BEHAVIOR_VALUES.has(value)
@@ -28,7 +27,7 @@ export function normalizeCloseBehavior(value) {
  * persistent unattended scheduler permission.
  */
 export function isBackgroundAutomationEnabled(value) {
-  return normalizeCloseBehavior(value) === CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
+  return value === CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
 }
 
 /** Validate an untrusted explicit preference update from a Desktop surface. */
@@ -175,7 +174,7 @@ export function createCloseBehaviorController({
       return normalizeCloseBehavior(getCloseBehavior())
     } catch (error) {
       report(error)
-      return DEFAULT_CLOSE_BEHAVIOR
+      return CLOSE_BEHAVIORS.QUIT
     }
   }
 

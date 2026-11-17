@@ -17,6 +17,8 @@ const GENERATED_RELEASE_FILES = new Set([
   'release-manifest.json',
   'release-notes.md',
   'runtime-prune-report.json',
+  'distribution-artifacts-linux-x64.json',
+  'distribution-artifacts-macos-arm64.json',
   'builder-effective-config.yaml',
   'builder-debug.yml',
 ])

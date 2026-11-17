@@ -97,11 +97,15 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
   min-width: 180px;
-  max-width: 260px;
+  max-width: min(260px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  color: inherit;
   padding: 6px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
   border-radius: 12px;

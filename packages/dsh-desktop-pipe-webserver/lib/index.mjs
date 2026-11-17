@@ -269,9 +269,9 @@ export class DesktopPipeWebServer extends Service {
     }
   }
 
-  collectIndexInjections() {
+  collectIndexInjections(peer) {
     const table = []
-    this.ctx.emit('webserver/index-inject', table)
+    this.ctx.emit('webserver/index-inject', table, peer)
     return table
   }
 
@@ -281,8 +281,8 @@ export class DesktopPipeWebServer extends Service {
     return output
   }
 
-  renderIndex(html) {
-    return this.applyIndexTaps(renderIndexInjections(html, this.collectIndexInjections()))
+  renderIndex(html, peer) {
+    return this.applyIndexTaps(renderIndexInjections(html, this.collectIndexInjections(peer)))
   }
 
   match(pathname) {
@@ -322,12 +322,13 @@ export class DesktopPipeWebServer extends Service {
   }
 
   async authorizeIndex(request) {
-    if (this.ctx.get('connection') === undefined || typeof this.ctx.connection.authorizeIndex !== 'function') {
+    const connection = this.ctx.get('connection')
+    if (connection === undefined || typeof connection.authorizeIndex !== 'function') {
       throw new Error('desktop pipe index authorization requires Connection')
     }
     const req = nodeRequest(request)
     const res = new FetchResponseBridge(request.method)
-    const authorized = this.ctx.connection.authorizeIndex(req, res)
+    const authorized = connection.authorizeIndex(req, res)
     if (authorized) return undefined
     return res.response
   }

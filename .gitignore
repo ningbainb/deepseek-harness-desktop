@@ -54,3 +54,7 @@ REVIEW-PROMPT.md
 
 # Wrangler local D1/Worker state (generated locally, never product source)
 apps/dsh-telemetry-worker/.wrangler/
+
+# Generated standalone installer browser-preflight bundle and digest include
+apps/dsh-desktop/build/browser-component-preflight/
+apps/dsh-desktop/build/browser-component-preflight.nsh

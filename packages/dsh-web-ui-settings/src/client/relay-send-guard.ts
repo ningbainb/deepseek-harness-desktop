@@ -1,5 +1,5 @@
 import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { ModelSelection, ModelSelectionProjection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ConversationController } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { RELAY_PROVIDER_ID, RELAY_STATUS_PATH, type RelayStatusResponse } from '../relay-protocol.ts'
 import { postRelay } from './relay-client.ts'
@@ -9,7 +9,10 @@ export const RELAY_SIGN_IN_REQUIRED_EVENT = 'dsh-relay-sign-in-required'
 type ConversationSender = Pick<ConversationController, 'sendSession'>
 
 function selectionOf(session: SessionFace) {
-  return (session.projections.faceOf('modelSelection').getSnapshot() as ModelSelectionProjection | undefined)?.next
+  // Agent host state uses { pending, lastUsed }; its public wire view exposes
+  // `next: pending ?? lastUsed`. SessionFace stores that wire view, matching
+  // the official browser model directory's `projected.next` read.
+  return (session.projections.faceOf('modelSelection').getSnapshot() as { readonly next: ModelSelection | null } | undefined)?.next
 }
 
 export function installRelaySendGuard(

@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+test('external browser payload gets a distinct macro and cannot claim reconstruction', async () => {
+  const { configureNormalNsisBuild } = await import('../scripts/runtime-nsis-options.mjs')
+  const adapter = { schemaVersion: 2, directory: 'D:/payload', manifestSHA256: 'a'.repeat(64), restorationBytes: 0, fullRuntime: true, externalBrowserRuntime: true }
+  const configured = configureNormalNsisBuild({}, adapter)
+  const defines = {}
+  await configured.effectiveOptionComputed([defines, {}])
+  assert.equal(defines.DSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD, '1')
+  assert.equal(defines.DSH_RUNTIME_FULL_PAYLOAD, '1')
+  assert.throws(() => configureNormalNsisBuild({}, { ...adapter, fullRuntime: false }), /external/i)
+})
+
+test('complete runtime payload bypasses child reconstruction and cannot omit runtime bytes', async () => {
+  const { configureNormalNsisBuild } = await import('../scripts/runtime-nsis-options.mjs')
+  const adapter = { schemaVersion: 2, directory: 'E:/payload', manifestSHA256: 'a'.repeat(64), restorationBytes: 0, fullRuntime: true }
+  const configured = configureNormalNsisBuild({}, adapter)
+  const defines = { APP_64_UNPACKED_SIZE: '100', ESTIMATED_SIZE: 100 }
+  await configured.effectiveOptionComputed([defines, {}])
+  assert.equal(defines.DSH_RUNTIME_FULL_PAYLOAD, '1')
+  assert.equal(defines.DSH_RUNTIME_MANIFEST_SHA256, adapter.manifestSHA256)
+  assert.throws(() => configureNormalNsisBuild({}, { ...adapter, restorationBytes: 1 }), /complete|full|restor/iu)
+})
+
 test('an old adapter without mandatory restoration accounting cannot build a new installer', async () => {
   const { configureNormalNsisBuild } = await import('../scripts/runtime-nsis-options.mjs')
   assert.throws(() => configureNormalNsisBuild({}, { schemaVersion: 1, directory: 'E:/payload',

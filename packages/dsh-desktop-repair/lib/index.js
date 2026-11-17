@@ -827,17 +827,11 @@ async function runOneCandidate(ctx, job, controller, selection, attempt) {
 			meta: { cwd: job.workspace },
 			agentOptions: {
 				provider: selection.provider,
-				model: selection.model
+				model: selection.model,
+				...selection.reasoningEffort === void 0 ? {} : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) }
 			},
 			setup: (agentCtx) => {
-				installModelSelection(agentCtx, {
-					current: {
-						provider: selection.provider,
-						model: selection.model,
-						...selection.reasoningEffort === void 0 ? {} : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) }
-					},
-					assembled: void 0
-				});
+				installModelSelection(agentCtx);
 				agentCtx.systemPrompt.section({
 					name: "desktop:repair-policy",
 					order: -1e4,

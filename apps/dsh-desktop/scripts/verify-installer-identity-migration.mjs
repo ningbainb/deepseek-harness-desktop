@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
+import { prepareBrowserPreflightFixtureResources } from '../test/fixtures/browser-preflight-resources.mjs'
 import { resolveNsisCompiler } from './nsis-compiler.mjs'
 
 const exec = promisify(execFile)
@@ -23,6 +24,7 @@ async function registryExists(key) {
 }
 
 try {
+  const resources = await prepareBrowserPreflightFixtureResources(root)
   for (const invalid of ['missing', 'no-marker', 'no-executable']) {
     for (const view of ['64', '32']) {
       const scenario = `conflicting-${invalid}-${view}`
@@ -43,7 +45,7 @@ try {
       try {
         await exec('reg.exe', ['ADD', `HKCU\\${registry}\\CurrentInstall`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', stale, '/f', '/reg:64'], { windowsHide: true })
         await exec('reg.exe', ['ADD', `HKCU\\${registry}\\CurrentUninstall`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', existing, '/f', `/reg:${view}`], { windowsHide: true })
-        await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+        await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
           `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${registry}`,
           join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi')], { windowsHide: true, timeout: 60_000, env: compiler.env })
         await exec(installer, ['/S'], { windowsHide: true, timeout: 60_000 })
@@ -71,7 +73,7 @@ try {
     await exec('reg.exe', ['ADD', `HKCU\\${registry}\\${registryLocation}`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', registered, '/f',
       scenario === 'current-registry32' ? '/reg:32' : '/reg:64'], { windowsHide: true })
     try {
-      await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+      await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${registry}`,
         join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi')], { windowsHide: true, timeout: 60_000, env: compiler.env })
       await exec(installer, ['/S', ...(scenario.startsWith('explicit-') ? [`/D=${requested}`] : [])], { windowsHide: true, timeout: 60_000 })
@@ -101,7 +103,7 @@ try {
     await exec('reg.exe', ['ADD', `HKCU\\${registry}\\LegacyUninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', '3.5.0', '/f'], { windowsHide: true })
     try {
       await exec(compiler.path, [
-        '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+        '/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_FRESH_INSTALL=${freshInstall}`,
         `/DTEST_REGISTRY=${registry}`,
         join(desktop, 'test', 'fixtures', 'installer-identity-migration.nsi'),

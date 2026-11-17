@@ -15,7 +15,7 @@ import {
 } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parse } from 'yaml'
+import { isMap, parse, parseDocument } from 'yaml'
 
 import { ControlCenterStore, createDefaultControlCenterConfiguration } from './control-center.mjs'
 import { createProfileDirectoryPreparer } from './profile-directory-preparation.mjs'
@@ -48,14 +48,17 @@ export const BUILTIN_BUNDLES = Object.freeze([
   'dsh-dafeiyu-pet',
   'dsh-builtin-browser',
   '@linxin666/dsh-release-plugin-adapter',
+  'dsh-context',
+  'dsh-context-memory',
+  'dsh-prompt-customizer',
 ])
 
 export const AGENT_TEAM_PROFILE_BUNDLE = '@deepseek-ai/dsh-experimental-agent-team-profile'
 export const AGENT_TEAM_VERSION = DESKTOP_DEPENDENCIES['@deepseek-ai/dsh']
 export const AGENT_TEAM_RUNTIME_PACKAGES = Object.freeze([
-  '@deepseek-ai/dsh-experimental-agent-team',
-  AGENT_TEAM_PROFILE_BUNDLE,
-  '@deepseek-ai/dsh-experimental-tool-agent-team',
+  '@deepseek-ai/dsh-agent-team',
+  '@deepseek-ai/dsh-tool-agent-team',
+  '@deepseek-ai/dsh-client-ui-agent-team',
 ].toSorted())
 
 export const DESKTOP_REPAIR_BUNDLE = '@linxin666/dsh-desktop-repair'
@@ -173,6 +176,9 @@ export const WEB_UI_SETTINGS_NAMESPACES = Object.freeze([
 ].toSorted())
 
 export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
+  'dsh-context',
+  'dsh-context-memory',
+  'dsh-prompt-customizer',
   '@local/dsh-prompt-pilot',
   'dsh-dafeiyu-pet',
   'dsh-builtin-browser',
@@ -320,6 +326,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
 // DSH 0.1.6 exposes these runtime modules as peers. Keep them explicit so the
 // packaged host is hermetic instead of resolving through a developer machine.
 export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
+  '@deepseek-ai/dsh-error',
   '@deepseek-ai/cordis-plugin-group',
   '@deepseek-ai/cordis-plugin-hmr',
   '@deepseek-ai/cordis-plugin-include',
@@ -439,7 +446,7 @@ export function renderControlCenterPatch(configuration = createDefaultControlCen
   return `- insert:\n    - id: desktop-browser-use\n      name: '@deepseek-ai/dsh-browser-use'\n    - id: desktop-browser-provider\n      name: '${browserPackage}'\n      disabled: ${browser.enabled === true ? 'false' : 'true'}${browserConfig}\n    - id: desktop-computer-use\n      name: '@deepseek-ai/dsh-computer-use'\n    - id: desktop-computer-provider\n      name: '${computerPackage}'\n      disabled: ${computer.enabled === true ? 'false' : 'true'}${computerConfig}\n`
 }
 
-function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration(), { marketDefaultEnabled = false } = {}) {
+function desktopPatchConfig(controlCenterConfiguration = createDefaultControlCenterConfiguration(), { marketDefaultEnabled = false, agentTeamEnabled = false, optionalPlugins = {}, minimalDefaults = false, contextDefaults = false } = {}) {
   return `${DESKTOP_PATCH_START}
 ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
 - id: dsh-agent-plugins-market
@@ -543,7 +550,17 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
         initialDelayMs: 750
         maxDelayMs: 15000
         jitterRatio: 0.15
+- id: agent-team
+  config:
+    maxTasks: 256
+    defaultEnabled: ${agentTeamEnabled}
+- id: dsh-context-memory
+  disabled: ${optionalPlugins['dsh-context-memory'] !== true}
+- id: prompt-customizer
+  disabled: ${optionalPlugins['dsh-prompt-customizer'] !== true}
+${contextDefaults ? '- id: dsh-context\n  config:\n    defaultPlacement: sidebar\n' : ''}
 ${renderControlCenterPatch(controlCenterConfiguration).trimEnd()}
+${minimalDefaults ? '- id: pet\n  disabled: true\n- id: dafeiyu-pet\n  disabled: true\n- id: live-stats\n  disabled: true\n' : ''}
 ${DESKTOP_PATCH_END}
 `
 }
@@ -584,11 +601,14 @@ export function materializeFilesystemPath(path) {
 }
 
 export function isAgentTeamProfileEnabled(manifest) {
+  if (typeof manifest?.dsh?.profile?.desktopAgentTeamEnabled === 'boolean') {
+    return manifest.dsh.profile.desktopAgentTeamEnabled
+  }
   return Array.isArray(manifest?.dsh?.profile?.bundles)
     && manifest.dsh.profile.bundles.includes(AGENT_TEAM_PROFILE_BUNDLE)
 }
 
-export function createDesktopProfileManifest(existing = {}) {
+export function createDesktopProfileManifest(existing = {}, { isNewInstallation = Object.keys(existing).length === 0 } = {}) {
   const existingDsh = existing.dsh !== null && typeof existing.dsh === 'object' && !Array.isArray(existing.dsh)
     ? existing.dsh
     : {}
@@ -599,6 +619,11 @@ export function createDesktopProfileManifest(existing = {}) {
     : {}
   const existingBundles = existingProfile.bundles
   const agentTeamEnabled = isAgentTeamProfileEnabled(existing)
+  const optionalPlugins = Object.fromEntries(['dsh-context-memory', 'dsh-prompt-customizer'].map(name => [
+    name, typeof existingProfile.desktopOptionalPlugins?.[name] === 'boolean'
+      ? existingProfile.desktopOptionalPlugins[name]
+      : Array.isArray(existingBundles) && existingBundles.includes(name),
+  ]))
   const existingDependencies = existing.dependencies ?? {}
   const managedBundles = new Set([
     ...BUILTIN_BUNDLES,
@@ -629,10 +654,14 @@ export function createDesktopProfileManifest(existing = {}) {
       ...existingDsh,
       profile: {
         ...existingProfile,
+        desktopAgentTeamEnabled: agentTeamEnabled,
+        desktopOptionalPlugins: optionalPlugins,
+        desktopDefaults: existingProfile.desktopDefaults ?? (isNewInstallation ? 'minimal-v1' : 'legacy-preserved'),
+        desktopContextDefaults: existingProfile.desktopContextDefaults
+          ?? (Object.hasOwn(existingDependencies, 'dsh-context') || (Array.isArray(existingBundles) && existingBundles.includes('dsh-context')) ? 'preserve' : 'sidebar'),
         bundles: [
           ...BUILTIN_BUNDLES,
           ...communityBundles,
-          ...(agentTeamEnabled ? [AGENT_TEAM_PROFILE_BUNDLE] : []),
         ],
       },
     },
@@ -707,10 +736,9 @@ export async function setAgentTeamProfileEnabled({ profileDir, enabled } = {}) {
     : {}
   const currentBundles = Array.isArray(profile.bundles) ? profile.bundles : []
   const bundles = currentBundles.filter(name => name !== AGENT_TEAM_PROFILE_BUNDLE)
-  if (enabled) bundles.push(AGENT_TEAM_PROFILE_BUNDLE)
   const next = {
     ...existing,
-    dsh: { ...dsh, profile: { ...profile, bundles } },
+    dsh: { ...dsh, profile: { ...profile, bundles, desktopAgentTeamEnabled: enabled } },
   }
   const changed = await writeIfChanged(manifestPath, `${JSON.stringify(next, null, 2)}\n`)
   return Object.freeze({ enabled, changed })
@@ -1172,7 +1200,15 @@ export function mergeDesktopPatch(existing = '', controlCenterConfiguration = cr
       return `${prefix}${quote}ssh${quote}${suffix}`
     },
   )
-  const { managed, remainder } = reconcileManagedPatch(userPatch, desktopPatchConfig(controlCenterConfiguration, options), DESKTOP_PATCH_START, DESKTOP_PATCH_END)
+  let { managed, remainder } = reconcileManagedPatch(userPatch, desktopPatchConfig(controlCenterConfiguration, options), DESKTOP_PATCH_START, DESKTOP_PATCH_END)
+  if (typeof options.agentTeamEnabled === 'boolean') {
+    const document = parseDocument(managed.slice(DESKTOP_PATCH_START.length, managed.indexOf(DESKTOP_PATCH_END)))
+    const row = document.contents.items.find(item => item.get('id') === 'agent-team')
+    const configuration = row.get('config', true)
+    if (!isMap(configuration)) throw new Error('Agent Team managed configuration must be a mapping')
+    configuration.set('defaultEnabled', options.agentTeamEnabled)
+    managed = `${DESKTOP_PATCH_START}\n${String(document).trimEnd()}\n${DESKTOP_PATCH_END}\n`
+  }
   const suffix = remainder.trim()
   return suffix ? `${managed.trimEnd()}\n\n${suffix}\n` : managed
 }
@@ -1434,7 +1470,10 @@ export async function ensureDesktopProfile({
     : existing
   const manifest = mode === 'repair'
     ? createDesktopRepairProfileManifest()
-    : createDesktopProfileManifest(preserveUserProfile ? repairedExisting : {})
+    : createDesktopProfileManifest(preserveUserProfile ? repairedExisting : {}, {
+      isNewInstallation: !await pathExists(manifestPath)
+        && !(await Promise.all(['settings.yaml', 'sessions', 'workspaces'].map(name => pathExists(join(dshHome, name))))).some(Boolean),
+    })
   for (const packageName of CODEX_PROVIDER_CONFLICTS) activePackageRoots.delete(packageName)
   for (const packageName of activePackageRoots.keys()) {
     if (isRetiredLegacySkinPackage(packageName)) activePackageRoots.delete(packageName)
@@ -1502,7 +1541,12 @@ export async function ensureDesktopProfile({
       const marketDefaultEnabled = !Object.hasOwn(previousRecords, 'dsh-agent-plugins-market')
         && Array.isArray(existing?.dsh?.profile?.bundles)
         && existing.dsh.profile.bundles.includes('dsh-agent-plugins-market')
-      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch, controlCenterConfiguration, { marketDefaultEnabled }), qqBotEnabled)
+      managedPatch = mergeQqBotPatch(mergeDesktopPatch(existingPatch, controlCenterConfiguration, {
+        marketDefaultEnabled, agentTeamEnabled: isAgentTeamProfileEnabled(manifest),
+        optionalPlugins: manifest.dsh.profile.desktopOptionalPlugins,
+        minimalDefaults: manifest.dsh.profile.desktopDefaults === 'minimal-v1',
+        contextDefaults: manifest.dsh.profile.desktopContextDefaults === 'sidebar',
+      }), qqBotEnabled)
     } catch (error) {
       throw profileBootstrapError('desktop profile patch is invalid', error)
     }

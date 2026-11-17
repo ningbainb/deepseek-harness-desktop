@@ -14,6 +14,7 @@ import { verifyAsarIntegrity } from './verify-asar-integrity.mjs'
 import { verifyBrandingAssets } from './verify-branding-assets.mjs'
 import { defaultReleaseChannel } from '../src/release-manifest.mjs'
 import { assertPackagedUpdateIdentity } from '../src/update-identity.mjs'
+import { prepareBrowserComponentPreflight } from './prepare-browser-component-preflight.mjs'
 
 const APP_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PNPM_COMMAND = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
@@ -83,6 +84,7 @@ await run(process.execPath, [
 ])
 await verifyBrandingAssets(APP_DIRECTORY)
 if (!INSTALLER_ONLY) await prepareReleaseDirectory()
+await prepareBrowserComponentPreflight()
 // prepare:bundled-git
 const prepareGitScript = resolve(APP_DIRECTORY, 'scripts/prepare-bundled-git.mjs')
 if (!INSTALLER_ONLY) await run(process.execPath, [prepareGitScript])
@@ -103,6 +105,9 @@ await buildVerifiedWindowsInstaller({
     '--publish',
     'never',
     `--config.publish.channel=${UPDATER_CHANNEL}`,
+    // electron-builder's downloader does not read Electron's cache variables.
+    // Forward the shared cache explicitly while retaining its checksum checks.
+    ...(process.env.ELECTRON_CACHE ? [`--config.electronDownload.cache=${process.env.ELECTRON_CACHE}`] : []),
     ...BUILDER_ARGUMENTS,
   ],
   runBuilder: async args => {
@@ -127,8 +132,8 @@ await buildVerifiedWindowsInstaller({
   },
   prepareArchive: async appOutDir => {
     await invalidateNsisArchiveCache(dirname(appOutDir), PACKAGE_MANIFEST.version)
-    const payload = await prepareInstallerElectronPayload(appOutDir)
-    process.stdout.write(`offline Electron payload: ${JSON.stringify(payload.summary)}\n`)
+    const payload = await prepareInstallerElectronPayload(appOutDir, { externalBrowserRuntime: true })
+    process.stdout.write(`core payload with external browser component: ${JSON.stringify(payload.summary)}\n`)
     return payload
   },
 })

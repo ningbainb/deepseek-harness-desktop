@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "title": { "en": "DSH Desktop Community", "zh": "DSH Desktop 社区目录" },
+  "description": {
+    "en": "Verified, pinned community packages for DSH Desktop. dsh-context-memory 1.2.0 is blocked: user-isolation acceptance failed; this release does not offer new activation. Other catalog entries without confirmed versions are not listed as installable packages.",
+    "zh": "DSH Desktop 已核验版本的社区插件。dsh-context-memory 1.2.0 用户隔离验收未通过，本版暂不提供新启用。其他尚无已核验版本的目录条目不列入可安装清单。"
+  },
+  "metadata": {
+    "categories": {
+      "context": { "title": { "en": "Context", "zh": "上下文" } },
+      "prompt": { "title": { "en": "Prompts", "zh": "提示词" } }
+    },
+    "labels": {
+      "license-apache-2.0": { "title": "Apache-2.0" },
+      "license-mit": { "title": "MIT" },
+      "opt-in": { "title": { "en": "Optional activation", "zh": "按需启用" } }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-context",
+      "title": { "en": "Context Visualizer", "zh": "上下文可视化" },
+      "description": {
+        "en": "A one-stop DeepSeek Harness context insight and visualization plugin: a Context dashboard and browser plus /context command that reveal composition, history evolution, compaction/prune events, and token cost per message and image.",
+        "zh": "一站式 DeepSeek Harness 上下文洞察与可视化插件：Context 面板与浏览器加 /context 命令，透视上下文构成、历史演进与压缩/剪枝等事件，并展示消息与图片的 token 占用。"
+      },
+      "author": "bowenliang123",
+      "homepage": "https://github.com/bowenliang123/dsh-context",
+      "repository": { "url": "https://github.com/bowenliang123/dsh-context" },
+      "metadata": { "category": "context", "labels": ["license-apache-2.0"] },
+      "versions": [
+        {
+          "version": "0.85.1",
+          "publishTimestamp": 1794768513,
+          "source": { "type": "npm", "registry": "https://registry.npmjs.org/" },
+          "engines": { "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1" }
+        }
+      ]
+    },
+    {
+      "name": "dsh-prompt-customizer",
+      "title": { "en": "Prompt Customizer P2", "zh": "提示词定制 P2" },
+      "description": {
+        "en": "Optional prompt customization, skill collections and MCP Server configuration for DeepSeek Harness. Existing P1 preferences remain available.",
+        "zh": "DeepSeek Harness 的三合一能力台：提示词定制、技能集合管理与 MCP Server 接入。按需启用，保留现有 P1 偏好。"
+      },
+      "homepage": "https://github.com/DreamsTOF/dsh-prompt-customizer#readme",
+      "repository": { "url": "https://github.com/DreamsTOF/dsh-prompt-customizer" },
+      "metadata": { "category": "prompt", "labels": ["license-mit", "opt-in"] },
+      "versions": [
+        {
+          "version": "2.2.0",
+          "publishTimestamp": 1794492532,
+          "source": { "type": "npm", "registry": "https://registry.npmjs.org/" },
+          "engines": { "dsh": "^0.2.2-rc.1" }
+        }
+      ]
+    }
+  ]
+}

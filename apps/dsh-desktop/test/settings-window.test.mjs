@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { EventEmitter } from 'node:events'
+import { runInNewContext } from 'node:vm'
 
 import {
   applySettingsWindow,
@@ -13,6 +14,7 @@ import {
 test('settings drag handle preserves legacy slots and scopes rc2 titles to native settings navigation', () => {
   const header = { id: 'settings-title' }
   const fixture = ({ legacy, modal = 'settings', title = 'settings-title', children = [header] } = {}) => ({
+    children: [],
     querySelector: selector => selector === '[data-slot="settings.header"]' ? legacy : { children },
     getAttribute: attribute => attribute === 'data-shortcut-modal' ? modal : title,
   })
@@ -23,6 +25,56 @@ test('settings drag handle preserves legacy slots and scopes rc2 titles to nativ
   assert.equal(settingsWindowDragHandle(fixture({ children: [{ id: 'other-title' }] })), undefined)
   assert.equal(settingsWindowDragHandle({ querySelector: () => null, getAttribute: () => 'settings' }), undefined)
   assert.match(createSettingsWindowScript(), /data-shortcut-modal/u)
+})
+
+test('the injected controller adapts current SDK sibling titles and legacy nav titles without capturing actions', async () => {
+  for (const layout of ['current', 'legacy-nav', 'legacy-slot']) {
+    const element = () => ({
+      children: [], dataset: {}, style: { setProperty() {} },
+      classList: { values: new Set(), contains(value) { return this.values.has(value) }, add(value) { this.values.add(value) } },
+      addEventListener() {}, setAttribute() {}, remove() {},
+      append(child) { this.children.push(child); child.parentElement = this },
+      getBoundingClientRect: () => ({ x: 0, y: 0, width: 1200, height: 900 }),
+    })
+    const layer = element()
+    const dialog = element()
+    const title = Object.assign(element(), { id: 'sdk-settings-title' })
+    const nav = element()
+    const actions = element()
+    const content = element()
+    if (layout === 'current') dialog.append(title)
+    dialog.append(nav)
+    dialog.append(actions)
+    dialog.append(content)
+    if (layout !== 'current') nav.append(title)
+    layer.append(dialog)
+    dialog.isConnected = true
+    dialog.getAttribute = name => ({ 'data-shortcut-modal': 'settings', 'aria-labelledby': title.id })[name]
+    dialog.querySelector = selector => selector === ':scope > nav' ? nav
+      : layout === 'legacy-slot' ? { parentElement: title } : null
+    const opened = []
+    const window = {
+      dshDesktop: { getSettingsWindowBounds: async () => undefined, setSettingsWindowBounds: async () => {}, settingsOpened: async () => { opened.push(true) } },
+      addEventListener() {}, removeEventListener() {},
+    }
+    const observers = []
+    const context = {
+      window, document: { documentElement: element(), querySelectorAll: () => [dialog], createElement: element },
+      MutationObserver: class { constructor(scan) { observers.push(scan) } observe() {} disconnect() {} },
+    }
+    assert.equal(runInNewContext(createSettingsWindowScript(), context), true)
+    assert.equal(dialog.classList.contains('dsh-desktop-settings-window'), true, layout)
+    assert.equal(layer.classList.contains('dsh-desktop-settings-layer'), true, layout)
+    assert.equal(title.dataset.dshSettingsDragHandle, 'true', layout)
+    assert.equal(actions.dataset.dshSettingsDragHandle, undefined, layout)
+    assert.equal(content.dataset.dshSettingsDragHandle, undefined, layout)
+    assert.deepEqual(layer.children.slice(1).map(child => child.dataset.dshSettingsResize), ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'], layout)
+    assert.equal(opened.length, 1, layout)
+    observers[0]()
+    assert.equal(layer.children.length, 9, 'later DOM mutations must not duplicate the eight handles')
+    assert.equal(opened.length, 1, 'later DOM mutations must not reopen the native settings bridge')
+    window.__dshDesktopSettingsWindowController.dispose()
+  }
 })
 
 test('settings controller scopes movement and eight-way resizing to the upstream settings dialog', () => {

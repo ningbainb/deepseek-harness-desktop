@@ -839,7 +839,7 @@ for (const mode of ['-File', '-f', '-Command', '-c']) test(`PowerShell ${mode} s
   await writeFile(audit, `param([string] $EncodedCommand)\n[IO.File]::WriteAllText(${literal(receipt)}, $EncodedCommand)\nStart-Sleep -Seconds 300\n`)
   const powershell = join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe')
   const entry = mode.toLowerCase().startsWith('-c') ? `& ${literal(audit)}` : audit
-  const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', mode, entry, '-EncodedCommand', base64],
+  const child = spawn(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', mode, entry, '-EncodedCommand', base64],
     { windowsHide: true, stdio: 'ignore' })
   const exited = once(child, 'exit')
   t.after(async () => {

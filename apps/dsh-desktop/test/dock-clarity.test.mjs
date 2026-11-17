@@ -118,9 +118,12 @@ test('Dock inactive navigation uses readable primary text in light and dark them
 
 test('Dock readability changes preserve all fifteen destinations and the search control', () => {
   const sidebar = html.slice(html.indexOf('<aside class="settings-sidebar">'), html.indexOf('</aside>'))
-  const ids = [...sidebar.matchAll(/id="([^"]+-tab)"/gu)].map(match => match[1])
-  assert.deepEqual(ids, ['control-center', 'models', 'value-mode', 'personal-prompt', 'describe-image', 'usage', 'sessions',
-    'plugins-hub', 'plugin-options', 'skills', 'qqbot', 'appearance', 'particle-theme', 'backup', 'recovery'].map(id => `${id}-tab`))
+  const ids = [...html.matchAll(/id="([^"]+-tab)"/gu)].map(match => match[1])
+  assert.ok(['control-center', 'models', 'value-mode', 'personal-prompt', 'describe-image', 'usage', 'sessions',
+    'plugins-hub', 'plugin-options', 'skills', 'qqbot', 'appearance', 'particle-theme', 'backup', 'recovery'].map(id => `${id}-tab`).every(id => ids.includes(id)))
+  const primary = sidebar.slice(0, sidebar.indexOf('</nav>'))
+  const roots = [...primary.matchAll(/data-group="([^"]+)"/gu)].map(match => match[1])
+  assert.deepEqual(roots, ['plugins', 'skills', 'appearance', 'desktop-settings', 'more-tools'])
   assert.match(sidebar, /id="dock-search"[^>]+type=|type="search"[^>]+id="dock-search"/u)
   assert.match(stylesheet, /height: 28px; min-height: 28px; font-size: 13px/u)
 })

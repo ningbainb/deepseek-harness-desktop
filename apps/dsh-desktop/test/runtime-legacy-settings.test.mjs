@@ -390,7 +390,7 @@ function healthFixture() {
   const loader = { await: async () => {}, getTasks: () => [], entries: function* () { yield root; yield* rows } }
   const services = { loader, settings, profileContext: profile }
   const ctx = { fiber: { state: 2 }, get: name => services[name] }
-  ctx.reflect = { _getImpl: name => ({ value: services[name], fiber: name === 'settings' ? services.settings?.ownerContext?.fiber : ctx.fiber }) }
+  ctx.reflect = { _getImpl: name => ({ value: services[name], ctx: { fiber: name === 'settings' ? services.settings?.ownerContext?.fiber : ctx.fiber } }) }
   return { ctx, patches, rows, root, loader, services }
 }
 
@@ -400,6 +400,41 @@ test('health waits for Loader settlement and verifies adapter owner, root Includ
   fixtureValue.loader.await = async () => { settled = true }
   assert.equal(await verifyRuntimeLegacySettingsHealth(fixtureValue.ctx, { patches: fixtureValue.patches }), true)
   assert.equal(settled, true)
+})
+
+test('health accepts the legacy service implementation fiber shape', async () => {
+  const health = healthFixture()
+  const current = health.ctx.reflect._getImpl
+  health.ctx.reflect._getImpl = name => {
+    const implementation = current(name)
+    return { value: implementation.value, fiber: implementation.ctx.fiber }
+  }
+  assert.equal(await verifyRuntimeLegacySettingsHealth(health.ctx, { patches: health.patches }), true)
+})
+
+test('health prefers a disposed current provider fiber over an active legacy fiber', async () => {
+  const health = healthFixture()
+  const current = health.ctx.reflect._getImpl
+  health.ctx.reflect._getImpl = name => ({ ...current(name), ctx: { fiber: { state: 4 } }, fiber: { state: 2 } })
+  assert.equal(await verifyRuntimeLegacySettingsHealth(health.ctx, { patches: health.patches }), false)
+})
+
+test('health rejects a disposed legacy provider fiber', async () => {
+  const health = healthFixture()
+  const current = health.ctx.reflect._getImpl
+  health.ctx.reflect._getImpl = name => ({ value: current(name).value, fiber: { state: 4 } })
+  assert.equal(await verifyRuntimeLegacySettingsHealth(health.ctx, { patches: health.patches }), false)
+})
+
+test('health rejects a remounted provider even when its service value is unchanged', async () => {
+  const health = healthFixture()
+  const current = health.ctx.reflect._getImpl
+  let loaderFiber = health.ctx.fiber
+  health.ctx.reflect._getImpl = name => name === 'loader'
+    ? { value: health.loader, ctx: { fiber: loaderFiber } }
+    : current(name)
+  health.loader.await = async () => { loaderFiber = { state: 2 } }
+  assert.equal(await verifyRuntimeLegacySettingsHealth(health.ctx, { patches: health.patches }), false)
 })
 
 for (const [name, mutate] of [
@@ -498,7 +533,8 @@ for (const useResolution of [false, true]) for (const nested of [false, true]) {
       assert.equal(await settings.prepareDocument(), settings.documentPath)
       assert.equal(ctx.get('configEditor').documentPath, fixtureValue.profilePatchPath)
       assert.equal(ctx.get('pluginPackages') !== undefined, useResolution)
-      assert.equal(await verifyRuntimeLegacySettingsHealth(ctx, { patches: transaction.patches }), true)
+      const health = await diagnoseRuntimeLegacySettingsHealth(ctx, { patches: transaction.patches })
+      assert.equal(health.healthy, true, JSON.stringify(health))
       const model = [...loader.entries()].find(entry => entry.options.id === 'agent-default-model')
       const saved = structuredClone(model.options.config)
       model.options.config.model = 'unexpected'

@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { openNativeSettings } from './native-settings-fixture.mjs'
+import { evaluateNativeSettings, openNativeSettings } from './native-settings-fixture.mjs'
+import { assertNativeSettingsContained as assertContained } from './native-settings-geometry-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -24,20 +25,29 @@ let debuggerSession
 const closeDiagnostics = { scripts: [], breakpoints: [], calls: [] }
 const closeLogpointTasks = []
 
-const panelState = (dialog) => dialog.evaluate((element) => {
+const panelState = (dialog) => evaluateNativeSettings(dialog, (element, contentOf) => {
   const layer = element.parentElement
   const nav = element.querySelector(':scope > nav')
-  const content = element.querySelector(':scope > nav + div')
+  const content = contentOf(element)
   const box = element.getBoundingClientRect()
   const layerBox = layer.getBoundingClientRect()
   const navBox = nav.getBoundingClientRect()
   const contentBox = content.getBoundingClientRect()
+  // Match the published SDK's responsive rule, independently of observed
+  // geometry: a wrong orientation or overlap must still fail this gate.
+  const root = element.ownerDocument.documentElement
+  const expectedStacked = element.ownerDocument.defaultView.matchMedia('(width <= 767px)').matches
+    && !root.hasAttribute('data-windows-titlebar') && root.getAttribute('data-platform') !== 'darwin'
   return {
+    expectedStacked,
     box: { x: box.x, y: box.y, width: box.width, height: box.height, right: box.right, bottom: box.bottom },
     layer: { x: layerBox.x, y: layerBox.y, width: layerBox.width, height: layerBox.height, right: layerBox.right, bottom: layerBox.bottom },
-    nav: { right: navBox.right, overflow: getComputedStyle(nav).overflow },
+    nav: { left: navBox.left, top: navBox.top, right: navBox.right, bottom: navBox.bottom,
+      width: navBox.width, height: navBox.height, overflow: getComputedStyle(nav).overflow },
     content: {
       left: contentBox.left,
+      top: contentBox.top, right: contentBox.right, bottom: contentBox.bottom,
+      width: contentBox.width, height: contentBox.height,
       clientWidth: content.clientWidth,
       scrollWidth: content.scrollWidth,
       overflow: getComputedStyle(content).overflow,
@@ -47,16 +57,6 @@ const panelState = (dialog) => dialog.evaluate((element) => {
     minHeight: getComputedStyle(element).minHeight,
   }
 })
-
-const assertContained = (state) => {
-  const tolerance = 1.5
-  assert.ok(state.box.x >= state.layer.x - tolerance, JSON.stringify(state))
-  assert.ok(state.box.y >= state.layer.y - tolerance, JSON.stringify(state))
-  assert.ok(state.box.right <= state.layer.right + tolerance, JSON.stringify(state))
-  assert.ok(state.box.bottom <= state.layer.bottom + tolerance, JSON.stringify(state))
-  assert.ok(state.nav.right <= state.content.left + tolerance, JSON.stringify(state))
-  assert.ok(state.content.scrollWidth <= state.content.clientWidth + tolerance, JSON.stringify(state))
-}
 
 try {
   await seedPrimaryRuntimePermissionForTest({ userData: resolve(temporary, 'user-data') })
@@ -168,7 +168,7 @@ try {
   console.log('drag event coalescing ' + JSON.stringify(dragCoalescing))
   state = await panelState(dialog)
 
-  if (traceDirectory !== undefined) settingsTrace = await dialog.evaluateHandle(element => {
+  if (traceDirectory !== undefined) settingsTrace = await evaluateNativeSettings(dialog, (element, contentOf) => {
     const doc = element.ownerDocument
     const view = doc.defaultView
     const records = []
@@ -181,7 +181,7 @@ try {
     } : { tag: node?.nodeName }
     const geometry = node => node?.getBoundingClientRect().toJSON()
     const status = () => {
-      const content = element.querySelector(':scope > nav + div')
+      const content = contentOf(element)
       const style = view.getComputedStyle(element)
       return { connected: element.isConnected, hidden: element.hidden,
         display: style.display, visibility: style.visibility, dialog: geometry(element),
@@ -226,10 +226,10 @@ try {
       snapshot() { return { firstClosed, records, final: status() } },
       dispose() { observer.disconnect(); for (const unsubscribe of listeners) unsubscribe() },
     }
-  })
+  }, { handle: true })
 
-  const scrollbarResult = await dialog.evaluate(async (element) => {
-    const content = element.querySelector(':scope > nav + div')
+  const scrollbarResult = await evaluateNativeSettings(dialog, async (element, contentOf) => {
+    const content = contentOf(element)
     if (!(content instanceof HTMLElement)) throw new Error('settings content is unavailable')
     const spacer = document.createElement('div')
     spacer.dataset.dshSettingsScrollbarProbe = 'true'
@@ -264,9 +264,9 @@ try {
     await page.mouse.down()
     await page.mouse.move(scrollbarResult.x, endY, { steps: 4 })
     await page.mouse.up()
-    const observed = await scrollbarDialog.evaluate(element => ({
+    const observed = await evaluateNativeSettings(scrollbarDialog, (element, contentOf) => ({
       connected: element.isConnected,
-      scrollTop: element.querySelector(':scope > nav + div')?.scrollTop,
+      scrollTop: contentOf(element).scrollTop,
     }))
     assert.equal(observed.connected, true, `the original settings dialog must survive scrollbar drag ${iteration + 1}`)
     scrollbarPositions.push(observed.scrollTop)

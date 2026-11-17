@@ -56,6 +56,54 @@ function fixture(overrides = {}) {
   return { calls, lifecycle, hooks, quit: () => { quitting = true }, get preparing() { return preparing } }
 }
 
+test('component preflight failure leaves the running program untouched before receipt and shutdown', async () => {
+  const f = fixture({ hooks: { prepareComponents: async () => { throw new Error('component checksum failed') } } })
+  await assert.rejects(f.hooks.beforeInstall(), /checksum failed/)
+  assert.deepEqual(f.calls, [])
+  assert.equal(f.lifecycle.runtimeStopped, false)
+  assert.equal(f.preparing, false)
+})
+
+test('update preparation timeout cancels component work before stopping the old runtime', async () => {
+  const entered = deferred()
+  let signal
+  const f = fixture({ hooks: { prepareComponents: options => {
+    signal = options.signal
+    entered.resolve()
+    return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+  } } })
+  const { controller, timers } = updateController(f)
+  const installing = controller.install()
+  await entered.promise
+  timers.findLast(timer => timer.delay === UPDATE_INSTALL_PREPARATION_TIMEOUT_MS).callback()
+  assert.equal(await installing, false)
+  assert.equal(signal.aborted, true)
+  assert.deepEqual(f.calls, [])
+  assert.equal(f.lifecycle.runtimeStopped, false)
+})
+
+test('real component progress renews the idle timeout while repeated status cannot keep an update alive', async () => {
+  const entered = deferred()
+  let report
+  const f = fixture({ hooks: { prepareComponents: ({ signal, onProgress }) => {
+    report = onProgress
+    entered.resolve()
+    return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+  } } })
+  const { controller, timers } = updateController(f)
+  const installing = controller.install()
+  await entered.promise
+  const before = timers.filter(timer => timer.delay === UPDATE_INSTALL_PREPARATION_TIMEOUT_MS).length
+  report({ phase: 'downloading', receivedBytes: 1024, totalBytes: 2048 })
+  assert.equal(timers.filter(timer => timer.delay === UPDATE_INSTALL_PREPARATION_TIMEOUT_MS).length, before + 1)
+  assert.equal(controller.getStatus().componentPreparation.receivedBytes, 1024)
+  report({ phase: 'downloading', receivedBytes: 1024, totalBytes: 2048 })
+  assert.equal(timers.filter(timer => timer.delay === UPDATE_INSTALL_PREPARATION_TIMEOUT_MS).length, before + 1)
+  timers.findLast(timer => timer.delay === UPDATE_INSTALL_PREPARATION_TIMEOUT_MS).callback()
+  assert.equal(await installing, false)
+  assert.deepEqual(f.calls, [])
+})
+
 test('installer failure restores Runtime after reversible preparation, not disposal', async () => {
   const f = fixture()
   await f.hooks.beforeInstall()

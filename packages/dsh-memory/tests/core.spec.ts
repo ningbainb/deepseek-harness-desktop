@@ -10,7 +10,7 @@ import {
   renderMemoryItems,
   type MemoryItem,
 } from '../src/index.ts'
-import { extractCurrentUserQuery } from '../src/core/query.ts'
+import { extractCurrentUserQuery, extractPendingUserQuery } from '../src/core/query.ts'
 
 const principalA = 'principal-a' as PrincipalId
 const principalB = 'principal-b' as PrincipalId
@@ -30,6 +30,16 @@ function memory(content: string, extra: Partial<MemoryItem> = {}): MemoryItem {
 }
 
 describe('memory schema, rank and prompt boundaries', () => {
+  it('extracts only claimed direct-user text without admitting context, tool output, attachments or subagents', () => {
+    const messages = [
+      { source: { kind: 'user' }, content: [{ type: 'text', text: 'fixture convention [file attachment ignored]' }, { type: 'image', image: { data: 'not-a-query' } }] },
+      { source: { kind: 'plugin' }, content: [{ type: 'text', text: 'injected text' }] },
+      { source: { kind: 'tool-result' }, content: [{ type: 'text', text: 'tool text' }] },
+    ] as any
+    expect(extractPendingUserQuery({} as any, messages)).toBe('fixture convention')
+    expect(extractPendingUserQuery({ origin: 'subagent' } as any, messages)).toBe('')
+    expect(extractPendingUserQuery({} as any, messages.slice(1))).toBe('')
+  })
   it('rejects obvious credentials without exposing the matched value', () => {
     const credential = 'api_key=super-secret-value-123456'
     expect(containsSensitiveMemoryContent(credential)).toBe(true)

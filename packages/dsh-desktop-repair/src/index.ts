@@ -53,18 +53,12 @@ async function runOneCandidate(
       agentOptions: {
         provider: selection.provider,
         model: selection.model,
+        ...(selection.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) }),
       },
       setup: (agentCtx) => {
-        installModelSelection(agentCtx, {
-          current: {
-            provider: selection.provider,
-            model: selection.model,
-            ...(selection.reasoningEffort === undefined
-              ? {}
-              : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) }),
-          },
-          assembled: undefined,
-        })
+        installModelSelection(agentCtx)
         agentCtx.systemPrompt.section({
           name: 'desktop:repair-policy',
           order: -10_000,

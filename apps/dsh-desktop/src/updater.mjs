@@ -150,6 +150,7 @@ export class DesktopUpdateController extends EventEmitter {
   }
 
   dispose() {
+    this.installPreparationAbort?.abort(new Error('update preparation disposed'))
     if (this.startupTimer) this.clearTimeoutFn(this.startupTimer)
     if (this.intervalTimer) this.clearIntervalFn(this.intervalTimer)
     if (this.installTimer) this.clearTimeoutFn(this.installTimer)
@@ -298,10 +299,15 @@ export class DesktopUpdateController extends EventEmitter {
     this.installing = true
     const installOperation = {}
     this.installOperation = installOperation
+    const preparationAbort = new AbortController()
+    this.installPreparationAbort = preparationAbort
     this.updateStage = 'prepare'
     this.#publish({ ...this.status, phase: 'installing', visible: true })
     try {
-      const preparation = Promise.resolve().then(() => this.beforeInstall())
+      let reportProgress = () => {}
+      const preparation = Promise.resolve().then(() => this.beforeInstall({
+        signal: preparationAbort.signal, onProgress: value => reportProgress(value),
+      }))
       await new Promise((resolve, reject) => {
         let timer
         let settled = false
@@ -316,14 +322,30 @@ export class DesktopUpdateController extends EventEmitter {
           (value) => finish(resolve, value),
           (error) => finish(reject, error),
         )
-        timer = this.setTimeoutFn(() => {
-          finish(
-            reject,
-            new Error(`update preparation did not finish before the timeout (${this.installPreparationTimeoutMs}ms)`),
-          )
-        }, this.installPreparationTimeoutMs)
-        this.installPreparationTimer = timer
-        timer?.unref?.()
+        const resetTimeout = () => {
+          if (timer) this.clearTimeoutFn(timer)
+          timer = this.setTimeoutFn(() => {
+            const error = new Error(`update preparation did not finish before the timeout (${this.installPreparationTimeoutMs}ms)`)
+            preparationAbort.abort(error)
+            finish(reject, error)
+          }, this.installPreparationTimeoutMs)
+          this.installPreparationTimer = timer
+          timer?.unref?.()
+        }
+        let receivedBytes = -1
+        let phase
+        const phases = new Set(['checking', 'waiting', 'downloading', 'verifying', 'extracting', 'activating', 'ready'])
+        reportProgress = value => {
+          if (settled || !phases.has(value?.phase) || !Number.isSafeInteger(value.receivedBytes) || value.receivedBytes < 0) return
+          if (value.receivedBytes <= receivedBytes && value.phase === phase) return
+          receivedBytes = Math.max(receivedBytes, value.receivedBytes)
+          phase = value.phase
+          this.#publish({ ...this.status, componentPreparation: {
+            phase, receivedBytes, totalBytes: Number.isSafeInteger(value.totalBytes) ? value.totalBytes : undefined,
+          } })
+          resetTimeout()
+        }
+        resetTimeout()
       })
       if (!this.installing || this.installOperation !== installOperation) return false
       this.updateStage = 'install'
@@ -350,6 +372,8 @@ export class DesktopUpdateController extends EventEmitter {
       return
     }
     const recoverInstall = this.installing
+    this.installPreparationAbort?.abort(error)
+    this.installPreparationAbort = undefined
     this.installing = false
     this.installOperation = undefined
     if (this.installTimer) this.clearTimeoutFn(this.installTimer)

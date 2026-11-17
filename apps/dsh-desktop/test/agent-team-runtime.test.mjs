@@ -68,6 +68,7 @@ test('Agent Team switch composes and creates an Agent session in the official ru
     })
     assert.equal(typeof created.sessionId, 'string')
     assert.equal(controller.status.state, 'ready')
+    assert.doesNotMatch(await logs.tail(300), /disabling profile plugin row "(?:memory|personal-prompt|ui-model-preferences|web-ui-mode-switcher|chat-artifacts|user-scope)"/u)
   } catch (error) {
     throw new Error(`${error.message}\nRecent runtime log:\n${await logs.tail(60)}`, { cause: error })
   } finally {

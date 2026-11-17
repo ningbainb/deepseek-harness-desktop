@@ -15,6 +15,18 @@ import {
 import { normalizeDockTab } from '../dock-pages.mjs'
 import { LEGACY_CONTEXT_SUMMARY_PROMPT } from './legacy-context-guide.mjs'
 
+document.querySelector('#desktop-storage-locations')?.addEventListener('toggle', async event => {
+  if (!event.currentTarget.open) return
+  try {
+    const { locations } = await window.dshDesktop.getInfo()
+    for (const name of ['program', 'data', 'cache']) {
+      document.querySelector(`#desktop-${name}-location`).textContent = locations?.[name] || '位置暂不可用'
+    }
+  } catch {
+    document.querySelector('#desktop-data-location').textContent = '读取失败，请重新展开后重试'
+  }
+})
+
 const themeQuery = new URLSearchParams(window.location.search).get('theme')
 if (themeQuery === 'dark' || themeQuery === 'light') {
   document.documentElement.dataset.dshDesktopTheme = themeQuery
@@ -359,6 +371,24 @@ function pluginDetailMarkup(plugin) {
 
 const NATIVE_PLUGINS = [
   {
+    id: 'context', name: '上下文增强', packageName: 'dsh-context',
+    category: 'ai', categoryLabel: 'AI 核心',
+    description: '上下文组件 0.85.1；沿用当前会话和项目作用域提供上下文增强。',
+    features: ['0.85.1', '上下文增强'], icon: 'brain',
+  },
+  {
+    id: 'context-memory', name: '项目经验记忆 (M2)', packageName: 'dsh-context-memory',
+    category: 'ai', categoryLabel: 'AI 核心',
+    description: '1.2.0，默认关闭，本轮暂停新启用。设计能力为从项目会话提取经验候选并保留历史，遗忘不同于 M1 的删除。验收发现项目经验可能进入另一用户的模型输入；已有配置和记忆文件保留。上游声明旧 Cordis peer，联合模型输入与隔离验收仍待完成。',
+    features: ['隔离待验收', '项目经验候选', '历史保留'], icon: 'brain',
+  },
+  {
+    id: 'prompt-customizer', name: 'Agent 高级提示词 (P2)', packageName: 'dsh-prompt-customizer',
+    category: 'ai', categoryLabel: 'AI 核心',
+    description: '2.2.0，默认关闭，需明确启用。用于 Agent 高级提示词编辑，不改变普通回复偏好 (P1)。',
+    features: ['需明确启用', 'Agent 高级设置', '保留回复偏好'], icon: 'text',
+  },
+  {
     id: 'prompt-pilot', name: 'Prompt Pilot 输入建议', packageName: '@local/dsh-prompt-pilot',
     settingsOwner: '@local/dsh-prompt-pilot', category: 'ai', categoryLabel: 'AI 核心',
     description: '根据当前会话给出下一句建议，支持指定模型与预算，并可随时关闭自动预测。',
@@ -379,10 +409,10 @@ const NATIVE_PLUGINS = [
   {
     id: 'agent-team',
     name: 'Agent Team（实验）',
-    packageName: '@deepseek-ai/dsh-experimental-agent-team-profile',
+    packageName: '@deepseek-ai/dsh-agent-team',
     category: 'ai',
     categoryLabel: 'AI 核心',
-    description: '官方实验性多 Agent 协作运行层，提供成员调度、持久消息和共享任务板；默认关闭。',
+    description: '官方多 Agent 协作运行层；成员协作、消息和任务操作位于会话中，原有启用配置保持有效。',
     features: ['成员协作', '共享任务板', '显式启用'],
     icon: 'sparkles',
   },
@@ -641,7 +671,7 @@ function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
   const settingsLink = item.settingsOwner
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
-    : ['value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
+    : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
   return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>随桌面版维护 (${escapeHtml(version)})</span></div>${settingsLink}<span class="native-safe-badge" title="受保护的桌面级原生能力">内置</span></div></article>`
 }
@@ -1254,6 +1284,7 @@ let activeSettingsTab
 let activeSettingsPlugin
 const groupTitles = {
   plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能中心'], qqbot: ['扩展能力', 'QQ 机器人'],
+  'desktop-settings': ['拓展坞', '桌面设置'], appearance: ['拓展坞', '外观'], 'more-tools': ['拓展坞', '更多工具'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
 async function activateTab(tab, focus = false, settingOverride, plugin, userAction = false) {
@@ -1289,6 +1320,8 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting)
   for (const nav of document.querySelectorAll('[data-tab-group]')) nav.hidden = nav.dataset.tabGroup !== tab.dataset.group
+  const storageLocations = document.querySelector('#desktop-storage-locations')
+  if (storageLocations) storageLocations.hidden = tab.dataset.group !== 'desktop-settings'
   const [group, title] = groupTitles[tab.dataset.group] ?? ['', '']
   document.querySelector('#workspace-breadcrumb').textContent = group
   document.querySelector('#workspace-title').textContent = title
@@ -1325,9 +1358,9 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
     }
   })
   for (const item of tabs) {
-    const sidebarItem = item.closest('.settings-sidebar')
+    const sidebarItem = item.closest('.settings-sidebar > nav:not([data-tab-group])')
     const exactSidebarDestination = sidebarItem && tabs.some((candidate) => {
-      if (!candidate.closest('.settings-sidebar')) return false
+      if (!candidate.closest('.settings-sidebar > nav:not([data-tab-group])')) return false
       return candidate.dataset.tab === tab.dataset.tab && (candidate.dataset.setting ?? '') === (tab.dataset.setting ?? '')
     })
     const active = sidebarItem
@@ -1340,6 +1373,7 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
     item.tabIndex = active ? 0 : -1
   }
   if (focus) tab.focus()
+  if (tab.dataset.tab === 'market') void refreshMarket()
 }
 document.querySelector('#dock-settings-retry').addEventListener('click', () => {
   if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin, true)
@@ -1365,8 +1399,9 @@ const searchEntries = [
   ['模型与能力', '模型目录 图片输入 推理档位 供应商 bai 中转站 登录 账号 充值 API Key 启用 停用 模型接入', 'models-tab'],
   ['用量与余额', '统计 token 额度 套餐 费用 供应商', 'usage-tab'],
   ['会话管理', '聊天历史 搜索 归档 恢复 清理', 'sessions-tab'],
+  ['共享浏览器', '独立组件 下载 取消 重试 浏览器权限', 'shared-browser-tab'],
   ['智能操控', 'Browser Use Computer Use 浏览器 电脑 Playwright Cua', 'control-center-tab'],
-  ['模型协作', '性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
+  ['模型高级 (Value Mode)', '模型协作 性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
   ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
   ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
@@ -2007,7 +2042,7 @@ checkPluginUpdatesButton.addEventListener('click', () => {
 function refreshAll() {
   if (refreshAllPromise) return refreshAllPromise
   refreshButton.disabled = true
-  refreshAllPromise = Promise.all([refresh(), refreshMarket({ force: true })])
+  refreshAllPromise = Promise.all([refresh(), ...(marketCatalog || document.querySelector('#market')?.classList.contains('active') ? [refreshMarket({ force: true })] : [])])
     .then(() => checkPluginUpdates({ silent: true }))
     .finally(() => {
       refreshAllPromise = undefined
@@ -2144,7 +2179,7 @@ document.querySelector('#import-preset').addEventListener('click', () => {
   })
 })
 
-let initialTab = document.querySelector('#value-mode-tab')
+let initialTab = document.querySelector('#plugins-hub-tab')
 let initialSetting
 try {
   const requestedTab = normalizeDockTab(new URLSearchParams(window.location.search).get('tab'))
@@ -2156,11 +2191,10 @@ try {
     initialTab = tabs.find(tab => tab.id === previousId)
       ?? (previousId === 'memory-tab' ? document.querySelector('#personal-prompt-tab') : previousId === 'relay-tab' ? document.querySelector('#models-tab') : initialTab)
     const previousSetting = previousId === 'memory-tab' ? 'memory' : localStorage.getItem('dsh-dock-setting')
-    if (initialTab.dataset.group === 'personal' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
+    if (initialTab.dataset.setting === 'personal-prompt' && ['personal-prompt', 'memory'].includes(previousSetting)) initialSetting = previousSetting
   }
-} catch { /* first visit opens model collaboration */ }
+} catch { /* first visit opens plugins */ }
 renderNativePlugins()
 activateTab(initialTab, false, initialSetting)
 await refresh()
-void refreshMarket()
 void checkPluginUpdates({ silent: true })

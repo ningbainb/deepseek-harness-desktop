@@ -18,6 +18,7 @@ import type {
 } from '@deepseek-ai/dsh-credentials'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 
 import * as tool from '../src/index.ts'
 import { registerAttachmentRef } from '../src/attach-routes.ts'
@@ -139,6 +140,7 @@ async function setup(
   await ctx.plugin(FakeWebServer)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(tool, {
     ...BASE_CONFIG,
     ...options.noInlineKey === true ? {} : { apiKey: 'sk-inline' },
@@ -155,13 +157,16 @@ async function tempPng(): Promise<string> {
   return path
 }
 
-function callDescribe(ctx: Context, args: unknown, signal?: AbortSignal) {
-  return ctx.tools.execute({
+async function callDescribe(ctx: Context, args: unknown, signal?: AbortSignal, callId = ToolCallId('vision-call')) {
+  const batch = await ctx.tools.execute({
     signal: signal ?? new AbortController().signal,
-    callId: ToolCallId('vision-call'),
-    name: 'describe_image',
-    arguments: args,
+    calls: [{ type: 'tool-call', id: callId, name: 'describe_image', arguments: JSON.stringify(args) }],
   })
+  expect(batch.results).toHaveLength(1)
+  const settled = batch.results[0]
+  if (!settled) throw new Error('expected one describe_image result')
+  expect(settled.callId).toBe(callId)
+  return settled.result
 }
 
 function errorText(result: { content: { type: string; text?: string }[] }): string {
@@ -543,12 +548,7 @@ describe('attachment references', () => {
     const attachments = ctx.get('attachments') as FakeAttachments
     attachments.stored.set(`sha256:${'a'.repeat(64)}`, PNG_BYTES)
 
-    const result = await ctx.tools.execute({
-      signal: new AbortController().signal,
-      callId: ToolCallId('bare-id-attachment'),
-      name: 'describe_image',
-      arguments: { image: `sha256:${'a'.repeat(64)}` },
-    })
+    const result = await callDescribe(ctx, { image: `sha256:${'a'.repeat(64)}` }, undefined, ToolCallId('bare-id-attachment'))
     expect(result.isError).toBe(false)
     if (result.isError) throw new Error('expected success for bare attachment id')
     expect(result.value).toMatchObject({ text: 'ok', image: `sha256:${'a'.repeat(64)}` })

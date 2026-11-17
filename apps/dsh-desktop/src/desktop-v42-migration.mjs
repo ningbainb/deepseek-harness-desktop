@@ -52,18 +52,23 @@ function isRecord(value) {
 }
 
 export class DesktopV42Migration {
-  constructor({ dshHome, desktopVersion = '4.2.0' } = {}) {
+  constructor({ dshHome, desktopVersion = '4.2.0', migrationVersion = DESKTOP_V42_MIGRATION_VERSION } = {}) {
     if (typeof dshHome !== 'string' || dshHome.length === 0) throw new TypeError('dshHome is required')
+    if (![DESKTOP_V42_MIGRATION_VERSION, 'desktop-v5.3.0'].includes(migrationVersion)) throw new TypeError('unsupported Desktop migration version')
+    this.migrationVersion = migrationVersion
+    this.backupFiles = migrationVersion === 'desktop-v5.3.0'
+      ? [...DESKTOP_V42_BACKUP_FILES, 'cordis.patch.yml']
+      : DESKTOP_V42_BACKUP_FILES
     this.dshHome = dshHome
     this.desktopVersion = desktopVersion
-    this.markerPath = join(dshHome, 'community', 'migrations', `${DESKTOP_V42_MIGRATION_VERSION}.json`)
+    this.markerPath = join(dshHome, 'community', 'migrations', `${this.migrationVersion}.json`)
     this.operation = undefined
   }
 
   async readMarker() {
     try {
       const marker = JSON.parse(await readFile(this.markerPath, 'utf8'))
-      if (!isRecord(marker) || marker.migration !== DESKTOP_V42_MIGRATION_VERSION) {
+      if (!isRecord(marker) || marker.migration !== this.migrationVersion) {
         throw new Error('Desktop 4.2 migration marker is invalid')
       }
       return marker
@@ -88,8 +93,8 @@ export class DesktopV42Migration {
 
     const captured = []
     const backupHashes = {}
-    const hash = createHash('sha256').update(DESKTOP_V42_MIGRATION_VERSION)
-    for (const relativePath of DESKTOP_V42_BACKUP_FILES) {
+    const hash = createHash('sha256').update(this.migrationVersion)
+    for (const relativePath of this.backupFiles) {
       const content = await readOptional(join(this.dshHome, relativePath))
       captured.push({ relativePath, content })
       hash.update(relativePath).update(content === undefined ? 'missing' : 'present')
@@ -100,7 +105,7 @@ export class DesktopV42Migration {
     }
     const sourceFingerprint = hash.digest('hex')
     const backupId = sourceFingerprint.slice(0, 20)
-    const backupRoot = join(this.dshHome, 'community', 'backups', DESKTOP_V42_MIGRATION_VERSION, backupId)
+    const backupRoot = join(this.dshHome, 'community', 'backups', this.migrationVersion, backupId)
     for (const { relativePath, content } of captured) {
       if (content === undefined) continue
       const target = join(backupRoot, relativePath)
@@ -108,7 +113,7 @@ export class DesktopV42Migration {
       await writeFile(target, content, { mode: 0o600 })
     }
     const marker = {
-      migration: DESKTOP_V42_MIGRATION_VERSION,
+      migration: this.migrationVersion,
       desktopVersion: this.desktopVersion,
       state: 'PREPARED',
       sourceFingerprint,
@@ -132,10 +137,10 @@ export class DesktopV42Migration {
       || !/^[a-f0-9]{64}$/u.test(marker.sourceFingerprint ?? '')) {
       throw new Error('Desktop 4.2 migration backup metadata is invalid')
     }
-    const allowed = new Set(DESKTOP_V42_BACKUP_FILES)
+    const allowed = new Set(this.backupFiles)
     const seen = new Set()
-    const sourceHash = createHash('sha256').update(DESKTOP_V42_MIGRATION_VERSION)
-    const backupRoot = join(this.dshHome, 'community', 'backups', DESKTOP_V42_MIGRATION_VERSION, marker.backupId)
+    const sourceHash = createHash('sha256').update(this.migrationVersion)
+    const backupRoot = join(this.dshHome, 'community', 'backups', this.migrationVersion, marker.backupId)
     const backupContents = new Map()
     for (const relativePath of marker.presentFiles) {
       if (!allowed.has(relativePath) || seen.has(relativePath)) throw new Error('Desktop 4.2 migration backup contains an unexpected file')
@@ -148,7 +153,7 @@ export class DesktopV42Migration {
       }
       backupContents.set(relativePath, content)
     }
-    for (const relativePath of DESKTOP_V42_BACKUP_FILES) {
+    for (const relativePath of this.backupFiles) {
       const content = backupContents.get(relativePath)
       sourceHash.update(relativePath).update(content === undefined ? 'missing' : 'present')
       if (content !== undefined) sourceHash.update(content)
@@ -175,8 +180,8 @@ export class DesktopV42Migration {
     if (marker?.state !== 'PREPARED') throw new Error('Desktop 4.2 migration is not prepared')
     await this.#assertBackup(marker)
     const present = new Set(marker.presentFiles)
-    const backupRoot = join(this.dshHome, 'community', 'backups', DESKTOP_V42_MIGRATION_VERSION, marker.backupId)
-    for (const relativePath of DESKTOP_V42_BACKUP_FILES) {
+    const backupRoot = join(this.dshHome, 'community', 'backups', this.migrationVersion, marker.backupId)
+    for (const relativePath of this.backupFiles) {
       const target = join(this.dshHome, relativePath)
       if (present.has(relativePath)) await writeAtomic(target, await readFile(join(backupRoot, relativePath)))
       else await rm(target, { force: true })
@@ -189,5 +194,12 @@ export class DesktopV42Migration {
     }
     await writeAtomic(this.markerPath, Buffer.from(`${JSON.stringify(rolledBack, null, 2)}\n`, 'utf8'))
     return Object.freeze(rolledBack)
+  }
+}
+
+// Reuse the byte-preserving transaction and its integrity/rollback checks.
+export class DesktopV53Migration extends DesktopV42Migration {
+  constructor(options = {}) {
+    super({ ...options, desktopVersion: options.desktopVersion ?? '5.3.0-rc.1', migrationVersion: 'desktop-v5.3.0' })
   }
 }

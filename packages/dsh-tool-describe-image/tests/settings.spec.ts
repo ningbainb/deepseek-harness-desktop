@@ -9,6 +9,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 
 import * as tool from '../src/index.ts'
 import { chatReply, FakeWebServer, jsonReply, PNG_BYTES, responsesReply, startMockServer } from './mock-server.ts'
@@ -67,6 +68,7 @@ async function boot(
   await ctx.plugin(FakeWebServer)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   tool.apply(ctx, fields as unknown as tool.Config)
   return { ctx, server }
 }
@@ -79,13 +81,17 @@ async function tempPng(): Promise<string> {
   return path
 }
 
-function callDescribe(ctx: Context, image: string) {
-  return ctx.tools.execute({
+async function callDescribe(ctx: Context, image: string) {
+  const callId = ToolCallId('settings-vision-call')
+  const batch = await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('settings-vision-call'),
-    name: 'describe_image',
-    arguments: { image },
+    calls: [{ type: 'tool-call', id: callId, name: 'describe_image', arguments: JSON.stringify({ image }) }],
   })
+  expect(batch.results).toHaveLength(1)
+  const settled = batch.results[0]
+  if (!settled) throw new Error('expected one describe_image result')
+  expect(settled.callId).toBe(callId)
+  return settled.result
 }
 
 afterEach(async () => {
@@ -159,6 +165,7 @@ describe('describe-image profile form', () => {
     await ctx.plugin(FakeWebServer)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(tool, { baseURL: server.url, model: 'entry-only', apiKey: 'sk-entry' })
     const path = await tempPng()
 

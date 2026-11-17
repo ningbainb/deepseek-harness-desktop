@@ -66,12 +66,12 @@ function closeEvent() {
   }
 }
 
-test('close behavior preserves the historical quit default for missing and malformed preferences', () => {
-  assert.equal(DEFAULT_CLOSE_BEHAVIOR, CLOSE_BEHAVIORS.QUIT)
+test('missing and malformed close preferences default to tray while explicit choices survive', () => {
+  assert.equal(DEFAULT_CLOSE_BEHAVIOR, CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY)
   for (const value of [undefined, null, '', 'minimize', {}, 1]) {
-    assert.equal(normalizeCloseBehavior(value), CLOSE_BEHAVIORS.QUIT)
+    assert.equal(normalizeCloseBehavior(value), CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY)
   }
-  assert.deepEqual(normalizeDesktopClosePreferences(), { closeBehavior: 'quit' })
+  assert.deepEqual(normalizeDesktopClosePreferences(), { closeBehavior: 'minimize-to-tray' })
   assert.deepEqual(normalizeDesktopClosePreferences({ closeBehavior: 'ask' }), { closeBehavior: 'ask' })
   assert.equal(assertCloseBehavior('minimize-to-tray'), 'minimize-to-tray')
   assert.equal(isBackgroundAutomationEnabled('minimize-to-tray'), true)
@@ -80,14 +80,18 @@ test('close behavior preserves the historical quit default for missing and malfo
   assert.throws(() => assertCloseBehavior('background-forever'), /invalid close behavior/u)
 })
 
-test('close preference store survives missing/corrupt legacy files and persists only an explicit opt-in', async () => {
+test('close preference store defaults to tray and preserves explicit quit and ask on disk', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-close-behavior-'))
   const path = join(directory, 'desktop-preferences.json')
   const store = new DesktopClosePreferencesStore(path)
   try {
+    assert.deepEqual(await store.load(), { closeBehavior: 'minimize-to-tray' })
+    await store.saveCloseBehavior('quit')
     assert.deepEqual(await store.load(), { closeBehavior: 'quit' })
+    await store.saveCloseBehavior('ask')
+    assert.deepEqual(await store.load(), { closeBehavior: 'ask' })
     await writeFile(path, JSON.stringify({ closeBehavior: 'legacy-minimize' }), 'utf8')
-    assert.deepEqual(await store.load(), { closeBehavior: 'quit' })
+    assert.deepEqual(await store.load(), { closeBehavior: 'minimize-to-tray' })
     assert.equal(await store.saveCloseBehavior('minimize-to-tray'), 'minimize-to-tray')
     assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), { closeBehavior: 'minimize-to-tray' })
     assert.deepEqual(await store.load(), { closeBehavior: 'minimize-to-tray' })

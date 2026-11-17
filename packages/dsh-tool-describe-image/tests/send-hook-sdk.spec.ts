@@ -51,7 +51,7 @@ describe('published SDK image admission', () => {
     const drafts = controller.createDrafts('session' as never, [
       new File(['ABC'], 'x.png', { type: 'image/png' }),
       ...withFile ? [new File(['text'], 'notes.txt', { type: 'text/plain' })] : [],
-    ])
+    ], false)
     if (withFile) await vi.waitFor(() => expect(Object.values(controller.fileUploads.getSnapshot())).toMatchObject([{ status: 'ready' }]))
     const ids = drafts.map(draft => draft.id)
     let retire: ((settlement: { reason: string; attachments: unknown[] }) => void) | undefined

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { AgentModel, type AgentOptions } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 
 import { createDesktopTaskBoardHostScheduleRunner } from '../src/background-scheduler-runner.ts'
 
@@ -21,6 +23,7 @@ function fixture({
   model = true,
   persisted = false,
   persistedPrompt = false,
+  reasoningEffort = undefined as string | undefined,
 } = {}) {
   const calls: Record<string, unknown[]> = { create: [], resume: [], followup: [], flush: [], dispose: [] }
   const session = {
@@ -60,7 +63,9 @@ function fixture({
         return { agent, dispose: async () => { calls.dispose.push(true) } }
       },
     } as never,
-    defaultModel: { currentSelection: () => model ? ({ provider: 'deepseek', model: 'deepseek-chat' }) : ({ provider: '', model: '' }) } as never,
+    defaultModel: { currentSelection: () => model ? ({ provider: 'deepseek', model: 'deepseek-chat',
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(reasoningEffort) }),
+    }) : ({ provider: '', model: '' }) } as never,
     sessions: { flush: async (value: unknown) => { calls.flush.push(value); return true } } as never,
     sessionPersistence: {
       list: async () => persisted ? [{ header: { id: 'task-board-session-1' } }] : [],
@@ -135,6 +140,14 @@ describe('Desktop Task Board Host scheduler runner', () => {
     })
     expect(calls.flush).toHaveLength(1)
     expect(calls.dispose).toHaveLength(1)
+  })
+
+  it('retains default reasoning effort in the route consumed by the official Agent model', async () => {
+    const { calls, runner } = fixture({ reasoningEffort: 'high' })
+    await runner.run(input)
+    const { agentOptions } = calls.create[0] as { agentOptions: AgentOptions }
+    const model = new AgentModel(() => ({ pending: null, lastUsed: null }), {} as never, agentOptions)
+    expect(model.current()).toEqual({ provider: 'deepseek', model: 'deepseek-chat', reasoningEffort: 'high' })
   })
 
   it('maps an aborted turn to cancellation and never executes unregistered workspaces', async () => {

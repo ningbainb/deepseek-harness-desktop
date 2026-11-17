@@ -1,11 +1,17 @@
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import {
   MAX_MEMORY_QUERY_LENGTH,
 } from './schema.ts'
 
 function textFromEvent(event: SessionEvent): string {
   if (event.type !== 'user/message' || event.data.source.kind !== 'user') return ''
-  const blocks = event.data.content
+  return directUserText(event.data)
+}
+
+function directUserText(message: UserMessage): string {
+  if (message.source.kind !== 'user') return ''
+  const blocks = message.content
   const text = blocks
     .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
     .map(block => block.text)
@@ -16,6 +22,12 @@ function textFromEvent(event: SessionEvent): string {
     .replace(/\[(?:image|file|office) attachment\b[^\]]*\]/giu, '')
     .replace(/<attachment\b[^>]*>[\s\S]*?<\/attachment>/giu, '')
     .trim()
+}
+
+/** Read uncommitted direct-user input from the official pre-step admission batch. */
+export function extractPendingUserQuery(header: SessionHeader, messages: readonly UserMessage[]): string {
+  if (header.origin === 'subagent') return ''
+  return messages.map(directUserText).filter(Boolean).join('\n').slice(0, MAX_MEMORY_QUERY_LENGTH)
 }
 
 /** Return only direct user text after the latest turn/start boundary. */

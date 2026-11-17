@@ -20,9 +20,9 @@ for (let offset = 0; offset + 512 <= tar.length && tar[offset];) {
 
 // Strict unified-diff application in memory: no extraction, install or patching
 // of node_modules. Every hunk must match the pinned archive at its stated line.
-function patchedFiles() {
+function patchedFiles(rawPatch = readFileSync(new URL('../../../patches/@local__dsh-prompt-pilot@1.2.3.patch', import.meta.url), 'utf8')) {
   const result = new Map(files)
-  const patch = readFileSync(new URL('../../../patches/@local__dsh-prompt-pilot@1.2.3.patch', import.meta.url), 'utf8')
+  const patch = rawPatch.replace(/\r\n/g, '\n')
   let filename
   const lines = patch.split('\n')
   for (let i = 0; i < lines.length; i++) {
@@ -45,6 +45,12 @@ function patchedFiles() {
   }
   return result
 }
+
+test('strict patch parsing accepts both checkout line endings and still rejects changed context', () => {
+  const lf = readFileSync(new URL('../../../patches/@local__dsh-prompt-pilot@1.2.3.patch', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  assert.deepEqual(patchedFiles(lf), patchedFiles(lf.replace(/\n/g, '\r\n')))
+  assert.throws(() => patchedFiles(lf.replace(/^ ([^\n]+)$/m, ' X$1')), /patch context/)
+})
 
 const key = 'dsh-prompt-pilot-v1'
 const candidate = process.env.PROMPT_PILOT_TEST_ORIGINAL === '1' ? files : patchedFiles()

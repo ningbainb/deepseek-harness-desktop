@@ -239,7 +239,11 @@ async function* controlFrames(
     }
     if (legacy.type === 'queue' && legacy.items !== undefined) yield { type: 'session/queue', sessionId, items: legacy.items }
     else if (legacy.type === 'jobs' && legacy.jobs !== undefined) yield { type: 'session/jobs', sessionId, jobs: legacy.jobs }
-    else if (frame.type === 'projection') yield { type: 'session/projection', sessionId, key: frame.key, value: frame.value, seq: frame.seq }
+    else if (frame.type === 'projection') {
+      for (const change of frame.changes) {
+        yield { type: 'session/projection', sessionId, key: change.key, value: change.val, seq: frame.seq }
+      }
+    }
   }
 }
 

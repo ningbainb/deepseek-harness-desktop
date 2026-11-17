@@ -39,6 +39,11 @@ import { createRuntimeAccountCallback } from './runtime-account-callback.mjs'
 import { fetchDesktopConnectionApi, openDesktopWireStream } from './runtime-wire-stream.mjs'
 import { adaptDesktopClientHmrPatches, DESKTOP_CLIENT_HMR_PACKAGE } from './runtime-client-hmr.mjs'
 import { installDesktopProfileComposition } from './runtime-profile-composition.mjs'
+import { adaptRuntimeAgentTeamPatches } from './runtime-agent-team-migration.mjs'
+import { adaptDesktopBrowserComponentPatches } from './runtime-browser-component-patches.mjs'
+import { adaptRuntimeOptionalContextSafety } from './runtime-optional-context-safety.mjs'
+import { adaptDesktopCommunityIndexPatches } from './runtime-community-index.mjs'
+import { installDesktopSubagentListCompatibility } from './runtime-subagent-list-compat.mjs'
 import { createDesktopConfigurationGuard } from './runtime-config-identity.mjs'
 import {
   adaptRuntimeLegacySettingsPatches,
@@ -63,7 +68,7 @@ async function watchDesktopUserPatches(ctx, filename, rootConfig, compose) {
     candidate.options.name === 'cordis:include' && candidate.options.config?.path === rootUrl)
   if (!entry) throw new Error('live desktop patch reload could not find the root Include entry')
   return hmr.registerConfig(filename, async () => {
-    const patches = prepareProfilePatches(ctx, compose(), pathToFileURL(dirname(rootConfig)).href + '/', NAME)
+    const patches = adaptRuntimeOptionalContextSafety(prepareProfilePatches(ctx, compose(), pathToFileURL(dirname(rootConfig)).href + '/', NAME))
     const { patches: _oldPatches, ...config } = entry.options.config
     await entry.update({ config: { ...config, patches } })
   })
@@ -89,7 +94,7 @@ function createDesktopPipeFetch(ctx, accountCallbackOrigin, sessionCookie) {
   const frontendFetch = createDesktopFrontendFetch({
     dist: resolveFrontendDist(),
     authorizeIndex: request => ctx.webServer.authorizeIndex(request),
-    renderIndex: html => ctx.webServer.renderIndex(html),
+    renderIndex: html => ctx.webServer.renderIndex(html, ctx.connection.browserPeer),
     bootstrap: `<script>${transportBootstrapScript({ accountCallbackOrigin })}</script>`,
   })
   return async (sourceRequest) => {
@@ -231,7 +236,10 @@ async function run() {
   const homePatches = loadOptionalPatches(NAME, homePatchPath) ?? []
   const overlayPatches = invocation.patchFiles.flatMap(path => loadOverlayPatches(NAME, resolve(path)))
   const baseLayers = [bundlePatches, profile.patches, homePatches, overlayPatches]
-  const rawPatches = [...baseLayers.flat(), ...telemetryPatch(baseLayers)]
+  const rawPatches = adaptDesktopCommunityIndexPatches(
+    adaptDesktopBrowserComponentPatches(adaptRuntimeAgentTeamPatches([...baseLayers.flat(), ...telemetryPatch(baseLayers)])),
+    { layers: baseLayers, profileName: invocation.profile },
+  )
   const allPatches = adaptDesktopClientHmrPatches(rawPatches, {
     enabled: profile.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
   })
@@ -253,7 +261,14 @@ async function run() {
   let migrationCommitted = false
   const composeLive = () => {
     const current = loadProfileDirectory(NAME, profile.dir, installAnchor)
-    const raw = readProfilePatches(NAME, profileContext, current)
+    const raw = adaptDesktopCommunityIndexPatches(
+      adaptDesktopBrowserComponentPatches(adaptRuntimeAgentTeamPatches(readProfilePatches(NAME, profileContext, current))),
+      { profileName: invocation.profile, userPatches: [
+        ...current.patches,
+        ...(loadOptionalPatches(NAME, homePatchPath) ?? []),
+        ...profileContext.overlays,
+      ] },
+    )
     const mapped = adaptDesktopClientHmrPatches(raw, {
       enabled: current.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
     })
@@ -306,10 +321,11 @@ async function run() {
       hostCtx.provide('desktopConfigurationGuard', configurationGuard)
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
+      installDesktopSubagentListCompatibility(hostCtx)
       installDesktopProfileComposition(hostCtx, {
         rootUrl: pathToFileURL(rootConfig).href,
         compose: () => migrationCommitted ? composeLive() : legacySettings.patches,
-        prepare: patches => prepareProfilePatches(hostCtx, patches, pathToFileURL(dirname(rootConfig)).href + '/', NAME),
+        prepare: patches => adaptRuntimeOptionalContextSafety(prepareProfilePatches(hostCtx, patches, pathToFileURL(dirname(rootConfig)).href + '/', NAME)),
       })
       provideCmdline(hostCtx, {
         args: invocation.args,

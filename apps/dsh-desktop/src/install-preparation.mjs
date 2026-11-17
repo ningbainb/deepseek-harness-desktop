@@ -3,6 +3,7 @@ export function createDesktopInstallPreparation({
   lifecycle,
   isQuitRequested,
   setPreparing,
+  prepareComponents = async () => {},
   recordInstallRequested = async () => {},
   finishPreparation = async () => {},
   log = async () => {},
@@ -13,15 +14,18 @@ export function createDesktopInstallPreparation({
   const report = async message => {
     try { await log(message) } catch { /* Diagnostics cannot block recovery. */ }
   }
-  const beforeInstall = async () => {
+  const beforeInstall = async ({ signal, onProgress } = {}) => {
     const current = { generation: ++generation, begun: false }
     attempt = current
     const assertCurrent = () => {
       if (current.generation !== generation || isQuitRequested() || lifecycle.resourcesDisposed) {
         throw new Error('Desktop install preparation was cancelled')
       }
+      signal?.throwIfAborted()
     }
     if (recovery) await recovery
+    assertCurrent()
+    await prepareComponents({ signal, onProgress })
     assertCurrent()
     await recordInstallRequested()
     assertCurrent()

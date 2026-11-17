@@ -5,18 +5,20 @@ import { DockSettingsPage, dockSettingFromUrl } from '../src/client/DockSettings
 
 afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
-it('keeps one collaboration page title and makes all explanatory text expandable without moving settings controls', () => {
+it('keeps one model advanced page title and makes all explanatory text expandable without moving settings controls', () => {
   window.history.replaceState({}, '', '/?desktop-dock-setting=value-mode')
   render(<DockSettingsPage renderSlot={(() => <button>Original settings</button>) as never} t={key => key} />)
-  expect(screen.getAllByRole('heading', { level: 1, name: 'dockCollaboration' })).toHaveLength(1)
+  expect(screen.getAllByRole('heading', { level: 1, name: '模型高级：性价比模式' })).toHaveLength(1)
   const details = document.querySelector<HTMLDetailsElement>('[data-dock-page-details]')
   expect(details).not.toBeNull()
   expect(details!.open).toBe(false)
-  expect(details!.textContent).toContain('两者可独立开启，也可同时使用')
-  expect(details!.textContent).toContain('复杂任务需要多人分工时开启 Agent Team')
+  expect(details!.textContent).toContain('保留已保存的模型 ID 和配置')
+  expect(details!.textContent).toContain('团队成员、任务与协作操作位于会话中')
   expect(details!.contains(screen.getByRole('button', { name: 'Original settings' }))).toBe(false)
   fireEvent.click(details!.querySelector('summary')!)
   expect(details!.open).toBe(true)
+  expect(screen.queryByRole('switch', { name: 'Agent Team' })).toBeNull()
+  act(() => window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: 'agent-team' })))
   expect(screen.getByRole('switch', { name: 'Agent Team' })).toBeTruthy()
 })
 

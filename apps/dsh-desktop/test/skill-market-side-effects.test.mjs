@@ -74,12 +74,15 @@ test('actual SDK tool registry exposes public feedback only after opt-in and rev
   const toolsRequire = createRequire(require.resolve('@deepseek-ai/dsh-tools/package.json'))
   const { default: SystemPrompt } = await import(pathToFileURL(toolsRequire.resolve('@deepseek-ai/dsh-system-prompt')).href)
   const { default: ToolRuntime } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-tools')).href)
+  const baseRequire = createRequire(require.resolve('@deepseek-ai/dsh-base/package.json'))
+  const NativeExecutor = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-tool-executor-native')).href)
   const { MarketSettingsNamespace } = await loadMarket('lib/packages/market-bundle/src/platform/settings-namespace.js')
   const context = new Context()
   let namespace
   try {
     await context.plugin(SystemPrompt, { includeHarnessIdentity: false, includeRuntimeContext: false })
-    await context.plugin(ToolRuntime, { mode: 'native' })
+    await context.plugin(ToolRuntime)
+    await context.plugin(NativeExecutor)
     const stored = {}
     const refs = Object.fromEntries(['mcpEnhanced', 'scanProjectLayouts', 'downloadRegion', 'feedbackEnabled',
       'autoUpdateSources', 'translationEnabled', 'agentPresetsEnabled'].map(key => [key, { get: () => stored[key] }]))

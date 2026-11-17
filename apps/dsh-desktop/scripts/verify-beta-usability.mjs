@@ -184,7 +184,8 @@ async function verifyContextHover(label) {
     const save = record => { records.push({ at: performance.now(), ...record }); if (records.length > 160) records.shift() }
     const sample = () => {
       const current = dock.querySelector('button[aria-haspopup="dialog"]:has(svg[viewBox="0 0 14 14"])')
-      const tooltip = current?.parentElement.querySelector('[role="tooltip"]')
+      const tooltip = current && [...current.ownerDocument.querySelectorAll('[role="tooltip"]')]
+        .find(element => element.textContent?.trim() === current.getAttribute('aria-label'))
       const hint = dock.querySelector('[data-dsh-prompt-shortcut]')
       const style = tooltip && getComputedStyle(tooltip)
       const hit = pointer && document.elementFromPoint(pointer.x, pointer.y)
@@ -230,7 +231,8 @@ async function verifyContextHover(label) {
   await page.waitForTimeout(500)
   for (let index = 0; index < 25; index++) {
     const sample = await meter.evaluate(button => {
-      const tooltip = button.parentElement.querySelector('[role="tooltip"]')
+      const tooltip = [...button.ownerDocument.querySelectorAll('[role="tooltip"]')]
+        .find(element => element.textContent?.trim() === button.getAttribute('aria-label'))
       const rect = button.getBoundingClientRect()
       const style = tooltip && getComputedStyle(tooltip)
       return { left: rect.left, top: rect.top, visible: Boolean(tooltip && style.visibility === 'visible' && Number(style.opacity) === 1),
@@ -240,7 +242,8 @@ async function verifyContextHover(label) {
     if (!sample.visible || Math.abs(sample.top - initial.y) > 1 || Math.abs(sample.left - initial.x) > 1) {
       try {
       const diagnostic = await meter.evaluate(button => {
-        const tooltip = button.parentElement.querySelector('[role="tooltip"]')
+        const tooltip = [...button.ownerDocument.querySelectorAll('[role="tooltip"]')]
+          .find(element => element.textContent?.trim() === button.getAttribute('aria-label'))
         const describe = element => {
           const style = getComputedStyle(element)
           return { tag: element.tagName, className: element.className, slot: element.getAttribute('data-slot'),

@@ -18,13 +18,13 @@ const patchesFor = (pollIntervalMs, disabled = true) => [
   { id: 'client-hmr', name: desktop, disabled, config: { pollIntervalMs } },
 ]
 
-test('installed rc.2 ConfigEditor persists candidates and rollbacks before reconciling the Root Include', async () => {
+test('installed ConfigEditor persists candidates and rollbacks before reconciling the Root Include', async () => {
   const require = createRequire(import.meta.url)
   const sdkRequire = createRequire(require.resolve('@deepseek-ai/dsh/package.json'))
   const source = await readFile(sdkRequire.resolve('@deepseek-ai/dsh-config-editor'), 'utf8')
-  const validate = source.indexOf('resolveConfig(fiber.runtime, resolved)')
+  const validate = source.indexOf('fiber.resolveConfig(next)')
   const persist = source.indexOf('await writeFileAtomic(path, String(document)')
-  const reconcile = source.indexOf('await reconcileProfilePatches(this.ownerContext.root, patches,')
+  const reconcile = source.indexOf('await reconcileProfilePatches(this.ownerContext.root, patches,', persist)
   const restore = source.indexOf('await writeFileAtomic(path, before,', reconcile)
   const rollback = source.indexOf('await reconcileProfilePatches(this.ownerContext.root, beforePatches,', restore)
   assert.ok(validate >= 0 && validate < persist && persist < reconcile)

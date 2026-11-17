@@ -172,7 +172,6 @@ const artifactNames = [
   'DeepSeek-Harness-Desktop-Setup-5.2.0-x64.exe',
   'DeepSeek-Harness-Desktop-5.2.0-arm64.dmg',
   'DeepSeek-Harness-Desktop-5.2.0-arm64.zip',
-  'DeepSeek-Harness-Desktop-5.2.0-x86_64.AppImage',
   'DeepSeek-Harness-Desktop-5.2.0-amd64.deb',
 ]
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -217,7 +216,7 @@ async function preflightFixture(context) {
   }
 }
 
-test('dispatch verifies all five native assets and binds their QA receipt to the exact run without publishing', async context => {
+test('dispatch verifies three user installers and the internal macOS updater ZIP at the exact run without publishing', async context => {
   const state = await preflightFixture(context)
   const result = state.run()
   assert.equal(result.status, 0, result.stderr)
@@ -232,6 +231,8 @@ test('dispatch verifies all five native assets and binds their QA receipt to the
   assert.equal(receipt.runAttempt, '2')
   assert.deepEqual(receipt.nativeJobs, { windows: 'success', macos: 'success', linux: 'success' })
   assert.deepEqual(receipt.files, state.files.map(({ file, bytes }) => ({ file, size: bytes.length, sha256: digest(bytes) })))
+  assert.deepEqual(receipt.userInstallers, [artifactNames[0], artifactNames[1], artifactNames[3]])
+  assert.deepEqual(receipt.internalUpdaterFiles, [artifactNames[2]])
   assert.deepEqual(receipt.nativeReceipts.map(row => row.file), ['SHA256SUMS-windows.txt', 'SHA256SUMS-macos.txt', 'SHA256SUMS-linux.txt'])
   assert.equal(await readFile(join(state.directory, 'SHA256SUMS-windows.txt'), 'utf8'), state.receipts['SHA256SUMS.txt'])
   for (const file of ['SHA256SUMS-macos.txt', 'SHA256SUMS-linux.txt']) {

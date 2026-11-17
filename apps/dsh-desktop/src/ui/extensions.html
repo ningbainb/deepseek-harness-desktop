@@ -15,45 +15,57 @@
         <label class="dock-search"><span class="sr-only">查找拓展坞功能</span><input id="dock-search" type="search" placeholder="查找功能…" autocomplete="off" aria-controls="dock-search-results"></label>
         <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
-          <p class="nav-group-label">AI 设置</p>
-          <button type="button" class="tab" id="control-center-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="control-center" data-group="ai"><span class="tab-title">智能操控</span></button>
-          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="model-catalog"><span class="tab-title">模型与能力</span><small class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai</small></button>
-          <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="ai"><span class="tab-title">模型协作</span></button>
-          <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="personal"><span class="tab-title">个人偏好</span></button>
-          <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="vision"><span class="tab-title">图像理解</span></button>
-          <p class="nav-group-label">扩展能力</p>
-          <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="usage"><span class="tab-title">用量与余额</span></button>
-          <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
-          <button type="button" class="tab" id="plugin-options-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="plugin-options" data-group="plugins"><span class="tab-title">插件自带配置</span></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
-          <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="qqbot"><span class="tab-title">QQ 机器人</span></button>
-          <p class="nav-group-label">桌面体验</p>
-          <button type="button" class="tab" id="appearance-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="appearance" data-group="skins"><span class="tab-title">皮肤与壁纸</span></button>
-          <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
-          <p class="nav-group-label">维护与迁移</p>
-          <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="backup"><span class="tab-title">备份与迁移</span></button>
-          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" data-tab="recovery" data-group="recovery"><span class="tab-title">诊断与恢复</span><small id="recovery-count" hidden>0</small></button>
+          <button type="button" class="tab" id="appearance-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="appearance" data-group="appearance"><span class="tab-title">外观</span></button>
+          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="desktop-settings"><span class="tab-title">桌面设置</span><small class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai</small></button>
+          <button type="button" class="tab" id="control-center-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="control-center" data-group="more-tools"><span class="tab-title">更多工具</span></button>
         </nav>
-        <p class="sidebar-note">配置工作方式，管理扩展能力。</p>
-      </aside>
-
-      <main>
-        <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
+        <details id="desktop-storage-locations" class="desktop-storage-locations" hidden>
+          <summary>存储位置</summary>
+          <dl><dt>程序</dt><dd id="desktop-program-location">正在读取</dd><dt>数据</dt><dd id="desktop-data-location">正在读取</dd><dt>缓存</dt><dd id="desktop-cache-location">正在读取</dd></dl>
+          <p>卸载默认保留数据。更改程序位置不会移动已有数据。</p>
+        </details>
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
           <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
           <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">创意工坊 <small id="market-count">--</small></button>
+          <button type="button" class="tab" id="plugin-options-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="plugin-options" data-group="plugins"><span class="tab-title">插件自带配置</span></button>
           <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
         </nav>
         <nav class="page-tabs" data-tab-group="skills" role="tablist" aria-label="技能中心" hidden>
           <button id="skills-local-tab" type="button" role="tab" data-tab="skills" data-group="skills" aria-controls="skills">本地技能</button>
           <button id="skill-market-tab" type="button" role="tab" data-tab="dock-settings" data-setting="skill-market" data-group="skills" aria-controls="dock-settings">技能市场</button>
         </nav>
-        <nav class="page-tabs" data-tab-group="backup" role="tablist" aria-label="备份与迁移" hidden>
-          <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="backup" aria-controls="presets">环境预设</button>
-          <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="backup" aria-controls="conversation-import">对话导入</button>
-          <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="backup" aria-controls="migration">旧配置迁移</button>
+        <nav class="page-tabs" data-tab-group="desktop-settings" role="tablist" aria-label="备份与迁移" hidden>
+          <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="desktop-settings" aria-controls="presets">环境预设</button>
+          <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="desktop-settings" aria-controls="conversation-import">对话导入</button>
+          <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="desktop-settings" aria-controls="migration">旧配置迁移</button>
         </nav>
+        <nav class="page-tabs" data-tab-group="appearance" role="tablist" aria-label="外观" hidden>
+          <button id="skins-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="appearance" data-group="appearance" aria-controls="dock-settings">皮肤与壁纸</button>
+          <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
+        </nav>
+        <nav class="page-tabs" data-tab-group="desktop-settings" role="tablist" aria-label="桌面设置" hidden>
+          <button id="models-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="models" data-group="desktop-settings" aria-controls="dock-settings">模型</button>
+          <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="desktop-settings"><span class="tab-title">模型高级 (Value Mode)</span></button>
+          <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="desktop-settings"><span class="tab-title">个人偏好</span></button>
+          <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="desktop-settings"><span class="tab-title">图像理解</span></button>
+          <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="desktop-settings"><span class="tab-title">用量与余额</span></button>
+          <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="desktop-settings"><span class="tab-title">会话管理</span></button>
+          <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="desktop-settings"><span class="tab-title">备份与迁移</span></button>
+          <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" data-tab="recovery" data-group="desktop-settings"><span class="tab-title">诊断与恢复</span><small id="recovery-count" hidden>0</small></button>
+        </nav>
+        <nav class="page-tabs" data-tab-group="more-tools" role="tablist" aria-label="更多工具" hidden>
+          <button id="control-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="control-center" data-group="more-tools" aria-controls="dock-settings">智能操控</button>
+          <button id="shared-browser-tab" type="button" role="tab" data-tab="dock-settings" data-setting="shared-browser" data-group="more-tools" aria-controls="dock-settings">共享浏览器</button>
+          <button id="agent-team-tab" type="button" role="tab" data-tab="dock-settings" data-setting="agent-team" data-group="more-tools" aria-controls="dock-settings">团队功能开关</button>
+          <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="more-tools"><span class="tab-title">QQ 机器人</span></button>
+        </nav>
+        <p class="sidebar-note">配置工作方式，管理扩展能力。</p>
+      </aside>
+
+      <main>
+        <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
         <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status" hidden>正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary" hidden>重新加载</button></section>
         <div class="content-toolbar">
           <button type="button" class="secondary refresh" id="refresh">刷新列表</button>

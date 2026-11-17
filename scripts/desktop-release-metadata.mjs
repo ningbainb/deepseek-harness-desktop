@@ -3,15 +3,17 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const STABLE_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u
+const PREVIEW_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-(?:rc|beta|alpha)\.(?:0|[1-9]\d*)$/u
 const DESKTOP_TAG_PREFIX = 'refs/tags/desktop-v'
 
 export function classifyDesktopReleaseMetadata({ eventName, ref, version } = {}) {
-  if (typeof version !== 'string' || !STABLE_VERSION.test(version)) {
+  if (typeof version !== 'string' || (!STABLE_VERSION.test(version) && !PREVIEW_VERSION.test(version))) {
     throw new Error('Desktop package version must be an exact stable version')
   }
   if (eventName !== 'push' || typeof ref !== 'string' || !ref.startsWith(DESKTOP_TAG_PREFIX)) {
     return Object.freeze({ version, publish: false })
   }
+  if (!STABLE_VERSION.test(version)) throw new Error('Desktop tag publication requires an exact stable package version')
   const tagVersion = ref.slice(DESKTOP_TAG_PREFIX.length)
   if (!STABLE_VERSION.test(tagVersion)) throw new Error('Desktop push tag must contain an exact stable version')
   if (tagVersion !== version) throw new Error('Desktop push tag version must match the package version')

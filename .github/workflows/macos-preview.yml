@@ -17,7 +17,6 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       REQUIRE_SIGNING: 'false'
-      DSH_DESKTOP_UPDATE_CHANNEL: stable
     steps:
       - uses: actions/checkout@v4
       - name: Verify Apple Silicon runner
@@ -38,10 +37,12 @@ jobs:
           pnpm typecheck
           node --test \
             apps/dsh-desktop/test/electron-builder-mac.test.mjs \
+            apps/dsh-desktop/test/distribution-artifacts.test.mjs \
             apps/dsh-desktop/test/package-mac.test.mjs \
             apps/dsh-desktop/test/verify-package-mac.test.mjs \
             apps/dsh-desktop/test/macos-lifecycle-menu.test.mjs \
             apps/dsh-desktop/test/unsigned-mac-preview.test.mjs
+          node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Configure official anonymous product metrics
         shell: bash
         env:
@@ -68,8 +69,12 @@ jobs:
           NODE
       - name: Build unsigned Apple Silicon package
         run: pnpm --filter @linxin666/dsh-desktop pack:mac
+      - name: Verify the user DMG and internal updater ZIP
+        run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs darwin
       - name: Verify packaged bundle
         run: pnpm --filter @linxin666/dsh-desktop pack:verify:mac
+      - name: Verify bundled Office preview conversion and recalculation
+        run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources "apps/dsh-desktop/dist/mac-arm64/DeepSeek Harness Desktop.app/Contents/Resources" --output apps/dsh-desktop/dist/office-runtime-verification
       - name: Run packaged application smoke
         run: pnpm --filter @linxin666/dsh-desktop pack:smoke:mac
       - name: Verify preview signing boundary
@@ -89,6 +94,8 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('../package.json').version")"
+          hdiutil verify "DeepSeek-Harness-Desktop-${version}-arm64.dmg"
+          unzip -t "DeepSeek-Harness-Desktop-${version}-arm64.zip" >/dev/null
           shasum -a 256 \
             "DeepSeek-Harness-Desktop-${version}-arm64.dmg" \
             "DeepSeek-Harness-Desktop-${version}-arm64.zip" \
@@ -101,5 +108,13 @@ jobs:
           retention-days: 14
           path: |
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeek-Harness-Desktop-macos-arm64-preview-internal-updater
+          if-no-files-found: error
+          retention-days: 14
+          path: |
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.zip
             apps/dsh-desktop/dist/SHA256SUMS-macos.txt
+            apps/dsh-desktop/dist/office-runtime-verification/report.json
+            apps/dsh-desktop/dist/distribution-artifacts-macos-arm64.json

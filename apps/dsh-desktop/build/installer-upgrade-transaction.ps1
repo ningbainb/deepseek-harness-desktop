@@ -11,7 +11,8 @@ param(
   [string] $UninstallRegistryKey = '',
 
   [string] $CleanupTransactionDirectory = '',
-  [string] $RuntimeManifestSHA256 = ''
+  [string] $RuntimeManifestSHA256 = '',
+  [switch] $CompleteRuntimePayload
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,14 +134,74 @@ function Get-RegistryEntries {
         })
       }
     }
+    foreach ($view in $hive.Views) {
+      foreach ($legacy in @(Get-LegacyUninstallEntries $hive $view)) {
+        if (-not ($entries | Where-Object { $_.Hive -eq $legacy.Hive -and $_.View -eq $legacy.View -and $_.SubKey -eq $legacy.SubKey })) {
+          $entries.Add($legacy)
+        }
+      }
+    }
   }
   $entries
+}
+
+function Get-LegacyUninstallState([object] $parent, [string] $name) {
+  $key = $null
+  try {
+    $key = $parent.OpenSubKey($name)
+    if ($null -eq $key) { return $null }
+    return [pscustomobject]@{
+      DisplayName = $key.GetValue('DisplayName')
+      InstallLocation = $key.GetValue('InstallLocation')
+      UninstallString = $key.GetValue('UninstallString')
+    }
+  } catch [System.UnauthorizedAccessException] {
+    # Unrelated applications may protect their entries. Discovery has not
+    # established ownership; snapshot and removal of owned entries stay strict.
+    return $null
+  } catch [System.Security.SecurityException] {
+    return $null
+  } finally { if ($null -ne $key) { $key.Dispose() } }
+}
+
+function Get-LegacyUninstallEntries([object] $hive, [string] $view, [string] $uninstallRoot = 'Software\Microsoft\Windows\CurrentVersion\Uninstall') {
+  # A product label alone is not ownership. Retire aliases only when their
+  # exact uninstaller points at this target and our private marker is present.
+  if (-not (Test-Path -LiteralPath (Join-Path $normalizedInstallDirectory 'resources\update-shutdown-v1') -PathType Leaf)) { return }
+  $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+    [Enum]::Parse([Microsoft.Win32.RegistryHive], $hive.Hive),
+    [Enum]::Parse([Microsoft.Win32.RegistryView], $view))
+  try {
+    $parent = $base.OpenSubKey($uninstallRoot)
+    if ($null -eq $parent) { return }
+    try {
+      foreach ($name in $parent.GetSubKeyNames()) {
+        $state = Get-LegacyUninstallState $parent $name
+        if ($null -eq $state) { continue }
+        $displayName = [string] $state.DisplayName
+        $uninstall = [string] $state.UninstallString
+        if ($displayName -notmatch '^DeepSeek Harness Desktop(?: \d[\w.\-]*)?$' -or
+            $uninstall -notmatch '^\s*"[^"]+\\Uninstall DeepSeek Harness Desktop\.exe"(?:\s|$)') { continue }
+        if (-not (Test-TargetRegistration $state)) { continue }
+        $subKey = "$uninstallRoot\$name"
+        [pscustomobject]@{
+          ProviderPath = "Registry::$($hive.Provider)\$subKey"
+          CommandPath = "$($hive.Command)\$subKey"
+          Hive = $hive.Hive; SubKey = $subKey; View = $view
+          ViewOption = switch ($view) { 'Registry64' { '/reg:64' }; 'Registry32' { '/reg:32' }; default { '' } }
+        }
+      }
+    } finally { $parent.Dispose() }
+  } finally { $base.Dispose() }
 }
 
 function Get-RegistryState([object] $entry) {
   if ([string]::IsNullOrWhiteSpace([string] $entry.View)) {
     # Journals written by older installers used the process-default view.
     try {
+      $legacyKey = Get-Item -LiteralPath ([string] $entry.ProviderPath) -ErrorAction Stop
+      try { if ($legacyKey.ValueCount -eq 0 -and $legacyKey.SubKeyCount -eq 0) { return $null } }
+      finally { $legacyKey.Dispose() }
       return Get-ItemProperty -LiteralPath ([string] $entry.ProviderPath) -ErrorAction Stop
     } catch [System.Management.Automation.ItemNotFoundException] {
       return $null
@@ -153,6 +214,9 @@ function Get-RegistryState([object] $entry) {
     $key = $base.OpenSubKey([string] $entry.SubKey)
     if ($null -eq $key) { return $null }
     try {
+      # An empty inaccessible HKLM tombstone cannot launch an old uninstaller.
+      # Leave it untouched rather than requiring elevation for a per-user setup.
+      if ($key.ValueCount -eq 0 -and $key.SubKeyCount -eq 0) { return $null }
       return [pscustomobject]@{
         InstallLocation = $key.GetValue('InstallLocation')
         UninstallString = $key.GetValue('UninstallString')
@@ -579,10 +643,85 @@ function Begin-Transaction {
   }
 }
 
+function Get-InstallerFileSHA256([string] $path) {
+  # Avoid PowerShell module auto-loading in minimal installer environments.
+  $stream = [IO.File]::OpenRead($path)
+  $hash = [Security.Cryptography.SHA256]::Create()
+  try { ([BitConverter]::ToString($hash.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+  finally { $hash.Dispose(); $stream.Dispose() }
+}
+
+function Assert-CompleteRuntimePayload {
+  if ($RuntimeManifestSHA256 -cnotmatch '^[a-f0-9]{64}$') { throw 'invalid complete runtime manifest digest' }
+  $assertNoLinks = {
+    param([string] $path)
+    $ancestor = [IO.Path]::GetFullPath($path)
+    while ($ancestor) {
+      $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
+      if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'complete runtime path contains a link' }
+      $ancestor = [IO.Path]::GetDirectoryName($ancestor)
+    }
+  }
+  $metadata = Join-Path $normalizedInstallDirectory 'resources\runtime-reconstruction\manifest.json'
+  if (-not (Test-Path -LiteralPath $metadata -PathType Leaf)) { throw 'complete runtime manifest is missing' }
+  & $assertNoLinks $metadata
+  if ((Get-Item -LiteralPath $metadata).Length -gt 262144 -or
+      (Get-InstallerFileSHA256 $metadata) -cne $RuntimeManifestSHA256) {
+    throw 'complete runtime manifest integrity mismatch'
+  }
+  try { $manifest = Get-Content -LiteralPath $metadata -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { throw 'invalid complete runtime manifest' }
+  $files = @($manifest.completeFiles)
+  $prefix = 'resources/app.asar.unpacked/node_modules/electron/'
+  $required = @('dist/electron.exe', 'package.json')
+  $external = $manifest.schemaVersion -eq 2
+  if ($external) {
+    if ($manifest.schemaVersion -isnot [int] -or $manifest.payloadKind -cne 'external-browser' -or
+        $manifest.electronVersion -cne '44.7.0' -or $files.Count -ne 4) { throw 'invalid complete runtime manifest' }
+    $required = @(
+      'DeepSeek Harness Desktop.exe',
+      'resources/app.asar',
+      'resources/app.asar.unpacked/package.json',
+      'resources/app.asar.unpacked/runtime-support/browser-component.json'
+    )
+  } elseif ($manifest.schemaVersion -ne 1 -or $files.Count -lt 2 -or $files.Count -gt 19) {
+    throw 'invalid complete runtime manifest'
+  }
+  $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($file in $files) {
+    $relative = [string] $file.target
+    if ($external) {
+      if ($file.target -isnot [string] -or $required -cnotcontains $relative -or
+          ($file.size -isnot [int] -and $file.size -isnot [long]) -or $file.size -lt 0) {
+        throw 'invalid complete runtime target'
+      }
+    } elseif (-not $relative.StartsWith($prefix, [StringComparison]::Ordinal) -or
+        $relative -notmatch '^resources/app\.asar\.unpacked/node_modules/electron/(?:package\.json|dist/[a-zA-Z0-9_.\-]+|dist/locales/[a-zA-Z0-9_\-]+\.pak)$') {
+      throw 'invalid complete runtime target'
+    }
+    if (-not $seen.Add($relative) -or $file.sha256 -cnotmatch '^[a-f0-9]{64}$') { throw 'invalid complete runtime target' }
+    $path = Join-Path $normalizedInstallDirectory $relative
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "complete runtime payload is missing: $relative" }
+    & $assertNoLinks $path
+    if ((Get-Item -LiteralPath $path).Length -ne $file.size -or (Get-InstallerFileSHA256 $path) -cne $file.sha256) {
+      throw "complete runtime file integrity mismatch: $relative"
+    }
+  }
+  foreach ($relative in $required) {
+    $target = if ($external) { $relative } else { $prefix + $relative }
+    if (-not $seen.Contains($target)) { throw "complete runtime payload is missing: $relative" }
+  }
+  Write-Output 'runtime-complete-payload-validated'
+}
+
 function Commit-Transaction {
   # Restoration is required even for fresh installs without an upgrade journal.
   # A failure here propagates to NSIS's existing commit rollback path.
-  & (Join-Path $PSScriptRoot 'installer-runtime-restore.ps1') -InstallDirectory $normalizedInstallDirectory -ExpectedManifestSHA256 $RuntimeManifestSHA256
+  if ($CompleteRuntimePayload) {
+    Assert-CompleteRuntimePayload
+  } else {
+    & (Join-Path $PSScriptRoot 'installer-runtime-restore.ps1') -InstallDirectory $normalizedInstallDirectory -ExpectedManifestSHA256 $RuntimeManifestSHA256
+  }
   $journal = Read-Journal
   if ($null -eq $journal) {
     Write-Output 'upgrade-transaction-not-required'

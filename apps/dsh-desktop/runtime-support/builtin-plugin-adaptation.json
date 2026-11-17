@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "policy": "desktop-first",
-  "runtimeVersion": "0.2.1-rc.4",
+  "runtimeVersion": "0.2.2-rc.3",
   "notes": [
-    "The selection records Desktop 5.2.0 candidate packages targeting official NPM DSH 0.2.1-rc.4 (next); interactive acceptance is recorded separately.",
+    "Desktop 5.3.0-rc.1 selects official NPM DSH 0.2.2-rc.3 explicitly (next, not latest). Source compatibility and interactive/business acceptance are recorded separately.",
     "Public registry snapshots below are historical and must be refreshed before a new package upgrade decision.",
     "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts; validation.results records executed checks separately.",
     "A selected version is not a packaged or user-data migration acceptance result."
@@ -27,7 +27,10 @@
       "@local/dsh-prompt-pilot",
       "dsh-dafeiyu-pet",
       "dsh-builtin-browser",
-      "@linxin666/dsh-release-plugin-adapter"
+      "@linxin666/dsh-release-plugin-adapter",
+      "dsh-context",
+      "dsh-context-memory",
+      "dsh-prompt-customizer"
     ],
     "dependencyOnly": [
       "@linxin666/dsh-client-ui-mode-switcher",
@@ -117,39 +120,141 @@
   "plugins": [
     {
       "name": "@linxin666/dsh-release-plugin-adapter",
-      "selection": { "version": "0.1.0", "source": "workspace", "path": "packages/dsh-release-plugin-adapter" },
-      "publicSnapshot": { "status": "not-found", "checkedAt": "2026-10-26T14:34:56.1246129Z", "url": "https://registry.npmjs.org/@linxin666%2Fdsh-release-plugin-adapter" },
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-release-plugin-adapter"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "checkedAt": "2026-10-26T14:34:56.1246129Z",
+        "url": "https://registry.npmjs.org/@linxin666%2Fdsh-release-plugin-adapter"
+      },
       "reason": "Keep release-specific SDK adaptation in a private workspace package, separate from immutable plugin tarballs and the official Runtime.",
-      "desktopContracts": ["Profile and Cordis patch mounting only", "Actionable prerequisite status without claiming behavioral acceptance", "Independent additional-pet settings preserve existing configuration"],
-      "validation": { "automatedChecks": ["packages/dsh-release-plugin-adapter/tests/contracts.spec.ts", "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts"], "desktopAcceptance": ["Open and operate release plugin settings in the actual isolated Desktop, then restart and verify persistence."], "results": [] }
+      "desktopContracts": [
+        "Profile and Cordis patch mounting only",
+        "Actionable prerequisite status without claiming behavioral acceptance",
+        "Independent additional-pet settings preserve existing configuration"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-release-plugin-adapter/tests/contracts.spec.ts",
+          "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Open and operate release plugin settings in the actual isolated Desktop, then restart and verify persistence."
+        ],
+        "results": []
+      }
     },
     {
       "name": "@local/dsh-prompt-pilot",
-      "selection": { "version": "1.2.3", "source": "vendor", "path": "vendor/plugins-20261026/dsh-prompt-pilot-1.2.3.tgz", "sha256": "9941974e4175a2854b54a09a6966bde1cd2c9557e407b70b2e66ba7274fb0d2a", "patch": "patches/@local__dsh-prompt-pilot@1.2.3.patch" },
-      "publicSnapshot": { "status": "available", "latest": "1.2.3", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "selection": {
+        "version": "1.2.3",
+        "source": "vendor",
+        "path": "vendor/plugins-20261026/dsh-prompt-pilot-1.2.3.tgz",
+        "sha256": "9941974e4175a2854b54a09a6966bde1cd2c9557e407b70b2e66ba7274fb0d2a",
+        "patch": "patches/@local__dsh-prompt-pilot@1.2.3.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "1.2.3",
+        "checkedAt": "2026-10-26",
+        "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026"
+      },
       "reason": "Preserve the verified public tarball and mount prediction through the official SDK profile; share the reviewed Zod identity with the Runtime.",
-      "desktopContracts": ["Predictions belong to the current conversation", "Tab acceptance preserves typed input and composition", "Existing skill and attachment controls remain available"],
-      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "packages/dsh-release-plugin-adapter/tests/contracts.spec.ts"], "desktopAcceptance": ["Configure prediction, generate a real simulated-model suggestion, accept and cancel it, and change conversations without leaking stale text."], "results": [] }
+      "desktopContracts": [
+        "Predictions belong to the current conversation",
+        "Tab acceptance preserves typed input and composition",
+        "Existing skill and attachment controls remain available"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/release-plugin-profile.test.mjs",
+          "packages/dsh-release-plugin-adapter/tests/contracts.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Configure prediction, generate a real simulated-model suggestion, accept and cancel it, and change conversations without leaking stale text."
+        ],
+        "results": []
+      }
     },
     {
       "name": "dsh-dafeiyu-pet",
-      "selection": { "version": "0.2.0", "source": "vendor", "path": "vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz", "sha256": "9759c153bef8b95284a380cddfa3d686d86aef4d5a28e2c00619f0d203d8b39e", "patch": "patches/dsh-dafeiyu-pet@0.2.0.patch" },
-      "publicSnapshot": { "status": "available", "latest": "0.2.0", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "selection": {
+        "version": "0.2.0",
+        "source": "vendor",
+        "path": "vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz",
+        "sha256": "9759c153bef8b95284a380cddfa3d686d86aef4d5a28e2c00619f0d203d8b39e",
+        "patch": "patches/dsh-dafeiyu-pet@0.2.0.patch"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.2.0",
+        "checkedAt": "2026-10-26",
+        "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026"
+      },
       "reason": "Ship the verified additional companion without replacing the existing Desktop pet or its saved preferences; keep independent settings windows free of floating pets.",
-      "desktopContracts": ["Preserve existing companion configuration", "Independent visibility and settings entry", "Widget assets and data stay profile-scoped", "Desktop off-first and independent settings create no widget resources", "Closing aborts pending requests and disposes widget-owned resources without changing global APIs", "Re-enabling mounts one instance and preserves vendor preferences and the original pet", "Only explicit absent-key and logged-out account results are unconfigured; other failures retain warnings and retry"],
-      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts", "packages/dsh-release-plugin-adapter/tests/dafeiyu-lifecycle.test.mjs"], "desktopAcceptance": ["Show and hide the new companion, reopen its controls and restart while preserving the original pet and settings usability.", "After installing the community patch, verify off/on/off/on and independent settings produce no hidden widget requests or console warnings in the isolated native Desktop."], "results": [] }
+      "desktopContracts": [
+        "Preserve existing companion configuration",
+        "Independent visibility and settings entry",
+        "Widget assets and data stay profile-scoped",
+        "Desktop off-first and independent settings create no widget resources",
+        "Closing aborts pending requests and disposes widget-owned resources without changing global APIs",
+        "Re-enabling mounts one instance and preserves vendor preferences and the original pet",
+        "Only explicit absent-key and logged-out account results are unconfigured; other failures retain warnings and retry"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/release-plugin-profile.test.mjs",
+          "packages/dsh-release-plugin-adapter/tests/visibility.spec.ts",
+          "packages/dsh-release-plugin-adapter/tests/dafeiyu-lifecycle.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Show and hide the new companion, reopen its controls and restart while preserving the original pet and settings usability.",
+          "After installing the community patch, verify off/on/off/on and independent settings produce no hidden widget requests or console warnings in the isolated native Desktop."
+        ],
+        "results": []
+      }
     },
     {
       "name": "dsh-builtin-browser",
-      "selection": { "version": "0.4.14", "source": "vendor", "path": "vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz", "sha256": "3f37f0664288a8ce2ec9c01d9d763d68bf5454e642cbd4a153fac27d2dc70f2a" },
-      "publicSnapshot": { "status": "available", "latest": "0.4.14", "checkedAt": "2026-10-26", "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026" },
+      "selection": {
+        "version": "0.4.14",
+        "source": "vendor",
+        "path": "vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz",
+        "sha256": "3f37f0664288a8ce2ec9c01d9d763d68bf5454e642cbd4a153fac27d2dc70f2a"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.4.14",
+        "checkedAt": "2026-10-26",
+        "url": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/plugins-20261026"
+      },
       "reason": "Mount the published browser and its tools through the profile; use the trusted installed host entry before Desktop single-instance startup instead of downloading a second Electron runtime.",
-      "desktopContracts": ["Authenticated visible browser host", "Preserve official browser providers and existing AionUI", "Keep settings, isolated sessions and durable cookies"],
-      "validation": { "automatedChecks": ["apps/dsh-desktop/test/release-plugin-profile.test.mjs", "apps/dsh-desktop/test/browser-host-bootstrap.test.mjs"], "desktopAcceptance": ["Open a visible browser, navigate and exercise DOM tools, then close and restart without losing its persisted session configuration."], "results": [] }
+      "desktopContracts": [
+        "Authenticated visible browser host",
+        "Preserve official browser providers and existing AionUI",
+        "Keep settings, isolated sessions and durable cookies"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/release-plugin-profile.test.mjs",
+          "apps/dsh-desktop/test/browser-host-bootstrap.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open a visible browser, navigate and exercise DOM tools, then close and restart without losing its persisted session configuration."
+        ],
+        "results": []
+      }
     },
     {
       "name": "dsh-agent-plugins-market",
-      "selection": { "version": "0.11.1", "source": "npm", "patch": "patches/dsh-agent-plugins-market@0.11.1.patch" },
+      "selection": {
+        "version": "0.11.1",
+        "source": "npm",
+        "patch": "patches/dsh-agent-plugins-market@0.11.1.patch"
+      },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.11.1",
@@ -165,94 +270,14 @@
         "Managed source replacement keeps the last complete checkout until durable state commit"
       ],
       "validation": {
-        "automatedChecks": ["apps/dsh-desktop/test/skill-market.test.mjs", "apps/dsh-desktop/test/skill-market-activation.test.mjs", "apps/dsh-desktop/test/skill-market-recovery.test.mjs", "apps/dsh-desktop/scripts/verify-skill-market.mjs"],
-        "desktopAcceptance": ["Verify inactive defaults, cancel and confirm activation, then search, inspect, cancel and install a suite; verify native skill discovery, restart persistence and recovery after source failure."],
-        "results": []
-      }
-    },
-    {
-      "name": "@deepseek-ai/dsh-experimental-agent-team",
-      "selection": {
-        "version": "0.2.1-rc.4",
-        "source": "npm"
-      },
-      "publicSnapshot": {
-        "status": "available",
-        "latest": "0.1.5-alpha.2",
-        "checkedAt": "2026-09-13T15:37:26.106Z",
-        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-agent-team"
-      },
-      "reason": "Use the official Agent Team package aligned with DSH 0.2.0-rc.2; Desktop opt-in behavior requires the listed checks.",
-      "desktopContracts": [
-        "Opt-in Team roster, mailbox and shared task state",
-        "No change to the default Desktop Agent behavior"
-      ],
-      "validation": {
         "automatedChecks": [
-          "apps/dsh-desktop/test/profile.test.mjs",
-          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+          "apps/dsh-desktop/test/skill-market.test.mjs",
+          "apps/dsh-desktop/test/skill-market-activation.test.mjs",
+          "apps/dsh-desktop/test/skill-market-recovery.test.mjs",
+          "apps/dsh-desktop/scripts/verify-skill-market.mjs"
         ],
         "desktopAcceptance": [
-          "Enable Agent Team, create a session, delegate one bounded task, and disable Agent Team again."
-        ],
-        "results": []
-      }
-    },
-    {
-      "name": "@deepseek-ai/dsh-experimental-agent-team-profile",
-      "selection": {
-        "version": "0.2.1-rc.4",
-        "source": "npm"
-      },
-      "publicSnapshot": {
-        "status": "available",
-        "latest": "0.1.5-alpha.2",
-        "checkedAt": "2026-09-13T15:37:26.106Z",
-        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-agent-team-profile"
-      },
-      "reason": "Use the official Agent Team composition package aligned with DSH 0.2.0-rc.2, retaining Desktop opt-in ordering.",
-      "desktopContracts": [
-        "Explicit Desktop settings switch with persisted state",
-        "Safe Runtime restart and rollback on activation failure",
-        "Existing one-shot SubAgent behavior restored when disabled"
-      ],
-      "validation": {
-        "automatedChecks": [
-          "apps/dsh-desktop/test/profile.test.mjs",
-          "apps/dsh-desktop/test/extension-ipc.test.mjs",
-          "apps/dsh-desktop/test/agent-team-runtime.test.mjs",
-          "apps/dsh-desktop/scripts/verify-dock-settings.mjs"
-        ],
-        "desktopAcceptance": [
-          "Toggle Agent Team in Plugin Settings and verify the status survives a Desktop restart."
-        ],
-        "results": []
-      }
-    },
-    {
-      "name": "@deepseek-ai/dsh-experimental-tool-agent-team",
-      "selection": {
-        "version": "0.2.1-rc.4",
-        "source": "npm"
-      },
-      "publicSnapshot": {
-        "status": "available",
-        "latest": "0.1.5-alpha.2",
-        "checkedAt": "2026-09-13T15:37:26.106Z",
-        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-tool-agent-team"
-      },
-      "reason": "Use the official Agent Team tool package aligned with DSH 0.2.0-rc.2.",
-      "desktopContracts": [
-        "Agent-scoped teammate lifecycle and messaging tools",
-        "Shared Team task-board tools without global tool-name collisions"
-      ],
-      "validation": {
-        "automatedChecks": [
-          "apps/dsh-desktop/test/profile.test.mjs",
-          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
-        ],
-        "desktopAcceptance": [
-          "Create a teammate and complete one shared task from an enabled Desktop session."
+          "Verify inactive defaults, cancel and confirm activation, then search, inspect, cancel and install a suite; verify native skill discovery, restart persistence and recovery after source failure."
         ],
         "results": []
       }
@@ -1341,16 +1366,16 @@
     {
       "name": "@deepseek-ai/dsh-browser-use",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.278Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-browser-use"
       },
-      "reason": "Use the official Browser Use service from the exact pinned Runtime graph; Desktop owns only opt-in configuration, provider discovery, and safe navigation.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Disabled by default with a visible isolated browser session",
         "Observation tools may run directly while mutating actions require approval"
@@ -1369,16 +1394,16 @@
     {
       "name": "@deepseek-ai/dsh-computer-use",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-computer-use"
       },
-      "reason": "Use the official Computer Use service while Desktop retains platform permission guidance, explicit activation, and repeated-crash safe mode.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Disabled by default and platform availability is reported honestly",
         "Input actions require approval and native startup loops are interrupted"
@@ -1397,16 +1422,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-chrome-devtools-mcp"
       },
-      "reason": "Keep the official Chrome DevTools MCP as an advanced diagnostic provider using Desktop-selected local Chromium and no arbitrary command input.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Advanced opt-in provider",
         "Visible isolated launch remains the default mode"
@@ -1424,16 +1449,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-playwright-mcp"
       },
-      "reason": "Use the official Playwright MCP as Desktop's default Browser Use provider with a system Chromium executable and an isolated visible session.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Default Browser Use provider",
         "No bundled Chromium download"
@@ -1451,16 +1476,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-runtime",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-runtime"
       },
-      "reason": "Retain the exact official shared Browser Use runtime required by the selected providers; it is dependency-only and has no Desktop UI mount.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Exact provider runtime identity",
         "Session-owned browser cleanup"
@@ -1478,16 +1503,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-stagehand-native"
       },
-      "reason": "Expose Stagehand only as an advanced provider with a separate model and secret environment reference; it never reuses or persists the DeepSeek route credentials.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Separate model credential boundary",
         "No secret value crosses the preload API"
@@ -1505,16 +1530,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.280Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-mcp"
       },
-      "reason": "Keep the official external Cua Driver MCP as a process-isolated fallback and accept only an operator-configured command with fixed no-shell arguments.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Process-isolated fallback",
         "Fixed mcp argument without shell execution"
@@ -1532,16 +1557,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
       "selection": {
-        "version": "0.2.1-rc.4",
+        "version": "0.2.2-rc.3",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-09-16T00:00:00.000Z",
+        "checkedAt": "2026-11-17T10:29:15.280Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-native"
       },
-      "reason": "Use the official native provider as the default Computer Use backend while retaining platform optional dependencies and Desktop safe-mode suspension after repeated startup failure.",
+      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Packaged architecture-specific optional dependency",
         "Repeated startup failure preserves configuration but disables effective activation"
@@ -1569,7 +1594,7 @@
         "checkedAt": "2026-09-18T00:49:19.000Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-web-all/latest"
       },
-      "reason": "Retain the published 0.4.4 carrier and its archived alpha cohort provenance while Desktop-owned SDK/Profile adapters target official 0.2.1-rc.4. Preserve Desktop-only loaders and user configuration; current interactive acceptance is recorded separately.",
+      "reason": "Retain the published 0.4.4 carrier and its archived alpha cohort provenance while Desktop-owned SDK/Profile adapters target official 0.2.2-rc.1. Preserve Desktop-only loaders and user configuration; current interactive acceptance is recorded separately.",
       "desktopContracts": [
         "One aggregate owns each shared web-ui loader ID",
         "Nine Desktop-only loader rows and saved disable overrides survive",
@@ -1583,6 +1608,269 @@
         ],
         "desktopAcceptance": [
           "Upgrade a disposable 4.1 profile, reopen its sessions and verify every preserved Desktop surface."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-agent-team",
+      "selection": {
+        "version": "0.2.2-rc.3",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.2.2-rc.2",
+        "checkedAt": "2026-11-17T10:29:16.262Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-agent-team"
+      },
+      "reason": "Official rc.3 team service/tool/UI replaces the retired experimental profile without duplicate mounts.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-client-ui-agent-team",
+      "selection": {
+        "version": "0.2.2-rc.3",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.2.2-rc.2",
+        "checkedAt": "2026-11-17T10:29:16.625Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-client-ui-agent-team"
+      },
+      "reason": "Official rc.3 team service/tool/UI replaces the retired experimental profile without duplicate mounts.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-tool-agent-team",
+      "selection": {
+        "version": "0.2.2-rc.3",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.2.2-rc.2",
+        "checkedAt": "2026-11-17T10:29:16.831Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-tool-agent-team"
+      },
+      "reason": "Official rc.3 team service/tool/UI replaces the retired experimental profile without duplicate mounts.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "dsh-context",
+      "selection": {
+        "version": "0.85.1",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.85.1",
+        "checkedAt": "2026-11-17T10:29:17.412Z",
+        "url": "https://registry.npmjs.org/dsh-context"
+      },
+      "reason": "Pinned context insight; primary Desktop entry is the conversation right sidebar.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "dsh-context-memory",
+      "selection": {
+        "version": "1.2.0",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "1.2.0",
+        "checkedAt": "2026-11-17T10:29:17.642Z",
+        "url": "https://registry.npmjs.org/dsh-context-memory"
+      },
+      "reason": "Pinned 1.2.0 SDK probe reproduced project memory crossing paired-user principals. Desktop preserves files and saved intent, blocks effective activation and reports the isolation gap; this is not accepted compatibility.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "dsh-prompt-customizer",
+      "selection": {
+        "version": "2.2.0",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "2.2.0",
+        "checkedAt": "2026-11-17T10:29:17.877Z",
+        "url": "https://registry.npmjs.org/dsh-prompt-customizer"
+      },
+      "reason": "Opt-in advanced Agent prompt editor; ordinary response preferences remain managed by P1.",
+      "desktopContracts": [
+        "Preserve existing configuration and explicit disabled states",
+        "No duplicate patch or prompt injection",
+        "Optional combinations require actual model-input and isolation acceptance"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/rc3-release-contract.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Open old and new sessions and verify scopes, settings persistence and effective model input."
+        ],
+        "results": []
+      }
+    }
+  ],
+  "retiredPlugins": [
+    {
+      "name": "@deepseek-ai/dsh-experimental-agent-team",
+      "selection": {
+        "version": "0.2.2-rc.1",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.5-alpha.2",
+        "checkedAt": "2026-09-13T15:37:26.106Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-agent-team"
+      },
+      "reason": "Use the official Agent Team package aligned with DSH 0.2.0-rc.2; Desktop opt-in behavior requires the listed checks.",
+      "desktopContracts": [
+        "Opt-in Team roster, mailbox and shared task state",
+        "No change to the default Desktop Agent behavior"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Enable Agent Team, create a session, delegate one bounded task, and disable Agent Team again."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-agent-team-profile",
+      "selection": {
+        "version": "0.2.2-rc.1",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.5-alpha.2",
+        "checkedAt": "2026-09-13T15:37:26.106Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-agent-team-profile"
+      },
+      "reason": "Use the official Agent Team composition package aligned with DSH 0.2.0-rc.2, retaining Desktop opt-in ordering.",
+      "desktopContracts": [
+        "Explicit Desktop settings switch with persisted state",
+        "Safe Runtime restart and rollback on activation failure",
+        "Existing one-shot SubAgent behavior restored when disabled"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/extension-ipc.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs",
+          "apps/dsh-desktop/scripts/verify-dock-settings.mjs"
+        ],
+        "desktopAcceptance": [
+          "Toggle Agent Team in Plugin Settings and verify the status survives a Desktop restart."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@deepseek-ai/dsh-experimental-tool-agent-team",
+      "selection": {
+        "version": "0.2.2-rc.1",
+        "source": "npm"
+      },
+      "publicSnapshot": {
+        "status": "available",
+        "latest": "0.1.5-alpha.2",
+        "checkedAt": "2026-09-13T15:37:26.106Z",
+        "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-tool-agent-team"
+      },
+      "reason": "Use the official Agent Team tool package aligned with DSH 0.2.0-rc.2.",
+      "desktopContracts": [
+        "Agent-scoped teammate lifecycle and messaging tools",
+        "Shared Team task-board tools without global tool-name collisions"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/profile.test.mjs",
+          "apps/dsh-desktop/test/agent-team-runtime.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Create a teammate and complete one shared task from an enabled Desktop session."
         ],
         "results": []
       }

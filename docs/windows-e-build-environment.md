@@ -1,28 +1,29 @@
 # Windows 本地打包与测试空间
 
-Windows 本地测试和打包统一使用 `E:\DeepSeekHarnessDesktop-Build`。该目录专门存放 E 盘工作树、pnpm store、Electron 与 Playwright 下载、node-gyp 头文件缓存、构建缓存、临时文件、WSL 验收发行版和安装包产物。macOS、Linux 仍交给 GitHub Actions，不在 Windows 本机安装其打包依赖。
+Windows 本地开发、依赖安装、测试和打包使用 `D:\dshshequ\deepseek-harness-desktop`。共享构建目录为 `D:\dshshequ\.desktop-build`，与工作树同盘，使 pnpm store 和 node_modules 能通过硬链接复用包内容。macOS、Linux 仍交给原生 GitHub Actions，不在 Windows 本机安装其打包依赖。
 
-使用仓库要求的 Node `22.19+` 或 `24+`。本机用于验收的 Node `24.19.0` 可放在 `E:\DeepSeekHarnessDesktop-Build\tools\node-v24.19.0\node.exe`，环境脚本会优先选用它并校验版本；不能用系统中低于要求的 Node `22.13.0` 运行完整测试。
-
-必须从 E 盘工作树运行测试或打包：electron-builder 的缓存与工作树跨盘时可能触发 `EXDEV`，而 D 盘工作树的 `node_modules` 仍会占用 D 盘。当前 D 盘开发工作树可继续编辑；完成并确认提交后，在 E 盘创建独立工作树，再安装依赖与打包。不要直接复制现有 `node_modules`，也不要清理未确认的旧文件。
-
-在 E 盘工作树的 PowerShell 中点源环境脚本，然后运行命令：
+在工作树的 PowerShell 中点源环境脚本，然后运行命令：
 
 ```powershell
-. .\scripts\use-e-build-env.ps1 -Mode test
+. .\scripts\use-build-env.ps1 -Mode test
 pnpm store path
 pnpm install --frozen-lockfile
 pnpm feature-baseline:check
 pnpm desktop:regression:e2e
 ```
 
-打包前重新在同一会话中运行 `. .\scripts\use-e-build-env.ps1 -Mode package`。脚本会拒绝非 E 盘工作树，而不是退回系统盘；pnpm store、Electron 缓存和测试临时文件会位于 E 盘。安装包按 E 盘工作树的正常 `dist` 路径生成，之后可归档到 `E:\DeepSeekHarnessDesktop-Build\artifacts`。本地只验收 Windows；macOS、Linux 的打包及对应平台检查由 GitHub 工作流完成。
+打包前在同一会话中运行 `. .\scripts\use-build-env.ps1 -Mode package`。脚本默认将构建目录放在仓库父目录的 `.desktop-build`，也支持 `-BuildRoot` 指定同盘目录；跨盘配置会被拒绝。安装包仍生成在工作树的正常 `dist` 路径。旧的 `use-e-build-env.ps1` 保留给已有 E 盘工作树，但当前本机工作使用通用脚本。
 
-真实 WSL 验收临时导入独立的 `dsh-agent-acceptance` 发行版，虚拟磁盘放在 `E:\DeepSeekHarnessDesktop-Build\wsl\dsh-agent-acceptance`，不使用 Docker Desktop 的内部发行版。官方 Alpine rootfs 与 SHA-256 文件保留在 E 盘 `downloads`。验收前校验其 SHA-256，再按需导入：
+`pnpm desktop:pack` 会把环境脚本的 `ELECTRON_CACHE` 显式传给 electron-builder 的下载缓存选项，保留官方校验。直接调用 electron-builder 时也需传入 `--config.electronDownload.cache=$env:ELECTRON_CACHE`；其下载器不会自行读取 Electron 安装器使用的缓存环境变量。
 
-```powershell
-wsl.exe --import dsh-agent-acceptance E:\DeepSeekHarnessDesktop-Build\wsl\dsh-agent-acceptance E:\DeepSeekHarnessDesktop-Build\downloads\alpine-minirootfs-3.24.2-x86_64.tar.gz --version 2
-node apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs
-```
+使用仓库要求的 Node `22.19+` 或 `24+`。需要独立工具时，只准备 `tools\node-v24.19.0\node.exe` 和 `tools\pnpm-11.22.0`；脚本优先选用它们并检查 Node 版本。
 
-确认测试实例没有个人数据后可执行 `wsl.exe --unregister dsh-agent-acceptance` 释放空间，避免它被 Agent 当作日常终端；验收报告保留在 E 盘 `artifacts`。
+## 空间控制
+
+- 只安装锁文件声明的当前项目依赖，保留构建和测试所需的开发依赖，不用 `--prod` 省略验证工具。
+- pnpm store、pnpm/npm 缓存、Electron、electron-builder、node-gyp 和 Playwright 缓存共用 `.desktop-build`；不为每个工作树重复下载。
+- 仅按当前 Windows 检查需要安装浏览器或原生工具，不预装其他平台资源、WSL 发行版或整个浏览器集合。
+- 不复制已有 node_modules、旧安装包、旧工作树或整份 E 盘缓存；E 盘旧数据保持原状。
+- 临时文件进入 `.desktop-build\temp`，验证报告进入 `.desktop-build\artifacts`。清理仅针对已确认无用的当前任务产物，不自动清理共享 store、历史数据或用户安装目录。
+
+本地只验收 Windows；macOS、Linux 的测试、打包和启动验收以对应原生 GitHub Actions 日志与产物为准。

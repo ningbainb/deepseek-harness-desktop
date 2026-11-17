@@ -39,6 +39,10 @@ configured.effectiveOptionComputed = async values => {
   const archivePaths = new Set([...stdout.matchAll(/^Path = (.+)\r?$/gmu)].map(match => match[1].replaceAll('\\', '/').trim()))
   if (!archivePaths.has('resources/runtime-reconstruction/manifest.json')) throw new Error('NSIS archive has no offline reconstruction metadata')
   for (const target of adapter.omittedTargets) if (archivePaths.has(target)) throw new Error('NSIS reused a stale complete-runtime archive')
+  if (adapter.fullRuntime === true) {
+    if (adapter.omittedTargets.length !== 0 || !Array.isArray(adapter.requiredTargets) || !adapter.requiredTargets.includes('resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')) throw new Error('Incomplete full-runtime adapter')
+    for (const target of adapter.requiredTargets) if (!archivePaths.has(target)) throw new Error(`Complete NSIS runtime target missing: ${target}`)
+  }
   console.log(`Verified readable NSIS payload before installer assembly; ${adapter.omittedTargets.length} duplicate targets omitted`)
   return normalOptions(values)
 }

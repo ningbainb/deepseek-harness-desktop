@@ -21,4 +21,8 @@ test('macOS preview workflow builds and smokes an isolated unsigned arm64 packag
   assert.match(workflow, /SHA256SUMS-macos\.txt/u)
   assert.doesNotMatch(workflow, /latest-mac\.yml/u)
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/u)
+  assert.match(workflow, /verify-distribution-artifacts\.mjs darwin/u)
+  assert.match(workflow, /hdiutil verify/u)
+  assert.match(workflow, /unzip -t/u)
+  assert.match(workflow, /preview-internal-updater/u)
 })

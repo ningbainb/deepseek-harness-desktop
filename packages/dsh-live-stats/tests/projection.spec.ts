@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -22,13 +23,13 @@ import {
 
 afterEach(() => { vi.useRealTimers() })
 
-async function harness(): Promise<{ ctx: Context; session: Session; ledgerFilePath: string }> {
+async function harness(config: { charsPerToken?: number; enabled?: boolean } = {}): Promise<{ ctx: Context; session: Session; ledgerFilePath: string }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   // Keep the bridge's ledger writes out of the real user state directory.
   const ledgerFilePath = join(tmpdir(), `test-projection-ledger-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
-  await ctx.plugin({ inject, apply: (context: Context) => apply(context, {}, { ledgerFilePath }) })
+  await ctx.plugin({ inject, apply: (context: Context) => apply(context, config, { ledgerFilePath }) })
   return { ctx, session: ctx.sessions.create(), ledgerFilePath }
 }
 
@@ -800,6 +801,108 @@ describe('liveTokenUsage projection', () => {
 })
 
 describe('ledger bridge', () => {
+  it('keeps disabled settlements out of the ledger across disable and re-enable handoffs', async () => {
+    const config = { enabled: true }
+    const { ctx, session, ledgerFilePath } = await harness(config)
+    const settle = (step: number) => {
+      session.append('step/start', { turn: 1, step })
+      session.append('assistant/chunk', { turn: 1, step, chunk: { type: 'usage', usage: { inputTokens: 3, outputTokens: 5 } } })
+      session.append('step/end', { turn: 1, step })
+    }
+    try {
+      config.enabled = false
+      ctx.emit('loader/volatile-update', [['enabled']])
+      await Promise.resolve()
+      settle(1)
+      await new Promise(resolve => setImmediate(resolve))
+      settle(2)
+      expect(existsSync(ledgerFilePath)).toBe(false)
+      expect(ctx.sessionProjections.snapshot(session).values.liveTokenUsage).toBeUndefined()
+      config.enabled = true
+      ctx.emit('loader/volatile-update', [['enabled']])
+      await new Promise(resolve => setImmediate(resolve))
+      session.append('step/start', { turn: 1, step: 3 })
+      expect(existsSync(ledgerFilePath)).toBe(false)
+      session.append('assistant/chunk', { turn: 1, step: 3, chunk: { type: 'usage', usage: { inputTokens: 3, outputTokens: 5 } } })
+      session.append('step/end', { turn: 1, step: 3 })
+      const persisted = readFileSync(ledgerFilePath, 'utf8')
+      expect(persisted).not.toContain(`${session.id}:1:1`)
+      expect(persisted).not.toContain(`${session.id}:1:2`)
+      expect(persisted).toContain(`${session.id}:1:3`)
+      const { LedgerStore } = await import('../src/ledger-store.ts')
+      expect(new LedgerStore({ filePath: ledgerFilePath }).getSummary()).toMatchObject({ todayTurns: 1, totalTokens: 8 })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it.each([false, true])('records both settlements across a volatile update (changed config: %s)', async changed => {
+    const config = { charsPerToken: 4 }
+    const { ctx, session, ledgerFilePath } = await harness(config)
+    const register = vi.spyOn(ctx.sessionProjections, 'register')
+    try {
+      if (changed) config.charsPerToken = 2
+      ctx.emit('loader/volatile-update', changed ? [['charsPerToken']] : [])
+      await Promise.resolve()
+      session.append('request/header', {
+        header: { config: { provider: 'deepseek', model: 'handoff-model' } }, reason: 'initial',
+      })
+      for (const step of [1, 2]) {
+        session.append('step/start', { turn: 1, step })
+        session.append('assistant/chunk', { turn: 1, step, chunk: { type: 'usage', usage: { inputTokens: 3, outputTokens: 5 } } })
+        session.append('step/end', { turn: 1, step })
+      }
+      const persisted = readFileSync(ledgerFilePath, 'utf8')
+      expect(persisted).toContain(`${session.id}:1:1`)
+      expect(persisted).toContain(`${session.id}:1:2`)
+      await new Promise(resolve => setImmediate(resolve))
+      expect(register).toHaveBeenCalledTimes(changed ? 1 : 0)
+      const { LedgerStore } = await import('../src/ledger-store.ts')
+      const summary = new LedgerStore({ filePath: ledgerFilePath }).getSummary()
+      expect(summary.todayTurns).toBe(2)
+      expect(summary.totalTokens).toBe(16)
+      // The replacement fold also catches up without recording either step twice.
+      expect(projected(ctx, session)).toMatchObject({ uncachedInputTokens: 6, outputTokens: 10 })
+      session.append('step/start', { turn: 1, step: 3 })
+      session.append('assistant/chunk', { turn: 1, step: 3, chunk: { type: 'text-delta', index: 0, text: 'abcdefgh' } })
+      expect(projected(ctx, session).outputTokens).toBe(changed ? 22 : 20)
+      expect(new LedgerStore({ filePath: ledgerFilePath }).getSummary().todayTurns).toBe(2)
+    } finally {
+      register.mockRestore()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('records every step settled synchronously immediately after plugin readiness', async () => {
+    const { ctx, session, ledgerFilePath } = await harness()
+    try {
+      session.append('request/header', {
+        header: { config: { provider: 'deepseek', model: 'startup-model' } },
+        reason: 'initial',
+      })
+      for (const step of [1, 2]) {
+        session.append('step/start', { turn: 1, step })
+        session.append('assistant/chunk', {
+          turn: 1, step,
+          chunk: { type: 'usage', usage: { inputTokens: 3, outputTokens: 5 } },
+        })
+        session.append('step/end', { turn: 1, step })
+      }
+      // No yield between plugin readiness and settlement; both must already
+      // have reached durable storage rather than waiting on a later event.
+      const persisted = readFileSync(ledgerFilePath, 'utf8')
+      expect(persisted).toContain(`${session.id}:1:1`)
+      expect(persisted).toContain(`${session.id}:1:2`)
+      const { LedgerStore } = await import('../src/ledger-store.ts')
+      const summary = new LedgerStore({ filePath: ledgerFilePath }).getSummary()
+      expect(summary.todayTurns).toBe(2)
+      expect(summary.totalTokens).toBe(16)
+      expect(summary.models[0]).toMatchObject({ model: 'startup-model', turns: 2, tokens: 16 })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('records each settled step once with the session model', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)

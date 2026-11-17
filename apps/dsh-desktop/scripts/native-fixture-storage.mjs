@@ -16,12 +16,12 @@ const within = (root, value) => {
 export function nativeFixtureStoragePolicy({ env = process.env, temporaryDirectory = tmpdir(), outputDirectory = temporaryDirectory } = {}) {
   if (!absolute(temporaryDirectory) || !absolute(outputDirectory)) throw new Error('Native fixture paths must be fully qualified absolute paths')
   const hosted = hostedWindows(env)
-  const root = hosted ? win32.join(env.RUNNER_TEMP, 'dsh-native-fixtures') : 'E:\\'
+  const root = hosted ? win32.join(env.RUNNER_TEMP, 'dsh-native-fixtures') : 'D:\\dshshequ'
   const temporary = win32.normalize(temporaryDirectory), output = win32.normalize(outputDirectory)
   if (!within(root, temporary) || !within(root, output)) {
-    throw new Error(hosted ? 'Native fixtures require the dedicated RUNNER_TEMP child' : 'Local native fixtures require E: storage')
+    throw new Error(hosted ? 'Native fixtures require the dedicated RUNNER_TEMP child' : 'Local native fixtures require D:\\dshshequ storage')
   }
-  return { mode: hosted ? 'github-hosted-windows' : 'local-e-drive', root, temporaryDirectory: temporary, outputDirectory: output,
+  return { mode: hosted ? 'github-hosted-windows' : 'local-d-workspace', root, temporaryDirectory: temporary, outputDirectory: output,
     ...(hosted ? { runnerRoot: win32.normalize(env.RUNNER_TEMP) } : {}) }
 }
 
@@ -60,7 +60,7 @@ export async function assertNativeFixtureExecutable(executablePath, options = {}
   const env = options.env ?? process.env
   const root = await realpath(policy.mode === 'github-hosted-windows' ? env.GITHUB_WORKSPACE : policy.root)
   const executable = await realpath(executablePath)
-  if (!within(root, executable)) throw new Error('Packaged fixture executable escapes its workspace or local E: storage')
+  if (!within(root, executable)) throw new Error('Packaged fixture executable escapes its workspace or local D:\\dshshequ storage')
   if (!(await lstat(executable)).isFile()) throw new Error('Packaged fixture executable must be a regular file')
   return executable
 }

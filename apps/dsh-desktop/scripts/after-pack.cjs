@@ -9,6 +9,7 @@ const { writeWindowsUpdateConfiguration } = require('./packaged-update-config.cj
 // peer-dependency snapshots. These are required by the DSH boot graph, so copy
 // the app's explicitly pinned instance only when the collector omitted it.
 const REQUIRED_PACKAGED_PEERS = Object.freeze([
+  '@deepseek-ai/dsh-error',
   '@deepseek-ai/dsh-atomic-write',
   '@deepseek-ai/dsh-attachment',
   '@deepseek-ai/dsh-brand',
@@ -776,6 +777,35 @@ async function restoreAllBundledSkinAssets(nodeModulesRoot) {
   return [...new Set(restored)].sort()
 }
 
+async function externalizeBrowserElectron(nodeModulesRoot, report) {
+  const root = resolve(nodeModulesRoot)
+  if (await realpath(root) !== root) throw new Error('Browser payload staging must not use linked directories')
+  let removedBytes = 0
+  let removedFiles = 0
+  const measure = async path => {
+    const info = await lstat(path)
+    if (info.isSymbolicLink()) return
+    if (info.isDirectory()) {
+      for (const name of await readdir(path)) await measure(join(path, name))
+    } else { removedBytes += info.size; removedFiles++ }
+  }
+  for (const relativePath of ['electron', 'dsh-builtin-browser/node_modules/electron']) {
+    const target = resolve(root, relativePath)
+    if (!target.startsWith(root + require('node:path').sep)) throw new Error('Browser payload staging escaped package root')
+    let info
+    try { info = await lstat(target) } catch (error) { if (error.code === 'ENOENT') continue; throw error }
+    if (!info.isDirectory() || info.isSymbolicLink() || await realpath(target) !== target) throw new Error('Browser Electron staging directory is linked')
+    await measure(target)
+    await rm(target, { recursive: true })
+  }
+  report.externalBrowserRuntime = true
+  report.externalBrowserRemovedBytes = (report.externalBrowserRemovedBytes ?? 0) + removedBytes
+  report.externalBrowserRemovedFiles = (report.externalBrowserRemovedFiles ?? 0) + removedFiles
+  report.removedBytes += removedBytes
+  report.removedFiles += removedFiles
+  report.categories['external-browser-electron'] = (report.categories['external-browser-electron'] ?? 0) + removedFiles
+}
+
 async function afterPack(context) {
   const platform = context.electronPlatformName
   if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') return
@@ -786,7 +816,7 @@ async function afterPack(context) {
   const restoredNativeBindings = await restoreRequiredNativeBindings(nodeModulesRoot, target)
   const restoredSkinAssets = await restoreAllBundledSkinAssets(nodeModulesRoot)
   const report = await prunePackagedRuntime(nodeModulesRoot, target)
-  await pruneNestedElectronLocales(nodeModulesRoot, report, target, context.packager?.config?.electronLanguages)
+  await externalizeBrowserElectron(nodeModulesRoot, report)
   report.restoredPeers = restoredPeers
   report.restoredNativeBindings = restoredNativeBindings
   report.restoredSkinAssets = restoredSkinAssets
@@ -801,6 +831,7 @@ module.exports = afterPack
 module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
+module.exports.externalizeBrowserElectron = externalizeBrowserElectron
 module.exports.pruneEmptyMaterialDirectories = pruneEmptyMaterialDirectories
 module.exports.pruneNestedElectronLocales = pruneNestedElectronLocales
 module.exports.restoreRequiredPackagedPeers = restoreRequiredPackagedPeers

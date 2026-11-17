@@ -5,7 +5,7 @@ import { basename, join, resolve } from 'node:path'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 
-export async function finalizeThreePlatformReceipts(directory, version) {
+export async function finalizeThreePlatformReceipts(directory, version, { legacyAppImage = false } = {}) {
   const manifestPath = join(directory, 'release-manifest.json')
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   assert.equal(manifest.version, version)
@@ -28,7 +28,7 @@ export async function finalizeThreePlatformReceipts(directory, version) {
     `DeepSeek-Harness-Desktop-Setup-${version}-x64.exe`,
     `DeepSeek-Harness-Desktop-${version}-arm64.dmg`,
     `DeepSeek-Harness-Desktop-${version}-arm64.zip`,
-    `DeepSeek-Harness-Desktop-${version}-x86_64.AppImage`,
+    ...(legacyAppImage ? [`DeepSeek-Harness-Desktop-${version}-x86_64.AppImage`] : []),
     `DeepSeek-Harness-Desktop-${version}-amd64.deb`,
   ]
   const rows = checksum.toString('utf8').trimEnd().split(/\r?\n/u)

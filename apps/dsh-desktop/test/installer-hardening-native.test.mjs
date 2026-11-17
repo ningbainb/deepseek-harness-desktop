@@ -11,6 +11,7 @@ import test from 'node:test'
 import { resolveNsisCompiler } from '../scripts/nsis-compiler.mjs'
 import { prepareInstallerElectronPayload } from '../scripts/installer-electron-payload.mjs'
 import { assertInstallerFixtureProcessIsolation } from '../scripts/installer-fixture-process-guard.mjs'
+import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from './fixtures/browser-preflight-resources.mjs'
 import { payloadFixture } from './fixtures/electron-payload.mjs'
 import { windowsInstallerTestOptions } from './fixtures/installer-platform.mjs'
 
@@ -81,6 +82,8 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   })
   staged = await prepareInstallerElectronPayload(f.app)
   const adapter = JSON.parse(await readFile(staged.builderArguments[0].slice(staged.builderArguments[0].indexOf('=') + 1), 'utf8'))
+  const resources = await prepareBrowserPreflightFixtureResources(f.root, { controlledService: true })
+  await registerBrowserPreflightFixture(resources, { key, install, directory: f.root })
   const compiler = await resolveNsisCompiler()
   const templates = resolve(dirname(builderRequire.resolve('app-builder-lib/out/targets/nsis/NsisTarget.js')), '../../../templates/nsis')
   const plugins = await builderRequire('app-builder-lib/out/toolsets/windows.js').getNsisPluginsPath()
@@ -88,7 +91,7 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   const archive = join(f.root, 'payload.7z'), fixtureExe = join(f.root, 'copy-cancel-fixture.exe')
   const payload = join(f.root, 'payload'); await mkdir(payload); await writeFile(join(payload, 'collision.txt'), 'new-file')
   await exec(sevenZip, ['a', '-t7z', archive, '.'], { cwd: payload, windowsHide: true })
-  await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`, `/DTEST_OUTPUT=${fixtureExe}`,
+  await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${resources}`, `/DTEST_OUTPUT=${fixtureExe}`,
     `/DTEST_INSTALL=${install}`, `/DTEST_REGISTRY=${key}`, `/DTEST_ARCHIVE=${archive}`,
     `/DSTOCK_INCLUDE=${join(templates, 'include')}`, `/DTEST_PLUGIN_DIR=${join(plugins, 'x86-unicode')}`,
     `/DADAPTED_INSTALLER=${join(adapter.directory, 'installer.nsh')}`, join(desktop, 'test/fixtures/installer-hardening-extract.nsi')],
@@ -127,6 +130,7 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   observe('observer-completed')
   console.log('native fixture observation', JSON.stringify({ ...await observation(), stdout }))
   assert.match(stdout, /native-copy-dialog-cancelled/u)
+  await assertBrowserPreflightFixtureCalled(resources, key)
   const [code] = await exited
   assert.notEqual(code, 0, 'native cancellation must report installation failure')
   assert.equal(await readFile(join(install, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'old-exe')
@@ -148,8 +152,9 @@ for (const [owned, modeReset] of [[true, false], [false, false], [true, true]]) 
   if (owned) await writeFile(join(install, 'resources/update-shutdown-v1'), 'dsh-desktop-update-shutdown-protocol=1\n')
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\CurrentUninstall`, '/v', 'UninstallString', '/t', 'REG_SZ',
     '/d', `"${join(install, 'Uninstall DeepSeek Harness Desktop.exe')}" /currentuser`, '/f', '/reg:64'], { windowsHide: true })
+  const resources = await prepareBrowserPreflightFixtureResources(root)
   const compiler = await resolveNsisCompiler()
-  await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`, `/DTEST_OUTPUT=${exe}`,
+  await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${resources}`, `/DTEST_OUTPUT=${exe}`,
     `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${key}`, ...(modeReset ? ['/DTEST_MODE_RESET'] : []), join(desktop, 'test/fixtures/installer-identity-migration.nsi')],
   { env: compiler.env, windowsHide: true, timeout: 15_000 })
   await exec(exe, ['/S'], { windowsHide: true, timeout: 15_000 })

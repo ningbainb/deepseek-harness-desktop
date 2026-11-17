@@ -106,6 +106,8 @@ export class DesktopTrayLifecycle {
     this.productName = asText(productName, 'DeepSeek Harness Desktop')
     this.log = log
     this.tray = undefined
+    this.refreshPending = undefined
+    this.appliedTaskStatus = undefined
     this.lastTaskStatus = normalizeTrayTaskStatus()
     this.onRestore = () => { restoreDesktopWindow(this.getWindow()) }
   }
@@ -147,8 +149,10 @@ export class DesktopTrayLifecycle {
 
   #applyMenu() {
     if (!this.tray) return false
+    if (this.appliedTaskStatus === this.lastTaskStatus) return true
     try {
       this.tray.setContextMenu?.(this.Menu.buildFromTemplate(this.#buildMenu()))
+      this.appliedTaskStatus = this.lastTaskStatus
       return true
     } catch (error) {
       this.#report(error)
@@ -189,18 +193,27 @@ export class DesktopTrayLifecycle {
 
   async refresh() {
     if (!this.tray) return false
-    try {
-      this.lastTaskStatus = normalizeTrayTaskStatus(await this.getTaskStatus())
-    } catch (error) {
-      this.#report(error)
-      this.lastTaskStatus = normalizeTrayTaskStatus()
-    }
-    return this.#applyMenu()
+    if (this.refreshPending) return this.refreshPending
+    const tray = this.tray
+    const pending = Promise.resolve().then(async () => {
+      let status
+      try { status = normalizeTrayTaskStatus(await this.getTaskStatus()) }
+      catch (error) { this.#report(error); status = normalizeTrayTaskStatus() }
+      // A refresh from a disposed tray cannot update a newly created tray.
+      if (this.tray !== tray) return false
+      this.lastTaskStatus = status
+      return this.#applyMenu()
+    })
+    this.refreshPending = pending
+    try { return await pending }
+    finally { if (this.refreshPending === pending) this.refreshPending = undefined }
   }
 
   dispose() {
     const tray = this.tray
     this.tray = undefined
+    this.refreshPending = undefined
+    this.appliedTaskStatus = undefined
     if (!tray) return false
     try {
       tray.removeListener?.('double-click', this.onRestore)

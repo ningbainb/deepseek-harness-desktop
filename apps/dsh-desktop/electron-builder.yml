@@ -7,6 +7,7 @@ asarUnpack:
   - node_modules/**
   - src/**
   - package.json
+  - runtime-support/browser-component.json
 npmRebuild: false
 compression: normal
 electronLanguages:
@@ -39,6 +40,7 @@ directories:
 
 files:
   - src/**
+  - runtime-support/browser-component.json
   - runtime-support/community-plugin-known-issues.json
   - package.json
   - '!**/*.map'
@@ -94,6 +96,7 @@ mac:
       arch:
         - arm64
     - target: zip
+      # Internal electron-updater payload; DMG is the sole user installer.
       arch:
         - arm64
 
@@ -111,14 +114,12 @@ linux:
   synopsis: AI coding desktop workspace
   description: DeepSeek Harness Desktop integrates AI conversations, project files, Git, skills and automation in one workspace.
   target:
-    - target: AppImage
-      arch:
-        - x64
     - target: deb
       arch:
         - x64
 
 appImage:
+  # Retained for explicit legacy rebuilds, not a default distribution target.
   artifactName: DeepSeek-Harness-Desktop-${version}-x86_64.${ext}
 
 deb:

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "component": "browser-electron",
+  "source": "https://github.com/electron/electron/releases/tag/v44.7.0",
+  "sizeSource": "https://api.github.com/repos/electron/electron/releases/tags/v44.7.0",
+  "sha256Source": "electron@44.7.0/checksums.json (official NPM package)",
+  "artifacts": [
+    {
+      "version": "44.7.0",
+      "platform": "win32",
+      "arch": "x64",
+      "url": "https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-win32-x64.zip",
+      "size": 158293649,
+      "sha256": "eee30dc8fa1f5ea95490e59f44e46ea68dd24c6e93d22facf70fe5c2d4c2665c",
+      "executable": "electron.exe",
+      "required": ["electron.exe", "version", "resources/default_app.asar", "icudtl.dat", "resources.pak", "chrome_100_percent.pak", "chrome_200_percent.pak", "v8_context_snapshot.bin", "locales/en-US.pak", "LICENSE", "LICENSES.chromium.html"]
+    },
+    {
+      "version": "44.7.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "url": "https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-darwin-arm64.zip",
+      "size": 130394296,
+      "sha256": "e04e411b58a0a14375dd21b0ab4a378fd38930a702e4e20e322fee4849404c0b",
+      "executable": "Electron.app/Contents/MacOS/Electron",
+      "required": ["Electron.app/Contents/MacOS/Electron", "Electron.app/Contents/Info.plist", "version", "LICENSE", "LICENSES.chromium.html"]
+    },
+    {
+      "version": "44.7.0",
+      "platform": "linux",
+      "arch": "x64",
+      "url": "https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-linux-x64.zip",
+      "size": 122998223,
+      "sha256": "3ae7d5bdad61c664486c6ab61361dd084d064c8c08af8d13a687096e18ce555a",
+      "executable": "electron",
+      "required": ["electron", "version", "chrome-sandbox", "resources/default_app.asar", "icudtl.dat", "resources.pak", "locales/en-US.pak", "LICENSE", "LICENSES.chromium.html"]
+    }
+  ]
+}

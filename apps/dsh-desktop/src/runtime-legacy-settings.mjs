@@ -124,8 +124,10 @@ function indexEntries(entries, result = new Map()) {
 
 function activeServiceIdentity(ctx, name) {
   const implementation = ctx.reflect?._getImpl(name)
-  if (implementation?.fiber?.state !== 2 || implementation.value === undefined) return undefined
-  return { fiber: implementation.fiber, value: implementation.value }
+  // Cordis 4.1 owns provisions through ctx; retain the earlier shim shape.
+  const fiber = implementation?.ctx?.fiber ?? implementation?.fiber
+  if (fiber?.state !== 2 || implementation.value === undefined) return undefined
+  return { fiber, value: implementation.value }
 }
 
 function sameActiveService(ctx, name, identity) {
@@ -179,7 +181,9 @@ export async function diagnoseRuntimeLegacySettingsHealth(ctx, { patches } = {})
       if (!check('targetActive', running.fiber?.state === 2)) return fail('targetActive', id)
       if (!check('targetModule', moduleName(running.options.name) === moduleName(planned.name))) return fail('targetModule', id)
       if (!check('targetConfig', isDeepStrictEqual(running.options.config ?? {}, planned.config ?? {}))) return fail('targetConfig', id)
-      if (id === 'settings' && !check('settingsOwner', settings.ownerContext?.fiber === running.fiber && settingsIdentity.fiber === running.fiber)) return fail('settingsOwner', id)
+      // Loader may expose a traced Fiber, whose context retains its real owner.
+      const runningFiber = running.fiber?.ctx?.fiber ?? running.fiber
+      if (id === 'settings' && !check('settingsOwner', settings.ownerContext?.fiber === runningFiber && settingsIdentity.fiber === runningFiber)) return fail('settingsOwner', id)
     }
     if (!check('rootFinallyActive', ctx.fiber.state === 2)) return fail('rootFinallyActive')
     if (!check('loaderFinallySame', sameActiveService(ctx, 'loader', loaderIdentity))) return fail('loaderFinallySame')

@@ -52,7 +52,10 @@ export async function openDockSetting(app, mainPage, id) {
   // The HTML can be visible before extensions.mjs binds tab clicks and
   // activates the initial panel. Wait for that binding to complete.
   await dock.locator('[role="tab"].active').first().waitFor({ timeout: 60_000 })
-  if (id === 'skill-market') await dock.locator('#skills-tab').click()
+  const groupRoot = id === 'skill-market' ? 'skills' : ['agent-team', 'shared-browser'].includes(id) ? 'control-center'
+    : ['value-mode', 'personal-prompt', 'memory', 'describe-image', 'usage', 'sessions'].includes(id) ? 'models'
+      : id === 'particle-theme' ? 'appearance' : id === 'plugin-options' ? 'plugins-hub' : undefined
+  if (groupRoot) await dock.locator(`#${groupRoot}-tab`).click()
   const tabId = `${id === 'memory' ? 'personal-prompt' : id}-tab`
   await dock.locator(`#${tabId}`).click()
   try {

@@ -44,3 +44,16 @@ test('market acceptance opens its retained Skills group before clicking the nest
   assert.deepEqual(await openDockSetting(app, {}, 'skill-market'), { dock, settings })
   assert.deepEqual(clicked, ['#skills-tab', '#skill-market-tab'])
 })
+
+
+for (const [id, root] of [['value-mode', 'models'], ['shared-browser', 'control-center'], ['agent-team', 'control-center'], ['particle-theme', 'appearance']]) {
+  test(`grouped setting fixture selects ${root} before ${id}`, async () => {
+    const clicked = []
+    const locator = selector => ({ first() { return this }, async waitFor() {}, async click() { clicked.push(selector) } })
+    const dock = { url: () => 'file:///fixture/extensions.html', locator }
+    const settings = { url: () => `dsh-runtime://app/?desktop-dock-setting=${id}`, locator, async waitForFunction() {} }
+    const app = { windows: () => [dock, settings], context: () => ({ async addInitScript() {} }) }
+    await openDockSetting(app, {}, id)
+    assert.deepEqual(clicked, [`#${root}-tab`, `#${id}-tab`])
+  })
+}

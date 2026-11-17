@@ -15,7 +15,7 @@ const connectionPeer = manifest.peerDependencies?.['@deepseek-ai/dsh-client-conn
 assert.equal(manifest.name, 'dsh-better-sidebar')
 assert.equal(manifest.version, '0.24.1')
 
-for (const version of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4']) {
+for (const version of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.2-rc.1']) {
   test(`the actual sidebar package passes the real SDK compatibility gate on ${version}`, () => {
     assert.equal(evaluatePluginCompatibility(manifest, {}, version), undefined)
   })
@@ -29,7 +29,7 @@ test('the actual package declares its Connection peer and retains the lower boun
   assert.equal(issue.requirements['@deepseek-ai/dsh-client-connection'], connectionPeer)
 })
 
-test('the real rc4 profile loader retains the actual package bundle with no skipped bundles or exemptions', async () => {
+test('the installed official profile loader retains the actual package bundle with no skipped bundles or exemptions', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-sidebar-peer-'))
   try {
     const packageDir = join(directory, 'node_modules', 'dsh-better-sidebar')

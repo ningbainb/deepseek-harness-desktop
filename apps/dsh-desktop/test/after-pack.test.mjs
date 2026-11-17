@@ -245,6 +245,7 @@ test('release recovery restores pnpm peer snapshots omitted by electron-builder'
     await mkdir(root)
     const restored = await restoreRequiredPackagedPeers(root)
     assert.deepEqual(restored, [
+      '@deepseek-ai/dsh-error',
       '@deepseek-ai/dsh-atomic-write',
       '@deepseek-ai/dsh-attachment',
       '@deepseek-ai/dsh-brand',

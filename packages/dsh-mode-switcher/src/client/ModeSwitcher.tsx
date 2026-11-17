@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ModePreset } from './mode-controller.ts'
 import { sessionPreset } from './session-preset.ts'
 import css from './ModeSwitcher.module.css'
@@ -18,6 +18,8 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode, na
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string>()
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const loadModesRef = useRef(loadModes)
   const switchModeRef = useRef(switchMode)
 
@@ -57,6 +59,41 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode, na
     }
   }, [open])
 
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    const trigger = triggerRef.current
+    if (!open || menu === null || trigger === null) return
+    // The official header clips and masks its title cluster. Keep the menu
+    // in this component's DOM/theme scope while rendering above that clip.
+    const nativePopover = typeof menu.showPopover === 'function' && typeof menu.hidePopover === 'function'
+    if (nativePopover) {
+      menu.setAttribute('popover', 'manual')
+      menu.showPopover()
+    }
+    let frame: number | undefined
+    const position = (): void => {
+      const anchor = trigger.getBoundingClientRect()
+      menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 8))}px`
+      menu.style.top = `${Math.max(8, Math.min(anchor.bottom + 6, window.innerHeight - menu.offsetHeight - 8))}px`
+    }
+    const schedulePosition = (): void => {
+      if (frame !== undefined) return
+      frame = window.requestAnimationFrame(() => {
+        frame = undefined
+        position()
+      })
+    }
+    position()
+    window.addEventListener('resize', schedulePosition)
+    window.addEventListener('scroll', schedulePosition, true)
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+      window.removeEventListener('resize', schedulePosition)
+      window.removeEventListener('scroll', schedulePosition, true)
+      if (nativePopover && menu.isConnected && menu.matches(':popover-open')) menu.hidePopover()
+    }
+  }, [open])
+
   const handleSelect = useCallback((presetId: string) => {
     if (presetId === current || busy) {
       setOpen(false)
@@ -84,6 +121,7 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode, na
       title={error ?? `${currentLabel}；已有对话时会在同一工作区创建新会话`}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={`${css.trigger} ${open ? css.triggerOpen : ''}`}
         disabled={busy}
@@ -106,7 +144,7 @@ export function ModeSwitcher({ sessionId, useSessions, loadModes, switchMode, na
       </button>
 
       {open && (
-        <div className={css.menu} role="listbox" aria-label="选择会话模式">
+        <div ref={menuRef} className={css.menu} role="listbox" aria-label="选择会话模式">
           <div className={css.menuHeader}>会话模式</div>
           <div className={css.menuList}>
             {modes.map((mode) => {

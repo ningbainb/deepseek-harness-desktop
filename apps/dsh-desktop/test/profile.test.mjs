@@ -597,8 +597,9 @@ test('Agent Team ships as an exact built-in runtime but stays opt-in in the desk
   assert.deepEqual(enabled.dsh.profile.bundles, [
     ...BUILTIN_BUNDLES,
     '@community/example',
-    AGENT_TEAM_PROFILE_BUNDLE,
   ])
+  assert.equal(enabled.dsh.profile.desktopAgentTeamEnabled, true)
+  assert.equal(enabled.dsh.profile.bundles.includes(AGENT_TEAM_PROFILE_BUNDLE), false)
 })
 
 test('Agent Team profile switch persists without changing unrelated manifest fields', async () => {
@@ -618,7 +619,8 @@ test('Agent Team profile switch persists without changing unrelated manifest fie
     assert.equal(await readAgentTeamProfileEnabled({ profileDir }), true)
     const enabled = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
     assert.deepEqual(enabled.userMetadata, { keep: true })
-    assert.equal(enabled.dsh.profile.bundles.at(-1), AGENT_TEAM_PROFILE_BUNDLE)
+    assert.equal(enabled.dsh.profile.desktopAgentTeamEnabled, true)
+    assert.equal(enabled.dsh.profile.bundles.includes(AGENT_TEAM_PROFILE_BUNDLE), false)
 
     assert.deepEqual(await setAgentTeamProfileEnabled({ profileDir, enabled: false }), { enabled: false, changed: true })
     assert.equal(await readAgentTeamProfileEnabled({ profileDir }), false)

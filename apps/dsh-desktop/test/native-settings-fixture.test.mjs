@@ -1,6 +1,38 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { openNativeSettings } from '../scripts/native-settings-fixture.mjs'
+import { runInNewContext } from 'node:vm'
+import { evaluateNativeSettings, nativeSettingsContent, openNativeSettings } from '../scripts/native-settings-fixture.mjs'
+
+test('settings measurements select real content instead of the current SDK actions header', async () => {
+  for (const current of [true, false]) {
+    const title = { tagName: 'DIV', id: 'settings-title' }
+    const nav = { tagName: 'NAV' }
+    const actions = { tagName: 'DIV', scrollTop: 0 }
+    const content = { tagName: 'DIV', scrollTop: 350, scrollHeight: 2400, clientHeight: 500 }
+    const children = current ? [title, nav, actions, content] : [nav, content]
+    const dialog = {
+      children, lastElementChild: content,
+      querySelector: selector => { assert.equal(selector, ':scope > nav'); return nav },
+      getAttribute: name => { assert.equal(name, 'data-shortcut-modal'); return current ? 'settings' : null },
+    }
+    assert.equal(nativeSettingsContent(dialog), content)
+    assert.notEqual(nativeSettingsContent(dialog), actions)
+    const calls = []
+    const evaluate = callback => {
+      assert.equal(typeof callback, 'function', 'Playwright only invokes functions; strings are evaluated as expressions')
+      calls.push(callback)
+      return runInNewContext(`(${callback.toString()})(dialog)`, { dialog })
+    }
+    const locator = { evaluate, evaluateHandle: evaluate }
+    // Execute the exact serialized browser callback, including its selector,
+    // with no module closure available in the VM.
+    assert.equal(await evaluateNativeSettings(locator, (element, contentOf) => contentOf(element).scrollTop), 350)
+    assert.equal(await evaluateNativeSettings(locator, (element, contentOf) => contentOf(element), { handle: true }), content)
+    assert.equal(calls.length, 2)
+    const incomplete = { ...dialog, children: [title, nav, actions], lastElementChild: actions }
+    assert.throws(() => nativeSettingsContent(incomplete), /settings content is unavailable/u)
+  }
+})
 
 function settingsFixture({ directVisible, entryMissing = false, sidebarVisible = false }) {
   const operations = []

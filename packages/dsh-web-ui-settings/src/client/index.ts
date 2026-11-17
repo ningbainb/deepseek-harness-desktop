@@ -22,6 +22,7 @@ import { installParticleThemeClient } from '@linxin666/dsh-particle-theme/src/cl
 import { WebUiSettingsBinder } from './compat-settings-scope.ts'
 import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
+import { ModelAdvancedEntry } from './ModelAdvancedEntry.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
 import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
@@ -189,6 +190,10 @@ export function apply(ctx: ClientContext): void {
       locale: 'relay-onboarding',
     }, RelayOnboardingCard))
   }
+
+  if (!dockSetting) ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
+    name: 'settings.models.footer', id: 'desktop-model-advanced', order: 100,
+  }, ModelAdvancedEntry))
 
   // The highest ordered footer action sits immediately before Settings.
   // Ordinary Web hosts receive no button because the component requires the

@@ -121,7 +121,7 @@ test('public model selection and slot contracts support one shared session direc
   assert.match(selectionTypes, /ModelDirectoryState/u)
   assert.match(selectionTypes, /directoryFor\(sessionId: SessionId\)/u)
   assert.match(selectionTypes, /conversation\.input\.model/u)
-  assert.match(selectionClient, /slots\.inject\("conversation\.input\.model"/u)
+  assert.match(selectionClient, /slots\.inject\(\s*(["'`])conversation\.input\.model\1/u)
   assert.match(slotTypes, /priority\?: number/u)
   assert.match(slotTypes, /same-priority second registration throws/u)
 })

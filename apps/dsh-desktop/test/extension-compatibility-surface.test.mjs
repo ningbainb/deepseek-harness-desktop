@@ -31,14 +31,15 @@ test('Extension Dock separates unified management from Creative Workshop discove
   assert.match(html, /class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai<\/small>/u)
 })
 
-test('Extension Dock moves Agent Team into the unified collaboration page', async () => {
+test('Extension Dock retains Agent Team configuration under more tools and uses the rc3 runtime', async () => {
   const [html, script, collaboration] = await Promise.all([
     readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../../../packages/dsh-web-ui-settings/src/client/AgentTeamSettingsCard.tsx', import.meta.url), 'utf8'),
   ])
   assert.doesNotMatch(html, /id="agent-team-enabled"/u)
-  assert.match(script, /packageName: '@deepseek-ai\/dsh-experimental-agent-team-profile'/u)
+  assert.match(script, /packageName: '@deepseek-ai\/dsh-agent-team'/u)
+  assert.match(html, /id="agent-team-tab"[^>]+data-setting="agent-team"[^>]+data-group="more-tools"/u)
   assert.match(collaboration, /role="switch"/u)
   assert.match(collaboration, /setAgentTeamEnabled\(target\)/u)
   assert.match(collaboration, /共享任务板/u)

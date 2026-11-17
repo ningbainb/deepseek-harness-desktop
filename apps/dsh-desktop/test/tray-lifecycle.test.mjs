@@ -10,6 +10,37 @@ import {
 
 const tick = () => new Promise((resolve) => setImmediate(resolve))
 
+test('unchanged background status does not rebuild native tray menus and concurrent refreshes share one read', async () => {
+  let reads = 0
+  const { lifecycle, templates } = createHarness({ getTaskStatus: async () => { reads++; await tick(); return { active: 1, queued: 2 } } })
+  lifecycle.ensure()
+  await tick(); await tick()
+  const baseline = templates.length
+  const readBaseline = reads
+  await Promise.all(Array.from({ length: 20 }, () => lifecycle.refresh()))
+  assert.equal(reads - readBaseline, 1)
+  assert.equal(templates.length, baseline)
+  lifecycle.dispose()
+})
+
+test('a disposed tray refresh cannot overwrite the status of a replacement tray', async () => {
+  const releases = []
+  const { lifecycle, templates } = createHarness({ getTaskStatus: () => new Promise(resolve => releases.push(resolve)) })
+  lifecycle.ensure()
+  await tick()
+  lifecycle.dispose()
+  lifecycle.ensure()
+  await tick()
+  releases[1]({ active: 2, queued: 0 })
+  await tick()
+  const template = templates.at(-1)
+  releases[0]({ active: 99, queued: 0 })
+  await tick()
+  assert.equal(templates.at(-1), template)
+  assert.match(template[1].label, /Active 2, queued 0/u)
+  lifecycle.dispose()
+})
+
 class FakeTray extends EventEmitter {
   static created = []
 

@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { zstdCompressSync } from 'node:zlib'
+import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import test from 'node:test'
 import { installSessionPersistenceRecovery } from '../../../packages/dsh-desktop-compat/lib/session-recovery.js'
 
@@ -16,12 +16,30 @@ const header = { type: 'session', version: 0, id: 'legacy-child', createdAt: 1, 
 const child = { type: 'subagent/descriptor', seq: 0, time: 1, data: { version: 2, mode: 'continuable', provider: 'in-process', label: 'worker' } }
 const permission = { type: 'permission/preset', seq: 0, time: 1, data: { preset: 'standard', origin: 'default' } }
 
-for (const [name, rows, suffix] of [
+// Model only the released reader's explicit generation-2 refusal. Successful
+// retries still execute the installed official backend's full preparation.
+function installReleasedDescriptorRefusal(backend) {
+  const native = backend.prepareStoredMigration
+  backend.prepareStoredMigration = async function (id, selected, ...args) {
+    if (selected.sourceVersion === 0) {
+      const bytes = await readFile(selected.sourcePath)
+      const boundary = zstdCompressSync(Buffer.from(JSON.stringify(header) + '\n')).length
+      const rows = zstdDecompressSync(bytes.subarray(boundary)).toString('utf8').trimEnd().split('\n').map(line => JSON.parse(line))
+      const legacy = rows.find(row => row.type === 'subagent/descriptor' && row.data?.version === 2)
+      if (legacy) throw new Error(`subagent/descriptor ${legacy.seq} uses unsupported descriptor version 2`)
+    }
+    return native.call(this, id, selected, ...args)
+  }
+}
+
+for (const [name, rows, suffix, releasedRefusal = true] of [
   ['child', [child], '.desktop-v0-subagent-descriptor-backup-v3.4.0'],
   ['permission', [permission], '.desktop-v0-permission-preset-backup-v3.4.0'],
   ['mixed', [permission, { ...child, seq: 1 }], '.desktop-v0-subagent-descriptor-backup-v3.4.0'],
+  ['child', [child], undefined, false],
+  ['mixed', [permission, { ...child, seq: 1 }], '.desktop-v0-permission-preset-backup-v3.4.0', false],
 ]) {
-  test(`official JSONL backend opens and resumes released-v0 ${name} history`, async () => {
+  test(`${releasedRefusal ? 'released-reader refusal recovers through' : 'current SDK migrates through'} official JSONL backend and resumes ${name} history`, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-real-backend-'))
     const ctx = new Context()
     let install
@@ -36,7 +54,16 @@ for (const [name, rows, suffix] of [
       ])
       await mkdir(dirname(current), { recursive: true })
       await writeFile(sourcePath, source)
-      await assert.rejects(backend.open(header.id, 'read'), /origin|unsupported descriptor version 2/u)
+      if (releasedRefusal && name !== 'permission') installReleasedDescriptorRefusal(backend)
+      if (!releasedRefusal && name === 'child') {
+        const native = await backend.open(header.id, 'read')
+        try { assert.deepEqual((await native.read()).events[0].data, child.data) }
+        finally { await native.close() }
+      } else {
+        await assert.rejects(backend.open(header.id, 'read'), !releasedRefusal || name === 'permission'
+          ? /permission\/preset 0 data has unexpected member "origin"/u
+          : { message: `subagent/descriptor ${name === 'mixed' ? 1 : 0} uses unsupported descriptor version 2` })
+      }
       assert.deepEqual(await readFile(sourcePath), source)
       install = installSessionPersistenceRecovery(backend)
       assert.equal(install.installed, true)
@@ -48,9 +75,16 @@ for (const [name, rows, suffix] of [
       for (const result of results) {
         assert.equal(result.value.events.length, rows.length)
         assert.deepEqual(result.value.events.map(event => event.type), rows.map(row => row.type))
+        for (const event of result.value.events.filter(event => event.type === 'subagent/descriptor')) {
+          assert.deepEqual(event.data, { ...child.data, version: releasedRefusal ? 3 : 2 })
+        }
       }
-      assert.deepEqual(await readFile(sourcePath + suffix), source)
-      assert.equal(install.getRecoveredCount(), 1)
+      if (suffix) assert.deepEqual(await readFile(sourcePath + suffix), source)
+      else {
+        assert.deepEqual(await readFile(sourcePath), source)
+        assert.equal((await readdir(dirname(current))).some(name => name.includes('.desktop-')), false)
+      }
+      assert.equal(install.getRecoveredCount(), suffix ? 1 : 0)
       const writer = await backend.open(header.id, 'write')
       try {
         const initial = await writer.read()
@@ -59,7 +93,8 @@ for (const [name, rows, suffix] of [
         assert.equal((await writer.read()).events.length, rows.length + 1)
       } finally { await writer.close() }
       assert.ok((await readdir(dirname(current))).includes(basename(current)))
-      assert.deepEqual(await readFile(sourcePath + suffix), source)
+      if (suffix) assert.deepEqual(await readFile(sourcePath + suffix), source)
+      else assert.deepEqual(await readFile(sourcePath), source)
       install.restore()
       const freshContext = new Context()
       try {
@@ -94,6 +129,7 @@ test('native historical preparation keeps invalid later rows and failed retries 
       await mkdir(directory, { recursive: true })
       await writeFile(sourcePath, source)
       if (failure === 'retry') {
+        installReleasedDescriptorRefusal(backend)
         const native = backend.prepareStoredMigration
         let calls = 0
         backend.prepareStoredMigration = function (...args) {
@@ -102,7 +138,9 @@ test('native historical preparation keeps invalid later rows and failed retries 
         }
       }
       install = installSessionPersistenceRecovery(backend)
-      await assert.rejects(backend.open(header.id, 'read'), failure === 'retry' ? /fixture native retry failed/u : /unsupported descriptor version 2/u)
+      await assert.rejects(backend.open(header.id, 'read'), failure === 'retry'
+        ? { message: 'fixture native retry failed' }
+        : /format v0 contains unknown historical event type "unknown\/unsafe" at seq 1; migration refuses unknown historical events even when ignorable/u)
       assert.deepEqual(await readFile(sourcePath), source)
       assert.equal(install.getRecoveredCount(), 0)
       const names = await readdir(directory)
@@ -119,7 +157,8 @@ test('native historical preparation keeps invalid later rows and failed retries 
   }
 })
 
-test('cancelling one observer does not cancel another native migration waiter', async () => {
+for (const releasedRefusal of [false, true]) {
+test(`cancelling one observer isolates another native migration waiter (released refusal: ${releasedRefusal})`, async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-real-backend-cancel-'))
   const ctx = new Context()
   let install
@@ -139,6 +178,7 @@ test('cancelling one observer does not cancel another native migration waiter', 
     ])
     await mkdir(directory, { recursive: true })
     await writeFile(sourcePath, source)
+    if (releasedRefusal) installReleasedDescriptorRefusal(backend)
     const prepare = backend.prepareStoredMigration
     const wait = backend.waitForPreparation
     let entered = 0
@@ -165,8 +205,14 @@ test('cancelling one observer does not cancel another native migration waiter', 
     assert.equal(retained.status, 'fulfilled')
     try { assert.equal((await retained.value.read()).events.length, 1) }
     finally { await retained.value.close() }
-    assert.equal(install.getRecoveredCount(), 1)
-    assert.deepEqual(await readFile(sourcePath + '.desktop-v0-subagent-descriptor-backup-v3.4.0'), source)
+    assert.equal(entered, 2)
+    assert.equal(install.getRecoveredCount(), releasedRefusal ? 1 : 0)
+    if (releasedRefusal) {
+      assert.deepEqual(await readFile(sourcePath + '.desktop-v0-subagent-descriptor-backup-v3.4.0'), source)
+    } else {
+      assert.deepEqual(await readFile(sourcePath), source)
+      assert.equal((await readdir(directory)).some(name => name.includes('.desktop-')), false)
+    }
   } finally {
     release()
     await Promise.allSettled(operations)
@@ -175,3 +221,4 @@ test('cancelling one observer does not cancel another native migration waiter', 
     await rm(root, { recursive: true, force: true })
   }
 })
+}

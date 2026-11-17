@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
+import ts from 'typescript'
 import * as React from 'react'
 import * as jsxRuntime from 'react/jsx-runtime'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -14,10 +15,20 @@ type ShellProps = Record<string, unknown> & {
   useOnboardingSteps: SnapshotSelectorHook<Array<{ id: string; order: number }>>
 }
 const published = readFileSync(resolve('../../node_modules/.pnpm/node_modules/@deepseek-ai/dsh-client-ui-settings-general/lib/client.js'), 'utf8')
-const start = published.indexOf('function SettingsRoot(props) {')
-const end = published.indexOf('\n\t\t//#endregion', start)
-if (start < 0 || end < start) throw new Error('The installed official settings shell diagnostic seam has changed')
-const OfficialShell = vm.runInNewContext(`(${published.slice(start, end)})`, {
+// rc.3 publishes compact JavaScript without region comments. Extract the actual
+// registered shell by its syntax boundary, independently of bundle whitespace.
+const publishedSyntax = ts.createSourceFile('official-settings-client.js', published, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+const shells: ts.FunctionDeclaration[] = []
+function findOfficialShell(node: ts.Node): void {
+  if (ts.isFunctionDeclaration(node) && node.name?.text === 'SettingsRoot') shells.push(node)
+  ts.forEachChild(node, findOfficialShell)
+}
+findOfficialShell(publishedSyntax)
+const officialShell = shells[0]
+if (shells.length !== 1 || officialShell?.body === undefined || officialShell.parameters[0]?.name.getText(publishedSyntax) !== 'props') {
+  throw new Error('The installed official settings shell diagnostic seam has changed')
+}
+const OfficialShell = vm.runInNewContext(`(${officialShell.getText(publishedSyntax)})`, {
   react: React,
   react_jsx_runtime: jsxRuntime,
   SettingsRoot_module_css_default: {},

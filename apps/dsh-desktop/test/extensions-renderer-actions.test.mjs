@@ -320,3 +320,77 @@ test('repair failure keeps the export-diagnostics action available after the fai
   assert.deepEqual(events, ['preview', 'export'])
   assert.equal(fixture.queue.busy, false)
 })
+
+
+test('five Dock groups retain every old destination and place settings navigation outside runtime overlay bounds', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const document = dom.window.document
+  const selected = []
+  const context = vm.createContext({ document, localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: { selectDockSetting: async value => selected.push(value) } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  const roots = [...document.querySelectorAll('.settings-sidebar > nav:not([data-tab-group]) > button')]
+  assert.deepEqual(roots.map(button => button.querySelector('.tab-title').textContent), ['插件', '技能', '外观', '桌面设置', '更多工具'])
+  for (const [id, setting, group] of [
+    ['control-center', 'control-center', 'more-tools'], ['models', 'models', 'desktop-settings'],
+    ['value-mode', 'value-mode', 'desktop-settings'], ['personal-prompt', 'personal-prompt', 'desktop-settings'],
+    ['describe-image', 'describe-image', 'desktop-settings'], ['usage', 'usage', 'desktop-settings'],
+    ['sessions', 'sessions', 'desktop-settings'], ['plugins-hub', null, 'plugins'],
+    ['plugin-options', 'plugin-options', 'plugins'], ['skills', null, 'skills'],
+    ['qqbot', null, 'more-tools'], ['appearance', 'appearance', 'appearance'],
+    ['particle-theme', 'particle-theme', 'appearance'], ['backup', null, 'desktop-settings'],
+    ['recovery', null, 'desktop-settings'], ['agent-team', 'agent-team', 'more-tools'], ['shared-browser', 'shared-browser', 'more-tools'],
+  ]) {
+    await vm.runInContext(`activateTab(document.getElementById('${id}-tab'))`, context)
+    await tick()
+    assert.equal(selected.at(-1), setting, `${id} must reach the original setting`)
+    const entry = document.getElementById(`${id}-tab`)
+    assert.equal(entry.closest('[hidden]'), null, `${id} navigation remains visible`)
+    assert.ok(entry.closest('.settings-sidebar'), `${id} must be outside the runtime view`)
+    assert.ok(roots.find(button => button.dataset.group === group).classList.contains('active'), `${id} selects its primary group`)
+  }
+  dom.window.close()
+})
+
+test('optional context and advanced prompt capabilities disclose scope and pending compatibility', () => {
+  assert.match(source, /packageName: 'dsh-context'/u)
+  assert.match(source, /0\.85\.1/u)
+  assert.match(source, /packageName: 'dsh-context-memory'/u)
+  assert.match(source, /1\.2\.0，默认关闭/u)
+  assert.match(source, /本轮暂停新启用/u)
+  assert.match(source, /项目经验可能进入另一用户的模型输入/u)
+  assert.match(source, /已有配置和记忆文件保留/u)
+  assert.match(source, /从项目会话提取经验候选并保留历史/u)
+  assert.match(source, /遗忘不同于 M1 的删除/u)
+  assert.match(source, /旧 Cordis peer，联合模型输入与隔离验收仍待完成/u)
+  assert.match(source, /packageName: 'dsh-prompt-customizer'/u)
+  assert.match(source, /2\.2\.0，默认关闭/u)
+  assert.match(source, /不改变普通回复偏好/u)
+})
+
+
+test('legacy shortcut and settings-open requests select their new containing groups', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const document = dom.window.document
+  const selected = []
+  let navigate
+  const context = vm.createContext({ document, localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: {
+      selectDockSetting: async value => selected.push(value),
+      onExtensionNavigate: callback => { navigate = callback; return () => {} },
+    } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  vm.runInContext(section('const removeNavigationListener =', 'const removePresetPreviewListener ='), context)
+  for (const [setting, root] of [['value-mode', 'models'], ['control-center', 'control-center'], ['models', 'models'], ['usage', 'models'], ['plugin-options', 'plugins-hub']]) {
+    navigate({ setting })
+    await tick()
+    assert.equal(selected.at(-1), setting)
+    assert.equal(document.getElementById(`${root}-tab`).getAttribute('aria-selected'), 'true')
+    assert.equal(document.querySelector(`[data-setting="${setting}"]`).closest('[hidden]'), null)
+  }
+  dom.window.close()
+})

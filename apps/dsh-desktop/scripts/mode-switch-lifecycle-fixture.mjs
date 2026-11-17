@@ -56,8 +56,20 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
 
   async function selectTarget(preset = target) {
     await trigger.click()
-    await switcher.getByRole('option').filter({ hasText: preset.name ?? preset.id }).click()
+    assert.equal(await switcher.getByRole('listbox').evaluate(menu => menu.matches(':popover-open')), true,
+      'mode choices must render in the top layer above the native clipped conversation header')
+    const option = switcher.getByRole('option').filter({ hasText: preset.name ?? preset.id })
+    assert.equal(await option.getAttribute('aria-selected'), 'false',
+      `mode-switch fixture must choose a different mode: ${JSON.stringify({ sourceSessionId: sessionId, target: preset.id, trigger: await trigger.getAttribute('aria-label') })}`)
+    await option.click()
   }
+
+  await trigger.click()
+  await switcher.getByRole('listbox').waitFor({ state: 'visible' })
+  await page.keyboard.press('Escape')
+  await switcher.getByRole('listbox').waitFor({ state: 'detached' })
+  assert.equal(await trigger.evaluate(button => document.activeElement === button), true,
+    'closing the mode menu with Escape must preserve trigger focus')
 
   const failureMessage = 'mode-switch-create-failure-fixture'
   const requestPaths = []
@@ -75,8 +87,21 @@ export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspac
   page.on('request', noteRequest)
   try {
     const rejectedResponsePromise = page.waitForResponse(isSessionCreateResponse, { timeout: 30_000 })
-    await selectTarget()
-    const rejectedResponse = await rejectedResponsePromise
+    rejectedResponsePromise.catch(() => {})
+    let rejectedResponse
+    try {
+      await selectTarget()
+      rejectedResponse = await rejectedResponsePromise
+    } catch (error) {
+      console.error('mode-switch create diagnostic', JSON.stringify({
+        requestPaths, pageUrl: page.url(),
+        sourceSessionId: sessionId, sourcePreset: originalPreset, targetPreset: target.id,
+        trigger: await trigger.getAttribute('aria-label'), title: await switcher.getAttribute('title'),
+        renderedUsers: await page.locator('[data-chat-flow-kind="user"]').count(),
+        selectedRows: await page.locator('[data-row-key][aria-selected="true"]').evaluateAll(rows => rows.map(row => row.getAttribute('data-row-key'))),
+      }))
+      throw error
+    }
     const rejectedBody = await rejectedResponse.json()
     assert.equal(rejectedBody.result?.ok, false)
     assert.equal(rejectedBody.result?.error?.message, failureMessage)

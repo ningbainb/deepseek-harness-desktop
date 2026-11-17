@@ -15,12 +15,14 @@ const hosted = {
 const temporaryDirectory = 'D:\\a\\_temp\\dsh-native-fixtures'
 const nativeWindows = { skip: process.platform === 'win32' ? false : 'Requires native Windows filesystem paths; Windows must run this case', timeout: 30_000 }
 
-test('local native fixtures retain the E-drive temporary and output requirement', () => {
-  const policy = nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'E:\\build\\temp', outputDirectory: 'E:\\build\\artifacts\\screens' })
-  assert.equal(policy.mode, 'local-e-drive')
-  assert.equal(policy.root, 'E:\\')
-  assert.throws(() => nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'C:\\Temp' }), /E:/u)
-  assert.throws(() => nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'E:\\temp', outputDirectory: 'D:\\screens' }), /E:/u)
+test('local native fixtures require the dedicated D workspace temporary and output paths', () => {
+  const policy = nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'D:\\dshshequ\\.desktop-build\\temp', outputDirectory: 'D:\\dshshequ\\.desktop-build\\artifacts\\screens' })
+  assert.equal(policy.mode, 'local-d-workspace')
+  assert.equal(policy.root, 'D:\\dshshequ')
+  for (const temporaryDirectory of ['C:\\Temp', 'E:\\temp', 'D:\\temp', 'D:\\dshshequ-other', 'D:\\dshshequ\\..\\outside']) {
+    assert.throws(() => nativeFixtureStoragePolicy({ env: {}, temporaryDirectory }), /D:.*dshshequ/u)
+  }
+  assert.throws(() => nativeFixtureStoragePolicy({ env: {}, temporaryDirectory: 'D:\\dshshequ\\.desktop-build\\temp', outputDirectory: 'D:\\screens' }), /D:.*dshshequ/u)
 })
 
 test('hosted Windows CI permits only its dedicated RUNNER_TEMP child', () => {
@@ -38,7 +40,7 @@ test('runner sibling paths, traversal, and workspace outputs cannot escape the e
 
 test('incomplete, self-hosted, and non-Windows contexts do not relax local storage rules', () => {
   for (const [key, value] of [['CI', 'false'], ['GITHUB_ACTIONS', 'false'], ['RUNNER_OS', 'Linux'], ['RUNNER_ENVIRONMENT', 'self-hosted'], ['RUNNER_NAME', 'private-worker'], ['RUNNER_TEMP', 'relative'], ['GITHUB_WORKSPACE', 'relative']]) {
-    assert.throws(() => nativeFixtureStoragePolicy({ env: { ...hosted, [key]: value }, temporaryDirectory }), /E:/u)
+    assert.throws(() => nativeFixtureStoragePolicy({ env: { ...hosted, [key]: value }, temporaryDirectory }), /D:.*dshshequ/u)
   }
 })
 
@@ -101,7 +103,7 @@ test('CI preparation rejects foreign command files and incomplete context before
   await assert.rejects(access(join(fixture.runner, 'dsh-native-fixtures')), { code: 'ENOENT' })
 })
 
-test('CI preparation rejects incomplete hosted identity before interpreting its non-E runner path', nativeWindows, async () => {
+test('CI preparation rejects incomplete hosted identity before interpreting its foreign runner path', nativeWindows, async () => {
   await assert.rejects(prepareNativeFixtureStorage({ env: {
     ...hosted, CI: 'false', GITHUB_ENV: 'D:\\a\\_temp\\github-env',
   } }), /hosted/u)

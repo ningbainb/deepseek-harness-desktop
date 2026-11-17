@@ -14,6 +14,7 @@ const CONTROLLED_PREFIXES = Object.freeze([
   'apps/dsh-desktop/src/atomic-write-adapter.mjs',
   'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
   'apps/dsh-desktop/src/runtime-provider.mjs',
+  'apps/dsh-desktop/src/runtime-subagent-list-compat.mjs',
   'packages/dsh-desktop-pipe-webserver/lib/',
   'packages/dsh-desktop-compat/src/',
   'packages/dsh-desktop-repair/src/',

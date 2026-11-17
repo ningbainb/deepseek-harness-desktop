@@ -156,13 +156,11 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 				const sessionId = sessionIdForExecutionKey(input.executionKey, createSessionId);
 				const agentOptions = {
 					provider: selection.provider,
-					model: selection.model
+					model: selection.model,
+					...selection.reasoningEffort === void 0 ? {} : { reasoningEffort: selection.reasoningEffort }
 				};
 				const setup = (agentCtx) => {
-					installModelSelection(agentCtx, {
-						current: selection,
-						assembled: void 0
-					});
+					installModelSelection(agentCtx);
 				};
 				const persisted = options.sessionPersistence === void 0 ? false : (await options.sessionPersistence.list()).some((snapshot) => String(snapshot.header.id) === String(sessionId));
 				handle = persisted ? await options.agents.resume({

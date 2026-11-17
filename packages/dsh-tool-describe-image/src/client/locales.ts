@@ -105,10 +105,11 @@ export const en = {
   'field.maxOutputTokens.hint': 'The max_tokens sent to the endpoint (max_output_tokens under the responses style).',
   'field.timeoutMs': 'Timeout (ms)',
   'field.timeoutMs.hint': 'Per-call vision request timeout.',
-} satisfies Record<string, string>
+} satisfies Record<DescribeImageClientKey, string>
 
 /** The two dictionaries, keyed by language. */
-export const dictionaries: Record<string, Record<DescribeImageClientKey, string>> = { zh, en }
+export const dictionaries: Record<'zh' | 'en', Record<DescribeImageClientKey, string>>
+  & Record<string, Record<DescribeImageClientKey, string>> = { zh, en }
 
 /** Current UI language, mirrored from the shell (defaults to zh). */
 let currentLanguage: string = 'zh'

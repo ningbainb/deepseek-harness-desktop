@@ -22,7 +22,8 @@ import {
 import {
   MEMORY_PROMPT_SECTION_TEMPLATE,
 } from './core/rank.ts'
-import { extractCurrentUserQuery } from './core/query.ts'
+import { extractCurrentUserQuery, extractPendingUserQuery } from './core/query.ts'
+import { MAX_MEMORY_QUERY_LENGTH } from './core/schema.ts'
 import { createMemoryTool } from './tools.ts'
 import { makeMemoryRoutes } from './routes.ts'
 
@@ -58,6 +59,8 @@ interface SessionEntry {
   session: Session
   scope: AccessScope
   events: Awaited<ReturnType<SessionQueryEngine['readSession']>>['events']
+  pendingQuery?: string
+  pendingTurn?: number
 }
 
 function workspaceForSession(registry: WorkspaceRegistryLike | undefined, sessionId: string): string | undefined {
@@ -106,6 +109,9 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   const contextForSession = (session: Session): MemoryRequestContext | undefined => {
     const entry = sessionsById.get(String(session.id))
     if (entry === undefined) return undefined
+    const liveScope = service.currentScope()
+    if (liveScope === undefined || liveScope.principalId !== entry.scope.principalId
+      || liveScope.source !== entry.scope.source || liveScope.deviceId !== entry.scope.deviceId) return undefined
     return service.contextFor(entry.scope, { sessionId: String(session.id) })
   }
 
@@ -145,6 +151,10 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   ctx.on('session/event', function (this: unknown, session: Session, event) {
     const entry = sessionsById.get(String(session.id))
     if (entry !== undefined) {
+      if (event.type === 'turn/end') {
+        delete entry.pendingQuery
+        delete entry.pendingTurn
+      }
       entry.events = [...entry.events, event]
       void hydrate(entry)
     }
@@ -153,6 +163,29 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
     const entry = sessionsById.get(String(agent.session.id))
     if (entry !== undefined) await hydrate(entry)
   })
+
+  ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
+    const entry = sessionsById.get(String(agent.session.id))
+    if (entry === undefined) return
+    if (entry.pendingTurn !== turn) entry.pendingQuery = ''
+    entry.pendingTurn = turn
+    // rc.3 assembles before pre-step admission and user/message commit.
+    // Keep only claimed direct-user text; never change the durable log.
+    entry.pendingQuery = [entry.pendingQuery, extractPendingUserQuery(agent.session.header, [message])]
+      .filter(Boolean).join('\n').slice(0, MAX_MEMORY_QUERY_LENGTH)
+  })
+  ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+    const entry = context.scope === undefined ? undefined : sessionScopes.get(context.scope)
+    if (entry !== undefined && currentConfig().enabled && contextForSession(entry.session) !== undefined) await hydrate(entry)
+    const value = resolvedMemoryVariable(context.scope)
+    // Populate our mutable registry presentation before downstream editors
+    // capture it. Their subsequent filtering/replacement remains authoritative.
+    for (const section of assembly.sections) {
+      if (section.name === 'dsh:memory') section.text = value === '' ? '' : MEMORY_PROMPT_SECTION_TEMPLATE
+    }
+    assembly.variables.dsh_memory = value
+    return next()
+  }, { prepend: true })
 
   // Sessions already live when the plugin is mounted are registered for
   // ownership. Prompt injection still requires an actual scoped carrier key.
@@ -196,9 +229,9 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
       if (scope === undefined) return ''
       const entry = sessionScopes.get(scope)
       if (entry === undefined) return ''
-      const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) })
+      const memoryContext = contextForSession(entry.session)
       if (memoryContext === undefined) return ''
-      return service.prepare(memoryContext, extractCurrentUserQuery({
+      return service.prepare(memoryContext, entry.pendingQuery ?? extractCurrentUserQuery({
         header: entry.session.header,
         events: entry.events,
       }), currentConfig().enabled)

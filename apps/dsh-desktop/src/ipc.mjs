@@ -465,6 +465,7 @@ export function registerDesktopIpc({
   metadata,
   version,
   platform,
+  locations,
   pluginRecovery,
   openLogs,
   exportDiagnostics = async () => { throw new Error('diagnostic export is unavailable') },
@@ -599,6 +600,7 @@ export function registerDesktopIpc({
     productName: metadata.productName,
     version,
     platform,
+    ...(locations ? { locations: { program: locations.program, data: locations.data, cache: locations.cache } } : {}),
   }))
   const getPublicStatus = async () => {
     const recovery = await pluginRecovery?.getState?.()

@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
+import { resolveDesktopDataLocation } from './desktop-data-location.mjs'
 import {
   CLOSE_BEHAVIORS,
   createCloseBehaviorController,
@@ -35,7 +36,7 @@ import {
 import { createDesktopIngress, registerDesktopProtocolClient } from './desktop-ingress.mjs'
 import { CommunityHomeMigration } from './community-home-migration.mjs'
 import { DesktopV41Migration } from './desktop-v41-migration.mjs'
-import { DesktopV42Migration } from './desktop-v42-migration.mjs'
+import { DesktopV42Migration, DesktopV53Migration } from './desktop-v42-migration.mjs'
 import { LegacyPluginRecovery } from './legacy-plugin-recovery.mjs'
 import { createRuntimePresentationGuard } from './runtime-presentation.mjs'
 import { createDesktopInstallPreparation } from './install-preparation.mjs'
@@ -691,8 +692,33 @@ export async function startElectronApp(metadata) {
   const userData = app.getPath('userData')
   const logsDirectory = join(userData, 'logs')
   const logStore = new BoundedLogStore({ directory: logsDirectory })
-  const dshHome = runtimeHome()
-  const communityHomeMigration = process.env.DSH_HOME
+  const legacyHome = join(homedir(), '.dsh')
+  let dataLocation
+  try {
+    dataLocation = await resolveDesktopDataLocation({
+      userData, defaultHome: runtimeHome(), legacyHome,
+      isPackaged: app.isPackaged,
+      programDirectory: app.isPackaged ? dirname(app.getPath('exe')) : undefined,
+      chooseDirectory: async ({ defaultPath }) => {
+        const choice = await dialog.showMessageBox({
+          type: 'question', title: '选择聊天数据目录',
+          message: '将会话、项目配置和模型设置保存在哪里？',
+          detail: `默认目录：${defaultPath}\n程序目录：${dirname(app.getPath('exe'))}\n缓存位于数据目录下的 cache 文件夹。`,
+          buttons: ['使用默认目录', '选择其他目录', '退出'], defaultId: 0, cancelId: 2,
+        })
+        if (choice.response === 0) return defaultPath
+        if (choice.response === 2) return undefined
+        return dialog.showOpenDialog({ title: '选择新的聊天数据目录', defaultPath, properties: ['openDirectory', 'createDirectory'] })
+      },
+    })
+  } catch (error) {
+    if (error?.code === 'DESKTOP_DATA_LOCATION_CANCELLED') { app.quit(); return }
+    throw error
+  }
+  const dshHome = dataLocation.home
+  const legacyHomeExists = await lstat(legacyHome).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error })
+  const explicitlySelectedHome = ['selected', 'persisted'].includes(dataLocation.source) && !legacyHomeExists
+  const communityHomeMigration = process.env.DSH_HOME || explicitlySelectedHome
     ? undefined
     : new CommunityHomeMigration({
       sourceHome: join(homedir(), '.dsh'),
@@ -723,6 +749,8 @@ export async function startElectronApp(metadata) {
   let desktopV41MigrationResult
   const desktopV42Migration = new DesktopV42Migration({ dshHome, desktopVersion })
   let desktopV42MigrationResult
+  const desktopV53Migration = new DesktopV53Migration({ dshHome, desktopVersion })
+  let desktopV53MigrationResult
   const telemetryEndpoint = await resolveTelemetryEndpoint({
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
@@ -1292,6 +1320,8 @@ export async function startElectronApp(metadata) {
     try {
       const repair = async () => {
         if (mode === 'full') {
+          desktopV53MigrationResult = await desktopV53Migration.prepare()
+          await logStore.append(`[migration] desktop-v5.3 state=${desktopV53MigrationResult.state}`)
           desktopV41MigrationResult = await desktopV41Migration.prepare()
           await logStore.append(
             `[migration] desktop-v4.1 state=${desktopV41MigrationResult.state}`
@@ -1804,7 +1834,7 @@ export async function startElectronApp(metadata) {
   })
   const agentTeamFeature = Object.freeze({
     status: async () => Object.freeze({
-      available: runtimePackages.has(AGENT_TEAM_PROFILE_BUNDLE),
+      available: runtimePackages.has('@deepseek-ai/dsh-agent-team'),
       enabled: await readAgentTeamProfileEnabled({ profileDir: desktopProfileDir }),
       version: AGENT_TEAM_VERSION,
     }),
@@ -1971,6 +2001,11 @@ export async function startElectronApp(metadata) {
     surfaceRegistry,
     controller: runtimeProvider,
     runtimeProvider,
+    locations: {
+      program: app.isPackaged ? dirname(app.getPath('exe')) : dirname(SOURCE_DIR),
+      data: dshHome,
+      cache: [join(userData, 'Cache'), join(dshHome, 'cache'), process.env.DSH_DESKTOP_BROWSER_COMPONENT_CACHE].filter(Boolean).join('\n'),
+    },
     conversationImportService,
     openConversationImport: () => createHandoffWindow(),
     pickProjectDirectory: () => pickProjectDirectory(),
@@ -2860,6 +2895,10 @@ export async function startElectronApp(metadata) {
           desktopV41MigrationResult = await desktopV41Migration.commitHealthy()
           await logStore.append('[migration] desktop-v4.1 committed after full Runtime health verification')
         }
+        if (desktopV53MigrationResult?.state === 'PREPARED') {
+          desktopV53MigrationResult = await desktopV53Migration.commitHealthy()
+          await logStore.append('[migration] desktop-v5.3 committed after full Runtime health verification')
+        }
         if (
           communityHomeMigration !== undefined
           && typeof communityHomeMigrationResult?.transactionId === 'string'
@@ -2908,6 +2947,12 @@ export async function startElectronApp(metadata) {
           })
         }
         const fallbackReason = builtinsRollbackFailed ? 'rollback-failed' : builtinsFallbackDetail
+        if (desktopV53MigrationResult?.state === 'PREPARED') {
+          desktopV53MigrationResult = await desktopV53Migration.rollback('full-runtime-unavailable').catch(async (error) => {
+            await logStore.append(`[migration] desktop-v5.3 rollback failed: ${error instanceof Error ? error.name : 'unknown'}`)
+            return desktopV53MigrationResult
+          })
+        }
         await showDirectStartupState(state, { reason: fallbackReason })
         productMetrics.recordBuiltinsFallbackReady({
           detail: fallbackReason,
@@ -3119,6 +3164,10 @@ export async function startElectronApp(metadata) {
   }) : undefined
   const installPreparation = createDesktopInstallPreparation({
     lifecycle: shutdownLifecycle,
+    prepareComponents: async ({ signal, onProgress }) => {
+      const { prepareInstalledBrowserUpgrade } = await import('./browser-upgrade-preflight.mjs')
+      await prepareInstalledBrowserUpgrade({ home: dshHome, signal, onProgress })
+    },
     isQuitRequested: () => appQuitStarted || updateShutdownCoordinator.requested,
     setPreparing: value => {
       setQuitInProgress(value)

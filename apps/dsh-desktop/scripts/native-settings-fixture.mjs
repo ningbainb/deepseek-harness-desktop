@@ -1,3 +1,23 @@
+export function nativeSettingsContent(dialog) {
+  const navigation = dialog.querySelector(':scope > nav')
+  const content = dialog.lastElementChild
+  if (!navigation || content?.tagName !== 'DIV') throw new Error('settings content is unavailable')
+  const children = [...dialog.children]
+  const currentSettings = dialog.getAttribute('data-shortcut-modal') === 'settings'
+  if (children.length === 2 && children[0] === navigation) return content
+  if (currentSettings && children.length === 4 && children[1] === navigation
+    && children[2].tagName === 'DIV') return content
+  throw new Error('settings content is unavailable')
+}
+
+// Playwright serializes callbacks without module closures. Include this pure
+// DOM selector explicitly so every measurement and scroll action uses the same
+// actual content column in both current four-child and legacy two-child shells.
+export function evaluateNativeSettings(locator, callback, { handle = false } = {}) {
+  const evaluate = new Function('element', `return (${callback.toString()})(element, (${nativeSettingsContent.toString()}))`)
+  return handle ? locator.evaluateHandle(evaluate) : locator.evaluate(evaluate)
+}
+
 export async function openNativeSettings(page) {
   const direct = page.getByRole('button', { name: /^(?:设置|Settings)$/iu }).filter({ visible: true }).first()
   const account = page.getByRole('button', { name: /^(?:账号菜单|Account menu)$/iu }).filter({ visible: true }).first()

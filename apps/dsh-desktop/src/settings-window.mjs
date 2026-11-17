@@ -37,7 +37,8 @@ export const SETTINGS_WINDOW_CSS = `
   scrollbar-gutter: stable;
 }
 
-.${SETTINGS_DIALOG_CLASS} > nav + div {
+.${SETTINGS_DIALOG_CLASS} > nav + div:last-child,
+.${SETTINGS_DIALOG_CLASS}[data-shortcut-modal="settings"] > div:last-child {
   box-sizing: border-box;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -108,7 +109,11 @@ export function settingsWindowDragHandle(dialog) {
   if (dialog.getAttribute('data-shortcut-modal') !== 'settings') return undefined
   const titleId = dialog.getAttribute('aria-labelledby')
   const navigation = dialog.querySelector(':scope > nav')
-  return titleId && navigation ? [...navigation.children].find(element => element.id === titleId) : undefined
+  if (!titleId || !navigation) return undefined
+  // Current SDK shells place their named title before nav; older shells put
+  // it inside nav. Keep the lookup local to this settings dialog so actions,
+  // section headings and other modals never become drag handles.
+  return [...dialog.children, ...navigation.children].find(element => element.id === titleId)
 }
 
 export function createSettingsWindowScript() {

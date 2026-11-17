@@ -165,3 +165,36 @@ it('restores the original hook when still the current owner', () => {
   test.dispose()
   expect(test.conversation.sendSession).toBe(test.original)
 })
+
+it('reads the browser projection face directly when no selection resolver is supplied', async () => {
+  const test = fixture(false, 'project-relay')
+  test.dispose()
+  disposers.push(installRelaySendGuard(test.conversation, document, () => '暂未登录', test.readStatus))
+  expect(await test.send()).toEqual({ kind: 'error', text: '暂未登录' })
+  expect(test.original).not.toHaveBeenCalled()
+  expect(test.required).toHaveBeenCalledOnce()
+  test.state.next = { provider: 'official', model: 'switched' }
+  expect(await test.send()).toEqual({ kind: 'success' })
+  expect(test.original).toHaveBeenCalledOnce()
+  expect(test.readStatus).toHaveBeenCalledOnce()
+})
+
+it.each([
+  // These are Agent wire views: next is pending ?? lastUsed, not host pending.
+  ['pending relay overrides last-used official', { next: { provider: 'project-relay', model: 'new' }, lastUsed: { provider: 'official', model: 'old' } }, true],
+  ['pending official overrides last-used relay', { next: { provider: 'official', model: 'new' }, lastUsed: { provider: 'project-relay', model: 'old' } }, false],
+  ['no pending selection retains last-used relay', { next: { provider: 'project-relay', model: 'old' }, lastUsed: { provider: 'project-relay', model: 'old' } }, true],
+  ['blank session has no recorded selection', { next: null, lastUsed: null }, false],
+] as const)('honors the actual SDK wire view: %s', async (_name, projection, blocked) => {
+  const test = fixture()
+  test.dispose()
+  const session = { projections: { faceOf: (key: string) => {
+    expect(key).toBe('modelSelection')
+    return { getSnapshot: () => projection }
+  } } } as unknown as SessionFace
+  disposers.push(installRelaySendGuard(test.conversation, document, () => '暂未登录', test.readStatus))
+  expect((await test.conversation.sendSession(session, 'retained prompt', [], 'queue')).kind).toBe(blocked ? 'error' : 'success')
+  expect(test.readStatus).toHaveBeenCalledTimes(blocked ? 1 : 0)
+  expect(test.required).toHaveBeenCalledTimes(blocked ? 1 : 0)
+  expect(test.original).toHaveBeenCalledTimes(blocked ? 0 : 1)
+})

@@ -3,7 +3,8 @@ import z from '@deepseek-ai/schemastery';
 import { DEFAULT_MEMORY_CONFIG, normalizeMemoryConfig, } from "./core/config.js";
 import { MemoryService, } from "./core/service.js";
 import { MEMORY_PROMPT_SECTION_TEMPLATE, } from "./core/rank.js";
-import { extractCurrentUserQuery } from "./core/query.js";
+import { extractCurrentUserQuery, extractPendingUserQuery } from "./core/query.js";
+import { MAX_MEMORY_QUERY_LENGTH } from "./core/schema.js";
 import { createMemoryTool } from "./tools.js";
 import { makeMemoryRoutes } from "./routes.js";
 export const name = 'memory';
@@ -65,6 +66,10 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
         const entry = sessionsById.get(String(session.id));
         if (entry === undefined)
             return undefined;
+        const liveScope = service.currentScope();
+        if (liveScope === undefined || liveScope.principalId !== entry.scope.principalId
+            || liveScope.source !== entry.scope.source || liveScope.deviceId !== entry.scope.deviceId)
+            return undefined;
         return service.contextFor(entry.scope, { sessionId: String(session.id) });
     };
     const hydrate = async (entry) => {
@@ -112,6 +117,10 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
     ctx.on('session/event', function (session, event) {
         const entry = sessionsById.get(String(session.id));
         if (entry !== undefined) {
+            if (event.type === 'turn/end') {
+                delete entry.pendingQuery;
+                delete entry.pendingTurn;
+            }
             entry.events = [...entry.events, event];
             void hydrate(entry);
         }
@@ -121,6 +130,32 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
         if (entry !== undefined)
             await hydrate(entry);
     });
+    ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
+        const entry = sessionsById.get(String(agent.session.id));
+        if (entry === undefined)
+            return;
+        if (entry.pendingTurn !== turn)
+            entry.pendingQuery = '';
+        entry.pendingTurn = turn;
+        // rc.3 assembles before pre-step admission and user/message commit.
+        // Keep only claimed direct-user text; never change the durable log.
+        entry.pendingQuery = [entry.pendingQuery, extractPendingUserQuery(agent.session.header, [message])]
+            .filter(Boolean).join('\n').slice(0, MAX_MEMORY_QUERY_LENGTH);
+    });
+    ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+        const entry = context.scope === undefined ? undefined : sessionScopes.get(context.scope);
+        if (entry !== undefined && currentConfig().enabled && contextForSession(entry.session) !== undefined)
+            await hydrate(entry);
+        const value = resolvedMemoryVariable(context.scope);
+        // Populate our mutable registry presentation before downstream editors
+        // capture it. Their subsequent filtering/replacement remains authoritative.
+        for (const section of assembly.sections) {
+            if (section.name === 'dsh:memory')
+                section.text = value === '' ? '' : MEMORY_PROMPT_SECTION_TEMPLATE;
+        }
+        assembly.variables.dsh_memory = value;
+        return next();
+    }, { prepend: true });
     // Sessions already live when the plugin is mounted are registered for
     // ownership. Prompt injection still requires an actual scoped carrier key.
     for (const session of ctx.sessions.list())
@@ -162,10 +197,10 @@ export function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
             const entry = sessionScopes.get(scope);
             if (entry === undefined)
                 return '';
-            const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
+            const memoryContext = contextForSession(entry.session);
             if (memoryContext === undefined)
                 return '';
-            return service.prepare(memoryContext, extractCurrentUserQuery({
+            return service.prepare(memoryContext, entry.pendingQuery ?? extractCurrentUserQuery({
                 header: entry.session.header,
                 events: entry.events,
             }), currentConfig().enabled);

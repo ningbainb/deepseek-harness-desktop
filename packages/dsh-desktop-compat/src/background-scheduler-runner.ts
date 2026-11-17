@@ -276,14 +276,13 @@ export function createDesktopTaskBoardHostScheduleRunner(
         const agentOptions = {
           provider: selection.provider,
           model: selection.model,
+          ...(selection.reasoningEffort === undefined ? {} : { reasoningEffort: selection.reasoningEffort }),
         }
         const setup = (agentCtx: Parameters<NonNullable<Parameters<AgentRegistry['create']>[0]['setup']>>[0]) => {
           // Agent setup is composition-only. The Agent scope owns the
           // selection listeners and unwinds them with the handle lifecycle.
-          installModelSelection(agentCtx, {
-            current: selection,
-            assembled: undefined,
-          })
+          // The SDK owns durable selection; agentOptions supplies the route.
+          installModelSelection(agentCtx)
         }
         const persisted = options.sessionPersistence === undefined
           ? false

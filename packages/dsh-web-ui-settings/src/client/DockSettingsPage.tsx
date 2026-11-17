@@ -2,12 +2,13 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 import type { DesktopPalette } from './desktop-appearance.ts'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
+import { BrowserComponentCard } from './BrowserComponentCard.tsx'
 import { AgentTeamSettingsCard } from './AgentTeamSettingsCard.tsx'
 import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
 import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
 
-export const DOCK_SETTINGS = ['control-center', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
+export const DOCK_SETTINGS = ['control-center', 'shared-browser', 'agent-team', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
 export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions', 'skill-market': 'agent-plugin-workspace' } as const
@@ -121,7 +122,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
   } as CSSProperties : undefined
   return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')}{!personal && selected !== 'value-mode' && <> / {selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</>}</p>
+    <p className={css.breadcrumb}>{selected === 'value-mode' ? '设置 / 模型 / 高级' : selected === 'shared-browser' || selected === 'agent-team' || selected === 'control-center' ? '更多工具' : t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')}{!personal && selected !== 'value-mode' && <> / {selected === 'shared-browser' ? '共享浏览器' : selected === 'agent-team' ? '团队功能开关' : selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</>}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -135,19 +136,20 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
       </div>
     </>}
     {selected === 'value-mode' && <div className={css.collaborationIntro}>
-      <h1 className={css.heading}>{t('dockCollaboration')}</h1>
+      <h1 className={css.heading}>模型高级：性价比模式</h1>
       <details className={css.disclosure} data-dock-page-details>
         <summary>{t('dockDetails')}</summary>
-        <p>Agent Team 负责多角色协作，性价比模式负责模型分工与成本控制；两者可独立开启，也可同时使用。</p>
-        <p>复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。</p>
+        <p>性价比模式负责主控、执行模型分工与成本控制，保留已保存的模型 ID 和配置。</p>
+        <p>团队成员、任务与协作操作位于会话中；团队功能开关位于更多工具。</p>
       </details>
     </div>}
     {selected === 'models' && <details className={css.modelDiscoveryHint} data-dock-connection-details><summary>{t('dockConnectionDetails')}</summary><p>bai 登录或填写 Key 后会自动同步可用模型，模型 ID 就是显示名称。其他自定义供应商可在提供方卡片中填写端点后使用“获取可用模型”；显示名称可留空，默认使用模型 ID。</p></details>}
     {visited.map(id => <section key={id} id={`dock-form-${id}`} hidden={id !== selected} className={css.content} role={id === 'memory' || id === 'personal-prompt' ? 'tabpanel' : undefined} aria-labelledby={id === 'memory' || id === 'personal-prompt' ? `${id}-tab` : undefined}>
       <SafePluginBoundary pluginName={id} fallback={<p role="alert">{t('dockSettingUnavailable')}</p>}>
+        {id === 'shared-browser' && <BrowserComponentCard active={id === selected} />}
         {id === 'control-center' && <ControlCenterSettingsCard />}
-        {id === 'value-mode' && <AgentTeamSettingsCard detailsLabel={t('dockDetails')} cautionLabel={t('dockAgentTeamCaution')} />}
-        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'control-center' ? null : sectionFor(id)
+        {id === 'agent-team' && <AgentTeamSettingsCard detailsLabel={t('dockDetails')} cautionLabel={t('dockAgentTeamCaution')} />}
+        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'shared-browser' || id === 'control-center' || id === 'agent-team' ? null : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
             {id === 'appearance'
               ? renderSlot('settings.section', { close: () => {} }, { only: 'skin-center', fallback: renderSlot('web-ui.plugin.item', {}, { only: 'skins', fallback: <p role="status">{t('dockSettingUnavailable')}</p> }) })

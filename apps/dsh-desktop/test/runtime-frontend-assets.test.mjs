@@ -2,9 +2,15 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
+import { Context } from '@deepseek-ai/cordis'
+import { apply as mountPipeWebServer } from '@linxin666/dsh-desktop-pipe-webserver'
 
 import { createDesktopFrontendFetch } from '../src/runtime-frontend-assets.mjs'
+import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from '../src/profile.mjs'
+import { BoundedLogStore } from '../src/log-store.mjs'
+import { DEFAULT_STARTUP_TIMEOUT_MS, DshRuntimeController } from '../src/runtime-controller.mjs'
 
 async function fixture(context, options = {}) {
   const dist = await mkdtemp(join(tmpdir(), 'desktop-frontend-assets-'))
@@ -42,6 +48,105 @@ test('frontend root and extensionless session routes retain per-request renderin
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('cache-control'), 'no-store')
     assert.equal(await response.text(), '<html><head><script>transport()</script></head><body>rendered</body></html>')
+  }
+})
+
+test('frontend index carries the admitted browser Peer into actual SDK access injections', async context => {
+  const ctx = new Context()
+  context.after(() => ctx.fiber.dispose())
+  mountPipeWebServer(ctx)
+  const root = resolveRuntimePackages().get('@deepseek-ai/dsh-api-remote-access')
+  const { default: RemoteAccess } = await import(pathToFileURL(join(root, 'lib', 'index.js')).href)
+  await ctx.plugin(RemoteAccess)
+  const browserPeer = Object.freeze({ principal: Object.freeze({ kind: 'owner' }) })
+  const restrictedPeer = Object.freeze({ principal: Object.freeze({ kind: 'fixture-restricted' }) })
+  const { request } = await fixture(context, {
+    renderIndex: html => ctx.webServer.renderIndex(html, browserPeer),
+  })
+  const response = await request('/')
+  assert.equal(response.status, 200)
+  const html = await response.text()
+  assert.match(html, /"owner":true/u)
+  assert.match(html, /transport\(\)/u)
+  const restrictedHtml = ctx.webServer.renderIndex('<html><head></head></html>', restrictedPeer)
+  assert.doesNotMatch(restrictedHtml, /"owner":true/u)
+  assert.throws(() => ctx.webServer.renderIndex('<html><head></head></html>'), /principal/u)
+})
+
+test('actual pipe runtime serves its authenticated index, plugin bundle and browser API', { timeout: DEFAULT_STARTUP_TIMEOUT_MS + 30_000 }, async () => {
+  const home = await mkdtemp(join(tmpdir(), 'desktop-frontend-pipe-'))
+  const logs = new BoundedLogStore({ directory: join(home, 'logs') })
+  let controller
+  try {
+    await ensureDesktopProfile({ dshHome: home })
+    controller = new DshRuntimeController({ cliPath: resolveDshCliPath(), cwd: process.cwd(),
+      dshHome: home, transport: 'pipe', logStore: logs,
+      patchFiles: [fileURLToPath(new URL('../runtime-support/desktop-pipe.patch.yml', import.meta.url))] })
+    await controller.start()
+    const response = await controller.fetch('http://dsh.internal/')
+    assert.equal(response.status, 200)
+    assert.match(response.headers.get('content-type'), /text\/html/u)
+    const html = await response.text()
+    assert.match(html, /"owner":true/u)
+    const plugin = html.match(/(?:src|href)="(\/?plugins\/[^"]+)"/u)?.[1]
+    assert.ok(plugin, 'authenticated index must advertise a plugin resource')
+    const bundle = await controller.fetch(new URL(plugin.replaceAll('&amp;', '&'), 'http://dsh.internal/'))
+    assert.equal(bundle.status, 200)
+    assert.ok((await bundle.text()).length > 0)
+    const api = await controller.fetch('http://dsh.internal/api/agentPresets/list', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 'frontend-pipe-presets',
+        method: 'agentPresets/list', payload: { args: {} } }),
+    })
+    assert.equal(api.status, 200)
+    const body = await api.json()
+    assert.equal(body.result?.ok, true)
+    assert.ok(body.result.value.presets.some(preset => !preset.broken))
+    const rpc = async (method, args) => {
+      const response = await controller.fetch(`http://dsh.internal/api/${method}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: method, method, payload: { args } }),
+      })
+      const result = await response.json()
+      assert.equal(result.result?.ok, true, JSON.stringify(result))
+      return result.result.value
+    }
+    const workspacePath = join(home, 'workspace')
+    await mkdir(workspacePath)
+    const { workspace } = await rpc('workspace/create', { request: { path: workspacePath } })
+    const preset = body.result.value.presets.find(preset => !preset.broken)
+    const created = await rpc('session/create', { request: { workspaceId: workspace.workspaceId, agentPreset: preset.id } })
+    const follow = controller.openDuplex('session/follow', { args: { request: {
+      address: { kind: 'session', sessionId: created.sessionId }, assistantStream: true,
+    } } }, AbortSignal.timeout(10_000))
+    const following = follow[Symbol.asyncIterator]()
+    try {
+      const first = await following.next()
+      assert.equal(first.done, false)
+      assert.equal(first.value.type, 'snapshot')
+      assert.equal(first.value.header.id, created.sessionId)
+    } finally {
+      follow.cancel()
+      await following.return()
+    }
+    for (const [endpoint, expectedType] of [['$events', 'ready'], ['remoteAccess/follow', 'baseline']]) {
+      const duplex = controller.openDuplex(endpoint, { args: {} }, AbortSignal.timeout(10_000))
+      const iterator = duplex[Symbol.asyncIterator]()
+      try {
+        const first = await iterator.next()
+        assert.equal(first.done, false)
+        assert.equal(first.value.type, expectedType)
+      } finally {
+        duplex.cancel()
+        await iterator.return()
+      }
+    }
+  } catch (error) {
+    throw new Error(`${error.message}\nRecent runtime log:\n${await logs.tail(35)}`, { cause: error })
+  } finally {
+    await controller?.stop()
+    await logs.queue
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })
 

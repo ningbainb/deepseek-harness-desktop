@@ -979,7 +979,16 @@ function sameTarget(a, b) {
 //#region src/core/query.ts
 function textFromEvent(event) {
 	if (event.type !== "user/message" || event.data.source.kind !== "user") return "";
-	return event.data.content.filter((block) => block.type === "text").map((block) => block.text).join("\n").replace(/\[(?:image|file|office) attachment\b[^\]]*\]/giu, "").replace(/<attachment\b[^>]*>[\s\S]*?<\/attachment>/giu, "").trim();
+	return directUserText(event.data);
+}
+function directUserText(message) {
+	if (message.source.kind !== "user") return "";
+	return message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n").replace(/\[(?:image|file|office) attachment\b[^\]]*\]/giu, "").replace(/<attachment\b[^>]*>[\s\S]*?<\/attachment>/giu, "").trim();
+}
+/** Read uncommitted direct-user input from the official pre-step admission batch. */
+function extractPendingUserQuery(header, messages) {
+	if (header.origin === "subagent") return "";
+	return messages.map(directUserText).filter(Boolean).join("\n").slice(0, MAX_MEMORY_QUERY_LENGTH);
 }
 /** Return only direct user text after the latest turn/start boundary. */
 function extractCurrentUserQuery(session) {
@@ -1585,6 +1594,8 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	const contextForSession = (session) => {
 		const entry = sessionsById.get(String(session.id));
 		if (entry === void 0) return void 0;
+		const liveScope = service.currentScope();
+		if (liveScope === void 0 || liveScope.principalId !== entry.scope.principalId || liveScope.source !== entry.scope.source || liveScope.deviceId !== entry.scope.deviceId) return void 0;
 		return service.contextFor(entry.scope, { sessionId: String(session.id) });
 	};
 	const hydrate = async (entry) => {
@@ -1624,6 +1635,10 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	ctx.on("session/event", function(session, event) {
 		const entry = sessionsById.get(String(session.id));
 		if (entry !== void 0) {
+			if (event.type === "turn/end") {
+				delete entry.pendingQuery;
+				delete entry.pendingTurn;
+			}
 			entry.events = [...entry.events, event];
 			hydrate(entry);
 		}
@@ -1632,6 +1647,21 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 		const entry = sessionsById.get(String(agent.session.id));
 		if (entry !== void 0) await hydrate(entry);
 	});
+	ctx.on("agent/inbox/claimed", ({ agent, message, turn }) => {
+		const entry = sessionsById.get(String(agent.session.id));
+		if (entry === void 0) return;
+		if (entry.pendingTurn !== turn) entry.pendingQuery = "";
+		entry.pendingTurn = turn;
+		entry.pendingQuery = [entry.pendingQuery, extractPendingUserQuery(agent.session.header, [message])].filter(Boolean).join("\n").slice(0, MAX_MEMORY_QUERY_LENGTH);
+	});
+	ctx.on("system-prompt/assemble", async (assembly, context, next) => {
+		const entry = context.scope === void 0 ? void 0 : sessionScopes.get(context.scope);
+		if (entry !== void 0 && currentConfig().enabled && contextForSession(entry.session) !== void 0) await hydrate(entry);
+		const value = resolvedMemoryVariable(context.scope);
+		for (const section of assembly.sections) if (section.name === "dsh:memory") section.text = value === "" ? "" : MEMORY_PROMPT_SECTION_TEMPLATE;
+		assembly.variables.dsh_memory = value;
+		return next();
+	}, { prepend: true });
 	for (const session of ctx.sessions.list()) rememberSession(void 0, session);
 	ctx.effect(() => {
 		const disposeSection = ctx.systemPrompt.section({
@@ -1667,9 +1697,9 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 			if (scope === void 0) return "";
 			const entry = sessionScopes.get(scope);
 			if (entry === void 0) return "";
-			const memoryContext = service.contextFor(entry.scope, { sessionId: String(entry.session.id) });
+			const memoryContext = contextForSession(entry.session);
 			if (memoryContext === void 0) return "";
-			return service.prepare(memoryContext, extractCurrentUserQuery({
+			return service.prepare(memoryContext, entry.pendingQuery ?? extractCurrentUserQuery({
 				header: entry.session.header,
 				events: entry.events
 			}), currentConfig().enabled);
@@ -1679,4 +1709,4 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	}
 }
 //#endregion
-export { Config, DEFAULT_MEMORY_CONFIG, MAX_MEMORY_CONTENT_LENGTH, MAX_MEMORY_ID_LENGTH, MAX_MEMORY_INJECTION_ITEMS, MAX_MEMORY_INJECTION_LENGTH, MAX_MEMORY_ITEMS, MAX_MEMORY_QUERY_LENGTH, MAX_MEMORY_TAGS, MAX_MEMORY_TAG_LENGTH, MAX_PENDING_MEMORY_SUGGESTIONS, MEMORY_API_PREFIX, MEMORY_PROMPT_SECTION_TEMPLATE, MEMORY_SCHEMA_VERSION, MEMORY_SENSITIVE_MESSAGE, MEMORY_SETTINGS_NAMESPACE, MemoryAccessError, MemoryNotFoundError, MemoryService, MemoryStore, MemoryStoreError, MemoryValidationError, apply, assertMemoryConfig, assertMemoryItem, assertMemorySnapshot, containsSensitiveMemoryContent, createMemoryItem, createMemoryTool, emptyMemorySnapshot, extractCurrentUserQuery, inject, isMemoryScope, isMemorySource, isSafeMemoryId, makeMemoryRoutes, memoryScopeMatches, name, normalizeMemoryConfig, normalizeMemorySnapshot, rankMemories, renderMemoryItems, toPublicMemoryItem };
+export { Config, DEFAULT_MEMORY_CONFIG, MAX_MEMORY_CONTENT_LENGTH, MAX_MEMORY_ID_LENGTH, MAX_MEMORY_INJECTION_ITEMS, MAX_MEMORY_INJECTION_LENGTH, MAX_MEMORY_ITEMS, MAX_MEMORY_QUERY_LENGTH, MAX_MEMORY_TAGS, MAX_MEMORY_TAG_LENGTH, MAX_PENDING_MEMORY_SUGGESTIONS, MEMORY_API_PREFIX, MEMORY_PROMPT_SECTION_TEMPLATE, MEMORY_SCHEMA_VERSION, MEMORY_SENSITIVE_MESSAGE, MEMORY_SETTINGS_NAMESPACE, MemoryAccessError, MemoryNotFoundError, MemoryService, MemoryStore, MemoryStoreError, MemoryValidationError, apply, assertMemoryConfig, assertMemoryItem, assertMemorySnapshot, containsSensitiveMemoryContent, createMemoryItem, createMemoryTool, emptyMemorySnapshot, extractCurrentUserQuery, extractPendingUserQuery, inject, isMemoryScope, isMemorySource, isSafeMemoryId, makeMemoryRoutes, memoryScopeMatches, name, normalizeMemoryConfig, normalizeMemorySnapshot, rankMemories, renderMemoryItems, toPublicMemoryItem };

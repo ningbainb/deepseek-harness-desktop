@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rename, rmdir, unlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
@@ -13,6 +14,12 @@ export const SHARED_ELECTRON_FILES = Object.freeze([
   'ffmpeg.dll', 'vk_swiftshader.dll', 'vulkan-1.dll',
 ])
 export const sha256 = data => createHash('sha256').update(data).digest('hex')
+
+async function fileSHA256(path) {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
+  return hash.digest('hex')
+}
 
 export function runtimeInstallerInclude(core, extractionCore) {
   if (extractionCore !== undefined) {
@@ -105,27 +112,45 @@ export async function stageInstallerRestorationHelper(appOutDir, helperPath) {
 }
 
 /** Temporarily compact only this verified staging tree; restore must run in finally. */
-export async function prepareInstallerElectronPayload(appOutDir) {
+export async function prepareInstallerElectronPayload(appOutDir, { compactRuntime = true, externalBrowserRuntime = false } = {}) {
   const root = resolve(appOutDir)
   if ((await realpath(root)).toLowerCase() !== root.toLowerCase() || !(await lstat(root)).isDirectory()) throw new Error('Linked application directory is not allowed')
   const main = await plainFile(root, 'DeepSeek Harness Desktop.exe')
-  const electron = await plainFile(root, ELECTRON_DIST + 'electron.exe')
-  const packagePath = await plainFile(root, 'resources/app.asar.unpacked/node_modules/electron/package.json')
+  if (externalBrowserRuntime) compactRuntime = false
+  const electron = externalBrowserRuntime ? undefined : await plainFile(root, ELECTRON_DIST + 'electron.exe')
+  const packagePath = await plainFile(root, externalBrowserRuntime
+    ? 'resources/app.asar.unpacked/runtime-support/browser-component.json'
+    : 'resources/app.asar.unpacked/node_modules/electron/package.json')
   const pkg = JSON.parse(await readFile(packagePath, 'utf8'))
-  if (pkg.name !== 'electron' || !/^\d+\.\d+\.\d+$/u.test(pkg.version)) throw new Error('Invalid Electron manifest')
-  const files = [], withheld = []
-  for (const name of SHARED_ELECTRON_FILES) {
+  let electronVersion = pkg.version
+  if (externalBrowserRuntime) {
+    const artifacts = pkg.artifacts?.filter(artifact => artifact.platform === 'win32' && artifact.arch === 'x64')
+    if (pkg.schemaVersion !== 1 || pkg.component !== 'browser-electron' || artifacts?.length !== 1
+      || artifacts[0].version !== '44.7.0' || !/^[a-f0-9]{64}$/u.test(artifacts[0].sha256)
+      || !Number.isSafeInteger(artifacts[0].size) || artifacts[0].size <= 0) throw new Error('Invalid Windows browser component manifest')
+    electronVersion = artifacts[0].version
+  }
+  if ((!externalBrowserRuntime && pkg.name !== 'electron') || !/^\d+\.\d+\.\d+$/u.test(electronVersion)) throw new Error('Invalid Electron manifest')
+  const files = [], withheld = [], requiredTargets = externalBrowserRuntime ? [
+    'DeepSeek Harness Desktop.exe',
+    'resources/app.asar',
+    'resources/app.asar.unpacked/package.json',
+    'resources/app.asar.unpacked/runtime-support/browser-component.json',
+  ] : [ELECTRON_DIST + 'electron.exe']
+  for (const name of externalBrowserRuntime ? [] : SHARED_ELECTRON_FILES) {
     const sourcePath = await plainFile(root, name, true)
     const targetPath = await plainFile(root, ELECTRON_DIST + name, true)
     if (!sourcePath || !targetPath) continue
+    requiredTargets.push(ELECTRON_DIST + name)
+    if (!compactRuntime) continue
     const source = await readFile(sourcePath), target = await readFile(targetPath)
     if (source.length !== target.length || sha256(source) !== sha256(target)) continue
     files.push({ source: name, target: ELECTRON_DIST + name, size: target.length,
       sha256: sha256(target), sourceSize: source.length, sourceSHA256: sha256(source) })
   }
-  const plan = createElectronReusePlan(await readFile(main), await readFile(electron))
+  const plan = compactRuntime ? createElectronReusePlan(await readFile(main), await readFile(electron)) : undefined
   // If a future Electron layout stops matching, retain the full independent EXE.
-  const compactExe = plan.literal.length <= 1024 * 1024 && plan.literal.length <= plan.targetSize / 2
+  const compactExe = plan && plan.literal.length <= 1024 * 1024 && plan.literal.length <= plan.targetSize / 2
   if (compactExe) files.push({ source: 'DeepSeek Harness Desktop.exe', target: ELECTRON_DIST + 'electron.exe',
     size: plan.targetSize, sha256: plan.targetSHA256, sourceSize: plan.sourceSize,
     sourceSHA256: plan.sourceSHA256, ranges: plan.ranges })
@@ -135,8 +160,18 @@ export async function prepareInstallerElectronPayload(appOutDir) {
   await plainFile(root, RECONSTRUCTION_DIRECTORY + '/manifest.json', true)
   await plainFile(root, RECONSTRUCTION_DIRECTORY + '/electron-literal.bin', true)
   await mkdir(metadata, { recursive: true })
-  const manifest = { schemaVersion: 1, electronVersion: pkg.version,
+  const completeFiles = []
+  if (!compactRuntime) {
+    if (!externalBrowserRuntime) requiredTargets.push('resources/app.asar.unpacked/node_modules/electron/package.json')
+    for (const target of requiredTargets) {
+      const path = await plainFile(root, target)
+      completeFiles.push({ target, size: (await lstat(path)).size, sha256: await fileSHA256(path) })
+    }
+  }
+  const manifest = { schemaVersion: 1, electronVersion,
     literal: { path: RECONSTRUCTION_DIRECTORY + '/electron-literal.bin', size: literal.length, sha256: sha256(literal) }, files }
+  if (!compactRuntime) manifest.completeFiles = completeFiles
+  if (externalBrowserRuntime) Object.assign(manifest, { schemaVersion: 2, payloadKind: 'external-browser' })
   await writeFile(join(metadata, 'electron-literal.bin'), literal)
   const manifestBytes = JSON.stringify(manifest, null, 2) + '\n'
   await writeFile(join(metadata, 'manifest.json'), manifestBytes)
@@ -167,7 +202,8 @@ export async function prepareInstallerElectronPayload(appOutDir) {
     const adapted = runtimeInstallerInclude(core, extraction)
     const adapter = { schemaVersion: 2, directory: staging, manifestSHA256: sha256(manifestBytes),
       coreTemplateSHA256: sha256(core), overrideSHA256: sha256(adapted), builderVersion: '26.15.3',
-      restorationBytes: files.reduce((sum, file) => sum + file.size, 0), omittedTargets: files.map(f => f.target) }
+      restorationBytes: files.reduce((sum, file) => sum + file.size, 0), omittedTargets: files.map(f => f.target),
+      fullRuntime: !compactRuntime, externalBrowserRuntime, requiredTargets }
     for (const [name, content] of [['installer.nsh', adapted], ['adapter.json', JSON.stringify(adapter, null, 2)]]) {
       const path = join(staging, name)
       await writeFile(path, content, { flag: 'wx' })

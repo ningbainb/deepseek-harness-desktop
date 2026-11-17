@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { deferModalReveal } from './modal-reveal.mjs'
 import { AFDIAN_SPONSOR_URL } from './community-links.mjs'
@@ -9,7 +10,8 @@ export function renderSponsorQr() {
   return sponsorQr ??= renderQrDataUrl(AFDIAN_SPONSOR_URL, { width: 288, margin: 4, errorCorrectionLevel: 'M', color: { dark: '#10131aff', light: '#ffffffff' } }).catch(error => { sponsorQr = undefined; throw error })
 }
 
-export const STAR_PROMPT_VERSION = '5.2.0'
+// Follow the shipped Desktop manifest so release bumps cannot leave this prompt stale.
+export const STAR_PROMPT_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
 
 function normalizeShownVersions(value) {

@@ -8,7 +8,8 @@ const require = createRequire(new URL('../package.json', import.meta.url))
 const { parse } = require('yaml')
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href)
 const { ApprovalService, setApprovalPolicy } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-user-approval')).href)
-const { Session, SessionId } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session')).href)
+const { default: SessionStore } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session')).href)
+const { default: SessionProjections } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-projection')).href)
 
 async function exercise({ answer = 'allowed-once', override, aborted = false } = {}) {
   const rows = parse(FULL_USER_RUNTIME_OVERLAY)
@@ -19,8 +20,12 @@ async function exercise({ answer = 'allowed-once', override, aborted = false } =
     prompts.push(request.toolName)
     return answer
   })
-  const approval = new ApprovalService(ctx, rows.find(row => row.id === 'approval').config)
-  const session = Session.create(SessionId('desktop-browser-approval'))
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjections)
+  await ctx.plugin(ApprovalService, rows.find(row => row.id === 'approval').config)
+  const approval = ctx.approval
+  assert.ok(approval instanceof ApprovalService)
+  const session = ctx.sessions.create()
   session.append('turn/start', { turn: 1 })
   if (override) setApprovalPolicy(session, override)
   const controller = new AbortController()

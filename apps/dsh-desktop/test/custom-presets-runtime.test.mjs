@@ -1,11 +1,121 @@
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import test from 'node:test'
+import { Context } from '@deepseek-ai/cordis'
+import Loader from '@deepseek-ai/cordis-plugin-loader'
+import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { createScope } from '@deepseek-ai/dsh-scope'
+import * as SubagentListCompatibility from '../src/runtime-subagent-list-compat.mjs'
 import { BoundedLogStore } from '../src/log-store.mjs'
 import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from '../src/profile.mjs'
 import { DshRuntimeController } from '../src/runtime-controller.mjs'
+
+async function createToolContext() {
+  const ctx = new Context()
+  const promptRoot = resolveRuntimePackages().get('@deepseek-ai/dsh-system-prompt')
+  const { default: SystemPrompt } = await import(pathToFileURL(join(promptRoot, 'lib', 'index.js')).href)
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
+  return ctx
+}
+
+test('legacy discovery compatibility rejects a missing control provider', async () => {
+  const ctx = await createToolContext()
+  try {
+    await assert.rejects(SubagentListCompatibility.apply(ctx), /requires a sibling subagent-control provider/u)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('legacy discovery rows retain the actual SDK control tools without duplicate registration', async () => {
+  const ctx = await createToolContext()
+  try {
+    await ctx.plugin(Loader)
+    ctx.provide('subagents', {})
+    ctx.provide('agents', {})
+    const controlRoot = resolveRuntimePackages().get('@deepseek-ai/dsh-tool-subagent-control')
+    const control = await import(pathToFileURL(join(controlRoot, 'lib', 'index.js')).href)
+    const modules = new Map([
+      ['@deepseek-ai/dsh-tool-subagent-control', control],
+      [SubagentListCompatibility.RETIRED_SUBAGENT_LIST_SPECIFIER, SubagentListCompatibility],
+    ])
+    ctx.loader.internal = { version: 'client', import: async name => {
+      assert.ok(modules.has(name))
+      if (name === '@deepseek-ai/dsh-tool-subagent-control') await new Promise(resolve => setImmediate(resolve))
+      return modules.get(name)
+    } }
+    const key = {}
+    const { EntryTree } = await import('@deepseek-ai/cordis-plugin-loader')
+    class MemoryTree extends EntryTree { commit() {} }
+    await ctx.plugin({ inject: ['loader'], async apply(child) {
+      const scope = createScope(child, key)
+      const tree = new MemoryTree(scope.ctx)
+      await Promise.all([
+        tree.create({ id: 'tool-subagent-control', name: '@deepseek-ai/dsh-tool-subagent-control' }),
+        tree.create({ id: 'tool-subagent-list-agents', name: SubagentListCompatibility.RETIRED_SUBAGENT_LIST_SPECIFIER }),
+      ])
+      await tree.await()
+      const legacy = tree.resolve('tool-subagent-list-agents').fiber
+      await legacy.await()
+      assert.equal(legacy.state, 2)
+    } })
+    for (const name of ['list_agents', 'send_message', 'interrupt_agent']) {
+      assert.equal(ctx.tools.schemas(key).filter(tool => tool.name === name).length, 1)
+      assert.equal(ctx.tools.get(name), undefined)
+    }
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('legacy discovery compatibility rejects a disabled sibling provider', async () => {
+  const ctx = await createToolContext()
+  try {
+    await ctx.plugin(Loader)
+    ctx.provide('subagents', {})
+    ctx.provide('agents', {})
+    ctx.loader.internal = { version: 'client', import: async () => SubagentListCompatibility }
+    await ctx.loader.create({ id: 'tool-subagent-control', name: '@deepseek-ai/dsh-tool-subagent-control', disabled: true })
+    await ctx.loader.create({ id: 'tool-subagent-list-agents', name: SubagentListCompatibility.RETIRED_SUBAGENT_LIST_SPECIFIER })
+    const legacy = ctx.loader.resolve('tool-subagent-list-agents').fiber
+    await assert.rejects(legacy.await(), /requires a sibling subagent-control provider/u)
+    assert.equal(ctx.tools.get('list_agents'), undefined)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+})
+
+test('legacy discovery resolution preserves existing exports and unrelated failures', () => {
+  const resolve = SubagentListCompatibility.resolveDesktopSubagentListCompatibility
+  const retired = SubagentListCompatibility.RETIRED_SUBAGENT_LIST_SPECIFIER
+  const current = { url: 'file:///existing-export.mjs' }
+  assert.equal(resolve(retired, {}, () => current), current)
+  const denied = Object.assign(new Error('not exported'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
+  assert.match(resolve(retired, {}, () => { throw denied }).url, /runtime-subagent-list-compat\.mjs$/u)
+  assert.throws(() => resolve('unrelated/package', {}, () => { throw denied }), error => error === denied)
+  const missing = Object.assign(new Error('missing package'), { code: 'ERR_MODULE_NOT_FOUND' })
+  assert.throws(() => resolve(retired, {}, () => { throw missing }), error => error === missing)
+})
+
+test('legacy discovery resolution hook is removed with its owning context', async () => {
+  const ctx = new Context()
+  const root = resolveRuntimePackages().get('@deepseek-ai/dsh-tool-subagent-control')
+  const require = createRequire(join(root, 'package.json'))
+  const retired = SubagentListCompatibility.RETIRED_SUBAGENT_LIST_SPECIFIER
+  try {
+    assert.throws(() => require.resolve(retired), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
+    SubagentListCompatibility.installDesktopSubagentListCompatibility(ctx)
+    assert.match(require.resolve(retired), /runtime-subagent-list-compat\.mjs$/u)
+  } finally {
+    await ctx.fiber.dispose()
+  }
+  assert.throws(() => require.resolve(retired), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
+})
 
 // Actual official Host and preset composition, isolated Home, no model request.
 test('upgraded custom presets mount and create sessions through the official runtime', { timeout: 90_000 }, async () => {

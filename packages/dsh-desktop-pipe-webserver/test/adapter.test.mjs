@@ -144,6 +144,20 @@ test('adapter ignores asynchronous response writes after request cancellation', 
   await lateWrite
 })
 
+test('adapter resolves late Connection through its actual plugin context without a dependency cycle', async context => {
+  const ctx = new Context()
+  context.after(() => ctx.fiber.dispose())
+  await ctx.plugin({ apply })
+  ctx.provide('connection', { authorizeIndex(_request, response) {
+    response.writeHead(303, { 'set-cookie': 'official=fixture; HttpOnly; SameSite=Strict' })
+    response.end()
+    return false
+  } })
+  const response = await ctx.webServer.authorizeIndex(new Request('http://dsh.internal/'))
+  assert.equal(response.status, 303)
+  assert.equal(response.headers.get('set-cookie'), 'official=fixture; HttpOnly; SameSite=Strict')
+})
+
 test('adapter renders structured injections and raw index taps', () => {
   const ctx = new Context()
   const web = new DesktopPipeWebServer(ctx)
@@ -152,6 +166,23 @@ test('adapter renders structured injections and raw index taps', () => {
   const html = web.renderIndex('<html><head></head><body></body></html>')
   assert.match(html, /__TEST__/u)
   assert.match(html, /<p>tap<\/p>/u)
+})
+
+test('adapter forwards the exact admitted Peer to every fresh index injection', () => {
+  const ctx = new Context()
+  const web = new DesktopPipeWebServer(ctx)
+  const observed = []
+  ctx.on('webserver/index-inject', (table, peer) => {
+    observed.push(peer)
+    table.push({ kind: 'global', name: '__PRINCIPAL__', value: peer.principal })
+  })
+  const owner = { principal: { kind: 'owner' } }
+  const visitor = { principal: { kind: 'visitor' } }
+  assert.match(web.renderIndex('<head></head>', owner), /owner/u)
+  assert.match(web.renderIndex('<head></head>', visitor), /visitor/u)
+  assert.deepEqual(observed, [owner, visitor])
+  assert.equal(observed[0], owner)
+  assert.equal(observed[1], visitor)
 })
 
 test('adapter carries registered upgrade sockets as bounded duplex bytes', async () => {

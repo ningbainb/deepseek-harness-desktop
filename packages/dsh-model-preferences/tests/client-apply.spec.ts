@@ -22,6 +22,10 @@ describe('model preference client registration', () => {
     const locale = {
       register: vi.fn(),
       bind: vi.fn(() => (key: string) => key),
+      resolveText: vi.fn(function (this: unknown, text: string | { en: string; zh: string }) {
+        expect(this).toBe(locale)
+        return typeof text === 'string' ? text : text.zh
+      }),
     }
     const command = {
       register: vi.fn(() => () => {}),
@@ -67,7 +71,7 @@ describe('model preference client registration', () => {
           effect: (effect: () => unknown) => effect(),
         }
       }
-      return { slots, get: (name: string) => name === 'modelDirectories' ? models : undefined }
+      return { slots, modelDirectories: models, sessions, get: (name: string) => name === 'modelDirectories' ? models : undefined }
     }
     const ctx: any = {
       locale,
@@ -103,5 +107,9 @@ describe('model preference client registration', () => {
     expect(modelCatalog).toHaveBeenCalledOnce()
     expect(slotRegistrations.map(entry => entry.contribution.name)).toContain('conversation.input.model')
     expect(slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.priority).toBe(-10)
+    const composer = slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.inject('session-a')
+    expect(composer.directory).toBe(directory.store)
+    expect(composer.resolveText({ en: 'Recommended', zh: '推荐' })).toBe('推荐')
+    expect(composer.resolveText('Provider label')).toBe('Provider label')
   })
 })

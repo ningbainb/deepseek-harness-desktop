@@ -8,11 +8,14 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { resolveNsisCompiler } from './nsis-compiler.mjs'
 import { prepareInstallerElectronPayload, sha256 } from './installer-electron-payload.mjs'
+import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from '../test/fixtures/browser-preflight-resources.mjs'
 import { tinyPE } from '../test/fixtures/electron-payload.mjs'
 import { assertInstallerFixtureProcessIsolation } from './installer-fixture-process-guard.mjs'
 
 // Compiles and executes the production NSIS macros with tiny isolated payloads.
 // This exercises callbacks and extraction, not a full Desktop overlay upgrade.
+// Browser resources use a scoped contract-checking service fixture; the actual
+// released Electron/self-contained resource helper has separate integration tests.
 const exec = promisify(execFile)
 const desktop = resolve(import.meta.dirname, '..')
 if (process.platform !== 'win32') throw new Error('Installer lifecycle verification requires Windows')
@@ -46,7 +49,15 @@ async function collectFailureEvidence({ scenario, exitCode, temporary, install, 
   }, null, 2)
 }
 try {
-  for (const scenario of ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock', 'runtime-fresh', 'runtime-upgrade', 'runtime-corrupt', 'runtime-fresh-corrupt']) {
+  const resources = await prepareBrowserPreflightFixtureResources(root, { controlledService: true })
+  const scenarios = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock', 'runtime-fresh', 'runtime-upgrade', 'runtime-corrupt', 'runtime-fresh-corrupt', 'runtime-fresh-complete', 'runtime-fresh-complete-missing', 'runtime-external', 'runtime-external-missing-core']
+  const requested = process.argv.slice(2).map(argument => {
+    if (!argument.startsWith('--scenario=')) throw Error(`Unknown lifecycle argument: ${argument}`)
+    const scenario = argument.slice('--scenario='.length)
+    if (!scenarios.includes(scenario)) throw Error(`Unknown lifecycle scenario: ${scenario}`)
+    return scenario
+  })
+  for (const scenario of requested.length ? requested : scenarios) {
     await assertInstallerFixtureProcessIsolation()
     const directory = join(root, scenario)
     const install = join(directory, "用户's Desktop")
@@ -58,7 +69,7 @@ try {
     await mkdir(temporary, { recursive: true })
     await writeFile(payload, 'new')
     await writeFile(sentinel, 'original-session')
-    if (!['fresh', 'runtime-fresh', 'runtime-fresh-corrupt'].includes(scenario)) {
+    if (!['fresh', 'runtime-fresh', 'runtime-fresh-corrupt', 'runtime-fresh-complete', 'runtime-fresh-complete-missing'].includes(scenario)) {
       if (scenario !== 'stale-registration') {
         await mkdir(join(install, 'resources'), { recursive: true })
         await writeFile(join(install, 'DeepSeek Harness Desktop.exe'), 'old')
@@ -74,17 +85,29 @@ try {
     try {
       if (scenario.startsWith('runtime-')) {
         runtimePayload = join(directory, 'runtime-payload')
+        const external = scenario.startsWith('runtime-external')
         const electronDirectory = join(runtimePayload, 'resources/app.asar.unpacked/node_modules/electron')
-        await mkdir(join(electronDirectory, 'dist'), { recursive: true })
-        await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('desktop'))
-        await writeFile(join(electronDirectory, 'package.json'), JSON.stringify({ name: 'electron', version: '44.0.0' }))
-        await writeFile(join(electronDirectory, 'dist/electron.exe'), tinyPE())
-        runtimeStaged = await prepareInstallerElectronPayload(runtimePayload)
+        if (external) {
+          await mkdir(join(runtimePayload, 'resources/app.asar.unpacked/runtime-support'), { recursive: true })
+          await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('desktop'))
+          await writeFile(join(runtimePayload, 'resources/app.asar'), 'new')
+          await writeFile(join(runtimePayload, 'resources/app.asar.unpacked/package.json'), JSON.stringify({ name: '@linxin666/dsh-desktop', version: '5.3.0-rc.1' }))
+          await writeFile(join(runtimePayload, 'resources/app.asar.unpacked/runtime-support/browser-component.json'), await readFile(join(desktop, 'runtime-support/browser-component.json')))
+        } else {
+          await mkdir(join(electronDirectory, 'dist'), { recursive: true })
+          await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('desktop'))
+          await writeFile(join(electronDirectory, 'package.json'), JSON.stringify({ name: 'electron', version: '44.0.0' }))
+          await writeFile(join(electronDirectory, 'dist/electron.exe'), tinyPE())
+        }
+        runtimeStaged = await prepareInstallerElectronPayload(runtimePayload, { compactRuntime: !scenario.includes('complete'), externalBrowserRuntime: external })
         runtimeManifestSHA256 = sha256(await readFile(join(runtimePayload, 'resources/runtime-reconstruction/manifest.json')))
         if (scenario.endsWith('corrupt')) await writeFile(join(runtimePayload, 'DeepSeek Harness Desktop.exe'), tinyPE('damaged', 0x11))
+        if (scenario.endsWith('complete-missing')) await rm(join(electronDirectory, 'dist/electron.exe'))
+        if (scenario === 'runtime-external-missing-core') await rm(join(runtimePayload, 'resources/app.asar.unpacked/package.json'))
       }
+      await registerBrowserPreflightFixture(resources, { key, install, directory })
       await exec(compiler.path, [
-        '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+        '/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_INSTALL=${install}`,
         `/DTEST_DEFAULT_INSTALL=${['custom-location', 'conflicting-location'].includes(scenario) ? join(directory, 'default-location') : install}`,
         `/DTEST_PAYLOAD=${payload}`, `/DTEST_REGISTRY=${key}`,
@@ -94,6 +117,8 @@ try {
         ...(scenario === 'uninstall-launch-failure' ? ['/DTEST_UNINSTALL_LAUNCH_FAILURE'] : []),
         ...(scenario === 'unwritable-log' ? ['/DTEST_UNWRITABLE_LOG'] : []),
         ...(runtimePayload ? [`/DTEST_RUNTIME_PAYLOAD=${runtimePayload}`, `/DDSH_RUNTIME_MANIFEST_SHA256=${runtimeManifestSHA256}`] : []),
+        ...(scenario.includes('complete') || scenario.startsWith('runtime-external') ? ['/DDSH_RUNTIME_FULL_PAYLOAD=1'] : []),
+        ...(scenario.startsWith('runtime-external') ? ['/DDSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD=1'] : []),
         join(desktop, 'test', 'fixtures', 'installer-lifecycle.nsi'),
       ], { windowsHide: true, timeout: 30_000, env: compiler.env })
       await runtimeStaged?.restore()
@@ -125,12 +150,18 @@ try {
         locker.kill()
         await exited
       }
-      const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log', 'runtime-fresh', 'runtime-upgrade'].includes(scenario)
+      try { await assertBrowserPreflightFixtureCalled(resources, key) }
+      catch (error) {
+        console.error('browser preflight fixture failure', await collectFailureEvidence({ scenario, exitCode, temporary, install, key }))
+        console.error('browser preflight contract', await readFile(join(resources, 'preflight-contracts.json'), 'utf8'))
+        throw error
+      }
+      const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log', 'runtime-fresh', 'runtime-upgrade', 'runtime-fresh-complete', 'runtime-external'].includes(scenario)
       if ((exitCode === 0) !== success) {
         const evidence = await collectFailureEvidence({ scenario, exitCode, temporary, install, key })
         assert.equal(exitCode === 0, success, `${scenario}: unexpected installer exit ${exitCode}\n${evidence}`)
       }
-      const expected = scenario === 'runtime-fresh-corrupt' ? 'absent' : success ? 'new' : 'old'
+      const expected = ['runtime-fresh-corrupt', 'runtime-fresh-complete-missing'].includes(scenario) ? 'absent' : success ? 'new' : 'old'
       if (expected === 'absent') {
         assert.equal(await pathExists(install), false, 'failed fresh restoration must remove only its owned payload')
         await assert.rejects(exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`], { windowsHide: true }))
@@ -138,7 +169,10 @@ try {
         assert.equal(await readFile(join(install, 'resources', 'app.asar'), 'utf8'), expected)
         if (runtimePayload && success) {
           assert.deepEqual(await readFile(join(install, 'DeepSeek Harness Desktop.exe')), tinyPE('desktop'))
-          assert.deepEqual(await readFile(join(install, 'resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')), tinyPE())
+          if (scenario.startsWith('runtime-external')) {
+            assert.equal(await pathExists(join(install, 'resources/app.asar.unpacked/node_modules/electron')), false, 'external payload succeeds without a nested Electron runtime')
+            assert.equal(await pathExists(join(install, 'resources/app.asar.unpacked/runtime-support/browser-component.json')), true)
+          } else assert.deepEqual(await readFile(join(install, 'resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')), tinyPE())
         } else assert.equal(await readFile(join(install, 'DeepSeek Harness Desktop.exe'), 'utf8'), expected)
         const { stdout } = await exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion'], { windowsHide: true })
         assert.match(stdout, new RegExp(`REG_SZ\\s+${expected}\\s`))

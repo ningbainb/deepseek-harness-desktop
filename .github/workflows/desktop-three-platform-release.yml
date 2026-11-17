@@ -118,6 +118,7 @@ jobs:
           $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
           pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
+      - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/win-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke
       - run: pnpm --filter @linxin666/dsh-desktop release:signatures:verify
       - run: pnpm --filter @linxin666/dsh-desktop release:manifest:verify
@@ -207,13 +208,17 @@ jobs:
           await writeFile('apps/dsh-desktop/build/telemetry-config.json', JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2) + '\n')
           NODE
       - run: pnpm --filter @linxin666/dsh-desktop pack:mac
+      - run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs darwin
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify:mac
+      - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources "apps/dsh-desktop/dist/mac-arm64/DeepSeek Harness Desktop.app/Contents/Resources" --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke:mac
       - name: Verify unsigned Preview and checksums
         working-directory: apps/dsh-desktop/dist
         run: |
           set -euo pipefail
           if codesign -dv --verbose=4 'mac-arm64/DeepSeek Harness Desktop.app' 2>&1 | grep -q '^Authority=Developer ID Application'; then exit 1; fi
+          hdiutil verify DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg
+          unzip -t DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip >/dev/null
           shasum -a 256 DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip > SHA256SUMS-macos.txt
           shasum -a 256 -c SHA256SUMS-macos.txt
       - uses: actions/upload-artifact@v4
@@ -225,6 +230,7 @@ jobs:
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.dmg
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-arm64.zip
             apps/dsh-desktop/dist/SHA256SUMS-macos.txt
+            apps/dsh-desktop/dist/distribution-artifacts-macos-arm64.json
 
   linux:
     needs: metadata
@@ -256,7 +262,9 @@ jobs:
           await writeFile('apps/dsh-desktop/build/telemetry-config.json', JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2) + '\n')
           NODE
       - run: pnpm --filter @linxin666/dsh-desktop pack:linux
+      - run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs linux
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify:linux
+      - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/linux-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux
       - name: Run packaged Linux smoke
         run: |
@@ -267,11 +275,14 @@ jobs:
         working-directory: apps/dsh-desktop/dist
         run: |
           set -euo pipefail
-          chmod +x DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage
-          ./DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage --appimage-extract AppRun >/dev/null
-          test -x squashfs-root/AppRun
-          dpkg-deb --info DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb >/dev/null
-          sha256sum DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb > SHA256SUMS-linux.txt
+          deb=DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb
+          dpkg-deb --info "$deb" >/dev/null
+          inspection="$(mktemp -d "$RUNNER_TEMP/dsh-deb-inspect.XXXXXX")"
+          dpkg-deb --extract "$deb" "$inspection"
+          mapfile -d '' types < <(find "$inspection" -type f -path '*/resources/package-type' -print0)
+          test "${#types[@]}" = 1
+          test "$(cat "${types[0]}")" = deb
+          sha256sum "$deb" > SHA256SUMS-linux.txt
           sha256sum -c SHA256SUMS-linux.txt
       - uses: actions/upload-artifact@v4
         with:
@@ -279,9 +290,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-x86_64.AppImage
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-amd64.deb
             apps/dsh-desktop/dist/SHA256SUMS-linux.txt
+            apps/dsh-desktop/dist/distribution-artifacts-linux-x64.json
 
   verify-artifacts:
     needs: [metadata, windows, macos, linux]
@@ -323,7 +334,6 @@ jobs:
             `DeepSeek-Harness-Desktop-Setup-${version}-x64.exe`,
             `DeepSeek-Harness-Desktop-${version}-arm64.dmg`,
             `DeepSeek-Harness-Desktop-${version}-arm64.zip`,
-            `DeepSeek-Harness-Desktop-${version}-x86_64.AppImage`,
             `DeepSeek-Harness-Desktop-${version}-amd64.deb`,
           ]
           const hash = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -339,7 +349,7 @@ jobs:
           for (const [file, expected] of [
             ['SHA256SUMS.txt', names.slice(0, 1)],
             ['SHA256SUMS-macos.txt', names.slice(1, 3)],
-            ['SHA256SUMS-linux.txt', names.slice(3, 5)],
+            ['SHA256SUMS-linux.txt', names.slice(3, 4)],
           ]) {
             const bytes = await readFile(file)
             const rows = bytes.toString('utf8').trimEnd().split(/\r?\n/u)
@@ -364,6 +374,7 @@ jobs:
             sourceCommit: process.env.GITHUB_SHA, eventName: process.env.GITHUB_EVENT_NAME, ref: process.env.GITHUB_REF,
             runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
             publish: process.env.DSH_DESKTOP_PUBLISH === 'true', nativeJobs, files, nativeReceipts,
+            userInstallers: [names[0], names[1], names[3]], internalUpdaterFiles: [names[2]],
             combinedChecksums: { file: 'SHA256SUMS.txt', size: combined.length, sha256: hash(combined) },
             releaseManifest: { file: 'release-manifest.json', size: manifest.length, sha256: hash(manifest) },
           }
@@ -404,13 +415,12 @@ jobs:
           test -f DeepSeek-Harness-Desktop-Setup-${{ needs.metadata.outputs.version }}-x64.exe
           test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg
           test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip
-          test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage
           test -f DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb
           sha256sum -c SHA256SUMS.txt
           sha256sum -c SHA256SUMS-macos.txt
           sha256sum -c SHA256SUMS-linux.txt
           cp SHA256SUMS.txt SHA256SUMS-windows.txt
-          sha256sum DeepSeek-Harness-Desktop-Setup-${{ needs.metadata.outputs.version }}-x64.exe DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-x86_64.AppImage DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb > SHA256SUMS.txt
+          sha256sum DeepSeek-Harness-Desktop-Setup-${{ needs.metadata.outputs.version }}-x64.exe DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.dmg DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-arm64.zip DeepSeek-Harness-Desktop-${{ needs.metadata.outputs.version }}-amd64.deb > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
       - name: Bind public manifest to the combined checksum receipt
         run: node scripts/finalize-three-platform-receipts.mjs release-assets ${{ needs.metadata.outputs.version }}

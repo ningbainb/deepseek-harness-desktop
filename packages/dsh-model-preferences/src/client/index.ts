@@ -190,6 +190,7 @@ export function apply(ctx: ClientContext): void {
           modelSessionId: String(sessionId),
           directory: directory.store,
           settingsScope,
+          resolveText: text => ctx.locale.resolveText(text),
           load: () => {
             if (available) directory.load().catch(() => {})
           },

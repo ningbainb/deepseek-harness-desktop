@@ -17,33 +17,97 @@ const minimal = { version: 2, mode: 'one-shot', provider: 'in-process' }
 const continuable = { version: 2, mode: 'continuable', provider: 'in-process', label: 'worker',
   agentProvider: 'deepseek', agentModel: 'test-model', persona: 'test-persona', toolFilter: { allow: ['read'], deny: ['write'] } }
 
-async function fixture(rows: unknown[], callback: (path: string, source: Buffer, headerFrame: Buffer) => Promise<void>) {
+async function fixture(rows: unknown[], callback: (path: string, source: Buffer, headerFrame: Buffer) => Promise<void>, storedHeader = header) {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-legacy-child-'))
   const path = join(directory, 'session.jsonl.zstd')
-  const headerFrame = zstdCompressSync(Buffer.from(JSON.stringify(header) + '\n'))
+  const headerFrame = zstdCompressSync(Buffer.from(JSON.stringify(storedHeader) + '\n'))
   const source = Buffer.concat([headerFrame, zstdCompressSync(Buffer.from(rows.map(row => JSON.stringify(row)).join('\n') + '\n'))])
   try { await writeFile(path, source); await callback(path, source, headerFrame) }
   finally { await rm(directory, { recursive: true, force: true }) }
 }
 
-async function officialRead(path: string, _expectedId: string) {
-  // Node's sync decoder stops at the first frame; this fixture deliberately
-  // has a separate header frame and body frame, as the official backend does.
+async function readPhysicalRows(path: string, storedHeader = header) {
+  // Node's decoder stops at the first frame; these fixtures have a separate
+  // header and body frame, as the official backend does.
   const bytes = await readFile(path)
-  const boundary = zstdCompressSync(Buffer.from(JSON.stringify(header) + '\n')).length
+  const boundary = zstdCompressSync(Buffer.from(JSON.stringify(storedHeader) + '\n')).length
   const plaintext = Buffer.concat([zstdDecompressSync(bytes.subarray(0, boundary)), zstdDecompressSync(bytes.subarray(boundary))])
-  const rows = plaintext.toString('utf8').trimEnd().split('\n').map(line => JSON.parse(line))
+  return plaintext.toString('utf8').trimEnd().split('\n').map(line => JSON.parse(line))
+}
+
+async function officialRead(path: string, _expectedId: string, storedHeader = header) {
+  const rows = await readPhysicalRows(path, storedHeader)
   // This child fixture has no children of its own; the current official
   // catalog requires that fact for the V3 to V4 migration.
-  const restore = createSessionFormatCatalogWithChildren([]).createRestore(rows[0], { recovery: 'strict', validation: 'transformed' })
+  const restore = createSessionFormatCatalogWithChildren([]).createRestore(rows[0], { recovery: 'strict', validation: 'current' })
   for (const row of rows.slice(1)) restore.decodeRow(row)
   return restore.finish()
 }
 
+// The current SDK natively accepts generation 2. Reproduce the released
+// reader's narrow refusal to keep exercising the compatibility seam, while
+// both candidate validation and the retry still use the actual NPM decoder.
+async function releasedReader(path: string, expectedId: string) {
+  const rows = await readPhysicalRows(path)
+  for (const row of rows.slice(1)) {
+    if (row.type === 'subagent/descriptor' && row.data?.version === 2) {
+      throw new Error(`subagent/descriptor ${row.seq} uses unsupported descriptor version 2`)
+    }
+  }
+  return officialRead(path, expectedId)
+}
+
+it.each([minimal, continuable])('preserves natively supported generation-2 children without repair: $mode', async data => {
+  await fixture([descriptor(data)], async (path, source) => {
+    const target = { readStoredLog: officialRead }
+    const install = installSessionPersistenceRecovery(target)
+    try {
+      const result = await target.readStoredLog(path, header.id)
+      expect(result.header.version).toBe(SESSION_FORMAT_VERSION)
+      expect(result.events[0]?.data).toEqual(data)
+      expect(await readFile(path)).toEqual(source)
+      expect(await readdir(join(path, '..'))).toEqual(['session.jsonl.zstd'])
+      expect(install.getRecoveredCount()).toBe(0)
+      expect(install.getSkippedCount()).toBe(0)
+    } finally { install.restore() }
+  })
+})
+
+it.each([
+  { version: 1, provider: 'in-process', label: 'worker' },
+  { ...continuable, version: 3 },
+])('preserves other natively supported descriptor generations without repair: $version', async data => {
+  await fixture([descriptor(data)], async (path, source) => {
+    const target = { readStoredLog: officialRead }
+    const install = installSessionPersistenceRecovery(target)
+    try {
+      expect((await target.readStoredLog(path, header.id)).events[0]?.data).toEqual(data)
+      expect(await readFile(path)).toEqual(source)
+      expect(await readdir(join(path, '..'))).toEqual(['session.jsonl.zstd'])
+      expect(install.getRecoveredCount()).toBe(0)
+    } finally { install.restore() }
+  })
+})
+
+it('refuses a Session format newer than the installed SDK without rewriting it', async () => {
+  const futureVersion = SESSION_FORMAT_VERSION + 1
+  const futureHeader = { ...header, version: futureVersion }
+  await fixture([descriptor(continuable)], async (path, source) => {
+    const target = { readStoredLog: (candidate: string, expectedId: string) => officialRead(candidate, expectedId, futureHeader) }
+    const install = installSessionPersistenceRecovery(target)
+    try {
+      await expect(target.readStoredLog(path, header.id)).rejects.toThrow(`stored Session uses newer format v${futureVersion}`)
+      expect(await readFile(path)).toEqual(source)
+      expect(await readdir(join(path, '..'))).toEqual(['session.jsonl.zstd'])
+      expect(install.getRecoveredCount()).toBe(0)
+    } finally { install.restore() }
+  }, futureHeader)
+})
+
 it.each([minimal, continuable])('recovers a released generation-2 child through the official strict decoder: $mode', async data => {
   await fixture([descriptor(data)], async (path, source, headerFrame) => {
-    await expect(officialRead(path, header.id)).rejects.toThrow('unsupported descriptor version 2')
-    const target = { readStoredLog: officialRead }
+    await expect(releasedReader(path, header.id)).rejects.toThrow('unsupported descriptor version 2')
+    const target = { readStoredLog: releasedReader }
     const outcomes: unknown[] = []
     const install = installSessionPersistenceRecovery(target, { onRecovered: event => { outcomes.push(event) } })
     try {
@@ -65,7 +129,7 @@ it.each([
   { ...continuable, toolFilter: { allow: ['read'], escape: true } },
 ])('does not rewrite unknown generations or invalid child schemas: %j', async data => {
   await fixture([descriptor(data)], async (path, source) => {
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const install = installSessionPersistenceRecovery(target)
     try {
       await expect(target.readStoredLog(path, header.id)).rejects.toThrow()
@@ -78,7 +142,7 @@ it.each([
 
 it('repairs permission-origin and descriptor-v2 together without dropping either event', async () => {
   await fixture([{ type: 'permission/preset', seq: 0, time: 1, data: { preset: 'standard', origin: 'default' } }, descriptor(continuable, 1)], async (path, source) => {
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const install = installSessionPersistenceRecovery(target)
     try {
       const result = await target.readStoredLog(path, header.id)
@@ -91,7 +155,7 @@ it('repairs permission-origin and descriptor-v2 together without dropping either
 
 it('coalesces concurrent recovery reads of the same child without losing the original backup', async () => {
   await fixture([descriptor(continuable)], async (path, source) => {
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const outcomes: unknown[] = []
     const install = installSessionPersistenceRecovery(target, { onRecovered: event => { outcomes.push(event) } })
     try {
@@ -110,7 +174,7 @@ it('restores original bytes if the actual Runtime retry fails after candidate va
     let calls = 0
     const target = { readStoredLog: async (candidate: string, expectedId: string) => {
       if (++calls > 1) throw new Error('runtime-retry-refused')
-      return officialRead(candidate, expectedId)
+      return releasedReader(candidate, expectedId)
     } }
     const install = installSessionPersistenceRecovery(target)
     try {
@@ -126,7 +190,7 @@ it('keeps a conflicting backup and invalid later rows untouched', async () => {
   await fixture([descriptor(minimal)], async (path, source) => {
     const preserved = Buffer.from('previous-source-must-survive')
     await writeFile(path + backupSuffix, preserved)
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const install = installSessionPersistenceRecovery(target)
     try {
       await expect(target.readStoredLog(path, header.id)).rejects.toThrow('unsupported descriptor version 2')
@@ -135,7 +199,7 @@ it('keeps a conflicting backup and invalid later rows untouched', async () => {
     } finally { install.restore() }
   })
   await fixture([descriptor(minimal), { type: 'unknown/unsafe', seq: 1, time: 1, data: {} }], async (path, source) => {
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const install = installSessionPersistenceRecovery(target)
     try {
       await expect(target.readStoredLog(path, header.id)).rejects.toThrow()
@@ -160,7 +224,7 @@ it('refuses a stale candidate if another writer appends while it is being normal
         appendFileSync(path, appended)
       }
     } })
-    const target = { readStoredLog: officialRead }
+    const target = { readStoredLog: releasedReader }
     const install = installSessionPersistenceRecovery(target)
     try {
       await expect((target.readStoredLog as (...args: unknown[]) => Promise<unknown>)(path, header.id, signal)).rejects.toThrow('unsupported descriptor version 2')
@@ -184,7 +248,7 @@ it('does not roll back over a newer external append after a failed Runtime retry
         newer = await readFile(candidate)
         throw new Error('retry failed after external append')
       }
-      return officialRead(candidate, expectedId)
+      return releasedReader(candidate, expectedId)
     } }
     const install = installSessionPersistenceRecovery(target)
     try {

@@ -17,6 +17,9 @@ const require = createRequire(import.meta.url)
 const sdk = createRequire(require.resolve('@deepseek-ai/dsh-base/package.json'))
 const officialUrl = pathToFileURL(sdk.resolve('@deepseek-ai/dsh-permission-presets')).href
 const { default: OfficialPresets } = await import(officialUrl)
+const { default: SessionStore } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session')).href)
+const { default: SessionProjections } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-projection')).href)
+const { default: AgentRegistry } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-agent')).href)
 const sdkName = '@deepseek-ai/dsh-permission-presets'
 
 async function activate(t, { sandbox = 'danger-full-access', unconfined = false, policy = 'ask', config = {} } = {}) {
@@ -25,8 +28,14 @@ async function activate(t, { sandbox = 'danger-full-access', unconfined = false,
   const registrations = []
   ctx.provide('shell', { sandboxMode: unconfined ? undefined : sandbox })
   ctx.provide('approval', { config: { policy } })
-  ctx.provide('sessions', { list: () => [] })
-  ctx.provide('sessionProjections', { register: value => registrations.push(value) })
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjections)
+  await ctx.plugin(AgentRegistry)
+  const register = ctx.sessionProjections.register
+  t.mock.method(ctx.sessionProjections, 'register', function (definition) {
+    registrations.push(definition)
+    return register.call(this, definition)
+  })
   const patches = [{ insert: [{ id: 'permission', name: sdkName, config }] }]
   const original = structuredClone(patches)
   const adapted = adaptRuntimeLegacySettingsPatches(patches)
@@ -162,8 +171,9 @@ test('official permission form preserves SDK identity through live reload and a 
       host.provide('desktopConfigurationGuard', guard)
       host.provide('shell', { sandboxMode: sandbox })
       host.provide('approval', { config: { policy: 'ask' } })
-      host.provide('sessions', { list: () => [] })
-      host.provide('sessionProjections', { register: () => {} })
+      await host.plugin(SessionStore)
+      await host.plugin(SessionProjections)
+      await host.plugin(AgentRegistry)
       installDesktopProfileComposition(host, {
         rootUrl: pathToFileURL(rootConfig).href,
         compose,

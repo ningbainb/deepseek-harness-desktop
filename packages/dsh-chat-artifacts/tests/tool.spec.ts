@@ -4,23 +4,34 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as artifact from '../src/index.ts'
 
 async function setup(): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(artifact)
   return ctx
 }
 
-function renderArtifact(ctx: Context, args: unknown) {
-  return ctx.tools.execute({
+async function renderArtifact(ctx: Context, args: unknown) {
+  const callId = ToolCallId('artifact-test')
+  const batch = await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('artifact-test'),
-    name: 'render_artifact',
-    arguments: args,
+    calls: [{
+      type: 'tool-call',
+      id: callId,
+      name: 'render_artifact',
+      arguments: JSON.stringify(args),
+    }],
   })
+  expect(batch.results).toHaveLength(1)
+  const settled = batch.results[0]
+  if (!settled) throw new Error('expected one render_artifact result')
+  expect(settled.callId).toBe(callId)
+  return settled.result
 }
 
 function textContent(result: { content: readonly { type: string; text?: string }[] }): string {

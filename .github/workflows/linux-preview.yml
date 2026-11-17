@@ -23,17 +23,10 @@ concurrency:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-22.04
-          - ubuntu-24.04
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     env:
       REQUIRE_SIGNING: 'false'
-      DSH_DESKTOP_UPDATE_CHANNEL: stable
     steps:
       - uses: actions/checkout@v4
       - name: Verify Linux x64 runner
@@ -56,12 +49,14 @@ jobs:
           pnpm typecheck
           node --test \
             apps/dsh-desktop/test/electron-builder-linux.test.mjs \
+            apps/dsh-desktop/test/distribution-artifacts.test.mjs \
             apps/dsh-desktop/test/package-linux.test.mjs \
             apps/dsh-desktop/test/verify-package-linux.test.mjs \
             apps/dsh-desktop/test/after-pack-linux.test.mjs \
             apps/dsh-desktop/test/unsigned-mac-preview.test.mjs \
             apps/dsh-desktop/test/terminal-session.test.mjs \
             apps/dsh-desktop/test/runtime-controller.test.mjs
+          node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Configure official anonymous product metrics
         shell: bash
         env:
@@ -86,10 +81,14 @@ jobs:
             `${JSON.stringify({ endpoint: endpoint.href, officialBuild: true }, null, 2)}\n`,
           )
           NODE
-      - name: Build Linux x64 AppImage and deb
+      - name: Build the Linux x64 deb installer
         run: pnpm --filter @linxin666/dsh-desktop pack:linux
+      - name: Verify the single installer and deb updater payload
+        run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs linux
       - name: Verify packaged Linux runtime
         run: pnpm --filter @linxin666/dsh-desktop pack:verify:linux
+      - name: Verify bundled Office preview conversion and recalculation
+        run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/linux-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - name: Verify packaged Landlock enforcement
         run: pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux
       - name: Run packaged Electron smoke under Xvfb
@@ -107,26 +106,147 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('../package.json').version")"
-          appimage="DeepSeek-Harness-Desktop-${version}-x86_64.AppImage"
           deb="DeepSeek-Harness-Desktop-${version}-amd64.deb"
-          chmod +x "$appimage"
-          rm -rf squashfs-root
-          "./$appimage" --appimage-extract AppRun >/dev/null
-          test -x squashfs-root/AppRun
-          rm -rf squashfs-root
           dpkg-deb --info "$deb" >/dev/null
           dpkg-deb --contents "$deb" > deb-contents.txt
           grep -q 'deepseek-harness-desktop' deb-contents.txt
           rm deb-contents.txt
-          sha256sum "$appimage" "$deb" > SHA256SUMS-linux.txt
+          inspection="$(mktemp -d "$RUNNER_TEMP/dsh-deb-inspect.XXXXXX")"
+          dpkg-deb --extract "$deb" "$inspection"
+          mapfile -d '' types < <(find "$inspection" -type f -path '*/resources/package-type' -print0)
+          test "${#types[@]}" = 1
+          test "$(cat "${types[0]}")" = deb
+          sha256sum "$deb" > SHA256SUMS-linux.txt
           sha256sum -c SHA256SUMS-linux.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: DeepSeek-Harness-Desktop-linux-x64-preview-${{ matrix.os }}
+          name: DeepSeek-Harness-Desktop-linux-x64-preview
           if-no-files-found: error
           retention-days: 14
           path: |
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-x86_64.AppImage
             apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-*-amd64.deb
             apps/dsh-desktop/dist/SHA256SUMS-linux.txt
+            apps/dsh-desktop/dist/distribution-artifacts-linux-x64.json
             apps/dsh-desktop/dist/runtime-prune-report.json
+            apps/dsh-desktop/dist/office-runtime-verification/report.json
+
+  validate-ubuntu24:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      REQUIRE_SIGNING: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify Ubuntu 24 x64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          . /etc/os-release
+          test "$VERSION_ID" = 24.04
+          uname -a
+          printf '%s %s\n' "$NAME" "$VERSION_ID"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: DeepSeek-Harness-Desktop-linux-x64-preview
+          path: apps/dsh-desktop/dist
+      - name: Verify the candidate commit and installer bytes
+        shell: bash
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          set -euo pipefail
+          sha256sum -c SHA256SUMS-linux.txt
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { createHash } from 'node:crypto'
+          import { createReadStream } from 'node:fs'
+          import { readFile, stat } from 'node:fs/promises'
+          const receipt = JSON.parse(await readFile('distribution-artifacts-linux-x64.json', 'utf8'))
+          const manifest = JSON.parse(await readFile('../package.json', 'utf8'))
+          assert.equal(receipt.sourceCommit, process.env.GITHUB_SHA)
+          assert.equal(receipt.version, manifest.version)
+          assert.equal(receipt.platform, 'linux')
+          assert.equal(receipt.arch, 'x64')
+          const expected = `DeepSeek-Harness-Desktop-${manifest.version}-amd64.deb`
+          assert.deepEqual(receipt.files.map(artifact => artifact.file), [expected])
+          const artifact = receipt.files[0]
+          assert.equal(artifact.role, 'user-installer')
+          assert.equal((await stat(expected)).size, artifact.size)
+          const digest = createHash('sha256')
+          for await (const chunk of createReadStream(expected)) digest.update(chunk)
+          assert.equal(digest.digest('hex'), artifact.sha256)
+          console.log(`Verified the Ubuntu 22 installer at ${receipt.sourceCommit}: ${artifact.sha256}`)
+          NODE
+      - name: Extract the same deb for Ubuntu 24 acceptance
+        shell: bash
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('../package.json').version")"
+          deb="DeepSeek-Harness-Desktop-${version}-amd64.deb"
+          dpkg-deb --info "$deb" >/dev/null
+          inspection="$(mktemp -d "$RUNNER_TEMP/dsh-deb-ubuntu24.XXXXXX")"
+          dpkg-deb --extract "$deb" "$inspection"
+          mapfile -d '' executables < <(find "$inspection" -type f -name deepseek-harness-desktop -print0)
+          test "${#executables[@]}" = 1
+          test -x "${executables[0]}"
+          app="$(dirname "${executables[0]}")"
+          test -f "$app/resources/app.asar"
+          test "$(cat "$app/resources/package-type")" = deb
+          ln -s "$app" linux-unpacked
+          mkdir -p linux-ubuntu24-qa
+      - name: Verify the downloaded packaged runtime on Ubuntu 24
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @linxin666/dsh-desktop pack:verify:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/package.log
+      - name: Verify the same bundled Office engines on Ubuntu 24
+        run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/linux-unpacked/resources --output apps/dsh-desktop/dist/linux-ubuntu24-qa/office-runtime-verification
+      - name: Verify the downloaded Landlock engine on Ubuntu 24
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @linxin666/dsh-desktop pack:sandbox:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/sandbox.log
+      - name: Run the downloaded Electron under Ubuntu 24 Xvfb
+        shell: bash
+        run: |
+          set -euo pipefail
+          sandbox=apps/dsh-desktop/dist/linux-unpacked/chrome-sandbox
+          sudo chown root:root "$sandbox"
+          sudo chmod 4755 "$sandbox"
+          test "$(stat -c '%U:%G %a' "$sandbox")" = 'root:root 4755'
+          xvfb-run -a pnpm --filter @linxin666/dsh-desktop pack:smoke:linux | tee apps/dsh-desktop/dist/linux-ubuntu24-qa/smoke.log
+      - name: Record Ubuntu 24 acceptance for the shared installer
+        shell: bash
+        working-directory: apps/dsh-desktop/dist
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFile, writeFile } from 'node:fs/promises'
+          const receipt = JSON.parse(await readFile('distribution-artifacts-linux-x64.json', 'utf8'))
+          assert.equal(receipt.sourceCommit, process.env.GITHUB_SHA)
+          await writeFile('linux-ubuntu24-qa/result.json', JSON.stringify({
+            schemaVersion: 1, status: 'passed', sourceCommit: receipt.sourceCommit,
+            runner: 'ubuntu-24.04', installer: receipt.files[0],
+            checks: ['packaged-runtime', 'Office-preview-conversion-recalculation', 'Landlock', 'sandbox-enabled-Xvfb-startup'],
+          }, null, 2) + '\n')
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DeepSeek-Harness-Desktop-linux-x64-ubuntu24-qa
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/dsh-desktop/dist/linux-ubuntu24-qa/**
+            apps/dsh-desktop/dist/SHA256SUMS-linux.txt
+            apps/dsh-desktop/dist/distribution-artifacts-linux-x64.json

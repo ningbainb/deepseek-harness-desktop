@@ -8,7 +8,13 @@
       "package": "@local/dsh-prompt-pilot",
       "path": "vendor/plugins-20261026/dsh-prompt-pilot-1.2.3.tgz",
       "description": "按当前会话预测下一条提示词，保留输入与显式接受行为",
-      "features": ["conversation-scoped-prompt-prediction", "explicit-tab-acceptance", "preserve-existing-composer-tools", "auto-prediction-default-on-and-explicit-disable-preserved", "prediction-shortcut-visibility-preserves-context-hover-geometry"],
+      "features": [
+        "conversation-scoped-prompt-prediction",
+        "explicit-tab-acceptance",
+        "preserve-existing-composer-tools",
+        "auto-prediction-default-on-and-explicit-disable-preserved",
+        "prediction-shortcut-visibility-preserves-context-hover-geometry"
+      ],
       "requiredInAggregate": false,
       "requiredInCordisPatch": false,
       "requiredInDesktop": true
@@ -18,7 +24,18 @@
       "package": "dsh-dafeiyu-pet",
       "path": "vendor/plugins-20261026/dsh-dafeiyu-pet-0.2.0.tgz",
       "description": "默认全身桌宠优先显示，保留原桌宠配置和切换能力",
-      "features": ["full-body-companion", "independent-companion-visibility", "preserve-existing-pet-and-settings-window-clarity", "desktop-default-on-explicit-off-preserved-and-settings-do-not-initialize-widget-resources", "widget-private-resource-disposal-aborts-requests-and-fences-late-callbacks", "single-widget-reenable-preserves-vendor-preferences-and-original-pet", "full-body-renderer-priority-stops-original-client-polling-without-config-writes", "idle-frames-preserve-animation-without-redundant-status-or-motion-dom-writes", "readback-canvases-declare-will-read-frequently", "unconfigured-balance-is-distinct-from-real-failures"],
+      "features": [
+        "full-body-companion",
+        "independent-companion-visibility",
+        "preserve-existing-pet-and-settings-window-clarity",
+        "fresh-default-off-upgrades-preserve-state-and-settings-do-not-initialize-widget-resources",
+        "widget-private-resource-disposal-aborts-requests-and-fences-late-callbacks",
+        "single-widget-reenable-preserves-vendor-preferences-and-original-pet",
+        "full-body-renderer-priority-stops-original-client-polling-without-config-writes",
+        "idle-frames-preserve-animation-without-redundant-status-or-motion-dom-writes",
+        "readback-canvases-declare-will-read-frequently",
+        "unconfigured-balance-is-distinct-from-real-failures"
+      ],
       "requiredInAggregate": false,
       "requiredInCordisPatch": false,
       "requiredInDesktop": true
@@ -28,7 +45,13 @@
       "package": "dsh-builtin-browser",
       "path": "vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz",
       "description": "可见浏览器与 CDP 工具，保留既有浏览器提供方和配置入口",
-      "features": ["visible-browser-and-cdp-tools", "authenticated-desktop-browser-host", "isolated-browser-sessions-and-cookie-persistence"],
+      "features": [
+        "visible-browser-and-cdp-tools",
+        "authenticated-desktop-browser-host",
+        "isolated-browser-sessions-and-cookie-persistence",
+        "prebuilt-runtime-prepared-on-demand-without-install-time-reconstruction",
+        "browser-entry-and-permissions-retained"
+      ],
       "requiredInAggregate": false,
       "requiredInCordisPatch": false,
       "requiredInDesktop": true
@@ -38,7 +61,11 @@
       "package": "@linxin666/dsh-release-plugin-adapter",
       "path": "packages/dsh-release-plugin-adapter",
       "description": "发布插件的官方 SDK 契约适配与独立配置入口",
-      "features": ["official-npm-sdk-only", "release-plugin-settings-and-prerequisites", "preserve-existing-plugin-capabilities"],
+      "features": [
+        "official-npm-sdk-only",
+        "release-plugin-settings-and-prerequisites",
+        "preserve-existing-plugin-capabilities"
+      ],
       "requiredInAggregate": false,
       "requiredInCordisPatch": false,
       "requiredInDesktop": true
@@ -213,7 +240,8 @@
         "native-remote-and-session-projection",
         "native-mode-switch-keeps-global-default",
         "legacy-mode-api-fallback",
-        "loaded-history-projection-vetoes-stale-blank-reuse"
+        "loaded-history-projection-vetoes-stale-blank-reuse",
+        "top-layer-mode-menu-escapes-sdk-header-clipping-with-anchored-placement-and-focus-preservation"
       ],
       "patchId": "ui-mode-switcher",
       "requiredInAggregate": true,
@@ -403,7 +431,12 @@
     "@linxin666/dsh-client-ui-model-capabilities",
     "@linxin666/dsh-usage",
     "@linxin666/dsh-session-archive",
-    "@deepseek-ai/dsh-experimental-agent-team-profile"
+    "@deepseek-ai/dsh-agent-team",
+    "@deepseek-ai/dsh-tool-agent-team",
+    "@deepseek-ai/dsh-client-ui-agent-team",
+    "dsh-context",
+    "dsh-context-memory",
+    "dsh-prompt-customizer"
   ],
   "desktopSurfaces": [
     {
@@ -601,7 +634,9 @@
         "explicit-native-menu-tray-residency-preserves-close-preferences",
         "opt-in-titlebar-minimize-hides-to-tray-with-live-runtime",
         "tray-restoration-persistent-choice-and-unavailable-tray-taskbar-fallback",
-        "tray-quit-reaps-owned-runtime-processes"
+        "tray-quit-reaps-owned-runtime-processes",
+        "default-close-to-tray-preserves-explicit-quit-and-ask",
+        "coalesced-task-status-refresh-and-unchanged-native-menu-reuse"
       ]
     },
     {
@@ -609,7 +644,14 @@
       "name": "运行时环境提供器与调度状态服务",
       "e2eScript": "scripts/verify-runtime-provider.mjs",
       "features": [
-        "official-dsh-0.1.5-exact-pin",
+        "official-dsh-runtime-exact-pin",
+        "official-dsh-0.2.2-rc.3-with-aligned-cordis-and-schema-sdk-cohort",
+        "official-agent-default-and-repair-reasoning-effort-preserved",
+        "async-session-projection-lifecycle-and-batched-mobile-updates",
+        "native-tool-executor-real-sdk-batch-coverage",
+        "retired-subagent-list-row-preserves-scoped-discovery-without-duplicate-tools",
+        "authenticated-pipe-index-forwards-official-peer-with-cycle-safe-late-service-access",
+        "current-sdk-settings-title-and-content-preserve-native-drag-and-eight-resize-handles",
         "immutable-application-runtime-baseline",
         "offline-startup-runtime-integrity-audit",
         "profile-parent-directory-preparation-shared-only-within-one-reconciliation",
@@ -740,6 +782,9 @@
         "installer-progress-observer-cannot-change-install-result",
         "installer-diagnostic-write-failure-does-not-block-install",
         "stale-registration-with-missing-uninstaller-recovery",
+        "empty-registry-tombstones-do-not-require-elevation",
+        "historical-uninstall-aliases-exact-target-owned-and-transactionally-restored",
+        "complete-independent-electron-payload-without-install-time-reconstruction",
         "verified-rollback-result-messaging",
         "noncommitted-upgrade-rollback",
         "plaintext-zstd-session-recovery",
@@ -1252,10 +1297,10 @@
         "final-quit-keeps-inert-handlers-for-late-renderer-acks-and-cancellation",
         "rc2-typed-stream-events-ready-and-bidirectional-uplink",
         "packaged-runtime-sdk-module-identity-preserved",
-          "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
-          "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
-          "windows-installer-compaction-restores-verified-full-directory-even-on-compression-failure",
-          "packaged-integrity-canonicalizes-payload-paths-and-rejects-symlink-escapes",
+        "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
+        "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
+        "windows-installer-compaction-restores-verified-full-directory-even-on-compression-failure",
+        "packaged-integrity-canonicalizes-payload-paths-and-rejects-symlink-escapes",
         "builder-generated-windows-update-provider-channel-cache-and-signature-metadata-gated-before-compression",
         "no-http-ready-address",
         "carrier-neutral-web-route-adapter-with-explicit-exit-condition",
@@ -1266,6 +1311,29 @@
         "large-history-snapshot-reassembly"
       ],
       "e2eScript": "scripts/verify-runtime-pipe.mjs"
+    },
+    {
+      "id": "desktop-next-navigation",
+      "name": "Consolidated Desktop navigation",
+      "features": [
+        "five-groups-preserve-all-legacy-entries",
+        "single-value-mode-editor-through-models-advanced",
+        "conversation-team-operations-and-compatible-settings-switch",
+        "agent-team-and-shared-browser-settings-routes"
+      ],
+      "e2eScript": "scripts/verify-dock-settings.mjs"
+    },
+    {
+      "id": "desktop-browser-component",
+      "name": "On-demand shared browser runtime",
+      "features": [
+        "separate-prebuilt-electron-outside-installation-payload",
+        "independent-cache-and-persistent-activation",
+        "sha256-platform-architecture-version-and-file-integrity",
+        "cancel-retry-and-coalesced-preparation",
+        "preflight-before-upgrade-shutdown"
+      ],
+      "e2eScript": "scripts/verify-release-plugins.mjs"
     }
   ],
   "skinCatalog": [
@@ -1284,5 +1352,81 @@
     "whale-mom",
     "whale-song",
     "xp"
-  ]
+  ],
+  "runtimeMigrations": {
+    "desktop-v5.3.0": {
+      "retiredBundles": [
+        "@deepseek-ai/dsh-experimental-agent-team-profile"
+      ],
+      "replacementPackages": [
+        "@deepseek-ai/dsh-agent-team",
+        "@deepseek-ai/dsh-tool-agent-team",
+        "@deepseek-ai/dsh-client-ui-agent-team"
+      ],
+      "preservedSwitch": "dsh.profile.desktopAgentTeamEnabled",
+      "backupTransaction": "DesktopV53Migration",
+      "acceptance": "apps/dsh-desktop/test/desktop-v53-migration.test.mjs",
+      "historyCompatibility": "pending-real-session-acceptance"
+    }
+  },
+  "freshDefaults": {
+    "profileMarker": "minimal-v1",
+    "defaultEnabled": [
+      "chat",
+      "projects",
+      "models",
+      "plugins",
+      "tray",
+      "dsh-context",
+      "@ningbainb/dsh-memory",
+      "@ningbainb/dsh-personal-prompt"
+    ],
+    "bundledDefaultOff": [
+      "pet",
+      "dafeiyu-pet",
+      "live-stats",
+      "dsh-context-memory",
+      "dsh-prompt-customizer"
+    ],
+    "downloadOnDemand": [
+      "browser-electron"
+    ],
+    "upgrades": "preserve-explicit-and-ambiguous-legacy-state"
+  },
+  "contextSuite": {
+    "context": {
+      "package": "dsh-context",
+      "version": "0.85.1",
+      "defaultEnabled": true,
+      "entry": "conversation-right-context",
+      "globalInsightNavigation": "retained-pending-public-sdk-relocation"
+    },
+    "M1": {
+      "package": "@ningbainb/dsh-memory",
+      "version": "0.1.0",
+      "defaultEnabled": true,
+      "rc3": "claimed-direct-user-input-and-awaited-owned-section-assembly",
+      "acceptance": "apps/dsh-desktop/test/context-suite-runtime.test.mjs"
+    },
+    "M2": {
+      "package": "dsh-context-memory",
+      "version": "1.2.0",
+      "defaultEnabled": false,
+      "state": "blocked",
+      "reason": "cross-principal-project-memory-reproduced",
+      "preserved": "saved-intent-and-memory-files"
+    },
+    "P1": {
+      "package": "@ningbainb/dsh-personal-prompt",
+      "version": "0.1.0",
+      "defaultEnabled": true
+    },
+    "P2": {
+      "package": "dsh-prompt-customizer",
+      "version": "2.2.0",
+      "defaultEnabled": false,
+      "sourceAcceptance": "authenticated-save-preview-backup-restore-and-model-input-passed",
+      "desktopAcceptance": "pending"
+    }
+  }
 }

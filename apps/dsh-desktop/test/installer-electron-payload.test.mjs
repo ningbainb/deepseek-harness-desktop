@@ -8,6 +8,47 @@ import { tinyPE, payloadFixture } from './fixtures/electron-payload.mjs'
 
 const moduleURL = new URL('../scripts/installer-electron-payload.mjs', import.meta.url)
 const sha = b => createHash('sha256').update(b).digest('hex')
+
+test('external browser payload validates the installed core without a second Electron or reconstruction', async t => {
+  const { prepareInstallerElectronPayload } = await import(moduleURL)
+  const f = await payloadFixture(t)
+  await rm(join(f.app, 'resources/app.asar.unpacked/node_modules/electron'), { recursive: true })
+  await mkdir(join(f.app, 'resources/app.asar.unpacked/runtime-support'), { recursive: true })
+  await writeFile(join(f.app, 'resources/app.asar'), 'desktop-core')
+  await writeFile(join(f.app, 'resources/app.asar.unpacked/package.json'), '{"version":"5.3.0-rc.1"}')
+  await writeFile(join(f.app, 'resources/app.asar.unpacked/runtime-support/browser-component.json'), await readFile(new URL('../runtime-support/browser-component.json', import.meta.url)))
+  const result = await prepareInstallerElectronPayload(f.app, { externalBrowserRuntime: true })
+  try {
+    assert.equal(result.manifest.schemaVersion, 2)
+    assert.equal(result.manifest.payloadKind, 'external-browser')
+    assert.equal(result.manifest.electronVersion, '44.7.0')
+    assert.equal(result.manifest.completeFiles.length, 4)
+    assert.equal(result.summary.withheldFiles, 0)
+    assert.deepEqual(result.manifest.files, [])
+    for (const file of result.manifest.completeFiles) {
+      assert.equal(sha(await readFile(join(f.app, file.target))), file.sha256)
+    }
+    const adapter = JSON.parse(await readFile(result.builderArguments[0].split('=').slice(1).join('='), 'utf8'))
+    assert.equal(adapter.fullRuntime, true)
+    assert.equal(adapter.restorationBytes, 0)
+    assert.deepEqual(adapter.requiredTargets, result.manifest.completeFiles.map(file => file.target))
+  } finally { await result.restore() }
+})
+
+test('complete payload retains independent Electron and all shared bytes during archive assembly', async t => {
+  const { prepareInstallerElectronPayload } = await import(moduleURL)
+  const f = await payloadFixture(t)
+  const result = await prepareInstallerElectronPayload(f.app, { compactRuntime: false })
+  try {
+    assert.equal(result.summary.withheldFiles, 0)
+    assert.deepEqual(await readFile(join(f.dist, 'electron.exe')), tinyPE())
+    assert.equal(await readFile(join(f.dist, 'icudtl.dat'), 'utf8'), 'same-data')
+    const adapter = JSON.parse(await readFile(result.builderArguments[0].split('=').slice(1).join('='), 'utf8'))
+    assert.equal(adapter.fullRuntime, true)
+    assert.equal(adapter.restorationBytes, 0)
+    assert.deepEqual(adapter.omittedTargets, [])
+  } finally { await result.restore() }
+})
 test('offline deduplication generator is available', async () => {
   const exists = await access(moduleURL).then(() => true, () => false)
   assert.equal(exists, true, 'Windows packaging needs a reversible Electron payload generator')

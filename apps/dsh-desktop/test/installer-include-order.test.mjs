@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
+import { prepareBrowserPreflightFixtureResources } from './fixtures/browser-preflight-resources.mjs'
 import { resolveNsisCompiler } from '../scripts/nsis-compiler.mjs'
 
 const exec = promisify(execFile)
@@ -18,10 +19,11 @@ test('NSIS compiles hooks with warnings as errors when the executable constant i
   const payload = join(root, 'payload.txt')
   const output = join(root, 'fixture.exe')
   try {
+    const resources = await prepareBrowserPreflightFixtureResources(root)
     await mkdir(join(root, 'install'))
     await writeFile(payload, 'isolated compiler payload')
     const { stdout, stderr } = await exec(compiler.path, [
-      '/WX', '/V2', `/DBUILD_RESOURCES_DIR=${join(desktop, 'build')}`,
+      '/WX', '/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
       `/DTEST_OUTPUT=${output}`, `/DTEST_DEFAULT_INSTALL=${join(root, 'install')}`,
       `/DTEST_PAYLOAD=${payload}`, '/DTEST_REGISTRY=Software\\DeepSeekHarnessDesktopTests\\include-order',
       '/DTEST_UNINSTALL_FAILURE', join(desktop, 'test', 'fixtures', 'installer-lifecycle.nsi'),

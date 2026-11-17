@@ -29,7 +29,7 @@ async function fixture() {
 test('public receipt reconciliation preserves installer evidence and binds the combined checksum file', async () => {
   const state = await fixture()
   try {
-    const result = await finalizeThreePlatformReceipts(state.directory, '5.0.0')
+    const result = await finalizeThreePlatformReceipts(state.directory, '5.0.0', { legacyAppImage: true })
     assert.deepEqual(result.files[0], state.manifest.files[0])
     assert.deepEqual(result.runtime, state.manifest.runtime)
     assert.equal(result.files[1].size, Buffer.byteLength(state.combined))
@@ -51,9 +51,20 @@ test('public receipt reconciliation rejects tampered native receipts, assets and
         state.manifest.files[0].file = '../outside.exe'
         await writeFile(join(state.directory, 'release-manifest.json'), JSON.stringify(state.manifest))
       }
-      await assert.rejects(finalizeThreePlatformReceipts(state.directory, mutation === 'wrong-version' ? '4.4.0' : '5.0.0'))
+      await assert.rejects(finalizeThreePlatformReceipts(state.directory, mutation === 'wrong-version' ? '4.4.0' : '5.0.0', { legacyAppImage: true }))
     } finally {
       await rm(state.directory, { recursive: true, force: true })
     }
   }
+})
+
+test('new receipt contract requires three user installers and the internal macOS ZIP, with legacy AppImage explicit', async t => {
+  const state = await fixture()
+  t.after(() => rm(state.directory, { recursive: true, force: true }))
+  await assert.rejects(finalizeThreePlatformReceipts(state.directory, '5.0.0'))
+  const combined = state.combined.split('\n').filter(line => !line.includes('.AppImage')).join('\n')
+  await writeFile(join(state.directory, 'SHA256SUMS.txt'), combined)
+  const result = await finalizeThreePlatformReceipts(state.directory, '5.0.0')
+  assert.equal(result.files[1].sha256, digest(combined))
+  assert.deepEqual(result.files[0], state.manifest.files[0])
 })

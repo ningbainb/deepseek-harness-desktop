@@ -1,3 +1,7 @@
+!ifndef BUILD_UNINSTALLER
+!include "${BUILD_RESOURCES_DIR}\browser-component-preflight.nsh"
+!endif
+
 !define DSH_UPGRADE_HELPER_DIR "$TEMP\dsh-desktop-installer-support"
 !include "FileFunc.nsh"
 !define DSH_UPGRADE_HELPER_SCRIPT "${DSH_UPGRADE_HELPER_DIR}\installer-upgrade-transaction.ps1"
@@ -249,6 +253,25 @@ dsh_extraction_cancel_recovered:
     File /oname=$PLUGINSDIR\installer-progress.ps1 "${BUILD_RESOURCES_DIR}\installer-progress.ps1"
     Call StartInstallerProgressObserver
   !endif
+  !ifndef BUILD_UNINSTALLER
+    ; Prepare browser resources while the previous application and profile remain untouched.
+    File /oname=$PLUGINSDIR\installer-browser-preflight.ps1 "${BUILD_RESOURCES_DIR}\installer-browser-preflight.ps1"
+    SetOutPath "$PLUGINSDIR\browser-component-preflight\bin"
+    File /oname=preflight.mjs "${BUILD_RESOURCES_DIR}\browser-component-preflight\bin\preflight.mjs"
+    SetOutPath "$PLUGINSDIR\browser-component-preflight\runtime-support"
+    File /oname=browser-component.json "${BUILD_RESOURCES_DIR}\browser-component-preflight\runtime-support\browser-component.json"
+    System::Call 'kernel32::GetCurrentProcessId() i .r2'
+    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-browser-preflight.ps1" -InstallDirectory "$INSTDIR" -PreflightEntry "$PLUGINSDIR\browser-component-preflight\bin\preflight.mjs" -ExpectedEntrySHA256 "${DSH_BROWSER_PREFLIGHT_SHA256}" -ExpectedManifestSHA256 "${DSH_BROWSER_COMPONENT_MANIFEST_SHA256}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -InstallerProcessId $2'
+    Pop $0
+    Pop $1
+    !insertmacro DshLog "browser-component-preflight" "$0" "$1"
+    StrCmp $0 "0" browser_preflight_ready
+    !insertmacro DshStopProgress
+    MessageBox MB_ICONSTOP|MB_OK "共享浏览器组件尚未准备完成，安装已停止，旧程序和配置未被替换。请检查网络和原有 DSH_HOME 后重试。$\r$\n$\r$\n$1" /SD IDOK
+    Abort
+browser_preflight_ready:
+    SetOutPath "$TEMP"
+  !endif
 cleanup_retry:
   !insertmacro DshWorkingProgress "1 / 3  准备安装与保护旧版" "正在检查旧进程并准备可恢复的升级备份。"
   !ifdef BUILD_UNINSTALLER
@@ -316,6 +339,36 @@ old_uninstall_done_${SUFFIX}:
 ; Called immediately after application extraction, before registration/shortcuts.
 !macro customRestoreRuntime
   !define /ifndef DSH_RUNTIME_RESTORATION_HOOK 1
+  !ifdef DSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD
+    !ifndef DSH_RUNTIME_FULL_PAYLOAD
+      !error "External browser runtime requires complete core payload verification"
+    !endif
+  !endif
+  !ifdef DSH_RUNTIME_FULL_PAYLOAD
+    !ifdef DSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD
+      ; Schema 2 deliberately omits the independent browser Electron. The four
+      ; core identities are checked here; Commit verifies exact schema/size/hash.
+      IfFileExists "$INSTDIR\DeepSeek Harness Desktop.exe" 0 runtime_external_payload_missing
+      IfFileExists "$INSTDIR\resources\app.asar" 0 runtime_external_payload_missing
+      IfFileExists "$INSTDIR\resources\app.asar.unpacked\package.json" 0 runtime_external_payload_missing
+      IfFileExists "$INSTDIR\resources\app.asar.unpacked\runtime-support\browser-component.json" runtime_external_payload_present
+runtime_external_payload_missing:
+      !insertmacro DshLog "runtime-restore" "missing-core" "External browser core payload is missing"
+      SetErrorLevel 2
+      Abort
+runtime_external_payload_present:
+      !insertmacro DshLog "runtime-restore" "0" "External browser core payload extracted; reconstruction not required"
+    !else
+    ; The complete independently verified Electron is in the archive. Avoid a
+    ; PowerShell PE reconstruction subprocess on the user's installation path.
+    IfFileExists "$INSTDIR\resources\app.asar.unpacked\node_modules\electron\dist\electron.exe" runtime_full_payload_present
+    !insertmacro DshLog "runtime-restore" "missing-runtime" "Complete Electron payload is missing"
+    SetErrorLevel 2
+    Abort
+runtime_full_payload_present:
+    !insertmacro DshLog "runtime-restore" "0" "Complete runtime payload extracted; reconstruction not required"
+    !endif
+  !else
   Push $OUTDIR
   Call StageUpgradeTransactionScript
   Pop $0
@@ -328,9 +381,15 @@ old_uninstall_done_${SUFFIX}:
   SetErrorLevel 2
   Abort
 runtime_restore_done:
+  !endif
 !macroend
 
 !macro customInstall
+  !ifdef DSH_RUNTIME_FULL_PAYLOAD
+    !define DSH_RUNTIME_COMPLETE_ARGUMENT "-CompleteRuntimePayload"
+  !else
+    !define DSH_RUNTIME_COMPLETE_ARGUMENT ""
+  !endif
   !if "${DSH_RUNTIME_MANIFEST_SHA256}" != ""
     !ifndef DSH_RUNTIME_RESTORATION_HOOK
       !error "Offline runtime restoration must execute before registration and shortcuts"
@@ -339,7 +398,7 @@ runtime_restore_done:
   !insertmacro DshLog "commit-start" "pending" "Validating the new installation"
   !insertmacro DshWorkingProgress "3 / 3  校验并完成安装" "正在校验新版本并提交安装结果，请勿关闭安装程序。"
   Call StageUpgradeTransactionScript
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit ${DSH_RUNTIME_COMPLETE_ARGUMENT} -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
   Pop $0
   Pop $1
   !insertmacro DshLog "commit" "$0" "$1"

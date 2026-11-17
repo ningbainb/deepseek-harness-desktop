@@ -1,14 +1,12 @@
 {
   "schemaVersion": 1,
   "status": "supported",
-  "verifiedAt": "2026-10-27",
+  "verifiedAt": "2026-11-17",
   "desktopRange": "current",
-  "matrixArtifact": "docs/archive/2026-10-27-desktop-5.2.0-prediction-guide.md",
+  "matrixArtifact": "docs/plans/2026-11-17-desktop-next-rc3.md",
   "knownIssues": [
-    "Local Windows Runtime/SDK compatibility evidence only; macOS and Linux require separate native acceptance.",
-    "The companion-default snapshot passed Windows source-core 30/30; the subsequent presentation-only Tab guide passed its own 13 native checks and 880x640 geometry acceptance. The full source-core gate was not repeated for the guide; no rebuilt installer is certified.",
-    "Final repository and packaged acceptance receipts are tracked separately from these installed-input identities.",
-    "The prior local 5.2.0 installer has its own historical packaged acceptance; it predates these companion-default changes. No installer was rebuilt for the current source inputs.",
-    "Clean-account Setup installation, overlay upgrade and rollback are not certified by isolated executable acceptance."
+    "Candidate source identity for Desktop 5.3.0-rc.1 and DSH 0.2.2-rc.3; product acceptance is recorded in the linked plan, not inferred from dependency resolution.",
+    "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
+    "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
   ]
 }

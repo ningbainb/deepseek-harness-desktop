@@ -14,6 +14,7 @@ import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as DescribeImage from '../src/index.ts'
 
 import { chatReply, FakeWebServer, jsonReply, PNG_BYTES, responsesReply, startMockServer } from './mock-server.ts'
@@ -43,6 +44,7 @@ async function boot(configLines: readonly string[]): Promise<Context> {
     "- name: '@deepseek-ai/dsh-agent'",
     "- name: '@deepseek-ai/dsh-system-prompt'",
     "- name: '@deepseek-ai/dsh-tools'",
+    "- name: '@deepseek-ai/dsh-tool-executor-native'",
     "- name: '@deepseek-ai/dsh-tool-describe-image'",
     ...configLines.length > 0 ? ['  config:', ...configLines] : [],
     '',
@@ -58,6 +60,7 @@ async function boot(configLines: readonly string[]): Promise<Context> {
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-tool-describe-image', DescribeImage],
   ])
   ctx.loader.internal = {
@@ -80,13 +83,17 @@ async function tempPng(): Promise<string> {
   return path
 }
 
-function callDescribe(ctx: Context, image: string) {
-  return ctx.tools.execute({
+async function callDescribe(ctx: Context, image: string) {
+  const callId = ToolCallId('loader-vision-call')
+  const batch = await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('loader-vision-call'),
-    name: 'describe_image',
-    arguments: { image },
+    calls: [{ type: 'tool-call', id: callId, name: 'describe_image', arguments: JSON.stringify({ image }) }],
   })
+  expect(batch.results).toHaveLength(1)
+  const settled = batch.results[0]
+  if (!settled) throw new Error('expected one describe_image result')
+  expect(settled.callId).toBe(callId)
+  return settled.result
 }
 
 describe('describe-image real Loader composition through cordis.yml', () => {

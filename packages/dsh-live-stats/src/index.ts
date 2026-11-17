@@ -1,11 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
-import type {} from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { resolveEstimatorConfig } from './estimator.ts'
 import type { EstimatorConfig } from './estimator.ts'
 import { createLiveTokenUsageProjectionDefinition } from './projection.ts'
+import type { LiveTokenUsageState } from './projection.ts'
 import { resolvePricingConfig } from './pricing.ts'
 import type { PriceMode } from './pricing.ts'
 import { BalanceService } from './balance-service.ts'
@@ -58,11 +59,11 @@ declare module '@deepseek-ai/cordis' {
 /**
  * Register the replayable live-token projection and balance HTTP routes.
  */
-export function apply(
+export async function apply(
   ctx: Context,
   config: LiveConfig = {},
   deps?: { ledgerFilePath?: string },
-): void {
+): Promise<void> {
   const current = (): Config => ({
     charsPerToken: fieldValue(config.charsPerToken, 4),
     blockOverhead: fieldValue(config.blockOverhead, 4),
@@ -71,40 +72,67 @@ export function apply(
     showCost: fieldValue(config.showCost, true),
     priceMode: fieldValue(config.priceMode, 'auto' as PriceMode),
   })
-  let disposeProjection: (() => void) | undefined
+  let projection: ProjectionHandle<LiveTokenUsageState> | undefined
+  let revision = 0
+  let disposed = false
+  let pending = Promise.resolve()
+  let requestedConfig: string | undefined
   const ledgerStore = new LedgerStore(
     deps?.ledgerFilePath === undefined ? undefined : { filePath: deps.ledgerFilePath },
   )
 
   const rebuild = (): void => {
-    if (disposeProjection !== undefined) {
-      disposeProjection()
-      disposeProjection = undefined
-    }
-    if ((current().enabled ?? true) === false) return
     const source = current()
-    const spec = resolveEstimatorConfig({
-      ...(source.charsPerToken === undefined ? {} : { charsPerToken: source.charsPerToken }),
-      ...(source.blockOverhead === undefined ? {} : { blockOverhead: source.blockOverhead }),
-      ...(source.roleOverhead === undefined ? {} : { roleOverhead: source.roleOverhead }),
-    })
-    disposeProjection = ctx.sessionProjections.register(createLiveTokenUsageProjectionDefinition(
-      spec,
-      resolvePricingConfig({ priceMode: source.priceMode }),
-      source.showCost !== false,
-    ))
+    const signature = JSON.stringify(source)
+    if (disposed || signature === requestedConfig) return
+    requestedConfig = signature
+    const requestedRevision = ++revision
+    // Release the previous registration before acquiring the same key: the SDK
+    // shares an existing unit until its final owner has finished disposal.
+    pending = pending.then(async () => {
+      const previous = projection
+      await previous?.dispose()
+      if (disposed || requestedRevision !== revision || source.enabled === false) return
+      const spec = resolveEstimatorConfig({
+        ...(source.charsPerToken === undefined ? {} : { charsPerToken: source.charsPerToken }),
+        ...(source.blockOverhead === undefined ? {} : { blockOverhead: source.blockOverhead }),
+        ...(source.roleOverhead === undefined ? {} : { roleOverhead: source.roleOverhead }),
+      })
+      const handle = await ctx.sessionProjections.register(createLiveTokenUsageProjectionDefinition(
+        spec,
+        resolvePricingConfig({ priceMode: source.priceMode }),
+        source.showCost !== false,
+      ))
+      if (disposed || requestedRevision !== revision) await handle.dispose()
+      else projection = handle
+    }).catch(error => { ctx.logger.error(error) })
   }
+
+  ctx.effect(() => () => {
+    disposed = true
+    ++revision
+    // Also wait for a registration already in flight; it must release its
+    // handle rather than publish it after the plugin has been unloaded.
+    return pending.then(async () => {
+      const previous = projection
+      projection = undefined
+      await previous?.dispose()
+    })
+  }, 'live-stats: projection lifecycle')
 
   // Persist every settled step into the ledger. The projection fold stays
   // pure (it replays on cold loads), so recording lives in this runtime
   // subscription; the durable `session:turn:step` dedupe key keeps replays
-  // from double-counting. `onChanged` also fires per streamed delta — the
-  // in-memory watermark skips those without touching the ledger.
+  // from double-counting. Observe Session events independently of registry
+  // registration: onChanged disappears during an asynchronous config handoff.
+  // The SDK explicitly retains handle reads after disposal, so keep the last
+  // reader until its replacement is ready. Each settlement is read immediately,
+  // rather than collapsing several steps into a later state's single `last`.
   ctx.effect(() => {
     const settledWatermarks = new Map<string, string>()
-    return ctx.sessionProjections.onChanged((session, key) => {
-      if (key !== 'liveTokenUsage') return
-      const last = ctx.sessionProjections.stateOf(session, 'liveTokenUsage')?.last
+    return ctx.on('session/event', (session, event) => {
+      if (disposed || current().enabled === false || event.type !== 'step/end') return
+      const last = projection?.stateOf(session).last
       if (!last) return
       const watermark = `${last.turn}:${last.step}`
       if (settledWatermarks.get(session.id) === watermark) return
@@ -136,6 +164,9 @@ export function apply(
 
   ctx.on('loader/volatile-update', rebuild)
   rebuild()
+  // Cordis must not report the plugin ready before the typed ledger reader is
+  // available; a settled step immediately after startup must be recorded.
+  await pending
 }
 
 export { BalanceService } from './balance-service.ts'

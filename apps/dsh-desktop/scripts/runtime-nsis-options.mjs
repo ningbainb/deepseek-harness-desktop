@@ -4,6 +4,8 @@ export function configureNormalNsisBuild(options, adapter) {
   if (typeof options.config === 'object' && options.config?.nsis?.script) throw new Error('A custom NSIS script would bypass the normal uninstaller lifecycle')
   const restorationBytes = adapter.restorationBytes
   if (!Number.isSafeInteger(restorationBytes) || restorationBytes < 0) throw new Error('Invalid runtime restoration byte size')
+  if (adapter.fullRuntime === true && restorationBytes !== 0) throw new Error('Complete runtime payload cannot require restoration')
+  if (adapter.externalBrowserRuntime === true && adapter.fullRuntime !== true) throw new Error('External browser payload requires complete core verification')
   const restorationKiB = Math.ceil(restorationBytes / 1024)
   const accounted = new WeakSet()
   const previous = options.effectiveOptionComputed
@@ -26,6 +28,8 @@ export function configureNormalNsisBuild(options, adapter) {
     }
     if (Object.hasOwn(commands, '!addincludedir')) throw new Error('Unexpected existing NSIS include override')
     defines.DSH_RUNTIME_MANIFEST_SHA256 = adapter.manifestSHA256
+    if (adapter.fullRuntime === true) defines.DSH_RUNTIME_FULL_PAYLOAD = '1'
+    if (adapter.externalBrowserRuntime === true) defines.DSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD = '1'
     // CLI preprocessing runs before sharedHeader adds the stock include path.
     // Keep the stock main script, uninstaller generation, signing and size gates.
     commands['!addincludedir'] = `"${adapter.directory.replaceAll('\\', '/')}"`

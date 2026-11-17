@@ -1318,3 +1318,10 @@ form, .skill-actions, .migration-card, .recovery-primary, .environment-repair { 
   .skill-list .item-actions { justify-content: flex-start; }
   .skill-source { justify-self: start; }
 }
+
+/* Keep grouped navigation outside the unprivileged runtime view's bounds. */
+.settings-sidebar nav.page-tabs { flex-direction: column; gap: 2px; margin: 12px 0; }
+.settings-sidebar nav.page-tabs button { width: 100%; text-align: left; padding: 7px 12px; }
+.desktop-storage-locations { padding: 10px 12px; font-size: 12px; }
+.desktop-storage-locations dd { margin: 3px 0 10px; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
+.desktop-storage-locations dt { font-weight: 600; }

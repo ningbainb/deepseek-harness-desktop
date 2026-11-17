@@ -9,29 +9,42 @@ import { resolveRuntimePackages } from '../src/profile.mjs'
 const desktopRequire = createRequire(new URL('../package.json', import.meta.url))
 const sidebar = dirname(desktopRequire.resolve('dsh-better-sidebar/package.json'))
 
+// Published SDK clients may be single-line compressed output. These two
+// selectors contain a flat body or one nested loop; extract their actual
+// declarations without assuming indentation, line breaks or quote style.
+function officialSelector(source, name) {
+  return source.match(new RegExp(`function\\s+${name}\\([^)]*\\)\\s*\\{(?:[^{}]|\\{[^{}]*\\})*\\}`, 'u'))?.[0]
+}
+
 for (const bundle of ['client.js', 'client-registry.js']) {
-  test(`${bundle}: produced-file row retains the official rc.2 list-slot contract and closing Turn`, () => {
+  test(`${bundle}: produced-file row retains the official list-slot contract and closing Turn`, () => {
     const source = readFileSync(join(sidebar, 'lib', bundle), 'utf8')
     const officialRoot = resolveRuntimePackages().get('@deepseek-ai/dsh-client-ui-deliverables')
     const official = readFileSync(join(officialRoot, 'lib', 'client.js'), 'utf8')
-    const selection = official.match(/function selectProducedFiles\(owner\) \{[\s\S]*?\n\t\t\}/u)?.[0]
-    const produced = official.match(/function producedForClosing\([\s\S]*?\n\t\t\}/u)?.[0]
+    const selection = officialSelector(official, 'selectProducedFiles')
+    const produced = officialSelector(official, 'producedForClosing')
     assert.ok(selection, 'official deliverables must expose its Turn-local produced-file selector')
     assert.ok(produced)
     const select = vm.runInNewContext(`(() => { ${produced}; return (${selection}); })()`)
     const owner = {
-      seq: 5,
       turn: { data: new Map([['deliverables', { produced: [
         { seq: 2, path: 'a.txt' }, { seq: 4, path: 'a.txt' },
-        { seq: 5, path: 'b.txt' }, { seq: 6, path: 'future.txt' },
+        { seq: 5, path: 'b.txt' },
       ] }]]) },
     }
+    // The SDK now selects the completed Turn accumulator. Later turns and
+    // other sessions own separate data, rather than sharing an event cutoff.
+    const nextTurn = { turn: { data: new Map([['deliverables', { produced: [{ seq: 6, path: 'future.txt' }] }]]) } }
+    const otherSession = { turn: { data: new Map([['deliverables', { produced: [{ seq: 2, path: 'private.txt' }] }]]) } }
+    assert.deepEqual([...select(owner)], ['a.txt', 'b.txt'])
+    assert.deepEqual([...select(nextTurn)], ['future.txt'])
+    assert.deepEqual([...select(otherSession)], ['private.txt'])
     assert.deepEqual([...select(owner)], ['a.txt', 'b.txt'])
     assert.equal(select({ ...owner, turn: { data: new Map() } }), null)
-    assert.match(official, /name: "conversation.chat.turnTail",\s*id: "@deepseek-ai\/dsh-client-ui-deliverables"/u)
-    assert.match(official, /ctx\.provide\("chatFileMentions"/u)
-    assert.doesNotMatch(official, /select: \(owner\)/u)
-    assert.doesNotMatch(source, /id: "dsh-better-sidebar-produced-files"/u)
+    assert.match(official, /name:\s*(["'`])conversation\.chat\.turnTail\1,\s*id:\s*(["'`])@deepseek-ai\/dsh-client-ui-deliverables\2/u)
+    assert.match(official, /ctx\.provide\(\s*(["'`])chatFileMentions\1/u)
+    assert.doesNotMatch(official, /select:\s*(?:\(owner\)|owner)\s*=>/u)
+    assert.doesNotMatch(source, /id:\s*(["'`])dsh-better-sidebar-produced-files\1/u)
   })
 
   test(`${bundle}: UI terminals use Desktop, without stealing web, agent or inactive-session PTYs`, async () => {

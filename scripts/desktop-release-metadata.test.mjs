@@ -53,11 +53,20 @@ for (const [eventName, ref] of [['push', 'refs/heads/main'], ['push', 'refs/tags
   })
 }
 
-for (const version of ['', '5.2', '05.2.0', '5.2.0-beta.1', '5.2.0\npublish=true']) {
+for (const version of ['', '5.2', '05.2.0', '5.2.0-beta.01', '5.2.0\npublish=true']) {
   test(`invalid stable package version cannot reach workflow outputs: ${JSON.stringify(version)}`, async () => {
     await assert.rejects(classify({ eventName: 'workflow_dispatch', ref: 'refs/heads/main', version }), /stable.*version|version.*stable/iu)
   })
 }
+
+test('preview versions support nonpublishing validation but cannot publish from a Desktop tag', async () => {
+  for (const version of ['5.3.0-rc.1', '5.3.0-beta.1', '5.3.0-alpha.0']) {
+    assert.deepEqual(await classify({ eventName: 'workflow_dispatch', ref: 'refs/heads/main', version }), { version, publish: false })
+    assert.deepEqual(await classify({ eventName: 'push', ref: 'refs/heads/main', version }), { version, publish: false })
+    await assert.rejects(classify({ eventName: 'push', ref: `refs/tags/desktop-v${version}`, version }), /stable/iu)
+    await assert.rejects(classify({ eventName: 'push', ref: 'refs/tags/desktop-v5.3.0', version }), /stable/iu)
+  }
+})
 
 test('metadata CLI writes nonpublishing dispatch outputs and leaves no outputs on a mismatched push', async context => {
   const directory = await mkdtemp(join(tmpdir(), 'workflow-metadata-'))

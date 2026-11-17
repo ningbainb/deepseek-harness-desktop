@@ -174,7 +174,7 @@ try {
   assert.ok(dock, 'Dock window opened')
   const errors = []
   dock.on('pageerror', error => errors.push(error.message))
-  await dock.locator('#value-mode-tab').waitFor()
+  await dock.locator('#plugins-hub-tab').waitFor()
   const controlEntry = main.getByRole('button', { name: /智能操控|Smart Control/u }).first()
   const collaborationEntry = main.getByRole('button', { name: /模型协作|Model collaboration/u }).first()
   const dockEntry = main.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first()
@@ -328,6 +328,7 @@ try {
     }
     await settings.screenshot({ path: resolve(output, `${id}.png`) })
   }
+  await dock.locator('#models-tab').click()
   await dock.locator('#personal-prompt-tab').click()
   await settings.locator('[data-dsh-dock-settings="personal-prompt"]').waitFor()
   const prompt = settings.locator('[data-personal-prompt-card="true"]')
@@ -341,6 +342,7 @@ try {
   await settings.screenshot({ path: resolve(output, 'personal-prompt-editor.png') })
   await settings.locator('#memory-tab').click()
   await settings.locator('[data-dsh-dock-settings="memory"]').waitFor()
+  await dock.locator('#models-tab').click()
   await dock.locator('#personal-prompt-tab').click()
   await settings.locator('[data-dsh-dock-settings="personal-prompt"]').waitFor()
   assert.equal(await prompt.locator('textarea').first().inputValue(), 'Preserve this draft across Dock tabs.')
@@ -418,10 +420,10 @@ try {
   await explanation.locator('summary').focus()
   await settings.keyboard.press('Enter')
   await settings.locator('[data-dock-page-details][open]').waitFor()
-  await explanation.getByText('复杂任务需要多人分工时开启 Agent Team；希望主控模型规划、轻量模型执行时使用性价比模式。', { exact: true }).waitFor()
+  await explanation.getByText('团队成员、任务与协作操作位于会话中；团队功能开关位于更多工具。', { exact: true }).waitFor()
   await settings.keyboard.press('Space')
   assert.equal(await explanation.getAttribute('open'), null)
-  assert.equal(await settings.getByRole('heading', { name: '模型协作', exact: true }).count(), 1)
+  assert.equal(await settings.getByRole('heading', { name: '模型高级：性价比模式', exact: true }).count(), 1)
   await settings.locator('[data-value-mode-details] > summary').click()
   await settings.locator('[data-value-mode-details][open]').waitFor()
   await settings.locator('[data-value-mode-details] > summary').click()
@@ -429,6 +431,9 @@ try {
   await settings.locator('[data-value-mode-model-picker="true"]').waitFor()
   await settings.keyboard.press('Escape')
   await settings.locator('[data-value-mode-model-picker="true"]').waitFor({ state: 'hidden' })
+  await dock.locator('#control-center-tab').click()
+  await dock.locator('#agent-team-tab').click()
+  await settings.locator('[data-dsh-dock-settings="agent-team"]').waitFor()
   const agentTeamSwitch = settings.getByRole('switch', { name: 'Agent Team', exact: true })
   await agentTeamSwitch.waitFor({ state: 'visible' })
   assert.equal(await agentTeamSwitch.isEnabled(), true, 'Agent Team is available in the source Desktop build')
@@ -436,11 +441,17 @@ try {
   await agentTeamSwitch.click()
   await settings.getByRole('status').filter({ hasText: '已开启' }).waitFor({ timeout: 90_000 })
   const enabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
-  assert.equal(enabledProfile.dsh.profile.bundles.at(-1), '@deepseek-ai/dsh-experimental-agent-team-profile')
+  assert.equal(enabledProfile.dsh.profile.desktopAgentTeamEnabled, true)
+  assert.equal(enabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-agent-team'), true)
+  assert.equal(enabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'), false)
   await agentTeamSwitch.click()
   await settings.getByRole('status').filter({ hasText: '已关闭' }).waitFor({ timeout: 90_000 })
   const disabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
   assert.equal(disabledProfile.dsh.profile.bundles.includes('@deepseek-ai/dsh-experimental-agent-team-profile'), false)
+  assert.equal(disabledProfile.dsh.profile.desktopAgentTeamEnabled, false)
+  await dock.locator('#models-tab').click()
+  await dock.locator('#value-mode-tab').click()
+  await settings.locator('[data-dsh-dock-settings="value-mode"]').waitFor()
   for (const theme of ['dark', 'light']) {
     await selectDockTheme(main, theme)
     const appliedTheme = await dock.evaluate(async theme => {
@@ -512,11 +523,13 @@ try {
   assert.equal(await dock.locator('#plugins-hub-tab').getAttribute('aria-selected'), 'true', 'one plugin sidebar destination owns installed plugins and the workshop')
   assert.equal(await dock.locator('#market-tab').getAttribute('aria-selected'), 'true', 'the workshop remains selected inside the plugin destination')
   assert.equal(await dock.locator('#market-hub-tab').count(), 0, 'the Dock has no duplicate workshop sidebar destination')
-  assert.deepEqual(await dock.locator('.settings-sidebar [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
-    'control-center-tab', 'models-tab', 'value-mode-tab', 'personal-prompt-tab', 'describe-image-tab',
-    'usage-tab', 'sessions-tab', 'plugins-hub-tab', 'plugin-options-tab', 'skills-tab', 'qqbot-tab',
-    'appearance-tab', 'particle-theme-tab', 'backup-tab', 'recovery-tab',
-  ], 'the combined model destination and all unique destinations remain available in order')
+  assert.deepEqual(await dock.locator('.settings-sidebar > nav:not([data-tab-group]) [role="tab"]').evaluateAll(tabs => tabs.map(tab => tab.id)), [
+    'plugins-hub-tab', 'skills-tab', 'appearance-tab', 'models-tab', 'control-center-tab',
+  ], 'five primary groups retain focused navigation')
+  for (const id of ['control-center', 'models', 'value-mode', 'personal-prompt', 'describe-image', 'usage', 'sessions',
+    'plugins-hub', 'plugin-options', 'skills', 'qqbot', 'appearance', 'particle-theme', 'backup', 'recovery']) {
+    assert.equal(await dock.locator(`#${id}-tab`).count(), 1, `original destination ${id} remains available once`)
+  }
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('#plugin-settings').waitFor({ state: 'visible' })
   assert.ok(await dock.locator('#plugin-settings .setting-row').evaluateAll(rows => rows.length > 0
@@ -544,8 +557,10 @@ try {
   assert.equal(await nativeCatalog.evaluate(element => element.open), true)
   assert.equal(await nativeCatalog.evaluate(element => getComputedStyle(element).borderTopWidth), '0px')
   await dock.locator('#native-plugin-grid').waitFor()
+  await dock.locator('#control-center-tab').click()
   await dock.locator('#qqbot-tab').click()
   await dock.locator('#qqbot-bind').waitFor()
+  await dock.locator('#models-tab').click()
   await dock.locator('#backup-tab').click()
   await dock.locator('#export-preset').waitFor()
   await dock.locator('#conversation-tab').click()

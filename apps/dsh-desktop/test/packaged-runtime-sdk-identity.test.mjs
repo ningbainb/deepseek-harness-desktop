@@ -39,6 +39,10 @@ async function writeSdkPackage(modulesRoot, name, contents = 'export { boot } fr
 
 async function createPackagedFixture(root, { unpack = '{**/src/**,**/package.json,**/node_modules/**}', staleRuntimeSize = false } = {}) {
   const source = join(root, 'source')
+  // ASAR matches unpack globs against absolute filenames with dot:false.
+  // Anchor the fixture root explicitly so a parent such as .desktop-build
+  // does not cause globstar to silently exclude every unpacked file.
+  const unpackPattern = `${source.replaceAll('\\', '/')}/${unpack}`
   const resources = join(root, 'resources')
   const manifest = { name: '@linxin666/dsh-desktop', version: '4.4.1', type: 'module', main: 'src/main.mjs' }
   await mkdir(resources, { recursive: true })
@@ -62,9 +66,9 @@ async function createPackagedFixture(root, { unpack = '{**/src/**,**/package.jso
     const files = (await readdir(source, { recursive: true })).map(name => join(source, name)).sort()
     await asar.createPackageFromFiles(source, join(resources, 'app.asar'), files, {
       [runtimePath]: { type: 'file', stat: oldStat },
-    }, { unpack })
+    }, { unpack: unpackPattern })
   } else {
-    await asar.createPackageWithOptions(source, join(resources, 'app.asar'), { unpack })
+    await asar.createPackageWithOptions(source, join(resources, 'app.asar'), { unpack: unpackPattern })
   }
   return { resources, manifest, sourceDirectory: join(source, 'src'), unpackedRoot: join(resources, 'app.asar.unpacked') }
 }
@@ -76,6 +80,24 @@ test('electron-builder unpacks the complete local source graph and launcher mani
   assert.ok(config.asarUnpack.includes('package.json'))
   assert.ok(config.files.includes('src/**'))
   assert.ok(config.files.includes('package.json'))
+})
+
+test('ASAR identity fixtures unpack runtime files beneath a hidden build directory', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-hidden-build-'))
+  try {
+    const fixture = await createPackagedFixture(join(root, '.build-cache'))
+    const archive = join(fixture.resources, 'app.asar')
+    for (const name of ['package.json', 'src/runtime-launcher.mjs', 'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js']) {
+      assert.equal(asar.statFile(archive, join(...name.split('/'))).unpacked, true)
+      assert.deepEqual(await readFile(join(fixture.unpackedRoot, name)), await readFile(join(root, '.build-cache', 'source', name)))
+    }
+    await verifyPackagedRuntimeSdkIdentity(fixture.resources, {
+      expectedManifest: fixture.manifest,
+      sourceDirectory: fixture.sourceDirectory,
+    })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test('physical packaged launcher and profile/HMR/config-editor/plugin-manager share canonical URL and module objects', async () => {

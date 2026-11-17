@@ -8,6 +8,7 @@ import { defaultSkillRoots, discoverSkills, importSkill } from './extensions/ski
 import { DESKTOP_ERROR_CODES, DesktopContractError } from './desktop-contract.mjs'
 import { assertExternalPluginDescriptor } from './external-plugin-source.mjs'
 import { desktopDeepLink } from './distribution-identity.mjs'
+import { assertOptionalContextPluginActivation, getOptionalContextPluginStatus } from './runtime-optional-context-safety.mjs'
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 import { createSkillMarketActivation } from './skill-market-activation.mjs'
 import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
@@ -342,7 +343,10 @@ export function registerExtensionIpc({
       }
     })
     return {
-      plugins: createPluginUIStates(plugins, { incidents: recoveryState?.incidents }),
+      plugins: createPluginUIStates(plugins, { incidents: recoveryState?.incidents }).map(plugin => {
+        const activation = getOptionalContextPluginStatus(plugin.name)
+        return activation ? { ...plugin, status: 'needs-attention', statusLabel: '待验收：用户隔离未通过', activation } : plugin
+      }),
       communityPlugins: COMMUNITY_PLUGIN_CATALOG.map((plugin) => ({ ...plugin })),
       skills,
       qqbot: qqBotBinding.status(),
@@ -784,6 +788,7 @@ export function registerExtensionIpc({
       throw new TypeError('invalid plugin enablement request')
     }
     const detail = request.enabled ? 'enable' : 'disable'
+    if (request.enabled) assertOptionalContextPluginActivation(request.name)
     return trackProductOperation(detail, () => enqueuePluginMutation(
       () => pluginRecovery.setPluginEnabledAndRestart(request.name, request.enabled),
     ))

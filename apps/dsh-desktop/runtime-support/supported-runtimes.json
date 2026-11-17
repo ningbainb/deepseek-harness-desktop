@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.2.1-rc.4",
+      "upstreamVersion": "0.2.2-rc.3",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.2.0",
+      "desktopRange": "=5.3.0-rc.1",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,29 +55,27 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-10-27",
-      "matrixArtifact": "docs/archive/2026-10-27-desktop-5.2.0-prediction-guide.md",
+      "verifiedAt": "2026-11-17",
+      "matrixArtifact": "docs/plans/2026-11-17-desktop-next-rc3.md",
       "knownIssues": [
-        "Clean-account Setup installation, overlay upgrade and rollback are not certified by isolated executable acceptance.",
-        "Final repository and packaged acceptance receipts are tracked separately from these installed-input identities.",
-        "Local Windows Runtime/SDK compatibility evidence only; macOS and Linux require separate native acceptance.",
-        "The companion-default snapshot passed Windows source-core 30/30; the subsequent presentation-only Tab guide passed its own 13 native checks and 880x640 geometry acceptance. The full source-core gate was not repeated for the guide; no rebuilt installer is certified.",
-        "The prior local 5.2.0 installer has its own historical packaged acceptance; it predates these companion-default changes. No installer was rebuilt for the current source inputs."
+        "Candidate source identity for Desktop 5.3.0-rc.1 and DSH 0.2.2-rc.3; product acceptance is recorded in the linked plan, not inferred from dependency resolution.",
+        "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
+        "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
       ],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.2.1-rc.4",
-          "integrity": "sha512-8gxl6zOi6vx1sDolH+vjh9txrpbXD+t74Z2YfWkEBtR3xP2YEtk0bbLkgLZRnYQgDxCoXitXyXDKn5k0+6iXrg==",
+          "version": "0.2.2-rc.3",
+          "integrity": "sha512-S+4oUYVKWuc1SCMMp1mpUa2llxVy0o9gIgp7TDg/Ea7PuvXVkAfnykqSH1/oDXVB+y5VzEm0QIJulo1LIB3qRg==",
           "files": {
-            "package.json": "ab0994ef7fc70a9974d39735d6e30b500b4be3435012b53cab1df149f39bbc5c",
-            "lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
+            "package.json": "b39b22222238db8168ad1285251088b270fdedc6d11b7bdaf432b8b59d6880c7",
+            "lib/bin.js": "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "2afbda28bc2f44ababe3a89cfd965d1555e296a3b4382e08a703b6d638ae0c44"
+          "sha256": "f3585cd37b7f1a8c4051ab1f7e55396fbd69bc72b19a67967e9d2f0017824fec"
         },
         "slots": [
           "conversation.composer.dock",

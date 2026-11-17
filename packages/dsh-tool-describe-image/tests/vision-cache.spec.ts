@@ -8,6 +8,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 
 import * as tool from '../src/index.ts'
 import { chatReply, FakeWebServer, jsonReply, PNG_BYTES, startMockServer } from './mock-server.ts'
@@ -47,16 +48,21 @@ async function boot(ctx: Context, baseURL: string): Promise<void> {
   await ctx.plugin(FakeWebServer)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(tool, { baseURL, model: 'vision-1', apiKey: 'sk-inline' })
 }
 
-function callDescribe(ctx: Context, args: unknown) {
-  return ctx.tools.execute({
+async function callDescribe(ctx: Context, args: unknown) {
+  const callId = ToolCallId('cache-vision-call')
+  const batch = await ctx.tools.execute({
     signal: new AbortController().signal,
-    callId: ToolCallId('cache-vision-call'),
-    name: 'describe_image',
-    arguments: args,
+    calls: [{ type: 'tool-call', id: callId, name: 'describe_image', arguments: JSON.stringify(args) }],
   })
+  expect(batch.results).toHaveLength(1)
+  const settled = batch.results[0]
+  if (!settled) throw new Error('expected one describe_image result')
+  expect(settled.callId).toBe(callId)
+  return settled.result
 }
 
 describe('semantic vision cache', () => {

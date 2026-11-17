@@ -47,7 +47,7 @@ test('the actual SDK Loader retains options.id and the original guard activates 
 test('a qualified nested tree retains the local options.id and excludes its own sidebar mount', async () => {
   await fixture(async ({ ctx, applications, modules }) => {
     modules.set('fixture:nested', { async apply(child) {
-      class MemoryTree extends EntryTree { write() {} }
+      class MemoryTree extends EntryTree { commit() {} }
       const tree = new MemoryTree(child)
       await tree.create(standalone())
     } })
