@@ -89,6 +89,20 @@ test('Linux CI smoke keeps the Chromium sandbox enabled with installed permissio
   assert.doesNotMatch(workflow, /--no-sandbox/u)
 })
 
+test('Linux browser component carrier runs after build and before upload using the actual packaged main', async () => {
+  const workflow = YAML.parse(await readFile(join(repositoryDirectory, '.github', 'workflows', 'linux-preview.yml'), 'utf8'))
+  const steps = workflow.jobs.build.steps
+  const build = steps.findIndex(step => step.run?.includes('pnpm --filter @linxin666/dsh-desktop pack:linux'))
+  const tests = steps.filter(step => step.run?.includes('node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs'))
+  assert.equal(tests.length, 1, 'Retain exactly one complete component and adapter test invocation')
+  const index = steps.indexOf(tests[0])
+  const upload = steps.findIndex(step => step.uses === 'actions/upload-artifact@v4')
+  assert.ok(build >= 0 && index > build, 'The real carrier test requires the packaged application from the build')
+  assert.ok(index < upload, 'A carrier failure must block every upload')
+  assert.equal(tests[0].env.DSH_BROWSER_COMPONENT_CARRIER, '${{ github.workspace }}/apps/dsh-desktop/dist/linux-unpacked/deepseek-harness-desktop')
+  assert.doesNotMatch(tests[0].run, /--test-name-pattern|--test-skip-pattern/u)
+})
+
 test('Linux preview verifies the sole deb, its updater identity, and archive contents before upload', async () => {
   const workflow = YAML.parse(await readFile(join(repositoryDirectory, '.github', 'workflows', 'linux-preview.yml'), 'utf8'))
   const run = workflow.jobs.build.steps.map(step => step.run ?? '').join('\n')

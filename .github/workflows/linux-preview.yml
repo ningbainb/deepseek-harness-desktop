@@ -56,7 +56,6 @@ jobs:
             apps/dsh-desktop/test/unsigned-mac-preview.test.mjs \
             apps/dsh-desktop/test/terminal-session.test.mjs \
             apps/dsh-desktop/test/runtime-controller.test.mjs
-          node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Configure official anonymous product metrics
         shell: bash
         env:
@@ -83,6 +82,10 @@ jobs:
           NODE
       - name: Build the Linux x64 deb installer
         run: pnpm --filter @linxin666/dsh-desktop pack:linux
+      - name: Verify browser component with the packaged Electron carrier
+        env:
+          DSH_BROWSER_COMPONENT_CARRIER: ${{ github.workspace }}/apps/dsh-desktop/dist/linux-unpacked/deepseek-harness-desktop
+        run: node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Verify the single installer and deb updater payload
         run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs linux
       - name: Verify packaged Linux runtime

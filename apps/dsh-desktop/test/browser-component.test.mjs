@@ -1,13 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, writeFile, rm, readdir, readlink, stat, mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdtemp, readFile, writeFile, rm, readdir, readlink, stat, mkdir, realpath } from 'node:fs/promises'
+import { join, isAbsolute } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { dirname } from 'node:path'
 import { zipSync } from 'fflate'
 
 // Removing archive integrity, atomic activation or the provider's prepare barrier
@@ -136,11 +135,11 @@ test('archive extractor preserves ordinary framework link metadata', { skip: pro
 
 test('native Electron Node carrier prepares, repairs and validates opaque ASAR resources without changing process.noAsar', async t => {
   const require = createRequire(import.meta.url)
-  const electronRoot = dirname(require.resolve('electron/package.json'))
-  // Read the prepared official dependency directly; importing electron's NPM
-  // loader can silently download a missing distribution during a test.
-  const electronExecutable = join(electronRoot, 'dist', (await readFile(join(electronRoot, 'path.txt'), 'utf8')).trim())
-  assert.ok((await stat(electronExecutable)).isFile(), 'Prepare the declared official native Electron dependency before running this carrier regression')
+  // Native preview jobs reuse their just-built main executable. Fresh source
+  // gates use the declared official NPM loader to prepare its prebuilt binary.
+  const electronExecutable = process.env.DSH_BROWSER_COMPONENT_CARRIER ?? require('electron')
+  assert.ok(typeof electronExecutable === 'string' && isAbsolute(electronExecutable), 'DSH_BROWSER_COMPONENT_CARRIER must be an absolute actual executable')
+  assert.ok((await stat(electronExecutable)).isFile(), 'The native Electron carrier must exist')
   const root = await mkdtemp(join(tmpdir(), 'dsh-browser-electron-carrier-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const executable = process.platform === 'win32' ? 'electron.exe' : process.platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron' : 'electron'
@@ -174,7 +173,7 @@ await raw.promises.rm(options.cacheRoot,{recursive:true,force:true});
 const offline=await createBrowserComponentManager({...options,fetch:()=>{throw Error('offline')}}).prepare();
 assert.equal(offline.executablePath,initial.executablePath);
 assert.equal(process.noAsar,originalNoAsar,'Never toggle the process-wide ASAR policy');
-console.log(JSON.stringify({passed:true,electron:process.versions.electron,node:process.version,platform:process.platform,downloads,opaqueAsarValidated:true,offlineReady:true,noAsarUnchanged:true}));
+console.log(JSON.stringify({passed:true,electron:process.versions.electron,node:process.version,platform:process.platform,carrierExecutable:process.execPath,downloads,opaqueAsarValidated:true,offlineReady:true,noAsarUnchanged:true}));
 `)
   const { stdout } = await promisify(execFile)(electronExecutable, [carrier], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true, timeout: 30000, maxBuffer: 1024 * 1024,
@@ -184,6 +183,10 @@ console.log(JSON.stringify({passed:true,electron:process.versions.electron,node:
   })
   const evidence = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1))
   assert.equal(evidence.passed, true)
+  assert.equal(evidence.electron, require('electron/package.json').version)
   assert.equal(evidence.platform, process.platform)
   assert.equal(evidence.downloads, 2)
+  if (process.env.DSH_BROWSER_COMPONENT_CARRIER !== undefined) {
+    assert.equal(await realpath(evidence.carrierExecutable), await realpath(process.env.DSH_BROWSER_COMPONENT_CARRIER), 'The actual carrier must be the explicitly selected packaged executable')
+  }
 })

@@ -42,7 +42,6 @@ jobs:
             apps/dsh-desktop/test/verify-package-mac.test.mjs \
             apps/dsh-desktop/test/macos-lifecycle-menu.test.mjs \
             apps/dsh-desktop/test/unsigned-mac-preview.test.mjs
-          node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Configure official anonymous product metrics
         shell: bash
         env:
@@ -69,6 +68,10 @@ jobs:
           NODE
       - name: Build unsigned Apple Silicon package
         run: pnpm --filter @linxin666/dsh-desktop pack:mac
+      - name: Verify browser component with the packaged Electron carrier
+        env:
+          DSH_BROWSER_COMPONENT_CARRIER: ${{ github.workspace }}/apps/dsh-desktop/dist/mac-arm64/DeepSeek Harness Desktop.app/Contents/MacOS/DeepSeek Harness Desktop
+        run: node --test apps/dsh-desktop/test/browser-component.test.mjs apps/dsh-desktop/test/runtime-browser-component.test.mjs
       - name: Verify the user DMG and internal updater ZIP
         run: node apps/dsh-desktop/scripts/verify-distribution-artifacts.mjs darwin
       - name: Verify packaged bundle
