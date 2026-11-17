@@ -16,11 +16,17 @@ test('sidebar reviewed entry pin agrees with the support manifest', async () => 
   assert.deepEqual(manifest.plugins.find(plugin => plugin.name === 'dsh-better-sidebar').desktopCompatibility.reviewedEntry, SIDEBAR_TEAM_REVIEWED_ENTRY)
 })
 
-for (const [label, version, source] of [
+for (const [label, version, source, reviewed = false] of [
   ['newer package version', '0.25.0', reviewedEntry],
   ['same-version customized entry', '0.24.1', 'export function apply(ctx) { return ctx }\nexport const customEntry = true\n'],
+  ['reviewed all-LF patched entry', '0.24.1', reviewedEntry.replaceAll('\r\n', '\n'), true],
+  ['same-version all-LF code modification', '0.24.1', reviewedEntry.replaceAll('\r\n', '\n').replace('autoOpenSubagent: true', 'autoOpenSubagent: !0  ')],
 ]) {
-  test(`native module loading preserves sidebar ${label}`, async () => {
+  test(`native module loading ${reviewed ? 'adapts' : 'preserves'} sidebar ${label}`, async () => {
+    if (label === 'same-version all-LF code modification') {
+      assert.notEqual(source, reviewedEntry.replaceAll('\r\n', '\n'))
+      assert.equal(Buffer.byteLength(source), Buffer.byteLength(reviewedEntry.replaceAll('\r\n', '\n')), 'the code mutation control must defeat SHA, not merely the byte-length check')
+    }
     const root = await mkdtemp(join(tmpdir(), 'dsh-sidebar-entry-identity-'))
     const packageRoot = join(root, 'node_modules', 'dsh-better-sidebar')
     let dispose
@@ -47,7 +53,8 @@ for (const [label, version, source] of [
       }
       installDesktopMarketTeamCompatibility({ effect(factory) { dispose = factory() } })
       const module = await import(pathToFileURL(join(packageRoot, 'lib', 'index.js')).href)
-      assert.doesNotMatch(module.apply.toString(), /wrapSidebarTeamContext/u)
+      if (reviewed) assert.match(module.apply.toString(), /wrapSidebarTeamContext/u)
+      else assert.doesNotMatch(module.apply.toString(), /wrapSidebarTeamContext/u)
       if (label === 'same-version customized entry') {
         const sentinel = { userOwnedEntry: true }
         assert.equal(module.apply(sentinel), sentinel)

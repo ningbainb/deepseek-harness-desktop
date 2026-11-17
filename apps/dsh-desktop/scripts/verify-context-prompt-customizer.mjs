@@ -16,6 +16,7 @@ import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { createContextP2ProviderProbe } from './context-p2-provider-fixture.mjs'
 import { waitForSessionLog, readSessionLogText } from './session-log-fixture.mjs'
 import { seedConversationHistory } from './conversation-history-fixture.mjs'
+import { waitForNativeSidebarCollapsed } from './panel-layout-fixture.mjs'
 
 // This script launches only its own isolated Windows Desktop. It does not use
 // a live provider, pre-enable P2, change vendor code, or call a fictional API.
@@ -279,12 +280,25 @@ try {
       .filter(chip => chip.querySelector('.lc-chip-label')?.textContent?.trim() === '用户消息')
       .map(chip => chip.querySelector('.lc-chip-nums')?.textContent?.trim()))
     await main.screenshot({ path: join(output, `context-long-history-${name}.png`) })
-    return { right, elapsedMs, userNodes: 40, userTokenLabels, estimatedUserTokens: detail.value.head.current.user, estimatedTotalTokens: detail.value.head.current.total }
+    return { right, elapsedMs, userNodes: 40, userTokenLabels,
+      composition: detail.value.nodes.map(({ seq, cat, tokens }) => ({ seq, cat, tokens })),
+      estimatedUserTokens: detail.value.head.current.user, estimatedTotalTokens: detail.value.head.current.total }
   }
   const first = await measuredContext('first')
-  await first.right.getByRole('tab', { name: '上下文', exact: true }).getByRole('button', { name: '关闭', exact: true }).click()
-  const repeat = await measuredContext('repeat')
   report.history.firstOpenMs = first.elapsedMs
+  stage = 'long-history-context-collapse'
+  // rc3's sidebar header owns collapse/expand independently of the tab's
+  // DockKit close affordance. Preserve the Context tab and use native controls.
+  const collapse = first.right.locator('[data-sidebar-right-toggle]')
+  assert.equal(await collapse.count(), 1, 'the native Context panel has one collapse control')
+  await collapse.click()
+  await waitForNativeSidebarCollapsed(first.right)
+  report.history.repeatMethod = 'native-panel-collapse-expand'
+  const repeat = await measuredContext('repeat')
+  assert.deepEqual(repeat.composition, first.composition, 'reopening retains the same real Context nodes and token estimates')
+  assert.equal(repeat.estimatedUserTokens, first.estimatedUserTokens)
+  assert.equal(repeat.estimatedTotalTokens, first.estimatedTotalTokens)
+  assert.deepEqual(repeat.userTokenLabels, first.userTokenLabels, 'visible composition remains consistent after native collapse/expand')
   report.history.repeatOpenMs = repeat.elapsedMs
   report.history.userNodes = repeat.userNodes
   report.history.userTokenLabels = repeat.userTokenLabels

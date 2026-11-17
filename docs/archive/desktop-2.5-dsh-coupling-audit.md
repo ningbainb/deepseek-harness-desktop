@@ -719,7 +719,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 94 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-bai-onboarding.mjs | 35 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-beta-usability.mjs | 106 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs | 50 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs | 51 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 93 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 30 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 136 | DSH_HOME |

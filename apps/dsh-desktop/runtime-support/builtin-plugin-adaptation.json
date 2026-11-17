@@ -1328,7 +1328,13 @@
           "version": "0.24.1",
           "entry": "lib/index.js",
           "byteLength": 174661,
-          "sha256": "59633da266535fca2fef926d44285b45981cf3423d4b8c158043924c90b3db6e"
+          "sha256": "59633da266535fca2fef926d44285b45981cf3423d4b8c158043924c90b3db6e",
+          "sourceVariants": [
+            {
+              "byteLength": 174657,
+              "sha256": "584c469b7f82ed4577843e27c424ee016a4f460e6dd3ec8ce90670572366b099"
+            }
+          ]
         },
         "unknownEntryPolicy": "Load the original module unchanged for unknown package versions or entry bytes; preserve the package URL, other exports and client discovery.",
         "teamContract": "Only sidebar's context receives tryMembership projected from exact live official Agent identity, rootOf/namesOf and isEnabled. Team-off and missing roots retain 404, native task services retain revision conflict and member authorization."

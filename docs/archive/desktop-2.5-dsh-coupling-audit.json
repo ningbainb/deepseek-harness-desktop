@@ -5962,7 +5962,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs",
-      "line": 50,
+      "line": 51,
       "operation": "DSH_HOME"
     },
     {

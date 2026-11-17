@@ -16,6 +16,11 @@ export const MARKET_TEAM_REVIEWED_ENTRY = Object.freeze({
 export const SIDEBAR_TEAM_REVIEWED_ENTRY = Object.freeze({
   package: 'dsh-better-sidebar', version: '0.24.1', entry: 'lib/index.js', byteLength: 174661,
   sha256: '59633da266535fca2fef926d44285b45981cf3423d4b8c158043924c90b3db6e',
+  // The tracked pnpm patch contributes four CRLF lines on Windows and LF
+  // lines on native Unix checkouts. Accept only these two reviewed byte sets.
+  sourceVariants: Object.freeze([Object.freeze({ byteLength: 174657,
+    sha256: '584c469b7f82ed4577843e27c424ee016a4f460e6dd3ec8ce90670572366b099',
+  })]),
 })
 
 /** Sidebar task writes retain the vendor route and official Team mutation API.
@@ -215,7 +220,8 @@ function isReviewedEntry(url, original, pin) {
   if (typeof source !== 'string' && !ArrayBuffer.isView(source) && !(source instanceof ArrayBuffer)) return false
   const bytes = typeof source === 'string' ? Buffer.from(source) : ArrayBuffer.isView(source)
     ? Buffer.from(source.buffer, source.byteOffset, source.byteLength) : Buffer.from(source)
-  return bytes.byteLength === pin.byteLength && createHash('sha256').update(bytes).digest('hex') === pin.sha256
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  return [pin, ...(pin.sourceVariants ?? [])].some(reviewed => bytes.byteLength === reviewed.byteLength && sha256 === reviewed.sha256)
 }
 
 export function marketTeamCompatibilityLoad(url, context, nextLoad) {

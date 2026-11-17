@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createRequire } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { createServer } from 'node:http'
-import { installDesktopMarketTeamCompatibility, wrapSidebarTeamContext } from '../src/runtime-market-team-compat.mjs'
+import { installDesktopMarketTeamCompatibility, wrapSidebarTeamContext, SIDEBAR_TEAM_REVIEWED_ENTRY } from '../src/runtime-market-team-compat.mjs'
 
 const require = createRequire(import.meta.url)
 const baseRequire = createRequire(require.resolve('@deepseek-ai/dsh-base'))
@@ -31,8 +33,32 @@ test('actual sidebar Team write routes use the rc3 Host without weakening Team m
   const routes = []
   ctx.provide('webServer', { register(route) { routes.push(route); return () => {} }, registerUpgrade() { return () => {} } })
   ctx.provide('connection', { requestRejection: request => request.headers.authorization === 'Bearer fixture' ? undefined : 'unauthorized' })
+  // Register before the compatibility hook so this observes its original
+  // nextLoad result, never the replacement wrapper. No source is changed.
+  const entryLoads = []
+  const diagnostics = registerHooks({ load(url, context, nextLoad) {
+    const original = nextLoad(url, context)
+    if (/\/node_modules\/dsh-better-sidebar\/lib\/index\.js$/u.test(new URL(url).pathname)) {
+      const source = original.source
+      const bytes = typeof source === 'string' ? Buffer.from(source) : ArrayBuffer.isView(source)
+        ? Buffer.from(source.buffer, source.byteOffset, source.byteLength) : source instanceof ArrayBuffer ? Buffer.from(source) : undefined
+      const manifest = JSON.parse(readFileSync(new URL('../package.json', url), 'utf8'))
+      const disk = readFileSync(new URL(url))
+      entryLoads.push({ url, packageName: manifest.name, version: manifest.version, format: original.format,
+        sourceType: typeof source, sourceConstructor: source?.constructor?.name,
+        byteLength: bytes?.byteLength, sha256: bytes && createHash('sha256').update(bytes).digest('hex'),
+        diskByteLength: disk.byteLength, diskSha256: createHash('sha256').update(disk).digest('hex'),
+        diskCrlfCount: (disk.toString('utf8').match(/\r\n/gu) ?? []).length,
+        diskLfSha256: createHash('sha256').update(disk.toString('utf8').replaceAll('\r\n', '\n')).digest('hex') })
+    }
+    return original
+  } })
+  ctx.effect(() => () => diagnostics.deregister(), 'sidebar entry identity diagnostics')
   installDesktopMarketTeamCompatibility(ctx)
   const sidebar = await import(pathToFileURL(require.resolve('dsh-better-sidebar')).href)
+  t.diagnostic(JSON.stringify({ node: process.version, platform: process.platform,
+    expectedEntry: SIDEBAR_TEAM_REVIEWED_ENTRY, originalEntryLoads: entryLoads,
+    applyLooksWrapped: sidebar.apply.toString().includes('wrapSidebarTeamContext') }))
   await ctx.plugin(sidebar, {})
   let api = routes.find(route => route.path === '/sidebar/api')
   assert.ok(api)
@@ -81,10 +107,17 @@ test('actual sidebar Team write routes use the rc3 Host without weakening Team m
   assert.equal((await call('teams.taskCreate', payload, false)).status, 403)
   assert.equal(ctx.agentTeams.tryMembership, undefined, 'compatibility must not mutate the global official service')
   const { LlmAdapter } = await load('dsh-llm')
-  class Adapter extends LlmAdapter { async *stream() {
-    yield { type: 'block-start', index: 0, blockType: 'text' }
-    yield { type: 'text-delta', index: 0, text: 'done' }
-    yield { type: 'block-end', index: 0, block: { type: 'text', text: 'done' } }
+  const memberStarted = Promise.withResolvers()
+  class Adapter extends LlmAdapter { async *stream(request) {
+    // A completed rc3 activation is naturally released after its journal
+    // flush. Keep this actual member running while HTTP authority is tested,
+    // then stop it through the exact activation disposal capability.
+    memberStarted.resolve()
+    await new Promise(resolve => {
+      if (request.signal.aborted) resolve()
+      else request.signal.addEventListener('abort', resolve, { once: true })
+    })
+    request.signal.throwIfAborted()
     yield { type: 'finish', reason: { kind: 'stop' } }
   } }
   ctx.llm.registerAdapter(['sidebar-fixture'], new Adapter())
@@ -92,7 +125,7 @@ test('actual sidebar Team write routes use the rc3 Host without weakening Team m
   const { agent: routedLead } = await ctx.agents.create({ sessionId: 'sidebar-routed-lead', meta: { cwd: home }, agentOptions: { provider: 'sidebar-fixture', model: 'fixture' } })
   await ctx.agentTeams.setEnabled(routedLead, true)
   const activation = await ctx.subagents.startActivation({ parent: routedLead, provider: 'sidebar-native-child', name: 'member', label: 'member', prompt: [{ type: 'text', text: 'done' }], signal: new AbortController().signal, delivery: 'parent' })
-  await ctx.agents.get(activation.childId).whenIdle()
+  await memberStarted.promise
   assert.ok(ctx.agents.get(activation.childId), 'member authorization control requires a real resident child')
   const owned = await call('teams.taskCreate', { ...payload, rootSessionId: routedLead.id })
   assert.equal(owned.status, 200)
