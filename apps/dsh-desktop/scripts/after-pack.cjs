@@ -1,6 +1,7 @@
 const { cp, lstat, mkdir, readFile, readdir, realpath, rm, rmdir, stat, writeFile } = require('node:fs/promises')
 const { createHash } = require('node:crypto')
-const { dirname, extname, isAbsolute, join, relative, resolve } = require('node:path')
+const { dirname, extname, isAbsolute, join, relative, resolve, sep } = require('node:path')
+const { isDeepStrictEqual } = require('node:util')
 
 const sharp = require('sharp')
 const { writeWindowsUpdateConfiguration } = require('./packaged-update-config.cjs')
@@ -806,18 +807,88 @@ async function externalizeBrowserElectron(nodeModulesRoot, report) {
   report.categories['external-browser-electron'] = (report.categories['external-browser-electron'] ?? 0) + removedFiles
 }
 
+// Restore the original published bytes, never a modified upstream manifest.
+// electron-builder removes an empty scripts object while collecting packages;
+// the supported-runtime receipt deliberately still requires the NPM original.
+async function restoreOfficialRuntimeManifest(nodeModulesRoot, {
+  sourceRoot = dirname(require.resolve('@deepseek-ai/dsh/package.json')),
+  evidence,
+  stagingRoot = nodeModulesRoot,
+} = {}) {
+  evidence ??= JSON.parse(await readFile(join(__dirname, '..', 'runtime-support', 'known-good.json'), 'utf8'))
+  const runtime = evidence.runtime
+  if (runtime?.packageName !== '@deepseek-ai/dsh' || !runtime.version) {
+    throw new Error('Official runtime source provenance identity is missing')
+  }
+  const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+  const source = {}
+  for (const file of ['package.json', 'lib/bin.js']) {
+    const expected = runtime.files?.[file]
+    const bytes = await readFile(join(sourceRoot, file))
+    if (!/^[a-f0-9]{64}$/u.test(expected ?? '') || sha256(bytes) !== expected) {
+      throw new Error(`Official runtime source provenance hash mismatch: ${file}`)
+    }
+    source[file] = bytes
+  }
+  const officialManifest = JSON.parse(source['package.json'].toString('utf8'))
+  if (officialManifest.name !== runtime.packageName || officialManifest.version !== runtime.version) {
+    throw new Error('Official runtime source provenance identity mismatch')
+  }
+  const staging = resolve(stagingRoot)
+  const targetRoot = resolve(nodeModulesRoot, '@deepseek-ai', 'dsh')
+  async function requirePhysicalTarget(file) {
+    const target = join(targetRoot, file)
+    const inside = relative(staging, target)
+    if (!inside || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+      throw new Error('Packaged runtime target is outside physical staging')
+    }
+    // Inspect ancestors too: a physical file behind a junction is not staging.
+    let cursor = target
+    while (true) {
+      const info = await lstat(cursor)
+      if (info.isSymbolicLink() || (cursor === target && (!info.isFile() || info.nlink !== 1))) {
+        throw new Error(`Packaged runtime target must be physical without links: ${cursor}`)
+      }
+      const parent = dirname(cursor)
+      if (parent === cursor) break
+      cursor = parent
+    }
+    return target
+  }
+  const manifestPath = await requirePhysicalTarget('package.json')
+  const binPath = await requirePhysicalTarget('lib/bin.js')
+  if (sha256(await readFile(binPath)) !== runtime.files['lib/bin.js']) {
+    throw new Error('Packaged runtime target executable hash mismatch: lib/bin.js')
+  }
+  const targetBytes = await readFile(manifestPath)
+  if (targetBytes.equals(source['package.json'])) return false
+  const targetManifest = JSON.parse(targetBytes.toString('utf8'))
+  const normalizedManifest = { ...officialManifest }
+  if (!isDeepStrictEqual(officialManifest.scripts, {})) {
+    throw new Error('Official runtime source does not have the expected empty scripts object')
+  }
+  delete normalizedManifest.scripts
+  if (!isDeepStrictEqual(targetManifest, normalizedManifest)) {
+    throw new Error('Packaged runtime target manifest differs beyond empty scripts normalization')
+  }
+  await writeFile(manifestPath, source['package.json'])
+  return true
+}
+
 async function afterPack(context) {
   const platform = context.electronPlatformName
   if (platform !== 'win32' && platform !== 'darwin' && platform !== 'linux') return
   await writeWindowsUpdateConfiguration(context)
   const target = packingTargetFromContext(context)
   const nodeModulesRoot = packagedNodeModulesRoot(context)
+  const restoredOfficialManifest = await restoreOfficialRuntimeManifest(nodeModulesRoot, { stagingRoot: context.appOutDir })
   const restoredPeers = await restoreRequiredPackagedPeers(nodeModulesRoot)
   const restoredNativeBindings = await restoreRequiredNativeBindings(nodeModulesRoot, target)
   const restoredSkinAssets = await restoreAllBundledSkinAssets(nodeModulesRoot)
   const report = await prunePackagedRuntime(nodeModulesRoot, target)
   await externalizeBrowserElectron(nodeModulesRoot, report)
   report.restoredPeers = restoredPeers
+  report.restoredOfficialManifest = restoredOfficialManifest
   report.restoredNativeBindings = restoredNativeBindings
   report.restoredSkinAssets = restoredSkinAssets
   const outputPath = join(context.outDir, 'runtime-prune-report.json')
@@ -828,6 +899,7 @@ async function afterPack(context) {
 }
 
 module.exports = afterPack
+module.exports.restoreOfficialRuntimeManifest = restoreOfficialRuntimeManifest
 module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime

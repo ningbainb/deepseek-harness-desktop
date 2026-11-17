@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 
@@ -151,6 +152,12 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
       appOutDir,
       packager: { appInfo: { productFilename: 'DeepSeek Harness Desktop' } },
     })
+    const officialRuntime = dirname(createRequire(import.meta.url).resolve('@deepseek-ai/dsh/package.json'))
+    for (const file of ['package.json', 'lib/bin.js']) {
+      const target = join(nodeModules, '@deepseek-ai', 'dsh', file)
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, await readFile(join(officialRuntime, file)))
+    }
     const keepPty = join(nodeModules, 'node-pty', 'prebuilds', 'darwin-arm64', 'pty.node')
     const keepHelper = join(nodeModules, 'node-pty', 'prebuilds', 'darwin-arm64', 'spawn-helper')
     const dropWin = join(nodeModules, 'node-pty', 'prebuilds', 'win32-x64', 'pty.node')
@@ -186,6 +193,7 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
 
     const report = JSON.parse(await readFile(join(root, 'runtime-prune-report.json'), 'utf8'))
     assert.ok(report.removedFiles >= 1)
+    assert.equal(report.restoredOfficialManifest, false)
     assert.deepEqual(report.restoredNativeBindings, [])
     await access(keepPty)
     await access(keepHelper)
