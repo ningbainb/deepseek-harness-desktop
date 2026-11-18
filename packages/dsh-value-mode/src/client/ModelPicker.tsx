@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelRouteSelection } from '../core/config.ts'
 import { en, zh, type ValueModeLocaleKey } from './locales.ts'
-import { ModelCatalogChangedError } from './model-catalog.ts'
+import { CODEX_MODEL_CATALOG_CHANGED, ModelCatalogChangedError } from './model-catalog.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
 import picker from './value-mode-picker.module.css'
@@ -54,11 +54,16 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
   useEffect(() => {
     const refresh = () => setReloadToken(value => value + 1)
     window.addEventListener('dsh-relay-models-updated', refresh)
+    window.addEventListener(CODEX_MODEL_CATALOG_CHANGED, refresh)
     const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('dsh-model-selection-confirmed-v1') : undefined
     if (channel) channel.onmessage = event => {
       if (typeof event.data === 'object' && event.data !== null && event.data.provider === 'project-relay') refresh()
     }
-    return () => { window.removeEventListener('dsh-relay-models-updated', refresh); channel?.close() }
+    return () => {
+      window.removeEventListener('dsh-relay-models-updated', refresh)
+      window.removeEventListener(CODEX_MODEL_CATALOG_CHANGED, refresh)
+      channel?.close()
+    }
   }, [])
 
   useEffect(() => {

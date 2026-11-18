@@ -782,8 +782,26 @@ input[type="text"]:focus { border-color: var(--harness-accent); box-shadow: none
 }
 .dock-search { display: block; margin: 0 4px 2px; }
 .dock-search input { box-sizing: border-box; min-width: 0; width: 100%; height: 30px; padding: 0 10px; border: 1px solid var(--harness-border-strong); border-radius: 7px; color: var(--harness-text); background: var(--harness-bg); font: inherit; font-size: 12px; }
-.dock-search-results { padding: 8px 4px; max-height: 240px; overflow: auto; color: var(--harness-text-secondary); font-size: 12px; }
-.dock-search-results button { width: 100%; margin: 2px 0; text-align: left; border-radius: 6px; }
+.dock-search-results { padding: 4px; color: var(--harness-text-secondary); font-size: 12px; }
+.dock-search-status { margin: 4px 8px; }
+.dock-search-results button {
+  display: grid;
+  gap: 1px;
+  justify-items: start;
+  width: 100%;
+  margin: 2px 0;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--harness-text);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  line-height: 1.35;
+}
+.dock-search-results button:hover,
+.dock-search-results button:focus-visible { background: var(--harness-bg-hover); transform: none; }
+.dock-search-results button small { color: var(--harness-text-secondary); font-size: 11px; font-weight: 400; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 main { padding: 24px 26px 28px; }
 .workspace-heading { margin-bottom: 20px; padding-right: 74px; }

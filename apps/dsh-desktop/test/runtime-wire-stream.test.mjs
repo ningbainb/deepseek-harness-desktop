@@ -18,6 +18,75 @@ test('private API dispatch passes the same SDK-owned browser Peer and refuses a 
   assert.throws(() => desktopConnection.fetchDesktopConnectionApi({ connection: {} }, api, request), /Connection peer/u)
 })
 
+test('the native shared model catalog tracks the Codex OAuth grant without changing saved selections', async () => {
+  const codex = 'openai-codex'
+  const compatible = 'project-openai'
+  const groups = [
+    { id: codex, name: 'Codex', models: [{ id: 'gpt-test', name: 'Codex model' }] },
+    { id: compatible, name: 'Custom', models: [{ id: 'gpt-test', name: 'Custom GPT' }] },
+  ]
+  const catalog = {
+    default: { provider: codex, model: 'gpt-test', reasoningEffort: 'high' },
+    groups, routableProviders: [codex, compatible],
+    failures: [{ id: codex, name: 'Codex', message: 'Unavailable' }, { id: 'other' }],
+  }
+  const envelope = { type: 'server-response', rpcId: 'model-catalog-probe', result: { ok: true, value: catalog } }
+  let record = { configured: false, writable: true }
+  const keyReads = []
+  const ctx = {
+    connection: { browserPeer: {} },
+    get(name) {
+      assert.equal(name, 'credentials')
+      return {
+        async describeRecord(key) {
+          keyReads.push(key)
+          if (record === null) throw new Error('record store could not be read')
+          return record
+        },
+      }
+    },
+  }
+  const request = new Request('http://dsh.internal/api/session/modelCatalog', { method: 'POST' })
+  const fetchCatalog = () => desktopConnection.fetchDesktopConnectionApi(ctx, {
+    fetch: () => Response.json(envelope, { headers: { 'x-test-metadata': 'kept', 'content-length': '10' } }),
+  }, request)
+  const hidden = await fetchCatalog()
+  assert.equal(hidden.headers.get('x-test-metadata'), 'kept')
+  assert.equal(hidden.headers.get('content-length'), null, 'do not forward the previous body length')
+  const hiddenEnvelope = {
+    ...envelope, result: { ok: true, value: { ...catalog,
+      routableProviders: [compatible], groups: [groups[1]], failures: [catalog.failures[1]],
+    } },
+  }
+  assert.deepEqual(await hidden.json(), hiddenEnvelope)
+  record = { configured: true, kind: 'grant', writable: false }
+  assert.deepEqual(await (await fetchCatalog()).json(), envelope)
+  record = { configured: true, kind: 'api-key', writable: true }
+  assert.deepEqual(await (await fetchCatalog()).json(), hiddenEnvelope)
+  record = null
+  assert.deepEqual(await (await fetchCatalog()).json(), hiddenEnvelope)
+  record = { configured: false, writable: true }
+  assert.deepEqual(await (await fetchCatalog()).json(), hiddenEnvelope)
+  assert.deepEqual(keyReads, Array(5).fill('llm-pi-ai/openai-codex'))
+  assert.deepEqual(catalog.groups.map(group => group.id), [codex, compatible])
+})
+
+test('model catalog projection preserves official RPC failures and ignores unrelated routes', async () => {
+  const ctx = {
+    connection: { browserPeer: {} },
+    get() { assert.fail('non-catalog requests must not touch the credential service') },
+  }
+  const route = 'http://dsh.internal/api/session/modelCatalog'
+  const failure = Response.json({ type: 'server-response', rpcId: 'refused', result: { ok: false, error: {} } })
+  const read = (url, method, response) => desktopConnection.fetchDesktopConnectionApi(
+    ctx, { fetch: async () => response }, new Request(url, { method }),
+  )
+  assert.equal(await read(route, 'POST', failure), failure)
+  const unrelated = Response.json({ ok: true })
+  assert.equal(await read(route + '/other', 'POST', unrelated), unrelated)
+  assert.equal(await read(route, 'GET', unrelated), unrelated)
+})
+
 test('Desktop maps the official five-argument wire stream contract and preserves uplink', async () => {
   const controller = new AbortController()
   const operator = {}

@@ -1,5 +1,19 @@
 import assert from 'node:assert/strict'
 
+export function createCodexGrantFixture() {
+  return {
+    version: 1,
+    refs: {},
+    records: {
+      'llm-pi-ai/openai-codex': {
+        kind: 'grant',
+        // Value-free visibility tests only. The fixture never sends a model request.
+        payload: { type: 'oauth', access: 'fixture-only', refresh: 'fixture-only', expires: 4102444800000 },
+      },
+    },
+  }
+}
+
 export function createModelPreferencesFixture() {
   return {
     settings: {

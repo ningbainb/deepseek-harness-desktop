@@ -12,8 +12,11 @@
     <div class="settings-shell">
       <aside class="settings-sidebar">
         <header><h1>拓展坞</h1></header>
-        <label class="dock-search"><span class="sr-only">查找拓展坞功能</span><input id="dock-search" type="search" placeholder="查找功能…" autocomplete="off" aria-controls="dock-search-results"></label>
-        <div id="dock-search-results" class="dock-search-results" hidden aria-label="功能搜索结果"></div>
+        <label class="dock-search"><span class="sr-only">搜索拓展坞设置和工具</span><input id="dock-search" type="search" placeholder="搜索设置和工具…" autocomplete="off" spellcheck="false" aria-controls="dock-search-results"></label>
+        <div id="dock-search-results" class="dock-search-results" role="region" aria-label="拓展坞搜索结果" hidden>
+          <p id="dock-search-status" class="dock-search-status" role="status"></p>
+          <div id="dock-search-items"></div>
+        </div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
           <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { zh, en, type ValueModeLocaleKey } from '../src/client/locales.ts'
 import { apply, inject } from '../src/client/index.ts'
+import { createModelCatalogLoader } from '../src/client/model-catalog.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 
 const EMOJI_REGEX = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/u
@@ -17,12 +18,27 @@ function runtimeContext(modelCatalog = vi.fn()) {
   Object.defineProperty(connection, 'api', { get() { throw new Error('Legacy connection.api must not be read') } })
   return {
     on: vi.fn(() => () => {}),
-    remote: { session: { modelCatalog }, $on: vi.fn(() => () => {}) },
+    remote: { session: { modelCatalog }, $on: vi.fn((_event: string, _callback: () => void) => () => {}) },
     get: vi.fn((name: string) => name === 'connection' ? connection : undefined),
   }
 }
 
 describe('ValueMode Client Plugin & Locales', () => {
+  it('invalidates a cached picker catalog when a Codex grant changes', async () => {
+    const codex = { id: 'openai-codex', name: 'Codex', models: [{ id: 'gpt-test', name: 'GPT Test' }] }
+    const models = vi.fn()
+      .mockResolvedValueOnce({ ok: true, value: { groups: [codex], failures: [] } })
+      .mockResolvedValueOnce({ ok: true, value: { groups: [], failures: [] } })
+    const runtime = runtimeContext(models)
+    const fetchModels = createModelCatalogLoader({ ...runtime, effect: vi.fn() } as unknown as ClientContext, key => zh[key])
+    await expect(fetchModels()).resolves.toEqual({ groups: [codex], failures: [] })
+    const credentialUpdated = runtime.remote.$on.mock.calls.find(([event]) => event === 'credentials/record-updated')?.[1]
+    expect(credentialUpdated).toBeTypeOf('function')
+    credentialUpdated?.()
+    await expect(fetchModels()).resolves.toEqual({ groups: [], failures: [] })
+    expect(models).toHaveBeenCalledTimes(2)
+  })
+
   it('has exact 100% key match between zh and en dictionaries', () => {
     const zhKeys = Object.keys(zh) as ValueModeLocaleKey[]
     const enKeys = Object.keys(en) as ValueModeLocaleKey[]

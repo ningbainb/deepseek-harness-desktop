@@ -11,7 +11,7 @@ import electronPath from 'electron'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
-import { assertModelCatalogProjection, createModelPreferencesFixture } from './model-catalog-fixture.mjs'
+import { assertModelCatalogProjection, createCodexGrantFixture, createModelPreferencesFixture } from './model-catalog-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const startupTimeout = Math.max(120_000, Number(process.env.DSH_DESKTOP_E2E_TIMEOUT_MS) || 120_000)
@@ -319,6 +319,7 @@ try {
   await mkdir(workspace, { recursive: true })
   await mkdir(dshHome, { recursive: true })
   await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify(modelFixture.settings))
+  await writeFile(join(dshHome, '.credentials.yaml'), JSON.stringify(createCodexGrantFixture()), { mode: 0o600 })
   const first = await launch()
   app = first.instance
   const firstPage = first.page

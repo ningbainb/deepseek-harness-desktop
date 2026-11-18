@@ -16,7 +16,7 @@ export async function readNativePresetRoster(page) {
   return result.body.result.value.presets
 }
 
-/** Use the existing official settings editor; never restore a chat switch. */
+/** The official editor remains available for existing and custom presets. */
 export async function verifyDesktopPresetSettings({ page, readRoster = () => readNativePresetRoster(page) }) {
   const before = await readRoster()
   await page.getByRole('button', { name: '账号菜单', exact: true }).click()
@@ -51,7 +51,26 @@ export async function verifyDesktopPresetSettings({ page, readRoster = () => rea
   return inspected
 }
 
-/** Desktop keeps failure/retry and history while preset management stays in Settings. */
+/** Only the separate Liangshen lever is suppressed in the Desktop composer. */
+export async function verifyDesktopComposerModeControls(page) {
+  const presets = await readNativePresetRoster(page)
+  const valueMode = presets.find(preset => preset.id === 'value-mode' && !preset.broken)
+  assert.ok(valueMode, 'Value Mode remains in the official preset roster')
+  const picker = page.locator('button[aria-haspopup="menu"][title="选择新任务使用的 Agent 预设"]')
+  await picker.waitFor({ state: 'visible' })
+  await picker.click()
+  await page.locator('button[title="选择新任务使用的 Agent 预设"][aria-expanded="true"]').waitFor()
+  const nativeModes = ['标准模式', presetName(valueMode)]
+  for (const name of nativeModes) {
+    await page.getByText(name, { exact: true }).filter({ visible: true }).last().waitFor()
+  }
+  await page.keyboard.press('Escape')
+  assert.equal(await page.locator('[data-dsh-plugin="liangshen"][data-dsh-part="lever"]').count(), 0,
+    'The dedicated Liangshen switch is absent while the native menu remains usable')
+  return nativeModes
+}
+
+/** Desktop keeps the official picker, failure/retry, and existing history. */
 export async function verifyNativePresetLifecycle({ page, rpc, sessionId, workspaceId, workspacePath,
   messageCount, logPath, openSeededSession, runtimeFetchGate, readWorkspace }) {
   const roster = () => readNativePresetRoster(page)
@@ -101,8 +120,7 @@ export async function verifyNativePresetLifecycle({ page, rpc, sessionId, worksp
     const createdId = created.result.value.sessionId
     assert.notEqual(createdId, sessionId)
     await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
-    assert.equal(await page.locator('button[aria-haspopup="menu"][title="选择新任务使用的 Agent 预设"]').count(), 0,
-      'Desktop does not expose the official inline preset switch after creating a blank session')
+    await verifyDesktopComposerModeControls(page)
     const seats = (await rpc(page, 'session.list', {})).items
     const blank = seats.find(item => (item.id ?? item.sessionId) === createdId)
     assert.equal(blank?.cwd, workspacePath)

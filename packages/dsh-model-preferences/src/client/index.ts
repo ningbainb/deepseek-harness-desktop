@@ -131,6 +131,9 @@ export function apply(ctx: ClientContext): void {
         config: currentConfig(settingsScope),
         settingsScope,
         loadCatalog,
+        subscribeCatalogChanges: (listener: () => void) => ctx.remote.$on('credentials/record-updated', key => {
+          if (key === 'llm-pi-ai/openai-codex') listener()
+        }),
       }),
     }, ModelPreferencesCard))
   })

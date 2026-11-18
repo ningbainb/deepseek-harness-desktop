@@ -1291,8 +1291,7 @@ for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
 let navigationRequest = 0
-let activeSettingsTab
-let activeSettingsPlugin
+let activeSettings
 const groupTitles = {
   plugins: ['扩展能力', '插件'], skills: ['扩展能力', '技能中心'], qqbot: ['扩展能力', 'QQ 机器人'],
   'desktop-settings': ['拓展坞', '桌面设置'], appearance: ['拓展坞', '外观'], 'more-tools': ['拓展坞', '更多工具'],
@@ -1326,8 +1325,7 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   const request = ++settingsRequest
   const requestedSetting = settingOverride ?? tab.dataset.setting
   const setting = requestedSetting === 'relay' ? 'models' : requestedSetting
-  activeSettingsTab = setting ? tab : undefined
-  activeSettingsPlugin = plugin
+  activeSettings = setting ? { tab, setting, plugin } : undefined
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting)
   for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
@@ -1389,7 +1387,10 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   if (tab.dataset.tab === 'market') void refreshMarket()
 }
 document.querySelector('#dock-settings-retry').addEventListener('click', () => {
-  if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin, true)
+  if (activeSettings) {
+    const { tab, setting, plugin } = activeSettings
+    activateTab(tab, false, setting, plugin, true)
+  }
 })
 
 for (const entry of document.querySelectorAll('[data-desktop-tool]')) {
@@ -1417,30 +1418,37 @@ for (const tab of tabs) {
   })
 }
 const searchEntries = [
-  ['皮肤与壁纸', '外观 试穿 配色 背景 Wallpaper 主题', 'appearance-tab'],
-  ['模型与能力', '模型目录 图片输入 推理档位 供应商 bai 中转站 登录 账号 充值 API Key 启用 停用 模型接入', 'models-tab'],
+  ['皮肤与壁纸', '外观 试穿 配色 背景 Wallpaper 主题', 'skins-page-tab'],
+  ['模型与能力', '模型目录 图片输入 推理档位 供应商 bai 中转站 登录 账号 充值 API Key Codex ChatGPT 启用 停用 模型接入', 'models-page-tab'],
   ['用量与余额', '统计 token 额度 套餐 费用 供应商', 'usage-tab'],
   ['会话管理', '聊天历史 搜索 归档 恢复 清理', 'sessions-tab'],
   ['共享浏览器', '独立组件 下载 取消 重试 浏览器权限', 'shared-browser-tab'],
-  ['智能操控', 'Browser Use Computer Use 浏览器 电脑 Playwright Cua', 'control-center-tab'],
+  ['智能操控', 'Browser Use Computer Use 浏览器 电脑 Playwright Cua', 'control-page-tab'],
+  ['团队功能开关', 'Agent Team 协作 多智能体', 'agent-team-tab'],
+  ['任务看板', '任务 管理 进度 Task Board Kanban', 'task-board-tool'],
+  ['SSH 远程开发', '服务器 连接 终端 Remote', 'ssh-tool'],
   ['模型高级 (Value Mode)', '模型协作 性价比模式 Value Mode 主控 执行模型 成本 策略', 'value-mode-tab'],
   ['回复偏好', '个人偏好 Prompt 提示词 全局 工作区', 'personal-prompt-tab', 'personal-prompt'],
-  ['记忆', '个人偏好 本地记忆 待确认建议', 'personal-prompt-tab', 'memory'],
+  ['记忆', '个人偏好 本地记忆 待确认建议 全局 项目 会话 Memory', 'personal-prompt-tab', 'memory'],
   ['图像理解', '视觉模型 图片 端点', 'describe-image-tab'],
   ['已安装插件', '社区扩展 更新 卸载 本地目录', 'plugins-tab'],
   ['创意工坊', '创意工坊 插件市场 社区 群友作品', 'market-tab'],
   ['插件设置', '自动更新 未知兼容 开发者 内置能力', 'plugin-settings-tab'],
-  ['技能中心', '导入技能 Skill', 'skills-tab'],
+  ['插件自带配置', '插件选项 参数 原生设置', 'plugin-options-tab'],
+  ['本地技能', '技能中心 导入技能 Skill', 'skills-local-tab'],
   ['技能市场', 'Skills MCP Hooks 套件 来源', 'skill-market-tab'],
   ['QQ 机器人', '绑定 扫码', 'qqbot-tab'],
   ['外观与动效', '鲸鱼粒子 主题', 'particle-theme-tab'],
-  ['环境预设', '备份 导入 导出 Preset', 'presets-tab'],
+  ['环境预设', '备份与迁移 导入 导出 Preset', 'presets-tab'],
   ['对话导入', 'Claude Codex 历史', 'conversation-tab'],
   ['旧配置迁移', 'Web Profile', 'migration-tab'],
   ['诊断与恢复', '故障 隔离 网络 检查 重置', 'recovery-tab'],
+  ['存储位置', '程序目录 安装路径 数据 缓存 文件夹', 'desktop-storage-locations'],
 ]
 const dockSearch = document.querySelector('#dock-search')
 const searchResults = document.querySelector('#dock-search-results')
+const searchItems = document.querySelector('#dock-search-items')
+const searchStatus = document.querySelector('#dock-search-status')
 function syncFeatureSearchNavigation() {
   const group = document.querySelector('.settings-sidebar > nav:not([data-tab-group]) [data-group][aria-selected="true"]')?.dataset.group
   for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
@@ -1448,32 +1456,83 @@ function syncFeatureSearchNavigation() {
   }
 }
 function resetFeatureSearch() {
-  searchResults.hidden = true
   dockSearch.value = ''
-  syncFeatureSearchNavigation()
+  renderFeatureSearch()
 }
-dockSearch.addEventListener('input', () => {
-  const query = dockSearch.value.trim().toLocaleLowerCase()
-  searchResults.replaceChildren()
+
+function searchRank(title, keywords, query, terms) {
+  if (title === query) return 0
+  if (title.startsWith(query)) return 1
+  if (title.includes(query)) return 2
+  if (keywords.includes(query)) return 3
+  if (terms.every(term => title.includes(term) || keywords.includes(term))) return 4
+  return Infinity
+}
+
+function renderFeatureSearch() {
+  const query = dockSearch.value.normalize('NFKC').trim().toLowerCase()
+  searchItems.replaceChildren()
+  searchStatus.textContent = ''
   searchResults.hidden = !query
   syncFeatureSearchNavigation()
   if (!query) return
-  for (const [title, aliases, id, setting] of searchEntries.filter(entry => entry.slice(0, 2).join(' ').toLocaleLowerCase().includes(query))) {
+  const terms = query.split(/\s+/u)
+  const matches = []
+  for (const [title, aliases, id, setting] of searchEntries) {
+    const target = document.getElementById(id)
+    if (!target) continue
+    const group = target.dataset.group ?? target.closest('[data-tab-group]')?.dataset.tabGroup ?? 'desktop-settings'
+    const path = setting === 'memory' ? `${groupTitles[group][1]} › 个人偏好` : groupTitles[group][1]
+    const score = searchRank(title.toLowerCase(), `${path} ${aliases}`.toLowerCase(), query, terms)
+    if (Number.isFinite(score)) matches.push({ title, id, setting, target, path, score })
+  }
+  matches.sort((left, right) => left.score - right.score)
+  for (const { title, id, setting, target, path } of matches) {
     const button = document.createElement('button')
     button.type = 'button'
-    button.textContent = title
+    const label = document.createElement('span')
+    label.id = `dock-result-${id}-${setting ?? 'page'}`
+    label.textContent = title
+    const location = document.createElement('small')
+    location.id = `${label.id}-location`
+    location.textContent = path
+    button.setAttribute('aria-labelledby', label.id)
+    button.setAttribute('aria-describedby', location.id)
+    button.append(label, location)
     button.addEventListener('click', () => {
+      if (target.disabled) return
       resetFeatureSearch()
-      activateTab(document.getElementById(id), true, setting, undefined, true)
+      if (target.dataset.desktopTool) {
+        dockSearch.focus()
+        target.click()
+      } else if (id === 'desktop-storage-locations') {
+        activateTab(document.getElementById('models-tab'))
+        target.open = true
+        target.querySelector('summary')?.focus()
+      } else {
+        activateTab(target, true, setting, undefined, true)
+      }
     })
-    searchResults.append(button)
+    searchItems.append(button)
   }
-  if (!searchResults.childElementCount) searchResults.textContent = '没有匹配的功能'
-})
+  searchStatus.classList.toggle('sr-only', matches.length > 0)
+  searchStatus.textContent = matches.length ? `找到 ${matches.length} 个结果` : '没有匹配的设置或工具'
+}
+dockSearch.addEventListener('input', renderFeatureSearch)
 dockSearch.addEventListener('keydown', event => {
-  if (event.key === 'Escape') resetFeatureSearch()
-  if (event.key === 'ArrowDown') { event.preventDefault(); searchResults.querySelector('button')?.focus() }
-  if (event.key === 'Enter') { event.preventDefault(); searchResults.querySelector('button')?.click() }
+  if (searchResults.hidden || event.isComposing) return
+  if (event.key === 'Escape') { event.preventDefault(); resetFeatureSearch() }
+  if (event.key === 'ArrowDown') { event.preventDefault(); searchItems.firstElementChild?.focus() }
+  if (event.key === 'Enter') { event.preventDefault(); searchItems.firstElementChild?.click() }
+})
+searchItems.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    resetFeatureSearch()
+    dockSearch.focus()
+  }
+  if (event.key === 'ArrowUp') { event.preventDefault(); (event.target.previousElementSibling ?? dockSearch).focus() }
+  if (event.key === 'ArrowDown') { event.preventDefault(); event.target.nextElementSibling?.focus() }
 })
 
 nativePluginGrid?.addEventListener('click', event => {
@@ -1505,18 +1564,17 @@ document.querySelectorAll('.native-chip').forEach((chip) => {
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
   if (['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(payload?.setting)) {
-    const tab = tabs.find((item) => item.dataset.setting === payload.setting)
-      ?? tabs.find((item) => item.dataset.tab === 'dock-settings')
-    if (payload.setting === 'plugin-options') {
-      void activateTab(document.querySelector('#plugin-options-tab'), true, undefined, payload.plugin)
-      return
-    }
-    if (tab) activateTab(tab)
-    document.querySelector(`[data-setting="${payload.setting}"]`)?.click()
+    const tab = tabs.find(item => item.dataset.setting === payload.setting)
+    if (!tab) return
+    resetFeatureSearch()
+    void activateTab(tab, payload.setting === 'plugin-options', undefined, payload.plugin)
     return
   }
   const tab = tabs.find((item) => item.dataset.tab === payload?.tab)
-  if (tab) activateTab(tab)
+  if (tab) {
+    resetFeatureSearch()
+    activateTab(tab)
+  }
 })
 const removePresetPreviewListener = window.dshDesktop.onPresetPreview((plan) => {
   const tab = tabs.find((item) => item.dataset.tab === 'presets')

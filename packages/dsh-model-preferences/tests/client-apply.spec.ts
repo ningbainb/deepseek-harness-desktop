@@ -54,6 +54,8 @@ describe('model preference client registration', () => {
       },
     }))
     const sessions = { subagentAddress: vi.fn(() => undefined) }
+    const stopCatalogChanges = vi.fn()
+    const subscribeRemote = vi.fn((_event: string, _callback: (key: string) => void) => stopCatalogChanges)
     const slotRegistrations: Array<{ contribution: any; component: unknown }> = []
     const dependencySets: string[][] = []
     const slots = {
@@ -76,7 +78,7 @@ describe('model preference client registration', () => {
     const ctx: any = {
       locale,
       settingsScope,
-      remote: { session: { modelCatalog } },
+      remote: { session: { modelCatalog }, $on: subscribeRemote },
       effect: (effect: () => unknown) => effect(),
       get: (name: string) => name === 'webUiSettings' ? { bind: vi.fn(() => settingsScope) } : undefined,
       inject: (dependencies: string[], callback: (scope: unknown) => unknown) => {
@@ -105,6 +107,14 @@ describe('model preference client registration', () => {
       failures: [],
     })
     expect(modelCatalog).toHaveBeenCalledOnce()
+    const onCatalogChanged = vi.fn()
+    expect(settingsContribution.inject().subscribeCatalogChanges(onCatalogChanged)).toBe(stopCatalogChanges)
+    expect(subscribeRemote).toHaveBeenCalledWith('credentials/record-updated', expect.any(Function))
+    const notify = subscribeRemote.mock.calls[0]![1]
+    notify('llm-pi-ai/other-provider')
+    expect(onCatalogChanged).not.toHaveBeenCalled()
+    notify('llm-pi-ai/openai-codex')
+    expect(onCatalogChanged).toHaveBeenCalledOnce()
     expect(slotRegistrations.map(entry => entry.contribution.name)).toContain('conversation.input.model')
     expect(slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.priority).toBe(-10)
     const composer = slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.inject('session-a')

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { ensureDesktopProfile, resolveDshCliPath, resolveRuntimePackages } from '../src/profile.mjs'
 import { DESKTOP_PIPE_RUNTIME_URL, DshRuntimeController } from '../src/runtime-controller.mjs'
+import { createCodexGrantFixture, createModelPreferencesFixture } from './model-catalog-fixture.mjs'
 
 const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-pipe-'))
 const dshHome = join(root, 'community-home')
@@ -55,13 +56,20 @@ function websocketClientFrame(opcode, payload) {
 
 try {
   await ensureDesktopProfile({ dshHome, packageRoots: resolveRuntimePackages() })
+  const modelFixture = createModelPreferencesFixture()
+  await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify(modelFixture.settings))
+  // These optional routes are asserted below. The production clean profile
+  // intentionally starts with the statistics and pet plugins disabled.
+  const routeFixture = join(root, 'optional-routes.patch.yml')
+  await writeFile(routeFixture, '- id: live-stats\n  disabled: false\n- id: pet\n  disabled: false\n')
   controller = new DshRuntimeController({
     cliPath: resolveDshCliPath(),
     cwd: repositoryRoot,
     dshHome,
     executable: process.execPath,
     transport: 'pipe',
-    patchFiles: [overlay],
+    patchFiles: [overlay, routeFixture],
+    environmentProvider: () => modelFixture.environment,
     startupTimeoutMs: 180_000,
     shutdownTimeoutMs: 15_000,
     logStore: { append: async (line) => diagnostics.push(String(line)) },
@@ -77,6 +85,27 @@ try {
   const eventsTimeout = setTimeout(() => eventsAbort.abort(new Error('Events readiness probe timed out')), 15_000)
   const events = controller.openDuplex('$events', { args: {} }, eventsAbort.signal)
   const eventsIterator = events[Symbol.asyncIterator]()
+  async function readModelCatalog() {
+    const rpcId = crypto.randomUUID()
+    const response = await controller.fetch('http://dsh.internal/api/session/modelCatalog', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId, method: 'session/modelCatalog', payload: { args: {} } }),
+    })
+    assert.equal(response.status, 200)
+    const envelope = await response.json()
+    assert.equal(envelope.rpcId, rpcId)
+    assert.equal(envelope.result.ok, true, JSON.stringify(envelope.result.error))
+    return envelope.result.value
+  }
+  async function expectCodexGrantChange() {
+    for (;;) {
+      const event = await eventsIterator.next()
+      assert.equal(event.done, false, 'the native credential change must reach the client')
+      if (event.value.type === 'emit' && event.value.event === 'credentials/record-updated'
+        && event.value.args[0] === 'llm-pi-ai/openai-codex') return
+    }
+  }
   try {
     if (typeof events.close === 'function') await events.close()
     const ready = await eventsIterator.next()
@@ -84,6 +113,26 @@ try {
     assert.equal(ready.value.type, 'ready')
     assert.equal(typeof ready.value.clientId, 'string')
     assert.equal(ready.value.host.home, homedir())
+    const signedOut = await readModelCatalog()
+    assert.equal(signedOut.groups.some(group => group.id === 'openai-codex'), false)
+    assert.equal(signedOut.routableProviders.includes('openai-codex'), false)
+    assert.equal(signedOut.groups.some(group => group.id === 'project-relay'), true)
+    await writeFile(join(dshHome, '.credentials.yaml'), JSON.stringify(createCodexGrantFixture()), { mode: 0o600 })
+    await expectCodexGrantChange()
+    const signedIn = await readModelCatalog()
+    assert.ok(signedIn.groups.find(group => group.id === 'openai-codex')?.models.length)
+    assert.equal(signedIn.routableProviders.includes('openai-codex'), true)
+    const logout = await controller.fetch('http://dsh.internal/api/dsh-chatgpt-auth/logout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+    assert.equal(logout.status, 200)
+    const logoutResult = await logout.json()
+    assert.equal(logoutResult.ok, true)
+    assert.equal(logoutResult.value.configured, false)
+    await expectCodexGrantChange()
+    assert.deepEqual(await readModelCatalog(), signedOut, 'logout restores only the original signed-out catalog')
   } finally {
     clearTimeout(eventsTimeout)
     eventsAbort.abort(new Error('Events readiness probe complete'))
@@ -155,6 +204,7 @@ try {
     communityRoutes: ['live-stats', 'pet-asset', 'ssh-websocket'],
     httpReadyLineObserved: false,
     officialEventsReady: true,
+    codexCatalogFollowsLocalGrant: true,
   }))
 } catch (error) {
   console.error(`Runtime pipe diagnostics:\n${diagnostics.slice(-120).join('\n') || '(empty)'}`)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConfigForm as SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -11,12 +11,11 @@ import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import type { MemoryLocaleKey } from './locales.ts'
 import styles from './memory.module.css'
 import { MemoryActivityPanel } from './MemoryActivityPanel.tsx'
+import { filterMemoryItems, isMemoryItem, memoryRequestErrorCode, postMemoryJson, readMemoryCatalog, type MemoryCatalog, type PendingMemoryItem } from './settings-data.ts'
 
-interface PendingItem {
-  id: string
-  item: MemoryPublicItem
-  createdAt: number
-}
+type CatalogState = { status: 'loading' | 'error' } | { status: 'ready'; value: MemoryCatalog }
+
+const emptyCatalog: MemoryCatalog = { items: [], pending: [] }
 
 interface Draft {
   id?: string
@@ -37,9 +36,9 @@ export type MemorySettingsCardProps = PropsRuntime<'web-ui.plugin.item'>
     settingsScope: SettingsScope<MemoryConfig>
   }
 
-function emptyDraft(): Draft {
+function emptyDraft(scope: MemoryScope = 'global'): Draft {
   return {
-    scope: 'global',
+    scope,
     workspaceId: '',
     sessionId: '',
     content: '',
@@ -101,58 +100,13 @@ function errorMessage(code: unknown, t: (key: MemoryLocaleKey) => string): strin
   return t('settings.errorSave')
 }
 
-async function responseJson(response: Response): Promise<Record<string, unknown>> {
-  const value: unknown = await response.json()
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('invalid memory response')
-  return value as Record<string, unknown>
-}
-
-function requestError(value: Record<string, unknown>): Error {
-  const code = typeof value.code === 'string' ? value.code : 'request-failed'
-  const error = new Error(code)
-  ;(error as Error & { code?: unknown }).code = code
-  return error
-}
-
-async function getJson(path: string): Promise<Record<string, unknown>> {
-  const response = await fetch(path, { cache: 'no-store' })
-  const value = await responseJson(response)
-  if (!response.ok || value.ok !== true) throw requestError(value)
-  return value
-}
-
-function errorCode(reason: unknown): unknown {
-  return reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined
-}
-
 function retryableLoadError(reason: unknown): boolean {
-  return errorCode(reason) === 'scope-unavailable' || errorCode(reason) === 'store-unavailable'
+  const code = memoryRequestErrorCode(reason)
+  return code === 'scope-unavailable' || code === 'store-unavailable'
 }
 
 async function waitBeforeReload(attempt: number): Promise<void> {
   await new Promise<void>(resolve => setTimeout(resolve, Math.min(1_000, 150 * 2 ** attempt)))
-}
-
-function responseItems(value: Record<string, unknown>): MemoryPublicItem[] {
-  if (!value.ok || !Array.isArray(value.items)) return []
-  return value.items.filter(item => typeof item === 'object' && item !== null) as MemoryPublicItem[]
-}
-
-function responsePending(value: Record<string, unknown>): PendingItem[] {
-  if (!value.ok || !Array.isArray(value.items)) return []
-  return value.items.filter(item => typeof item === 'object' && item !== null) as PendingItem[]
-}
-
-async function postJson(path: string, body: unknown): Promise<Record<string, unknown>> {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    cache: 'no-store',
-    body: JSON.stringify(body),
-  })
-  const value = await responseJson(response)
-  if (!response.ok || value.ok !== true) throw requestError(value)
-  return value
 }
 
 export function MemorySettingsCard(props: MemorySettingsCardProps) {
@@ -169,194 +123,212 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
   const [editorOpen, setEditorOpen] = useState(!dock)
   const [memoryTab, setMemoryTab] = useState<'items' | 'pending'>('items')
   const [cleanDraft, setCleanDraft] = useState(() => JSON.stringify(emptyDraft()))
-  const [enabled, setEnabled] = useState(liveConfig.enabled)
-  const [items, setItems] = useState<MemoryPublicItem[]>([])
-  const [pending, setPending] = useState<PendingItem[]>([])
+  const [catalog, setCatalog] = useState<CatalogState>({ status: 'loading' })
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [filter, setFilter] = useState('')
   const [scopeFilter, setScopeFilter] = useState<'all' | MemoryScope>('all')
   const [clearEntries, setClearEntries] = useState<MemoryPublicItem[] | null>(null)
+  const [deleteRequested, setDeleteRequested] = useState(false)
   const [replacements, setReplacements] = useState<Record<string, string>>({})
-  const [feedback, setFeedback] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [feedback, setFeedback] = useState<MemoryLocaleKey>()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const lastRevision = useRef(settingsSnapshot.revision)
+  const pendingRead = useRef<AbortController>()
+  const mounted = useRef(false)
+  const content = useRef<HTMLTextAreaElement>(null)
+  const [focusRequest, setFocusRequest] = useState(0)
+  const panelId = useId()
+  const ready = catalog.status === 'ready'
+  const { items, pending } = ready ? catalog.value : emptyCatalog
+  const mayWrite = ready && settingsSnapshot.writable && !saving
+  const editorVisible = ready && editorOpen && (!dock || memoryTab === 'items')
+  const dirty = editorOpen && JSON.stringify(draft) !== cleanDraft
 
   useEffect(() => {
-    if (lastRevision.current !== settingsSnapshot.revision) {
-      if (saving) setError(t('settings.errorConflict'))
-      lastRevision.current = settingsSnapshot.revision
-    }
-  }, [saving, settingsSnapshot.revision, t])
+    if (!focusRequest) return
+    content.current?.focus()
+  }, [focusRequest])
 
-  useEffect(() => {
-    if (!saving) setEnabled(liveConfig.enabled)
-  }, [liveConfig.enabled, saving])
-
-  const load = (): void => {
-    setLoading(true)
+  const load = useCallback((notice?: MemoryLocaleKey): void => {
+    if (!mounted.current) return
+    pendingRead.current?.abort()
+    const read = new AbortController()
+    pendingRead.current = read
+    const { signal } = read
+    setCatalog({ status: 'loading' })
+    setClearEntries(null)
+    setDeleteRequested(false)
+    setReplacements({})
+    setFeedback(undefined)
     setError(null)
     void (async () => {
-      let failure: unknown
-      for (let attempt = 0; attempt < 8; attempt += 1) {
+      for (let attempt = 0; attempt < 8 && !signal.aborted; attempt += 1) {
         try {
-          const [itemValue, pendingValue] = await Promise.all([
-            getJson('/api/dsh-memory/items?view=manage&refresh=1'),
-            getJson('/api/dsh-memory/pending'),
-          ])
-          setItems(responseItems(itemValue))
-          setPending(responsePending(pendingValue))
-          setLoading(false)
-          setFeedback(t('settings.refreshed'))
+          const value = await readMemoryCatalog(signal)
+          if (signal.aborted) return
+          setCatalog({ status: 'ready', value })
+          setFeedback(notice)
           return
         } catch (reason) {
-          failure = reason
-          if (!retryableLoadError(reason) || attempt === 7) break
+          if (signal.aborted) return
+          if (!retryableLoadError(reason) || attempt === 7) {
+            setCatalog({ status: 'error' })
+            return
+          }
           await waitBeforeReload(attempt)
         }
       }
-      setItems([])
-      setPending([])
-      setLoading(false)
-      setError(t('settings.errorLoad'))
-      void failure
     })()
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    mounted.current = true
+    load()
+    return () => {
+      mounted.current = false
+      pendingRead.current?.abort()
+    }
+  }, [load])
 
-  const visibleItems = useMemo(() => {
-    const needle = filter.trim().toLocaleLowerCase()
-    const scoped = items.filter(item => scopeFilter === 'all' || item.scope === scopeFilter)
-    if (needle === '') return scoped
-    return scoped.filter(item => [item.content, ...item.tags].join(' ').toLocaleLowerCase().includes(needle))
-  }, [filter, items, scopeFilter])
+  const filtering = scopeFilter !== 'all' || filter.trim() !== ''
+  const visibleItems = useMemo(() => filterMemoryItems(items, scopeFilter, filter), [filter, items, scopeFilter])
+  const scopeCounts = useMemo(() => items.reduce((counts, item) => {
+    counts[item.scope] += 1
+    return counts
+  }, { global: 0, workspace: 0, session: 0 }), [items])
 
   const select = (item: MemoryPublicItem): void => {
+    if (!ready || saving) return
+    setMemoryTab('items')
     setEditorOpen(true)
-    setCleanDraft(JSON.stringify(draftOf(item)))
+    const entry = draftOf(item)
+    setCleanDraft(JSON.stringify(entry))
     setSelectedId(item.id)
-    setDraft(draftOf(item))
+    setDraft(entry)
+    setDeleteRequested(false)
     setSaved(false)
     setError(null)
+    setFocusRequest(current => current + 1)
   }
 
   const create = (): void => {
+    const entry = emptyDraft(scopeFilter === 'all' ? 'global' : scopeFilter)
     setEditorOpen(true)
-    setCleanDraft(JSON.stringify(emptyDraft()))
+    setCleanDraft(JSON.stringify(entry))
     setSelectedId(undefined)
-    setDraft(emptyDraft())
+    setDraft(entry)
+    setDeleteRequested(false)
     setSaved(false)
     setError(null)
+    setFocusRequest(current => current + 1)
   }
 
   const saveConfig = (next: boolean): void => {
-    setEnabled(next)
+    if (saving || !settingsSnapshot.writable) return
+    setSaving(true)
     setSaved(false)
-    void settingsScope.set('enabled', next).then(() => setSaved(true), () => setError(t('settings.errorSave')))
+    setError(null)
+    void (async () => {
+      try {
+        if (!await settingsScope.set('enabled', next)) throw new Error('memory setting not accepted')
+        if (mounted.current) setSaved(true)
+      } catch {
+        if (mounted.current) setError(t('settings.errorSave'))
+      } finally {
+        if (mounted.current) setSaving(false)
+      }
+    })()
+  }
+
+  const mutate = (path: string, body: unknown, onSuccess: (value: Record<string, unknown>) => void, notice?: MemoryLocaleKey): void => {
+    if (!mayWrite) return
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    void (async () => {
+      try {
+        const value = await postMemoryJson(path, body)
+        if (!mounted.current) return
+        onSuccess(value)
+        load(notice)
+      } catch (reason) {
+        if (mounted.current) setError(errorMessage(memoryRequestErrorCode(reason), t))
+      } finally {
+        if (mounted.current) setSaving(false)
+      }
+    })()
   }
 
   const save = (): void => {
     const body = itemFromDraft(draft)
-    if (body === undefined || !settingsSnapshot.writable || saving) {
+    if (body === undefined) {
       setError(t('settings.errorInvalid'))
       return
     }
-    setSaving(true)
-    setError(null)
-    void postJson('/api/dsh-memory/items', body).then(value => {
-      const item = value.item as unknown as MemoryPublicItem
-      setSelectedId(item.id)
-      setDraft(draftOf(item))
-      setCleanDraft(JSON.stringify(draftOf(item)))
-      setFeedback(t('settings.savedTo') + ' ' + t(('settings.' + item.scope) as MemoryLocaleKey))
+    mutate('/api/dsh-memory/items', body, value => {
+      if (!isMemoryItem(value.item)) throw new Error('invalid memory response')
+      const next = draftOf(value.item)
+      setSelectedId(value.item.id)
+      setDraft(next)
+      setCleanDraft(JSON.stringify(next))
       setSaved(true)
-      setSaving(false)
-      load()
-    }, reason => {
-      const code = reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined
-      setError(errorMessage(code, t))
-      setSaving(false)
     })
+  }
+
+  const discardDraft = (): void => {
+    setSelectedId(undefined)
+    setDraft(emptyDraft())
+    setCleanDraft(JSON.stringify(emptyDraft()))
+    setDeleteRequested(false)
+    setEditorOpen(!dock)
   }
 
   const remove = (): void => {
-    if (selectedId === undefined || saving) return
-    setSaving(true)
-    void postJson('/api/dsh-memory/items', { operation: 'remove', id: selectedId, expectedUpdatedAt: draft.expectedUpdatedAt }).then(() => {
-      setSelectedId(undefined)
-      setDraft(emptyDraft())
-      setCleanDraft(JSON.stringify(emptyDraft()))
-      setEditorOpen(!dock)
-      setSaving(false)
-      load()
-    }, reason => {
-      setError(errorMessage(reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined, t))
-      setSaving(false)
-    })
+    if (!selectedId || !deleteRequested) return
+    mutate('/api/dsh-memory/items', { operation: 'remove', id: selectedId, expectedUpdatedAt: draft.expectedUpdatedAt }, discardDraft, 'settings.removed')
   }
 
   const clear = (): void => {
-    if (saving || !clearEntries) return
-    setSaving(true)
-    void postJson('/api/dsh-memory/items', { operation: 'clear', entries: clearEntries.map(item => ({ id: item.id, updatedAt: item.updatedAt })) }).then(() => {
-      setClearEntries(null)
-      setSelectedId(undefined)
-      setDraft(emptyDraft())
-      setCleanDraft(JSON.stringify(emptyDraft()))
-      setEditorOpen(!dock)
-      setSaving(false)
-      load()
-    }, reason => {
-      setError(errorMessage(reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined, t))
-      setSaving(false)
-    })
+    if (!clearEntries) return
+    mutate('/api/dsh-memory/items', { operation: 'clear', entries: clearEntries.map(item => ({ id: item.id, updatedAt: item.updatedAt })) }, discardDraft, 'settings.removed')
   }
 
-  const confirm = (entry: PendingItem): void => {
-    if (saving) return
-    setSaving(true)
+  const confirm = (entry: PendingMemoryItem): void => {
     const replacement = items.find(item => item.id === replacements[entry.id])
-    void postJson('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'confirm', ...(replacement ? { replaceId: replacement.id, expectedUpdatedAt: replacement.updatedAt } : {}) }).then(() => {
-      setSaving(false)
-      load()
-    }, reason => {
-      setError(errorMessage(reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined, t))
-      setSaving(false)
-    })
+    mutate('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'confirm', ...(replacement ? { replaceId: replacement.id, expectedUpdatedAt: replacement.updatedAt } : {}) }, () => {}, 'settings.confirmed')
   }
 
-  const reject = (entry: PendingItem): void => {
-    if (saving) return
-    setSaving(true)
-    void postJson('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'cancel' }).then(() => {
-      setSaving(false)
-      load()
-    }, reason => {
-      setError(errorMessage(reason instanceof Error ? (reason as Error & { code?: unknown }).code : undefined, t))
-      setSaving(false)
-    })
+  const reject = (entry: PendingMemoryItem): void => {
+    mutate('/api/dsh-memory/pending/' + encodeURIComponent(entry.id), { operation: 'cancel' }, () => {}, 'settings.dismissed')
   }
+
+  const requestReload = (): void => load('settings.refreshed')
+  const activityStatus = saving ? 'settings.saving' : dirty ? 'settings.unsaved' : saved ? 'settings.saved' : undefined
+  const readStatus = catalog.status === 'loading'
+    ? <p className={styles.muted} role="status">{t('settings.loading')}</p>
+    : catalog.status === 'error'
+      ? <p className={styles.error} role="alert">{t('settings.errorLoad')}</p>
+      : null
 
   return (
-    <section className={styles.card} data-memory-card="true" data-dock-owner="memory" data-dock-dirty={editorOpen && JSON.stringify(draft) !== cleanDraft}>
+    <section className={styles.card} data-memory-card="true" data-dock-owner="memory" data-dock-dirty={dirty}>
       <header className={styles.header}>
         <div>
           <h3 className={styles.title}>{t('settings.title')}</h3>
           <p className={styles.description}>{t('settings.description')}</p>
         </div>
-        <span className={saved ? styles.badgeSaved : styles.badge}>{saving ? t('settings.saving') : saved ? t('settings.saved') : editorOpen && JSON.stringify(draft) !== cleanDraft ? t('settings.unsaved') : t('settings.ready')}</span>
+        {activityStatus && <span className={activityStatus === 'settings.saved' ? styles.badgeSaved : styles.badge} role="status">{t(activityStatus)}</span>}
       </header>
-      {saved && selectedId && <p className={styles.muted} role="status">{t('settings.savedTo')} {t(('settings.' + draft.scope) as MemoryLocaleKey)}{draft.workspaceId || draft.sessionId ? ' · ' + (draft.workspaceId || draft.sessionId) : ''}</p>}
-      {!settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
-      {settingsSnapshot.status === 'loading' && <p className={styles.muted} role="status">{t('settings.loading')}</p>}
+      {saved && !dirty && selectedId && <p className={styles.muted}>{t('settings.savedTo')} {t(`settings.${draft.scope}`)}</p>}
+      {feedback && <p className={styles.muted} role="status">{t(feedback)}</p>}
+      {settingsSnapshot.status !== 'loading' && !settingsSnapshot.writable && <p className={styles.notice} role="status">{t('settings.readonly')}</p>}
+      {ready && settingsSnapshot.status === 'loading' && <p className={styles.muted} role="status">{t('settings.loading')}</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
 
       <div className={styles.enableRow}><label className={styles.toggle}>
-        <input type="checkbox" checked={enabled} disabled={!settingsSnapshot.writable || saving} onChange={event => saveConfig(event.target.checked)} />
+        <input type="checkbox" checked={liveConfig.enabled} disabled={!settingsSnapshot.writable || saving} onChange={event => saveConfig(event.target.checked)} />
         {t('settings.enabled')}
       </label><p className={styles.muted}>{t('settings.ownerNotice')}</p></div>
 
@@ -367,39 +339,44 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         setMemoryTab(next)
         event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next === 'items' ? 0 : 1]?.focus()
       }}>
-        <button type="button" role="tab" tabIndex={memoryTab === 'items' ? 0 : -1} aria-selected={memoryTab === 'items'} onClick={() => setMemoryTab('items')}>{t('settings.items')} · {items.length}</button>
-        <button type="button" role="tab" tabIndex={memoryTab === 'pending' ? 0 : -1} aria-selected={memoryTab === 'pending'} onClick={() => setMemoryTab('pending')}>{t('settings.pending')} · {pending.length}</button>
+        <button type="button" id={panelId + '-items-tab'} role="tab" aria-controls={panelId + '-items'} tabIndex={memoryTab === 'items' ? 0 : -1} aria-selected={memoryTab === 'items'} onClick={() => setMemoryTab('items')}>{t('settings.items')}{ready && ` · ${items.length}`}</button>
+        <button type="button" id={panelId + '-pending-tab'} role="tab" aria-controls={panelId + '-pending'} tabIndex={memoryTab === 'pending' ? 0 : -1} aria-selected={memoryTab === 'pending'} onClick={() => setMemoryTab('pending')}>{t('settings.pending')}{ready && ` · ${pending.length}`}</button>
       </div>}
-      <section className={styles.section} hidden={dock && memoryTab !== 'items'}>
+      <section className={styles.section} id={panelId + '-items'} role={dock ? 'tabpanel' : undefined} aria-labelledby={dock ? panelId + '-items-tab' : undefined} hidden={dock && memoryTab !== 'items'}>
         <header className={styles.sectionHeader}>
-          <strong>{t('settings.items')}</strong>
-          <span>{visibleItems.length} {t('settings.count')}</span>
-          {feedback && <small className={styles.muted} role="status">{feedback}</small>}
-          <button type="button" className={styles.button} disabled={saving} onClick={load}>{t('settings.reload')}</button>
+          {!dock && <strong>{t('settings.items')}</strong>}
+          {ready && <span role="status">{filtering ? `${visibleItems.length} / ${items.length}` : items.length} {t('settings.count')}</span>}
+          <button type="button" className={styles.button} disabled={saving || catalog.status === 'loading'} onClick={requestReload}>{t('settings.reload')}</button>
+          <button type="button" className={styles.primary} disabled={!mayWrite} onClick={create}>{t('settings.new')}</button>
         </header>
-        <label className={styles.scopeFilter}><span>{t('settings.scopeFilter')}</span><select aria-label={t('settings.scopeFilter')} value={scopeFilter} onChange={event => { setScopeFilter(event.target.value as typeof scopeFilter); setClearEntries(null) }}>{(['all', 'global', 'workspace', 'session'] as const).map(scope => <option key={scope} value={scope}>{t(('settings.' + scope) as MemoryLocaleKey)} · {scope === 'all' ? items.length : items.filter(item => item.scope === scope).length}</option>)}</select></label>
-        <div className={styles.filterRow}>
-          <input value={filter} onChange={event => { setFilter(event.target.value); setClearEntries(null) }} placeholder={t('settings.searchPlaceholder')} aria-label={t('settings.search')} />
-          <button type="button" className={styles.button} disabled={saving || !settingsSnapshot.writable} onClick={create}>{t('settings.new')}</button>
-          <button type="button" className={styles.danger} disabled={saving || visibleItems.length === 0 || !settingsSnapshot.writable} onClick={() => setClearEntries([...visibleItems])}>{t('settings.clearVisible')}</button>
-        </div>
-        {clearEntries && <div className={styles.notice} role="alert"><p>{t('settings.clearConfirm')} {clearEntries.length} {t('settings.count')}</p><div className={styles.actions}><button type="button" className={styles.button} onClick={() => setClearEntries(null)}>{t('settings.cancelAction')}</button><button type="button" className={styles.danger} disabled={saving} onClick={clear}>{t('settings.confirmDelete')}</button></div></div>}
-        {loading && <p className={styles.muted}>{t('settings.loading')}</p>}
-        {!loading && visibleItems.length === 0 && <p className={styles.empty}>{t('settings.noItems')}</p>}
-        <div className={styles.itemList} role="list">
+        {readStatus}
+        {ready && <div className={styles.filterRow}>
+          <input type="search" value={filter} onChange={event => { setFilter(event.target.value); setClearEntries(null) }} placeholder={t('settings.searchPlaceholder')} aria-label={t('settings.search')} />
+          <select className={styles.scopeFilter} aria-label={t('settings.scopeFilter')} value={scopeFilter} onChange={event => { setScopeFilter(event.target.value as typeof scopeFilter); setClearEntries(null) }}>
+            {(['all', 'global', 'workspace', 'session'] as const).map(scope => <option key={scope} value={scope}>{t(`settings.${scope}`)} · {scope === 'all' ? items.length : scopeCounts[scope]}</option>)}
+          </select>
+          {filtering && <button type="button" className={styles.button} onClick={() => { setFilter(''); setScopeFilter('all'); setClearEntries(null) }}>{t('settings.resetFilter')}</button>}
+        </div>}
+        {ready && visibleItems.length === 0 && <p className={styles.empty}>{t(items.length === 0 ? 'settings.noItems' : 'settings.noResults')}</p>}
+        {visibleItems.length > 0 && <ul className={styles.itemList} aria-label={t('settings.items')}>
           {visibleItems.map(item => (
-            <button type="button" role="listitem" key={item.id} className={item.id === selectedId ? styles.itemSelected : styles.item} onClick={() => select(item)}>
-              <span className={styles.itemContent}>{item.content}</span>
-              <span className={styles.itemMeta}>{item.scope === 'global' ? t('settings.global') : item.scope === 'workspace' ? t('settings.workspace') : t('settings.session')}{item.workspaceId || item.sessionId ? ' · ' + (item.workspaceId ?? item.sessionId) : ''}{item.pinned ? ` · ${t('settings.pinned')}` : ''}{item.expiresAt !== undefined && item.expiresAt <= Date.now() ? ' · ' + t('settings.expired') : ''}</span>
-            </button>
+            <li key={item.id}>
+              <button type="button" disabled={saving} aria-pressed={item.id === selectedId} className={item.id === selectedId ? styles.itemSelected : styles.item} onClick={() => select(item)}>
+                <span className={styles.itemContent}>{item.content}</span>
+                <span className={styles.itemMeta}>{[t(`settings.${item.scope}`), item.workspaceId ?? item.sessionId, item.pinned ? t('settings.pinned') : undefined, item.source === 'confirmed-suggestion' ? t('settings.sourceSuggested') : undefined, item.expiresAt !== undefined && item.expiresAt <= Date.now() ? t('settings.expired') : undefined, ...item.tags].filter(Boolean).join(' · ')}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>}
+        {ready && <div className={styles.actions}><button type="button" className={styles.danger} disabled={!mayWrite || visibleItems.length === 0} onClick={() => { setDeleteRequested(false); setClearEntries([...visibleItems]) }}>{t('settings.clearVisible')}</button></div>}
+        {clearEntries && <div className={styles.notice} role="alert"><p>{t('settings.clearConfirm')} {clearEntries.length} {t('settings.count')}</p><div className={styles.actions}><button type="button" className={styles.button} onClick={() => setClearEntries(null)}>{t('settings.cancelAction')}</button><button type="button" className={styles.danger} disabled={!mayWrite} onClick={clear}>{t('settings.confirmDelete')}</button></div></div>}
       </section>
 
-      <section className={styles.section} hidden={dock && memoryTab !== 'pending'}>
-        <header className={styles.sectionHeader}><strong>{t('settings.pending')}</strong><span>{pending.length} {t('settings.count')}</span></header>
-        {pending.length === 0 && <p className={styles.muted}>{t('settings.noPending')}</p>}
-        <p className={styles.muted}>{t('settings.pendingHint')}</p>
+      <section className={styles.section} id={panelId + '-pending'} role={dock ? 'tabpanel' : undefined} aria-labelledby={dock ? panelId + '-pending-tab' : undefined} hidden={dock && memoryTab !== 'pending'}>
+        <header className={styles.sectionHeader}>{!dock && <strong>{t('settings.pending')}</strong>}{!dock && ready && <span>{pending.length} {t('settings.count')}</span>}{dock && <button type="button" className={styles.button} disabled={saving || catalog.status === 'loading'} onClick={requestReload}>{t('settings.reload')}</button>}</header>
+        {dock && readStatus}
+        {ready && pending.length === 0 && <p className={styles.empty}>{t('settings.noPending')}</p>}
+        {ready && pending.length > 0 && <p className={styles.muted}>{t('settings.pendingHint')}</p>}
         <div className={styles.pendingList}>
           {pending.map(entry => (
             <article className={styles.pendingItem} key={entry.id}>
@@ -408,34 +385,35 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
               <label className={styles.field}><span>{t('settings.replacement')}</span><select value={replacements[entry.id] ?? ''} onChange={event => setReplacements(current => ({ ...current, [entry.id]: event.target.value }))}><option value="">{t('settings.newMemory')}</option>{items.filter(item => item.scope === entry.item.scope && item.workspaceId === entry.item.workspaceId && item.sessionId === entry.item.sessionId).map(item => <option key={item.id} value={item.id}>{t('settings.replaceMemory')}: {item.content.slice(0, 80)}</option>)}</select></label>
               {replacements[entry.id] && <blockquote>{items.find(item => item.id === replacements[entry.id])?.content}</blockquote>}
               <div className={styles.actions}>
-                <button type="button" className={styles.primary} disabled={saving || !settingsSnapshot.writable} onClick={() => confirm(entry)}>{t('settings.confirm')}</button>
-                <button type="button" className={styles.button} disabled={saving || !settingsSnapshot.writable} onClick={() => reject(entry)}>{t('settings.reject')}</button>
+                <button type="button" className={styles.primary} disabled={!mayWrite} onClick={() => confirm(entry)}>{t('settings.confirm')}</button>
+                <button type="button" className={styles.button} disabled={!mayWrite} onClick={() => reject(entry)}>{t('settings.reject')}</button>
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className={styles.editor} hidden={dock && !editorOpen}>
+      <section className={styles.editor} hidden={!editorVisible}>
         {selectedId && <p className={styles.muted}>{t('settings.updated')} {new Date(draft.expectedUpdatedAt ?? 0).toLocaleString()}</p>}
         <header className={styles.sectionHeader}><strong>{selectedId === undefined ? t('settings.newMemory') : t('settings.edit')}</strong></header>
         <label className={styles.field}><span>{t('settings.scope')}</span><select value={draft.scope} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, scope: event.target.value as MemoryScope }))}><option value="global">{t('settings.global')}</option><option value="workspace">{t('settings.workspace')}</option><option value="session">{t('settings.session')}</option></select></label>
         {draft.scope === 'workspace' && <label className={styles.field}><span>{t('settings.workspaceId')}</span><input value={draft.workspaceId} maxLength={128} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, workspaceId: event.target.value }))} /></label>}
         {draft.scope === 'session' && <label className={styles.field}><span>{t('settings.sessionId')}</span><input value={draft.sessionId} maxLength={128} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, sessionId: event.target.value }))} /></label>}
-        <label className={styles.field}><span>{t('settings.content')}</span><textarea value={draft.content} maxLength={MAX_MEMORY_CONTENT_LENGTH} placeholder={t('settings.contentPlaceholder')} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, content: event.target.value }))} /><span className={styles.counter}>{draft.content.length} / {MAX_MEMORY_CONTENT_LENGTH}</span></label>
+        <label className={styles.field}><span>{t('settings.content')}</span><textarea ref={content} value={draft.content} maxLength={MAX_MEMORY_CONTENT_LENGTH} placeholder={t('settings.contentPlaceholder')} disabled={!mayWrite} onChange={event => setDraft(current => ({ ...current, content: event.target.value }))} /><span className={styles.counter}>{draft.content.length} / {MAX_MEMORY_CONTENT_LENGTH}</span></label>
         <details className={styles.details} data-memory-advanced="true"><summary>{t('settings.advanced')}</summary>
         <p className={styles.muted}>{t('settings.targetHint')}</p>
         <label className={styles.field}><span>{t('settings.tags')}</span><input value={draft.tags} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, tags: event.target.value }))} /></label>
         <label className={styles.toggle}><input type="checkbox" checked={draft.pinned} disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, pinned: event.target.checked }))} />{t('settings.pinned')}</label>
         <label className={styles.field}><span>{t('settings.expiresAt')}</span><input value={draft.expiresAt} inputMode="numeric" disabled={saving || !settingsSnapshot.writable} onChange={event => setDraft(current => ({ ...current, expiresAt: event.target.value }))} /></label>
         </details>
+        {deleteRequested && <div className={styles.notice} role="alert"><p>{t('settings.deleteConfirm')}</p><div className={styles.actions}><button type="button" className={styles.button} disabled={saving} onClick={() => setDeleteRequested(false)}>{t('settings.cancelAction')}</button><button type="button" className={styles.danger} disabled={!mayWrite} onClick={remove}>{t('settings.confirmDelete')}</button></div></div>}
         <footer className={styles.actions} data-dock-save-bar={dock || undefined}>
-          {selectedId !== undefined && <button type="button" className={styles.danger} disabled={saving || !settingsSnapshot.writable} onClick={remove}>{t('settings.delete')}</button>}
-          <button type="button" className={styles.button} disabled={saving} onClick={() => { setSelectedId(undefined); setDraft(emptyDraft()); setCleanDraft(JSON.stringify(emptyDraft())); setEditorOpen(!dock) }}>{t('settings.cancel')}</button>
-          <button type="button" className={styles.primary} data-dock-save="true" disabled={saving || !settingsSnapshot.writable} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
+          {selectedId !== undefined && <button type="button" className={styles.danger} disabled={!mayWrite || deleteRequested} onClick={() => { setClearEntries(null); setDeleteRequested(true) }}>{t('settings.delete')}</button>}
+          <button type="button" className={styles.button} disabled={saving} onClick={discardDraft}>{t('settings.cancel')}</button>
+          <button type="button" className={styles.primary} data-dock-save="true" disabled={!mayWrite} onClick={save}>{saving ? t('settings.saving') : t('settings.save')}</button>
         </footer>
       </section>
-      <MemoryActivityPanel t={t} enabled={enabled} onEdit={select} />
+      <MemoryActivityPanel t={t} enabled={liveConfig.enabled} onEdit={select} />
     </section>
   )
 }

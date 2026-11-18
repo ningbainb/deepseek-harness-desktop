@@ -26,6 +26,7 @@ export interface ModelPreferencesCardFace {
   config: ModelPreferencesConfig
   settingsScope: SettingsScope<ModelPreferencesConfig>
   loadCatalog: () => Promise<ModelPreferenceCatalog>
+  subscribeCatalogChanges?: (listener: () => void) => () => void
 }
 
 export type ModelPreferencesCardProps = PropsRuntime<'settings.models.footer'>
@@ -45,7 +46,7 @@ function replacePinned(config: ModelPreferencesConfig, pinnedModels: ModelKey[])
 
 /** Settings card for the durable model preference projection. */
 export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
-  const { config, settingsScope, loadCatalog, renderSlot, t } = props
+  const { config, settingsScope, loadCatalog, subscribeCatalogChanges, renderSlot, t } = props
   const settingsSnapshot = useSyncExternalStore(
     listener => settingsScope.subscribe(listener),
     () => settingsScope.getSnapshot(),
@@ -64,6 +65,7 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
   const [catalog, setCatalog] = useState<ModelPreferenceCatalog>(EMPTY_CATALOG)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState(false)
+  const catalogRead = useRef(0)
   const [manualProvider, setManualProvider] = useState('')
   const [manualModel, setManualModel] = useState('')
   const lastRevision = useRef(settingsSnapshot.revision)
@@ -77,12 +79,15 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
   }, [dirty, liveConfig, settingsSnapshot.revision])
 
   const readCatalog = (): void => {
+    const request = ++catalogRead.current
     setCatalogLoading(true)
     setCatalogError(false)
     void loadCatalog().then((value) => {
+      if (request !== catalogRead.current) return
       setCatalog(value)
       setCatalogLoading(false)
     }, () => {
+      if (request !== catalogRead.current) return
       setCatalog(EMPTY_CATALOG)
       setCatalogError(true)
       setCatalogLoading(false)
@@ -91,9 +96,13 @@ export function ModelPreferencesCard(props: ModelPreferencesCardProps) {
 
   useEffect(() => {
     readCatalog()
-    // The settings card owns one initial catalog read. The reload button is
-    // the explicit second read, so a changed callback identity does not reset
-    // the user's in-progress form.
+    const unsubscribe = subscribeCatalogChanges?.(() => {
+      setCatalog(EMPTY_CATALOG)
+      readCatalog()
+    })
+    return () => { catalogRead.current++; unsubscribe?.() }
+    // The mounted card owns catalog requests. Parent renders, including
+    // settings revisions, do not reset the user's in-progress form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

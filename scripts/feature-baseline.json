@@ -104,6 +104,7 @@
         "chatgpt-browser-mode-one-click",
         "chatgpt-login-safe-terminal-diagnostics",
         "chatgpt-login-to-model-picker",
+        "desktop-codex-model-availability-follows-the-local-oauth-grant-without-changing-saved-models",
         "chatgpt-login-privacy-safe-funnel",
         "smart-control-shortcut-consolidated-into-extension-dock-more-tools",
         "conversation-extension-dock-brand-entry",
@@ -244,7 +245,7 @@
         "legacy-mode-api-fallback",
         "loaded-history-projection-vetoes-stale-blank-reuse",
         "top-layer-mode-menu-escapes-sdk-header-clipping-with-anchored-placement-and-focus-preservation",
-        "desktop-hides-inline-agent-preset-switch-and-preserves-official-settings-and-history"
+        "desktop-suppresses-only-the-liangshen-composer-lever-and-preserves-the-official-preset-picker-settings-and-history"
       ],
       "patchId": "ui-mode-switcher",
       "requiredInAggregate": true,
@@ -885,6 +886,8 @@
       "e2eScript": "scripts/verify-packaged-personalization.mjs",
       "features": [
         "managed-scope-filter",
+        "memory-settings-distinguishes-loading-failure-and-empty-results-and-rejects-stale-reads",
+        "memory-settings-searches-text-tags-and-scope-target-with-the-same-user-bound-writes",
         "refresh-from-disk",
         "revision-conflicts",
         "reviewed-clear",
@@ -996,6 +999,8 @@
         "collaboration-unified-page",
         "single-collaboration-title-and-keyboard-expandable-guidance-with-visible-restart-conflict-cautions",
         "neutral-compact-dock-navigation-retains-every-destination-search-and-focus",
+        "dock-search-opens-exact-settings-and-tools-with-group-paths",
+        "dock-setting-retry-preserves-exact-target-and-deep-link-selects-once",
         "windows-native-dark-light-ui-capture-keeps-web-content-composites-diagnostic-only",
         "bai-acquisition-single-primary-path",
         "bai-acquisition-privacy-safe-funnel",

@@ -150,6 +150,8 @@
   gap: 8px;
 }
 
+.sectionHeader > button:first-of-type { margin-inline-start: auto; }
+
 .sectionHeader strong {
   font-size: 13px;
   font-weight: 600;
@@ -170,7 +172,7 @@
 
 .filterRow input {
   flex: 1;
-  min-width: 140px;
+  min-width: 0;
 }
 
 .itemList {
@@ -179,7 +181,9 @@
   gap: 3px;
   max-height: 220px;
   overflow-y: auto;
+  margin: 0;
   padding: 4px;
+  list-style: none;
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.12));
   border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
@@ -210,6 +214,16 @@
   background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.06));
 }
 
+.item:focus-visible,
+.itemSelected:focus-visible,
+.button:focus-visible,
+.primary:focus-visible,
+.danger:focus-visible,
+.scopeFilter:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
 .itemSelected {
   background: var(--dsw-alias-bg-module-platform, rgba(51, 112, 255, 0.1));
   border-color: var(--dsw-alias-brand-primary, #3370ff);
@@ -224,7 +238,7 @@
 }
 
 .itemMeta {
-  flex: 0 1 40%;
+  flex: 0 1 44%;
   color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 11px;
   overflow-wrap: anywhere;
@@ -440,5 +454,4 @@
   }
 }
 
-.scopeFilter { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
-.scopeFilter select { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.scopeFilter { height: 34px; min-width: 0; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }

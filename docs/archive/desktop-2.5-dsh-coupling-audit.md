@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.0-rc.5.
+Authoritative Desktop version: 5.3.0-rc.6.
 
 Stable DSH package version: 0.2.2-rc.3.
 
@@ -794,9 +794,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 6 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 57 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 57 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 59 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 58 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 58 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 66 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 7 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 7 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 7 | resolveRuntimePackages |
@@ -2232,7 +2232,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | verify-3.3.0-source-mode-selection.mjs | 68 | DSH_HOME |
 | profile-home | verify-3.3.0-source-paste-large.mjs | 68 | DSH_HOME |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 117 | start |
-| runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 69 | start |
+| runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 77 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 233 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 292 | restart |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1248 | recover |
@@ -2427,7 +2427,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-memory/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-mode-switcher/src/client/index.ts | 34 | conversation.session.header.actions |
 | slot | packages/dsh-model-preferences/src/client/index.ts | 124 | settings.models.footer |
-| slot | packages/dsh-model-preferences/src/client/index.ts | 181 | conversation.input.model |
+| slot | packages/dsh-model-preferences/src/client/index.ts | 184 | conversation.input.model |
 | slot | packages/dsh-particle-theme/src/client/index.ts | 81 | web-ui.plugin.item |
 | slot | packages/dsh-personal-prompt/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-pet/src/client/index.ts | 134 | web-ui.plugin.item |

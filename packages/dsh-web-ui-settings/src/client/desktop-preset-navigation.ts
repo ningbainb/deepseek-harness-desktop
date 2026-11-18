@@ -3,10 +3,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 type DesktopHost = { dshDesktop?: { onDesktopToolOpen?: unknown } }
 
-/** Desktop keeps preset editing in its official settings owner, not chat. */
+/** The published Liangshen plugin contributes a dedicated composer lever. */
 export function installDesktopPresetNavigation(slots: Pick<Context['slots'], 'register'>, host: object): () => void {
   if (typeof (host as DesktopHost).dshDesktop?.onDesktopToolOpen !== 'function') return () => {}
-  // Shadow this single control only. The official preset registry, settings
-  // editor and history header label keep their original owner and state.
-  return slots.register({ name: 'conversation.hero.agentPreset', priority: -100 }, () => null)
+  // A list slot elects its component by id. Leave the native preset chooser
+  // and other composer controls owned by their original registrations.
+  return slots.register({ name: 'conversation.input.right', id: 'liangshen-lever', priority: -100 }, () => null)
 }

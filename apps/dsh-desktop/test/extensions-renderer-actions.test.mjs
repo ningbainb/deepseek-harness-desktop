@@ -450,10 +450,14 @@ test('legacy shortcut and settings-open requests select their new containing gro
     } },
   })
   vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
+  vm.runInContext(section('for (const tab of tabs)', 'const searchEntries ='), context)
+  vm.runInContext(section('const searchEntries =', "nativePluginGrid?.addEventListener('click'"), context)
   vm.runInContext(section('const removeNavigationListener =', 'const removePresetPreviewListener ='), context)
   for (const [setting, root] of [['value-mode', 'models'], ['control-center', 'control-center'], ['models', 'models'], ['usage', 'models'], ['plugin-options', 'plugins-hub']]) {
+    const previousCalls = selected.length
     navigate({ setting })
     await tick()
+    assert.equal(selected.length, previousCalls + 1, `${setting} opens exactly once`)
     assert.equal(selected.at(-1), setting)
     assert.equal(document.getElementById(`${root}-tab`).getAttribute('aria-selected'), 'true')
     assert.equal(document.querySelector(`[data-setting="${setting}"]`).closest('[hidden]'), null)
@@ -489,6 +493,76 @@ test('feature search hides every navigation and restores only the primary plus s
   assert.equal(after.length, 2)
   assert.equal(after.find(nav => nav.dataset.tabGroup)?.dataset.tabGroup, 'appearance')
   assert.equal(document.querySelector('#particle-theme-tab').getAttribute('aria-selected'), 'true')
+  dom.window.close()
+})
+
+test('Dock search shows category paths and opens exact settings and tools with the keyboard', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const { document } = dom.window
+  const settings = [], tools = []
+  const context = vm.createContext({ document, localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: { selectDockSetting: async setting => settings.push(setting), openDesktopTool: async tool => tools.push(tool) } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', 'const searchEntries ='), context)
+  vm.runInContext(section('const searchEntries =', "nativePluginGrid?.addEventListener('click'"), context)
+  const input = document.querySelector('#dock-search')
+  const results = document.querySelector('#dock-search-results')
+  const search = value => { input.value = value; input.dispatchEvent(new dom.window.Event('input')) }
+  const press = (element, key) => element.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+  await vm.runInContext("activateTab(document.getElementById('skills-tab'))", context)
+  search('成本 模型')
+  const settingsResult = results.querySelector('button')
+  assert.match(document.getElementById(settingsResult.getAttribute('aria-labelledby')).textContent, /模型高级/u)
+  assert.equal(document.getElementById(settingsResult.getAttribute('aria-describedby')).textContent, '桌面设置')
+  press(input, 'Enter')
+  await tick()
+  assert.equal(settings.at(-1), 'value-mode')
+  assert.equal(document.activeElement.id, 'value-mode-tab')
+
+  search('任务 看板')
+  press(input, 'ArrowDown')
+  const toolResult = document.activeElement
+  assert.match(toolResult.textContent, /任务看板.*更多工具/u)
+  press(toolResult, 'ArrowUp')
+  assert.equal(document.activeElement, input)
+  press(input, 'Enter')
+  await tick()
+  assert.deepEqual(tools, ['task-board'])
+
+  search('zzz没有匹配项')
+  assert.match(document.querySelector('#dock-search-status').textContent, /没有匹配/u)
+  press(input, 'Escape')
+  assert.equal(input.value, '')
+  assert.equal(results.hidden, true)
+  assert.equal(input.getAttribute('aria-controls'), results.id)
+  dom.window.close()
+})
+
+test('retry after opening memory from Dock search preserves the exact setting', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const { document } = dom.window
+  const selected = []
+  const context = vm.createContext({ document, localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
+    window: { dshDesktop: { selectDockSetting: async setting => {
+      selected.push(setting)
+      if (selected.length === 1) throw new Error('fixture unavailable')
+    } } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', 'const searchEntries ='), context)
+  vm.runInContext(section('const searchEntries =', "nativePluginGrid?.addEventListener('click'"), context)
+  const input = document.querySelector('#dock-search')
+  input.value = '记忆'
+  input.dispatchEvent(new dom.window.Event('input'))
+  document.querySelector('#dock-search-results button').click()
+  await tick()
+  const retry = document.querySelector('#dock-settings-retry')
+  assert.equal(retry.hidden, false)
+  retry.click()
+  await tick()
+  assert.deepEqual(selected, ['memory', 'memory'])
+  assert.equal(retry.hidden, true)
   dom.window.close()
 })
 

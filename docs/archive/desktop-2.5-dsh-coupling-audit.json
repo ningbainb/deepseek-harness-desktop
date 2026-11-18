@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.0-rc.5",
+  "desktopVersion": "5.3.0-rc.6",
   "upstreamVersion": "0.2.2-rc.3",
   "lockfileSha256": "f3585cd37b7f1a8c4051ab1f7e55396fbd69bc72b19a67967e9d2f0017824fec",
   "policy": {
@@ -6421,19 +6421,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-pipe.mjs",
-      "line": 57,
+      "line": 58,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-pipe.mjs",
-      "line": 57,
+      "line": 58,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-runtime-pipe.mjs",
-      "line": 59,
+      "line": 66,
       "operation": "resolveDshCliPath"
     },
     {
@@ -15049,7 +15049,7 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/scripts/verify-runtime-pipe.mjs",
-      "line": 69,
+      "line": 77,
       "operation": "start"
     },
     {
@@ -16219,7 +16219,7 @@
     {
       "category": "slot",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 181,
+      "line": 184,
       "operation": "conversation.input.model"
     },
     {
