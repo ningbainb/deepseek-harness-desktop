@@ -1,8 +1,16 @@
 /** Runtime documents allowed inside the unprivileged Extension Dock view. */
 export const DOCK_SETTING_IDS = Object.freeze([
   'control-center', 'shared-browser', 'agent-team', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image',
-  'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market',
+  'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market', 'prompt-customizer',
 ])
+
+const NATIVE_DESTINATIONS = new Set([
+  'plugins', 'workshop', 'experimental-plugins', 'models', 'relay', 'value-mode', 'personal-prompt', 'memory', 'describe-image', 'usage', 'sessions',
+])
+
+export function assertNativeDockDestination(destination) {
+  if (!NATIVE_DESTINATIONS.has(destination)) throw new TypeError('unknown native navigation destination')
+}
 
 export function assertDockSetting(id) {
   if (id !== null && !DOCK_SETTING_IDS.includes(id)) throw new TypeError('unknown Dock settings page')

@@ -125,6 +125,16 @@ const SOURCE_ROOTS = new Map([
   ['zod', ['src']],
 ])
 
+// Reviewed published TypeScript trees whose Windows runtime entry points
+// resolve to compiled files. Official SDK source exports stay available.
+const WINDOWS_COMPILED_SOURCE_PACKAGES = new Set([
+  '@braintree/sanitize-url',
+  '@browserbasehq/sdk',
+  '@tencent-connect/qqbot-nodejs',
+  'khroma',
+  'rxjs',
+])
+
 const DEVELOPMENT_DIRECTORIES = new Set([
   '__tests__',
   'coverage',
@@ -255,6 +265,10 @@ function classifyPrunableFile(relativePath, target = DEFAULT_PACKING_TARGET) {
 
   const sourceRoots = SOURCE_ROOTS.get(packageName) ?? []
   if (sourceRoots.includes(packageParts[0])) return 'published-source'
+  if (packingTarget.platform === 'win32' && packageParts[0] === 'src'
+    && WINDOWS_COMPILED_SOURCE_PACKAGES.has(packageName) && /\.[cm]?tsx?$/u.test(fileName)) {
+    return 'published-source'
+  }
 
   const nodePtyPath = nodePtyPackagePath(normalized)
   if (nodePtyPath !== undefined && isForeignNodePtyBinary(nodePtyPath, packingTarget)) {

@@ -112,8 +112,11 @@ try {
   await page.screenshot({ path: join(screenshots, 'shortcuts.png') })
   await page.keyboard.press('Escape')
   const settings = await dialog.isVisible() ? dialog : await openSettings()
+  assert.deepEqual(await settings.locator(':scope > nav').getByRole('button').allTextContents(),
+    ['通用', '模型与登录', '个人偏好', '会话与 Agent', '外观', '工具与权限'])
   if (sidebarDiagnostic) await captureSidebarLedgerDiagnostic(page, join(screenshots, 'sidebar-ledger-before-wait.json'), consoleEvents)
-  await settings.getByRole('button', { name: '侧边卡片', exact: true }).click()
+  await settings.getByRole('button', { name: '外观', exact: true }).click()
+  await settings.getByRole('tab', { name: '侧边卡片', exact: true }).click()
   const card = settings.locator('button[aria-pressed]').first()
   await card.waitFor()
   const initial = await card.getAttribute('aria-pressed')
@@ -147,19 +150,12 @@ try {
   const usageButton = page.locator('[data-dsh-usage-foot-card] button[data-dsh-part="foot-card-main"]')
   await usageButton.waitFor({ state: 'visible' })
   await usageButton.click()
-  await dock.locator('#usage-tab.active').waitFor({ timeout: 15000 })
-  let usageSettings
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    usageSettings = app.windows().find(candidate => candidate.url().includes('desktop-dock-setting='))
-    if (usageSettings) break
-    await page.waitForTimeout(250)
-  }
-  assert.ok(usageSettings, 'ordinary usage footer click must open the real Runtime settings document')
-  await usageSettings.locator('[data-dsh-dock-settings="usage"] [data-dsh-plugin="usage"]').first().waitFor({ timeout: 60000 })
-  assert.equal(await usageSettings.evaluate(() => typeof window.dshDesktop), 'undefined', 'usage settings must remain outside the Extension IPC authority')
-  await usageSettings.screenshot({ path: join(screenshots, 'usage-footer-settings.png') })
+  await settings.getByRole('tab', { name: '用量与余额', exact: true, selected: true }).waitFor({ timeout: 60000 })
+  await settings.locator('[data-dsh-plugin="usage"]').first().waitFor({ timeout: 60000 })
+  assert.equal(app.windows().filter(candidate => candidate.url().includes('desktop-dock-setting=')).length, 0)
+  await page.screenshot({ path: join(screenshots, 'usage-footer-settings.png') })
   assert.equal(app.windows().filter(candidate => candidate.url().includes('extensions.html')).length, 1)
-  console.log('PASS ordinary usage footer click opens the shared official usage section in the existing Dock')
+  console.log('PASS ordinary usage footer click opens the shared official usage section in the main window')
   console.log(JSON.stringify({ temporary, screenshots }))
 } catch (error) {
   if (sidebarDiagnostic && page) await captureSidebarLedgerDiagnostic(page, join(screenshots, 'sidebar-ledger-failure.json'), [...consoleEvents, ...rendererErrors.map(text => ({ type: 'pageerror', text }))]).catch(probeError => console.error('sidebar diagnostic capture failed', probeError.message))

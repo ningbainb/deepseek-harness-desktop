@@ -33,6 +33,7 @@ test('market acceptance opens its retained Skills group before clicking the nest
   const locator = selector => ({
     first() { return this },
     async waitFor() {},
+    async getAttribute() { return null },
     async click() {
       if (selector === '#skill-market-tab') assert.ok(clicked.includes('#skills-tab'), 'nested market tab is initially outside the selected group')
       clicked.push(selector)
@@ -49,11 +50,22 @@ test('market acceptance opens its retained Skills group before clicking the nest
 for (const [id, root] of [['value-mode', 'models'], ['shared-browser', 'control-center'], ['agent-team', 'control-center'], ['particle-theme', 'appearance']]) {
   test(`grouped setting fixture selects ${root} before ${id}`, async () => {
     const clicked = []
-    const locator = selector => ({ first() { return this }, async waitFor() {}, async click() { clicked.push(selector) } })
-    const dock = { url: () => 'file:///fixture/extensions.html', locator }
+    const locator = selector => ({
+      first() { return this },
+      async waitFor() {},
+      async getAttribute(name) { return name === 'data-native-page' && selector === '#value-mode-tab' ? 'value-mode' : null },
+      async click() { clicked.push(selector) },
+    })
+    const dock = { url: () => 'file:///fixture/extensions.html', locator,
+      async evaluate(callback, setting) {
+        await runInNewContext(`(${callback.toString()})(setting)`, {
+          setting, window: { dshDesktop: { selectDockSetting: async value => { clicked.push(`embedded:${value}`) } } },
+        })
+      },
+    }
     const settings = { url: () => `dsh-runtime://app/?desktop-dock-setting=${id}`, locator, async waitForFunction() {} }
     const app = { windows: () => [dock, settings], context: () => ({ async addInitScript() {} }) }
     await openDockSetting(app, {}, id)
-    assert.deepEqual(clicked, [`#${root}-tab`, `#${id}-tab`])
+    assert.deepEqual(clicked, [`#${root}-tab`, id === 'value-mode' ? 'embedded:value-mode' : `#${id}-tab`])
   })
 }

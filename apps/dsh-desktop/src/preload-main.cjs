@@ -82,6 +82,8 @@ const baseApi = {
   onConversationImported: createSubscription('desktop:conversation-imported', 'conversation imported'),
   onConversationImportBatchProgress: createBufferedSubscription('desktop:conversation-import-batch-progress', 'conversation import batch progress', 128),
   onPluginSettingsOpen: createBufferedSubscription('desktop:plugin-settings-open', 'plugin settings navigation'),
+  onNativePageOpen: createBufferedSubscription('desktop:native-page-open', 'native page navigation', 1),
+  mutateNativePlugin: (request) => ipcRenderer.invoke('desktop:native-plugin-mutation', request),
   openRuntimeStream: (endpoint, payload) => ipcRenderer.invoke('desktop:runtime-stream-open', { endpoint, payload, flowControl: true }),
   acknowledgeRuntimeStream: (id, sequence) => ipcRenderer.invoke('desktop:runtime-stream-ack', id, sequence),
   writeRuntimeStream: (id, value) => ipcRenderer.invoke('desktop:runtime-stream-write', id, value),

@@ -14,6 +14,7 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { SECONDARY_WINDOW_PARTITION } from '../src/electron-app.mjs'
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../src/runtime-controller.mjs'
+import { COMMUNITY_QQ_GROUP, COMMUNITY_QQ_URL } from '../src/community-links.mjs'
 import { appendSessionLogText, findSessionLogs, readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -536,7 +537,12 @@ try {
   ])), [true, true])
   const communityPage = await communityPagePromise
   await communityPage.waitForURL(/community\.html/u)
-  await communityPage.locator('#community-qr[src^="data:image/png;base64,"]').waitFor({ state: 'visible' })
+  const communityQr = communityPage.locator('#community-qr[src^="data:image/jpeg;base64,"]')
+  await communityQr.waitFor({ state: 'visible' })
+  await communityQr.evaluate(image => image.decode())
+  assert.equal(await communityPage.locator('#join-community').getAttribute('href'), COMMUNITY_QQ_URL)
+  assert.equal(await communityPage.locator('#community-group-number').textContent(), COMMUNITY_QQ_GROUP)
+  assert.equal(await communityPage.locator('#qr-status').isVisible(), false)
   assert.equal(electronApp.windows().filter((window) => window.url().includes('community.html')).length, 1)
   assert.equal(await communityPage.getByRole('button', { name: '帮助 / Help' }).count(), 0)
   assert.equal(await communityPage.getByRole('button', { name: '工具 / Tools' }).count(), 0)

@@ -6,6 +6,7 @@ import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import headerStyles from './value-mode-header.module.css'
 import { reportValueModeTelemetry } from './telemetry.ts'
+import { formatValueModeModelLabel } from './model-label.ts'
 
 export interface ValueModeHeroOnboardingProps {
   config: ValueModeConfig
@@ -23,11 +24,6 @@ interface SetupDraft {
   executor: ModelRouteSelection
   expert: ModelRouteSelection
   strategy: ValueModeStrategy
-}
-
-function formatModel(route?: ModelRouteSelection): string {
-  if (!isCompleteModelRoute(route)) return '未配置'
-  return `${route.provider} / ${route.model}`
 }
 
 function errorText(reason: unknown, fallback: string): string {
@@ -88,7 +84,7 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
         group.id === defaultExpert.provider && group.models.some((model) => model.id === defaultExpert.model)
       ))
       if (!defaultExists) {
-        throw new Error(`当前默认模型 ${formatModel(defaultExpert)} 不在可用模型目录中，请先在模型设置中选择可用模型。`)
+        throw new Error(`当前默认模型 ${formatValueModeModelLabel(defaultExpert)} 不在可用模型目录中，请先在模型设置中选择可用模型。`)
       }
     }
     return catalog
@@ -181,7 +177,7 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
             <span className={headerStyles.setupStepNumber}>01</span>
             <div className={headerStyles.setupStepBody}>
               <div className={headerStyles.setupStepHeading}>专家主控模型</div>
-              <div className={headerStyles.setupStepValue}>{formatModel(draft.expert)}</div>
+              <div className={headerStyles.setupStepValue}>{formatValueModeModelLabel(draft.expert)}</div>
               {!isCompleteModelRoute(liveConfig.expert) && isCompleteModelRoute(defaultExpert) && (
                 <div className={headerStyles.setupDefaultNote}>已预选当前默认模型，确认后会保存到性价比模式</div>
               )}
@@ -195,7 +191,7 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
             <span className={headerStyles.setupStepNumber}>02</span>
             <div className={headerStyles.setupStepBody}>
               <div className={headerStyles.setupStepHeading}>副模型 / 子代理执行模型</div>
-              <div className={headerStyles.setupStepValue}>{formatModel(draft.executor)}</div>
+              <div className={headerStyles.setupStepValue}>{formatValueModeModelLabel(draft.executor)}</div>
               <div className={headerStyles.setupDefaultNote}>用于并行调查、局部实现和重复性工作</div>
             </div>
             <button type="button" className={`${styles.button} ${headerStyles.setupModelButton}`} onClick={() => setPickingTarget('executor')}>

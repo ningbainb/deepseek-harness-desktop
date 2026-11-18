@@ -30,6 +30,7 @@ import {
 import { verifyPackagedRuntimeCriticalFiles, verifyWindowsSharpBinding } from './packaged-runtime-integrity.mjs'
 import { verifyPackagedRuntimeSdkIdentity } from './packaged-runtime-sdk-identity.mjs'
 import { assertPackagedUpdateIdentity } from '../src/update-identity.mjs'
+import { createCommunityQrImage } from '../src/community.mjs'
 import {
   assessRuntimeSupport,
   normalizeKnownGoodRuntimeEvidence,
@@ -50,6 +51,10 @@ const resources = await resolvePackagedResourcesPath({
   appDir,
   parsed: parsedArguments,
 })
+const communityQr = await createCommunityQrImage(resources)
+if (!communityQr || communityQr !== await createCommunityQrImage()) {
+  throw new Error('packaged QQ group QR does not match the website source image')
+}
 const desktopManifest = JSON.parse(await readFile(join(appDir, 'package.json'), 'utf8'))
 const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
 const { packageSupportsPlatform, verifyWindowsOfficePayload } = afterPack
@@ -522,7 +527,7 @@ const packagedSdkIdentity = await verifyPackagedRuntimeSdkIdentity(resources, {
 })
 console.log(`verified ${packagedSdkIdentity.runtimeFiles.length} physical unpacked Runtime files and ${packagedSdkIdentity.consumers.length} SDK consumers sharing ${packagedSdkIdentity.canonicalURL}`)
 console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'), {
-  requiredFiles: ['runtime-support/community-plugin-known-issues.json', 'runtime-support/community-plugin-index.json'],
+  requiredFiles: ['runtime-support/community-plugin-known-issues.json', 'runtime-support/context-model-prices.NOTICE.txt'],
 })} packed ASAR files`)
 await access(join(resources, 'app-icon.png'))
 await verifyBrandingAssets(appDir, { resources })

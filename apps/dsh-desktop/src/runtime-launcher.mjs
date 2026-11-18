@@ -42,7 +42,8 @@ import { installDesktopProfileComposition } from './runtime-profile-composition.
 import { adaptRuntimeAgentTeamPatches } from './runtime-agent-team-migration.mjs'
 import { adaptDesktopBrowserComponentPatches } from './runtime-browser-component-patches.mjs'
 import { adaptRuntimeOptionalContextSafety } from './runtime-optional-context-safety.mjs'
-import { adaptDesktopCommunityIndexPatches } from './runtime-community-index.mjs'
+import { adaptDesktopCommunityIndexPatches, installDesktopWorkshopIndexFetch } from './runtime-community-index.mjs'
+import { installDesktopContextPriceCatalogFetch } from './runtime-context-price-catalog.mjs'
 import { installDesktopSubagentListCompatibility } from './runtime-subagent-list-compat.mjs'
 import { installDesktopMarketTeamCompatibility } from './runtime-market-team-compat.mjs'
 import { createDesktopConfigurationGuard } from './runtime-config-identity.mjs'
@@ -204,9 +205,12 @@ async function run() {
   process.env.DSH_CLIENT_VERSION ??= require('../package.json').version
 
   const environment = loadLayeredEnv(NAME)
-  const disposeProxy = await installProxyFromEnvironment(environment, message => {
+  const releaseProxy = await installProxyFromEnvironment(environment, message => {
     process.stderr.write(`${NAME}: ${message}\n`)
   })
+  const releaseWorkshop = invocation.profile === 'desktop' ? installDesktopWorkshopIndexFetch() : undefined
+  const releaseContextPrices = invocation.profile === 'desktop' ? installDesktopContextPriceCatalogFetch() : undefined
+  const disposeProxy = async () => { releaseContextPrices?.(); releaseWorkshop?.(); await releaseProxy() }
   markStartup('environment')
   const profileDir = join(dshHome, 'profiles', invocation.profile)
   const installAnchor = resolveInstallAnchor(invocation.dshCliPath)
@@ -239,7 +243,7 @@ async function run() {
   const baseLayers = [bundlePatches, profile.patches, homePatches, overlayPatches]
   const rawPatches = adaptDesktopCommunityIndexPatches(
     adaptDesktopBrowserComponentPatches(adaptRuntimeAgentTeamPatches([...baseLayers.flat(), ...telemetryPatch(baseLayers)])),
-    { layers: baseLayers, profileName: invocation.profile },
+    { layers: baseLayers, profileName: invocation.profile, enableWorkshop: true },
   )
   const allPatches = adaptDesktopClientHmrPatches(rawPatches, {
     enabled: profile.layers.some(layer => layer.packageName === DESKTOP_CLIENT_HMR_PACKAGE),
@@ -264,7 +268,7 @@ async function run() {
     const current = loadProfileDirectory(NAME, profile.dir, installAnchor)
     const raw = adaptDesktopCommunityIndexPatches(
       adaptDesktopBrowserComponentPatches(adaptRuntimeAgentTeamPatches(readProfilePatches(NAME, profileContext, current))),
-      { profileName: invocation.profile, userPatches: [
+      { profileName: invocation.profile, enableWorkshop: true, userPatches: [
         ...current.patches,
         ...(loadOptionalPatches(NAME, homePatchPath) ?? []),
         ...profileContext.overlays,
@@ -363,6 +367,7 @@ async function run() {
       // Unrelated surviving handles must not delay an already committed stop.
       onStopped: () => process.exit(process.exitCode ?? 0),
     })
+    markStartup('transport')
 
     if (profile.patchReload === 'live' && ctx.fiber.state === 2 && ctx.get('loader') !== undefined) {
       if (ctx.get('hmr') === undefined) {
@@ -379,11 +384,16 @@ async function run() {
         return health.healthy
       } })
       migrationCommitted = true
+      markStartup('settings-commit')
       await finalizeRuntimeReadiness({
-        commit: () => ready.commit(),
+        commit: () => {
+          ready.commit()
+          markStartup('sdk-startup')
+        },
         hmr: ctx.get('hmr'),
         isStopping: () => shuttingDown,
         announce: () => {
+          markStartup('hmr-settled')
           if (pipeIdentity !== undefined) process.stdout.write(`${RUNTIME_PIPE_READY_LINE}\n`)
           markStartup('ready')
           if (pipeIdentity === undefined) process.stdout.write(`${RUNTIME_HTTP_READY_LINE}\n`)

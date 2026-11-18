@@ -1,4 +1,5 @@
-export const COMMUNITY_QQ_URL = 'https://qm.qq.com/q/vehlNjaeye'
+export const COMMUNITY_QQ_URL = 'https://qm.qq.com/q/9hrcdaEYPC'
+export const COMMUNITY_QQ_GROUP = '1129522514'
 export const GITHUB_DOWNLOADS_URL = 'https://github.com/ningbainb/deepseek-harness-desktop/releases/latest'
 export const GITHUB_FEEDBACK_URL = 'https://github.com/ningbainb/deepseek-harness-desktop/issues/new/choose'
 export const GITHUB_PROJECT_URL = 'https://github.com/ningbainb/deepseek-harness-desktop'

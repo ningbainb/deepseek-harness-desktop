@@ -16,7 +16,7 @@ test('the Office workbook fixture starts with stale zeros and the verification r
 })
 test('Office runtime resolution uses the installed official rc3 service and 0.2.3 engine cohort', async () => {
  const runtime = await resolveOfficeRuntime()
- assert.equal(runtime.officeManifest.version, '0.2.2-rc.3'); assert.equal(runtime.kitManifest.version, '0.2.3')
+ assert.equal(runtime.officeManifest.version, '0.2.2-rc.5'); assert.equal(runtime.kitManifest.version, '0.2.3')
  assert.equal(typeof runtime.office.OfficeKit, 'function'); assert.equal(typeof runtime.kit.createConverter, 'function')
 })
 

@@ -12,6 +12,10 @@ export const RELAY_PROVIDER_DISPLAY_NAME = 'bai供应商'
 export const RELAY_PENDING_MODEL_ID = '__bai_login_required__'
 export const RELAY_PREFERRED_MODEL_ID = 'deepseek-flash'
 
+export function isPendingBaiModel(route?: { provider?: unknown; model?: unknown } | null): boolean {
+  return route?.provider === RELAY_PROVIDER_ID && route.model === RELAY_PENDING_MODEL_ID
+}
+
 /** The credential-reference name consumed by llm-pi-ai. */
 export const RELAY_CREDENTIAL_REF = 'PROJECT_RELAY_API_KEY'
 

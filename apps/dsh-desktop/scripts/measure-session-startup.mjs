@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -17,7 +17,7 @@ import { parseRuntimeChildTimings } from './startup-metrics.mjs'
 
 const options = {}
 for (let i = 2; i < process.argv.length; i++) {
-  const match = /^--(executable|output|iterations)(?:=(.*))?$/u.exec(process.argv[i])
+  const match = /^--(executable|previous-executable|output|iterations)(?:=(.*))?$/u.exec(process.argv[i])
   if (!match) throw Error(`Unknown argument: ${process.argv[i]}`)
   options[match[1]] = match[2] ?? process.argv[++i]
 }
@@ -26,6 +26,11 @@ const iterations = Number(options.iterations ?? 1)
 assert.ok(Number.isSafeInteger(iterations) && iterations >= 1 && iterations <= 10, '--iterations must be 1 through 10')
 assert.equal(process.platform, 'win32', 'This benchmark measures a native Windows packaged application only')
 assert.ok((await stat(options.executable)).isFile(), '--executable must identify an existing packaged executable')
+const previousExecutable = options['previous-executable']
+if (previousExecutable !== undefined) {
+  assert.ok(isAbsolute(previousExecutable) && (await stat(previousExecutable)).isFile(), '--previous-executable must identify an existing packaged executable')
+  assert.notEqual(resolve(previousExecutable).toLowerCase(), resolve(options.executable).toLowerCase())
+}
 const temporaryBase = resolve(tmpdir())
 assert.match(temporaryBase, /^d:[\\/]/iu, 'Dot-source scripts/use-build-env.ps1 first: benchmark temporary data must remain on D:')
 const root = await mkdtemp(join(temporaryBase, 'dsh-session-startup-'))
@@ -36,7 +41,9 @@ const model = 'agent-fixture-model'
 const evidence = {
   schemaVersion: 1, platform: process.platform, executable: options.executable,
   measuredAt: new Date().toISOString(), iterations, passed: false,
-  scope: 'Native packaged Windows; one small cold message followed by same-Home, same-session warm continuation',
+  scope: previousExecutable
+    ? 'Native packaged Windows application compatibility on an isolated Home: official previous executable, candidate continuation, candidate restart, saved session snapshot, previous executable. No installer or product registration.'
+    : 'Native packaged Windows; one small cold message followed by same-Home, same-session warm continuation',
   modelScope: 'Loopback synthetic OpenAI SSE provider. localModelResponseMs is stub service time, not real cloud LLM latency.',
   timingScope: 'All *Ms startup measurements use parent monotonic time since electron.launch invocation, including deterministic workspace/session navigation. Window visibility is the first actual isVisible() observation after inspector attachment, an upper bound with 20 ms polling.',
   startupLogScope: 'Logged renderer readiness and phase durations are reported separately; they do not establish usable input or successful submission.',
@@ -47,9 +54,9 @@ let app
 let active
 let auxiliaryRequests = 0
 
-async function hashExecutable() {
+async function hashExecutable(path) {
   const hash = createHash('sha256')
-  for await (const chunk of createReadStream(options.executable)) hash.update(chunk)
+  for await (const chunk of createReadStream(path)) hash.update(chunk)
   return hash.digest('hex')
 }
 
@@ -102,11 +109,13 @@ const server = createServer(async (request, response) => {
     stage = active
     assert.equal(body.model, model, 'The selected synthetic model must survive native submission and restart')
     assert.equal(stage.modelRequests++, 0, 'A text-only benchmark must use one agent model request, without tool-call rounds')
-    if (stage.previousResponse) assert.ok(messages.includes(stage.previousResponse), 'Warm continuation lost the actual cold assistant response')
+    for (const previousResponse of stage.priorResponses) {
+      assert.ok(messages.includes(previousResponse), 'Continuation lost a persisted assistant response')
+    }
     stage.sample.firstSubmitReachedModelMs = performance.now() - stage.started
     stage.sample.submitToModelMs = performance.now() - stage.clickedAt
     stage.sample.syntheticAuthorizationVerified = true
-    stage.sample.warmHistoryRetained = stage.previousResponse ? true : undefined
+    stage.sample.warmHistoryRetained = stage.priorResponses.length ? true : undefined
     const receivedAt = performance.now()
     response.once('finish', () => {
       stage.sample.localModelResponseMs = performance.now() - receivedAt
@@ -172,15 +181,15 @@ function isolatedEnvironment(paths) {
     DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_TELEMETRY_DISABLED: '1', DSH_AGENT_FIXTURE_KEY: credential }
 }
 
-async function measure(paths, mode, session) {
-  const sample = { mode, iteration: paths.iteration, firstRunControlsDismissed: 0, passed: false }
+async function measure(paths, mode, session, executable = options.executable) {
+  const sample = { mode, executable, iteration: paths.iteration, firstRunControlsDismissed: 0, passed: false }
   evidence.samples.push(sample)
   const runtimeLogPath = join(paths.userData, 'logs', 'runtime.log')
   const logOffset = (await readFile(runtimeLogPath).catch(() => Buffer.alloc(0))).length
   const started = performance.now()
   let visibility
   try {
-    app = await electron.launch({ timeout, executablePath: options.executable, args: [], cwd: dirname(options.executable), env: isolatedEnvironment(paths) })
+    app = await electron.launch({ timeout, executablePath: executable, args: [], cwd: dirname(executable), env: isolatedEnvironment(paths) })
     const attachedAt = performance.now() - started
     sample.inspectorAttachedMs = attachedAt
     visibility = (async () => {
@@ -220,7 +229,7 @@ async function measure(paths, mode, session) {
       assert.equal(selected.selected.model, model)
     } else {
       await reopenNativeSession(page, session.workspaceId, session.id)
-      await page.getByText(session.coldResponse, { exact: true }).last().waitFor({ state: 'visible', timeout: modelTimeout })
+      await page.getByText(session.responses.at(-1), { exact: true }).last().waitFor({ state: 'visible', timeout: modelTimeout })
     }
     sample.sessionNavigationMs = performance.now() - navigationStarted
     sample.sessionId = session.id
@@ -233,7 +242,7 @@ async function measure(paths, mode, session) {
     let rejectModel
     const modelFinished = new Promise((resolve, reject) => { resolveModel = resolve; rejectModel = reject })
     void modelFinished.catch(() => {})
-    active = { sample, started, prompt: marker, responseText, previousResponse: mode === 'warm' ? session.coldResponse : undefined,
+    active = { sample, started, prompt: marker, responseText, priorResponses: [...session.responses],
       modelRequests: 0, resolve: resolveModel, reject: rejectModel }
     await composer.fill(marker)
     assert.equal(await composer.evaluate(input => 'value' in input ? input.value : input.textContent), marker,
@@ -243,8 +252,13 @@ async function measure(paths, mode, session) {
     assert.equal(await send.isEnabled(), true, 'Native send must be enabled for the configured model')
     active.clickedAt = performance.now()
     sample.nativeSendStartedMs = active.clickedAt - started
+    const nativePrompt = page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt', { timeout: modelTimeout })
+      .then(request => {
+        sample.nativePromptDispatchedMs = performance.now() - started
+        return request
+      })
     const results = await Promise.allSettled([
-      page.waitForRequest(request => new URL(request.url()).pathname === '/api/session/prompt', { timeout: modelTimeout }),
+      nativePrompt,
       send.click({ timeout: modelTimeout }),
     ])
     const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
@@ -257,12 +271,14 @@ async function measure(paths, mode, session) {
     try {
       await Promise.race([modelFinished, delay(modelTimeout, undefined, { signal: abort.signal }).then(() => { throw Error('Native submission never reached the authenticated local agent model') })])
     } finally { abort.abort() }
+    sample.nativeClickToPromptMs = sample.nativePromptDispatchedMs - sample.nativeSendStartedMs
+    sample.promptToModelMs = sample.firstSubmitReachedModelMs - sample.nativePromptDispatchedMs
     await page.getByText(responseText, { exact: true }).last().waitFor({ state: 'visible', timeout: modelTimeout })
     sample.assistantResponseVisibleMs = performance.now() - started
     sample.modelRequests = active.modelRequests
     assert.equal(sample.modelRequests, 1)
     await waitForSessionLog(join(paths.home, 'sessions'), session.id)
-    if (mode === 'cold') session.coldResponse = responseText
+    session.responses.push(responseText)
     await visibility
     sample.passed = true
   } catch (error) {
@@ -279,13 +295,16 @@ async function measure(paths, mode, session) {
     const log = (await readFile(runtimeLogPath).catch(() => Buffer.alloc(0))).subarray(logOffset).toString('utf8')
     sample.loggedStartupPhasesMs = Object.fromEntries([...log.matchAll(/\[startup\] ([a-z-]+)=(\d+)ms/gu)].map(match => [match[1], Number(match[2])]))
     sample.runtimeChildPhasesMs = parseRuntimeChildTimings(log)
+    const details = [...log.matchAll(/^\[stdout\] \[runtime-startup-detail\] ([a-z-]+)=(\d+)ms\r?$/gmu)]
+    if (details.length) sample.runtimeChildDetailMs = Object.fromEntries(details.map(([, phase, ms]) => [phase, Number(ms)]))
     if (!sample.passed) sample.runtimeLogTail = log.slice(-18000)
   }
 }
 
 try {
   // Hash and all fixture setup stay outside every launch stopwatch.
-  evidence.executableSha256 = await hashExecutable()
+  evidence.executableSha256 = await hashExecutable(options.executable)
+  if (previousExecutable) evidence.previousExecutable = { path: previousExecutable, sha256: await hashExecutable(previousExecutable) }
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const port = server.address().port
   for (let iteration = 0; iteration < iterations; iteration++) {
@@ -307,11 +326,21 @@ try {
     } } } }))
     await writeFile(join(paths.home, 'cordis.patch.yml'), `- id: workspace-controller\n  config:\n    documentsDirectory: ${JSON.stringify(join(pairRoot, 'documents'))}\n    documentsLookupTimeoutMs: 10000\n`)
     await seedPrimaryRuntimePermissionForTest({ userData: paths.userData })
-    const session = {}
-    await measure(paths, 'cold', session)
-    // Reuse the exact persisted cold snapshot and session; no intervening
-    // profile rebuild, account switch, alternate session or prepared warm launch.
-    await measure(paths, 'warm', session)
+    const session = { responses: [] }
+    await measure(paths, 'cold', session, previousExecutable)
+    if (previousExecutable) {
+      await measure(paths, 'upgrade', session)
+      await measure(paths, 'restart', session)
+      const backup = join(dirname(options.output), `post-upgrade-session-${paths.identity}`)
+      await cp(join(paths.home, 'sessions'), backup, { recursive: true, errorOnExist: true, force: false })
+      await waitForSessionLog(backup, session.id)
+      evidence.postUpgradeSessionBackups ??= []
+      evidence.postUpgradeSessionBackups.push({ path: backup, sessionId: session.id })
+      await measure(paths, 'rollback', session, previousExecutable)
+      assert.equal(evidence.samples.at(-1).application.version, evidence.samples.at(-4).application.version)
+    } else {
+      await measure(paths, 'warm', session)
+    }
   }
   evidence.auxiliaryTitleOrNonAgentRequests = auxiliaryRequests
   evidence.passed = true

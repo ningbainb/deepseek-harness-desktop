@@ -17,8 +17,8 @@ h1 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
 h2 { margin: 0; font-size: 15px; font-weight: 600; }
 
 /* keep the QR frame white in both themes so scanners can read the code */
-.qr-frame { display: grid; place-items: center; width: 214px; height: 214px; margin: 16px auto 12px; padding: 9px; border: 1px solid var(--harness-border); border-radius: 12px; background: #ffffff; }
-.qr-frame img { width: 100%; height: 100%; object-fit: contain; }
+.qr-frame { display: grid; place-items: center; width: 248px; height: 248px; margin: 16px auto 12px; padding: 9px; overflow: hidden; border: 1px solid var(--harness-border); border-radius: 12px; background: #ffffff; }
+.qr-frame img { width: 100%; height: 100%; object-fit: cover; object-position: center 54%; min-height: 0; transform: scale(1.28); }
 .qr-frame p { margin: 0; color: var(--harness-text-secondary); font-size: 12px; }
 .scan-hint { margin: 0 0 13px; color: var(--harness-text-secondary); font-size: 12px; text-align: center; }
 .action { display: inline-flex; align-items: center; justify-content: center; }

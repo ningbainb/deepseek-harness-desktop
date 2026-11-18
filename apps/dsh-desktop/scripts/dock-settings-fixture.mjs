@@ -49,7 +49,7 @@ export async function useChineseFixtureLocale(app) {
   }
 }
 
-/** Open an existing form through the same sidebar navigation used by the user. */
+/** Open a retained embedded form for lifecycle and persistence probes. */
 export async function openDockSetting(app, mainPage, id) {
   await useChineseFixtureLocale(app)
   let dock = app.windows().find(page => page.url().includes('/extensions.html'))
@@ -88,19 +88,13 @@ export async function openDockSetting(app, mainPage, id) {
     : ['value-mode', 'personal-prompt', 'memory', 'describe-image', 'usage', 'sessions'].includes(id) ? 'models'
       : id === 'particle-theme' ? 'appearance' : id === 'plugin-options' ? 'plugins-hub' : undefined
   if (groupRoot) await dock.locator(`#${groupRoot}-tab`).click()
-  const tabId = `${id === 'memory' ? 'personal-prompt' : id}-tab`
-  await dock.locator(`#${tabId}`).click()
-  try {
+  const tabId = `${id === 'memory' ? 'personal-prompt' : id === 'models' ? 'models-page' : id}-tab`
+  const tab = dock.locator(`#${tabId}`)
+  if (await tab.getAttribute('data-native-page')) {
+    await dock.evaluate(id => window.dshDesktop.selectDockSetting(id), id)
+  } else {
+    await tab.click()
     await dock.locator(`#${tabId}.active`).waitFor({ timeout: 5_000 })
-  } catch (error) {
-    const state = await dock.evaluate(() => ({
-      active: [...document.querySelectorAll('[role="tab"].active')].map(item => item.id),
-      storedTab: localStorage.getItem('dsh-dock-tab'),
-      storedSetting: localStorage.getItem('dsh-dock-setting'),
-      message: document.querySelector('#dock-settings-state')?.textContent,
-      retryHidden: document.querySelector('#dock-settings-retry')?.hidden,
-    }))
-    throw new Error(`Dock tab ${tabId} did not activate: ${JSON.stringify(state)}`, { cause: error })
   }
   let settings
   for (let attempt = 0; attempt < 120; attempt++) {

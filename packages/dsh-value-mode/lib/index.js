@@ -8,6 +8,7 @@ import { parse } from "yaml";
 import z from "@deepseek-ai/schemastery";
 //#region src/core/config.ts
 const VALUE_MODE_SETTINGS_NAMESPACE = "value-mode";
+const BAI_PROVIDER_ID = "project-relay";
 const DEFAULT_STRATEGY = "balanced";
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const DEFAULT_MAX_CONTEXT_CHARS = 16e3;
@@ -29,8 +30,12 @@ const DEFAULT_AUTO_REVIEW_KEYWORDS = [
 function hasAnyRouteValue(route) {
 	return Boolean(route && (typeof route.provider === "string" && route.provider.trim().length > 0 || typeof route.model === "string" && route.model.trim().length > 0));
 }
+/** Desktop's initial bai route becomes callable only after sign-in provisions a model. */
+function isPendingBaiModel(route) {
+	return route?.provider === "project-relay" && route.model === "__bai_login_required__";
+}
 function isCompleteModelRoute(route) {
-	return typeof route?.provider === "string" && route.provider.trim().length > 0 && typeof route.model === "string" && route.model.trim().length > 0;
+	return !isPendingBaiModel(route) && typeof route?.provider === "string" && route.provider.trim().length > 0 && typeof route.model === "string" && route.model.trim().length > 0;
 }
 /** True when both model choices have been explicitly saved in Value Mode. */
 function hasExplicitModelRoutes(config) {
@@ -1133,4 +1138,4 @@ function apply(ctx, initialConfig = {}) {
 	});
 }
 //#endregion
-export { Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionConfig, routeErrorType, routeParameters, valueModeState };
+export { BAI_PROVIDER_ID, Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isPendingBaiModel, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionConfig, routeErrorType, routeParameters, valueModeState };

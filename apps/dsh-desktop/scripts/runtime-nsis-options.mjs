@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 const EXTERNAL_BROWSER_CORE_TARGETS = Object.freeze([
   'DeepSeek Harness Desktop.exe',
   'resources/app.asar',
@@ -6,6 +8,21 @@ const EXTERNAL_BROWSER_CORE_TARGETS = Object.freeze([
 ])
 
 const WINDOWS_OFFICE_ROOT = 'resources/app.asar.unpacked/node_modules/@deepseek-ai/libreoffice-kit-win32-x64'
+
+export function routeOldUninstallFailure(stockUtility) {
+  const digest = createHash('sha256').update(stockUtility).digest('hex')
+  if (digest !== '97bd546b5cd2aaf16b77bc9e2be8a18962dd74ab5c4d23b35b163ca89bf4dd2a') {
+    throw new Error('Review the NSIS old-uninstaller utility template before adapting it')
+  }
+  // Keep the retry limit and last exit code. installSection immediately hands
+  // the result to our existing error-reporting and transaction rollback hook.
+  return stockUtility.toString('utf8')
+    .replace(
+      'MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDCANCEL IDRETRY OneMoreAttempt',
+      'DetailPrint "Previous uninstaller returned $R0; stopping for rollback."',
+    )
+    .replace(/^  OneMoreAttempt:\r?\n/mu, '')
+}
 
 /** Inspect the real compressed payload, preserving the legacy nested-runtime contract. */
 export function verifyNormalNsisArchive(adapter, archivePaths) {

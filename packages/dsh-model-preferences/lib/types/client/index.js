@@ -77,6 +77,10 @@ export function apply(ctx) {
                 config: currentConfig(settingsScope),
                 settingsScope,
                 loadCatalog,
+                subscribeCatalogChanges: (listener) => ctx.remote.$on('credentials/record-updated', key => {
+                    if (key === 'llm-pi-ai/openai-codex')
+                        listener();
+                }),
             }),
         }, ModelPreferencesCard));
     });

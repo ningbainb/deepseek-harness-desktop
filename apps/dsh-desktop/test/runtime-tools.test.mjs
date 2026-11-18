@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { promisify } from 'node:util'
 
 import { boundedManagedGitInspection, ensurePnpmCommandShim } from '../src/electron-app.mjs'
 
@@ -21,6 +23,23 @@ test('bundled pnpm is exposed to in-process plugin stores without a system insta
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('bundled pnpm starts from a Unicode Windows install for a legacy command code page', { skip: process.platform !== 'win32' }, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-tools-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const install = join(root, "程序 100% ' test")
+  await mkdir(install)
+  const cli = join(install, 'pnpm.mjs')
+  await writeFile(cli, 'console.log(JSON.stringify(process.argv.slice(2))); process.exitCode = 7\n')
+  const directory = await ensurePnpmCommandShim({ directory: join(root, 'runtime-bin'), executable: process.execPath, pnpmCli: cli })
+  // Use ASCII commands in a fresh shell, matching a Runtime with an OEM code page.
+  const { stdout } = await promisify(execFile)(process.env.ComSpec || 'cmd.exe', ['/d', '/c',
+    'chcp 437 >nul & pnpm.cmd view "fixture package" --json'], { cwd: directory, windowsHide: true }).then(
+    () => assert.fail('pnpm exit status was lost'),
+    error => { assert.equal(error.code, 7, error.stderr); return error },
+  )
+  assert.deepEqual(JSON.parse(stdout), ['view', 'fixture package', '--json'])
 })
 
 test('optional Git discovery cannot hold Desktop startup indefinitely', async () => {

@@ -9,7 +9,7 @@ import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
 import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
 
-export const DOCK_SETTINGS = ['control-center', 'shared-browser', 'agent-team', 'relay', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
+export const DOCK_SETTINGS = ['control-center', 'shared-browser', 'agent-team', 'relay', 'value-mode', 'prompt-customizer', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]
 
 export const DOCK_SECTIONS = { appearance: 'skin-center', models: 'models', usage: 'dsh-usage', sessions: 'archived-sessions', 'skill-market': 'agent-plugin-workspace' } as const
@@ -123,7 +123,7 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
     '--dsw-alias-brand-primary': palette.accent, '--dsw-alias-border-l2': palette.border,
   } as CSSProperties : undefined
   return <main className={css.page} style={paletteStyle} data-theme={theme} data-dsh-dock-settings={selected}>
-    <p className={css.breadcrumb}>{selected === 'value-mode' ? '设置 / 模型 / 高级' : selected === 'shared-browser' || selected === 'agent-team' || selected === 'control-center' ? '更多工具' : t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')}{!personal && selected !== 'value-mode' && <> / {selected === 'shared-browser' ? '共享浏览器' : selected === 'agent-team' ? '团队功能开关' : selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</>}</p>
+    <p className={css.breadcrumb}>{selected === 'value-mode' || selected === 'prompt-customizer' ? '设置 / 模型 / 高级' : selected === 'shared-browser' || selected === 'agent-team' || selected === 'control-center' ? '更多工具' : t(selected === 'particle-theme' || selected === 'appearance' ? 'dockDesktopGroup' : 'dockAiGroup')}{!personal && selected !== 'value-mode' && selected !== 'prompt-customizer' && <> / {selected === 'shared-browser' ? '共享浏览器' : selected === 'agent-team' ? '团队功能开关' : selected === 'control-center' ? '智能操控' : t(sectionTitle ?? (selected === 'particle-theme' ? 'dockAppearance' : 'dockVision'))}</>}</p>
     {personal && <>
       <h1 className={css.heading}>{t('dockPersonal')}</h1>
       <div className={css.tabs} role="tablist" aria-label={t('dockPersonal')}>
@@ -150,8 +150,8 @@ export function DockSettingsPage({ renderSlot, t, pluginOptions }: PropsRenderSl
         {id === 'shared-browser' && <BrowserComponentCard active={id === selected} />}
         {id === 'control-center' && <ControlCenterSettingsCard />}
         {id === 'agent-team' && <AgentTeamSettingsCard detailsLabel={t('dockDetails')} cautionLabel={t('dockAgentTeamCaution')} />}
-        {id === 'value-mode' && <PromptCustomizerSettingsCard />}
-        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'shared-browser' || id === 'control-center' || id === 'agent-team' ? null : sectionFor(id)
+        {(id === 'value-mode' || id === 'prompt-customizer') && <PromptCustomizerSettingsCard />}
+        {id === 'plugin-options' ? <DockPluginOptions directory={pluginOptions} plugin={plugin} renderSlot={renderSlot} t={t} /> : id === 'shared-browser' || id === 'control-center' || id === 'agent-team' || id === 'prompt-customizer' ? null : sectionFor(id)
           ? <>{id === 'models' && renderSlot('web-ui.plugin.item', {}, { only: 'relay', fallback: <p role="status">{t('dockSettingUnavailable')}</p> })}
             {id === 'appearance'
               ? renderSlot('settings.section', { close: () => {} }, { only: 'skin-center', fallback: renderSlot('web-ui.plugin.item', {}, { only: 'skins', fallback: <p role="status">{t('dockSettingUnavailable')}</p> }) })

@@ -13,7 +13,7 @@ function replacePinned(config, pinnedModels) {
 }
 /** Settings card for the durable model preference projection. */
 export function ModelPreferencesCard(props) {
-    const { config, settingsScope, loadCatalog, renderSlot, t } = props;
+    const { config, settingsScope, loadCatalog, subscribeCatalogChanges, renderSlot, t } = props;
     const settingsSnapshot = useSyncExternalStore(listener => settingsScope.subscribe(listener), () => settingsScope.getSnapshot(), () => settingsScope.getSnapshot());
     const liveConfig = useMemo(() => normalizeModelPreferences(settingsSnapshot.value ?? config), [config, settingsSnapshot.value]);
     const [draft, setDraft] = useState(liveConfig);
@@ -25,6 +25,7 @@ export function ModelPreferencesCard(props) {
     const [catalog, setCatalog] = useState(EMPTY_CATALOG);
     const [catalogLoading, setCatalogLoading] = useState(true);
     const [catalogError, setCatalogError] = useState(false);
+    const catalogRead = useRef(0);
     const [manualProvider, setManualProvider] = useState('');
     const [manualModel, setManualModel] = useState('');
     const lastRevision = useRef(settingsSnapshot.revision);
@@ -38,12 +39,17 @@ export function ModelPreferencesCard(props) {
         }
     }, [dirty, liveConfig, settingsSnapshot.revision]);
     const readCatalog = () => {
+        const request = ++catalogRead.current;
         setCatalogLoading(true);
         setCatalogError(false);
         void loadCatalog().then((value) => {
+            if (request !== catalogRead.current)
+                return;
             setCatalog(value);
             setCatalogLoading(false);
         }, () => {
+            if (request !== catalogRead.current)
+                return;
             setCatalog(EMPTY_CATALOG);
             setCatalogError(true);
             setCatalogLoading(false);
@@ -51,9 +57,13 @@ export function ModelPreferencesCard(props) {
     };
     useEffect(() => {
         readCatalog();
-        // The settings card owns one initial catalog read. The reload button is
-        // the explicit second read, so a changed callback identity does not reset
-        // the user's in-progress form.
+        const unsubscribe = subscribeCatalogChanges?.(() => {
+            setCatalog(EMPTY_CATALOG);
+            readCatalog();
+        });
+        return () => { catalogRead.current++; unsubscribe?.(); };
+        // The mounted card owns catalog requests. Parent renders, including
+        // settings revisions, do not reset the user's in-progress form.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const knownProviders = useMemo(() => catalog.groups.map(group => group.id), [catalog.groups]);

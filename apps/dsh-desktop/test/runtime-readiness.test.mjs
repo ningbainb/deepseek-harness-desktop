@@ -82,11 +82,11 @@ for (const phase of ['before-commit', 'commit', 'barrier']) {
 test('launcher publishes both pipe and diagnostic readiness only through the completion barrier', async () => {
   const source = await readFile(new URL('../src/runtime-launcher.mjs', import.meta.url), 'utf8')
   const guarded = source.slice(source.indexOf('await finalizeRuntimeReadiness('))
-  assert.match(guarded, /commit: \(\) => ready\.commit\(\)/u)
+  assert.match(guarded, /commit: \(\) => \{\s*ready\.commit\(\)\s*markStartup\('sdk-startup'\)\s*\}/u)
   assert.match(guarded, /hmr: ctx\.get\('hmr'\)/u)
   assert.match(guarded, /isStopping: \(\) => shuttingDown/u)
   assert.match(guarded, /if \(pipeIdentity === undefined\) process\.stdout\.write\(`\$\{RUNTIME_HTTP_READY_LINE\}\\n`\)/u)
-  assert.match(guarded, /announce: \(\) => \{\r?\n\s*if \(pipeIdentity !== undefined\) process\.stdout\.write\(`\$\{RUNTIME_PIPE_READY_LINE\}\\n`\)\r?\n\s*markStartup\('ready'\)/u)
+  assert.match(guarded, /announce: \(\) => \{\s*markStartup\('hmr-settled'\)\s*if \(pipeIdentity !== undefined\) process\.stdout\.write\(`\$\{RUNTIME_PIPE_READY_LINE\}\\n`\)\r?\n\s*markStartup\('ready'\)/u)
   assert.equal(source.split('ready.commit()').length, 2)
   assert.equal(source.split("markStartup('ready')").length, 2)
 })

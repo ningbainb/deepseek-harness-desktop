@@ -11,6 +11,8 @@ param(
   [string] $UninstallRegistryKey = '',
 
   [string] $CleanupTransactionDirectory = '',
+  [string] $InstallerExecutable = '',
+  [string] $InstallerStoreFile = '',
   [string] $RuntimeManifestSHA256 = '',
   [long] $PayloadArchiveBytes = 0,
   [long] $PayloadInstalledBytes = 0,
@@ -691,7 +693,9 @@ function Assert-PlainPayloadPath([string] $path) {
 function Assert-PlainPayloadTree([string] $path) {
   Assert-PlainPayloadPath $path
   $pending = [Collections.Generic.Stack[IO.DirectoryInfo]]::new()
-  $pending.Push([IO.DirectoryInfo]::new($path))
+  # Staging adds a transaction name before the package's longest paths.
+  # Windows PowerShell must walk them even when LongPathsEnabled is off.
+  $pending.Push([IO.DirectoryInfo]::new("\\?\$path"))
   while ($pending.Count -gt 0) {
     foreach ($entry in $pending.Pop().EnumerateFileSystemInfos()) {
       if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
@@ -699,6 +703,40 @@ function Assert-PlainPayloadTree([string] $path) {
       }
       if ($entry -is [IO.DirectoryInfo]) { $pending.Push($entry) }
     }
+  }
+}
+
+function Save-TargetVolumeInstaller {
+  if ($InstallerStoreFile -cnotmatch '^[a-zA-Z0-9@_-][a-zA-Z0-9@._-]+\\installer\.exe$') {
+    throw 'invalid installer cache relative path'
+  }
+  $source = [IO.Path]::GetFullPath($InstallerExecutable)
+  if (-not [IO.File]::Exists($source) -or [IO.Path]::GetExtension($source) -ine '.exe') {
+    throw 'installer cache source is not an executable file'
+  }
+  # Keep the downloaded updater out of the program directory that Begin moves.
+  $destination = Join-Path "$normalizedInstallDirectory.dsh-desktop-updates" $InstallerStoreFile
+  Assert-PlainPayloadPath $destination
+  $directory = [IO.Path]::GetDirectoryName($destination)
+  $blockMap = Join-Path $directory 'current.blockmap'
+  Assert-PlainPayloadPath $blockMap
+  [IO.Directory]::CreateDirectory($directory) | Out-Null
+  $temporary = Join-Path $directory ("installer-" + [Guid]::NewGuid().ToString('N') + '.tmp')
+  $previous = "$temporary.previous"
+  try {
+    [IO.File]::Copy($source, $temporary, $false)
+    if ([IO.File]::Exists($destination)) {
+      [IO.File]::Replace($temporary, $destination, $previous, $true)
+    } else {
+      [IO.File]::Move($temporary, $destination)
+    }
+    # The updater may still have a block map for the previous manually installed base.
+    [IO.File]::Delete($blockMap)
+    $bytes = [IO.FileInfo]::new($destination).Length
+    Write-Output "destination=target-volume bytes=$bytes path=$destination"
+  } finally {
+    [IO.File]::Delete($temporary)
+    [IO.File]::Delete($previous)
   }
 }
 
@@ -884,7 +922,7 @@ function Remove-PayloadStage([object] $journal) {
   if (-not $stage -or -not (Test-Path -LiteralPath $stage)) { return }
   Assert-PayloadStageOwner $journal $stage
   Assert-PlainPayloadTree $stage
-  [IO.Directory]::Delete($stage, $true)
+  [IO.Directory]::Delete("\\?\$stage", $true)
 }
 
 function Assert-CompleteRuntimePayload([string] $payloadRoot = $normalizedInstallDirectory) {
@@ -1011,7 +1049,19 @@ switch ($Mode) {
   'ValidatePayload' { Assert-TargetPayloadAvailable -RecoverInterrupted }
   'PreparePayload' { Prepare-TargetPayload }
   'PromotePayload' { Promote-TargetPayload }
-  'Commit' { Commit-Transaction }
+  'Commit' {
+    Commit-Transaction
+    if ($InstallerExecutable -or $InstallerStoreFile) {
+      # The transaction is durable. A failed optional cache cannot trigger rollback.
+      $cacheTiming = [Diagnostics.Stopwatch]::StartNew()
+      try {
+        $cacheDetail = Save-TargetVolumeInstaller
+        Write-Output "installer-cache code=0 elapsed_ms=$($cacheTiming.ElapsedMilliseconds) $cacheDetail"
+      } catch {
+        Write-Output "installer-cache code=1 elapsed_ms=$($cacheTiming.ElapsedMilliseconds) $($_.Exception.Message)"
+      }
+    }
+  }
   'Rollback' {
     $journal = Read-Journal
     if ($null -eq $journal) {

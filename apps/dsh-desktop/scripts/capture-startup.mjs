@@ -120,7 +120,7 @@ try {
     }
   }
   if (communityMode) {
-    await page.locator('#community-qr[src^="data:image/png;base64,"]').waitFor({ state: 'visible' })
+    await page.locator('#community-qr[src^="data:image/jpeg;base64,"]').waitFor({ state: 'visible' })
   }
   await page.setViewportSize(communityMode ? { width: 580, height: 740 } : compactMode ? { width: 1024, height: 720 } : { width: 1440, height: 900 })
   if (communityMode) {

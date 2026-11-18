@@ -94,10 +94,11 @@ async function launch() {
 async function openSettings(page) {
   const settings = await openNativeSettings(page)
   await settings.waitFor({ state: 'visible', timeout: 30_000 })
-  await settings.getByText('Web UI 插件', { exact: true }).click()
+  assert.equal(await settings.getByRole('button', { name: 'Web UI 插件', exact: true }).count(), 0)
+  await settings.getByRole('button', { name: '通用', exact: true }).click()
   await page.waitForFunction(() => document.querySelectorAll('[data-relay-onboarding-card="true"]').length === 0, undefined, { timeout: 10_000 })
   assert.equal(await page.locator('[data-relay-onboarding-card="true"]').count(), 0)
-  const modelNav = settings.getByRole('button', { name: '模型', exact: true })
+  const modelNav = settings.getByRole('button', { name: '模型与登录', exact: true })
   assert.equal(await modelNav.count(), 1)
   assert.equal(await settings.getByRole('button', { name: '模型选项', exact: true }).count(), 0)
   await modelNav.click()
@@ -121,7 +122,7 @@ async function openSettings(page) {
     throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
   }
   const relay = settings.locator('[data-relay-onboarding-card="true"]')
-  await relay.getByRole('heading', { name: '推荐：使用 bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  await relay.getByRole('heading', { name: 'bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   const [relayBounds, baiBounds] = await Promise.all([relay.boundingBox(), baiProvider.boundingBox()])
   assert.ok(relayBounds && baiBounds && relayBounds.y < baiBounds.y, 'bai onboarding is visible before the provider list')
   if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {

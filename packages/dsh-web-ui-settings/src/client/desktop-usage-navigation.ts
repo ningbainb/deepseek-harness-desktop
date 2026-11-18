@@ -1,6 +1,6 @@
 import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 
-export function installDesktopUsageNavigation(doc: Document, translate: (key: 'usageOpenFailed') => string): () => void {
+export function installDesktopUsageNavigation(doc: Document, translate: (key: 'usageOpenFailed') => string, openNative?: () => boolean): () => void {
   const host = doc.defaultView as (Window & { dshDesktop?: unknown; dshDesktopTransport?: unknown }) | null
   if (!host?.dshDesktop && !host?.dshDesktopTransport) return () => {}
   let disposed = false
@@ -18,6 +18,7 @@ export function installDesktopUsageNavigation(doc: Document, translate: (key: 'u
     opening = true
     failure?.remove()
     failure = undefined
+    if (openNative?.()) { opening = false; return }
     const reportFailure = () => {
       if (disposed) return
       failure = doc.createElement('p')

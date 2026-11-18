@@ -167,7 +167,10 @@ async function installProbe() {
       '@deepseek-ai/dsh-api-session-controller', '@deepseek-ai/dsh-client-ui-conversation',
       '@deepseek-ai/dsh-client-ui-workspace',
     ] } } }, null, 2))
-  await writeFile(join(target, 'host.mjs'), `export { name, inject, apply } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, 'release-plugins-host-fixture.mjs')).href)};\n`)
+  await writeFile(join(target, 'host.mjs'), `import { name, inject, apply as install } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, 'release-plugins-host-fixture.mjs')).href)};
+export { name, inject };
+export function apply(ctx) { install(ctx, { outboundDispatcher: true }); }
+`)
   await writeFile(join(target, 'client.js'), CLIENT_SOURCE)
   await writeFile(join(target, 'cordis.patch.yml'), `- insert:\n    - id: release-plugins-verification\n      name: '${fixtureName}'\n`)
   const manifestPath = join(profile, 'package.json')

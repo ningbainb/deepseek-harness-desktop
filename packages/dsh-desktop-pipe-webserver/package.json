@@ -11,11 +11,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.5",
-    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.3"
+    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.1.0",
-    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.3"
+    "@deepseek-ai/dsh-host-webserver": "0.2.2-rc.5"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"

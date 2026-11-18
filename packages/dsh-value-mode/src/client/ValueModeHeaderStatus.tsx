@@ -13,6 +13,7 @@ import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import headerStyles from './value-mode-header.module.css'
 import { reportValueModeTelemetry } from './telemetry.ts'
+import { formatValueModeModelLabel } from './model-label.ts'
 
 export interface ConsultationHistoryItem {
   id: string
@@ -55,11 +56,6 @@ interface SetupDraft {
   executor: ModelRouteSelection
   expert: ModelRouteSelection
   strategy: ValueModeStrategy
-}
-
-function formatModel(route?: ModelRouteSelection): string {
-  if (!isCompleteModelRoute(route)) return '未配置'
-  return `${route.provider} / ${route.model}`
 }
 
 function renderPortal(node: React.ReactNode): React.ReactNode {
@@ -346,11 +342,11 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
       <div className={styles.roleSummary}>
         <div className={styles.popoverItem}>
           <span className={styles.popoverItemLabel}>专家主控:</span>
-          <span className={styles.popoverItemValue}>{formatModel(resolved.expert)}</span>
+          <span className={styles.popoverItemValue}>{formatValueModeModelLabel(resolved.expert)}</span>
         </div>
         <div className={styles.popoverItem}>
           <span className={styles.popoverItemLabel}>副模型子代理:</span>
-          <span className={styles.popoverItemValue}>{formatModel(resolved.executor)}</span>
+          <span className={styles.popoverItemValue}>{formatValueModeModelLabel(resolved.executor)}</span>
         </div>
         <div className={styles.popoverItem}>
           <span className={styles.popoverItemLabel}>当前策略:</span>
@@ -441,7 +437,7 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
           <span className={headerStyles.setupStepNumber}>01</span>
           <div className={headerStyles.setupStepBody}>
             <div className={headerStyles.setupStepHeading}>专家主控模型</div>
-            <div className={headerStyles.setupStepValue}>{formatModel(setupDraft.expert)}</div>
+            <div className={headerStyles.setupStepValue}>{formatValueModeModelLabel(setupDraft.expert)}</div>
             {!isCompleteModelRoute(liveConfig.expert) && isCompleteModelRoute(defaultExpert) && (
               <div className={headerStyles.setupDefaultNote}>已预选当前默认模型，确认后会保存到性价比模式</div>
             )}
@@ -455,7 +451,7 @@ export const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps> = ({
           <span className={headerStyles.setupStepNumber}>02</span>
           <div className={headerStyles.setupStepBody}>
             <div className={headerStyles.setupStepHeading}>副模型 / 子代理执行模型</div>
-            <div className={headerStyles.setupStepValue}>{formatModel(setupDraft.executor)}</div>
+            <div className={headerStyles.setupStepValue}>{formatValueModeModelLabel(setupDraft.executor)}</div>
             <div className={headerStyles.setupDefaultNote}>用于并行调查、局部实现和重复性工作</div>
           </div>
           <button type="button" className={`${styles.button} ${headerStyles.setupModelButton}`} onClick={() => setPickingTarget('executor')}>

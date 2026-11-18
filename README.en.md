@@ -10,13 +10,13 @@
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="Afdian sponsorship QR code"></a>
 
-## DeepSeek Harness Desktop Community
+## DeepSeek Harness Desktop Community Group 2
 
-QQ Group: **1105158177**
+QQ Group 2: **1129522514**
 
-**[Join the QQ Group](https://qm.qq.com/q/vehlNjaeye)**
+**[Join QQ Group 2](https://qm.qq.com/q/9hrcdaEYPC)**
 
-<a href="https://qm.qq.com/q/vehlNjaeye"><img src="website/assets/qq-group-1105158177.jpg" width="280" alt="QR code for DeepSeek Harness Desktop QQ group 1105158177"></a>
+<a href="https://qm.qq.com/q/9hrcdaEYPC"><img src="website/assets/qq-group-1129522514.jpg" width="280" alt="QR code for DeepSeek Harness Desktop QQ Group 2 (1129522514)"></a>
 
 Join the community to discuss:
 

@@ -26,8 +26,10 @@ export type DesktopExtensionDockEntryProps = {
 type ManagementTab = 'plugins' | 'skills'
 
 type PluginSettingsRequest = Readonly<{ name?: unknown }>
+type NativePageRequest = string | Readonly<{ destination: string; notice?: { name: string; applied: boolean } }>
 type PluginSettingsBridge = Readonly<{
   onPluginSettingsOpen?: (listener: (request: PluginSettingsRequest) => void) => () => void
+  onNativePageOpen?: (listener: (request: NativePageRequest) => void) => () => void
 }>
 
 function mainBridge(): PluginSettingsBridge | undefined {
@@ -80,6 +82,7 @@ export async function openRuntimePluginSettings(
 export function installDesktopManagementRouting(
   ownerDocument: Document,
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string,
+  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean },
 ): () => void {
   let disposed = false
   let observer: MutationObserver | undefined
@@ -89,6 +92,10 @@ export function installDesktopManagementRouting(
   const opening = new WeakSet<HTMLElement>()
   const nativeClicks = new WeakSet<HTMLElement>()
   let unsubscribePluginSettings: (() => void) | undefined
+  let unsubscribeNativePage: (() => void) | undefined
+  let pageRequest = 0
+  let notice: HTMLElement | undefined
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
   const mark = (entry: HTMLElement | null | undefined, tab: ManagementTab): void => {
     if (entry === null || entry === undefined) return
@@ -129,12 +136,17 @@ export function installDesktopManagementRouting(
     entry.insertAdjacentElement('afterend', message)
   }
   const onClick = (event: Event): void => {
+    if (event.isTrusted) ++pageRequest
     const target = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-dsh-desktop-management-entry]')
       : null
     if (target === null || !ownerDocument.contains(target)) return
     const tab = target.dataset.dshDesktopManagementEntry
     if (tab !== 'plugins' && tab !== 'skills') return
+    if (tab === 'plugins' && navigation) {
+      ++pageRequest
+      return
+    }
     if (nativeClicks.has(target)) {
       nativeClicks.delete(target)
       return
@@ -183,12 +195,76 @@ export function installDesktopManagementRouting(
         .catch(() => { if (entry !== null) showError(entry, 'plugins') })
         .finally(() => entry?.removeAttribute('aria-busy'))
     })
+    unsubscribeNativePage = mainBridge()?.onNativePageOpen?.(payload => {
+      if (!navigation || disposed) return
+      const destination = typeof payload === 'string' ? payload : payload.destination
+      const outcome = typeof payload === 'string' ? undefined : payload.notice
+      const request = ++pageRequest
+      if (destination !== 'plugins' && destination !== 'workshop' && destination !== 'experimental-plugins') {
+        navigation.openSettings(destination)
+        return
+      }
+      let opened = false
+      let menuOpened = false
+      const startsAt = Date.now()
+      const openDestination = () => {
+        if (disposed || request !== pageRequest) return
+        if (!opened) opened = navigation.openPlugins()
+        if (opened && destination === 'plugins') {
+          if (outcome) {
+            notice?.remove()
+            clearTimeout(noticeTimer)
+            const entry = ownerDocument.createElement('div')
+            entry.className = css.nativePluginResult
+            entry.setAttribute('role', outcome.applied ? 'status' : 'alert')
+            entry.dataset.dshNativePluginResult = outcome.applied ? 'applied' : 'failed'
+            entry.textContent = t(outcome.applied ? 'nativePluginUpdated' : 'nativePluginFailed', { name: outcome.name })
+            ownerDocument.body.append(entry)
+            notice = entry
+            noticeTimer = setTimeout(() => entry.remove(), 10_000)
+          }
+          return
+        }
+        if (destination === 'experimental-plugins') {
+          if (opened) {
+            const panel = ownerDocument.querySelector('[data-plugin-panel]')
+            if (panel?.querySelector('[data-plugin-group="more"]')) return
+            const heading = panel?.querySelector('[data-plugin-group="extensions"] h3')
+            const more = heading?.parentElement?.querySelector<HTMLButtonElement>('button')
+            if (more) { more.click(); return }
+          }
+          if (Date.now() - startsAt < 45_000) globalThis.setTimeout(openDestination, 200)
+          return
+        }
+        const tab = ownerDocument.querySelector<HTMLButtonElement>('[data-plugin-panel] [role="tab"][id$="-discover"]')
+        if (tab?.getAttribute('aria-selected') === 'false') tab.click()
+        const source = ownerDocument.querySelector<HTMLButtonElement>('[data-discover-toolbar] button[aria-haspopup="menu"]')
+        if (source) {
+          const isWorkshop = (value: string | null) => /创意工坊|Creative Workshop|ningbainb\/deepseek-harness-desktop/iu.test(value ?? '')
+          if (isWorkshop(source.textContent)) {
+            if (menuOpened && source.getAttribute('aria-expanded') === 'true') source.click()
+            return
+          }
+          if (!menuOpened) { menuOpened = true; source.click() }
+          const option = [...ownerDocument.querySelectorAll<HTMLButtonElement>('[role="menu"] button[role="menuitem"]')]
+            .find(button => isWorkshop(button.textContent))
+          if (option) { option.click(); return }
+        }
+        // Initial Desktop connection can remount the official Discover slot.
+        if (Date.now() - startsAt < 45_000) globalThis.setTimeout(openDestination, 125)
+        else if (source?.getAttribute('aria-expanded') === 'true' && menuOpened) source.click()
+      }
+      openDestination()
+    })
   }).catch(() => {})
 
   return () => {
     disposed = true
+    notice?.remove()
+    clearTimeout(noticeTimer)
     observer?.disconnect()
     unsubscribePluginSettings?.()
+    unsubscribeNativePage?.()
     ownerDocument.removeEventListener('click', onClick, true)
     for (const entry of managed) {
       clearError(entry)

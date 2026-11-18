@@ -1,4 +1,5 @@
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000;
+export const CODEX_MODEL_CATALOG_CHANGED = 'dsh-codex-model-catalog-changed';
 const MAX_CATALOG_REVISION_RETRIES = 2;
 export class ModelCatalogChangedError extends Error {
     name = 'ModelCatalogChangedError';
@@ -16,6 +17,12 @@ export function createModelCatalogLoader(ctx, translate) {
         ctx.remote.$on('llm/adapters-updated', invalidate),
         ctx.remote.$on('settings/document-updated', invalidate),
         ctx.remote.$on('credentials/reference-updated', invalidate),
+        ctx.remote.$on('credentials/record-updated', key => {
+            invalidate();
+            if (key === 'llm-pi-ai/openai-codex' && typeof window !== 'undefined') {
+                window.dispatchEvent(new Event(CODEX_MODEL_CATALOG_CHANGED));
+            }
+        }),
         ctx.get('connection').generation.subscribe(invalidate),
     ];
     ctx.effect(() => () => { disposed = true; invalidate(); removers.forEach(remove => remove()); }, 'value-mode: model catalog lifetime');

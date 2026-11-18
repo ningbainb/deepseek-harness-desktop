@@ -85,6 +85,21 @@ test('NSIS runtime restoration precedes registration and keeps original install 
   assert.throws(() => runtimeInstallerInclude('missing macro'), /template/u)
 })
 
+test('the reviewed NSIS utility sends an exhausted old uninstaller to the existing rollback hook', async () => {
+  const { routeOldUninstallFailure } = await import('../scripts/runtime-nsis-options.mjs')
+  const require = createRequire(import.meta.url)
+  const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
+  const includes = resolve(dirname(builderRequire.resolve('app-builder-lib/out/targets/nsis/NsisTarget.js')), '../../../templates/nsis/include')
+  const original = await readFile(join(includes, 'installUtil.nsh'))
+  const adapted = routeOldUninstallFailure(original)
+  assert.match(adapted, /\$R5 > 5\s+DetailPrint "Previous uninstaller returned \$R0; stopping for rollback\."\s+Return/u)
+  assert.doesNotMatch(adapted, /\$\(appCannotBeClosed\)/u)
+  assert.doesNotMatch(adapted, /OneMoreAttempt/u)
+  assert.match(adapted, /ExecWait [^\n]+\/S \/KEEP_APP_DATA[^\n]+\$R0/u)
+  assert.match(adapted, /!insertmacro customUnInstallCheck\s+Return/u)
+  assert.throws(() => routeOldUninstallFailure(Buffer.from('changed template')), /template/u)
+})
+
 test('the reviewed embedded NSIS template records separate archive, extraction, copy and installer cache timing', async () => {
   const { runtimeInstallerInclude } = await import(moduleURL)
   const require = createRequire(import.meta.url)
@@ -99,6 +114,7 @@ test('the reviewed embedded NSIS template records separate archive, extraction, 
   assert.match(result, /DshTiming "archive-decompress-start"[\s\S]*?Nsis7z::Extract "\$\{FILE\}"[\s\S]*?DshTiming "archive-decompressed"/u)
   assert.match(result, /DshTiming "payload-copy-start"[\s\S]*?CopyFiles \/SILENT[^\r\n]+\r?\n\s*IfErrors 0 DoneExtract7za[\s\S]*?DoneExtract7za:\r?\n\s*!insertmacro DshTiming "payload-copy-end"/u)
   assert.match(result, /DshTiming "installer-cache-copy-start"\r?\n\s*!insertmacro copyFile "\$EXEPATH"[^\r\n]+\r?\n\s*!insertmacro DshTiming "installer-cache-copy-end"/u)
+  assert.match(result, /!ifdef DSH_TARGET_PAYLOAD_STAGE\s+\$\{If\} \$installMode == "all"[\s\S]*?copyFile "\$EXEPATH" "\$LOCALAPPDATA\\\$\{APP_INSTALLER_STORE_FILE\}"/iu)
   assert.match(result, /AbortExtract7za:\r?\n\s*!insertmacro DshAbortExtraction/u)
 })
 test('archive staging removes only verified duplicates and restores every original file', async t => {

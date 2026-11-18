@@ -136,6 +136,44 @@ function stagedFullAccessManager(apply) {
   }
 }
 
+test('official install is main-frame only and stages the exact version with the requested enablement', async () => {
+  const ipcMain = new FakeIpcMain()
+  const surfaces = new DesktopSurfaceRegistry()
+  const senderFrame = { url: 'dsh-runtime://app/' }
+  const sender = { mainFrame: senderFrame }
+  surfaces.register(sender, 'main')
+  const event = { sender, senderFrame }
+  const calls = []
+  const notices = []
+  const qqBotBinding = Object.assign(new EventEmitter(), { status: () => ({ bound: false }) })
+  const unregister = registerExtensionIpc({
+    ipcMain, surfaceRegistry: surfaces, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {
+      prepare: async (spec, options) => { calls.push(['prepare', spec, options.enabled]); return { spec } },
+      applyPrepared: async () => ({ result: { version: '1.0.0' }, commit: async () => true, rollback: async () => true }),
+    },
+    controller: { stop: async () => { calls.push(['stop']) }, start: async () => { calls.push(['start']) } },
+    ensureProfile: async () => {}, dshHome: tmpdir(), qqBotBinding, pluginRecovery: {},
+    captureNativePluginView: () => notice => { notices.push(notice) },
+  })
+  try {
+    const mutate = ipcMain.handlers.get('desktop:native-plugin-mutation')
+    const install = { method: 'pluginManager/installBundle', args: { spec: 'test-native-plugin', options: {
+      enabled: false, expected: { name: 'test-native-plugin', version: '1.0.0' },
+    } } }
+    await assert.rejects(mutate({ sender, senderFrame: { url: senderFrame.url } }, install), /primary Runtime/u)
+    const rejected = await mutate(event, { ...install, args: { spec: 'github:example/plugin' } })
+    assert.match(rejected.value.error.diagnostic, /插件维护/u)
+    assert.deepEqual(calls, [])
+    const applied = await mutate(event, install)
+    assert.equal(applied.value.application, 'applied', applied.value.error?.diagnostic)
+    assert.equal(applied.value.version, '1.0.0')
+    assert.equal(applied.value.enabled, false)
+    assert.deepEqual(calls, [['prepare', 'test-native-plugin@1.0.0', false], ['stop'], ['start']])
+    assert.deepEqual(notices, [{ name: 'test-native-plugin', applied: true }])
+  } finally { await unregister() }
+})
+
 function stagedRemovalManager(apply) {
   return {
     prepareRemoval: async (name) => ({

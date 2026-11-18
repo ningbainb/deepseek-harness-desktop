@@ -14,13 +14,13 @@ afterEach(() => {
   window.history.replaceState({}, '', '/')
 })
 
-function mount() {
+function mount(expert = { provider: 'fixture', model: 'planner' }) {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
   roots.push(root)
   const onChange = vi.fn(async () => {})
-  act(() => root.render(<ValueModeSettingsCard config={{ expert: { provider: 'fixture', model: 'planner' },
+  act(() => root.render(<ValueModeSettingsCard config={{ expert,
     executor: { provider: 'fixture', model: 'worker' } }} onChange={onChange} />))
   return { onChange, card: container.querySelector('[data-value-mode-card]')! }
 }
@@ -55,4 +55,14 @@ it('localizes the new Dock disclosure without changing the ordinary settings pre
   const ordinary = mount().card
   expect(ordinary.querySelector('[data-value-mode-details]')).toBeNull()
   expect(ordinary.textContent).toContain('不需要重新填写 API Key')
+})
+
+it('shows the bai sign-in state and keeps Value Mode disabled until the route is usable', () => {
+  const { card, onChange } = mount({ provider: 'project-relay', model: '__bai_login_required__' })
+  expect(card.textContent).toContain('登录 bai 后可用')
+  expect(card.textContent).not.toContain('__bai_login_required__')
+  const toggle = card.querySelector<HTMLButtonElement>('[role="switch"]')!
+  expect(toggle.disabled).toBe(true)
+  act(() => toggle.click())
+  expect(onChange).not.toHaveBeenCalled()
 })

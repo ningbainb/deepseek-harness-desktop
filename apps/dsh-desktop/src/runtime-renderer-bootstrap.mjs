@@ -164,13 +164,75 @@ export function installDesktopTransportBridge(target = globalThis, { accountCall
     return url
   }
 
+  // Connection unary calls use this carrier. Keep reads in the SDK worker and
+  // hand mutations to Desktop main, which can replace that worker mid-request.
+  const pluginApiPrefix = '/api/pluginManager/'
+  const pluginReads = new Set([
+    'inspect', 'listBundles', 'listPlugins', 'listVersionExemptions',
+    'listVersions', 'readBundleDetail', 'registries', 'waitForInstall',
+  ])
+  // These official controls write only entry enablement or version metadata.
+  // Bundle selection and package changes remain Desktop transactions.
+  const workerPluginControls = new Set(['setPluginEnabled', 'setVersionExemption'])
+  const pluginMutations = new Set(['installBundle', 'updateBundle', 'removeBundle', 'setBundleEnabled'])
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const rpcFailure = message => ({ ok: false, error: { code: 'gateway/internal', message, details: {} } })
+
+  async function mutatePlugin(url, input, init, operation) {
+    const request = new target.Request(input, init)
+    const { signal } = request
+    signal.throwIfAborted()
+    const badRequest = () => new target.Response(null, { status: 400 })
+    if (url.username || url.password || url.port || url.search || url.hash || request.method !== 'POST'
+      || request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') return badRequest()
+
+    const method = `pluginManager/${operation}`
+    let message
+    try {
+      const body = await request.text()
+      if (body.length > 16_384) return badRequest()
+      message = JSON.parse(body)
+    } catch { signal.throwIfAborted(); return badRequest() }
+    signal.throwIfAborted()
+    if (!object(message) || message.type !== 'client-request' || message.method !== method
+      || typeof message.rpcId !== 'string' || message.rpcId.length === 0 || message.rpcId.length > 128
+      || !object(message.payload?.args)) return badRequest()
+
+    const respond = result => target.Response.json({ type: 'server-response', rpcId: message.rpcId, method, result })
+    if (!pluginMutations.has(operation) || typeof target.dshDesktop?.mutateNativePlugin !== 'function') {
+      return respond(rpcFailure('This plugin operation is not available in the Desktop plugin manager.'))
+    }
+
+    let onAbort
+    const aborted = new Promise((_, reject) => {
+      onAbort = () => reject(signal.reason)
+      signal.addEventListener('abort', onAbort, { once: true })
+    })
+    try {
+      const result = await Promise.race([target.dshDesktop.mutateNativePlugin({ method, args: message.payload.args }), aborted])
+      signal.throwIfAborted()
+      if (object(result) && (result.ok === true && Object.hasOwn(result, 'value')
+        || result.ok === false && object(result.error) && typeof result.error.code === 'string'
+          && typeof result.error.message === 'string' && object(result.error.details))) return respond(result)
+      return respond(rpcFailure('Desktop did not report a plugin operation result.'))
+    } catch {
+      signal.throwIfAborted()
+      return respond(rpcFailure('The Desktop plugin operation could not be completed.'))
+    } finally { signal.removeEventListener('abort', onAbort) }
+  }
+
   target.__DSH_TRANSPORT__ = Object.freeze({
     ...(accountCallbackOrigin === undefined ? {} : { streamBaseUrl: accountCallbackOrigin }),
     ownsHost: true,
-    fetch: (input, init) => target.fetch(
-      input instanceof target.Request ? new target.Request(remap(input), input) : remap(input),
-      init,
-    ),
+    fetch(input, init) {
+      const url = remap(input)
+      const forwarded = input instanceof target.Request ? new target.Request(url, input) : url
+      if (url.protocol === 'dsh-runtime:' && url.hostname === 'app' && url.pathname.startsWith(pluginApiPrefix)) {
+        const operation = url.pathname.slice(pluginApiPrefix.length)
+        if (!pluginReads.has(operation) && !workerPluginControls.has(operation)) return mutatePlugin(url, forwarded, init, operation)
+      }
+      return target.fetch(forwarded, init)
+    },
     openStream,
   })
 

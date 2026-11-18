@@ -18,6 +18,7 @@ if (!executablePath) throw new Error('DSH_DESKTOP_E2E_EXECUTABLE is required')
 const cleanupScriptPath = process.env.DSH_DESKTOP_E2E_CLEANUP_SCRIPT
   ?? join(desktopRoot, 'build', 'cleanup-stale-processes.ps1')
 if (!isAbsolute(cleanupScriptPath)) throw new Error('cleanup script path must be absolute')
+process.env.DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION = '1'
 
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-update-shutdown-'))
 const userData = join(temporary, 'user-data')
@@ -99,7 +100,7 @@ try {
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress',
+      '[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json -Compress',
     ],
     { timeout: 30_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
   )
@@ -147,6 +148,7 @@ try {
       const { stdout: diagnostics } = await execFileAsync('powershell.exe', [
         '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
         [
+          '[Console]::OutputEncoding = [Text.Encoding]::UTF8',
           '$rows = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:DSH_SHUTDOWN_PROBE_EXE } | Select-Object ProcessId,ParentProcessId,Name)',
           '$state = "available"; $stream = $null',
           'try { $stream = [IO.File]::Open($env:DSH_SHUTDOWN_PROBE_EXE, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) } catch { $state = "blocked" } finally { if ($null -ne $stream) { $stream.Dispose() } }',

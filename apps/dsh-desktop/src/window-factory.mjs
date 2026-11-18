@@ -183,6 +183,7 @@ export function createDesktopWindowFactory({
   extensionsPath,
   handoffPath,
   communityPath,
+  communityQrResourcesPath,
   surfaceRegistry,
   screen,
   shell,
@@ -365,7 +366,7 @@ export function createDesktopWindowFactory({
     let createdWindow
     let operation
     operation = (async () => {
-      const qrImage = await createCommunityQrImage()
+      const qrImage = await createCommunityQrImage(communityQrResourcesPath)
       const mainWindow = getMainWindow()
       if (!mainWindow || mainWindow.isDestroyed()) {
         throw new Error('main window closed before the community window could open')
@@ -391,7 +392,7 @@ export function createDesktopWindowFactory({
         filePath: communityPath,
         chromeTheme,
         permissionCheck: true,
-        query: { qr: qrImage },
+        query: qrImage === undefined ? undefined : { qr: qrImage },
       })
       return createdWindow
     })().catch((error) => {

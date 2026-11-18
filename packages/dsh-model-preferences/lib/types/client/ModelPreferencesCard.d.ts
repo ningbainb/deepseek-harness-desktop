@@ -10,6 +10,7 @@ export interface ModelPreferencesCardFace {
     config: ModelPreferencesConfig;
     settingsScope: SettingsScope<ModelPreferencesConfig>;
     loadCatalog: () => Promise<ModelPreferenceCatalog>;
+    subscribeCatalogChanges?: (listener: () => void) => () => void;
 }
 export type ModelPreferencesCardProps = PropsRuntime<'settings.models.footer'> & PropsLocale<'model-preferences'> & PropsRenderSlots<'model-preferences.onboarding'> & ModelPreferencesCardFace;
 /** Settings card for the durable model preference projection. */

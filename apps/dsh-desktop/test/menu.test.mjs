@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
+  COMMUNITY_QQ_GROUP,
   COMMUNITY_QQ_URL,
   GITHUB_DOWNLOADS_URL,
   GITHUB_FEEDBACK_URL,
@@ -13,17 +15,26 @@ import { createApplicationMenuTemplate } from '../src/menu.mjs'
 import { installEditContextMenu, installTrayResidencyShortcut } from '../src/menu.mjs'
 
 test('community and feedback destinations are fixed secure URLs', () => {
-  assert.equal(COMMUNITY_QQ_URL, 'https://qm.qq.com/q/vehlNjaeye')
+  assert.equal(COMMUNITY_QQ_URL, 'https://qm.qq.com/q/9hrcdaEYPC')
   assert.equal(GITHUB_DOWNLOADS_URL, 'https://github.com/ningbainb/deepseek-harness-desktop/releases/latest')
   assert.equal(GITHUB_FEEDBACK_URL, 'https://github.com/ningbainb/deepseek-harness-desktop/issues/new/choose')
   assert.equal(GITHUB_PROJECT_URL, 'https://github.com/ningbainb/deepseek-harness-desktop')
   assert.equal(PRIVACY_POLICY_URL, 'https://ningbainb.github.io/deepseek-harness-desktop/privacy.html')
 })
 
-test('community QR is generated from the fixed join destination', async () => {
+test('community uses the same supplied JPEG as the website', async () => {
   const image = await createCommunityQrImage()
-  assert.match(image, /^data:image\/png;base64,/u)
-  assert.ok(image.length > 500)
+  const prefix = 'data:image/jpeg;base64,'
+  assert.ok(image.startsWith(prefix))
+  const supplied = await readFile(new URL('../../../website/assets/qq-group-1129522514.jpg', import.meta.url))
+  assert.deepEqual(Buffer.from(image.slice(prefix.length), 'base64'), supplied)
+
+  const docs = ['website/index.html', 'README.md', 'README.en.md', 'docs/desktop.md']
+  for (const path of docs) {
+    const source = await readFile(new URL(`../../../${path}`, import.meta.url), 'utf8')
+    assert.ok(source.includes(COMMUNITY_QQ_URL), `${path} must link to the current community`)
+    assert.ok(source.includes(`qq-group-${COMMUNITY_QQ_GROUP}.jpg`), `${path} must reference the supplied QR`)
+  }
 })
 
 test('Tools and Help menus expose built-in terminal, Extension Dock, and community actions', () => {

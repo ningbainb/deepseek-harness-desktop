@@ -1,5 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
+import { lstat, realpath } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { classifyUpdateError, updateDiagnostic } from './update-diagnostics.mjs'
 
 import { emitBestEffort } from './best-effort-events.mjs'
@@ -483,7 +485,34 @@ export class DesktopUpdateController extends EventEmitter {
 
 }
 
-export async function loadElectronAutoUpdater() {
+export async function targetVolumeUpdaterCache(installDirectory) {
+  const cache = `${installDirectory}.dsh-desktop-updates`
+  try {
+    const info = await lstat(cache)
+    if (info.isDirectory() && (await realpath(cache)).toLowerCase() === cache.toLowerCase()) return cache
+  } catch { /* Installations without a usable sibling use the stock update cache. */ }
+  return undefined
+}
+
+export async function loadElectronAutoUpdater(app) {
   const electronUpdater = await import('electron-updater')
+  if (process.platform === 'win32' && app?.isPackaged) {
+    const baseCachePath = await targetVolumeUpdaterCache(dirname(app.getPath('exe')))
+    if (baseCachePath) {
+      const NsisUpdater = electronUpdater.NsisUpdater ?? electronUpdater.default?.NsisUpdater
+      return new NsisUpdater(undefined, {
+        baseCachePath,
+        isPackaged: true,
+        appUpdateConfigPath: join(process.resourcesPath, 'app-update.yml'),
+        get version() { return app.getVersion() },
+        get name() { return app.getName() },
+        get userDataPath() { return app.getPath('userData') },
+        whenReady: () => app.whenReady(),
+        quit: () => app.quit(),
+        relaunch: () => app.relaunch(),
+        onQuit: handler => app.once('quit', (_, exitCode) => handler(exitCode)),
+      })
+    }
+  }
   return electronUpdater.autoUpdater || electronUpdater.default?.autoUpdater
 }

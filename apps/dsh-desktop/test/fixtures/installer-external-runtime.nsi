@@ -7,6 +7,7 @@ InstallDir "${TEST_INSTALL}"
 Var perUserInstallationFolder
 Var hasPerUserInstallation
 Var hasPerMachineInstallation
+Var installMode
 !define INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Install"
 !define UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Uninstall"
 !define DSH_LEGACY_INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\LegacyInstall"
@@ -18,6 +19,7 @@ Var hasPerMachineInstallation
 !define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 !insertmacro customHeader
 Function .onInit
+  StrCpy $installMode "CurrentUser"
   !insertmacro customInit
 FunctionEnd
 Section

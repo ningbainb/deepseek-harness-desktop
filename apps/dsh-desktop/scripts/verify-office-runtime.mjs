@@ -60,7 +60,7 @@ export async function resolveOfficeRuntime(resources) {
  await verifyLocation(officePath); await verifyLocation(kitPath)
  const cordisPath = officeRequire.resolve('@deepseek-ai/cordis/package.json'); await verifyLocation(cordisPath)
  const officeManifest = JSON.parse(await readFile(officePath, 'utf8')), kitManifest = JSON.parse(await readFile(kitPath, 'utf8'))
- assert.equal(officeManifest.version, '0.2.2-rc.3', 'smoke must use the actual rc3 Office service')
+ assert.equal(officeManifest.version, '0.2.2-rc.5', 'smoke must use the actual rc5 Office service')
  assert.equal(kitManifest.version, '0.2.3', 'smoke must use the selected official engine cohort')
  return { officePath, kitPath, officeManifest, kitManifest,
   office: await import(pathToFileURL(officeRequire.resolve('@deepseek-ai/dsh-office-kit')).href),

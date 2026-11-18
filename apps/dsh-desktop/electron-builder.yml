@@ -8,6 +8,8 @@ asarUnpack:
   - src/**
   - package.json
   - runtime-support/browser-component.json
+  - runtime-support/community-plugin-index.json
+  - runtime-support/context-model-prices.json.gz
 npmRebuild: false
 compression: normal
 electronLanguages:
@@ -17,6 +19,8 @@ electronLanguages:
 afterPack: scripts/after-pack.cjs
 
 extraResources:
+  - from: ../../website/assets/qq-group-1129522514.jpg
+    to: community-qq.jpg
   - from: build/icon.png
     to: app-icon.png
   - from: build/telemetry-config.json
@@ -43,6 +47,8 @@ files:
   - runtime-support/browser-component.json
   - runtime-support/community-plugin-index.json
   - runtime-support/community-plugin-known-issues.json
+  - runtime-support/context-model-prices.json.gz
+  - runtime-support/context-model-prices.NOTICE.txt
   - package.json
   - '!**/*.map'
   - '!**/test/**'

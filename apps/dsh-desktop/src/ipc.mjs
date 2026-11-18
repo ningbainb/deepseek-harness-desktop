@@ -405,7 +405,7 @@ export function normalizeDesktopDockOpenOptions(value) {
   const keys = Object.keys(value)
   if (
     keys.some(key => key !== 'setting' && key !== 'tab' && key !== 'plugin')
-    || (value.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(value.setting))
+    || (value.setting !== undefined && !['control-center', 'value-mode', 'models', 'usage', 'plugin-options', 'prompt-customizer'].includes(value.setting))
     || (value.tab !== undefined && !['plugins', 'market', 'skills'].includes(value.tab))
     || (value.setting !== undefined && value.tab !== undefined)
   ) {

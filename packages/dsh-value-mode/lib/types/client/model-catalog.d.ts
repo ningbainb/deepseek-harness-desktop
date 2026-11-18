@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { ValueModeModelCatalog } from './ModelPicker.tsx';
 import type { ValueModeLocaleKey } from './locales.ts';
 export declare const MODEL_CATALOG_TIMEOUT_MS = 10000;
+export declare const CODEX_MODEL_CATALOG_CHANGED = "dsh-codex-model-catalog-changed";
 export declare class ModelCatalogChangedError extends Error {
     name: string;
 }

@@ -96,10 +96,12 @@ async function launch(scaleFactor) {
 async function openSkinCenter(page) {
   const dialog = await openNativeSettings(page)
 
-  const header = dialog.locator(':scope > nav').getByRole('button', { name: /^(?:皮肤|Skin Center)$/iu })
+  const header = dialog.locator(':scope > nav').getByRole('button', { name: /^(?:外观|Appearance)$/iu })
   await header.waitFor({ state: 'visible', timeout: 30_000 })
   await header.scrollIntoViewIfNeeded()
   await header.click()
+  const skins = dialog.locator('[data-desktop-settings-section="skin-center"]')
+  if (await skins.isVisible()) await skins.click()
   const title = dialog.getByText('Blue Fantasy', { exact: true })
   await title.waitFor({ state: 'visible', timeout: 30_000 })
   await title.scrollIntoViewIfNeeded()

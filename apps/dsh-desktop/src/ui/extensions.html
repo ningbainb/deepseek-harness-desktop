@@ -18,10 +18,10 @@
           <div id="dock-search-items"></div>
         </div>
         <nav aria-label="拓展坞导航" role="tablist" aria-orientation="vertical">
-          <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins" data-tab="plugins" data-group="plugins"><span class="tab-title">插件</span></button>
+          <button type="button" class="tab" id="plugins-hub-tab" role="tab" aria-controls="plugins-home" data-tab="plugins-home" data-group="plugins"><span class="tab-title">插件</span></button>
           <button type="button" class="tab" id="skills-tab" role="tab" aria-controls="skills" data-tab="skills" data-group="skills"><span class="tab-title">技能</span><small id="skill-count">0</small></button>
           <button type="button" class="tab" id="appearance-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="appearance" data-group="appearance"><span class="tab-title">外观</span></button>
-          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="models" data-group="desktop-settings"><span class="tab-title">桌面设置</span><small class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai</small></button>
+          <button type="button" class="tab" id="models-tab" role="tab" aria-controls="settings-home" data-tab="settings-home" data-group="desktop-settings"><span class="tab-title">桌面设置</span></button>
           <button type="button" class="tab" id="control-center-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="control-center" data-group="more-tools"><span class="tab-title">更多工具</span></button>
         </nav>
         <details id="desktop-storage-locations" class="desktop-storage-locations" hidden>
@@ -30,10 +30,10 @@
           <p>卸载默认保留数据。更改程序位置不会移动已有数据。</p>
         </details>
         <nav class="page-tabs" data-tab-group="plugins" role="tablist" aria-label="插件管理" hidden>
-          <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins">已安装 <small id="plugin-count">0</small></button>
-          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market">创意工坊 <small id="market-count">--</small></button>
+          <button id="plugins-tab" type="button" role="tab" data-tab="plugins" data-group="plugins" aria-controls="plugins" data-native-page="plugins">已安装 <small id="plugin-count">0</small></button>
+          <button id="market-tab" type="button" role="tab" data-tab="market" data-group="plugins" aria-controls="market" data-native-page="workshop">创意工坊 <small id="market-count" hidden>--</small></button>
           <button type="button" class="tab" id="plugin-options-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="plugin-options" data-group="plugins"><span class="tab-title">插件自带配置</span></button>
-          <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">设置</button>
+          <button id="plugin-settings-tab" type="button" role="tab" data-tab="plugin-settings" data-group="plugins" aria-controls="plugin-settings">插件维护</button>
         </nav>
         <nav class="page-tabs" data-tab-group="skills" role="tablist" aria-label="技能中心" hidden>
           <button id="skills-local-tab" type="button" role="tab" data-tab="skills" data-group="skills" aria-controls="skills">本地技能</button>
@@ -49,12 +49,12 @@
           <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
         </nav>
         <nav class="page-tabs" data-tab-group="desktop-settings" role="tablist" aria-label="桌面设置" hidden>
-          <button id="models-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="models" data-group="desktop-settings" aria-controls="dock-settings">模型</button>
-          <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="desktop-settings"><span class="tab-title">模型高级 (Value Mode)</span></button>
-          <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="desktop-settings"><span class="tab-title">个人偏好</span></button>
-          <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="desktop-settings"><span class="tab-title">图像理解</span></button>
-          <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="desktop-settings"><span class="tab-title">用量与余额</span></button>
-          <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="desktop-settings"><span class="tab-title">会话管理</span></button>
+          <button id="models-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="models" data-group="desktop-settings" aria-controls="dock-settings" data-native-page="models">模型</button>
+          <button type="button" class="tab" id="value-mode-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="value-mode" data-group="desktop-settings" data-native-page="value-mode"><span class="tab-title">高级模型策略</span></button>
+          <button type="button" class="tab" id="personal-prompt-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="personal-prompt" data-group="desktop-settings" data-native-page="personal-prompt"><span class="tab-title">个人偏好</span></button>
+          <button type="button" class="tab" id="describe-image-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="describe-image" data-group="desktop-settings" data-native-page="describe-image"><span class="tab-title">图像理解</span></button>
+          <button type="button" class="tab" id="usage-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="usage" data-group="desktop-settings" data-native-page="usage"><span class="tab-title">用量与余额</span></button>
+          <button type="button" class="tab" id="sessions-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="sessions" data-group="desktop-settings" data-native-page="sessions"><span class="tab-title">会话管理</span></button>
           <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="desktop-settings"><span class="tab-title">备份与迁移</span></button>
           <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" data-tab="recovery" data-group="desktop-settings"><span class="tab-title">诊断与恢复</span><small id="recovery-count" hidden>0</small></button>
         </nav>
@@ -66,11 +66,21 @@
           <button id="agent-team-tab" type="button" role="tab" data-tab="dock-settings" data-setting="agent-team" data-group="more-tools" aria-controls="dock-settings">团队功能开关</button>
           <button type="button" class="tab" id="qqbot-tab" role="tab" aria-controls="qqbot" data-tab="qqbot" data-group="more-tools"><span class="tab-title">QQ 机器人</span></button>
         </nav>
-        <p class="sidebar-note">配置工作方式，管理扩展能力。</p>
       </aside>
 
       <main>
         <header id="workspace-heading" class="workspace-heading"><p id="workspace-breadcrumb" class="eyebrow"></p><h2 id="workspace-title"></h2></header>
+        <section id="plugins-home" class="panel dock-destinations active" role="tabpanel" aria-labelledby="plugins-hub-tab">
+          <button type="button" class="dock-destination" data-destination-icon="layout" data-open-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>已安装</strong><span>启停、更新和配置插件</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="toggle" data-native-destination="experimental-plugins" data-open-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>官方实验性插件</strong><span>查看官方提供的功能与开关</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="sparkles" data-open-dock-tab="market-tab"><span class="dock-destination-copy"><strong>创意工坊</strong><span>浏览「发现」里的社区精选</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="sliders" data-open-dock-tab="plugin-settings-tab"><span class="dock-destination-copy"><strong>插件维护</strong><span>其他来源安装、完整社区目录和恢复</span></span></button>
+        </section>
+        <section id="settings-home" class="panel dock-destinations" role="tabpanel" aria-labelledby="models-tab" hidden>
+          <button type="button" class="dock-destination" data-destination-icon="cpu" data-open-dock-tab="models-page-tab"><span class="dock-destination-copy"><strong>模型</strong><span>连接供应商与设置默认模型</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="user-check" data-open-dock-tab="personal-prompt-tab"><span class="dock-destination-copy"><strong>个人偏好</strong><span>回复偏好与本地记忆</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="git-branch" data-open-dock-tab="backup-tab"><span class="dock-destination-copy"><strong>备份与迁移</strong><span>环境预设、对话导入与旧版配置</span></span></button>
+        </section>
         <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status" hidden>正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary" hidden>重新加载</button></section>
         <div class="content-toolbar">
           <button type="button" class="secondary refresh" id="refresh">刷新列表</button>
@@ -80,6 +90,10 @@
         <div class="item-actions"><button type="button" class="primary" id="activation-refresh">刷新</button><button type="button" class="secondary" id="restart-runtime">Restart DeepSeek Harness</button></div>
       </section>
       <section id="plugin-settings" class="panel plugin-settings-panel" role="tabpanel" aria-labelledby="plugin-settings-tab" hidden>
+        <div class="dock-destinations dock-maintenance-links">
+          <button type="button" class="dock-destination" data-destination-icon="terminal" data-open-legacy-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>本地安装与恢复</strong><span>从 npm、Git 或本地文件安装</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="sparkles" data-open-legacy-dock-tab="market-tab"><span class="dock-destination-copy"><strong>完整社区目录</strong><span>浏览扩展目录与群友作品</span></span></button>
+        </div>
         <div class="panel-head">
           <div><h2>插件设置</h2></div>
           <p>只保留日常会用到的选项。诊断工具在开发者模式中按需显示。</p>
@@ -121,7 +135,7 @@
             <div class="native-grid" id="native-plugin-grid" aria-live="polite"></div>
         </details>
       </section>
-      <section id="plugins" class="panel active" role="tabpanel" aria-labelledby="plugins-tab">
+      <section id="plugins" class="panel" role="tabpanel" aria-labelledby="plugins-tab" hidden>
         <div class="panel-head">
           <div><h2 id="plugin-heading">已安装插件</h2></div>
           <p>统一管理已安装插件的启停、更新、卸载和恢复；创意工坊只负责发现与安装。</p>
@@ -155,11 +169,11 @@
         <header class="market-masthead">
           <div class="market-intro">
             <p class="market-kicker">发现扩展</p>
-            <h2>创意工坊</h2>
+            <h2>完整社区目录</h2>
             <p>用于发现和安装精选社区插件；安装完成后统一回到「插件」页管理，仍走本机原生事务。</p>
           </div>
           <div class="market-metrics" aria-label="目录状态">
-            <div><strong id="market-total">--</strong><span>可安装条目</span></div>
+            <div><strong id="market-total">--</strong><span>目录条目</span></div>
             <div><strong id="market-updated">--</strong><span>目录更新</span></div>
           </div>
         </header>

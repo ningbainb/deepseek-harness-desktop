@@ -1,0 +1,75 @@
+.section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+}
+
+.title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--dsw-radius-lg, 8px);
+  background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-bg-layer-2));
+}
+
+.tabs button, .button {
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md, 6px);
+  color: var(--dsw-alias-label-secondary);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabs button { flex: 1 0 auto; }
+.groupTabs { width: fit-content; max-width: 100%; box-sizing: border-box; }
+.groupTabs button { flex: 0 1 auto; min-width: 0; }
+.tabs button[aria-selected='true'] {
+  border-color: var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-3);
+  font-weight: 500;
+}
+.button:hover {
+  border-color: var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.tabs button:focus-visible, .advancedItem summary:focus-visible, .button:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.advancedItem summary {
+  min-height: 28px;
+  padding-block: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advancedItem { padding: 4px 0 4px 12px; }
+.section[data-model-advanced-entry] {
+  --dsh-text-primary: var(--dsw-alias-label-primary);
+  --dsh-text-secondary: var(--dsw-alias-label-secondary);
+  --dsh-text-tertiary: var(--dsw-alias-label-tertiary);
+  --dsh-surface-primary: var(--dsw-alias-bg-layer-1);
+  --dsh-surface-secondary: var(--dsw-alias-bg-layer-2);
+  --dsh-surface-tertiary: var(--dsw-alias-bg-module-platform);
+  --dsh-surface-hover: var(--dsw-alias-bg-module-platform);
+  --dsh-border-primary: var(--dsw-alias-border-l2);
+  --dsh-border-secondary: var(--dsw-alias-border-l3);
+  --dsh-border-hover: var(--dsw-alias-border-l2);
+  --dsh-brand-primary: var(--dsw-alias-brand-primary);
+}
+.form { min-width: 0; }
+.form:not(:empty) { margin-top: 6px; }
+.button { justify-self: start; margin: 6px 0 0 12px; border-color: var(--dsw-alias-border-l2); }
+.button:disabled { cursor: default; opacity: .6; }
+.error { margin: 4px 0 0 12px; color: var(--dsw-alias-state-error-primary); }

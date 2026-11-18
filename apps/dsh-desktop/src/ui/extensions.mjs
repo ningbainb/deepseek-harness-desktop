@@ -1288,6 +1288,9 @@ const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgr
 // Reuse the product's existing icon set across both navigation and catalog.
 const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
+for (const destination of document.querySelectorAll('.dock-destination[data-destination-icon]')) {
+  destination.insertAdjacentHTML('afterbegin', `<span class="dock-destination-icon" aria-hidden="true">${nativeIconSvg(destination.dataset.destinationIcon)}</span>`)
+}
 const tabs = Array.from(document.querySelectorAll('[data-tab]'))
 let settingsRequest = 0
 let navigationRequest = 0
@@ -1297,8 +1300,15 @@ const groupTitles = {
   'desktop-settings': ['拓展坞', '桌面设置'], appearance: ['拓展坞', '外观'], 'more-tools': ['拓展坞', '更多工具'],
   backup: ['维护与迁移', '备份与迁移'], recovery: ['维护与迁移', '诊断与恢复'],
 }
-async function activateTab(tab, focus = false, settingOverride, plugin, userAction = false) {
+async function activateTab(tab, focus = false, settingOverride, plugin, userAction = false, nativeDestination) {
   const navigation = ++navigationRequest
+  const nativePage = nativeDestination ?? (settingOverride === 'prompt-customizer' ? undefined : settingOverride ?? tab.dataset.nativePage)
+  if (userAction && tab.dataset.nativePage && nativePage && typeof window.dshDesktop.openNativePage === 'function') {
+    try {
+      if (await window.dshDesktop.openNativePage(nativePage)) return
+    } catch (error) { notify(error.message || '页面未能打开，请重试。', true) }
+    if (navigation !== navigationRequest) return
+  }
   if ((settingOverride ?? tab.dataset.setting) === 'skill-market') {
     try {
       const status = await window.dshDesktop.getSkillMarketStatus()
@@ -1327,14 +1337,14 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   const setting = requestedSetting === 'relay' ? 'models' : requestedSetting
   activeSettings = setting ? { tab, setting, plugin } : undefined
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
-  document.querySelector('.content-toolbar').hidden = Boolean(setting)
+  document.querySelector('.content-toolbar').hidden = Boolean(setting) || ['plugins-home', 'settings-home'].includes(tab.dataset.tab)
   for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
     nav.hidden = Boolean(document.querySelector('#dock-search')?.value.trim()) || Boolean(nav.dataset.tabGroup && nav.dataset.tabGroup !== tab.dataset.group)
   }
   const storageLocations = document.querySelector('#desktop-storage-locations')
   if (storageLocations) storageLocations.hidden = tab.dataset.group !== 'desktop-settings'
   const [group, title] = groupTitles[tab.dataset.group] ?? ['', '']
-  document.querySelector('#workspace-breadcrumb').textContent = group
+  document.querySelector('#workspace-breadcrumb').textContent = ['plugins-home', 'settings-home'].includes(tab.dataset.tab) ? '' : group
   document.querySelector('#workspace-title').textContent = title
   document.querySelector('main').scrollTop = 0
   try { localStorage.setItem('dsh-dock-setting', setting ?? '') } catch { /* optional navigation state */ }
@@ -1415,6 +1425,12 @@ for (const tab of tabs) {
     if (nextIndex === undefined) return
     event.preventDefault()
     activateTab(peers[nextIndex], true, undefined, undefined, true)
+  })
+}
+for (const button of document.querySelectorAll('[data-open-dock-tab], [data-open-legacy-dock-tab]')) {
+  button.addEventListener('click', () => {
+    const target = document.getElementById(button.dataset.openDockTab ?? button.dataset.openLegacyDockTab)
+    if (target) void activateTab(target, true, undefined, undefined, button.hasAttribute('data-open-dock-tab'), button.dataset.nativeDestination)
   })
 }
 const searchEntries = [
@@ -1563,6 +1579,11 @@ document.querySelectorAll('.native-chip').forEach((chip) => {
 })
 
 const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload) => {
+  if (payload?.setting === 'prompt-customizer') {
+    resetFeatureSearch()
+    void activateTab(document.getElementById('value-mode-tab'), false, 'prompt-customizer')
+    return
+  }
   if (['control-center', 'value-mode', 'models', 'usage', 'plugin-options'].includes(payload?.setting)) {
     const tab = tabs.find(item => item.dataset.setting === payload.setting)
     if (!tab) return

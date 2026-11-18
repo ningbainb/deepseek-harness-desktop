@@ -9,8 +9,38 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.compact {
+  padding: 12px;
+  border-color: var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.compact .header > .actions { flex: 0 1 auto; min-width: 0; }
+.defaultModel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  align-items: baseline;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.defaultModel dt { color: var(--dsw-alias-label-secondary); }
+.defaultModel dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+
 .accessBackdrop { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 40%); }
 .accessDialog { width: min(520px, 100%); max-height: calc(100vh - 40px); overflow: auto; background: var(--dsw-alias-bg-layer-2, #202124); }
+
+.accountOfficial {
+  margin: 0;
+  padding: 4px 10px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+}
 
 .accountRecommendation {
   display: grid;
@@ -27,6 +57,8 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+.accountRecommendation .description { color: var(--dsw-alias-label-secondary); }
 
 .accountRecommendation button:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);

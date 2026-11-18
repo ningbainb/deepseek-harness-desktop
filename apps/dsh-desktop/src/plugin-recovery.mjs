@@ -1144,10 +1144,11 @@ export class DesktopPluginRecovery extends EventEmitter {
 
   setPluginEnabledAndRestart(name, enabled) {
     return this.#enqueue(async () => {
-      await this.controller.stop()
       const dependencySpec = enabled ? await this.store.getDisabledDependency(name) : undefined
-      const transaction = await this.pluginManager.setEnabled(name, enabled, { dependencySpec })
+      await this.controller.stop()
+      let transaction
       try {
+        transaction = await this.pluginManager.setEnabled(name, enabled, { dependencySpec })
         await this.ensureProfile()
         if (enabled) await this.store.setSafeMode(false)
         await this.controller.start()
@@ -1158,7 +1159,7 @@ export class DesktopPluginRecovery extends EventEmitter {
         }
         return transaction.result
       } catch (error) {
-        await transaction.rollback()
+        await transaction?.rollback()
         await this.ensureProfile()
         await this.controller.start().catch(() => {})
         throw error

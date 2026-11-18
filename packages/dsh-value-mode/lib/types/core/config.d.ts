@@ -1,4 +1,5 @@
 export declare const VALUE_MODE_SETTINGS_NAMESPACE = "value-mode";
+export declare const BAI_PROVIDER_ID = "project-relay";
 export type ValueModeStrategy = 'saver' | 'balanced' | 'powerful';
 export type ValueModeRole = 'controller' | 'subagent';
 export interface ModelRouteSelection {
@@ -57,6 +58,8 @@ export declare const DEFAULT_ALLOW_REVIEW = true;
 export declare const DEFAULT_SHOW_EXPERT_ACTIVITY = true;
 export declare const DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD = 2;
 export declare const DEFAULT_AUTO_REVIEW_KEYWORDS: string[];
+/** Desktop's initial bai route becomes callable only after sign-in provisions a model. */
+export declare function isPendingBaiModel(route?: ModelRouteSelection): boolean;
 export declare function isCompleteModelRoute(route?: ModelRouteSelection): route is ModelRouteSelection & {
     provider: string;
     model: string;

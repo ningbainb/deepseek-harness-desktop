@@ -32,7 +32,7 @@ export function DockSettingsOutlet(props: Omit<Parameters<typeof DockSettingsPag
   return <DockSettingsPage t={props.t} pluginOptions={props.pluginOptions} renderSlot={mapped.renderSlot as Parameters<typeof DockSettingsPage>[0]['renderSlot']} />
 }
 
-export function mirrorDockSlot(slots: MirrorRegistry, source: string, destination: string): () => void {
+export function mirrorDockSlot(slots: MirrorRegistry, source: string, destination: string, accept: (entry: StoredEntry) => boolean = () => true): () => void {
   const register = (options: DynamicOptions, component: unknown) => (slots.register as unknown as (options: DynamicOptions, component: unknown) => () => void)(options, component)
   const records = new Map<StoredEntry, () => void>()
   let stopped = false
@@ -89,7 +89,7 @@ export function mirrorDockSlot(slots: MirrorRegistry, source: string, destinatio
     try {
       do {
         dirty = false
-        const winners = slots.entriesOfSlot(source as Parameters<SlotRegistry['entriesOfSlot']>[0])
+        const winners = slots.entriesOfSlot(source as Parameters<SlotRegistry['entriesOfSlot']>[0]).filter(accept)
         for (const [entry, cleanup] of records) {
           if (winners.includes(entry)) continue
           records.delete(entry)

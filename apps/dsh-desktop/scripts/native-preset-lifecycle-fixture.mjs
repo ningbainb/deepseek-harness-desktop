@@ -23,7 +23,8 @@ export async function verifyDesktopPresetSettings({ page, readRoster = () => rea
   await page.getByRole('menuitem', { name: /^设置/u }).click()
   const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible')
   await settings.waitFor({ state: 'visible' })
-  await settings.getByRole('button', { name: 'Agent 预设', exact: true }).click()
+  await settings.locator(':scope > nav').getByRole('button', { name: '会话与 Agent', exact: true }).click()
+  await settings.getByRole('tab').and(settings.locator('[data-desktop-settings-section="agent-presets"]')).click()
   const inspected = []
   try {
     await settings.getByRole('heading', { name: 'Agent 预设', exact: true }).waitFor()

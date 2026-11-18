@@ -160,6 +160,24 @@ try {
   await dock.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--harness-bg').trim() === '#142536')
   await main.evaluate(async () => window.dshDesktop.setWindowChromeTheme('dark', null))
   await dock.waitForFunction(() => !document.documentElement.hasAttribute('data-dsh-desktop-palette'))
+  await dock.locator('#plugins-hub-tab').click()
+  const inventoryTimings = []
+  main.on('requestfinished', request => {
+    const path = new URL(request.url()).pathname
+    if (!/^\/api\/(?:pluginInventory\/list|pluginManager\/(?:listBundles|listPlugins))$/u.test(path)) return
+    const { responseEnd } = request.timing()
+    inventoryTimings.push({ path, milliseconds: Math.round(responseEnd) })
+  })
+  const openedExperimentalAt = performance.now()
+  await dock.locator('#plugins-home [data-native-destination="experimental-plugins"]').click()
+  const officialExperiments = main.locator('[data-plugin-panel] [data-plugin-group="more"]')
+  await officialExperiments.waitFor({ timeout: 45_000 })
+  const voiceToggle = officialExperiments.locator('[data-plugin-package="@deepseek-ai/dsh-experimental-voice-input-bundle"]').getByRole('switch')
+  await voiceToggle.waitFor({ timeout: 10_000 })
+  assert.equal(await voiceToggle.getAttribute('aria-checked'), 'false', 'opening official experimental plugins preserves enablement')
+  assert.equal(await voiceToggle.isEnabled(), true, 'official plugin retains an interactive switch')
+  await main.screenshot({ path: resolve(screenshots, 'official-experimental-plugins.png') })
+  console.log(`PASS Dock opens official experimental plugins in ${Math.round(performance.now() - openedExperimentalAt)}ms ${JSON.stringify(inventoryTimings)}`)
   assert.deepEqual(errors, [], 'native pages have no renderer errors')
   console.log(`PASS native plugin pages and palette synchronization; artifacts: ${temporary}`)
 } catch (error) {

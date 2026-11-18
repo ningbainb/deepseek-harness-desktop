@@ -37,7 +37,7 @@ async function writeSdkPackage(modulesRoot, name, contents = 'export { boot } fr
   return packageRoot
 }
 
-async function createPackagedFixture(root, { unpack = '{**/src/**,**/package.json,**/node_modules/**}', staleRuntimeSize = false } = {}) {
+async function createPackagedFixture(root, { unpack = '{**/src/**,**/package.json,**/node_modules/**,**/runtime-support/**}', staleRuntimeSize = false } = {}) {
   const source = join(root, 'source')
   // ASAR matches unpack globs against absolute filenames with dot:false.
   // Anchor the fixture root explicitly so a parent such as .desktop-build
@@ -54,6 +54,8 @@ async function createPackagedFixture(root, { unpack = '{**/src/**,**/package.jso
   await writeFixtureFile(join(source, 'src', 'local-helper.mjs'), 'export const helper = true\n')
   await writeFixtureFile(join(source, 'src', 'ui', 'index.html'), '<main>Desktop</main>\n')
   await writeFixtureFile(join(source, 'runtime-support', 'community-plugin-known-issues.json'), '{}\n')
+  await writeFixtureFile(join(source, 'runtime-support', 'community-plugin-index.json'), '{}\n')
+  await writeFixtureFile(join(source, 'runtime-support', 'context-model-prices.json.gz'), 'price snapshot fixture')
   const modulesRoot = join(source, 'node_modules')
   for (const name of ['dsh', 'dsh-base', 'dsh-web-app', 'dsh-hmr', 'dsh-config-editor', 'dsh-plugin-manager']) {
     await writeSdkPackage(modulesRoot, name)
@@ -80,6 +82,10 @@ test('electron-builder unpacks the complete local source graph and launcher mani
   assert.ok(config.asarUnpack.includes('package.json'))
   assert.ok(config.files.includes('src/**'))
   assert.ok(config.files.includes('package.json'))
+  for (const name of REQUIRED_UNPACKED_RUNTIME_FILES.filter(name => name.startsWith('runtime-support/'))) {
+    assert.ok(config.files.includes(name))
+    assert.ok(config.asarUnpack.includes(name))
+  }
 })
 
 test('ASAR identity fixtures unpack runtime files beneath a hidden build directory', async () => {
@@ -137,7 +143,8 @@ test('physical packaged launcher and profile/HMR/config-editor/plugin-manager sh
 for (const [label, unpack, missing] of [
   ['packed launcher', '{**/package.json,**/node_modules/**}', 'src/runtime-launcher.mjs'],
   ['packed root manifest', '{**/src/**,**/node_modules/**}', 'package.json'],
-  ['packed local dependency', `{**/package.json,**/node_modules/**,**/src/ui/**,${REQUIRED_UNPACKED_RUNTIME_FILES.filter(name => name.startsWith('src/')).map(name => `**/${name}`).join(',')}}`, 'src/local-helper.mjs'],
+  ['packed local dependency', `{**/package.json,**/node_modules/**,**/src/ui/**,**/runtime-support/**,${REQUIRED_UNPACKED_RUNTIME_FILES.filter(name => name.startsWith('src/')).map(name => `**/${name}`).join(',')}}`, 'src/local-helper.mjs'],
+  ['packed Context price snapshot', '{**/src/**,**/package.json,**/node_modules/**,**/runtime-support/community-plugin-index.json}', 'runtime-support/context-model-prices.json.gz'],
 ]) {
   test(`packaged SDK identity rejects ${label}`, async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-packaged-sdk-identity-'))

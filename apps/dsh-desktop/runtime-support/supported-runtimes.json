@@ -10,9 +10,9 @@
   "entries": [
     {
       "status": "supported",
-      "upstreamVersion": "0.2.2-rc.3",
+      "upstreamVersion": "0.2.2-rc.5",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.3.0-rc.7",
+      "desktopRange": "=5.3.0-rc.10",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,27 +55,27 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-11-17",
-      "matrixArtifact": "docs/plans/2026-11-17-desktop-next-rc3.md",
+      "verifiedAt": "2026-11-18",
+      "matrixArtifact": "docs/launch/release-notes-5.3.0-rc.10.md",
       "knownIssues": [
-        "Candidate source identity for Desktop 5.3.0-rc.1 and DSH 0.2.2-rc.3; product acceptance is recorded in the linked plan, not inferred from dependency resolution.",
+        "Exact public DSH 0.2.2-rc.5 SDK cohort for the Windows 5.3.0-rc.10 local preview. Package, session and native acceptance each require executed evidence.",
         "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
         "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
       ],
       "evidence": {
         "package": {
           "name": "@deepseek-ai/dsh",
-          "version": "0.2.2-rc.3",
-          "integrity": "sha512-S+4oUYVKWuc1SCMMp1mpUa2llxVy0o9gIgp7TDg/Ea7PuvXVkAfnykqSH1/oDXVB+y5VzEm0QIJulo1LIB3qRg==",
+          "version": "0.2.2-rc.5",
+          "integrity": "sha512-cNbp12tLYLUTXaVli7zwwMjzmmEVCD1PRldg4oKtXM4+lFYckcaliMS2PU/FoThB4iAN/fKOSID0nrtRZU4Gjw==",
           "files": {
-            "package.json": "b39b22222238db8168ad1285251088b270fdedc6d11b7bdaf432b8b59d6880c7",
+            "package.json": "2a694f0180a778c1c083fdc0369500d3638fa72457aee882e0aeedf14581f2ff",
             "lib/bin.js": "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9"
           }
         },
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "f3585cd37b7f1a8c4051ab1f7e55396fbd69bc72b19a67967e9d2f0017824fec"
+          "sha256": "838a8b6d4c3e3cf9cf866225632610a8b6e8f1dda51f904427e232f854af6e50"
         },
         "slots": [
           "conversation.composer.dock",

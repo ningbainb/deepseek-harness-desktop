@@ -23,12 +23,15 @@ test('Extension Dock separates unified management from Creative Workshop discove
   const group = /<nav class="page-tabs" data-tab-group="plugins"[\s\S]*?<\/nav>/u.exec(html)?.[0] ?? ''
   assert.match(group, />已安装 /u)
   assert.match(group, />创意工坊 /u)
-  assert.match(group, />设置</u)
+  assert.match(group, /id="plugin-settings-tab"[^>]*>插件维护</u)
   assert.doesNotMatch(group, />内置能力 /u)
-  assert.match(html, /统一管理已安装插件的启停、更新、卸载和恢复/u)
+  assert.match(html, /data-open-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>已安装<\/strong><span>启停、更新和配置插件/u)
+  assert.match(html, /data-open-legacy-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>本地安装与恢复/u)
+  assert.match(html, /data-native-destination="experimental-plugins" data-open-dock-tab="plugins-tab"><span class="dock-destination-copy"><strong>官方实验性插件/u)
+  assert.match(group, /id="market-tab"[^>]*data-native-page="workshop"/u)
   assert.match(html, /用户技能默认写入 <code>~\/.dsh\/skills<\/code>/u)
   assert.match(html, /兼容扫描 <code>~\/.agents\/skills<\/code>/u)
-  assert.match(html, /class="bai-nav-badge" aria-hidden="true" title="bai 推荐">bai<\/small>/u)
+  assert.match(html, /data-open-dock-tab="models-page-tab"><span class="dock-destination-copy"><strong>模型<\/strong><span>连接供应商与设置默认模型/u)
 })
 
 test('Extension Dock retains Agent Team configuration under more tools and uses the rc3 runtime', async () => {

@@ -10,13 +10,13 @@
 >
 > <a href="https://www.ifdian.net/a/ningbai"><img src="website/assets/afdian-qr.svg" width="180" alt="爱发电赞助二维码"></a>
 
-## DeepSeek Harness Desktop 用户交流群
+## DeepSeek Harness Desktop 用户二群
 
-QQ 群：**1105158177**
+QQ 二群：**1129522514**
 
-**[点击一键加入 QQ 群](https://qm.qq.com/q/vehlNjaeye)**
+**[点击一键加入 QQ 二群](https://qm.qq.com/q/9hrcdaEYPC)**
 
-<a href="https://qm.qq.com/q/vehlNjaeye"><img src="website/assets/qq-group-1105158177.jpg" width="280" alt="DeepSeek Harness Desktop QQ 群 1105158177 加群二维码"></a>
+<a href="https://qm.qq.com/q/9hrcdaEYPC"><img src="website/assets/qq-group-1129522514.jpg" width="280" alt="DeepSeek Harness Desktop QQ 二群 1129522514 加群二维码"></a>
 
 欢迎加入社群交流：
 
@@ -380,7 +380,7 @@ Windows 安装包已经包含 DSH、桌面插件、皮肤、pnpm、MinGit 与所
 
 提供 AppImage 与 DEB。AppImage 需要执行权限，DEB 可通过系统软件包管理器安装；需要图形会话、系统 Git 及可用沙箱，不应以关闭沙箱的方式处理启动失败。预览版手动更新，实体桌面安装与操作体验仍需用户验收。完整步骤见 [Linux x64 Preview 安装说明](docs/linux-preview.zh.md)。
 
-如果 GitHub 下载速度较慢，也可以加入页面顶部的用户交流群获取同步提供的安装包。
+如果 GitHub 下载速度较慢，也可以加入页面顶部的用户二群获取同步提供的安装包。
 
 ## 更新
 

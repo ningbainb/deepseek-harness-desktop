@@ -23,6 +23,7 @@ import { WebUiSettingsBinder } from './compat-settings-scope.ts'
 import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { ModelAdvancedEntry } from './ModelAdvancedEntry.tsx'
+import { installDesktopNativeSettings, openDesktopNativeSettings } from './desktop-native-settings.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
 import { DesktopExtensionDockEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
@@ -104,13 +105,15 @@ export const inject = ['slots', 'locale', 'connection', 'configForms', 'remote']
  */
 export function apply(ctx: ClientContext): void {
   const dockSetting = dockSettingFromUrl()
-  if (!dockSetting && supportsDesktopSettingsPriority(window)) {
-    ctx.effect(() => installSettingsOnboardingPriority(ctx.slots), 'web-ui-settings: settings interaction before automatic onboarding')
+  const nativeDesktopSettings = !dockSetting && supportsDesktopSettingsPriority(window)
+  if (nativeDesktopSettings) {
+    ctx.effect(() => installSettingsOnboardingPriority(ctx.slots, () => ctx.locale.getSnapshot().active), 'web-ui-settings: settings interaction before automatic onboarding')
+    ctx.effect(() => installDesktopNativeSettings(ctx), 'web-ui-settings: native desktop preferences')
   }
   ctx.effect(() => installDesktopAppearance(window), 'web-ui-settings: desktop appearance')
   if (!dockSetting) {
     ctx.effect(() => installDesktopPresetNavigation(ctx.slots, window), 'web-ui-settings: Desktop preset navigation')
-    ctx.effect(() => installDesktopUsageNavigation(document, ctx.locale.bind('web-ui-plugins')), 'web-ui-settings: usage navigation')
+    ctx.effect(() => installDesktopUsageNavigation(document, ctx.locale.bind('web-ui-plugins'), nativeDesktopSettings ? () => openDesktopNativeSettings('usage') : undefined), 'web-ui-settings: usage navigation')
     ctx.inject(['commandUi'], scope => {
       scope.effect(() => installDesktopSkillsCommand(scope, document), 'web-ui-settings: native skills command')
     })
@@ -145,7 +148,15 @@ export function apply(ctx: ClientContext): void {
     scope.effect(() => installRelayAuthFailures(scope.sessions, document), 'web-ui-settings: bai runtime authorization failures')
   })
   if (!dockSetting) ctx.effect(
-    () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins')),
+    () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins'), nativeDesktopSettings ? {
+      openPlugins() {
+        const navigation = ctx.get('pluginNavigation') as { openList(): void } | undefined
+        if (!navigation) return false
+        navigation.openList()
+        return true
+      },
+      openSettings: openDesktopNativeSettings,
+    } : undefined),
     'web-ui-settings: unified Desktop management routing',
   )
 
@@ -185,15 +196,25 @@ export function apply(ctx: ClientContext): void {
     // The official Models page only exposes a footer extension seat. The page
     // is a flex column, so the card's negative order raises bai into the first
     // screen without modifying or replacing the upstream package.
+    const subscribeCodexCredential = (listener: () => void) => ctx.remote.$on('credentials/record-updated', key => {
+      if (key === 'llm-pi-ai/openai-codex') listener()
+    })
     ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
       name: 'settings.models.footer',
       id: 'bai-onboarding',
       order: -100,
       locale: 'relay-onboarding',
+      inject: () => ({
+        compact: nativeDesktopSettings,
+        ...(nativeDesktopSettings && {
+          defaultModelScope: ctx.configForms.get<{ provider?: string; model?: string }>('agent-default-model'),
+          subscribeCodexCredential,
+        }),
+      }),
     }, RelayOnboardingCard))
   }
 
-  if (!dockSetting) ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
+  if (!dockSetting && !nativeDesktopSettings) ctx.slots.inject('settings.models.footer', () => ctx.slots.register({
     name: 'settings.models.footer', id: 'desktop-model-advanced', order: 100,
   }, ModelAdvancedEntry))
 

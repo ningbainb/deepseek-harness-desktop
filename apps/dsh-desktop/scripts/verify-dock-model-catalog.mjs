@@ -127,7 +127,8 @@ try {
   timings.warmTabsMs = []
   for (const id of ['personal-prompt', 'particle-theme', 'value-mode', 'personal-prompt', 'value-mode']) {
     start = performance.now()
-    await visitDockDestination(dock, id + '-tab')
+    if (id === 'particle-theme') await visitDockDestination(dock, id + '-tab')
+    else await dock.evaluate(id => window.dshDesktop.selectDockSetting(id), id)
     await settings.locator('[data-dsh-dock-settings="' + id + '"]').waitFor()
     await dock.locator('#dock-settings-state').waitFor({ state: 'hidden' })
     timings.warmTabsMs.push(Math.round(performance.now() - start))

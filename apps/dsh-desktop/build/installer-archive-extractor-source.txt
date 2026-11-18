@@ -1,0 +1,5 @@
+This installer uses the unmodified standalone 7-Zip 24.09 extractor.
+Copyright (c) 1999-2024 Igor Pavlov.
+
+Source code: https://github.com/ip7z/7zip/releases/download/24.09/7z2409-src.7z
+See LICENSE.txt and COPYING in this directory for the license terms.

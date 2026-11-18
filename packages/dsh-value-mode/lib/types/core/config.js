@@ -1,4 +1,5 @@
 export const VALUE_MODE_SETTINGS_NAMESPACE = 'value-mode';
+export const BAI_PROVIDER_ID = 'project-relay';
 export const DEFAULT_STRATEGY = 'balanced';
 export const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 export const DEFAULT_MAX_CONTEXT_CHARS = 16000;
@@ -21,8 +22,13 @@ function hasAnyRouteValue(route) {
     return Boolean(route && ((typeof route.provider === 'string' && route.provider.trim().length > 0) ||
         (typeof route.model === 'string' && route.model.trim().length > 0)));
 }
+/** Desktop's initial bai route becomes callable only after sign-in provisions a model. */
+export function isPendingBaiModel(route) {
+    return route?.provider === BAI_PROVIDER_ID && route.model === '__bai_login_required__';
+}
 export function isCompleteModelRoute(route) {
-    return (typeof route?.provider === 'string' &&
+    return (!isPendingBaiModel(route) &&
+        typeof route?.provider === 'string' &&
         route.provider.trim().length > 0 &&
         typeof route.model === 'string' &&
         route.model.trim().length > 0);

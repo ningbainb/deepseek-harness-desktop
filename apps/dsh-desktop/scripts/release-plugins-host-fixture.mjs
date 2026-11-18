@@ -1,27 +1,54 @@
 // Mounted only in this runner's temporary profile. Uses the vendor's public
 // BrowserRuntime; it never replaces a provider, model response, UI or SDK state.
+import { createRequire } from 'node:module'
+
 export const name = 'release-plugins-verification'
 export const inject = ['connection', 'browser']
 export const FIXTURE_PATH = '/api/release-plugins-fixture'
 
-export function apply(ctx) {
+const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]', 'dsh.internal'])
+
+function assertLocal(url, blocked) {
+  if (localHosts.has(url.hostname)) return
+  blocked.push({ protocol: url.protocol, hostname: url.hostname })
+  throw new Error('Release fixture denied external network egress')
+}
+
+export function guardOutboundDispatcher(blocked) {
+  const proxyRequire = createRequire(import.meta.resolve('@deepseek-ai/dsh-http-proxy'))
+  const { Dispatcher, getGlobalDispatcher, setGlobalDispatcher } = proxyRequire('undici')
+  const previous = getGlobalDispatcher()
+  const dispatcher = new class extends Dispatcher {
+    dispatch(options, handler) {
+      assertLocal(new URL(options.path, String(options.origin)), blocked)
+      return previous.dispatch(options, handler)
+    }
+  }()
+  setGlobalDispatcher(dispatcher)
+  return () => { if (getGlobalDispatcher() === dispatcher) setGlobalDispatcher(previous) }
+}
+
+function guardFetch(blocked) {
+  const original = globalThis.fetch
+  const guarded = async (input, init) => {
+    assertLocal(new URL(input instanceof Request ? input.url : String(input)), blocked)
+    return original(input, init)
+  }
+  globalThis.fetch = guarded
+  return () => { if (globalThis.fetch === guarded) globalThis.fetch = original }
+}
+
+export function apply(ctx, { outboundDispatcher = false } = {}) {
   const expectedHome = process.env.DSH_RELEASE_PLUGINS_HOME
   if (!expectedHome || process.env.DSH_HOME !== expectedHome) throw new Error('Release fixture Home mismatch')
   const target = new URL(process.env.DSH_RELEASE_PLUGINS_PAGE)
   if (target.protocol !== 'http:' || target.hostname !== '127.0.0.1') throw new Error('Browser fixture must be loopback')
   let browserSession
   const blocked = []
-  const originalFetch = globalThis.fetch
-  const guardedFetch = (input, init) => {
-    const url = new URL(input instanceof Request ? input.url : String(input))
-    if (!['127.0.0.1', 'localhost', '[::1]', 'dsh.internal'].includes(url.hostname)) {
-      blocked.push({ protocol: url.protocol, hostname: url.hostname })
-      return Promise.reject(new Error('Release fixture denied external network egress'))
-    }
-    return originalFetch(input, init)
-  }
-  globalThis.fetch = guardedFetch
-  ctx.effect(() => () => { if (globalThis.fetch === guardedFetch) globalThis.fetch = originalFetch }, 'release fixture: egress guard')
+  // The source gate observes the actual outbound boundary below bundled
+  // assets. Its guard denies every non-loopback HTTP dispatch at that layer.
+  const restoreGuard = outboundDispatcher ? guardOutboundDispatcher(blocked) : guardFetch(blocked)
+  ctx.effect(() => restoreGuard, 'release fixture: egress guard')
   ctx.effect(() => () => {
     if (browserSession !== undefined) return ctx.browser.close(browserSession)
   }, 'release fixture: owned browser cleanup')

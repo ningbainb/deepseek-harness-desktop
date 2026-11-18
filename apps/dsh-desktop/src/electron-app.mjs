@@ -312,15 +312,27 @@ export { desktopDeepLinkFrom } from './desktop-ingress.mjs'
 
 export async function ensurePnpmCommandShim({ directory, executable, pnpmCli }) {
   await mkdir(directory, { recursive: true })
-  const path = join(directory, process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm')
-  const content = process.platform === 'win32'
-    ? `@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"${executable}" "${pnpmCli}" %*\r\n`
-    : `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec "${executable}" "${pnpmCli}" "$@"\n`
-  const existing = await readFile(path, 'utf8').catch((error) => {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  })
-  if (existing !== content) await writeFile(path, content, { encoding: 'utf8', mode: 0o755 })
+  const writeShim = async (name, content) => {
+    const path = join(directory, name)
+    const existing = await readFile(path, 'utf8').catch(error => {
+      if (error?.code === 'ENOENT') return undefined
+      throw error
+    })
+    if (existing !== content) await writeFile(path, content, { encoding: 'utf8', mode: 0o755 })
+  }
+  if (process.platform === 'win32') {
+    let command = `"${executable}" "${pnpmCli}" %*`
+    // A hidden Runtime's cmd.exe reads batch literals in its OEM code page.
+    // Keep the batch text ASCII and let PowerShell read Unicode paths as UTF-8.
+    if (/[\u0080-\uFFFF%]/u.test(executable + pnpmCli)) {
+      const quote = path => `'${path.replaceAll("'", "''")}'`
+      await writeShim('dsh-pnpm-unicode.ps1', `\uFEFF& ${quote(executable)} ${quote(pnpmCli)} @args\r\nexit $LASTEXITCODE\r\n`)
+      command = '"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0dsh-pnpm-unicode.ps1" %*'
+    }
+    await writeShim('pnpm.cmd', `@echo off\r\nsetlocal DisableDelayedExpansion\r\nset ELECTRON_RUN_AS_NODE=1\r\n${command}\r\n`)
+  } else {
+    await writeShim('pnpm', `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec "${executable}" "${pnpmCli}" "$@"\n`)
+  }
   return directory
 }
 
@@ -918,6 +930,7 @@ export async function startElectronApp(metadata) {
     extensionsPath: EXTENSIONS_PATH,
     handoffPath: HANDOFF_PATH,
     communityPath: COMMUNITY_PATH,
+    communityQrResourcesPath: app.isPackaged ? process.resourcesPath : undefined,
     surfaceRegistry,
     screen,
     shell,
@@ -2334,6 +2347,7 @@ export async function startElectronApp(metadata) {
     }
   }
   let extensionRuntimeMaintenance = false
+  let runtimeViewLoad
   const preflightFeatureMutation = async (feature) => {
     const audit = await auditFullProfileIntegrity()
     const activeProfile = runtimeProvider.profileName
@@ -2383,7 +2397,27 @@ export async function startElectronApp(metadata) {
     trackProductOperation: (detail, operation) => productMetrics.trackExtensionOperation(detail, operation),
     recordFeatureEvent: (event) => productMetrics.recordFeatureEvent(event),
     onRuntimeMaintenanceChange: (active) => { extensionRuntimeMaintenance = active === true },
+    captureNativePluginView: () => {
+      const previousLoad = runtimeViewLoad
+      return async (notice) => {
+        const currentLoad = runtimeViewLoad
+        if (!currentLoad || currentLoad === previousLoad) return
+        await currentLoad
+        if (runtimeViewLoad === currentLoad && mainWindow && !mainWindow.isDestroyed()
+          && mainWindow.webContents.getURL().startsWith('dsh-runtime://app/')) {
+          mainWindow.webContents.send('desktop:native-page-open', { destination: 'plugins', notice })
+        }
+      }
+    },
     completeBlockedPluginRecovery,
+    openNativePage: (destination) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return false
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      mainWindow.webContents.send('desktop:native-page-open', destination)
+      return true
+    },
     openPluginSettings: async (name) => {
       if (!mainWindow || mainWindow.isDestroyed()) return false
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -2526,7 +2560,8 @@ export async function startElectronApp(metadata) {
       if (runtimeStartedAt !== undefined) {
         void logStore.append(`[startup] runtime-ready=${Math.round(runtimeReadyAt - runtimeStartedAt)}ms`)
       }
-      void showRuntime(status, runtimeReadyAt)
+      runtimeViewLoad = showRuntime(status, runtimeReadyAt)
+      void runtimeViewLoad
     } else if (['crashed', 'stopping', 'restarting'].includes(status.state)) {
       deepLinkRouter.setReady(false)
       if (
@@ -3149,7 +3184,7 @@ export async function startElectronApp(metadata) {
       if (app.isPackaged) {
         await assertPackagedUpdateIdentity(join(process.resourcesPath, 'app-update.yml'))
       }
-      autoUpdater = await loadElectronAutoUpdater()
+      autoUpdater = await loadElectronAutoUpdater(app)
     } catch (error) {
       void logStore.append(`[updater] disabled by identity check: ${error.message}`)
     }

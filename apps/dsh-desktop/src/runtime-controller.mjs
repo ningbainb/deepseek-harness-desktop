@@ -221,13 +221,13 @@ export function createRuntimeInvocation({
   const runtimePidLinePrefix = `dsh desktop runtime pid ${runtimeControlToken}: `
   const command = [
     '$ErrorActionPreference = \'Stop\'',
-    '$startInfo = New-Object System.Diagnostics.ProcessStartInfo',
+    '$startInfo = [System.Diagnostics.ProcessStartInfo]::new()',
     `$startInfo.FileName = ${quotePowerShellLiteral(executable)}`,
     `$startInfo.Arguments = ${quotePowerShellLiteral(runtimeArgumentsString)}`,
     '$startInfo.UseShellExecute = $false',
     '$startInfo.CreateNoWindow = $false',
     '$startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden',
-    '$runtime = New-Object System.Diagnostics.Process',
+    '$runtime = [System.Diagnostics.Process]::new()',
     '$runtime.StartInfo = $startInfo',
     '[void] $runtime.Start()',
     `[Console]::Out.WriteLine(${quotePowerShellLiteral(runtimePidLinePrefix)} + $runtime.Id)`,

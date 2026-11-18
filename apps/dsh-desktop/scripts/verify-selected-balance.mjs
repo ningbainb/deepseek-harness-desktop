@@ -86,25 +86,19 @@ try {
   assert.equal(await footer.count(), 1)
   await page.waitForFunction(() => !document.querySelector('[data-dsh-balance-entry]'))
   await footer.click()
-  let usageSettings
-  for (let attempt = 0; attempt < 120; attempt++) {
-    usageSettings = app.windows().find(candidate => candidate.url().includes('desktop-dock-setting='))
-    if (usageSettings) break
-    await page.waitForTimeout(250)
-  }
-  assert.ok(usageSettings, 'Today spending must open the real usage settings document')
-  const usageSection = usageSettings.locator('[data-dsh-dock-settings="usage"] [data-dsh-plugin="usage"]').first()
+  const usageSettings = page.locator('[role="dialog"].dsh-desktop-settings-window').last()
+  await usageSettings.getByRole('tab', { name: '用量与余额', exact: true, selected: true }).waitFor({ timeout: 60_000 })
+  const usageSection = usageSettings.locator('[data-desktop-settings-group="models"] [role="tabpanel"]:visible [data-dsh-plugin="usage"]').first()
   await usageSection.waitFor({ state: 'visible', timeout: 60_000 })
   const enabled = usageSection.getByRole('checkbox', { name: '启用插件', exact: true })
   assert.equal(await enabled.isChecked(), true)
   await enabled.click()
-  await usageSettings.waitForFunction(() => document.querySelector('[data-dsh-plugin="usage"] input[type="checkbox"]')?.checked === false,
+  await page.waitForFunction(() => document.querySelector('[data-desktop-settings-group="models"] [role="tabpanel"]:not([hidden]) [data-dsh-plugin="usage"] input[type="checkbox"]')?.checked === false,
     undefined, { timeout: 60_000 })
   await page.locator('[data-dsh-balance-entry]').waitFor({ state: 'visible', timeout: 60_000 })
   assert.equal(await footer.count(), 0)
-  const dock = app.windows().find(candidate => candidate.url().includes('extensions.html'))
-  assert.ok(dock)
-  await dock.close()
+  await page.keyboard.press('Escape')
+  await usageSettings.waitFor({ state: 'hidden' })
   const amount = page.locator('[data-dsh-balance-amount]')
   const catalogRequest = { type: 'client-request', rpcId: 'selected-balance-catalog', method: 'session/modelCatalog', payload: { args: {} } }
   const catalogResponse = await page.evaluate(async request => {

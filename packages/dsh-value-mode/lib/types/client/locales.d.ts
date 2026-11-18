@@ -29,6 +29,7 @@ export declare const zh: {
     change: string;
     selectModel: string;
     notSelected: string;
+    modelRequiresBaiSignIn: string;
     selectProvider: string;
     noAvailableModels: string;
     allowReview: string;

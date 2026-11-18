@@ -878,9 +878,10 @@ export class PluginManager {
     })
   }
 
-  prepare(rawSpec, { allowUnknown = false, allowIncompatible = false } = {}) {
+  prepare(rawSpec, { allowUnknown = false, allowIncompatible = false, enabled = true } = {}) {
     if (typeof allowUnknown !== 'boolean') throw new TypeError('allowUnknown must be a boolean')
     if (typeof allowIncompatible !== 'boolean') throw new TypeError('allowIncompatible must be a boolean')
+    if (typeof enabled !== 'boolean') throw new TypeError('plugin enablement must be a boolean')
     const parsed = validatePluginSpec(rawSpec)
     return this.#enqueue(async () => {
       if (PROTECTED_PACKAGES.has(parsed.name)) throw new Error(`${parsed.name} is a built-in desktop plugin`)
@@ -895,13 +896,14 @@ export class PluginManager {
         version: candidate.version,
         spec,
         integrity: typeof candidate.dist?.integrity === 'string' ? candidate.dist.integrity : undefined,
-      }], { operation: 'plugin-install' })
+      }], { operation: 'plugin-install', enabledNames: enabled ? undefined : new Set() })
       return Object.freeze({
         name: parsed.name,
         version: candidate.version,
         spec,
         manifest: candidate,
         compatibility,
+        ...(enabled ? {} : { enabled: false }),
         ...(staging === undefined ? {} : {
           staging,
           previousVersion: typeof previous?.version === 'string' ? previous.version : undefined,
@@ -1075,7 +1077,8 @@ export class PluginManager {
         }
         const manifest = await readManifest(this.profileDir)
         const bundles = new Set(manifest.dsh?.profile?.bundles ?? [])
-        bundles.add(prepared.name)
+        if (prepared.enabled === false) bundles.delete(prepared.name)
+        else bundles.add(prepared.name)
         manifest.dsh = { ...(manifest.dsh ?? {}), profile: { bundles: [...bundles] } }
         await writeManifest(this.profileDir, manifest)
         this.updateStates.delete(prepared.name)

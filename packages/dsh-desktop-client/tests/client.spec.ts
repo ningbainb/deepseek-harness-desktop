@@ -105,10 +105,12 @@ describe('Desktop Client SDK v1', () => {
     } } })
     expect(await client.openDesktopSurface('extensions', { setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })).toBe(true)
     expect(openExtensionDock).toHaveBeenCalledWith({ setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })
-    for (const options of [{ plugin: 'search' }, { setting: 'usage', plugin: 'search' }, { setting: 'plugin-options', plugin: '../other' }, { setting: 'plugin-options', plugin: 'https://example.com' }]) {
+    expect(await client.openDesktopSurface('extensions', { setting: 'prompt-customizer' })).toBe(true)
+    expect(openExtensionDock).toHaveBeenCalledWith({ setting: 'prompt-customizer' })
+    for (const options of [{ plugin: 'search' }, { setting: 'usage', plugin: 'search' }, { setting: 'prompt-customizer', plugin: 'search' }, { setting: 'plugin-options', plugin: '../other' }, { setting: 'plugin-options', plugin: 'https://example.com' }]) {
       await expect(client.openDesktopSurface('extensions', options as never)).rejects.toMatchObject({ code: 'desktop-invalid-argument' })
     }
-    expect(openExtensionDock).toHaveBeenCalledTimes(1)
+    expect(openExtensionDock).toHaveBeenCalledTimes(2)
   })
 
   it('hands plugin install sources to the Desktop only after capability checks', async () => {

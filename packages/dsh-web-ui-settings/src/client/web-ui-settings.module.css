@@ -651,6 +651,22 @@
     transform: none !important;
   }
 }
+.nativePluginResult {
+  position: fixed;
+  z-index: 300;
+  right: 20px;
+  bottom: 20px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 10px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
 .managementRoutingError {
   display: block;
   box-sizing: border-box;

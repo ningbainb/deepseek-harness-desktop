@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { access, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -83,6 +83,13 @@ test('native NSIS releases and expands the archive beside the selected directory
     const resources = await prepareBrowserPreflightFixtureResources(f.root)
     const input = join(f.root, 'archive-input')
     const digest = await f.extract(input)
+    const deepResource = join('resources/app.asar.unpacked/node_modules/@deepseek-ai',
+      'dsh-plugin-manager/node_modules/yaml/dist', 'nested-toolchain-support'.repeat(3),
+      'resolve-flow-collection-with-nested-data'.repeat(2) + '.js')
+    assert.ok(join(f.install, deepResource).length > 260)
+    const payloadFile = join(input, 'files', deepResource)
+    await mkdir(resolve(payloadFile, '..'), { recursive: true })
+    await writeFile(payloadFile, 'nested runtime code')
     if (corrupt) {
       await mkdir(join(f.install, 'resources'), { recursive: true })
       await writeFile(join(f.install, 'DeepSeek Harness Desktop.exe'), 'old-exe')
@@ -100,15 +107,28 @@ test('native NSIS releases and expands the archive beside the selected directory
       '/DUNINSTALL_FILENAME=Uninstall DeepSeek Harness Desktop.exe', `/DUNINSTALLER_OUT_FILE=${uninstaller}`,
       `/DDSH_RUNTIME_MANIFEST_SHA256=${digest}`, '/DDSH_RUNTIME_FULL_PAYLOAD=1',
       '/DDSH_RUNTIME_EXTERNAL_BROWSER_PAYLOAD=1', '/DDSH_TARGET_PAYLOAD_STAGE=1',
+      `/DDSH_TARGET_PAYLOAD_EXTRACTOR=${sevenZip}`,
+      `/DDSH_TARGET_PAYLOAD_EXTRACTOR_LICENSES=${dirname(dirname(sevenZip))}`,
+      '/DAPP_INSTALLER_STORE_FILE=fixture-updater\\installer.exe',
       '/DDSH_TARGET_ARCHIVE_BYTES=4096', '/DDSH_TARGET_INSTALLED_BYTES=4096',
       join(desktop, 'test/fixtures/installer-external-runtime.nsi'),
     ], { env: nsis.env, windowsHide: true })
     await f.run('Begin')
     const install = () => exec(output, ['/S'], { env: f.env, windowsHide: true, timeout: 30000 })
-    if (corrupt) await assert.rejects(install(), { code: 2 })
-    else await install()
-    const log = (await readdir(f.temporary)).find(name => /^dsh-desktop-install-.*\.log$/u.test(name))
-    const diagnostic = await readFile(join(f.temporary, log), 'utf16le')
+    const readDiagnostic = async () => {
+      const log = (await readdir(f.temporary)).find(name => /^dsh-desktop-install-.*\.log$/u.test(name))
+      return log ? readFile(join(f.temporary, log), 'utf16le') : ''
+    }
+    try {
+      if (corrupt) await assert.rejects(install(), { code: 2 })
+      else await install()
+    } catch (error) {
+      t.diagnostic(await readDiagnostic())
+      throw error
+    }
+    const diagnostic = await readDiagnostic()
+    const baseCache = f.install + '.dsh-desktop-updates'
+    const cachedInstaller = join(baseCache, 'fixture-updater', 'installer.exe')
     assert.ok(diagnostic.includes(`${f.root}\\.dsh-desktop-payload-`))
     assert.match(diagnostic, /timing=archive-decompressed tick_ms=\d+/u)
     assert.match(diagnostic, /timing=payload-promote-end tick_ms=\d+/u)
@@ -122,16 +142,40 @@ test('native NSIS releases and expands the archive beside the selected directory
     if (corrupt) {
       assert.match(diagnostic, /stage=failure-rollback code=0/u)
       assert.equal(await readFile(join(f.install, 'resources/app.asar'), 'utf8'), 'old-asar')
+      await assert.rejects(access(cachedInstaller), { code: 'ENOENT' })
     } else {
       assert.match(diagnostic, /payload-promoted mode=directory/u)
       assert.equal(await readFile(join(f.install, 'resources/app.asar'), 'utf8'), 'new-asar')
+      assert.equal(await readFile(join(f.install, deepResource), 'utf8'), 'nested runtime code')
+      assert.match(await readFile(join(f.install, 'resources/installer-archive-extractor/COPYING'), 'utf8'), /GNU LESSER GENERAL PUBLIC LICENSE/u)
       assert.equal(await readFile(join(f.install, 'Uninstall DeepSeek Harness Desktop.exe'), 'utf8'), 'host-provided uninstaller fixture')
       assert.equal(await readFile(join(f.install, 'completed.txt'), 'utf8'), 'committed')
+      assert.deepEqual(await readFile(cachedInstaller), await readFile(output))
+      assert.match(diagnostic, /installer-cache code=0 elapsed_ms=\d+ destination=target-volume/u)
     }
     const staged = () => readdir(f.root).then(names => names.filter(name => name.startsWith('.dsh-desktop-payload-')))
     for (let retries = 0; retries < 20 && (await staged()).length; retries += 1) await delay(150)
     assert.deepEqual(await staged(), [])
   })
+})
+
+test('installer cache accepts only the fixed updater relative shape and rejects a linked sibling', { skip: process.platform !== 'win32' }, async t => {
+  const f = await fixture(t)
+  const setup = join(f.root, 'setup.exe')
+  const cacheBase = f.install + '.dsh-desktop-updates'
+  const unrelated = join(f.root, 'unrelated')
+  const stage = await f.extract(f.root)
+  await rename(join(f.root, 'files'), f.install)
+  await writeFile(setup, 'fixture setup')
+  await mkdir(unrelated)
+  const save = storePath => f.run('Commit', f.install, '-CompleteRuntimePayload', '-RuntimeManifestSHA256', stage,
+    '-InstallerExecutable', setup, '-InstallerStoreFile', storePath)
+  const invalid = await save('..\\installer.exe')
+  assert.match(invalid.stdout, /installer-cache code=1 elapsed_ms=\d+ .*invalid installer cache relative path/u)
+  await symlink(unrelated, cacheBase, 'junction')
+  const linked = await save('fixture-updater\\installer.exe')
+  assert.match(linked.stdout, /installer-cache code=1 elapsed_ms=\d+ .*payload path contains a link/u)
+  assert.deepEqual(await readdir(unrelated), [])
 })
 
 test('rollback of a renamed directory preserves unrelated files created after promotion', { skip: process.platform !== 'win32' }, async t => {

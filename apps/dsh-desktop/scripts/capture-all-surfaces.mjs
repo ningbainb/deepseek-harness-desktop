@@ -258,7 +258,7 @@ try {
     if (!communityPage) await delay(100)
   }
   if (!communityPage) throw new Error('community window did not open')
-  await communityPage.locator('#community-qr[src^="data:image/png;base64,"]').waitFor({ state: 'visible', timeout: 10_000 })
+  await communityPage.locator('#community-qr[src^="data:image/jpeg;base64,"]').waitFor({ state: 'visible', timeout: 10_000 })
   await captureWindow(communityPage, '22-community.png', '加入社群与问题反馈')
 
   await mainPage.evaluate(() => window.dshDesktop.openConversationImport())

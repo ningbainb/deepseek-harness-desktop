@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ModelRouteSelection } from '../core/config.ts'
+import { BAI_PROVIDER_ID, isPendingBaiModel, type ModelRouteSelection } from '../core/config.ts'
 import { en, zh, type ValueModeLocaleKey } from './locales.ts'
 import { CODEX_MODEL_CATALOG_CHANGED, ModelCatalogChangedError } from './model-catalog.ts'
 import styles from './value-mode.module.css'
@@ -23,7 +23,7 @@ export interface ModelPickerProps {
   fetchModels?: () => Promise<ValueModeModelCatalog>
 }
 
-export const BAI_PROVIDER_ID = 'project-relay'
+export { BAI_PROVIDER_ID }
 
 /** Keep the Desktop-recommended bai provider first without disturbing the catalog's remaining order. */
 export function sortValueModeProviderGroups(groups: readonly ModelProviderGroup[]): readonly ModelProviderGroup[] {
@@ -57,7 +57,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
     window.addEventListener(CODEX_MODEL_CATALOG_CHANGED, refresh)
     const channel = typeof BroadcastChannel === 'function' ? new BroadcastChannel('dsh-model-selection-confirmed-v1') : undefined
     if (channel) channel.onmessage = event => {
-      if (typeof event.data === 'object' && event.data !== null && event.data.provider === 'project-relay') refresh()
+      if (typeof event.data === 'object' && event.data !== null && event.data.provider === BAI_PROVIDER_ID) refresh()
     }
     return () => {
       window.removeEventListener('dsh-relay-models-updated', refresh)
@@ -121,7 +121,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
       clearTimeout(timer)
       if (!active) return
       if (!result) return
-      setGroups(sortValueModeProviderGroups(result.groups ?? []))
+      const groups = (result.groups ?? []).map(group => group.id === BAI_PROVIDER_ID
+        ? { ...group, models: group.models.filter(model => !isPendingBaiModel({ provider: group.id, model: model.id })) }
+        : group)
+      setGroups(sortValueModeProviderGroups(groups))
       setFailures(result.failures ?? [])
       setLoading(false)
     }).catch((reason) => {

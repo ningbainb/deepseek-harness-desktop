@@ -1,10 +1,10 @@
-import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 import { relayEn, relayZh } from './locales.ts'
 import css from './relay-onboarding.module.css'
 
 export function installAccountRelayRecommendation(doc: Document): () => void {
   if (!(doc.defaultView as Window & { dshDesktop?: unknown } | null)?.dshDesktop) return () => {}
-  const owned = new Map<HTMLElement, HTMLElement>()
+  const owned = new Map<HTMLElement, [detail: HTMLElement, recommendation: HTMLElement]>()
+  const removeRows = (rows: readonly HTMLElement[]) => rows.forEach(row => row.remove())
   const label = (item: HTMLElement) => {
     const copy = item.cloneNode(true) as HTMLElement
     for (const hidden of copy.querySelectorAll('[aria-hidden="true"], svg')) hidden.remove()
@@ -13,15 +13,15 @@ export function installAccountRelayRecommendation(doc: Document): () => void {
   let disposed = false
   const sync = () => {
     if (disposed) return
-    for (const [official, node] of owned) {
-      if (!official.isConnected || !node.isConnected) {
-        node.remove()
+    for (const [official, rows] of owned) {
+      if (!official.isConnected || rows.some(row => !row.isConnected)) {
+        removeRows(rows)
         owned.delete(official)
       }
     }
     const accountOpen = doc.querySelector('[data-signed-out="true"][aria-expanded="true"][aria-haspopup="menu"]')
     if (!accountOpen) {
-      for (const node of owned.values()) node.remove()
+      for (const rows of owned.values()) removeRows(rows)
       owned.clear()
       return
     }
@@ -31,6 +31,10 @@ export function installAccountRelayRecommendation(doc: Document): () => void {
       const official = items.find(item => /^(?:登录|Sign in|Log in)$/iu.test(label(item)))
       if (!official || owned.has(official)) continue
       const copy = label(official) === '登录' ? relayZh : relayEn
+      const detail = doc.createElement('p')
+      detail.dataset.dshAccountOfficial = 'true'
+      detail.className = css.accountOfficial ?? ''
+      detail.textContent = copy.accountOfficial
       const node = doc.createElement('div')
       node.dataset.dshAccountRelay = 'true'
       node.className = css.accountRecommendation ?? ''
@@ -40,21 +44,13 @@ export function installAccountRelayRecommendation(doc: Document): () => void {
       const button = doc.createElement('button')
       button.type = 'button'
       button.setAttribute('role', 'menuitem')
+      button.dataset.dshRelayConnect = 'true'
       button.textContent = copy.accountConnect
       button.className = css.secondary ?? ''
-      button.addEventListener('click', event => {
-        event.preventDefault()
-        event.stopPropagation()
-        button.disabled = true
-        void openDesktopSurface('extensions', { setting: 'models' }).then(opened => {
-          if (!opened) description.textContent = copy.accountOpenFailed
-        }).catch(() => { description.textContent = copy.accountOpenFailed }).finally(() => {
-          if (button.isConnected) button.disabled = false
-        })
-      })
       node.append(description, button)
+      official.before(detail)
       official.after(node)
-      owned.set(official, node)
+      owned.set(official, [detail, node])
     }
   }
   const observer = new MutationObserver(sync)
@@ -63,7 +59,7 @@ export function installAccountRelayRecommendation(doc: Document): () => void {
   return () => {
     disposed = true
     observer.disconnect()
-    for (const node of owned.values()) node.remove()
+    for (const rows of owned.values()) removeRows(rows)
     owned.clear()
   }
 }

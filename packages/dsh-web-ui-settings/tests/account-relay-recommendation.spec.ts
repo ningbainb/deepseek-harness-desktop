@@ -1,21 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 
-const desktop = vi.hoisted(() => ({ openDesktopSurface: vi.fn() }))
-vi.mock('@linxin666/dsh-desktop-client', () => desktop)
 import { installAccountRelayRecommendation } from '../src/client/account-relay-recommendation.ts'
 import { relayEn, relayZh } from '../src/client/locales.ts'
+import { installRelayModelEntrances } from '../src/client/relay-model-entrances.tsx'
+import { RELAY_CONNECT_PATH, RELAY_STATUS_PATH } from '../src/relay-protocol.ts'
 
 let dispose: (() => void) | undefined
+let disposeAccess: (() => void) | undefined
 beforeEach(() => {
-  desktop.openDesktopSurface.mockReset().mockResolvedValue(true)
   Object.defineProperty(window, 'dshDesktop', { configurable: true, value: {} })
   document.body.innerHTML = ''
 })
 afterEach(() => {
   dispose?.()
+  act(() => disposeAccess?.())
+  disposeAccess = undefined
   dispose = undefined
   document.body.innerHTML = ''
+  vi.unstubAllGlobals()
   Reflect.deleteProperty(window, 'dshDesktop')
 })
 
@@ -34,6 +37,8 @@ describe('account bai recommendation', () => {
     const original = official.outerHTML
     dispose = installAccountRelayRecommendation(document)
     const recommendation = document.querySelector('[data-dsh-account-relay]')
+    expect(official.previousElementSibling?.hasAttribute('data-dsh-account-official')).toBe(true)
+    expect(official.previousElementSibling?.textContent).toMatch(/DeepSeek/u)
     expect(official.nextElementSibling).toBe(recommendation)
     expect(recommendation?.textContent).toContain(copy.accountRecommendation)
     expect(recommendation?.textContent).toContain(copy.accountConnect)
@@ -44,15 +49,24 @@ describe('account bai recommendation', () => {
     expect(document.querySelectorAll('[role="menuitem"]')).toHaveLength(4)
   })
 
-  it('opens existing bai setup and reports failure without changing official handlers', async () => {
+  it('starts the existing browser authorization once directly from the account menu', async () => {
     const official = menu()
+    const url = 'https://api.1521003.xyz/dsh-desktop-connect.html#port=12345&state=public-test-state'
+    const open = vi.fn().mockResolvedValue(true)
+    Object.defineProperty(window, 'dshDesktop', { configurable: true, value: { openExternalUrl: open } })
+    const request = vi.fn(async (path: string) => Response.json(path === RELAY_STATUS_PATH
+      ? { ok: true, configured: false, writable: true }
+      : { ok: true, connection: { phase: 'pending', url } }))
+    vi.stubGlobal('fetch', request)
+    act(() => { disposeAccess = installRelayModelEntrances(document, key => relayZh[key]) })
     dispose = installAccountRelayRecommendation(document)
-    const button = document.querySelector('[data-dsh-account-relay] button') as HTMLButtonElement
-    desktop.openDesktopSurface.mockResolvedValue(false)
+    const button = screen.getByRole('menuitem', { name: relayZh.accountConnect })
+    expect(request).not.toHaveBeenCalled()
     fireEvent.click(button)
-    expect(desktop.openDesktopSurface).toHaveBeenCalledWith('extensions', { setting: 'models' })
-    await waitFor(() => expect(document.querySelector('[data-dsh-account-relay]')?.textContent).toContain(relayZh.accountOpenFailed))
-    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(url))
+    expect(screen.getByRole('dialog', { name: relayZh.accessTitle })).toBeTruthy()
+    expect(request.mock.calls.filter(([path]) => path === RELAY_CONNECT_PATH)).toHaveLength(1)
     expect(official.textContent).toBe('登录')
   })
 
@@ -63,6 +77,7 @@ describe('account bai recommendation', () => {
     await waitFor(() => expect(document.querySelectorAll('[data-dsh-account-relay]')).toHaveLength(1))
     document.querySelector('[data-signed-out]')?.setAttribute('data-signed-out', 'false')
     await waitFor(() => expect(document.querySelector('[data-dsh-account-relay]')).toBeNull())
+    expect(document.querySelector('[data-dsh-account-official]')).toBeNull()
     document.querySelector('[data-signed-out]')?.setAttribute('data-signed-out', 'true')
     await waitFor(() => expect(document.querySelector('[data-dsh-account-relay]')).not.toBeNull())
     dispose()

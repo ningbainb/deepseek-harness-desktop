@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client';
-import type { ModelRouteSelection } from '../core/config.ts';
+import { BAI_PROVIDER_ID, type ModelRouteSelection } from '../core/config.ts';
 export interface ValueModeModelCatalog {
     /** Models exposed by currently registered provider routes. */
     groups: readonly ModelProviderGroup[];
@@ -14,7 +14,7 @@ export interface ModelPickerProps {
     onClose: () => void;
     fetchModels?: () => Promise<ValueModeModelCatalog>;
 }
-export declare const BAI_PROVIDER_ID = "project-relay";
+export { BAI_PROVIDER_ID };
 /** Keep the Desktop-recommended bai provider first without disturbing the catalog's remaining order. */
 export declare function sortValueModeProviderGroups(groups: readonly ModelProviderGroup[]): readonly ModelProviderGroup[];
 export declare const ModelPicker: React.FC<ModelPickerProps>;

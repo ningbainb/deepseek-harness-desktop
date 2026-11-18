@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts'
-import { isConfigured, resolveResolvedConfig } from '../core/config.ts'
+import { isCompleteModelRoute, isConfigured, resolveResolvedConfig } from '../core/config.ts'
 import { ModelPicker, type ValueModeModelCatalog } from './ModelPicker.tsx'
 import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
@@ -9,6 +9,7 @@ import a11y from './value-mode-a11y.module.css'
 import dockStyles from './value-mode-dock.module.css'
 import { reportValueModeTelemetry } from './telemetry.ts'
 import { en, zh } from './locales.ts'
+import { formatValueModeModelLabel } from './model-label.ts'
 
 export interface ValueModeSettingsCardProps {
   config: ValueModeConfig
@@ -61,10 +62,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
     setPickingTarget(null)
   }
 
-  const formatModelLabel = (route?: { provider?: string; model?: string }) => {
-    if (!route?.provider || !route?.model) return '未配置'
-    return `${route.provider} / ${route.model}`
-  }
+  const expertChosen = isCompleteModelRoute(resolved.expert)
 
   const statusClass = resolved.enabled
     ? configured ? styles.badgeActive : styles.badgeDegraded
@@ -127,7 +125,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
         <div className={`${styles.modelRow} ${layout.modelRow}`}>
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
             <div className={styles.modelRole}>{dock ? '主控模型' : '主控模型'}</div>
-            <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.expert)}</div>
+            <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatValueModeModelLabel(resolved.expert)}</div>
             {!dock && <div className={`${styles.modelDesc} ${layout.modelDesc}`}>负责理解任务、拆分工作、汇总子代理结果并完成最终交付。</div>}
           </div>
           <button
@@ -143,7 +141,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
         <div className={`${styles.modelRow} ${layout.modelRow}`}>
           <div className={`${styles.modelInfo} ${layout.modelInfo}`}>
             <div className={styles.modelRole}>{dock ? '执行模型' : '执行模型'}</div>
-            <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatModelLabel(resolved.executor)}</div>
+            <div className={`${styles.modelValue} ${layout.modelValue}`}>{formatValueModeModelLabel(resolved.executor)}</div>
             {!dock && <div className={`${styles.modelDesc} ${layout.modelDesc}`}>只执行主控派发的单项任务，适合并行调查、局部实现和重复性工作。</div>}
           </div>
           <button
@@ -243,7 +241,7 @@ export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({
 
       {dock && !configured && <div className={dockStyles.setupHint}>
         <span>先选择{resolved.expert.model ? '执行模型' : '主控模型'}，再开启协作。</span>
-        <button type="button" className={`${styles.button} ${styles.buttonPrimary}`} onClick={() => setPickingTarget(resolved.expert.model ? 'executor' : 'expert')}>选择{resolved.expert.model ? '执行模型' : '主控模型'}</button>
+        <button type="button" className={`${styles.button} ${styles.buttonPrimary}`} onClick={() => setPickingTarget(expertChosen ? 'executor' : 'expert')}>选择{expertChosen ? '执行模型' : '主控模型'}</button>
       </div>}
       {pickingTarget && (
         <ModelPicker

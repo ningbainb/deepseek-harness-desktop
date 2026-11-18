@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "status": "supported",
-  "verifiedAt": "2026-11-17",
+  "verifiedAt": "2026-11-18",
   "desktopRange": "current",
-  "matrixArtifact": "docs/plans/2026-11-17-desktop-next-rc3.md",
+  "matrixArtifact": "docs/launch/release-notes-5.3.0-rc.10.md",
   "knownIssues": [
-    "Candidate source identity for Desktop 5.3.0-rc.1 and DSH 0.2.2-rc.3; product acceptance is recorded in the linked plan, not inferred from dependency resolution.",
+    "Exact public DSH 0.2.2-rc.5 SDK cohort for the Windows 5.3.0-rc.10 local preview. Package, session and native acceptance each require executed evidence.",
     "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
     "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
   ]

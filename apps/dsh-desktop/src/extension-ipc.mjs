@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, readdir, rename, rm, statfs, writeFile } from 'node:fs/promises'
 import { parse, stringify } from 'yaml'
 import { basename, dirname, join } from 'node:path'
+import semver from 'semver'
 
 import { COMMUNITY_PLUGIN_CATALOG, resolveCommunityPluginUrl } from './extensions/community-catalog.mjs'
 import { createPluginUIStates } from './extensions/plugin-ui-state.mjs'
@@ -12,7 +13,7 @@ import { assertOptionalContextPluginActivation, getOptionalContextPluginStatus }
 import { createRuntimeMutationCoordinator } from './runtime-mutation-coordinator.mjs'
 import { createSkillMarketActivation } from './skill-market-activation.mjs'
 import { createPromptCustomizerFeature } from './prompt-customizer-feature.mjs'
-import { assertDockPlugin, assertDockSetting } from './dock-pages.mjs'
+import { assertDockPlugin, assertDockSetting, assertNativeDockDestination } from './dock-pages.mjs'
 import { classifyPluginInstallFailure } from './legacy-plugin-recovery.mjs'
 import { normalizeFeatureEvent } from './feature-telemetry.mjs'
 import { AgentShellPermissionStore, AGENT_SHELL_PERMISSION_MODES } from './agent-shell-permission.mjs'
@@ -22,6 +23,8 @@ const PROFILE_RESET_BACKUP_LIMIT = 3
 const PROFILE_RESET_SCAN_ENTRY_LIMIT = 50_000
 const PROFILE_RESET_FREE_SPACE_RESERVE = 64 * 1024 * 1024
 const CLIPBOARD_TEXT_LIMIT = 64 * 1024
+const NATIVE_PLUGIN_NAME = /^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*$/u
+const NATIVE_REGISTRIES = new Set(['https://registry.npmjs.org', 'https://registry.npmjs.org/'])
 
 async function profileResetAvailableBytes(path) {
   let cursor = path
@@ -155,6 +158,8 @@ async function awaitWithTimeout(value, timeoutMs, label) {
 const CHANNELS = [
   'extensions:list',
   'extensions:settings-select',
+  'extensions:native-page-open',
+  'desktop:native-plugin-mutation',
   'extensions:tool-open',
   'extensions:plugin-check',
   'extensions:plugin-install',
@@ -261,6 +266,8 @@ export function registerExtensionIpc({
   onRuntimeMaintenanceChange = () => {},
   completeBlockedPluginRecovery = async () => Object.freeze({ resolved: false }),
   openPluginSettings = async () => { throw new Error('plugin settings navigation is unavailable') },
+  openNativePage = async () => false,
+  captureNativePluginView = () => () => {},
   quiesceTimeoutMs = EXTENSION_QUIESCE_TIMEOUT_MS,
   getProfileResetAvailableBytes = profileResetAvailableBytes,
 }) {
@@ -518,6 +525,7 @@ export function registerExtensionIpc({
       prepare: () => pluginManager.prepare(request.spec, {
         allowUnknown: request.allowUnknown,
         allowIncompatible: request.allowIncompatible,
+        ...(request.enabled === undefined ? {} : { enabled: request.enabled }),
       }),
       abandon: async (prepared) => prepared?.staging?.cancel?.(),
       apply: async (prepared) => {
@@ -776,6 +784,72 @@ export function registerExtensionIpc({
       record('opened')
       return result
     } catch (error) { record('failed'); throw error }
+  })
+  handleExtension('extensions:native-page-open', (_event, destination) => {
+    assertNativeDockDestination(destination)
+    return openNativePage(destination)
+  })
+  ipcMain.handle('desktop:native-plugin-mutation', async (event, request) => {
+    surfaceRegistry.assert(event?.sender, 'main')
+    if (event.senderFrame !== event.sender.mainFrame || !/^dsh-runtime:\/\/app(?:[/?#]|$)/u.test(event.senderFrame?.url ?? '')) {
+      throw new TypeError('native plugin management requires the primary Runtime document')
+    }
+    const { method, args } = request ?? {}
+    const kind = method === 'pluginManager/installBundle' ? 'install'
+      : method === 'pluginManager/updateBundle' ? 'update'
+        : method === 'pluginManager/removeBundle' ? 'remove'
+          : method === 'pluginManager/setBundleEnabled' ? 'enable' : undefined
+    if (!kind || !args || typeof args !== 'object' || Array.isArray(args)) throw new TypeError('invalid native plugin operation')
+    const stage = kind === 'update' ? 'install' : kind
+    const target = kind === 'install' ? args.spec : args.name
+    const options = args.options ?? {}
+    if (typeof target !== 'string' || target.length === 0 || target.length > 260 || typeof options !== 'object' || Array.isArray(options)) {
+      throw new TypeError('invalid native plugin target')
+    }
+    const result = (body, from) => ({ ok: true, value: kind === 'update'
+      ? { from: from ?? target, to: args.version, step: 'install', result: body } : body })
+    const failure = (message, from) => result({ changed: false, application: 'failed', stage, target,
+      error: { code: 'operation-error', diagnostic: message } }, from)
+    const match = kind === 'install' ? /^(?<name>(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*)(?:@(?<version>[^@]+))?$/u.exec(target)?.groups : undefined
+    const name = kind === 'install' ? match?.name : target
+    const version = kind === 'update' ? args.version : match?.version ?? options.expected?.version
+    if (!name || !NATIVE_PLUGIN_NAME.test(name) || (kind === 'update' && typeof version !== 'string')
+      || (version !== undefined && semver.valid(version) === null && !(kind === 'install' && version === 'latest'))
+      || (options.registry !== undefined && !NATIVE_REGISTRIES.has(options.registry))
+      || (kind === 'update' && options.spec !== undefined)
+      || (options.approvedBuilds !== undefined && (!Array.isArray(options.approvedBuilds) || options.approvedBuilds.length > 0))
+      || (options.expected && (options.expected.name !== name || options.expected.version !== version))) {
+      return failure('此来源需要通过拓展坞 → 插件维护安装。')
+    }
+    if ((kind === 'enable' && typeof args.enabled !== 'boolean') || (options.enabled !== undefined && typeof options.enabled !== 'boolean')) {
+      throw new TypeError('invalid native plugin enablement')
+    }
+    let installed
+    const restoreView = captureNativePluginView()
+    const openResult = (applied) => {
+      void Promise.resolve().then(() => restoreView({ name, applied })).catch(() => {})
+    }
+    try {
+      const enabled = kind === 'update' ? (installed = (await pluginManager.inventory()).find(item => item.name === name))?.enabled
+        : kind === 'enable' ? args.enabled : options.enabled
+      if (kind === 'update' && !installed) return failure('找不到已安装的插件。')
+      if (enabled !== false && (kind === 'install' || kind === 'enable' || kind === 'update')) assertOptionalContextPluginActivation(name)
+      const detail = kind === 'enable' ? (enabled ? 'enable' : 'disable') : kind
+      const applied = await trackProductOperation(detail, () => {
+        if (kind === 'remove') return removePlugin(name)
+        if (kind === 'enable') return enqueuePluginMutation(() => pluginRecovery.setPluginEnabledAndRestart(name, enabled))
+        return installPlugin({ spec: version === undefined ? name : `${name}@${version}`, enabled,
+          allowUnknown: false, allowIncompatible: false })
+      })
+      openResult(true)
+      return result({ changed: true, application: 'applied', stage, target,
+        ...(kind === 'install' || kind === 'update' ? { bundle: name, version: applied.version, enabled } : {}) }, installed?.version)
+    } catch (error) {
+      openResult(false)
+      const admission = /^(?:PLUGIN_COMPATIBILITY_CONFIRMATION_REQUIRED|PLUGIN_INCOMPATIBLE)$/u.test(error?.code ?? '')
+      return failure(admission ? '需要确认插件兼容性。请从拓展坞 → 插件维护继续。'
+        : String(error?.message ?? error).split('\n', 1)[0].slice(0, 500), installed?.version)
+    }
   })
   handleExtension('extensions:plugin-check', async () => {
     const [plugins, recoveryState] = await Promise.all([

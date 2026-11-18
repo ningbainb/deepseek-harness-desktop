@@ -15,7 +15,7 @@ const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-account-skin-chrome-'))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
-const evidence = { temporary, skins: [], baiSetupReady: false, loginDialog: null, authorizationLinkForwarded: false, authInit: false, callback: false, signedIn: false }
+const evidence = { temporary, skins: [], baiDirectLogin: false, loginDialog: null, authorizationLinkForwarded: false, authInit: false, callback: false, signedIn: false }
 const requests = []
 let initialization
 let app
@@ -117,27 +117,36 @@ try {
   await menu.locator('[data-dsh-account-relay]').waitFor({ timeout: 15_000 })
   assert.equal(await official.isVisible(), true)
   assert.equal(await official.isEnabled(), true)
+  const officialDetail = menu.locator('[data-dsh-account-official]')
+  assert.match(await officialDetail.innerText(), /(?:DeepSeek 官方直连|Connect directly to DeepSeek)/u)
   const recommended = menu.locator('[data-dsh-account-relay]')
-  assert.match(await recommended.innerText(), /(?:低于官方|cost less than the official)/u)
+  assert.match(await recommended.innerText(), /(?:第三方模型供应商.*性价比|third-party model provider.*cost is a priority)/u)
   await page.screenshot({ path: join(temporary, 'account-menu-xp.png') })
-  const dockOpened = app.waitForEvent('window', { timeout: 30_000 })
-  await recommended.getByRole('menuitem').click()
-  const dock = await dockOpened
-  await dock.waitForURL(url => url.pathname.endsWith('/extensions.html'), { timeout: 30_000 })
-  await dock.locator('#models-tab.active[aria-selected="true"]').waitFor({ timeout: 60_000 })
-  const settingsDeadline = Date.now() + 60_000
-  let baiSettings
-  while (Date.now() < settingsDeadline) {
-    baiSettings = app.windows().find(candidate => candidate.url().includes('desktop-dock-setting='))
-    if (baiSettings) break
-    await new Promise(resolve => setTimeout(resolve, 100))
+  await app.evaluate(({ shell }) => {
+    globalThis.baiAccountBrowserLinks = []
+    shell.openExternal = async target => { globalThis.baiAccountBrowserLinks.push(target) }
+  })
+  const windowsBeforeBai = app.windows().length
+  await recommended.getByRole('menuitem', { name: /^(?:bai 供应商登录|Sign in to bai)$/u }).click()
+  const baiDialog = page.locator('[data-dsh-relay-access-root]').getByRole('dialog')
+  const cancelBai = baiDialog.getByRole('button', { name: /^(?:取消连接|Cancel connection)$/u })
+  await cancelBai.waitFor({ timeout: 30_000 })
+  const baiDeadline = Date.now() + 15_000
+  let baiLinks = []
+  while (Date.now() < baiDeadline && baiLinks.length === 0) {
+    baiLinks = await app.evaluate(() => globalThis.baiAccountBrowserLinks)
+    if (baiLinks.length === 0) await new Promise(resolve => setTimeout(resolve, 100))
   }
-  assert.ok(baiSettings, 'bai recommendation opens existing provider setup view')
-  await baiSettings.locator('[data-dsh-dock-settings="models"] [data-relay-onboarding-card="true"]').waitFor({ timeout: 60_000 })
-  await baiSettings.getByRole('button', { name: /^(?:登录或注册，自动连接 bai|Sign in or register and connect bai)$/u }).waitFor({ timeout: 30_000 })
-  evidence.baiSetupReady = true
-  await baiSettings.screenshot({ path: join(temporary, 'bai-provider-setup.png') })
-  await dock.close()
+  assert.equal(baiLinks.length, 1, 'the account login opens the supplier browser once')
+  const baiUrl = new URL(baiLinks[0])
+  assert.equal(baiUrl.origin, 'https://api.1521003.xyz')
+  assert.equal(baiUrl.pathname, '/dsh-desktop-connect.html')
+  assert.equal(app.windows().length, windowsBeforeBai, 'bai authorization does not open the Extension Dock')
+  evidence.baiDirectLogin = true
+  await page.screenshot({ path: join(temporary, 'bai-account-direct-login.png') })
+  await cancelBai.click()
+  await baiDialog.getByRole('button', { name: /^(?:关闭|Close)$/u }).click()
+  await baiDialog.waitFor({ state: 'hidden' })
   if (await account.getAttribute('aria-expanded') !== 'true') await account.click()
   await official.click()
   await page.getByRole('dialog').waitFor({ timeout: 15_000 })

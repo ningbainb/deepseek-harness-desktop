@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { validUpdateDiagnostic } from '../src/update-diagnostics.mjs'
 
@@ -9,6 +12,7 @@ import {
   UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
   formatUpdateDetails,
   normalizeReleaseNotes,
+  targetVolumeUpdaterCache,
 } from '../src/updater.mjs'
 import {
   beginDesktopStartup,
@@ -25,6 +29,19 @@ test('Windows updater retains the exact running install directory instead of fal
   assert.equal(updater.installDirectory, "E:\\用户 软件\\DeepSeek Harness Desktop")
   new DesktopUpdateController({ updater, enabled: false })
   assert.equal(updater.installDirectory, "E:\\用户 软件\\DeepSeek Harness Desktop")
+})
+
+test('Windows updater uses a plain existing sibling cache and rejects a redirected cache', { skip: process.platform !== 'win32' }, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-updater-cache-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const install = join(root, '程序 path')
+  const cache = install + '.dsh-desktop-updates'
+  assert.equal(await targetVolumeUpdaterCache(install), undefined)
+  await mkdir(cache)
+  assert.equal(await targetVolumeUpdaterCache(install), cache)
+  await rm(cache, { recursive: true })
+  await symlink(root, cache, 'junction')
+  assert.equal(await targetVolumeUpdaterCache(install), undefined)
 })
 
 class FakeUpdater extends EventEmitter {

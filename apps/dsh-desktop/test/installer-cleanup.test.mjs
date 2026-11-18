@@ -827,6 +827,32 @@ test('independent Node and encoded PowerShell processes only mentioning an insta
   for (const child of children) assert.doesNotThrow(() => process.kill(child.pid, 0), `independent PID ${child.pid} was killed for only mentioning an install`)
 })
 
+test('the installer continues when the owned process exits on the final cleanup attempt', { ...windowsOnly, timeout: 30_000 }, async t => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-cleanup-final-attempt-'))
+  const original = join(desktopRoot, 'build', 'cleanup-stale-processes.ps1')
+  const oneAttemptScript = join(temporary, 'cleanup.ps1')
+  let child
+  t.after(async () => {
+    if (child?.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit')
+      child.kill()
+      await exited
+    }
+    await rm(temporary, { recursive: true, force: true })
+  })
+  const source = await readFile(original, 'utf8')
+  assert.match(source, /\$forceAttempts = 12/u)
+  await writeFile(oneAttemptScript, source.replace('$forceAttempts = 12', '$forceAttempts = 1'))
+  const executable = join(temporary, 'DeepSeek Harness Desktop.exe')
+  await copyFile(join(process.env.SystemRoot, 'System32', 'PING.EXE'), executable)
+  child = spawn(executable, ['-t', '127.0.0.1'], { windowsHide: true, stdio: 'ignore' })
+  await once(child, 'spawn')
+  await waitForWindowsProcessCommandLines([child.pid])
+  await execFileAsync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', oneAttemptScript, '-InstallDirectory', temporary], { windowsHide: true, timeout: 15_000 })
+  assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' })
+})
+
 for (const mode of ['-File', '-f', '-Command', '-c']) test(`PowerShell ${mode} script arguments cannot impersonate a host EncodedCommand runner`, { ...windowsOnly, timeout: 30_000 }, async t => {
   const temporary = await mkdtemp(join(tmpdir(), 'dsh-cleanup-file-boundary-'))
   const install = join(temporary, 'desktop')
@@ -971,6 +997,13 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
       Buffer.from(modernScript, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore' })
     ownedProcesses.push({ child: modernWrapper, exit: once(modernWrapper, 'exit') })
     await once(modernWrapper, 'spawn')
+    const typedScript = modernScript
+      .replace('New-Object System.Diagnostics.ProcessStartInfo', '[System.Diagnostics.ProcessStartInfo]::new()')
+      .replace('New-Object System.Diagnostics.Process', '[System.Diagnostics.Process]::new()')
+    const typedWrapper = spawn(powershellExecutable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand',
+      Buffer.from(typedScript, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore' })
+    ownedProcesses.push({ child: typedWrapper, exit: once(typedWrapper, 'exit') })
+    await once(typedWrapper, 'spawn')
     encodedUnrelatedProcess = spawn(powershellExecutable, [
       '-NoLogo',
       '-NoProfile',
@@ -997,6 +1030,7 @@ test('Windows 2.2 installer check terminates owned processes and legacy same-nam
       attributedProcess.pid,
       encodedAttributed.pid,
       modernWrapper.pid,
+      typedWrapper.pid,
       encodedUnrelatedProcess.pid,
       officialWebProcess.pid,
     ])

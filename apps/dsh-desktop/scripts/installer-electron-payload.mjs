@@ -43,6 +43,16 @@ export function runtimeInstallerInclude(core, extractionCore) {
     extraction = addTiming(extraction, /^([ \t]+DoneExtract7za:)\r?$/gmu, undefined, 'payload-copy-end')
     core = addTiming(core, /^([ \t]+!insertmacro copyFile "\$EXEPATH" "\$LOCALAPPDATA\\\$\{APP_INSTALLER_STORE_FILE\}")\r?$/gmu,
       'installer-cache-copy-start', 'installer-cache-copy-end')
+    const stockCache = /^([ \t]*!insertmacro DshTiming "installer-cache-copy-start"\r?\n[^\r\n]+\r?\n[ \t]*!insertmacro DshTiming "installer-cache-copy-end")\r?$/gmu
+    core = core.replace(stockCache, (_, copy) => [
+      '!ifdef DSH_TARGET_PAYLOAD_STAGE',
+      '  ${If} $installMode == "all"',
+      copy,
+      '  ${EndIf}',
+      '!else',
+      copy,
+      '!endif',
+    ].join('\n'))
     const embedded = /^([ \t]*)!insertmacro extractEmbeddedAppPackage\r?$/gmu
     if ([...core.matchAll(embedded)].length !== 1) throw new Error('Unsupported NSIS embedded payload template')
     core = core.replace(embedded, (_, indent) => [

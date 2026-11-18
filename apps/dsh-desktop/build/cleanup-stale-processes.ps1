@@ -342,7 +342,7 @@ try {
     # Current Desktop: literal ProcessStartInfo executable/argv, Start and WaitForExit.
     } elseif ($statements.Count -eq 13 -and
         $statements[0].Extent.Text -match '^\$ErrorActionPreference\s*=\s*''Stop''$' -and
-        $statements[1].Extent.Text -match '^\$startInfo\s*=\s*New-Object System.Diagnostics.ProcessStartInfo$' -and
+        $statements[1].Extent.Text -match '^\$startInfo\s*=\s*(?:New-Object System\.Diagnostics\.ProcessStartInfo|\[System\.Diagnostics\.ProcessStartInfo\]::new\(\))$' -and
         $statements[2] -is [Management.Automation.Language.AssignmentStatementAst] -and
         $statements[2].Left.Extent.Text -ceq '$startInfo.FileName' -and
         $statements[3] -is [Management.Automation.Language.AssignmentStatementAst] -and
@@ -350,7 +350,7 @@ try {
         $statements[4].Extent.Text -match '^\$startInfo.UseShellExecute\s*=\s*\$false$' -and
         $statements[5].Extent.Text -match '^\$startInfo.CreateNoWindow\s*=\s*\$false$' -and
         $statements[6].Extent.Text -match '^\$startInfo.WindowStyle\s*=\s*\[System.Diagnostics.ProcessWindowStyle\]::Hidden$' -and
-        $statements[7].Extent.Text -match '^\$runtime\s*=\s*New-Object System.Diagnostics.Process$' -and
+        $statements[7].Extent.Text -match '^\$runtime\s*=\s*(?:New-Object System\.Diagnostics\.Process|\[System\.Diagnostics\.Process\]::new\(\))$' -and
         $statements[8].Extent.Text -match '^\$runtime.StartInfo\s*=\s*\$startInfo$' -and
         $statements[9].Extent.Text -match '^\[void\]\s*\$runtime.Start\(\)$' -and
         $statements[10].Extent.Text -match '^\[Console\]::Out.WriteLine\(''dsh desktop runtime pid [a-f0-9]{48}: '' \+ \$runtime.Id\)$' -and
@@ -492,6 +492,7 @@ try {
       if ($null -eq (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
         return $true
       }
+      if ($wait.ElapsedMilliseconds -ge $timeoutMs) { break }
       Start-Sleep -Milliseconds 100
     } while ($wait.ElapsedMilliseconds -lt $timeoutMs)
     return $false
@@ -687,7 +688,7 @@ try {
     $marker = Join-Path $root $shutdownProtocolMarker
     $hasRunningMain = $targets | Where-Object {
       $_.Kind -eq 'main' -and $_.ExecutablePath.Equals($mainExecutable, $comparison)
-    } | Select-Object -First 1
+    } | Where-Object { Test-IsDesktopBrowserProcess $_ } | Select-Object -First 1
     if (-not $hasRunningMain -or -not (Test-Path -LiteralPath $marker -PathType Leaf)) {
       continue
     }
@@ -736,6 +737,9 @@ try {
   }
 
   $remaining = @(Get-InstallProcesses)
+  if ($remaining.Count -eq 0) {
+    Complete-Preflight
+  }
   foreach ($target in $remaining) {
     Write-Output "busy pid=$($target.ProcessId) path=$($target.ExecutablePath)"
   }

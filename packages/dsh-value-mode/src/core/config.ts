@@ -1,4 +1,5 @@
 export const VALUE_MODE_SETTINGS_NAMESPACE = 'value-mode'
+export const BAI_PROVIDER_ID = 'project-relay'
 
 export type ValueModeStrategy = 'saver' | 'balanced' | 'powerful'
 
@@ -83,10 +84,16 @@ function hasAnyRouteValue(route?: ModelRouteSelection): boolean {
   ))
 }
 
+/** Desktop's initial bai route becomes callable only after sign-in provisions a model. */
+export function isPendingBaiModel(route?: ModelRouteSelection): boolean {
+  return route?.provider === BAI_PROVIDER_ID && route.model === '__bai_login_required__'
+}
+
 export function isCompleteModelRoute(
   route?: ModelRouteSelection,
 ): route is ModelRouteSelection & { provider: string; model: string } {
   return (
+    !isPendingBaiModel(route) &&
     typeof route?.provider === 'string' &&
     route.provider.trim().length > 0 &&
     typeof route.model === 'string' &&

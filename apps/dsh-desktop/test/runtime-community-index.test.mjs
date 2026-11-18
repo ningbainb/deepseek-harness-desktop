@@ -23,6 +23,7 @@ test('official format-1 validator accepts the named pinned catalog and retains l
   const parsed = parseMarketIndex(raw, DESKTOP_COMMUNITY_INDEX_URL)
   assert.equal(parsed.format, 1)
   assert.match(parsed.title.en, /DSH Desktop/)
+  assert.equal(parsed.title.zh, '创意工坊')
   assert.deepEqual(parsed.plugins.map(plugin => [plugin.name, plugin.versions[0].version]), [
     ['dsh-context', '0.85.1'],
     ['dsh-prompt-customizer', '2.2.0'],
@@ -62,10 +63,30 @@ test('existing index order, user configuration and disabled state survive idempo
   const patches = [...base([]), ...userPatches]
   const first = adaptDesktopCommunityIndexPatches(patches, { userPatches })
   const row = composeEntries(first)[0]
-  assert.deepEqual(row.config.indexes, ['https://example.com/a.json', 'https://example.com/b.json', DESKTOP_COMMUNITY_INDEX_URL])
+  assert.deepEqual(row.config.indexes, ['https://example.com/a.json', 'https://example.com/b.json'])
   assert.equal(row.disabled, true)
   assert.equal(row.config.fetchTimeoutMs, 7700)
   assert.deepEqual(adaptDesktopCommunityIndexPatches(first, { userPatches }), first)
+})
+
+test('Desktop enables the official Discover source once and uses the bundled Workshop without network', async () => {
+  const { adaptDesktopCommunityIndexPatches, DESKTOP_COMMUNITY_INDEX_URL, installDesktopWorkshopIndexFetch } = await import(moduleUrl)
+  const options = { enableWorkshop: true }
+  const first = adaptDesktopCommunityIndexPatches([], options)
+  assert.deepEqual(adaptDesktopCommunityIndexPatches(first, options), first)
+  assert.deepEqual(composeEntries(first).map(row => row.id), ['plugin-market', 'ui-plugin-market'])
+  const calls = []
+  const original = async input => { calls.push(input); return new Response('ordinary fetch') }
+  const target = { fetch: original }
+  const dispose = installDesktopWorkshopIndexFetch(target)
+  try {
+    const response = await target.fetch(DESKTOP_COMMUNITY_INDEX_URL)
+    assert.equal(parseMarketIndex(await response.json(), DESKTOP_COMMUNITY_INDEX_URL).title.zh, '创意工坊')
+    assert.deepEqual(calls, [])
+    assert.equal(await (await target.fetch('https://example.com/index.json')).text(), 'ordinary fetch')
+    assert.deepEqual(calls, ['https://example.com/index.json'])
+  } finally { dispose() }
+  assert.equal(target.fetch, original)
 })
 
 test('foreign market replacements and independent Web profiles remain untouched', async () => {

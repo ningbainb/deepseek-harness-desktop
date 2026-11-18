@@ -280,7 +280,9 @@ dsh_extraction_cancel_recovered:
 !macroend
 
 !macro DshExtractTargetVolumePayload
+  !insertmacro DshTiming "payload-prepare-start"
   !insertmacro DshTargetPayloadCommand PreparePayload '-PayloadArchiveBytes ${DSH_TARGET_ARCHIVE_BYTES} -PayloadInstalledBytes ${DSH_TARGET_INSTALLED_BYTES}'
+  !insertmacro DshTiming "payload-prepare-end"
   StrCmp $0 "0" 0 payload_prepare_failed
   StrLen $2 $1
   StrCmp $2 "32" 0 payload_prepare_failed
@@ -299,13 +301,22 @@ dsh_extraction_cancel_recovered:
   !endif
   !insertmacro DshTiming "embedded-archive-ready"
   !insertmacro DshTiming "archive-decompress-start"
-  SetOutPath "$DshTargetPayloadStage\files"
   ClearErrors
-  Nsis7z::Extract "$DshTargetPayloadStage\application.7z"
+  File /oname=$PLUGINSDIR\dsh-payload-7za.exe "${DSH_TARGET_PAYLOAD_EXTRACTOR}"
   IfErrors payload_extract_failed
+  ; Nsis7z silently drops files whose stage path exceeds MAX_PATH.
+  nsExec::ExecToStack '"$PLUGINSDIR\dsh-payload-7za.exe" x "$DshTargetPayloadStage\application.7z" -o"$DshTargetPayloadStage\files" -y -bso0 -bsp0'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 payload_decode_failed
   !insertmacro DshTiming "archive-decompressed"
   IfFileExists "$DshTargetPayloadStage\files\${UNINSTALL_FILENAME}" payload_extract_failed
   File "/oname=$DshTargetPayloadStage\files\${UNINSTALL_FILENAME}" "${UNINSTALLER_OUT_FILE}"
+  IfErrors payload_extract_failed
+  SetOutPath "$DshTargetPayloadStage\files\resources\installer-archive-extractor"
+  File "${DSH_TARGET_PAYLOAD_EXTRACTOR_LICENSES}\LICENSE.txt"
+  File "${DSH_TARGET_PAYLOAD_EXTRACTOR_LICENSES}\COPYING"
+  File "${BUILD_RESOURCES_DIR}\installer-archive-extractor-source.txt"
   IfErrors payload_extract_failed
   !insertmacro DshTiming "payload-promote-start"
   !insertmacro DshTargetPayloadCommand PromotePayload '-RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
@@ -315,6 +326,9 @@ dsh_extraction_cancel_recovered:
   Goto payload_staging_failed
 payload_prepare_failed:
   !insertmacro DshLog "payload-staging" "$0" "$1"
+  Goto payload_staging_failed
+payload_decode_failed:
+  !insertmacro DshLog "payload-extraction" "$0" "$1"
   Goto payload_staging_failed
 payload_extract_failed:
   !insertmacro DshLog "payload-extraction" "2" "Failed to stage or decompress the embedded application archive"
@@ -342,7 +356,9 @@ payload_promoted:
   !endif
   !ifndef BUILD_UNINSTALLER
     !ifdef DSH_TARGET_PAYLOAD_STAGE
+      !insertmacro DshTiming "target-volume-preflight-start"
       !insertmacro DshTargetPayloadCommand ValidatePayload '-PayloadArchiveBytes ${DSH_TARGET_ARCHIVE_BYTES} -PayloadInstalledBytes ${DSH_TARGET_INSTALLED_BYTES}'
+      !insertmacro DshTiming "target-volume-preflight-end"
       !insertmacro DshLog "target-volume-preflight" "$0" "$1"
       StrCmp $0 "0" target_volume_preflight_ready
       !insertmacro DshStopProgress
@@ -362,6 +378,7 @@ payload_promoted:
     nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-browser-preflight.ps1" -InstallDirectory "$INSTDIR" -PreflightEntry "$PLUGINSDIR\browser-component-preflight\bin\preflight.mjs" -ExpectedEntrySHA256 "${DSH_BROWSER_PREFLIGHT_SHA256}" -ExpectedManifestSHA256 "${DSH_BROWSER_COMPONENT_MANIFEST_SHA256}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -InstallerProcessId $2'
     Pop $0
     Pop $1
+    !insertmacro DshTiming "browser-preflight-end"
     !insertmacro DshLog "browser-component-preflight" "$0" "$1"
     StrCmp $0 "0" browser_preflight_ready
     !insertmacro DshStopProgress
@@ -420,9 +437,10 @@ cleanup_done:
   Goto old_uninstall_failed_${SUFFIX}
 old_uninstall_launch_failed_${SUFFIX}:
   !insertmacro DshLog "old-uninstaller" "launch-error" "Previous uninstaller could not be started"
+  StrCpy $R0 "launch-error"
 old_uninstall_failed_${SUFFIX}:
   !insertmacro DshStopProgress
-  MessageBox MB_ICONSTOP|MB_OK "旧版卸载未完成，安装已停止。请勿手动删除旧目录或会话数据。关闭占用程序后重试；日志位于：$\r$\n$DshInstallerLogPath" /SD IDOK
+  MessageBox MB_ICONSTOP|MB_OK "旧版卸载未完成（$R0），安装已停止。请保留旧目录和会话数据。详细日志：$\r$\n$DshInstallerLogPath" /SD IDOK
   SetErrorLevel 2
   Abort
 old_uninstall_done_${SUFFIX}:
@@ -495,12 +513,22 @@ runtime_restore_done:
       !error "Offline runtime restoration must execute before registration and shortcuts"
     !endif
   !endif
+  StrCpy $4 ""
+  !ifdef DSH_TARGET_PAYLOAD_STAGE
+    !ifdef APP_INSTALLER_STORE_FILE
+      StrCmp $installMode "all" installer_cache_arguments_ready
+      StrCpy $4 '-InstallerExecutable "$EXEPATH" -InstallerStoreFile "${APP_INSTALLER_STORE_FILE}"'
+    installer_cache_arguments_ready:
+    !endif
+  !endif
   !insertmacro DshLog "commit-start" "pending" "Validating the new installation"
   !insertmacro DshWorkingProgress "3 / 3  校验并完成安装" "正在校验新版本并提交安装结果，请勿关闭安装程序。"
+  !insertmacro DshTiming "upgrade-commit-start"
   Call StageUpgradeTransactionScript
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit ${DSH_RUNTIME_COMPLETE_ARGUMENT} -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode Commit ${DSH_RUNTIME_COMPLETE_ARGUMENT} -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}" $4'
   Pop $0
   Pop $1
+  !insertmacro DshTiming "upgrade-commit-end"
   !insertmacro DshLog "commit" "$0" "$1"
   StrCmp $0 "0" upgrade_commit_done
   !insertmacro DshStopProgress
@@ -525,7 +553,9 @@ upgrade_commit_done:
   Call RetireLegacyInstallerIdentity
   !insertmacro DshLog "legacy-identity" "0" "Retired the owned 3.x installer registry identity"
 legacy_identity_retired:
+  !insertmacro DshTiming "finish-paths-start"
   Call DshReadFinishPaths
+  !insertmacro DshTiming "finish-paths-end"
   !insertmacro DshLog "completed" "0" "Installation committed"
   !insertmacro DshStopProgress
   SendMessage $DshProgressBar 0x401 0 0x00640000

@@ -49,7 +49,21 @@ try {
     await dock.waitForFunction(expected => document.documentElement.dataset.dshDesktopTheme === expected, theme, { timeout: 60_000 })
     const visited = new Set()
     for (const destination of destinationIds) {
-      await visitDockDestination(dock, destination)
+      const button = dock.locator(`#${destination}`)
+      if (await button.getAttribute('data-native-page')) await dock.locator('#models-tab').click()
+      else await visitDockDestination(dock, destination)
+      if (destination === 'plugins-hub-tab' && !baseline) {
+        const rows = dock.locator('#plugins-home .dock-destination')
+        await rows.last().waitFor({ state: 'visible' })
+        assert.equal(await rows.count(), 4, 'plugin destinations remain directly available')
+        const geometry = await rows.evaluateAll(buttons => buttons.map(button => {
+          const bounds = button.getBoundingClientRect()
+          const icon = button.querySelector('.dock-destination-icon')?.getBoundingClientRect()
+          return { rowFits: bounds.left >= 0 && bounds.right <= innerWidth && bounds.height >= 56,
+            iconFits: icon?.width === 42 && icon.top >= bounds.top && icon.bottom <= bounds.bottom }
+        }))
+        assert.ok(geometry.every(row => row.rowFits && row.iconFits), JSON.stringify(geometry))
+      }
       await dock.locator(`#${destination}`).hover()
       await dock.waitForTimeout(300)
       const sample = await dock.evaluate(ids => {
@@ -159,7 +173,7 @@ try {
   await visitDockDestination(dock, 'skills-tab')
   await dock.locator('#skills').waitFor({ state: 'visible' })
   await visitDockDestination(dock, 'plugins-hub-tab')
-  await dock.locator('#plugins').waitFor({ state: 'visible' })
+  await dock.locator('#plugins-home [data-open-dock-tab="market-tab"]').waitFor({ state: 'visible' })
   const navigation = dock.locator('#models-tab')
   await navigation.focus()
   if (!baseline) assert.ok(await navigation.evaluate(element => Number.parseFloat(getComputedStyle(element).outlineWidth)) >= 2)

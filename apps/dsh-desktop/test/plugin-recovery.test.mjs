@@ -68,6 +68,23 @@ test('diagnostic-only recovery observes no Runtime events and cannot auto-disabl
   await recovery.dispose()
 })
 
+test('a rejected bundle toggle restarts the previous Runtime', async () => {
+  const calls = []
+  const controller = Object.assign(new EventEmitter(), {
+    stop: async () => { calls.push('stop') },
+    start: async () => { calls.push('start') },
+  })
+  const recovery = new DesktopPluginRecovery({
+    controller, store: new EventEmitter(), automatic: false,
+    pluginManager: { setEnabled: async () => { throw new Error('Protected bundle') } },
+    ensureProfile: async () => { calls.push('profile') },
+  })
+  try {
+    await assert.rejects(recovery.setPluginEnabledAndRestart('protected-bundle', false), /Protected bundle/u)
+    assert.deepEqual(calls, ['stop', 'profile', 'start'])
+  } finally { await recovery.dispose() }
+})
+
 test('Electron startup leaves baseline quarantine and compatibility mutation out of the load path', async () => {
   const source = await readFile(new URL('../src/electron-app.mjs', import.meta.url), 'utf8')
   const bootstrap = source.slice(source.indexOf('export async function startElectronApp'))

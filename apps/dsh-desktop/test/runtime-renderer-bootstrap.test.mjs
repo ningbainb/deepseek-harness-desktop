@@ -37,6 +37,7 @@ function testTarget() {
     EventTarget,
     NativeWebSocket,
     Request,
+    Response,
     TextDecoder,
     TextEncoder,
     URL,
@@ -81,6 +82,94 @@ test('bootstrap source is self-contained and installs the owned transport', () =
   const source = transportBootstrapScript()
   assert.match(source, /^\(function installDesktopTransportBridge/u)
   assert.match(source, /openRuntimeStream/u)
+})
+
+function pluginRequest(method, args, overrides = {}) {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'client-request', rpcId: 'fixture-rpc', method, payload: { args } }),
+    ...overrides,
+  }
+}
+
+test('official plugin mutations go through main IPC and retain the SDK response envelope', async () => {
+  const { target } = testTarget()
+  const calls = []
+  const value = { changed: true, application: 'applied', stage: 'enable', target: 'fixture' }
+  target.dshDesktop.mutateNativePlugin = async (request) => { calls.push(request); return { ok: true, value } }
+  target.fetch = async () => assert.fail('a plugin mutation must not reach the worker')
+  installDesktopTransportBridge(target)
+
+  const commands = [
+    ['pluginManager/installBundle', { spec: 'dsh-context@0.85.1', options: { expected: { name: 'dsh-context', version: '0.85.1' } } }],
+    ['pluginManager/updateBundle', { name: 'dsh-context', version: '0.86.0' }],
+    ['pluginManager/removeBundle', { name: 'dsh-context' }],
+    ['pluginManager/setBundleEnabled', { name: 'dsh-context', enabled: false }],
+  ]
+  for (const [method, args] of commands) {
+    const request = new Request(`dsh-runtime://app/api/${method}`, pluginRequest(method, args))
+    const response = await target.__DSH_TRANSPORT__.fetch(request)
+    assert.deepEqual(await response.json(), { type: 'server-response', rpcId: 'fixture-rpc', method, result: { ok: true, value } })
+  }
+  assert.deepEqual(calls, commands.map(([method, args]) => ({ method, args })))
+})
+
+test('malformed and unsupported local plugin calls fail closed, while reads and remote requests stay on fetch', async () => {
+  const { target } = testTarget()
+  const forwarded = []
+  let ipcCalls = 0
+  target.fetch = async (input) => { forwarded.push(String(input)); return new Response('ok') }
+  target.dshDesktop.mutateNativePlugin = () => { ipcCalls += 1 }
+  installDesktopTransportBridge(target)
+
+  const transport = target.__DSH_TRANSPORT__
+  const method = 'pluginManager/installBundle'
+  const path = `api/${method}`
+  assert.equal((await transport.fetch(path, pluginRequest(method, {}, { body: '{' }))).status, 400)
+  assert.equal((await transport.fetch(path, pluginRequest('pluginManager/removeBundle', { name: 'fixture' }))).status, 400)
+  assert.equal((await transport.fetch(`${path}?bypass=1`, pluginRequest(method, { spec: 'fixture' }))).status, 400)
+  assert.equal((await transport.fetch(path, pluginRequest(method, []))).status, 400)
+  const unsupported = 'pluginManager/unsupportedPackageMutation'
+  const response = await transport.fetch(`api/${unsupported}`, pluginRequest(unsupported, {}))
+  assert.equal((await response.json()).result.ok, false)
+  assert.equal(ipcCalls, 0)
+
+  const read = 'pluginManager/listBundles'
+  await transport.fetch(`api/${read}`, pluginRequest(read, {}))
+  const row = 'pluginManager/setPluginEnabled'
+  await transport.fetch(`api/${row}`, pluginRequest(row, { id: 'fixture-row', enabled: false }))
+  await transport.fetch(`https://outside.test/api/${method}`, pluginRequest(method, { spec: 'fixture' }))
+  assert.deepEqual(forwarded, [`dsh-runtime://app/api/${read}`, `dsh-runtime://app/api/${row}`, `https://outside.test/api/${method}`])
+})
+
+test('aborting a plugin request prevents dispatch when possible and stops waiting after dispatch', async () => {
+  const { target } = testTarget()
+  let called = 0
+  let dispatch
+  const started = new Promise(resolve => { dispatch = resolve })
+  let settle
+  target.dshDesktop.mutateNativePlugin = () => {
+    called += 1
+    dispatch()
+    return new Promise(resolve => { settle = resolve })
+  }
+  target.fetch = async () => assert.fail('aborted mutations must not fall back to the worker')
+  installDesktopTransportBridge(target)
+  const method = 'pluginManager/removeBundle'
+  const path = `api/${method}`
+  const early = new AbortController()
+  early.abort(new Error('aborted before send'))
+  await assert.rejects(target.__DSH_TRANSPORT__.fetch(path, pluginRequest(method, { name: 'fixture' }, { signal: early.signal })), /aborted before send/u)
+  assert.equal(called, 0)
+
+  const late = new AbortController()
+  const reply = target.__DSH_TRANSPORT__.fetch(path, pluginRequest(method, { name: 'fixture' }, { signal: late.signal }))
+  await started
+  late.abort(new Error('aborted after send'))
+  await assert.rejects(reply, /aborted after send/u)
+  assert.equal(called, 1)
+  settle({ ok: true, value: {} })
 })
 
 test('owned WebSocket crosses the duplex bridge with RFC 6455 framing', async () => {

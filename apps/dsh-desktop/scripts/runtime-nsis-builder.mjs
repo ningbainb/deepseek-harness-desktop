@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { lstat, readFile, realpath } from 'node:fs/promises'
+import { lstat, readFile, realpath, unlink, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { configureNormalNsisBuild, verifyNormalNsisArchive } from './runtime-nsis-options.mjs'
+import { configureNormalNsisBuild, routeOldUninstallFailure, verifyNormalNsisArchive } from './runtime-nsis-options.mjs'
 
 const flag = '--dsh-runtime-nsis-adapter='
 const matches = process.argv.slice(2).filter(arg => arg.startsWith(flag))
@@ -47,9 +47,19 @@ configured.effectiveOptionComputed = async values => {
       throw new Error('Missing exact target-volume payload size')
     }
     defines.DSH_TARGET_PAYLOAD_STAGE = '1'
+    defines.DSH_TARGET_PAYLOAD_EXTRACTOR = sevenZip
+    defines.DSH_TARGET_PAYLOAD_EXTRACTOR_LICENSES = dirname(dirname(sevenZip))
     defines.DSH_TARGET_ARCHIVE_BYTES = String(archive.size)
     defines.DSH_TARGET_INSTALLED_BYTES = String(installedBytes)
   }
   return result
 }
-await builder.build(configured)
+const stockUtility = await readFile(join(dirname(core), 'installUtil.nsh'))
+const utilityOverride = join(directory, 'installUtil.nsh')
+await writeFile(utilityOverride, routeOldUninstallFailure(stockUtility), { flag: 'wx' })
+console.log('Verified NSIS old-uninstaller failures route to transaction rollback')
+try {
+  await builder.build(configured)
+} finally {
+  await unlink(utilityOverride)
+}

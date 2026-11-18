@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "policy": "desktop-first",
-  "runtimeVersion": "0.2.2-rc.3",
+  "runtimeVersion": "0.2.2-rc.5",
   "notes": [
-    "Desktop 5.3.0-rc.1 selects official NPM DSH 0.2.2-rc.3 explicitly (next, not latest). Source compatibility and interactive/business acceptance are recorded separately.",
+    "Desktop 5.3.0-rc.10 pins the public DSH 0.2.2-rc.5 cohort. Source compatibility and interactive Windows acceptance are recorded separately.",
     "Public registry snapshots below are historical and must be refreshed before a new package upgrade decision.",
     "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts; validation.results records executed checks separately.",
     "A selected version is not a packaged or user-data migration acceptance result."
@@ -567,7 +567,7 @@
       "publicSnapshot": {
         "status": "available",
         "latest": "0.3.20",
-        "checkedAt": "2026-09-12T06:50:37.000Z",
+        "checkedAt": "2026-09-12T06:50:37Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-client-ui-skin-center"
       },
       "reason": "Select the 0.4.4 Skin Center v2 and restore all 15 bundled skins in Desktop packaging; preserve selection migration and cross-window state.",
@@ -751,7 +751,7 @@
       "publicSnapshot": {
         "status": "not-found",
         "latest": null,
-        "checkedAt": "2026-09-13T00:00:00.000Z",
+        "checkedAt": "2026-09-13T00:00:00Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-pipe-webserver"
       },
       "reason": "Desktop-owned temporary compatibility boundary for reviewed WebRoute and upgrade subsets over the authenticated private pipe; it creates no TCP listener and has a documented exit condition.",
@@ -808,7 +808,7 @@
       "publicSnapshot": {
         "status": "not-found",
         "latest": null,
-        "checkedAt": "2026-09-12T06:50:36.270Z",
+        "checkedAt": "2026-09-12T06:50:36.27Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-desktop-repair"
       },
       "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
@@ -1106,7 +1106,7 @@
       "publicSnapshot": {
         "status": "available",
         "latest": "0.4.10",
-        "checkedAt": "2026-10-26T17:38:01.630Z",
+        "checkedAt": "2026-10-26T17:38:01.63Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-usage/latest"
       },
       "reason": "Select the published rc.4-compatible 0.4.10 settings navigation and retain ledger/configuration identities. Cache the live footer through a reviewed Desktop patch; actual billing reconciliation remains separate acceptance.",
@@ -1275,7 +1275,7 @@
       "publicSnapshot": {
         "status": "not-found",
         "latest": null,
-        "checkedAt": "2026-09-12T06:50:37.380Z",
+        "checkedAt": "2026-09-12T06:50:37.38Z",
         "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-user-scope"
       },
       "reason": "Keep the Desktop-owned workspace implementation; no public replacement was available in the registry snapshot.",
@@ -1381,7 +1381,7 @@
       "publicSnapshot": {
         "status": "available",
         "latest": "0.0.6",
-        "checkedAt": "2026-09-12T06:50:37.620Z",
+        "checkedAt": "2026-09-12T06:50:37.62Z",
         "url": "https://registry.npmjs.org/reasoning-slider"
       },
       "reason": "Select 0.0.6 and keep the model preferences integration; verify that the reasoning control remains visible and affects requests.",
@@ -1402,7 +1402,7 @@
     {
       "name": "@deepseek-ai/dsh-browser-use",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1411,7 +1411,7 @@
         "checkedAt": "2026-11-17T10:29:15.278Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-browser-use"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Disabled by default with a visible isolated browser session",
         "Observation tools may run directly while mutating actions require approval"
@@ -1430,7 +1430,7 @@
     {
       "name": "@deepseek-ai/dsh-computer-use",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1439,7 +1439,7 @@
         "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-computer-use"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Disabled by default and platform availability is reported honestly",
         "Input actions require approval and native startup loops are interrupted"
@@ -1458,7 +1458,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1467,7 +1467,7 @@
         "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-chrome-devtools-mcp"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Advanced opt-in provider",
         "Visible isolated launch remains the default mode"
@@ -1485,7 +1485,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1494,7 +1494,7 @@
         "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-playwright-mcp"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Default Browser Use provider",
         "No bundled Chromium download"
@@ -1512,7 +1512,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-runtime",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1521,7 +1521,7 @@
         "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-runtime"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Exact provider runtime identity",
         "Session-owned browser cleanup"
@@ -1539,7 +1539,7 @@
     {
       "name": "@deepseek-ai/dsh-experimental-browser-use-stagehand-native",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1548,7 +1548,7 @@
         "checkedAt": "2026-11-17T10:29:15.279Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-browser-use-stagehand-native"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Separate model credential boundary",
         "No secret value crosses the preload API"
@@ -1566,16 +1566,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-11-17T10:29:15.280Z",
+        "checkedAt": "2026-11-17T10:29:15.28Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-mcp"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Process-isolated fallback",
         "Fixed mcp argument without shell execution"
@@ -1593,16 +1593,16 @@
     {
       "name": "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
         "latest": "0.1.6-alpha.1",
-        "checkedAt": "2026-11-17T10:29:15.280Z",
+        "checkedAt": "2026-11-17T10:29:15.28Z",
         "url": "https://registry.npmjs.org/%40deepseek-ai%2Fdsh-experimental-computer-use-cua-driver-native"
       },
-      "reason": "Use the verified official rc.3 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
+      "reason": "Use the verified official rc.4 package and preserve its Desktop settings and permissions. Interactive migration acceptance remains separate.",
       "desktopContracts": [
         "Packaged architecture-specific optional dependency",
         "Repeated startup failure preserves configuration but disables effective activation"
@@ -1627,7 +1627,7 @@
       "publicSnapshot": {
         "status": "available",
         "latest": "0.3.23",
-        "checkedAt": "2026-09-18T00:49:19.000Z",
+        "checkedAt": "2026-09-18T00:49:19Z",
         "url": "https://registry.npmjs.org/%40linxin666%2Fdsh-web-all/latest"
       },
       "reason": "Retain the published 0.4.4 carrier and its archived alpha cohort provenance while Desktop-owned SDK/Profile adapters target official 0.2.2-rc.1. Preserve Desktop-only loaders and user configuration; current interactive acceptance is recorded separately.",
@@ -1651,7 +1651,7 @@
     {
       "name": "@deepseek-ai/dsh-agent-team",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1680,7 +1680,7 @@
     {
       "name": "@deepseek-ai/dsh-client-ui-agent-team",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {
@@ -1709,7 +1709,7 @@
     {
       "name": "@deepseek-ai/dsh-tool-agent-team",
       "selection": {
-        "version": "0.2.2-rc.3",
+        "version": "0.2.2-rc.5",
         "source": "npm"
       },
       "publicSnapshot": {

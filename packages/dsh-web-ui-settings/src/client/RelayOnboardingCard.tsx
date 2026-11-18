@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   RELAY_CONFIGURE_PATH,
   RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH,
+  isPendingBaiModel,
   type RelayConnection, type RelayConnectResponse,
   RELAY_KEYS_URL,
+  RELAY_PROVIDER_ID,
   RELAY_REMOVE_PATH,
   RELAY_REFRESH_PATH,
   RELAY_SIGN_UP_URL,
@@ -17,9 +19,63 @@ import type { RelayLocaleKey } from './locales.ts'
 import { reportFeatureEvent } from './feature-telemetry.ts'
 import { openExternalUrl } from './open-external.ts'
 import { announceRelayModels, postRelay as postJson, RelayClientError } from './relay-client.ts'
+import { chatGptAuthClient } from './chatgpt-auth-client.ts'
 import css from './relay-onboarding.module.css'
 
-export type RelayOnboardingCardProps = PropsLocale<'relay-onboarding'>
+type DefaultModel = { provider?: string; model?: string }
+type DefaultModelScope = {
+  getSnapshot: () => { value: DefaultModel | undefined; status: 'loading' | 'ready' | 'unavailable' }
+  subscribe: (listener: () => void) => () => void
+}
+
+export type RelayOnboardingCardProps = PropsLocale<'relay-onboarding'> & {
+  compact?: boolean
+  defaultModelScope?: DefaultModelScope
+  subscribeCodexCredential?: (listener: () => void) => () => void
+}
+
+function defaultModelText(snapshot: ReturnType<DefaultModelScope['getSnapshot']> | undefined, status: RelayStatusResponse | null,
+  t: (key: RelayLocaleKey) => string, subscribeCodexCredential: RelayOnboardingCardProps['subscribeCodexCredential']): ReactNode {
+  if (snapshot?.status === 'loading') return t('defaultModelLoading')
+  if (snapshot?.status !== 'ready') return t('defaultModelUnavailable')
+  const selected = snapshot.value
+  if (!selected?.provider || !selected.model) return t('defaultModelEmpty')
+  if (isPendingBaiModel(selected)) return t('defaultModelBaiSignIn')
+  if (selected.provider === RELAY_PROVIDER_ID) {
+    return `${t('title')} · ${status?.models.find(model => model.id === selected.model)?.name ?? selected.model}`
+  }
+  if (selected.provider === 'deepseek-official' || selected.provider === 'deepseek-account') return `DeepSeek · ${selected.model}`
+  if (selected.provider === 'openai-codex') {
+    return <CodexDefaultLabel key={selected.model} model={selected.model} t={t} subscribe={subscribeCodexCredential} />
+  }
+  return `${selected.provider} · ${selected.model}`
+}
+
+function CodexDefaultLabel({ model, t, subscribe }: {
+  model: string
+  t: (key: RelayLocaleKey) => string
+  subscribe: RelayOnboardingCardProps['subscribeCodexCredential']
+}): string {
+  const [credential, setCredential] = useState<'loading' | 'unavailable' | 'signed-in' | 'signed-out'>('loading')
+  useEffect(() => {
+    let revision = 0
+    const refresh = () => {
+      const request = ++revision
+      setCredential('loading')
+      void chatGptAuthClient.state().then(state => {
+        if (request === revision) setCredential(state.configured ? 'signed-in' : 'signed-out')
+      }, () => {
+        if (request === revision) setCredential('unavailable')
+      })
+    }
+    const unsubscribe = subscribe?.(refresh)
+    refresh()
+    return () => { revision++; unsubscribe?.() }
+  }, [subscribe])
+  if (credential === 'signed-in') return `Codex · ${model}`
+  if (credential === 'signed-out') return t('defaultModelCodexSignIn')
+  return t(credential === 'loading' ? 'defaultModelLoading' : 'defaultModelUnavailable')
+}
 
 type BaiAcquisitionOutcome = 'viewed' | 'started' | 'succeeded' | 'failed' | 'continued'
 type BaiAcquisitionDetail = 'entry' | 'browser' | 'manual' | 'model-picker'
@@ -67,6 +123,7 @@ function errorText(code: string, t: (key: RelayLocaleKey) => string): string {
 function statusText(status: RelayStatusResponse | null, loading: boolean, t: (key: RelayLocaleKey) => string): string {
   if (loading) return t('statusLoading')
   if (status === null) return t('statusRemote')
+  if (status.configured && status.sync?.error === 'relay-auth') return t('statusSignInAgain')
   if (status.configured) return t('statusReady')
   if (status.profileConfigured) return t('statusProfileOnly')
   if (status.credentialConfigured) return t('statusCredentialOnly')
@@ -74,8 +131,8 @@ function statusText(status: RelayStatusResponse | null, loading: boolean, t: (ke
 }
 
 export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
-  const { t } = props
-  const [expanded, setExpanded] = useState(true)
+  const { t, compact = false, defaultModelScope, subscribeCodexCredential } = props
+  const [expanded, setExpanded] = useState(!compact)
   const [status, setStatus] = useState<RelayStatusResponse | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(true)
@@ -87,6 +144,10 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const [connection, setConnection] = useState<RelayConnection>({ phase: 'idle' })
   const initialStatus = useRef(true)
   const connecting = ['starting', 'pending', 'connecting'].includes(connection.phase)
+  const defaultModel = useSyncExternalStore(
+    useCallback((listener: () => void) => defaultModelScope?.subscribe(listener) ?? (() => {}), [defaultModelScope]),
+    useCallback(() => defaultModelScope?.getSnapshot(), [defaultModelScope]),
+  )
 
   const loadStatus = useCallback(async (): Promise<void> => {
     setLoading(true)
@@ -190,6 +251,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
 
   const canWrite = status?.writable === true && !loading
   const configured = status?.configured === true
+  const authorized = configured && status.sync?.error !== 'relay-auth'
   const showClear = status?.profileConfigured === true || status?.credentialConfigured === true
 
   const continueToModels = (): void => {
@@ -215,7 +277,11 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   }
 
   return (
-    <section className={css.card} data-relay-onboarding-card="true" data-dock-dirty={apiKey.trim() !== '' ? 'true' : undefined}>
+    <section className={compact ? `${css.card} ${css.compact}` : css.card} data-relay-onboarding-card="true" data-dock-dirty={apiKey.trim() !== '' ? 'true' : undefined}>
+      {compact && defaultModelScope && <dl className={css.defaultModel} data-dsh-default-model aria-live="polite">
+        <dt>{t('defaultModel')}</dt>
+        <dd>{defaultModelText(defaultModel, status, t, subscribeCodexCredential)}</dd>
+      </dl>}
       <header className={css.header}>
         <button type="button" className={css.collapse} aria-expanded={expanded} aria-controls="dsh-relay-content" aria-label={t(expanded ? 'collapseRelay' : 'expandRelay')} title={t(expanded ? 'collapseRelay' : 'expandRelay')} onClick={() => setExpanded(value => !value)}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d={expanded ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -224,7 +290,13 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
           <h3 className={css.title}>{t('title')}</h3>
           <p className={css.description}>{t('description')}</p>
         </div>
-        <span className={status?.configured ? css.badgeReady : css.badge}>{statusText(status, loading, t)}</span>
+        <span className={authorized ? css.badgeReady : css.badge}>{statusText(status, loading, t)}</span>
+        {compact && !expanded && <div className={css.actions}>
+          {authorized
+            ? <button type="button" className={css.secondary} onClick={continueToModels}>{t('chooseModel')}</button>
+            : <button type="button" className={css.primary} disabled={!canWrite || connecting}
+                onClick={() => { setExpanded(true); void connect() }}>{t('connect')}</button>}
+        </div>}
       </header>
       <div id="dsh-relay-content" className={css.body} hidden={!expanded}>
       {!configured && <div className={css.benefits} aria-label={t('benefitsLabel')}>

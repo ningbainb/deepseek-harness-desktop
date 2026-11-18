@@ -392,15 +392,17 @@ test('five Dock groups retain every old destination and place settings navigatio
   const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
   const document = dom.window.document
   const selected = []
+  const native = []
   const context = vm.createContext({ document, localStorage: dom.window.localStorage,
     tabs: [...document.querySelectorAll('[data-tab]')], notify() {},
-    window: { dshDesktop: { selectDockSetting: async value => selected.push(value) } },
+    window: { dshDesktop: { selectDockSetting: async value => selected.push(value),
+      openNativePage: async value => { native.push(value); return true } } },
   })
   vm.runInContext(section('let settingsRequest = 0', "document.querySelector('#dock-settings-retry').addEventListener"), context)
   const roots = [...document.querySelectorAll('.settings-sidebar > nav:not([data-tab-group]) > button')]
   assert.deepEqual(roots.map(button => button.querySelector('.tab-title').textContent), ['插件', '技能', '外观', '桌面设置', '更多工具'])
   for (const [id, setting, group] of [
-    ['control-center', 'control-center', 'more-tools'], ['models', 'models', 'desktop-settings'],
+    ['control-center', 'control-center', 'more-tools'], ['models', null, 'desktop-settings'], ['models-page', 'models', 'desktop-settings'],
     ['value-mode', 'value-mode', 'desktop-settings'], ['personal-prompt', 'personal-prompt', 'desktop-settings'],
     ['describe-image', 'describe-image', 'desktop-settings'], ['usage', 'usage', 'desktop-settings'],
     ['sessions', 'sessions', 'desktop-settings'], ['plugins-hub', null, 'plugins'],
@@ -417,6 +419,11 @@ test('five Dock groups retain every old destination and place settings navigatio
     assert.ok(entry.closest('.settings-sidebar'), `${id} must be outside the runtime view`)
     assert.ok(roots.find(button => button.dataset.group === group).classList.contains('active'), `${id} selects its primary group`)
   }
+  const embeddedCalls = selected.length
+  await vm.runInContext("activateTab(document.getElementById('models-page-tab'), false, undefined, undefined, true)", context)
+  await vm.runInContext("activateTab(document.getElementById('market-tab'), false, undefined, undefined, true)", context)
+  assert.deepEqual(native, ['models', 'workshop'])
+  assert.equal(selected.length, embeddedCalls, 'Successful native shortcuts do not mount duplicate embedded settings')
   dom.window.close()
 })
 
