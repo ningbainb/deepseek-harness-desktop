@@ -194,8 +194,10 @@ test('streaming mutation bursts share one geometry sync before the next frame', 
 test('streamed reply markup avoids caption layout while real inline dialogs still receive it', () => {
   const f = chromeObserverFixture(), dispose = f.start()
   const flow = { closest: selector => selector === '[data-chat-flow]' ? flow : null }
+  const conversation = { closest: selector => selector === '[data-pane="conversation"]' ? conversation : null }
   for (let index = 0; index < 10; index++) {
     f.mutate([{ type: 'childList', target: flow, addedNodes: [f.node(false)], removedNodes: [] }])
+    f.mutate([{ type: 'childList', target: conversation, addedNodes: [f.node(false)], removedNodes: [] }])
   }
   assert.equal(f.rootCalls.length, 1)
   const dialog = f.node()

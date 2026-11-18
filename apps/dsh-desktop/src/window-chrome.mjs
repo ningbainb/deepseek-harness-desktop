@@ -484,7 +484,8 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
       const target = record.target
       // Transcript mutations cannot move the caption or its viewport root.
       // Inline dialogs still participate in the same ownership checks.
-      if (!needsLayout && !target?.closest?.('[data-chat-flow]')) needsLayout = true
+      if (!needsLayout && !target?.closest?.('[data-chat-flow]')
+        && !target?.closest?.('[data-pane="conversation"]')) needsLayout = true
       if (record.type === 'attributes') {
         const wasDialog = dialogs.has(target)
         if (membership.has(record.attributeName)) classify(target)
@@ -679,7 +680,8 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
       }
     });
     return true;
-  })()`
+  })()
+//# sourceURL=dsh-desktop/window-chrome.js`
 }
 
 export async function applyWindowChrome({ webContents, iconDataUrl, showHelpMenu = false, showToolsMenu = false }) {

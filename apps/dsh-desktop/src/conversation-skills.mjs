@@ -393,24 +393,28 @@ function installConversationSkillsPage() {
     state.button = button
   }
 
+  const composerSelector = '[data-composer-card="true"]'
+  const commandSelector = [
+    'button[aria-label="指令"]',
+    'button[aria-label="命令"]',
+    'button[aria-label="Commands"]',
+    'button[aria-label="添加文件或调用指令"]',
+    'button[aria-label="Add files or invoke commands"]',
+    'button[aria-label="添加文件或运行命令"]',
+    'button[aria-label="Add files or run commands"]',
+  ].join(',')
+  const editorSelector = 'textarea, [role="textbox"][contenteditable]:not([contenteditable="false"])'
+
   function visibleComposer() {
-    const composers = [...document.querySelectorAll('[data-composer-card="true"]')]
+    const composers = [...document.querySelectorAll(composerSelector)]
     return composers.findLast((element) => element.getClientRects().length > 0) ?? null
   }
 
   function mount() {
     state.scheduled = false
     const composer = visibleComposer()
-    const commandButton = composer?.querySelector([
-      'button[aria-label="指令"]',
-      'button[aria-label="命令"]',
-      'button[aria-label="Commands"]',
-      'button[aria-label="添加文件或调用指令"]',
-      'button[aria-label="Add files or invoke commands"]',
-      'button[aria-label="添加文件或运行命令"]',
-      'button[aria-label="Add files or run commands"]',
-    ].join(','))
-    const textarea = composer?.querySelector('textarea, [role="textbox"][contenteditable]:not([contenteditable="false"])')
+    const commandButton = composer?.querySelector(commandSelector)
+    const textarea = composer?.querySelector(editorSelector)
     if (!composer || !commandButton || !textarea) {
       if (state.composer && !state.composer.isConnected) closeMenu()
       return false
@@ -433,12 +437,27 @@ function installConversationSkillsPage() {
 
   createMenu()
   mount()
-  // Reply chunks do not replace the native composer. Measuring it from
-  // their mutation callbacks would force layout before the renderer paints.
+  const hasMatch = (node, selector) => node.matches?.(selector) || node.querySelector?.(selector)
+  const controlsSelector = [composerSelector, commandSelector, editorSelector].join(',')
   const observer = new MutationObserver(records => {
-    if (records.some(record => !record.target.closest?.('[data-chat-flow]'))) scheduleMount()
+    const affected = records.some(record => {
+      const composer = record.target.closest?.(composerSelector)
+      if (record.type === 'attributes') {
+        if (record.attributeName === 'data-composer-card') return true
+        if (record.attributeName === 'hidden' || record.attributeName === 'aria-hidden') {
+          return composer || hasMatch(record.target, composerSelector)
+        }
+        return composer && (record.target === state.commandButton || record.target === state.textarea
+          || hasMatch(record.target, controlsSelector))
+      }
+      if (composer === state.composer && state.anchor && !state.anchor.isConnected) return true
+      const selector = composer ? controlsSelector : composerSelector
+      return [...record.addedNodes, ...record.removedNodes].some(node => hasMatch(node, selector))
+    })
+    if (affected) scheduleMount()
   })
-  observer.observe(document.body, { childList: true, subtree: true })
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true,
+    attributeFilter: ['data-composer-card', 'aria-label', 'contenteditable', 'hidden', 'aria-hidden'] })
   const onOutsideInteraction = (event) => {
     if (!state.open) return
     if (state.menu.contains(event.target) || state.button.contains(event.target)) return
@@ -727,7 +746,8 @@ ${normalizeSkillDiagnostics.toString()}
 ${setNativeInputValue.toString()}
 ${insertSkillTrigger.toString()}
 return (${installConversationSkillsPage.toString()})()
-})()`
+})()
+//# sourceURL=dsh-desktop/conversation-skills.js`
 
 export async function applyConversationSkills(webContents) {
   if (!webContents || webContents.isDestroyed?.()) return false

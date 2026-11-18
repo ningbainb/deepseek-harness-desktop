@@ -55,7 +55,7 @@ for (const label of ['指令', '命令', 'Commands', '添加文件或调用指�
 
 
 test('streamed replies leave the skill launcher attached without measuring the composer', async () => {
-  const dom = new JSDOM('<article data-chat-flow></article><main data-composer-card="true"><button aria-label="Commands"></button><div role="textbox" contenteditable="true"></div></main>',
+  const dom = new JSDOM('<aside data-pane="sidebar"></aside><article data-chat-flow></article><main data-composer-card="true"><button aria-label="Commands"></button><div role="textbox" contenteditable="true"></div></main>',
     { runScripts: 'outside-only', url: 'https://dsh.internal/' })
   try {
     const { document } = dom.window
@@ -72,6 +72,7 @@ test('streamed replies leave the skill launcher attached without measuring the c
       const row = document.createElement('p')
       row.textContent = 'stream ' + index
       document.querySelector('[data-chat-flow]').append(row)
+      document.querySelector('[data-pane=sidebar]').append(document.createElement('span'))
       await new Promise(resolve => setImmediate(resolve))
     }
     assert.equal(measured, beforeStreaming)
