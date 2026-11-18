@@ -15676,13 +15676,13 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-shutdown-control.test.mjs",
-      "line": 93,
+      "line": 120,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-shutdown-control.test.mjs",
-      "line": 104,
+      "line": 131,
       "operation": "stop"
     },
     {

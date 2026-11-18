@@ -733,6 +733,7 @@
         "packaged-windows-background-console-regression",
         "quit-invalidates-pending-runtime-presentation",
         "private-runtime-graceful-shutdown-with-force-fallback",
+        "runtime-stays-alive-until-shutdown-acknowledgement-pipe-closes",
         "bounded-shutdown-waits-for-inflight-http-responses",
         "quit-cancel-does-not-revive-stale-navigation",
         "official-hoisted-pnpm-linker-validated-with-local-fixtures",

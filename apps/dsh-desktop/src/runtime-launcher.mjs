@@ -363,8 +363,8 @@ async function run() {
     }
 
     await listenRuntimeShutdownControl(shutdownControl, () => shutdown(0), {
-      // Cleanup has completed and its acknowledgement has reached the pipe.
-      // Unrelated surviving handles must not delay an already committed stop.
+      // After cleanup, let the controller finish reading the acknowledgement
+      // before exiting regardless of unrelated surviving handles.
       onStopped: () => process.exit(process.exitCode ?? 0),
     })
     markStartup('transport')

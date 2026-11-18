@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createConnection } from 'node:net'
-import { EventEmitter } from 'node:events'
+import { EventEmitter, once } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { spawn } from 'node:child_process'
 import { DshRuntimeController } from '../src/runtime-controller.mjs'
@@ -41,6 +41,33 @@ test('authenticated stop waits for cleanup, refuses other capabilities and is si
     assert.equal(stopCount, 1)
     assert.equal(await requestRuntimeShutdown(control), false)
   } finally { release(); dispose() }
+})
+
+
+test('keeps the Runtime alive while the client receives the completed cleanup acknowledgement', { timeout: 5000 }, async () => {
+  const control = createRuntimeShutdownControl()
+  let stopped = false
+  let finish
+  const closed = new Promise(resolve => { finish = resolve })
+  const dispose = await listenRuntimeShutdownControl(control, async () => {}, {
+    onStopped: () => { stopped = true; finish() },
+  })
+  const client = createConnection({ path: control.path, allowHalfOpen: true })
+  try {
+    await once(client, 'connect')
+    const reply = once(client, 'data')
+    client.write(`stop ${control.token}\n`)
+    const [data] = await reply
+    assert.equal(data.toString('utf8'), 'stopped\n')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(stopped, false, 'the receiver still owns the open acknowledgement pipe')
+    client.destroy()
+    await closed
+    assert.equal(stopped, true)
+  } finally {
+    client.destroy()
+    dispose()
+  }
 })
 
 test('failed, missing and hung control servers do not acknowledge a graceful shutdown', async () => {

@@ -57,7 +57,14 @@ export async function listenRuntimeShutdownControl(control, shutdown, { onStoppe
       server.close()
       // A failed cleanup is not a successful acknowledgement. The Desktop's
       // existing process-tree timeout remains the final authority.
-      void Promise.resolve().then(shutdown).then(() => socket.end('stopped\n', onStopped), () => socket.destroy())
+      void Promise.resolve().then(shutdown).then(() => {
+        if (socket.destroyed) { onStopped(); return }
+        // A locally written acknowledgement can be lost on Windows if the
+        // Runtime exits before the controller reads and closes the pipe.
+        socket.once('close', onStopped)
+        socket.setTimeout(1000)
+        socket.write('stopped\n')
+      }, () => socket.destroy())
     })
   })
   await new Promise((resolve, reject) => {
