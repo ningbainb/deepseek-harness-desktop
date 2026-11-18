@@ -2,7 +2,7 @@
 
 ## 中文
 
-这一版把重点放在五件事上：覆盖升级更稳，界面更清晰，减少操作时的卡顿，记忆更容易管理，以及跟进官方 DSH RC5。
+5.3.0 正式版带来更稳妥的覆盖升级、更清晰的界面、更流畅的交互和更易管理的记忆，并适配官方 DSH RC5。
 
 ### 本次亮点
 
@@ -28,7 +28,7 @@ DeepSeek Harness Desktop 是社区维护的开源桌面应用。macOS arm64（ma
 
 ## English
 
-This release focuses on reliable upgrades, a clearer workspace, less work during everyday interactions, easier memory management, and compatibility with the official DSH RC5 runtime.
+The 5.3.0 stable release focuses on reliable upgrades, a clearer workspace, less work during everyday interactions, easier memory management, and compatibility with the official DSH RC5 runtime.
 
 ### Highlights
 

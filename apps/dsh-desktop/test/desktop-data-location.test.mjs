@@ -1,12 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, stat } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, stat, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
 
 const moduleUrl = new URL('../src/desktop-data-location.mjs', import.meta.url)
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-data-location-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-data-location-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   return { root, userData: join(root, 'shell'), defaultHome: join(root, 'community'), legacyHome: join(root, 'legacy'), env: {}, isPackaged: true }
 }

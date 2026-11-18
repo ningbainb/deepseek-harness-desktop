@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -103,7 +103,7 @@ test('packaged node_modules root uses Contents/Resources on macOS and resources 
 })
 
 test('darwin-arm64 pruner keeps spawn-helper and drops foreign node-pty prebuilds', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-prune-darwin-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-runtime-prune-darwin-'))
   try {
     const fixtures = new Map([
       ['node-pty/prebuilds/darwin-arm64/pty.node', 'keep-pty'],
@@ -144,7 +144,7 @@ test('darwin-arm64 pruner keeps spawn-helper and drops foreign node-pty prebuild
 })
 
 test('afterPack on darwin writes a prune report using the macOS bundle layout', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-after-pack-darwin-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-after-pack-darwin-'))
   try {
     const appOutDir = join(root, 'mac')
     const nodeModules = packagedNodeModulesRoot({
@@ -204,7 +204,7 @@ test('afterPack on darwin writes a prune report using the macOS bundle layout', 
 })
 
 test('afterPack still no-ops on unsupported platforms', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-after-pack-linux-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-after-pack-linux-'))
   try {
     await afterPack({
       electronPlatformName: 'freebsd',

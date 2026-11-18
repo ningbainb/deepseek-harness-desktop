@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -8,7 +8,7 @@ import afterPack from '../scripts/after-pack.cjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-manifest-provenance-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-manifest-provenance-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const sourceRoot = join(root, 'source')
   const nodeModulesRoot = join(root, 'staging', 'node_modules')

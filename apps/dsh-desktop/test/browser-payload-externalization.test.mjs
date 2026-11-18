@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url)
 const afterPack = require('../scripts/after-pack.cjs')
 
 test('packaging removes only the second Electron and reports actual bytes while retaining browser and Office', async t => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-external-browser-payload-'))
+  const root = await mkdtemp(join(await realpath(tmpdir()), 'dsh-external-browser-payload-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const modules = join(root, 'node_modules')
   for (const [name, bytes] of [['electron/dist/electron.exe', 'second-runtime'], ['electron/package.json', '{}'], ['dsh-builtin-browser/lib/index.js', 'browser'], ['@deepseek-ai/dsh-office-kit/lib/index.js', 'office']]) {

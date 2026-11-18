@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 import { prepareInstalledBrowserUpgrade } from '../src/browser-upgrade-preflight.mjs'
 async function fixture(t, { minimal = false, patch = '' } = {}) {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-browser-upgrade-'))
+  const home = await mkdtemp(join(await realpath(tmpdir()), 'dsh-browser-upgrade-'))
   t.after(() => rm(home, { recursive: true, force: true }))
   await mkdir(join(home, 'profiles/desktop'), { recursive: true })
   const original = JSON.stringify({ name: 'dsh-profile-desktop', dsh: { profile: { bundles: [], ...(minimal ? { desktopDefaults: 'minimal-v1' } : {}) } } })
