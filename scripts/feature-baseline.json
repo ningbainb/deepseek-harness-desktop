@@ -107,6 +107,7 @@
         "chatgpt-login-privacy-safe-funnel",
         "smart-control-shortcut-consolidated-into-extension-dock-more-tools",
         "conversation-extension-dock-brand-entry",
+        "first-run-dock-hint-keeps-neighboring-footer-controls-clickable",
         "wide-sidebar-extension-dock-label",
         "desktop-control-actions-require-approval",
         "full-filesystem-permission-preserves-browser-one-shot-approval-and-explicit-session-denial",

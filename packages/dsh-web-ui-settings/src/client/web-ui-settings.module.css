@@ -557,6 +557,8 @@
 
 .dockNudge {
   position: fixed;
+  /* The hint may overlap neighboring footer controls; only dismiss is interactive. */
+  pointer-events: none;
   z-index: 2147483000;
   display: flex;
   align-items: center;
@@ -596,6 +598,7 @@
 }
 
 .dockNudgeClose {
+  pointer-events: auto;
   display: inline-flex;
   flex: none;
   align-items: center;

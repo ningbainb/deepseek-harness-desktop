@@ -2,6 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const desktop = vi.hoisted(() => ({
   dismissDockNudge: vi.fn(),
@@ -186,6 +188,33 @@ describe('Desktop Extension Dock entry', () => {
     fireEvent.click(screen.getByRole('button', { name: '关闭拓展坞提示' }))
     expect(screen.queryByText('插件、技能和桌面核心功能在这里')).toBeNull()
     expect(desktop.dismissDockNudge).toHaveBeenCalledWith('close')
+  })
+
+  it('lets the first-run hint body pass pointer input to neighboring footer controls while its dismiss button remains interactive', async () => {
+    render(<DesktopExtensionDockEntry wide={true} t={t} />)
+    const copy = await screen.findByText('插件、技能和桌面核心功能在这里')
+    const hint = screen.getByRole('status')
+    const dismiss = screen.getByRole('button', { name: '关闭拓展坞提示' })
+    const source = readFileSync(resolve('src/client/web-ui-settings.module.css'), 'utf8')
+    const style = document.createElement('style')
+    // Apply the real declarations to the rendered elements: CSS modules are
+    // transformed in production, while jsdom has no native pointer hit testing.
+    style.textContent = ['dockNudge', 'dockNudgeClose'].map(name => {
+      const declarations = source.match(new RegExp(`\\.${name}\\s*\\{([^}]+)\\}`))?.[1]
+      expect(declarations).toBeTruthy()
+      return `.${name} { ${declarations} }`
+    }).join('\n')
+    hint.classList.add('dockNudge')
+    dismiss.classList.add('dockNudgeClose')
+    document.head.append(style)
+    try {
+      expect(getComputedStyle(hint).pointerEvents).toBe('none')
+      expect(getComputedStyle(copy).pointerEvents).toBe('none')
+      expect(getComputedStyle(dismiss).pointerEvents).toBe('auto')
+      fireEvent.click(dismiss)
+      expect(screen.queryByRole('status')).toBeNull()
+      expect(desktop.dismissDockNudge).toHaveBeenCalledWith('close')
+    } finally { style.remove() }
   })
 
   it('clamps the portaled hint inside a narrow viewport while pointing at the trigger', () => {
