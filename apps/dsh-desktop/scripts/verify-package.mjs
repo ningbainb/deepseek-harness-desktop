@@ -52,7 +52,7 @@ const resources = await resolvePackagedResourcesPath({
 })
 const desktopManifest = JSON.parse(await readFile(join(appDir, 'package.json'), 'utf8'))
 const unpackedModules = join(resources, 'app.asar.unpacked', 'node_modules')
-const { packageSupportsPlatform } = afterPack
+const { packageSupportsPlatform, verifyWindowsOfficePayload } = afterPack
 const ELECTRON_LOCALES = Object.freeze(['en-US.pak', 'zh-CN.pak', 'zh-TW.pak'])
 const requiredPackages = [
   ...DSH_BOOT_RUNTIME_PACKAGES,
@@ -131,6 +131,7 @@ await access(join(
 ))
 
 if (TARGET_PLATFORM.platform === 'win32' && TARGET_PLATFORM.arch === 'x64') {
+  await verifyWindowsOfficePayload(unpackedModules)
   await verifyWindowsSharpBinding(unpackedModules)
   await access(join(
     unpackedModules,
@@ -521,7 +522,7 @@ const packagedSdkIdentity = await verifyPackagedRuntimeSdkIdentity(resources, {
 })
 console.log(`verified ${packagedSdkIdentity.runtimeFiles.length} physical unpacked Runtime files and ${packagedSdkIdentity.consumers.length} SDK consumers sharing ${packagedSdkIdentity.canonicalURL}`)
 console.log(`verified SHA256 integrity for ${verifyAsarIntegrity(join(resources, 'app.asar'), {
-  requiredFiles: ['runtime-support/community-plugin-known-issues.json'],
+  requiredFiles: ['runtime-support/community-plugin-known-issues.json', 'runtime-support/community-plugin-index.json'],
 })} packed ASAR files`)
 await access(join(resources, 'app-icon.png'))
 await verifyBrandingAssets(appDir, { resources })
@@ -593,6 +594,9 @@ if (!packagingConfig.fileAssociations?.some((entry) => entry.ext === 'dshpreset'
 }
 if (!packagingConfig.files?.includes('runtime-support/community-plugin-known-issues.json')) {
   throw new Error('packaging config is missing the community plugin known-issues evidence')
+}
+if (!packagingConfig.files.includes('runtime-support/community-plugin-index.json')) {
+  throw new Error('packaging config is missing the community plugin index')
 }
 if (!packagingConfig.extraResources?.some((entry) => entry.to === 'telemetry-config.json')) {
   throw new Error('packaging config is missing the anonymous metrics resource')

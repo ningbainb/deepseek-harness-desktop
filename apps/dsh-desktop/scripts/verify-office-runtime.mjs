@@ -80,6 +80,9 @@ export async function verifyOfficeRuntime({ resources, output = join(tmpdir(), `
  let fiber, failure
  try {
   const runtime = await resolveOfficeRuntime(resources), discovered = await runtime.kit.discoverRuntime()
+  if (resources && process.platform === 'win32' && process.arch === 'x64') {
+   assert.equal(discovered.backend, 'native', 'Windows x64 Desktop must operate on its packaged native Office engine')
+  }
   const engineName = discovered.backend === 'wasm' ? '@deepseek-ai/libreoffice-kit-wasm' : `@deepseek-ai/libreoffice-kit-${process.platform}-${process.arch}`
   const engineManifestPath = runtime.kitRequire.resolve(`${engineName}/prebuilds.json`)
   await runtime.verifyLocation(engineManifestPath)

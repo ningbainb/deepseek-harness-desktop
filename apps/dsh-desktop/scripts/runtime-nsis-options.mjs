@@ -5,6 +5,8 @@ const EXTERNAL_BROWSER_CORE_TARGETS = Object.freeze([
   'resources/app.asar.unpacked/runtime-support/browser-component.json',
 ])
 
+const WINDOWS_OFFICE_ROOT = 'resources/app.asar.unpacked/node_modules/@deepseek-ai/libreoffice-kit-win32-x64'
+
 /** Inspect the real compressed payload, preserving the legacy nested-runtime contract. */
 export function verifyNormalNsisArchive(adapter, archivePaths) {
   if (!archivePaths.has('resources/runtime-reconstruction/manifest.json')) throw new Error('NSIS archive has no offline reconstruction metadata')
@@ -18,7 +20,15 @@ export function verifyNormalNsisArchive(adapter, archivePaths) {
     if (required.length !== EXTERNAL_BROWSER_CORE_TARGETS.length
       || new Set(required).size !== required.length
       || EXTERNAL_BROWSER_CORE_TARGETS.some(target => !required.includes(target))) throw new Error('Incomplete external-browser core adapter')
-    for (const target of archivePaths) if (/(?:^|\/)node_modules\/electron\//u.test(target)) throw new Error('External-browser archive includes a nested Electron runtime')
+    for (const target of archivePaths) {
+      if (/(?:^|\/)node_modules\/electron\//u.test(target)) throw new Error('External-browser archive includes a nested Electron runtime')
+      if (/(?:^|\/)node_modules\/@deepseek-ai\/libreoffice-kit-wasm(?:\/|$)/u.test(target)) {
+        throw new Error('Windows NSIS archive includes the secondary Office WASM engine')
+      }
+    }
+    for (const file of ['prebuilds.json', 'bin/dsoffice.exe']) {
+      if (!archivePaths.has(`${WINDOWS_OFFICE_ROOT}/${file}`)) throw new Error(`Windows NSIS native Office engine file missing: ${file}`)
+    }
   } else if (!required.includes('resources/app.asar.unpacked/node_modules/electron/dist/electron.exe')) {
     throw new Error('Incomplete full-runtime adapter')
   }

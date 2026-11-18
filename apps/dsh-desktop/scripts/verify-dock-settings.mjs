@@ -186,28 +186,22 @@ try {
   const errors = []
   dock.on('pageerror', error => errors.push(error.message))
   await dock.locator('#plugins-hub-tab').waitFor()
-  const controlEntry = main.getByRole('button', { name: /智能操控|Smart Control/u }).first()
-  const collaborationEntry = main.getByRole('button', { name: /模型协作|Model collaboration/u }).first()
-  const dockEntry = main.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).first()
-  await controlEntry.waitFor({ timeout: 60_000 })
-  await collaborationEntry.waitFor({ timeout: 60_000 })
+  assert.equal(await main.getByRole('button', { name: /智能操控|Smart Control/u }).count(), 0, 'Desktop control entry lives in More tools')
+  assert.equal(await main.getByRole('button', { name: /模型协作|Model collaboration/u }).count(), 0, 'Desktop collaboration settings live in Models advanced')
+  const dockEntry = main.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u })
   await dockEntry.waitFor({ timeout: 60_000 })
+  assert.equal(await dockEntry.count(), 1)
   const sidebarBounds = await main.locator('[data-pane="sidebar"]').boundingBox()
-  const shortcutBounds = await Promise.all([controlEntry, collaborationEntry, dockEntry].map(entry => entry.boundingBox()))
-  assert.ok(sidebarBounds && shortcutBounds.every(Boolean), 'Desktop sidebar destinations have measurable bounds')
-  for (const entryBounds of shortcutBounds) {
-    assert.ok(entryBounds.x >= sidebarBounds.x - 1, JSON.stringify({ sidebarBounds, shortcutBounds }))
-    assert.ok(entryBounds.x + entryBounds.width <= sidebarBounds.x + sidebarBounds.width + 1, JSON.stringify({ sidebarBounds, shortcutBounds }))
+  const entryBounds = await dockEntry.boundingBox()
+  assert.ok(sidebarBounds && entryBounds, 'the canonical Desktop Dock entry has measurable bounds')
+  assert.ok(entryBounds.x >= sidebarBounds.x - 1, JSON.stringify({ sidebarBounds, entryBounds }))
+  assert.ok(entryBounds.x + entryBounds.width <= sidebarBounds.x + sidebarBounds.width + 1, JSON.stringify({ sidebarBounds, entryBounds }))
+  // Retain the old public settings link contract while removing duplicate buttons.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await main.evaluate(() => window.dshDesktop.openExtensionDock({ setting: 'value-mode' }))
+    await dock.locator('#value-mode-tab[aria-selected="true"]').waitFor({ timeout: 60_000 })
   }
-  const orderedShortcuts = shortcutBounds.toSorted((left, right) => left.y - right.y)
-  assert.ok(orderedShortcuts.every((entryBounds, index) => index === 0
-    || entryBounds.y >= orderedShortcuts[index - 1].y + orderedShortcuts[index - 1].height - 1), JSON.stringify(shortcutBounds))
-  // The isolated first-run fixture can keep its unrelated workspace modal open.
-  // Invoke the actual button handler without letting that modal mask hide this navigation contract.
-  await collaborationEntry.evaluate(button => button.click())
-  await dock.locator('#value-mode-tab[aria-selected="true"]').waitFor({ timeout: 60_000 })
-  await collaborationEntry.evaluate(button => button.click())
-  assert.equal(app.windows().filter(page => page.url().includes('/extensions.html')).length, 1, 'collaboration shortcut reuses one Dock window')
+  assert.equal(app.windows().filter(page => page.url().includes('/extensions.html')).length, 1, 'legacy Value Mode links reuse one Dock window')
   const bounds = await dock.evaluate(() => ({ width: innerWidth, height: innerHeight, scroll: document.documentElement.scrollWidth }))
   const nativeBounds = await (await app.browserWindow(dock)).evaluate(window => ({ bounds: window.getBounds(), zoom: window.webContents.getZoomFactor() }))
   console.log(JSON.stringify({ bounds, nativeBounds }))

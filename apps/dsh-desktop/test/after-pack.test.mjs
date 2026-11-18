@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -177,6 +178,61 @@ test('release pruner removes complete foreign-platform optional packages', async
     )
   } finally {
     await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('Windows pruning removes Office WASM only after validating the bundled native engine', async t => {
+  const fixture = await mkdtemp(join(tmpdir(), 'dsh-office-engine-prune-'))
+  t.after(() => rm(fixture, { recursive: true, force: true }))
+  const root = join(fixture, 'node_modules')
+  const scope = join(root, '@deepseek-ai')
+  const native = join(scope, 'libreoffice-kit-win32-x64')
+  const wasm = join(scope, 'libreoffice-kit-wasm')
+  const executable = 'bin/dsoffice.exe'
+  const bytes = 'native engine fixture'
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  for (const [id, metadata] of [
+    ['dsh', {}], ['dsh-office-kit', {}],
+    ['libreoffice-kit', { optionalDependencies: {
+      '@deepseek-ai/libreoffice-kit-win32-x64': '0.2.3', '@deepseek-ai/libreoffice-kit-wasm': '0.2.3',
+    } }],
+    ['libreoffice-kit-win32-x64', { os: ['win32'], cpu: ['x64'] }],
+    ['libreoffice-kit-wasm', {}],
+  ]) {
+    const directory = join(scope, id)
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'package.json'), JSON.stringify({ name: `@deepseek-ai/${id}`, version: '0.2.3', ...metadata }))
+  }
+  await mkdir(join(native, 'bin'))
+  await mkdir(join(native, 'program', 'program'), { recursive: true })
+  await writeFile(join(native, 'program/program/bootstrap.ini'), 'runtime')
+  await writeFile(join(native, 'prebuilds.json'), JSON.stringify({ schemaVersion: 1, version: '0.2.3', platform: 'win32-x64', status: 'built',
+    engine: { kind: 'native', executable, programDirectory: 'program/program' }, files: { [executable]: digest },
+  }))
+  await writeFile(join(wasm, 'engine.wasm'), 'wasm fallback fixture')
+  await writeFile(join(wasm, 'prebuilds.json'), '{}')
+  await writeFile(join(native, executable), 'corrupt native engine')
+  await assert.rejects(prunePackagedRuntime(root), /Windows Office native executable integrity/u)
+  assert.equal(await readFile(join(wasm, 'engine.wasm'), 'utf8'), 'wasm fallback fixture')
+
+  await writeFile(join(native, executable), bytes)
+  const report = await prunePackagedRuntime(root)
+  assert.equal(report.categories['duplicate-office-engine'], 3)
+  await assert.rejects(access(wasm), { code: 'ENOENT' })
+  assert.equal(await readFile(join(native, executable), 'utf8'), bytes)
+})
+
+test('portable Office engine remains packaged for macOS and Linux', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-office-engine-portable-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const wasm = join(root, '@deepseek-ai/libreoffice-kit-wasm')
+  await mkdir(wasm, { recursive: true })
+  await writeFile(join(wasm, 'package.json'), '{"name":"@deepseek-ai/libreoffice-kit-wasm"}')
+  await writeFile(join(wasm, 'engine.wasm'), 'portable')
+  for (const target of [{ platform: 'darwin', arch: 'arm64' }, { platform: 'linux', arch: 'x64' }]) {
+    const report = await prunePackagedRuntime(root, target)
+    assert.equal(report.categories['duplicate-office-engine'], undefined)
+    assert.equal(await readFile(join(wasm, 'engine.wasm'), 'utf8'), 'portable')
   }
 })
 

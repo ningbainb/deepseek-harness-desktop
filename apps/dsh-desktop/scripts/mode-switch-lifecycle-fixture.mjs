@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
+import { verifyNativePresetLifecycle } from './native-preset-lifecycle-fixture.mjs'
 
 function nativePresetName(preset) {
   return preset.name ?? (preset.id === 'minimal' ? '极简模式' : preset.id)
@@ -10,7 +11,12 @@ function nativePresetName(preset) {
 // Runs against the real loaded client and an isolated durable conversation.
 // Only the first create response is fault-injected; successful mode selection
 // uses the real Host, workspace, preset composition and session persistence.
-export async function verifyModeSwitchLifecycle({ page, rpc, sessionId, workspaceId,
+export async function verifyModeSwitchLifecycle(options) {
+  if (await options.page.evaluate(() => Boolean(window.dshDesktop))) return verifyNativePresetLifecycle(options)
+  return verifyCommunityModeSwitchLifecycle(options)
+}
+
+async function verifyCommunityModeSwitchLifecycle({ page, rpc, sessionId, workspaceId,
   workspacePath, messageCount, logPath, openSeededSession, runtimeFetchGate }) {
   const isSessionCreateResponse = response => desktopLocalPath(new URL(response.url()).pathname) === '/api/session/create'
     && response.request().method() === 'POST'

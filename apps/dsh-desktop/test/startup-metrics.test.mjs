@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { parseStartupTimings, summarizeSamples } from '../scripts/startup-metrics.mjs'
+import { parseRuntimeChildTimings, parseStartupTimings, summarizeSamples } from '../scripts/startup-metrics.mjs'
+
+test('runtime child timings keep the latest attempt separate from renderer readiness', () => {
+  const log = [
+    '[stdout] [runtime-startup] entry=231ms',
+    '[stdout] [runtime-startup] boot=6440ms',
+    '[stdout] [runtime-startup] ready=12ms',
+    '[stdout] [runtime-startup] entry=150ms',
+    '[stdout] [runtime-startup] profile=301ms',
+    '[startup] runtime-ready=9999ms',
+    '[stdout] [runtime-startup] bad-phase=123ms',
+  ].join('\n')
+  assert.deepEqual(parseRuntimeChildTimings(log), { entry: 150, profile: 301 })
+  assert.deepEqual(parseRuntimeChildTimings('[startup] runtime-ready=9999ms'), {})
+})
 
 test('startup timing parser uses the latest complete phase values', () => {
   const first = [

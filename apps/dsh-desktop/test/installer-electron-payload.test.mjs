@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { tinyPE, payloadFixture } from './fixtures/electron-payload.mjs'
 
@@ -82,6 +83,23 @@ test('NSIS runtime restoration precedes registration and keeps original install 
   assert.match(result, /File "\$\{UNINSTALLER_OUT_FILE\}"/u)
   assert.match(result, /header[\s\S]*footer/u)
   assert.throws(() => runtimeInstallerInclude('missing macro'), /template/u)
+})
+
+test('the reviewed embedded NSIS template records separate archive, extraction, copy and installer cache timing', async () => {
+  const { runtimeInstallerInclude } = await import(moduleURL)
+  const require = createRequire(import.meta.url)
+  const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
+  const includes = resolve(dirname(builderRequire.resolve('app-builder-lib/out/targets/nsis/NsisTarget.js')), '../../../templates/nsis/include')
+  const [core, extraction] = await Promise.all([
+    readFile(join(includes, 'installer.nsh'), 'utf8'),
+    readFile(join(includes, 'extractAppPackage.nsh'), 'utf8'),
+  ])
+  const result = runtimeInstallerInclude(core, extraction)
+  assert.match(result, /DshTiming "embedded-archive-start"\r?\n\s*!insertmacro compute_files_for_current_arch\r?\n\s*!insertmacro DshTiming "embedded-archive-ready"/u)
+  assert.match(result, /DshTiming "archive-decompress-start"[\s\S]*?Nsis7z::Extract "\$\{FILE\}"[\s\S]*?DshTiming "archive-decompressed"/u)
+  assert.match(result, /DshTiming "payload-copy-start"[\s\S]*?CopyFiles \/SILENT[^\r\n]+\r?\n\s*IfErrors 0 DoneExtract7za[\s\S]*?DoneExtract7za:\r?\n\s*!insertmacro DshTiming "payload-copy-end"/u)
+  assert.match(result, /DshTiming "installer-cache-copy-start"\r?\n\s*!insertmacro copyFile "\$EXEPATH"[^\r\n]+\r?\n\s*!insertmacro DshTiming "installer-cache-copy-end"/u)
+  assert.match(result, /AbortExtract7za:\r?\n\s*!insertmacro DshAbortExtraction/u)
 })
 test('archive staging removes only verified duplicates and restores every original file', async t => {
   const { prepareInstallerElectronPayload } = await import(moduleURL)

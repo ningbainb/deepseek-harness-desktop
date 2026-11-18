@@ -24,13 +24,27 @@ async function fileSHA256(path) {
 export function runtimeInstallerInclude(core, extractionCore) {
   if (extractionCore !== undefined) {
     const include = /^!include "extractAppPackage\.nsh"\r?$/gmu
-    const cancel = /^(\s*AbortExtract7za:\r?\n)[ \t]+Quit[ \t]*\r?$/gmu
+    const addTiming = (template, pattern, before, after) => {
+      if ([...template.matchAll(pattern)].length !== 1) throw new Error(`Unsupported NSIS timing template: ${before ?? after}`)
+      return template.replace(pattern, (_, body) => [
+        before && `  !insertmacro DshTiming "${before}"`,
+        body.replace(/\r$/u, ''),
+        after && `  !insertmacro DshTiming "${after}"`,
+      ].filter(Boolean).join('\n'))
+    }
+    const cancel = /^([ \t]*AbortExtract7za:\r?\n)[ \t]+Quit[ \t]*\r?$/gmu
     if ([...core.matchAll(include)].length !== 1 || [...extractionCore.matchAll(cancel)].length !== 1) {
       throw new Error('Unsupported NSIS extraction cancellation template')
     }
+    let extraction = extractionCore.replace(cancel, '$1    !insertmacro DshAbortExtraction')
+    extraction = addTiming(extraction, /^([ \t]+!insertmacro compute_files_for_current_arch)\r?$/gmu, 'embedded-archive-start', 'embedded-archive-ready')
+    extraction = addTiming(extraction, /^([ \t]+Nsis7z::Extract "\$\{FILE\}"\r?\n[ \t]+Pop \$R0\r?\n[ \t]+SetOutPath \$R0)\r?$/gmu, 'archive-decompress-start', 'archive-decompressed')
+    extraction = addTiming(extraction, /^([ \t]+LoopExtract7za:)\r?$/gmu, 'payload-copy-start', undefined)
+    extraction = addTiming(extraction, /^([ \t]+DoneExtract7za:)\r?$/gmu, undefined, 'payload-copy-end')
+    core = addTiming(core, /^([ \t]+!insertmacro copyFile "\$EXEPATH" "\$LOCALAPPDATA\\\$\{APP_INSTALLER_STORE_FILE\}")\r?$/gmu,
+      'installer-cache-copy-start', 'installer-cache-copy-end')
     // Inline the reviewed extraction macros into the already hash-bound owned
     // include. No dependency file or secondary unchecked include is modified.
-    const extraction = extractionCore.replace(cancel, '$1    !insertmacro DshAbortExtraction')
     core = core.replace(include, () => extraction)
   }
   const macro = /^!macro installApplicationFiles\r?\n[\s\S]*?^!macroend/gmu

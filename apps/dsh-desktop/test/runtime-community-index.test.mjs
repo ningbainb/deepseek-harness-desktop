@@ -23,7 +23,11 @@ test('official format-1 validator accepts the named pinned catalog and retains l
   const parsed = parseMarketIndex(raw, DESKTOP_COMMUNITY_INDEX_URL)
   assert.equal(parsed.format, 1)
   assert.match(parsed.title.en, /DSH Desktop/)
-  assert.deepEqual(parsed.plugins.map(plugin => [plugin.name, plugin.versions[0].version]), [['dsh-context', '0.85.1'], ['dsh-prompt-customizer', '2.2.0']])
+  assert.deepEqual(parsed.plugins.map(plugin => [plugin.name, plugin.versions[0].version]), [
+    ['dsh-context', '0.85.1'],
+    ['dsh-prompt-customizer', '2.2.0'],
+    ['@michengai/dsh-im-connect', '1.0.44'],
+  ])
   for (const plugin of parsed.plugins) {
     assert.ok(plugin.metadata.labels.some(label => label.startsWith('license-')))
     assert.ok(plugin.versions[0].publishTimestamp > 0)

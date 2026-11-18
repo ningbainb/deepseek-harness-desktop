@@ -102,6 +102,54 @@ test('PluginManager resolves offline in staging and atomically activates after v
   }
 })
 
+test('a cold transitive dependency cache is resolved in staging before runtime downtime', async () => {
+  const packageManifest = candidate('@community/cold-cache', '1.0.0')
+  const calls = []
+  const value = await fixture({
+    registry: { fetchManifest: async () => packageManifest },
+    runner: async ({ args, profileDir }) => {
+      calls.push({ args, profileDir })
+      if (args.includes('--offline')) throw new Error('pnpm exited with code 1\n[ERR_PNPM_NO_OFFLINE_META] missing transitive dependency')
+      if (args[0] === 'add') await materializePackage(profileDir, packageManifest)
+    },
+  })
+  try {
+    const original = await readFile(join(value.profileDir, 'package.json'), 'utf8')
+    const spec = `${packageManifest.name}@${packageManifest.version}`
+    const prepared = await value.manager.prepare(spec)
+    assert.equal(await readFile(join(value.profileDir, 'package.json'), 'utf8'), original)
+    assert.deepEqual(calls, [
+      { args: ['store', 'add', spec], profileDir: value.profileDir },
+      { args: ['add', spec, '--save-exact', '--offline'], profileDir: prepared.staging.stageDir },
+      { args: ['add', spec, '--save-exact', '--prefer-offline'], profileDir: prepared.staging.stageDir },
+    ])
+    assert.deepEqual(value.graphChecks, [prepared.staging.stageDir])
+    await prepared.staging.cancel()
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('the pinned prebuilt IM Connect registry install skips install scripts on a warm cache', async () => {
+  const packageManifest = candidate('@michengai/dsh-im-connect', '1.0.44')
+  const value = await fixture({
+    registry: { fetchManifest: async () => packageManifest },
+    runner: async ({ args, profileDir }) => {
+      if (args[0] !== 'add') return
+      assert.ok(args.includes('--offline'))
+      assert.ok(args.includes('--ignore-scripts'))
+      await materializePackage(profileDir, packageManifest)
+    },
+  })
+  try {
+    const prepared = await value.manager.prepare(`${packageManifest.name}@${packageManifest.version}`)
+    assert.equal(prepared.version, '1.0.44')
+    await prepared.staging.cancel()
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
 test('risk admission bypasses only the declared version mismatch and keeps the staged Runtime graph gate', async () => {
   const name = '@community/risk-admitted'
   const packageManifest = {

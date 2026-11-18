@@ -89,7 +89,7 @@ test('community market projects bounded catalog data and derives install sources
   const result = await service.list()
   assert.equal(requests[0][0], COMMUNITY_MARKET_URL)
   assert.equal(result.updated, '2026-08-21')
-  assert.equal(result.count, 4)
+  assert.equal(result.count, 5)
   assert.deepEqual(result.bridge, DSHMARKET_CATALOG_BRIDGE)
   assert.deepEqual(result.bridge, {
     provider: 'dshmarket',
@@ -97,6 +97,7 @@ test('community market projects bounded catalog data and derives install sources
     installation: 'desktop-managed',
   })
   assert.deepEqual(result.categories, [
+    { id: 'notify', label: { zh: '消息通知', en: 'Notifications' } },
     { id: 'tools', label: { zh: '工具', en: 'Tools' } },
     { id: 'ui', label: { zh: '界面', en: 'Interface' } },
   ])
@@ -130,6 +131,33 @@ test('community market projects bounded catalog data and derives install sources
   assert.equal(verified.plugins[1].verification, 'incompatible')
   assert.equal(verified.plugins[1].failureCategory, 'legacy-sdk-incompatible')
   await assert.rejects(service.resolveInstall('unknown-entry'), /community market plugin identifier/u)
+})
+
+test('market discovery retains one pinned IM Connect trial and stages its exact npm release', async () => {
+  const service = createCommunityMarketService({
+    fetch: async () => jsonResponse({
+      ...catalog,
+      plugins: [
+        ...catalog.plugins,
+        { name: 'dsh-im-connect', npm: '@michengai/dsh-im-connect', url: 'https://github.com/MichengAI/dsh-im-connect', downloads: 25 },
+        { name: 'im-connect-github', url: 'https://github.com/michengai/dsh-im-connect' },
+      ],
+    }),
+  })
+  const result = await service.list()
+  const cards = result.plugins.filter((plugin) => plugin.repository?.toLowerCase() === 'michengai/dsh-im-connect')
+  assert.equal(cards.length, 1)
+  const [plugin] = cards
+  assert.equal(plugin.npm, '@michengai/dsh-im-connect')
+  assert.match(plugin.description.zh, /飞书.*需/u)
+  assert.equal(plugin.downloads, 25)
+  assert.equal(plugin.verification, 'registry')
+  assert.deepEqual(await service.resolveInstallEntry(plugin.id), {
+    id: plugin.id,
+    name: '@michengai/dsh-im-connect',
+    sourceKind: 'npm',
+    installSpec: '@michengai/dsh-im-connect@1.0.44',
+  })
 })
 
 test('community market serves a bounded cache and force-revalidates with its ETag', async () => {
@@ -191,6 +219,29 @@ test('community market rejects empty, malformed, and oversized catalogs', async 
     fetch: async () => jsonResponse(catalog, { headers: { 'content-length': '200' } }),
   })
   await assert.rejects(oversized.list(), /catalog response is too large/u)
+})
+
+test('community market accepts the current catalog size and cancels oversized streams', async () => {
+  const currentSize = createCommunityMarketService({
+    fetch: async () => jsonResponse(catalog, { headers: { 'content-length': '16544482' } }),
+  })
+  assert.equal((await currentSize.list()).count, 5)
+
+  let cancelled = false
+  let chunks = 0
+  const oversized = createCommunityMarketService({
+    maxBytes: 32,
+    fetch: async () => new Response(new ReadableStream({
+      pull(controller) {
+        if (chunks < 3) controller.enqueue(new Uint8Array(33))
+        else controller.close()
+        chunks += 1
+      },
+      cancel() { cancelled = true },
+    })),
+  })
+  await assert.rejects(oversized.list(), /catalog response is too large/u)
+  assert.equal(cancelled, true)
 })
 
 test('community market does not substitute stale data after a network failure', async () => {

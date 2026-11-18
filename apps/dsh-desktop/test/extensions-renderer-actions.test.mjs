@@ -431,3 +431,22 @@ test('feature search hides every navigation and restores only the primary plus s
   assert.equal(document.querySelector('#particle-theme-tab').getAttribute('aria-selected'), 'true')
   dom.window.close()
 })
+
+
+test('More tools opens task board and SSH through the fixed Desktop bridge and reports failures', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' }), calls = [], messages = []
+  const context = vm.createContext({ document: dom.window.document,
+    window: { dshDesktop: { openDesktopTool: async tool => { calls.push(tool); if (tool === 'ssh') throw new Error('fixture unavailable') } } },
+    notify: (...args) => messages.push(args),
+  })
+  const board = dom.window.document.querySelector('#task-board-tool'), ssh = dom.window.document.querySelector('#ssh-tool')
+  assert.ok(board && ssh)
+  assert.equal(board.closest('nav').dataset.tabGroup, 'more-tools')
+  assert.equal(ssh.closest('nav').dataset.tabGroup, 'more-tools')
+  vm.runInContext(section("for (const entry of document.querySelectorAll('[data-desktop-tool]'))", 'for (const tab of tabs)'), context)
+  board.click(); await tick(); ssh.click(); await tick()
+  assert.deepEqual(calls, ['task-board', 'ssh'])
+  assert.equal(messages.at(-1)[1], true)
+  assert.equal(ssh.disabled, false, 'failed navigation remains retryable')
+  dom.window.close()
+})

@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
+import { openDockTools } from './dock-settings-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -73,7 +74,8 @@ async function launchDesktop() {
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
     await dismissStartup(page)
     await expandSidebarTools(page)
-    await page.locator('[data-dsh-ssh-entry]').waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+    await page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
+    assert.equal(await page.locator('[data-dsh-ssh-entry]').count(), 0, 'Desktop SSH has one Dock entry')
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
     throw new Error(`${error.message}\nRecent runtime log:\n${runtimeLog.slice(-8_000)}`, { cause: error })
@@ -82,11 +84,18 @@ async function launchDesktop() {
 }
 
 async function openSshPanel(application, page) {
+  const dock = await openDockTools(application, page)
   const windowsBefore = await application.evaluate(({ BrowserWindow }) => (
     BrowserWindow.getAllWindows().map(window => window.id).toSorted((left, right) => left - right)
   ))
-  await page.locator('[data-dsh-ssh-entry]').click()
+  assert.equal(await page.locator('[data-dsh-taskboard-entry]').count(), 0, 'Desktop task board has one Dock entry')
+  await dock.locator('#task-board-tool').click()
+  await page.locator('[data-dsh-taskboard-view]').waitFor({ state: 'visible', timeout: 20_000 })
+  await page.locator('[data-dsh-ssh-view]').waitFor({ state: 'hidden', timeout: 20_000 })
+  await openDockTools(application, page)
+  await dock.locator('#ssh-tool').click()
   await page.locator('[data-dsh-ssh-view]').waitFor({ state: 'visible', timeout: 20_000 })
+  await page.locator('[data-dsh-taskboard-view]').waitFor({ state: 'hidden', timeout: 20_000 })
   try {
     await page.locator('#dsh-ssh-tab-hosts[aria-selected="true"]').waitFor({ state: 'visible', timeout: 20_000 })
   } catch (error) {

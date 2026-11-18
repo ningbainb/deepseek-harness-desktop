@@ -2304,3 +2304,26 @@ for (const latestConfig of [
     }
   })
 }
+
+
+test('Dock tools allow only task-board/ssh from the registered extensions owner', async () => {
+  const dshHome = await mkdtemp(join(tmpdir(), 'dsh-dock-tools-'))
+  const ipcMain = new FakeIpcMain(), opened = []
+  const unregister = registerExtensionIpc({ ipcMain, dialog: {}, shell: {}, getWindow: () => undefined,
+    pluginManager: {}, controller: {}, ensureProfile: async () => {}, projectRoot: dshHome, dshHome,
+    qqBotBinding: new EventEmitter(), pluginRecovery: new EventEmitter(),
+    openDesktopTool: async tool => { opened.push(tool); return { accepted: true } },
+  })
+  try {
+    const open = ipcMain.handlers.get('extensions:tool-open')
+    assert.equal(typeof open, 'function')
+    assert.deepEqual(await open(undefined, 'task-board'), { accepted: true })
+    assert.deepEqual(await open(undefined, 'ssh'), { accepted: true })
+    for (const value of ['terminal', '../ssh', { tool: 'ssh' }, null]) {
+      await assert.rejects(open(undefined, value), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    }
+    await assert.rejects(open({ sender: {} }, 'ssh'))
+    await assert.rejects(open(undefined, 'ssh', { command: 'unexpected' }), error => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT)
+    assert.deepEqual(opened, ['task-board', 'ssh'])
+  } finally { unregister(); await rm(dshHome, { recursive: true, force: true }) }
+})

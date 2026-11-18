@@ -24,7 +24,7 @@ import { ChatGptAuthSection } from './ChatGptAuthSection.tsx'
 import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { ModelAdvancedEntry } from './ModelAdvancedEntry.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
-import { DesktopCollaborationEntry, DesktopExtensionDockEntry, DesktopSmartControlEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
+import { DesktopExtensionDockEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { DockSettingsOutlet, mirrorDockSlot } from './dock-slot-mirror.tsx'
 import { createPluginOptionsDirectory } from './plugin-options-directory.ts'
@@ -195,23 +195,8 @@ export function apply(ctx: ClientContext): void {
     name: 'settings.models.footer', id: 'desktop-model-advanced', order: 100,
   }, ModelAdvancedEntry))
 
-  // The highest ordered footer action sits immediately before Settings.
-  // Ordinary Web hosts receive no button because the component requires the
-  // narrow Desktop `extensions.open` capability before rendering.
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
-    id: 'desktop-smart-control',
-    order: 98,
-    locale: 'web-ui-plugins',
-  }, DesktopSmartControlEntry))
-
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
-    id: 'desktop-model-collaboration',
-    order: 99,
-    locale: 'web-ui-plugins',
-  }, DesktopCollaborationEntry))
-
+  // Desktop management starts at the Dock. Legacy shortcuts still route to
+  // the same canonical settings pages through the public Desktop client.
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'desktop-extension-dock',

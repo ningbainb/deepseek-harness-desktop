@@ -24,3 +24,11 @@ test('ambiguous ownership fails closed', () => {
     builtinPlugin: ['shared-name'],
   }), /declared more than once/u)
 })
+
+test('host admission checks the packaged Cordis, Schema and UI primitives singleton identities', () => {
+  for (const name of ['@deepseek-ai/cordis', '@deepseek-ai/schemastery', '@deepseek-ai/dsh-client-ui-primitives']) {
+    assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get(name)?.ownership, PACKAGE_OWNERSHIP.DESKTOP_RUNTIME)
+    assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.get(name)?.singleton, true)
+    assert.equal(DESKTOP_RUNTIME_PACKAGE_POLICY.isProtected(name), true)
+  }
+})

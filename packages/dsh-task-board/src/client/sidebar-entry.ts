@@ -105,11 +105,16 @@ export function mountSidebarEntry(controller: BoardController): () => void {
   if (typeof document !== 'undefined' && document.querySelector('[data-dsh-taskboard-entry]') !== null) {
     return () => {}
   }
+  const candidate = typeof window === 'undefined' ? undefined : (window as typeof window & { dshDesktop?: {
+    onDesktopToolOpen?: (tool: 'task-board' | 'ssh', callback: () => boolean) => () => void
+  } }).dshDesktop
+  const desktop = typeof candidate?.onDesktopToolOpen === 'function' ? candidate : undefined
   const entry = createEntry(controller)
   let root: HTMLElement | undefined
   let placed = false
 
   const tryPlace = (): void => {
+    if (desktop) return
     if (root !== undefined && !root.isConnected) {
       // The shell rebuilt the sidebar pane (whole-tree teardown); the root
       // observer is gone with the old tree, so detach it and re-query from
@@ -142,7 +147,7 @@ export function mountSidebarEntry(controller: BoardController): () => void {
   // unrelated app mutations (e.g. chat streaming) cost one contains check
   // instead of churning the full re-query.
   const waitObserver = new MutationObserver(() => { tryPlace() })
-  waitObserver.observe(document.body, { childList: true, subtree: true })
+  if (!desktop) waitObserver.observe(document.body, { childList: true, subtree: true })
 
   // Self-heal: if a React re-render displaces the row, re-insert it in the
   // same frame (microtask before paint → no visible flicker).
@@ -180,6 +185,12 @@ export function mountSidebarEntry(controller: BoardController): () => void {
   }
   document.addEventListener('click', closeForNativeNavigation, true)
   document.addEventListener(SURFACE_NAVIGATION_EVENT, closeForOtherSurface)
+  const unsubscribeDesktop = desktop?.onDesktopToolOpen?.('task-board', () => {
+    if (!document.querySelector('[data-dsh-taskboard-view]')?.isConnected) return false
+    document.dispatchEvent(new CustomEvent(SURFACE_NAVIGATION_EVENT, { detail: { surface: SURFACE_ID } }))
+    controller.openBoard()
+    return true
+  })
 
   tryPlace()
 
@@ -187,6 +198,7 @@ export function mountSidebarEntry(controller: BoardController): () => void {
     waitObserver.disconnect()
     rootObserver.disconnect()
     unsubscribe()
+    unsubscribeDesktop?.()
     document.removeEventListener('click', closeForNativeNavigation, true)
     document.removeEventListener(SURFACE_NAVIGATION_EVENT, closeForOtherSurface)
     entry.remove()

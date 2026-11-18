@@ -10,7 +10,7 @@ test('the Windows release command uses packed and unpacked integrity verificatio
   assert.match(source, /verifyDirectory: async resources =>/u)
   assert.match(source, /await assertPackagedUpdateIdentity\(join\(resources, 'app-update.yml'\)\)/u)
   assert.match(source, /await verifyPackagedRuntimeSdkIdentity\(resources,[\s\S]*expectedManifest: PACKAGE_MANIFEST,[\s\S]*sourceDirectory: join\(APP_DIRECTORY, 'src'\)/u)
-  assert.match(source, /verifyAsarIntegrity\(join\(resources, 'app.asar'\),[\s\S]*requiredFiles: \['runtime-support\/community-plugin-known-issues.json'\]/u)
+  assert.match(source, /verifyAsarIntegrity\(join\(resources, 'app.asar'\),[\s\S]*requiredFiles: \['runtime-support\/community-plugin-known-issues.json', 'runtime-support\/community-plugin-index.json'\]/u)
 })
 
 test('Windows builds, verifies and compresses the same directory with the original release arguments', async () => {

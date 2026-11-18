@@ -1,4 +1,5 @@
-const PHASES = new Set(['entry', 'environment', 'profile', 'patches', 'legacy-settings', 'boot', 'ready'])
+export const RUNTIME_STARTUP_PHASES = Object.freeze(['entry', 'environment', 'profile', 'patches', 'legacy-settings', 'boot', 'ready'])
+const PHASES = new Set(RUNTIME_STARTUP_PHASES)
 
 /** Bounded diagnostic timings only; failures must never change Runtime startup. */
 export function createRuntimeStartupTiming({ enabled = true, now = () => performance.now(), emit } = {}) {

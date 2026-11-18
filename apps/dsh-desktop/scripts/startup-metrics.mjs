@@ -1,3 +1,5 @@
+import { RUNTIME_STARTUP_PHASES } from '../src/runtime-startup-timing.mjs'
+
 export const STARTUP_PHASES = Object.freeze([
   'application-ready',
   'package-resolution',
@@ -12,6 +14,18 @@ export const STARTUP_DERIVED_METRICS = Object.freeze([
   'estimated-serialized-total',
   'estimated-overlap-saved',
 ])
+
+export function parseRuntimeChildTimings(runtimeLog) {
+  let timings = {}
+  for (const match of String(runtimeLog).matchAll(/^\[stdout\] \[runtime-startup\] ([a-z-]+)=(\d+)ms\r?$/gmu)) {
+    const [, phase, rawDuration] = match
+    const duration = Number(rawDuration)
+    if (!RUNTIME_STARTUP_PHASES.includes(phase) || !Number.isSafeInteger(duration)) continue
+    if (phase === 'entry') timings = {}
+    timings[phase] = duration
+  }
+  return Object.freeze(timings)
+}
 
 export function parseStartupTimings(runtimeLog) {
   const timings = {}

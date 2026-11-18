@@ -11,6 +11,10 @@ import { modeSwitcherDependencies } from './runtime-adapter.ts'
 export const inject = ['slots', 'sessions', 'workspaces', 'connection', 'conversation', 'uiWorkspace']
 
 export function apply(ctx: ClientContext): void {
+  // Desktop uses the official new-session preset seat and preset settings.
+  // Keep this package, its saved preferences and the Web workflow intact.
+  const desktop = typeof window === 'undefined' ? undefined : (window as typeof window & { dshDesktop?: { onDesktopToolOpen?: unknown } }).dshDesktop
+  if (typeof desktop?.onDesktopToolOpen === 'function') return
   if (typeof (ctx.sessions as unknown as { noteAgentPreset?: unknown }).noteAgentPreset === 'function') {
     mount(ctx)
   } else {

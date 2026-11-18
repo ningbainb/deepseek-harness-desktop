@@ -43,3 +43,52 @@ describe('SSH sidebar navigation', () => {
     dispose()
   })
 })
+
+
+it('desktop Dock opens the existing ssh controller without mounting a left shortcut', () => {
+  const native = shell()
+  let receive: (() => boolean) | undefined
+  const unsubscribe = vi.fn()
+  const onDesktopToolOpen = vi.fn((tool: string, callback: () => boolean) => {
+    expect(tool).toBe('ssh')
+    receive = callback
+    return unsubscribe
+  })
+  Object.assign(window, { dshDesktop: { onDesktopToolOpen } })
+  const controller = { open: vi.fn(), close: vi.fn(),
+    subscribe: () => () => {}, getSnapshot: () => ({ panelOpen: false }) }
+  const dispose = mountSidebarEntry(controller as never)
+  try {
+    expect(document.querySelector('[data-dsh-ssh-entry]')).toBeNull()
+    expect(onDesktopToolOpen).toHaveBeenCalledOnce()
+    expect(receive!()).toBe(false)
+    expect(controller.open).not.toHaveBeenCalled()
+    const view = document.createElement('div')
+    view.dataset.dshSshView = ''
+    document.body.append(view)
+    expect(receive!()).toBe(true)
+    expect(controller.open).toHaveBeenCalledOnce()
+    document.dispatchEvent(new CustomEvent(SURFACE_NAVIGATION_EVENT, { detail: { surface: 'another-tool' } }))
+    expect(controller.close).toHaveBeenCalledOnce()
+    native.click()
+    expect(controller.close).toHaveBeenCalledTimes(2)
+  } finally {
+    dispose()
+    delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop
+  }
+  expect(unsubscribe).toHaveBeenCalledOnce()
+})
+
+
+it('retains the existing ssh entry on older hosts without the new Desktop tool bridge', () => {
+  shell()
+  Object.assign(window, { dshDesktop: { getInfo: vi.fn() } })
+  const controller = { toggle: vi.fn(), subscribe: () => () => {}, getSnapshot: () => ({ panelOpen: false }) }
+  const dispose = mountSidebarEntry(controller as never)
+  try {
+    const entry = document.querySelector<HTMLButtonElement>('[data-dsh-ssh-entry]')
+    expect(entry).not.toBeNull()
+    entry!.click()
+    expect(controller.toggle).toHaveBeenCalledOnce()
+  } finally { dispose(); delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop }
+})

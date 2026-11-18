@@ -1,5 +1,7 @@
 const { cp, lstat, mkdir, readFile, readdir, realpath, rm, rmdir, stat, writeFile } = require('node:fs/promises')
 const { createHash } = require('node:crypto')
+const { createReadStream } = require('node:fs')
+const { createRequire } = require('node:module')
 const { dirname, extname, isAbsolute, join, relative, resolve, sep } = require('node:path')
 const { isDeepStrictEqual } = require('node:util')
 
@@ -147,6 +149,8 @@ const SKIN_CENTER_ROOT = ['@linxin666', 'dsh-client-ui-skin-center', 'skins']
 const BUNDLED_SKIN_ASSETS_ROOT = join(__dirname, '..', 'build', 'skin-center-v2-assets')
 const BUNDLED_SKIN_ASSETS_MANIFEST = join(__dirname, '..', 'build', 'skin-center-v2-assets.sha256.json')
 const SKIN_PREVIEW_BOUNDS = Object.freeze({ width: 1440, height: 900 })
+const OFFICE_NATIVE_WINDOWS = '@deepseek-ai/libreoffice-kit-win32-x64'
+const OFFICE_WASM = '@deepseek-ai/libreoffice-kit-wasm'
 
 const DEFAULT_PACKING_TARGET = Object.freeze({ platform: 'win32', arch: 'x64' })
 const ELECTRON_BUILDER_ARCH_NAMES = Object.freeze({
@@ -421,6 +425,77 @@ async function pruneRetiredSkinCarrierAssets(nodeModulesRoot, report) {
   report.categories['retired-skin-assets'] = (report.categories['retired-skin-assets'] ?? 0) + files.length
 }
 
+async function windowsOfficeGraph(nodeModulesRoot) {
+  const root = await realpath(nodeModulesRoot)
+  async function packagedPath(path) {
+    const physical = await realpath(path)
+    const local = relative(root, physical)
+    if (!local || local === '..' || local.startsWith(`..${sep}`) || isAbsolute(local)) {
+      throw new Error(`Windows Office dependency escaped the packaged Runtime: ${path}`)
+    }
+    return physical
+  }
+
+  const dsh = createRequire(await packagedPath(join(root, '@deepseek-ai', 'dsh', 'package.json')))
+  const dshOffice = createRequire(await packagedPath(dsh.resolve('@deepseek-ai/dsh-office-kit/package.json')))
+  const kitManifest = await packagedPath(dshOffice.resolve('@deepseek-ai/libreoffice-kit/package.json'))
+  const kit = createRequire(kitManifest)
+  const kitPackage = JSON.parse(await readFile(kitManifest, 'utf8'))
+  const nativePackagePath = await packagedPath(kit.resolve(`${OFFICE_NATIVE_WINDOWS}/package.json`))
+  const nativePackage = JSON.parse(await readFile(nativePackagePath, 'utf8'))
+  const engineManifest = await packagedPath(kit.resolve(`${OFFICE_NATIVE_WINDOWS}/prebuilds.json`))
+  const { schemaVersion, version, platform, status, engine, files } = JSON.parse(await readFile(engineManifest, 'utf8'))
+  const engineRoot = dirname(engineManifest)
+  const executable = 'bin/dsoffice.exe'
+  if (schemaVersion !== 1 || version !== kitPackage.optionalDependencies?.[OFFICE_NATIVE_WINDOWS]
+    || version !== kitPackage.version || nativePackage.name !== OFFICE_NATIVE_WINDOWS || nativePackage.version !== version
+    || engineRoot !== dirname(nativePackagePath) || platform !== 'win32-x64' || status !== 'built'
+    || engine?.kind !== 'native' || engine.executable !== executable
+    || engine.programDirectory !== 'program/program' || !/^[a-f0-9]{64}$/u.test(files?.[executable])) {
+    throw new Error('Invalid Windows Office native engine manifest')
+  }
+  const engineBinary = await packagedPath(join(engineRoot, executable))
+  await packagedPath(join(engineRoot, engine.programDirectory, 'bootstrap.ini'))
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(engineBinary)) hash.update(chunk)
+  if (hash.digest('hex') !== files[executable]) throw new Error('Windows Office native executable integrity mismatch')
+
+  return { kit, packagedPath, optionalWasm: kitPackage.optionalDependencies?.[OFFICE_WASM] === version }
+}
+
+async function pruneWindowsOfficeFallback(nodeModulesRoot, report, target) {
+  if (target.platform !== 'win32' || target.arch !== 'x64') return
+  const wasmRoot = join(nodeModulesRoot, ...OFFICE_WASM.split('/'))
+  let metadata
+  try { metadata = await lstat(wasmRoot) } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  if (!metadata.isDirectory()) throw new Error('Windows Office WASM staging path must be a regular directory')
+
+  // The packaged official kit selects the native Windows engine by default.
+  // Verify the actual dependency chain and native executable before omitting
+  // the secondary engine. Never remove anything outside the staging tree.
+  const { kit, packagedPath, optionalWasm } = await windowsOfficeGraph(nodeModulesRoot)
+  if (!optionalWasm || await packagedPath(wasmRoot) !== dirname(await packagedPath(kit.resolve(`${OFFICE_WASM}/prebuilds.json`)))) {
+    throw new Error('Windows Office WASM staging path does not match the optional SDK engine')
+  }
+  const files = await listFiles(wasmRoot)
+  for (const path of files) report.removedBytes += (await stat(path)).size
+  await rm(wasmRoot, { recursive: true, force: true })
+  report.removedFiles += files.length
+  report.categories['duplicate-office-engine'] = files.length
+}
+
+async function verifyWindowsOfficePayload(nodeModulesRoot) {
+  const { kit } = await windowsOfficeGraph(nodeModulesRoot)
+  try { kit.resolve(`${OFFICE_WASM}/prebuilds.json`) } catch (error) {
+    if (error?.code === 'MODULE_NOT_FOUND') return
+    throw error
+  }
+  throw new Error('packaged Windows Runtime retains the secondary Office WASM engine')
+}
+
 async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32', arch: 'x64' }) {
   const report = {
     removedBytes: 0,
@@ -435,6 +510,7 @@ async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32
   // x64 artifact cannot execute those packages, so remove their complete
   // directories before inspecting individual runtime files.
   await pruneForeignPlatformPackages(nodeModulesRoot, report, target)
+  await pruneWindowsOfficeFallback(nodeModulesRoot, report, normalizePackingTarget(target))
   const files = await listFiles(nodeModulesRoot)
 
   for (const path of files) {
@@ -903,6 +979,7 @@ module.exports.restoreOfficialRuntimeManifest = restoreOfficialRuntimeManifest
 module.exports.classifyPrunableFile = classifyPrunableFile
 module.exports.packageSupportsPlatform = packageSupportsPlatform
 module.exports.prunePackagedRuntime = prunePackagedRuntime
+module.exports.verifyWindowsOfficePayload = verifyWindowsOfficePayload
 module.exports.externalizeBrowserElectron = externalizeBrowserElectron
 module.exports.pruneEmptyMaterialDirectories = pruneEmptyMaterialDirectories
 module.exports.pruneNestedElectronLocales = pruneNestedElectronLocales

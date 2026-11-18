@@ -41,6 +41,18 @@ function createBufferedSubscription(channel, label, maxPending = 32, pending = [
 }
 
 const runtimeStreamFrames = []
+// Tool navigation never queues requests for a disabled or not-yet-mounted plugin.
+const desktopToolOwners = new Map()
+for (const tool of ['task-board', 'ssh']) {
+  ipcRenderer.on(`desktop:tool-open:${tool}`, (_event, request) => {
+    if (!request || typeof request !== 'object' || Array.isArray(request)
+      || Object.keys(request).sort().join(',') !== 'id,tool' || request.tool !== tool
+      || typeof request.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(request.id)) return
+    let handled = false
+    try { handled = desktopToolOwners.get(tool)?.() === true } catch {}
+    ipcRenderer.send('desktop:tool-open-result', { id: request.id, tool, handled })
+  })
+}
 
 const baseApi = {
   openExternalUrl: (url) => ipcRenderer.invoke('desktop:external-url-open', url),
@@ -60,6 +72,13 @@ const baseApi = {
   onStartupActivity: createSubscription('desktop:startup-activity', 'startup activity'),
   onDirectState: createSubscription('desktop:direct-state', 'direct state'),
   onDeepLink: createBufferedSubscription('desktop:deep-link', 'deep link'),
+  onDesktopToolOpen: (tool, callback) => {
+    if (tool !== 'task-board' && tool !== 'ssh') throw new TypeError('Unknown Desktop tool')
+    if (typeof callback !== 'function') throw new TypeError('Desktop tool callback must be a function')
+    if (desktopToolOwners.has(tool)) throw new Error('Desktop tool already has a mounted owner')
+    desktopToolOwners.set(tool, callback)
+    return () => { if (desktopToolOwners.get(tool) === callback) desktopToolOwners.delete(tool) }
+  },
   onConversationImported: createSubscription('desktop:conversation-imported', 'conversation imported'),
   onConversationImportBatchProgress: createBufferedSubscription('desktop:conversation-import-batch-progress', 'conversation import batch progress', 128),
   onPluginSettingsOpen: createBufferedSubscription('desktop:plugin-settings-open', 'plugin settings navigation'),

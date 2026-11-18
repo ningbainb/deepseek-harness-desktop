@@ -155,6 +155,7 @@ async function awaitWithTimeout(value, timeoutMs, label) {
 const CHANNELS = [
   'extensions:list',
   'extensions:settings-select',
+  'extensions:tool-open',
   'extensions:plugin-check',
   'extensions:plugin-install',
   'extensions:plugin-install-batch',
@@ -209,6 +210,7 @@ const CHANNELS = [
 
 export function registerExtensionIpc({
   selectDockSetting = async () => { throw new Error('Dock settings are unavailable') },
+  openDesktopTool = async () => { throw new Error('Desktop tools are unavailable') },
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
   isDockSettingsSender = () => false,
@@ -756,6 +758,12 @@ export function registerExtensionIpc({
     const { response } = await dialog.showMessageBox(getWindow(), options)
     if (response !== 0) return { canceled: true, enabled: false }
     return skillMarket().activate({ confirmed: true, expectedRevision: request.expectedRevision })
+  })
+  handleExtension('extensions:tool-open', async (_event, ...args) => {
+    if (args.length !== 1) throw new TypeError('Desktop tool navigation requires one fixed tool')
+    const [tool] = args
+    if (tool !== 'task-board' && tool !== 'ssh') throw new TypeError('Unknown Desktop tool')
+    return openDesktopTool(tool)
   })
   handleExtension('extensions:settings-select', async (_event, id, plugin) => {
     assertDockSetting(id)

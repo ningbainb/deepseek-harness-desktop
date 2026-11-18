@@ -126,7 +126,7 @@ await buildVerifiedWindowsInstaller({
       sourceDirectory: join(APP_DIRECTORY, 'src'),
     })
     const packedFiles = verifyAsarIntegrity(join(resources, 'app.asar'), {
-      requiredFiles: ['runtime-support/community-plugin-known-issues.json'],
+      requiredFiles: ['runtime-support/community-plugin-known-issues.json', 'runtime-support/community-plugin-index.json'],
     })
     process.stdout.write(`verified directory before installer compression: ${identity.runtimeFiles.length} unpacked files, ${packedFiles} packed files, ${identity.consumers.length} SDK consumers\n`)
   },

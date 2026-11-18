@@ -651,13 +651,22 @@ try {
 
   if (process.argv.includes('--mode-switch')) {
     const { verifyModeSwitchLifecycle } = await import('./mode-switch-lifecycle-fixture.mjs')
-    await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
-      workspacePath, messageCount, logPath, openSeededSession, runtimeFetchGate })
+    const modeResult = await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
+      workspacePath, messageCount, logPath, openSeededSession, runtimeFetchGate,
+      readWorkspace: () => readWorkspaceStateProbe(second.page) })
     await activeApp.close()
     activeApp = undefined
     assert.deepEqual(second.rendererErrors, [], 'mode switching must not introduce renderer exceptions')
-    assert.deepEqual(second.rendererConsole.filter(line =>
-      !/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line)), [],
+    const nativeExpected = [...(modeResult?.expectedConsole ?? [])]
+    const unexpectedModeConsole = second.rendererConsole.filter(line => {
+      if (/favicon|DevTools|style-src 'self'|Electron Security Warning/iu.test(line)) return false
+      const expectedIndex = nativeExpected.indexOf(line)
+      if (expectedIndex < 0) return true
+      nativeExpected.splice(expectedIndex, 1)
+      return false
+    })
+    assert.deepEqual(nativeExpected, [], 'each explicitly asserted native fault must be captured in the renderer log')
+    assert.deepEqual(unexpectedModeConsole, [],
     'mode switching and shutdown must not introduce unexpected console errors')
   }
 

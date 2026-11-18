@@ -25,6 +25,7 @@ import {
 } from './community-links.mjs'
 import { promptForDownloadDestination } from './download-destination.mjs'
 import { DockNudgeStore } from './dock-nudge-state.mjs'
+import { createDesktopToolNavigator } from './desktop-tool-navigation.mjs'
 import { BoundedLogStore, sanitizeLogLine } from './log-store.mjs'
 import {
   DESKTOP_LAN_GATEWAY_BASE_ENV,
@@ -2347,6 +2348,8 @@ export async function startElectronApp(metadata) {
     throw error
   }
   const unregisterExtensionIpc = registerExtensionIpc({
+    openDesktopTool: createDesktopToolNavigator({ ipcMain, surfaceRegistry, getMainWindow: () => mainWindow,
+      getDockWindow: () => desktopWindowFactory.extensionWindow }),
     selectDockSetting: (id, plugin) => desktopWindowFactory.selectDockSetting(id, plugin),
     ipcMain,
     surfaceRegistry,

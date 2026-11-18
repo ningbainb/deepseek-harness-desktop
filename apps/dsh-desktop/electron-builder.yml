@@ -41,6 +41,7 @@ directories:
 files:
   - src/**
   - runtime-support/browser-component.json
+  - runtime-support/community-plugin-index.json
   - runtime-support/community-plugin-known-issues.json
   - package.json
   - '!**/*.map'

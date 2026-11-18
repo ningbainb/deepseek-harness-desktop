@@ -13,6 +13,7 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 import { waitForSessionLog } from './session-log-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { reopenNativeSession as reopenRetainedNativeSession } from './native-session-navigation-fixture.mjs'
+import { parseRuntimeChildTimings } from './startup-metrics.mjs'
 
 const options = {}
 for (let i = 2; i < process.argv.length; i++) {
@@ -277,6 +278,7 @@ async function measure(paths, mode, session) {
     await visibility?.catch(() => {})
     const log = (await readFile(runtimeLogPath).catch(() => Buffer.alloc(0))).subarray(logOffset).toString('utf8')
     sample.loggedStartupPhasesMs = Object.fromEntries([...log.matchAll(/\[startup\] ([a-z-]+)=(\d+)ms/gu)].map(match => [match[1], Number(match[2])]))
+    sample.runtimeChildPhasesMs = parseRuntimeChildTimings(log)
     if (!sample.passed) sample.runtimeLogTail = log.slice(-18000)
   }
 }

@@ -97,7 +97,7 @@
         "chatgpt-login-polls-until-terminal-state",
         "cancelled-login-response-isolation",
         "same-field-draft-preserved-during-save",
-        "conversation-collaboration-entry",
+        "model-collaboration-shortcut-consolidated-into-extension-dock-models-advanced",
         "desktop-usage-footer-opens-official-dock-settings-with-visible-failure",
         "desktop-plugin-detail-native-row-configuration-entry",
         "real-plugin-owned-configuration-form-and-save-full-release-gate",
@@ -105,7 +105,7 @@
         "chatgpt-login-safe-terminal-diagnostics",
         "chatgpt-login-to-model-picker",
         "chatgpt-login-privacy-safe-funnel",
-        "conversation-smart-control-entry",
+        "smart-control-shortcut-consolidated-into-extension-dock-more-tools",
         "conversation-extension-dock-brand-entry",
         "wide-sidebar-extension-dock-label",
         "desktop-control-actions-require-approval",
@@ -208,7 +208,8 @@
       "features": [
         "visible-persistence-failure-and-retry",
         "unsaved-task-execution-guard",
-        "revision-aware-draft-recovery"
+        "revision-aware-draft-recovery",
+        "desktop-dock-opens-existing-board-with-web-entry-and-background-scheduler-preserved"
       ],
       "package": "@linxin666/dsh-client-ui-task-board",
       "path": "packages/dsh-task-board",
@@ -241,7 +242,8 @@
         "native-mode-switch-keeps-global-default",
         "legacy-mode-api-fallback",
         "loaded-history-projection-vetoes-stale-blank-reuse",
-        "top-layer-mode-menu-escapes-sdk-header-clipping-with-anchored-placement-and-focus-preservation"
+        "top-layer-mode-menu-escapes-sdk-header-clipping-with-anchored-placement-and-focus-preservation",
+        "desktop-uses-official-new-session-preset-picker-and-preserves-history-and-default"
       ],
       "patchId": "ui-mode-switcher",
       "requiredInAggregate": true,
@@ -326,7 +328,8 @@
       "features": [
         "host-isolated-transfer-browser",
         "active-transfer-target-lock",
-        "desktop-ssh-client-host-pair-preserved"
+        "desktop-ssh-client-host-pair-preserved",
+        "desktop-dock-opens-existing-ssh-panel-with-web-entry-preserved"
       ],
       "package": "@linxin666/dsh-ssh",
       "path": "packages/dsh-ssh",
@@ -1004,6 +1007,7 @@
         "extension-dock-plugin-market-deep-link-allowlist",
         "extension-dock-skill-management-deep-link-allowlist",
         "dshmarket-catalog-bridge-with-desktop-owned-mutations",
+        "pinned-optional-im-connect-through-desktop-owned-market-mutations",
         "plugin-diagnostics-native-clipboard-write",
         "plugin-native-settings-bridge",
         "smart-control-deep-link-single-window",
@@ -1312,6 +1316,8 @@
         "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
         "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
         "windows-installer-compaction-restores-verified-full-directory-even-on-compression-failure",
+        "windows-native-office-preview-conversion-and-recalculation-without-duplicate-wasm-engine",
+        "windows-installer-timing-separates-preflight-extraction-copy-and-cache",
         "packaged-integrity-canonicalizes-payload-paths-and-rejects-symlink-escapes",
         "builder-generated-windows-update-provider-channel-cache-and-signature-metadata-gated-before-compression",
         "no-http-ready-address",
@@ -1331,7 +1337,8 @@
         "five-groups-preserve-all-legacy-entries",
         "single-value-mode-editor-through-models-advanced",
         "conversation-team-operations-and-compatible-settings-switch",
-        "agent-team-and-shared-browser-settings-routes"
+        "agent-team-and-shared-browser-settings-routes",
+        "task-board-and-ssh-open-from-more-tools-without-duplicate-desktop-sidebar-items"
       ],
       "e2eScript": "scripts/verify-dock-settings.mjs"
     },

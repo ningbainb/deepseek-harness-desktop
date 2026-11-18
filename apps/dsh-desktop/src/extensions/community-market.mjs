@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import semver from 'semver'
 
 export const COMMUNITY_MARKET_URL = 'https://awesome-dsh-plugin.com/plugins.json'
 /**
@@ -14,8 +16,8 @@ export const DSHMARKET_CATALOG_BRIDGE = Object.freeze({
 
 const DEFAULT_TIMEOUT_MS = 6_000
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000
-const DEFAULT_MAX_BYTES = 10_000_000
-const MAX_PLUGINS = 10_000
+const DEFAULT_MAX_BYTES = 24_000_000
+const MAX_PLUGINS = 20_000
 const MAX_NAME_LENGTH = 200
 const MAX_OWNER_LENGTH = 100
 const MAX_CATEGORY_LENGTH = 80
@@ -28,6 +30,8 @@ const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u
 const SAFE_PATH_SEGMENT_PATTERN = /^[A-Za-z0-9._~-]+$/u
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{20}$/u
 const RETIRED_MARKET_PACKAGES = new Set(['dshmarket'])
+const IM_CONNECT = '@michengai/dsh-im-connect'
+const DESKTOP_INDEX = new URL('../../runtime-support/community-plugin-index.json', import.meta.url)
 
 function boundedString(value, maxLength) {
   if (typeof value !== 'string') return undefined
@@ -157,6 +161,33 @@ function categoryLabel(value) {
   return Object.freeze(result)
 }
 
+function readImConnectTrial() {
+  const index = JSON.parse(readFileSync(DESKTOP_INDEX, 'utf8'))
+  const row = index.plugins.find((plugin) => plugin.name === IM_CONNECT)
+  const releases = row?.versions ?? []
+  const [release] = releases
+  if (releases.length !== 1 || !semver.valid(release.version) || release.source.type !== 'npm') {
+    throw new Error('desktop IM Connect trial must pin a single npm version')
+  }
+  const plugin = projectPlugin({
+    name: row.name,
+    npm: row.name,
+    url: row.repository.url,
+    owner: row.author,
+    category: row.metadata.category,
+    description: row.description,
+    added: new Date(release.publishTimestamp * 1000).toISOString().slice(0, 10),
+  })
+  return {
+    plugin: {
+      ...plugin,
+      displayName: row.title.zh,
+      installSpec: `${row.name}@${release.version}`,
+    },
+    label: index.metadata.categories[plugin.category].title,
+  }
+}
+
 function projectCatalog(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.plugins)) {
     throw new TypeError('community market catalog shape is invalid')
@@ -164,13 +195,23 @@ function projectCatalog(value) {
 
   const plugins = []
   const installById = new Map()
+  const { plugin: pinnedTrial, label: trialLabel } = readImConnectTrial()
+  const trialRepository = pinnedTrial.repository.toLowerCase()
+  let upstreamTrial
   for (const candidate of value.plugins.slice(0, MAX_PLUGINS)) {
     const plugin = projectPlugin(candidate)
     if (plugin === undefined || installById.has(plugin.id)) continue
+    if (plugin.npm === pinnedTrial.npm || plugin.repository?.toLowerCase() === trialRepository) {
+      if (upstreamTrial === undefined || plugin.npm === pinnedTrial.npm) upstreamTrial = plugin
+      continue
+    }
     plugins.push(plugin)
     installById.set(plugin.id, plugin)
   }
-  if (plugins.length === 0) throw new TypeError('community market catalog contains no installable plugins')
+  if (plugins.length === 0 && upstreamTrial === undefined) throw new TypeError('community market catalog contains no installable plugins')
+  const trial = Object.freeze({ ...pinnedTrial, stars: upstreamTrial?.stars, downloads: upstreamTrial?.downloads })
+  plugins.push(trial)
+  installById.set(trial.id, trial)
 
   const categorySource = value.categories !== null && typeof value.categories === 'object' && !Array.isArray(value.categories)
     ? value.categories
@@ -178,7 +219,10 @@ function projectCatalog(value) {
   const categoryIds = new Set(plugins.map((plugin) => plugin.category))
   const categories = [...categoryIds]
     .sort((left, right) => left.localeCompare(right, 'en'))
-    .map((id) => Object.freeze({ id, label: categoryLabel(categorySource[id]) }))
+    .map((id) => Object.freeze({
+      id,
+      label: categoryLabel(categorySource[id] ?? (id === trial.category ? trialLabel : undefined)),
+    }))
 
   const publicCatalog = Object.freeze({
     updated: boundedString(value.updated, 32),
@@ -198,6 +242,28 @@ function responseHeader(response, name) {
 function catalogUnavailable(error) {
   const message = error instanceof Error ? error.message : String(error)
   return new Error(`community market catalog unavailable: ${message}`)
+}
+
+async function readCatalogBytes(response, maxBytes) {
+  const announcedLength = Number(responseHeader(response, 'content-length'))
+  if (Number.isFinite(announcedLength) && announcedLength > maxBytes) {
+    void response.body?.cancel().catch(() => {})
+    throw new Error('community market catalog response is too large')
+  }
+
+  const chunks = []
+  let length = 0
+  try {
+    for await (const chunk of response.body ?? []) {
+      length += chunk.byteLength
+      if (length > maxBytes) break
+      chunks.push(chunk)
+    }
+  } catch (error) {
+    throw catalogUnavailable(error)
+  }
+  if (length > maxBytes) throw new Error('community market catalog response is too large')
+  return Buffer.concat(chunks, length)
 }
 
 export function createCommunityMarketService({
@@ -241,15 +307,22 @@ export function createCommunityMarketService({
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     timer.unref?.()
     let response
+    let bytes
     try {
-      response = await fetchImpl(catalogUrl, {
-        method: 'GET',
-        headers,
-        redirect: 'error',
-        signal: controller.signal,
-      })
-    } catch (error) {
-      throw catalogUnavailable(error)
+      try {
+        response = await fetchImpl(catalogUrl, {
+          method: 'GET',
+          headers,
+          redirect: 'error',
+          signal: controller.signal,
+        })
+      } catch (error) {
+        throw catalogUnavailable(error)
+      }
+      if (response.status !== 304) {
+        if (!response.ok) throw new Error(`community market catalog request failed with HTTP ${response.status}`)
+        bytes = await readCatalogBytes(response, maxBytes)
+      }
     } finally {
       clearTimeout(timer)
     }
@@ -259,20 +332,6 @@ export function createCommunityMarketService({
       served.servedAt = now()
       return presentCatalog(served.publicCatalog)
     }
-    if (!response.ok) throw new Error(`community market catalog request failed with HTTP ${response.status}`)
-
-    const announcedLength = Number(responseHeader(response, 'content-length'))
-    if (Number.isFinite(announcedLength) && announcedLength > maxBytes) {
-      throw new Error('community market catalog response is too large')
-    }
-
-    let bytes
-    try {
-      bytes = new Uint8Array(await response.arrayBuffer())
-    } catch (error) {
-      throw catalogUnavailable(error)
-    }
-    if (bytes.byteLength > maxBytes) throw new Error('community market catalog response is too large')
 
     let parsed
     try {

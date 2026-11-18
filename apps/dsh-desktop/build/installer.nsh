@@ -15,6 +15,7 @@ Var DshInstallerLogPath
 Var DshInstallerStage
 Var DshInstallerCode
 Var DshInstallerDetail
+Var DshInstallerTiming
 Var DshInstallerLogAvailable
 Var DshLegacyInstallDetected
 Var DshLegacyInstallDirectory
@@ -37,12 +38,20 @@ diagnostic_open:
   FileOpen $9 "$DshInstallerLogPath" a
   IfErrors diagnostic_done
   FileSeek $9 0 END
+  System::Call 'kernel32::GetTickCount64() l .r8'
+  StrCmp $DshInstallerTiming "" diagnostic_stage
+  FileWriteUTF16LE $9 "timing=$DshInstallerTiming tick_ms=$8$\r$\n"
+  Goto diagnostic_result
+diagnostic_stage:
+  FileWriteUTF16LE $9 "tick_ms=$8$\r$\n"
   FileWriteUTF16LE $9 "stage=$DshInstallerStage code=$DshInstallerCode$\r$\n$DshInstallerDetail$\r$\n"
+diagnostic_result:
   IfErrors diagnostic_close
   StrCpy $DshInstallerLogAvailable "1"
 diagnostic_close:
   FileClose $9
 diagnostic_done:
+  StrCpy $DshInstallerTiming ""
   ClearErrors
   Pop $9
   Pop $8
@@ -230,6 +239,22 @@ legacy_identity_done:
   !endif
 !macroend
 
+; Timing entries leave the last stage, the progress observer, and Windows error
+; flag unchanged. GetTickCount64 measures durations across wall-clock changes.
+!macro DshTiming NAME
+  !ifndef BUILD_UNINSTALLER
+    Push $7
+    StrCpy $7 "0"
+    IfErrors 0 +2
+    StrCpy $7 "1"
+    StrCpy $DshInstallerTiming "${NAME}"
+    Call WriteInstallerDiagnostic
+    StrCmp $7 "0" +2
+    SetErrors
+    Pop $7
+  !endif
+!macroend
+
 ; GUI Abort may wait on the failed page before .onInstFailed. Recover before Quit.
 !macro DshAbortExtraction
   !insertmacro DshLog "extract-cancelled" "2" "Application file copy failed and the user cancelled"
@@ -261,6 +286,7 @@ dsh_extraction_cancel_recovered:
     File /oname=preflight.mjs "${BUILD_RESOURCES_DIR}\browser-component-preflight\bin\preflight.mjs"
     SetOutPath "$PLUGINSDIR\browser-component-preflight\runtime-support"
     File /oname=browser-component.json "${BUILD_RESOURCES_DIR}\browser-component-preflight\runtime-support\browser-component.json"
+    !insertmacro DshTiming "browser-preflight-start"
     System::Call 'kernel32::GetCurrentProcessId() i .r2'
     nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-browser-preflight.ps1" -InstallDirectory "$INSTDIR" -PreflightEntry "$PLUGINSDIR\browser-component-preflight\bin\preflight.mjs" -ExpectedEntrySHA256 "${DSH_BROWSER_PREFLIGHT_SHA256}" -ExpectedManifestSHA256 "${DSH_BROWSER_COMPONENT_MANIFEST_SHA256}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -InstallerProcessId $2'
     Pop $0
@@ -275,6 +301,7 @@ browser_preflight_ready:
   !endif
 cleanup_retry:
   !insertmacro DshWorkingProgress "1 / 3  准备安装与保护旧版" "正在检查旧进程并准备可恢复的升级备份。"
+  !insertmacro DshTiming "upgrade-preflight-start"
   !ifdef BUILD_UNINSTALLER
   nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup-stale-processes.ps1" -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}"'
   !else
@@ -283,6 +310,7 @@ cleanup_retry:
   !endif
   Pop $0
   Pop $1
+  !insertmacro DshTiming "upgrade-preflight-end"
   !insertmacro DshLog "preflight" "$0" "$1"
   StrCmp $0 "0" cleanup_done
   !insertmacro DshStopProgress

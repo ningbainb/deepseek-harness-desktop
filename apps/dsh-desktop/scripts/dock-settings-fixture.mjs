@@ -1,5 +1,25 @@
 const localizedContexts = new WeakSet()
 
+/** Use the visible Desktop entry and More tools group, without forced input. */
+export async function openDockTools(app, mainPage) {
+  // Tool navigation hides the Dock after focusing the existing main window.
+  // Clicking its canonical entry also restores that retained Dock on reentry.
+  await mainPage.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).click()
+  let dock = app.windows().find(page => page.url().includes('/extensions.html'))
+  if (!dock) {
+    for (let attempt = 0; attempt < 120 && !dock; attempt++) {
+      dock = app.windows().find(page => page.url().includes('/extensions.html'))
+      if (!dock) await new Promise(resolve => setTimeout(resolve, 250))
+    }
+  }
+  if (!dock) throw new Error('Extension Dock did not open')
+  await dock.locator('[role="tab"].active').first().waitFor({ state: 'visible', timeout: 60_000 })
+  await dock.locator('.settings-sidebar > nav:not([data-tab-group]) [data-group="more-tools"]').click()
+  await dock.locator('#task-board-tool').waitFor({ state: 'visible' })
+  await dock.locator('#ssh-tool').waitFor({ state: 'visible' })
+  return dock
+}
+
 /** Reach retained destinations through their visible group using normal input. */
 export async function visitDockDestination(dock, id) {
   const tab = dock.locator(`#${id}`)

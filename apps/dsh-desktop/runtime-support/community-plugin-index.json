@@ -8,7 +8,8 @@
   "metadata": {
     "categories": {
       "context": { "title": { "en": "Context", "zh": "上下文" } },
-      "prompt": { "title": { "en": "Prompts", "zh": "提示词" } }
+      "prompt": { "title": { "en": "Prompts", "zh": "提示词" } },
+      "notify": { "title": { "en": "Notifications", "zh": "消息通知" } }
     },
     "labels": {
       "license-apache-2.0": { "title": "Apache-2.0" },
@@ -53,6 +54,26 @@
           "publishTimestamp": 1794492532,
           "source": { "type": "npm", "registry": "https://registry.npmjs.org/" },
           "engines": { "dsh": "^0.2.2-rc.1" }
+        }
+      ]
+    },
+    {
+      "name": "@michengai/dsh-im-connect",
+      "title": { "en": "IM Connect (Feishu trial)", "zh": "IM 助理（飞书试用）" },
+      "description": {
+        "en": "Optional messaging channels for DeepSeek Harness. Install and connect a Feishu bot when needed. Keep existing QQ bots managed by Desktop.",
+        "zh": "按需接入消息渠道，首轮试用飞书机器人。安装后需自行绑定飞书账号，已有 QQ 机器人继续在桌面版管理。"
+      },
+      "author": "MichengAI",
+      "homepage": "https://github.com/MichengAI/dsh-im-connect",
+      "repository": { "url": "https://github.com/MichengAI/dsh-im-connect" },
+      "metadata": { "category": "notify", "labels": ["license-apache-2.0", "opt-in"] },
+      "versions": [
+        {
+          "version": "1.0.44",
+          "publishTimestamp": 1794925123,
+          "source": { "type": "npm", "registry": "https://registry.npmjs.org/" },
+          "engines": { "dsh": ">=0.2.2-rc.3 <0.3.0-0" }
         }
       ]
     }

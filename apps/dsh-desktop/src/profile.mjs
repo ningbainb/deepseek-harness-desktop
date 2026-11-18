@@ -326,6 +326,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
 // DSH 0.1.6 exposes these runtime modules as peers. Keep them explicit so the
 // packaged host is hermetic instead of resolving through a developer machine.
 export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
+  '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-error',
   '@deepseek-ai/cordis-plugin-group',
   '@deepseek-ai/cordis-plugin-hmr',
@@ -351,6 +352,7 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-client-modules',
   '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-conversation',
+  '@deepseek-ai/dsh-client-ui-primitives',
   '@deepseek-ai/dsh-client-ui-renderer',
   '@deepseek-ai/dsh-client-ui-session',
   '@deepseek-ai/dsh-client-ui-sidebar',
@@ -371,6 +373,7 @@ export const DSH_BOOT_RUNTIME_PACKAGES = Object.freeze([
   '@deepseek-ai/dsh-sandbox-policy',
   '@deepseek-ai/dsh-scope',
   '@deepseek-ai/dsh-sdk-protocol',
+  '@deepseek-ai/schemastery',
   '@deepseek-ai/dsh-session-query',
   '@deepseek-ai/dsh-session-telemetry',
   '@deepseek-ai/dsh-session-title-llm',

@@ -622,8 +622,8 @@ const NATIVE_PLUGINS = [
     packageName: '@linxin666/dsh-mode-switcher',
     category: 'ui',
     categoryLabel: '界面主题',
-    description: '极简专注模式与专家全功能模式间的一键切换，适应不同开发场景。',
-    features: ['双模切换', '界面精简', '快捷响应'],
+    description: '桌面通过新会话中的原生 Agent 预设选择工作方式；保留 Web 模式切换及已有配置。',
+    features: ['原生新会话预设', '保留旧配置', 'Web 模式切换'],
     icon: 'toggle',
   },
   {
@@ -1382,6 +1382,15 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
 document.querySelector('#dock-settings-retry').addEventListener('click', () => {
   if (activeSettingsTab) activateTab(activeSettingsTab, false, undefined, activeSettingsPlugin, true)
 })
+
+for (const entry of document.querySelectorAll('[data-desktop-tool]')) {
+  entry.addEventListener('click', async () => {
+    entry.disabled = true
+    try { await window.dshDesktop.openDesktopTool(entry.dataset.desktopTool) }
+    catch (error) { notify(error.message || '工具未能打开，请重试。', true) }
+    finally { entry.disabled = false }
+  })
+}
 
 for (const tab of tabs) {
   tab.addEventListener('click', () => { activateTab(tab, false, undefined, undefined, true) })

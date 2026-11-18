@@ -43,3 +43,52 @@ describe('task-board sidebar navigation', () => {
     dispose()
   })
 })
+
+
+it('desktop Dock opens the existing task-board controller without mounting a left shortcut', () => {
+  const native = shell()
+  let receive: (() => boolean) | undefined
+  const unsubscribe = vi.fn()
+  const onDesktopToolOpen = vi.fn((tool: string, callback: () => boolean) => {
+    expect(tool).toBe('task-board')
+    receive = callback
+    return unsubscribe
+  })
+  Object.assign(window, { dshDesktop: { onDesktopToolOpen } })
+  const controller = { openBoard: vi.fn(), closeBoard: vi.fn(),
+    subscribe: () => () => {}, getSnapshot: () => ({ boardOpen: false }) }
+  const dispose = mountSidebarEntry(controller as never)
+  try {
+    expect(document.querySelector('[data-dsh-taskboard-entry]')).toBeNull()
+    expect(onDesktopToolOpen).toHaveBeenCalledOnce()
+    expect(receive!()).toBe(false)
+    expect(controller.openBoard).not.toHaveBeenCalled()
+    const view = document.createElement('div')
+    view.dataset.dshTaskboardView = ''
+    document.body.append(view)
+    expect(receive!()).toBe(true)
+    expect(controller.openBoard).toHaveBeenCalledOnce()
+    document.dispatchEvent(new CustomEvent(SURFACE_NAVIGATION_EVENT, { detail: { surface: 'another-tool' } }))
+    expect(controller.closeBoard).toHaveBeenCalledOnce()
+    native.click()
+    expect(controller.closeBoard).toHaveBeenCalledTimes(2)
+  } finally {
+    dispose()
+    delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop
+  }
+  expect(unsubscribe).toHaveBeenCalledOnce()
+})
+
+
+it('retains the existing task-board entry on older hosts without the new Desktop tool bridge', () => {
+  shell()
+  Object.assign(window, { dshDesktop: { getInfo: vi.fn() } })
+  const controller = { toggleBoard: vi.fn(), subscribe: () => () => {}, getSnapshot: () => ({ boardOpen: false }) }
+  const dispose = mountSidebarEntry(controller as never)
+  try {
+    const entry = document.querySelector<HTMLButtonElement>('[data-dsh-taskboard-entry]')
+    expect(entry).not.toBeNull()
+    entry!.click()
+    expect(controller.toggleBoard).toHaveBeenCalledOnce()
+  } finally { dispose(); delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop }
+})
