@@ -319,7 +319,7 @@ payload_prepare_failed:
 payload_extract_failed:
   !insertmacro DshLog "payload-extraction" "2" "Failed to stage or decompress the embedded application archive"
 payload_staging_failed:
-  SetOutPath "$PLUGINSDIR"
+  SetOutPath "$TEMP"
   !insertmacro DshStopProgress
   MessageBox MB_ICONSTOP|MB_OK "无法在所选安装磁盘准备应用文件，安装已停止。请确认目录可写、有足够空间，并查看日志：$\r$\n$DshInstallerLogPath" /SD IDOK
   SetErrorLevel 2

@@ -778,6 +778,7 @@
         "finish-path-discovery-is-readonly-and-labels-unselected-or-unconfirmed-home-without-assuming-defaults",
         "stock-extraction-cancel-rolls-back-before-quitting",
         "embedded-archive-and-extraction-stage-on-selected-program-volume",
+        "windows-install-failure-releases-the-target-volume-staging-directory",
         "same-volume-payload-promotion-preserves-unrelated-directory-entries-and-rolls-back",
         "installer-process-ownership-excludes-prefix-siblings-and-unrelated-command-line-references",
         "offline-runtime-restoration-bytes-rounded-up-in-native-disk-space-gates",
