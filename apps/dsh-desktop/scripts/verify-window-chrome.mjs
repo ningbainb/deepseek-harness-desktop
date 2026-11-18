@@ -702,9 +702,19 @@ try {
     menuBarVisible: false,
     minimizable: true,
   })
-  const pnpmShim = await readFile(resolve(temporary, 'user-data', 'runtime-bin', 'pnpm.cmd'), 'utf8')
+  const runtimeBin = resolve(temporary, 'user-data', 'runtime-bin')
+  const pnpmShim = await readFile(resolve(runtimeBin, 'pnpm.cmd'), 'utf8')
   assert.match(pnpmShim, /ELECTRON_RUN_AS_NODE=1/u)
-  assert.match(pnpmShim, /pnpm\.(?:mjs|cjs)/u)
+  const runtimeExecutable = await electronApp.evaluate(() => process.execPath)
+  if (/[\u0080-\uFFFF%]/u.test(runtimeExecutable) || pnpmShim.includes('dsh-pnpm-unicode.ps1')) {
+    assert.match(pnpmShim, /powershell\.exe" [^\r\n]+ -File "%~dp0dsh-pnpm-unicode\.ps1" %\*/u)
+    const delegated = await readFile(resolve(runtimeBin, 'dsh-pnpm-unicode.ps1'), 'utf8')
+    const quotedExecutable = `'${runtimeExecutable.replaceAll("'", "''")}'`
+    assert.ok(delegated.startsWith(`\uFEFF& ${quotedExecutable} `), 'Unicode runner preserves the packaged Electron path')
+    assert.match(delegated, /[\\/]pnpm\.(?:mjs|cjs)' @args\r?\nexit \$LASTEXITCODE\r?\n$/u)
+  } else {
+    assert.match(pnpmShim, /pnpm\.(?:mjs|cjs)/u)
+  }
   assert.deepEqual(settingsActivationErrors, [], 'the settings plugin must activate in every Desktop window')
   const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8')
   const startupTimings = parseStartupTimings(runtimeLog)

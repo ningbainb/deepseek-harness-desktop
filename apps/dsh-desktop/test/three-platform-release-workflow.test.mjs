@@ -109,15 +109,15 @@ test('failed Windows candidates retain diagnostics without entering the publicat
   assert.doesNotMatch(publication, /desktop-debug/u)
 })
 
-test('Windows release also verifies the latest 5.1.0 stable upgrade without replacing older coverage', async () => {
+test('Windows release also verifies the latest 5.2.0 stable upgrade without replacing older coverage', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
   const setup = workflow.slice(workflow.indexOf('- name: Verify production Setup'), workflow.indexOf('- name: Run packaged Windows regression'))
-  for (const version of ['4.3.0', '5.0.0', '5.0.1', '5.1.0']) {
+  for (const version of ['4.3.0', '5.0.0', '5.0.1', '5.1.0', '5.2.0']) {
     assert.ok(setup.includes(`$env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '${version}'`))
     assert.ok(setup.includes(`gh release download desktop-v${version} --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-${version}-x64.exe' --pattern SHA256SUMS.txt`))
     assert.ok(setup.includes(`setup-from-${version}.json`))
   }
-  assert.equal(setup.match(/node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/gu)?.length, 4)
+  assert.equal(setup.match(/node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/gu)?.length, 5)
 })
 
 test('Windows acceptance receipts survive successful runs and remain separate from public assets', async () => {

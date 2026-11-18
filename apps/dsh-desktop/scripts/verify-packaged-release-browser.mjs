@@ -1,6 +1,6 @@
 // Windows packaged acceptance. Run AFTER packaging, with Electron work serialized:
-// . ./scripts/use-e-build-env.ps1
-// node apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs --desktop-exe="E:/.../win-unpacked/DeepSeek Harness Desktop.exe"
+// . ./scripts/use-build-env.ps1
+// node apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs --desktop-exe="D:/dshshequ/.../win-unpacked/DeepSeek Harness Desktop.exe"
 // This driver never installs, builds, launches source Electron, changes the
 // payload, injects a main-process entry, or substitutes app.whenReady.
 import assert from 'node:assert/strict'
@@ -51,7 +51,7 @@ const probeName = '@fixture/dsh-release-plugins'
 const factsPath = '/api/packaged-release-browser-facts'
 const inputPath = '/api/packaged-release-browser-input'
 const guardPath = '/api/packaged-release-browser-guard-controls'
-const expectedVersion = '5.2.0'
+const { version: expectedVersion } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const nativeText = 'packaged browser trusted input'
 const execFileAsync = promisify(execFile)
 const phases = [], servers = [], serverSockets = new Set()
@@ -276,7 +276,7 @@ async function start(name) {
   evidence.webdriver = await owner.main.evaluate(() => navigator.webdriver)
   assert.equal(evidence.webdriver, true, 'The actual Chromium renderer must identify this QA launch as automation')
   evidence.info = await owner.main.evaluate(() => window.dshDesktop.getInfo())
-  assert.equal(evidence.info.version, expectedVersion, 'Live packaged version must be 5.2.0')
+  assert.equal(evidence.info.version, expectedVersion, 'Live packaged version must match the candidate manifest')
   assert.equal(evidence.info.platform, 'win32')
   await waitUntil(async () => {
     const status = await owner.main.evaluate(() => window.dshDesktop.getStatus())
@@ -590,7 +590,7 @@ document.querySelector('#fixture-trusted-submit').addEventListener('click',event
     response.writeHead(200, headers)
     response.end(`<!doctype html><meta charset="utf-8"><title>Release plugins visiblewindow</title>
       <style>${fixtureStyle}</style>
-      <h1>Release plugins visiblewindow</h1><p>Packaged 5.2.0 loopback browser acceptance</p>
+      <h1>Release plugins visiblewindow</h1><p>Packaged ${expectedVersion} loopback browser acceptance</p>
       <label>Name <input id="fixture-name"></label><button id="fixture-submit">Apply local value</button><output id="fixture-result">not-applied</output>
       <label>Trusted input <input id="fixture-trusted-name"></label><button id="fixture-trusted-submit">Apply trusted value</button><output id="fixture-trusted-result">not-applied</output>
       <script>${fixtureScript}</script>`)
