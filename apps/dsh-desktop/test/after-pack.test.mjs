@@ -147,6 +147,50 @@ test('release pruner removes classified files and preserves runtime entries', as
   }
 })
 
+test('Windows retains the sidebar icon families, license and unrelated consumers', async t => {
+  for (const [scenario, otherManifest, iconVersion, platform, prune, sidebarSource = 'import { SiGit } from "react-icons/si"'] of [
+    ['reviewed sidebar', undefined, '5.7.0', 'win32', true],
+    ['additional consumer', { peerDependencies: { 'react-icons': '^5.0.0' } }, '5.7.0', 'win32', false],
+    ['future icon version', undefined, '5.8.0', 'win32', false],
+    ['new sidebar import', undefined, '5.7.0', 'win32', false, 'import { GiDice } from "react-icons/gi"'],
+    ['dynamic sidebar import', undefined, '5.7.0', 'win32', false, 'import(`react-icons/${family}`)'],
+    ['other target', undefined, '5.7.0', 'linux', false],
+  ]) await t.test(scenario, async t => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-sidebar-icons-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const exports = Object.fromEntries(['si', 'vsc', 'gi'].map(family => [
+      `./${family}`, { require: `./${family}/index.js`, import: `./${family}/index.mjs` },
+    ]))
+    const files = {
+      'dsh-better-sidebar/package.json': JSON.stringify({ name: 'dsh-better-sidebar', version: '0.24.1', dependencies: { 'react-icons': '5.7.0' } }),
+      'dsh-better-sidebar/lib/client.js': sidebarSource,
+      'react-icons/package.json': JSON.stringify({ name: 'react-icons', version: iconVersion, exports }),
+      'react-icons/LICENSE': 'license',
+      'react-icons/index.js': 'base exports',
+      'react-icons/lib/index.js': 'core',
+      'react-icons/si/index.js': 'simple-icons CJS',
+      'react-icons/si/index.mjs': 'simple-icons ESM',
+      'react-icons/vsc/index.js': 'codicons CJS',
+      'react-icons/vsc/index.mjs': 'codicons ESM',
+      'react-icons/gi/index.js': 'unused game icons CJS',
+      'react-icons/gi/index.mjs': 'unused game icons ESM',
+      'react-icons/gi/package.json': '{}',
+    }
+    if (otherManifest) files['@fixture/other-plugin/package.json'] = JSON.stringify({ name: '@fixture/other-plugin', ...otherManifest })
+    for (const [name, content] of Object.entries(files)) {
+      const path = join(root, name)
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, content)
+    }
+    const report = await prunePackagedRuntime(root, { platform, arch: 'x64' })
+    if (prune) assert.equal(report.categories['unused-sidebar-icon-family'], 3)
+    for (const [name, content] of Object.entries(files)) {
+      if (prune && name.startsWith('react-icons/gi/')) await assert.rejects(access(join(root, name)), { code: 'ENOENT' })
+      else assert.equal(await readFile(join(root, name), 'utf8'), content)
+    }
+  })
+})
+
 test('release pruner removes complete foreign-platform optional packages', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-runtime-platform-prune-'))
   try {

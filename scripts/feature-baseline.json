@@ -765,6 +765,7 @@
       "features": [
         "normal-installer-compression",
         "nested-windows-electron-locales-match-explicit-desktop-languages-with-en-US-fallback-and-link-guards",
+        "windows-sidebar-icon-trimming-preserves-used-families-license-and-other-declared-consumers",
         "windows-package-runtime-evidence-preflight-before-dist-cleanup",
         "packaged-critical-runtime-owner-resolution-contained-in-payload",
         "deferred-committed-backup-cleanup",

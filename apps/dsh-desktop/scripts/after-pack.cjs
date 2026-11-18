@@ -343,6 +343,71 @@ async function pruneForeignPlatformPackages(nodeModulesRoot, report, target) {
   }
 }
 
+async function pruneUnusedSidebarIconFamilies(nodeModulesRoot, files, report, target) {
+  if (target.platform !== 'win32' || target.arch !== 'x64') return
+  const iconRoot = join(nodeModulesRoot, 'react-icons')
+  const iconManifestPath = join(iconRoot, 'package.json')
+  if (!files.includes(iconManifestPath)) return
+  const iconManifest = JSON.parse(await readFile(iconManifestPath, 'utf8'))
+  if (iconManifest.name !== 'react-icons' || iconManifest.version !== '5.7.0') return
+
+  // Sidebar 0.24.1 ships Simple Icons and Codicons in its client bundles and
+  // exposes source that imports those same families. Retain both module formats
+  // and keep the full catalog whenever another bundled package declares it.
+  const sidebarPath = join(nodeModulesRoot, 'dsh-better-sidebar', 'package.json')
+  const manifests = files.filter(path => /(?:^|\/node_modules\/)(?:@[^/]+\/)?[^/]+\/package\.json$/u
+    .test(relative(nodeModulesRoot, path).replaceAll('\\', '/')))
+  const consumers = []
+  for (const path of manifests) {
+    let manifest
+    try { manifest = JSON.parse(await readFile(path, 'utf8')) } catch (error) {
+      if (error.code === 'ENOENT') continue
+      if (error instanceof SyntaxError) return
+      throw error
+    }
+    if (!manifest || typeof manifest !== 'object') return
+    const dependencies = ['dependencies', 'peerDependencies', 'optionalDependencies']
+      .flatMap(field => Object.entries(manifest[field] ?? {}))
+    if (dependencies.some(([name, spec]) => name === 'react-icons' || (typeof spec === 'string' && /^npm:react-icons(?:@|$)/u.test(spec)))) {
+      consumers.push({ path, manifest })
+    }
+  }
+  if (consumers.length !== 1 || consumers[0].path !== sidebarPath || consumers[0].manifest.name !== 'dsh-better-sidebar'
+    || consumers[0].manifest.version !== '0.24.1') return
+
+  const requiredFamilies = new Set(['lib', 'si', 'vsc'])
+  for (const path of files) {
+    const local = relative(dirname(sidebarPath), path).replaceAll('\\', '/')
+    if (!/^(?:lib|src)\/.+\.[cm]?[jt]sx?$/u.test(local) || classifyPrunableFile(`dsh-better-sidebar/${local}`, target)) continue
+    const source = await readFile(path, 'utf8')
+    // A newly referenced or computed subpath in a local patch preserves the full package.
+    if ([...source.matchAll(/react-icons\/([^/"'`\s]*)/gu)].some(([, family]) => !requiredFamilies.has(family))) return
+  }
+
+  const category = 'unused-sidebar-icon-family'
+  for (const [entry, conditions] of Object.entries(iconManifest.exports ?? {})) {
+    const family = /^\.\/([a-z][a-z0-9]*)$/u.exec(entry)?.[1]
+    if (!family || requiredFamilies.has(family)
+      || conditions?.require !== `./${family}/index.js` || conditions?.import !== `./${family}/index.mjs`) continue
+    const directory = join(iconRoot, family)
+    const info = await lstat(directory).catch(error => {
+      if (error.code === 'ENOENT') return undefined
+      throw error
+    })
+    if (!info?.isDirectory() || info.isSymbolicLink()) continue
+    for (const file of await readdir(directory, { withFileTypes: true })) {
+      if (!file.isFile() || !['index.js', 'index.mjs', 'package.json'].includes(file.name)) continue
+      const path = join(directory, file.name)
+      const { size } = await lstat(path)
+      await rm(path)
+      report.removedBytes += size
+      report.removedFiles += 1
+      report.categories[category] = (report.categories[category] ?? 0) + 1
+    }
+    if ((await readdir(directory)).length === 0) await rmdir(directory)
+  }
+}
+
 async function optimizePackagedSkinPreviews(nodeModulesRoot, report) {
   const catalogRoot = join(nodeModulesRoot, ...SKIN_CENTER_ROOT)
   let skins
@@ -524,6 +589,7 @@ async function prunePackagedRuntime(nodeModulesRoot, target = { platform: 'win32
     report.categories[category] = (report.categories[category] ?? 0) + 1
   }
 
+  await pruneUnusedSidebarIconFamilies(nodeModulesRoot, files, report, normalizePackingTarget(target))
   await pruneRetiredSkinCarrierAssets(nodeModulesRoot, report)
   await optimizePackagedSkinPreviews(nodeModulesRoot, report)
   if (normalizePackingTarget(target).platform === 'win32') {
