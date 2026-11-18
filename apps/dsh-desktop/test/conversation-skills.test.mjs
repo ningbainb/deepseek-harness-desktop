@@ -53,6 +53,35 @@ for (const label of ['指令', '命令', 'Commands', '添加文件或调用指�
   })
 }
 
+
+test('streamed replies leave the skill launcher attached without measuring the composer', async () => {
+  const dom = new JSDOM('<article data-chat-flow></article><main data-composer-card="true"><button aria-label="Commands"></button><div role="textbox" contenteditable="true"></div></main>',
+    { runScripts: 'outside-only', url: 'https://dsh.internal/' })
+  try {
+    const { document } = dom.window
+    const composer = document.querySelector('main')
+    let measured = 0
+    composer.getClientRects = () => { measured++; return [{ width: 400, height: 200 }] }
+    dom.window.dshDesktop = { listSkills: async () => ({ skills: [] }) }
+    dom.window.eval(CONVERSATION_SKILLS_SCRIPT)
+    await new Promise(resolve => setImmediate(resolve))
+    const originalButton = composer.querySelector('button[aria-label="技能库"]')
+    assert.ok(originalButton)
+    const beforeStreaming = measured
+    for (let index = 0; index < 8; index++) {
+      const row = document.createElement('p')
+      row.textContent = 'stream ' + index
+      document.querySelector('[data-chat-flow]').append(row)
+      await new Promise(resolve => setImmediate(resolve))
+    }
+    assert.equal(measured, beforeStreaming)
+    assert.equal(composer.querySelector('button[aria-label="技能库"]'), originalButton)
+  } finally {
+    dom.window.__dshDesktopConversationSkillsV1?.dispose()
+    dom.window.close()
+  }
+})
+
 test('skill inventory hides shadowed entries, deduplicates names, and pins recent use', () => {
   const skills = normalizeConversationSkills([
     { name: 'playwright', description: 'Browser automation', source: 'user-agents', shadowed: false },

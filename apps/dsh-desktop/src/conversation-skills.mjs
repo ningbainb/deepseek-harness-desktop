@@ -433,7 +433,11 @@ function installConversationSkillsPage() {
 
   createMenu()
   mount()
-  const observer = new MutationObserver(scheduleMount)
+  // Reply chunks do not replace the native composer. Measuring it from
+  // their mutation callbacks would force layout before the renderer paints.
+  const observer = new MutationObserver(records => {
+    if (records.some(record => !record.target.closest?.('[data-chat-flow]'))) scheduleMount()
+  })
   observer.observe(document.body, { childList: true, subtree: true })
   const onOutsideInteraction = (event) => {
     if (!state.open) return

@@ -479,16 +479,37 @@ export function observeWindowChromeDocument({ document, window, chrome, syncThem
   }
   const observer = new window.MutationObserver(records => {
     if (disposed) return
+    let needsLayout = false
     for (const record of records) {
-      if (record.type === 'attributes' && membership.has(record.attributeName)) classify(record.target)
-      if (record.type !== 'childList') continue
-      for (const node of record.addedNodes) {
-        if (node.nodeType !== 1 || !node.isConnected || node.ownerDocument !== document) continue
-        classify(node)
-        if (node.firstElementChild) for (const dialog of node.querySelectorAll(selector)) dialogs.add(dialog)
+      const target = record.target
+      // Transcript mutations cannot move the caption or its viewport root.
+      // Inline dialogs still participate in the same ownership checks.
+      if (!needsLayout && !target?.closest?.('[data-chat-flow]')) needsLayout = true
+      if (record.type === 'attributes') {
+        const wasDialog = dialogs.has(target)
+        if (membership.has(record.attributeName)) classify(target)
+        if (wasDialog || dialogs.has(target)) needsLayout = true
+      } else if (record.type === 'childList') {
+        for (const node of record.addedNodes) {
+          if (node.nodeType !== 1 || !node.isConnected || node.ownerDocument !== document) continue
+          classify(node)
+          if (dialogs.has(node)) needsLayout = true
+          if (node.firstElementChild) for (const dialog of node.querySelectorAll(selector)) {
+            dialogs.add(dialog)
+            needsLayout = true
+          }
+        }
+      }
+      if (!needsLayout) {
+        for (const dialog of dialogs) {
+          if (!dialog.isConnected || dialog.ownerDocument !== document || target?.contains?.(dialog)) {
+            needsLayout = true
+            break
+          }
+        }
       }
     }
-    scheduleSync()
+    if (needsLayout) scheduleSync()
   })
   observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true,
     attributeFilter: ['class', 'style', 'hidden', 'data-open', 'data-skin-chrome', 'data-ds-dark-theme', 'data-dsh-desktop-theme', 'role', 'aria-modal', 'open'] })

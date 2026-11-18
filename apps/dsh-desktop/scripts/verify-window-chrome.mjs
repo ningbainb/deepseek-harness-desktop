@@ -316,19 +316,22 @@ try {
       if (!cluster) return undefined
       const style = getComputedStyle(cluster)
       const rect = cluster.getBoundingClientRect()
+      // Chromium can subtract two float coordinates with DPI residuals.
+      // Compare exact sizes at Chromium's 1/64 CSS px layout precision.
+      const layoutPixels = value => Math.round(value * 64) / 64
       const buttons = [...cluster.querySelectorAll(':scope > button')].map(button => {
         const buttonRect = button.getBoundingClientRect()
         return {
-          width: buttonRect.width,
-          height: buttonRect.height,
+          width: layoutPixels(buttonRect.width),
+          height: layoutPixels(buttonRect.height),
           centerDelta: buttonRect.top + buttonRect.height / 2 - (rect.top + rect.height / 2),
         }
       })
       return {
         controls: buttons.length,
         buttons,
-        width: rect.width,
-        height: rect.height,
+        width: layoutPixels(rect.width),
+        height: layoutPixels(rect.height),
         padding: style.padding,
         borderRadius: style.borderRadius,
         borderWidth: style.borderWidth,

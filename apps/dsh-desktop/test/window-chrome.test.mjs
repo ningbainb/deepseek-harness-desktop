@@ -190,6 +190,25 @@ test('streaming mutation bursts share one geometry sync before the next frame', 
   dispose()
 })
 
+
+test('streamed reply markup avoids caption layout while real inline dialogs still receive it', () => {
+  const f = chromeObserverFixture(), dispose = f.start()
+  const flow = { closest: selector => selector === '[data-chat-flow]' ? flow : null }
+  for (let index = 0; index < 10; index++) {
+    f.mutate([{ type: 'childList', target: flow, addedNodes: [f.node(false)], removedNodes: [] }])
+  }
+  assert.equal(f.rootCalls.length, 1)
+  const dialog = f.node()
+  f.mutate([{ type: 'childList', target: flow, addedNodes: [f.node(false, [dialog])], removedNodes: [] }])
+  assert.equal(f.rootCalls.length, 2)
+  assert.deepEqual(f.marked, [dialog])
+  dialog.isConnected = false
+  f.mutate([{ type: 'childList', target: flow, addedNodes: [], removedNodes: [dialog] }])
+  assert.equal(f.rootCalls.length, 3)
+  assert.deepEqual(f.marked, [dialog])
+  dispose()
+})
+
 test('disposing a document cancels its queued geometry sync', () => {
   const f = chromeObserverFixture(), dispose = f.start()
   f.mutate([{ type: 'childList', addedNodes: [f.node()] }], { flush: false })
