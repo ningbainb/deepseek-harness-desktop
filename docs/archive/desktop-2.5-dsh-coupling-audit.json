@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.0-rc.6",
+  "desktopVersion": "5.3.0-rc.7",
   "upstreamVersion": "0.2.2-rc.3",
   "lockfileSha256": "f3585cd37b7f1a8c4051ab1f7e55396fbd69bc72b19a67967e9d2f0017824fec",
   "policy": {
@@ -6637,7 +6637,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-window-chrome.mjs",
-      "line": 63,
+      "line": 66,
       "operation": "DSH_HOME"
     },
     {
@@ -16293,6 +16293,12 @@
       "path": "packages/dsh-value-mode/src/client/index.ts",
       "line": 262,
       "operation": "conversation.session.header.actions"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts",
+      "line": 11,
+      "operation": "conversation.input.right"
     },
     {
       "category": "slot",

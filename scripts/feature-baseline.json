@@ -245,7 +245,8 @@
         "legacy-mode-api-fallback",
         "loaded-history-projection-vetoes-stale-blank-reuse",
         "top-layer-mode-menu-escapes-sdk-header-clipping-with-anchored-placement-and-focus-preservation",
-        "desktop-suppresses-only-the-liangshen-composer-lever-and-preserves-the-official-preset-picker-settings-and-history"
+        "desktop-suppresses-only-the-liangshen-composer-lever-and-preserves-the-official-preset-picker-settings-and-history",
+        "desktop-composer-lever-suppression-follows-slot-declaration-lifetime"
       ],
       "patchId": "ui-mode-switcher",
       "requiredInAggregate": true,

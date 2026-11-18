@@ -27,6 +27,7 @@ const dshHome = resolve(temporary, 'dsh-home')
 const traceDirectory = process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY
   ? resolve(process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY) : undefined
 const diagnostic = { temporary, stage: 'startup' }
+const settingsActivationErrors = []
 let electronApp
 let page
 
@@ -46,7 +47,9 @@ function attachRendererDiagnostics(window) {
     if (message.type() === 'error' || message.type() === 'warning') {
       const location = message.location()
       const suffix = location.url ? ` (${location.url}:${location.lineNumber}:${location.columnNumber})` : ''
-      console.error(`renderer console ${message.type()}: ${message.text()}${suffix}`)
+      const detail = message.text()
+      if (detail.includes('@linxin666/dsh-client-ui-web-ui-settings: failed:')) settingsActivationErrors.push(detail)
+      console.error(`renderer console ${message.type()}: ${detail}${suffix}`)
     }
   })
 }
@@ -696,6 +699,7 @@ try {
   const pnpmShim = await readFile(resolve(temporary, 'user-data', 'runtime-bin', 'pnpm.cmd'), 'utf8')
   assert.match(pnpmShim, /ELECTRON_RUN_AS_NODE=1/u)
   assert.match(pnpmShim, /pnpm\.(?:mjs|cjs)/u)
+  assert.deepEqual(settingsActivationErrors, [], 'the settings plugin must activate in every Desktop window')
   const runtimeLog = await readFile(resolve(temporary, 'user-data', 'logs', 'runtime.log'), 'utf8')
   const startupTimings = parseStartupTimings(runtimeLog)
   console.log(`startup timings ${JSON.stringify(startupTimings)}`)

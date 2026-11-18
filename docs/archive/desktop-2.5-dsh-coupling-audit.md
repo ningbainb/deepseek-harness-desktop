@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.0-rc.6.
+Authoritative Desktop version: 5.3.0-rc.7.
 
 Stable DSH package version: 0.2.2-rc.3.
 
@@ -830,7 +830,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-terminal.mjs | 105 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 79 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 142 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 63 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 66 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 35 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 72 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 165 | profileDir |
@@ -2440,6 +2440,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-tool-describe-image/src/client/index.ts | 99 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 239 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 262 | conversation.session.header.actions |
+| slot | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 11 | conversation.input.right |
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 158 | web-ui.plugin.item |
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 163 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 171 | settings.section |
