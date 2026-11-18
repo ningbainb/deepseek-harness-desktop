@@ -1,5 +1,20 @@
 const MARKET_SORTS = new Set(['popular', 'newest', 'name'])
 
+export function communityMarketFailureMessage(error, source) {
+  const message = String(error?.message ?? '')
+  let reason = '社区目录暂时不可用'
+  if (message.includes('community market catalog unavailable: timeout')) reason = '社区目录读取超时'
+  if (message.includes('community market catalog unavailable: proxy')) reason = '市场代理连接失败'
+  if (message.includes('community market catalog unavailable: network')) reason = '无法连接社区目录'
+  if (message.includes('community market catalog response is too large')) reason = '社区目录超过读取上限'
+  const retained = source === 'curated'
+    ? '当前显示本版精选，安装时仍需连接插件来源。'
+    : source === 'cache' || source === 'community'
+      ? '继续显示本次启动后上次成功读取的目录。'
+      : '已安装插件仍可管理。'
+  return `${reason}。${retained}可重新读取目录。`
+}
+
 export function communityMarketInstallPresentation({ installed = false, phase = 'idle' } = {}) {
   if (installed) {
     return Object.freeze({
@@ -32,6 +47,8 @@ function searchableText(plugin) {
   return [
     plugin.name,
     plugin.displayName,
+    plugin.npm,
+    plugin.installSpec,
     plugin.owner,
     plugin.category,
     plugin.description?.zh,

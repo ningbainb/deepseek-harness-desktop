@@ -11,6 +11,9 @@ Var hasPerMachineInstallation
 !define UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\Uninstall"
 !define DSH_LEGACY_INSTALL_REGISTRY_KEY "${TEST_REGISTRY}\LegacyInstall"
 !define DSH_LEGACY_UNINSTALL_REGISTRY_KEY "${TEST_REGISTRY}\LegacyUninstall"
+!ifdef DSH_TARGET_PAYLOAD_STAGE
+!addplugindir /x86-unicode "${TEST_PLUGIN_DIR}"
+!endif
 !include "${BUILD_RESOURCES_DIR}\installer.nsh"
 !define APP_EXECUTABLE_FILENAME "DeepSeek Harness Desktop.exe"
 !insertmacro customHeader
@@ -24,9 +27,13 @@ Section
   IfSilent +2 0
   Call StartInstallerProgressObserver
   SetOutPath "$INSTDIR"
+  !ifdef DSH_TARGET_PAYLOAD_STAGE
+  !insertmacro DshExtractTargetVolumePayload
+  !else
   File /r "${TEST_RUNTIME_PAYLOAD}\*.*"
   SetOutPath "$INSTDIR\resources"
   File /oname=installer-upgrade-v3 "${BUILD_RESOURCES_DIR}\installer-upgrade-v3"
+  !endif
   SetOutPath "$INSTDIR"
   !insertmacro customRestoreRuntime
   WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"

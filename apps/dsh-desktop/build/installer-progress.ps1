@@ -80,13 +80,13 @@ namespace DshInstallerProgress {
     $elapsed = [DateTime]::UtcNow - $started
     $duration = '{0:00}:{1:00}' -f [Math]::Floor($elapsed.TotalMinutes), $elapsed.Seconds
     $phase = switch ($stage) {
-      'replace-files' { '2 / 3  解压并安装文件' }
+      { $_ -in @('replace-files', 'payload-staging', 'payload-promotion') } { '2 / 3  解压并安装文件' }
       { $_ -in @('commit-start', 'commit') } { '3 / 3  校验并完成安装' }
       default { '1 / 3  准备安装与保护旧版' }
     }
     $status = if (([DateTime]::UtcNow - $lastActivity).TotalSeconds -ge 20) {
       '暂未观察到新的文件读写，正在等待系统返回；可展开详情。'
-    } elseif ($stage -eq 'replace-files') {
+    } elseif ($stage -in @('replace-files', 'payload-staging', 'payload-promotion')) {
       '正在处理应用文件。此阶段耗时取决于文件数量和磁盘速度。'
     } elseif ($stage -in @('commit-start', 'commit')) {
       '正在校验新版本并提交安装结果，请勿关闭安装程序。'

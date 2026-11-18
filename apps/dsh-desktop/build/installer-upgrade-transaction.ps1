@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('Begin', 'Commit', 'Rollback', 'Cleanup')]
+  [ValidateSet('Begin', 'ValidatePayload', 'PreparePayload', 'PromotePayload', 'Commit', 'Rollback', 'Cleanup')]
   [string] $Mode,
 
   [Parameter(Mandatory = $true)]
@@ -12,6 +12,8 @@ param(
 
   [string] $CleanupTransactionDirectory = '',
   [string] $RuntimeManifestSHA256 = '',
+  [long] $PayloadArchiveBytes = 0,
+  [long] $PayloadInstalledBytes = 0,
   [switch] $CompleteRuntimePayload
 )
 
@@ -389,6 +391,12 @@ function Remove-TransactionRootIfEmpty {
 }
 
 function Complete-CommittedTransaction([object] $journal) {
+  Remove-PayloadStage $journal
+  if ($journal.payload.promotion -ceq 'directory') {
+    $receipt = Get-PromotedDirectoryReceipt $journal
+    Assert-PlainPayloadPath $receipt
+    if (Test-PromotedDirectoryReceipt $journal $receipt) { [IO.File]::Delete($receipt) }
+  }
   $retained = [System.Collections.Generic.List[string]]::new()
   foreach ($rawInstall in @($journal.installs)) {
     $install = Assert-InstallBackup $rawInstall
@@ -501,13 +509,22 @@ function Invoke-Rollback([object] $journal) {
     }
   }
 
+  Restore-TargetPayload $journal
+  if ($null -ne $journal.payload -and $journal.payload.promotion) {
+    # Persist the completed reversal before restoring the previous app or
+    # deleting staged files. A later retry must not treat old files as payload.
+    $journal.payload.promotion = ''
+    $journal.payload.entries = @()
+    Write-Journal $journal
+  }
+
   $freshOwnedTarget = $false
   if (-not $hasBackup -and -not [bool] $journal.targetExisted -and (Test-ProductInstall $normalizedInstallDirectory)) {
     $marker = Join-Path $normalizedInstallDirectory $upgradeMarkerRelativePath
     $freshOwnedTarget = (Test-Path -LiteralPath $marker -PathType Leaf) -and
       (Get-Content -LiteralPath $marker -Raw -Encoding UTF8).Trim() -ceq $upgradeMarkerValue
   }
-  if (($hasBackup -or $freshOwnedTarget) -and -not [bool] $journal.targetExisted -and
+  if ($null -eq $journal.payload -and ($hasBackup -or $freshOwnedTarget) -and -not [bool] $journal.targetExisted -and
     (Test-Path -LiteralPath $normalizedInstallDirectory -PathType Container)) {
     $targetIsRestoreRoot = $installs | Where-Object {
       $_.Root.Equals($normalizedInstallDirectory, [System.StringComparison]::OrdinalIgnoreCase)
@@ -522,7 +539,14 @@ function Invoke-Rollback([object] $journal) {
       continue
     }
     if (Test-Path -LiteralPath $install.Root) {
-      Remove-Item -LiteralPath $install.Root -Recurse -Force -ErrorAction Stop
+      if ($null -ne $journal.payload -and $install.Root.Equals($normalizedInstallDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+        Assert-PlainPayloadPath $install.Root
+        # The journaled payload has already been removed. Keep any unrelated
+        # files and leave the previous app available in its validated backup.
+        [IO.Directory]::Delete($install.Root, $false)
+      } else {
+        Remove-Item -LiteralPath $install.Root -Recurse -Force -ErrorAction Stop
+      }
     }
     [System.IO.Directory]::Move($install.Backup, $install.Root)
     Write-Output "upgrade-install-restored root=$($install.Root)"
@@ -530,6 +554,7 @@ function Invoke-Rollback([object] $journal) {
 
   Restore-RegistryEntries $journal
 
+  Remove-PayloadStage $journal
   Remove-TransactionRootIfEmpty
   Write-Output 'upgrade-transaction-rolled-back'
 }
@@ -651,7 +676,218 @@ function Get-InstallerFileSHA256([string] $path) {
   finally { $hash.Dispose(); $stream.Dispose() }
 }
 
-function Assert-CompleteRuntimePayload {
+function Assert-PlainPayloadPath([string] $path) {
+  $ancestor = [IO.Path]::GetFullPath($path)
+  while ($ancestor) {
+    try {
+      if ([IO.File]::GetAttributes($ancestor) -band [IO.FileAttributes]::ReparsePoint) {
+        throw "installer payload path contains a link: $ancestor"
+      }
+    } catch [IO.FileNotFoundException] {} catch [IO.DirectoryNotFoundException] {}
+    $ancestor = [IO.Path]::GetDirectoryName($ancestor)
+  }
+}
+
+function Assert-PlainPayloadTree([string] $path) {
+  Assert-PlainPayloadPath $path
+  $pending = [Collections.Generic.Stack[IO.DirectoryInfo]]::new()
+  $pending.Push([IO.DirectoryInfo]::new($path))
+  while ($pending.Count -gt 0) {
+    foreach ($entry in $pending.Pop().EnumerateFileSystemInfos()) {
+      if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "installer payload tree contains a link: $($entry.FullName)"
+      }
+      if ($entry -is [IO.DirectoryInfo]) { $pending.Push($entry) }
+    }
+  }
+}
+
+function Get-PayloadStage([object] $journal) {
+  if ($null -eq $journal.payload) { return }
+  $token = [string] $journal.payload.token
+  if ($token -cnotmatch '^[a-f0-9]{32}$') { throw 'invalid installer payload staging token' }
+  Join-Path ([IO.Path]::GetDirectoryName($normalizedInstallDirectory)) ".dsh-desktop-payload-$token"
+}
+
+function Assert-PayloadStageOwner([object] $journal, [string] $stage) {
+  $receipt = Join-Path $stage 'owner'
+  Assert-PlainPayloadPath $receipt
+  if (-not [IO.File]::Exists($receipt) -or ([IO.FileInfo]::new($receipt)).Length -ne 57 -or
+      [IO.File]::ReadAllText($receipt) -cne "${transactionId}:$($journal.payload.token)") {
+    throw 'installer payload staging ownership does not match the transaction'
+  }
+}
+
+function Write-PayloadReceipt([string] $path, [string] $token) {
+  $bytes = [Text.Encoding]::ASCII.GetBytes($token)
+  $stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+  try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+}
+
+function Assert-TargetPayloadAvailable([switch] $RecoverInterrupted) {
+  Assert-PlainPayloadPath $normalizedInstallDirectory
+  if ([IO.File]::Exists($normalizedInstallDirectory)) { throw 'installer payload target is a file' }
+  $volumeRoot = [IO.Path]::GetPathRoot($normalizedInstallDirectory)
+  if ($volumeRoot -notmatch '^[a-zA-Z]:\\$') { throw 'target payload requires a local Windows drive' }
+  $userData = if ($env:DSH_DESKTOP_USER_DATA) { $env:DSH_DESKTOP_USER_DATA } else { Join-Path $env:APPDATA 'DeepSeek Harness Desktop' }
+  $desktopDataHome = $env:DSH_HOME
+  if (-not $desktopDataHome) {
+    $desktopDataHome = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dsh-community'
+    $location = Join-Path $userData 'desktop-data-location.json'
+    if ([IO.File]::Exists($location)) {
+      Assert-PlainPayloadPath $location
+      $saved = [IO.File]::ReadAllText($location, [Text.Encoding]::UTF8) | ConvertFrom-Json
+      if ($saved.schemaVersion -ne 1 -or $saved.owner -cne 'deepseek-harness-community-desktop' -or $saved.home -isnot [string]) {
+        throw 'installer payload cannot verify the persisted Desktop data directory'
+      }
+      $desktopDataHome = $saved.home
+    }
+  }
+  foreach ($path in @($desktopDataHome, $userData, $env:DSH_DESKTOP_BROWSER_COMPONENT_ROOT, $env:DSH_DESKTOP_BROWSER_COMPONENT_CACHE)) {
+    if (-not $path) { continue }
+    $protectedPath = [IO.Path]::GetFullPath($path).TrimEnd('\')
+    if ($protectedPath.Equals($normalizedInstallDirectory, [StringComparison]::OrdinalIgnoreCase) -or
+        $protectedPath.StartsWith($normalizedInstallDirectory + '\', [StringComparison]::OrdinalIgnoreCase) -or
+        $normalizedInstallDirectory.StartsWith($protectedPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+      throw 'installer payload target overlaps a configured data directory'
+    }
+  }
+  if ($PayloadArchiveBytes -le 0 -or $PayloadInstalledBytes -le 0) { throw 'invalid installer payload size' }
+  if ($RecoverInterrupted) {
+    # A previous Setup process can leave the old app in its backup and an
+    # owned partial archive taking up the same volume. Recover it before the
+    # space gate, so it cannot keep the user from retrying the installation.
+    $pending = Read-Journal
+    if ($null -ne $pending.payload -and $pending.state -ceq 'prepared') { Invoke-Rollback $pending }
+  }
+  # The staged archive and unpacked files coexist. Add headroom for filesystem
+  # allocation overhead and the uninstaller written after promotion.
+  $required = [decimal] $PayloadArchiveBytes + $PayloadInstalledBytes + 134217728
+  if ([IO.DriveInfo]::new($volumeRoot).AvailableFreeSpace -lt $required) {
+    throw "target volume requires $required free bytes for the installer payload"
+  }
+}
+
+function Prepare-TargetPayload {
+  Assert-TargetPayloadAvailable
+  $journal = Read-Journal
+  if ($null -eq $journal -or $journal.state -cne 'prepared' -or $null -ne $journal.payload) {
+    throw 'target payload staging requires an active upgrade transaction without a payload'
+  }
+  $token = [Guid]::NewGuid().ToString('N')
+  $journal | Add-Member -NotePropertyName payload -NotePropertyValue ([pscustomobject]@{
+    token = $token; promotion = ''; entries = @()
+  })
+  $stage = Get-PayloadStage $journal
+  Assert-PlainPayloadPath $stage
+  if (Test-Path -LiteralPath $stage) { throw 'installer payload staging path is already in use' }
+  Write-Journal $journal
+  New-Item -Path $stage -ItemType Directory -ErrorAction Stop | Out-Null
+  Assert-PlainPayloadPath $stage
+  Write-PayloadReceipt (Join-Path $stage 'owner') "${transactionId}:$token"
+  New-Item -Path (Join-Path $stage 'files') -ItemType Directory -ErrorAction Stop | Out-Null
+  [Console]::Write($token)
+}
+
+function Get-PromotedDirectoryReceipt([object] $journal) {
+  Join-Path $normalizedInstallDirectory ".dsh-desktop-payload-$($journal.payload.token).owner"
+}
+
+function Test-PromotedDirectoryReceipt([object] $journal, [string] $receipt) {
+  [IO.File]::Exists($receipt) -and ([IO.FileInfo]::new($receipt)).Length -eq 32 -and
+    [IO.File]::ReadAllText($receipt) -ceq $journal.payload.token
+}
+
+function Promote-TargetPayload {
+  $journal = Read-Journal
+  $stage = Get-PayloadStage $journal
+  if (-not $stage -or $journal.state -cne 'prepared' -or $journal.payload.promotion -ne '') {
+    throw 'target payload is not ready for promotion'
+  }
+  Assert-PayloadStageOwner $journal $stage
+  Assert-PlainPayloadPath $normalizedInstallDirectory
+  $files = Join-Path $stage 'files'
+  Assert-PlainPayloadTree $files
+  Assert-CompleteRuntimePayload $files
+  $upgradeMarker = Join-Path $files $upgradeMarkerRelativePath
+  if (-not [IO.File]::Exists($upgradeMarker) -or [IO.File]::ReadAllText($upgradeMarker).Trim() -cne $upgradeMarkerValue) {
+    throw 'staged payload upgrade marker is invalid'
+  }
+  $entries = @([IO.DirectoryInfo]::new($files).EnumerateFileSystemInfos())
+  foreach ($entry in $entries) {
+    if (Test-Path -LiteralPath (Join-Path $normalizedInstallDirectory $entry.Name)) {
+      throw "payload target already contains $($entry.Name)"
+    }
+  }
+  [IO.File]::Delete((Join-Path $stage 'application.7z'))
+  $journal.payload.entries = @($entries | ForEach-Object { $_.Name })
+  $existing = [IO.Directory]::Exists($normalizedInstallDirectory)
+  if (-not $existing -or @([IO.DirectoryInfo]::new($normalizedInstallDirectory).EnumerateFileSystemInfos()).Count -eq 0) {
+    $journal.payload.promotion = 'directory'
+    Write-Journal $journal
+    Write-PayloadReceipt (Join-Path $files ([IO.Path]::GetFileName((Get-PromotedDirectoryReceipt $journal)))) $journal.payload.token
+    if ($existing) { [IO.Directory]::Delete($normalizedInstallDirectory, $false) }
+    [IO.Directory]::Move($files, $normalizedInstallDirectory)
+  } else {
+    # Preserve unrelated destination entries, including hidden files. Move
+    # only the collision-free top-level payload entries on the same volume.
+    $journal.payload.promotion = 'entries'
+    Write-Journal $journal
+    foreach ($entry in $entries) {
+      $destination = Join-Path $normalizedInstallDirectory $entry.Name
+      if ($entry -is [IO.DirectoryInfo]) { [IO.Directory]::Move($entry.FullName, $destination) }
+      else { [IO.File]::Move($entry.FullName, $destination) }
+    }
+  }
+  Write-Output "payload-promoted mode=$($journal.payload.promotion)"
+}
+
+function Restore-TargetPayload([object] $journal) {
+  $stage = Get-PayloadStage $journal
+  if (-not $stage -or -not (Test-Path -LiteralPath $stage)) { return }
+  Assert-PayloadStageOwner $journal $stage
+  Assert-PlainPayloadPath $normalizedInstallDirectory
+  $files = Join-Path $stage 'files'
+  $promotion = $journal.payload.promotion
+  $receipt = Get-PromotedDirectoryReceipt $journal
+  Assert-PlainPayloadPath $receipt
+  $receiptValid = Test-PromotedDirectoryReceipt $journal $receipt
+  if ($promotion -cnotin @('', 'directory', 'entries')) { throw 'invalid installer payload promotion mode' }
+  if ($promotion -ceq 'entries' -or ($promotion -ceq 'directory' -and $receiptValid)) {
+    Assert-PlainPayloadPath $files
+    [IO.Directory]::CreateDirectory($files) | Out-Null
+    foreach ($name in @($journal.payload.entries)) {
+      if ($name -isnot [string] -or $name -in @('', '.', '..') -or $name -match '[\\/:]') {
+        throw 'invalid installer payload journal entry'
+      }
+      $stagedPath = Join-Path $files $name
+      $installedPath = Join-Path $normalizedInstallDirectory $name
+      Assert-PlainPayloadPath $stagedPath
+      Assert-PlainPayloadPath $installedPath
+      if (-not (Test-Path -LiteralPath $stagedPath)) {
+        if ([IO.Directory]::Exists($installedPath)) { [IO.Directory]::Move($installedPath, $stagedPath) }
+        elseif ([IO.File]::Exists($installedPath)) { [IO.File]::Move($installedPath, $stagedPath) }
+      }
+    }
+    if ($receiptValid) { [IO.File]::Delete($receipt) }
+  }
+  if ($promotion -ceq 'directory' -and [bool] $journal.targetExisted -and -not [IO.Directory]::Exists($normalizedInstallDirectory)) {
+    [IO.Directory]::CreateDirectory($normalizedInstallDirectory) | Out-Null
+  } elseif (-not [bool] $journal.targetExisted -and [IO.Directory]::Exists($normalizedInstallDirectory) -and
+      @([IO.DirectoryInfo]::new($normalizedInstallDirectory).EnumerateFileSystemInfos()).Count -eq 0) {
+    [IO.Directory]::Delete($normalizedInstallDirectory, $false)
+  }
+}
+
+function Remove-PayloadStage([object] $journal) {
+  $stage = Get-PayloadStage $journal
+  if (-not $stage -or -not (Test-Path -LiteralPath $stage)) { return }
+  Assert-PayloadStageOwner $journal $stage
+  Assert-PlainPayloadTree $stage
+  [IO.Directory]::Delete($stage, $true)
+}
+
+function Assert-CompleteRuntimePayload([string] $payloadRoot = $normalizedInstallDirectory) {
   if ($RuntimeManifestSHA256 -cnotmatch '^[a-f0-9]{64}$') { throw 'invalid complete runtime manifest digest' }
   $assertNoLinks = {
     param([string] $path)
@@ -662,7 +898,7 @@ function Assert-CompleteRuntimePayload {
       $ancestor = [IO.Path]::GetDirectoryName($ancestor)
     }
   }
-  $metadata = Join-Path $normalizedInstallDirectory 'resources\runtime-reconstruction\manifest.json'
+  $metadata = Join-Path $payloadRoot 'resources\runtime-reconstruction\manifest.json'
   if (-not (Test-Path -LiteralPath $metadata -PathType Leaf)) { throw 'complete runtime manifest is missing' }
   & $assertNoLinks $metadata
   if ((Get-Item -LiteralPath $metadata).Length -gt 262144 -or
@@ -700,7 +936,7 @@ function Assert-CompleteRuntimePayload {
       throw 'invalid complete runtime target'
     }
     if (-not $seen.Add($relative) -or $file.sha256 -cnotmatch '^[a-f0-9]{64}$') { throw 'invalid complete runtime target' }
-    $path = Join-Path $normalizedInstallDirectory $relative
+    $path = Join-Path $payloadRoot $relative
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "complete runtime payload is missing: $relative" }
     & $assertNoLinks $path
     if ((Get-Item -LiteralPath $path).Length -ne $file.size -or (Get-InstallerFileSHA256 $path) -cne $file.sha256) {
@@ -772,6 +1008,9 @@ try {
   if (-not $ownsMutex) { throw 'installer transaction is busy; retry after the other installer finishes' }
 switch ($Mode) {
   'Begin' { Begin-Transaction }
+  'ValidatePayload' { Assert-TargetPayloadAvailable -RecoverInterrupted }
+  'PreparePayload' { Prepare-TargetPayload }
+  'PromotePayload' { Promote-TargetPayload }
   'Commit' { Commit-Transaction }
   'Rollback' {
     $journal = Read-Journal

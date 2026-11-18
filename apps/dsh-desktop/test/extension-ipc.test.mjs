@@ -765,6 +765,7 @@ test('community market resolves an opaque catalog ID and confirms Git full acces
   qqBotBinding.unbind = async () => ({})
   const descriptor = await resolveExternalPluginSource('github:owner/plugin')
   const publicCatalog = { updated: '2026-08-21', count: 1, categories: [], plugins: [] }
+  const availableCatalog = { source: 'curated', count: 1, categories: [], plugins: [] }
   const unregister = registerExtensionIpc({
     ipcMain,
     dialog: { showMessageBox: async () => ({ response: 0 }) },
@@ -791,6 +792,7 @@ test('community market resolves an opaque catalog ID and confirms Git full acces
     qqBotBinding,
     communityMarket: {
       list: async () => { events.push('list'); return publicCatalog },
+      listAvailable: () => { events.push('available'); return availableCatalog },
       resolveInstallEntry: async (id) => {
         events.push(['catalog-resolve', id])
         return { id, name: '@community/plugin', sourceKind: 'github', installSpec: 'github:owner/plugin' }
@@ -803,12 +805,16 @@ test('community market resolves an opaque catalog ID and confirms Git full acces
     onRuntimeMaintenanceChange: (active) => events.push(['maintenance', active]),
   })
 
-  assert.equal(await ipcMain.handlers.get('extensions:market-list')(undefined, true), publicCatalog)
+  const listMarket = ipcMain.handlers.get('extensions:market-list')
+  assert.equal(await listMarket(undefined, false, 'available'), availableCatalog)
+  await assert.rejects(listMarket(undefined, false, 'other'), /invalid community market source/u)
+  assert.equal(await listMarket(undefined, true), publicCatalog)
   assert.deepEqual(
     await ipcMain.handlers.get('extensions:market-install')(undefined, 'opaque-market-id'),
     { name: '@community/plugin', fullAccess: true, isolated: false },
   )
   assert.deepEqual(events, [
+    'available',
     'list',
     ['catalog-resolve', 'opaque-market-id'],
     ['maintenance', true],

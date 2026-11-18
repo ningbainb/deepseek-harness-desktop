@@ -160,6 +160,46 @@ test('market discovery retains one pinned IM Connect trial and stages its exact 
   })
 })
 
+test('packaged discovery is available and resolves its exact pin before any remote request', async () => {
+  let calls = 0
+  const service = createCommunityMarketService({
+    fetch: async () => {
+      calls += 1
+      throw new Error('net::ERR_PROXY_CONNECTION_FAILED')
+    },
+  })
+
+  const curated = service.listAvailable()
+  assert.equal(curated.source, 'curated')
+  assert.equal(curated.count, 1)
+  assert.ok(curated.plugins.every((plugin) => plugin.sourceKind === 'npm'))
+  assert.equal(await service.resolveInstall(curated.plugins[0].id), '@michengai/dsh-im-connect@1.0.44')
+  assert.equal(calls, 0)
+  await assert.rejects(service.list(), /community market catalog unavailable: proxy/u)
+  assert.deepEqual(service.listAvailable(), curated)
+  assert.equal(calls, 1)
+})
+
+test('last successfully validated catalog remains available when refreshing fails', async () => {
+  let fail = false
+  const service = createCommunityMarketService({
+    fetch: async () => {
+      if (fail) throw new Error('offline: https://user:private-password@example.invalid')
+      return jsonResponse(catalog)
+    },
+  })
+
+  const first = await service.list()
+  assert.equal(first.source, 'community')
+  fail = true
+  await assert.rejects(service.list({ force: true }), (error) => {
+    assert.match(error.message, /community market catalog unavailable: network/u)
+    assert.doesNotMatch(error.message, /private-password/u)
+    return true
+  })
+  assert.deepEqual(service.listAvailable(), { ...first, source: 'cache' })
+})
+
 test('community market serves a bounded cache and force-revalidates with its ETag', async () => {
   const headers = []
   let calls = 0
@@ -255,5 +295,5 @@ test('community market does not substitute stale data after a network failure', 
 
   await service.list()
   fail = true
-  await assert.rejects(service.list({ force: true }), /community market catalog unavailable: offline/u)
+  await assert.rejects(service.list({ force: true }), /community market catalog unavailable: network/u)
 })

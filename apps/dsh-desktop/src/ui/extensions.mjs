@@ -1,6 +1,7 @@
 import { createExtensionOperationQueue } from './extension-operation-queue.mjs'
 import { presetExportFailureMessage } from './preset-export-view.mjs'
 import {
+  communityMarketFailureMessage,
   communityMarketInstallPresentation,
   selectCommunityMarketPlugins,
 } from './community-market-view.mjs'
@@ -622,8 +623,8 @@ const NATIVE_PLUGINS = [
     packageName: '@linxin666/dsh-mode-switcher',
     category: 'ui',
     categoryLabel: '界面主题',
-    description: '桌面通过新会话中的原生 Agent 预设选择工作方式；保留 Web 模式切换及已有配置。',
-    features: ['原生新会话预设', '保留旧配置', 'Web 模式切换'],
+    description: '桌面通过设置中的原生 Agent 预设管理工作方式；保留当前会话、历史预设与 Web 模式切换。',
+    features: ['原生预设设置', '保留旧配置', 'Web 模式切换'],
     icon: 'toggle',
   },
   {
@@ -736,7 +737,7 @@ function marketPluginMarkup(plugin) {
     registry: 'Registry 校验',
     required: '实验性，安装前验证',
     passed: '已通过验证',
-    incompatible: '与 4.0 不兼容',
+    incompatible: '与当前运行时不兼容',
     failed: '验证失败',
   }
   const verificationBadge = `<span class="badge${['incompatible', 'failed'].includes(plugin.verification) ? ' inactive' : ''}">${escapeHtml(verificationLabels[plugin.verification] ?? '待验证')}</span>`
@@ -807,46 +808,54 @@ function renderMarket() {
   if (extensionOperations.busy) setOperationBusy(true)
 }
 
+function showMarketCatalog(catalog) {
+  marketCatalog = catalog
+  marketCount.textContent = compactNumber.format(catalog.count)
+  marketTotal.textContent = compactNumber.format(catalog.count)
+  marketUpdated.textContent = catalog.source === 'curated' ? '随本版提供' : catalog.updated ?? '未提供'
+  const selectedCategory = marketCategory.value
+  marketCategory.innerHTML = '<option value="all">全部分类</option>' + catalog.categories.map((category) => {
+    const label = category.label?.zh ?? category.label?.en ?? category.id
+    return `<option value="${escapeHtml(category.id)}">${escapeHtml(label)}</option>`
+  }).join('')
+  if ([...marketCategory.options].some((option) => option.value === selectedCategory)) {
+    marketCategory.value = selectedCategory
+  }
+  renderMarket()
+}
+
 function refreshMarket({ force = false } = {}) {
   if (marketRefreshPromise) return marketRefreshPromise
-  const previousCatalog = marketCatalog
   marketReloadButton.disabled = true
-  marketResultState.textContent = '正在读取社区目录'
   marketRefreshPromise = (async () => {
     try {
+      if (!marketCatalog) {
+        try {
+          showMarketCatalog(await window.dshDesktop.listCommunityMarket(false, 'available'))
+        } catch {
+          // The full request remains available when the preview cannot be read.
+        }
+      }
+      marketBridge.textContent = marketCatalog?.source === 'curated'
+        ? '当前显示本版精选，正在读取完整社区目录。'
+        : '正在读取完整社区目录。'
       const catalog = await window.dshDesktop.listCommunityMarket(force)
-      marketCatalog = catalog
-      marketPage = 1
+      showMarketCatalog(catalog)
       marketBridge.textContent = catalog.bridge?.provider === 'dshmarket' && catalog.bridge?.installation === 'desktop-managed'
         ? '已接入 dshmarket 兼容目录；安装、卸载和回滚由 Desktop 安全事务接管。'
         : '社区目录已接入；安装、卸载和回滚由 Desktop 安全事务接管。'
-      marketCount.textContent = compactNumber.format(catalog.count)
-      marketTotal.textContent = compactNumber.format(catalog.count)
-      marketUpdated.textContent = catalog.updated ?? '--'
-      const selectedCategory = marketCategory.value
-      marketCategory.innerHTML = '<option value="all">全部分类</option>' + catalog.categories.map((category) => {
-        const label = category.label?.zh ?? category.label?.en ?? category.id
-        return `<option value="${escapeHtml(category.id)}">${escapeHtml(label)}</option>`
-      }).join('')
-      if ([...marketCategory.options].some((option) => option.value === selectedCategory)) {
-        marketCategory.value = selectedCategory
-      }
-      renderMarket()
     } catch (error) {
-      if (previousCatalog) {
-        marketCatalog = previousCatalog
+      marketBridge.textContent = communityMarketFailureMessage(error, marketCatalog?.source)
+      if (marketCatalog) {
         renderMarket()
-        marketResultState.textContent = '目录刷新失败，继续显示本机缓存'
         return
       }
-      marketCatalog = undefined
       marketView = undefined
-      marketBridge.textContent = '市场目录暂时不可用；不会影响已安装插件。'
       marketCount.textContent = '--'
       marketTotal.textContent = '--'
       marketUpdated.textContent = '--'
       marketResultState.textContent = '社区目录暂时不可用'
-      marketList.innerHTML = `<p class="market-empty">${escapeHtml(error.message)}</p>`
+      marketList.innerHTML = '<p class="market-empty">暂时无法读取目录，可重试或在诊断与恢复中检查连通性。</p>'
       marketPagination.hidden = true
     } finally {
       marketRefreshPromise = undefined

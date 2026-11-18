@@ -22,6 +22,9 @@ Var DshLegacyInstallDirectory
 Var DshCurrentInstallDirectory
 Var DshRequestedInstallDirectory
 Var DshModeDirectory
+!ifdef DSH_TARGET_PAYLOAD_STAGE
+Var DshTargetPayloadStage
+!endif
 !include "${BUILD_RESOURCES_DIR}\installer-finish-paths.nsh"
 
 ; Local-only diagnostics. No credentials/sessions are read or uploaded.
@@ -268,6 +271,64 @@ dsh_extraction_cancel_recovered:
   Quit
 !macroend
 
+!ifdef DSH_TARGET_PAYLOAD_STAGE
+!macro DshTargetPayloadCommand MODE ARGUMENTS
+  Call StageUpgradeTransactionScript
+  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_SCRIPT}" -Mode ${MODE} -InstallDirectory "$INSTDIR" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" ${ARGUMENTS}'
+  Pop $0
+  Pop $1
+!macroend
+
+!macro DshExtractTargetVolumePayload
+  !insertmacro DshTargetPayloadCommand PreparePayload '-PayloadArchiveBytes ${DSH_TARGET_ARCHIVE_BYTES} -PayloadInstalledBytes ${DSH_TARGET_INSTALLED_BYTES}'
+  StrCmp $0 "0" 0 payload_prepare_failed
+  StrLen $2 $1
+  StrCmp $2 "32" 0 payload_prepare_failed
+  ${GetParent} "$INSTDIR" $2
+  StrCpy $DshTargetPayloadStage "$2\.dsh-desktop-payload-$1"
+  !insertmacro DshLog "payload-staging" "0" "$DshTargetPayloadStage"
+  !insertmacro DshTiming "embedded-archive-start"
+  !ifdef COMPRESS
+    SetCompress off
+  !endif
+  ClearErrors
+  File /oname=$DshTargetPayloadStage\application.7z "${APP_64}"
+  IfErrors payload_extract_failed
+  !ifdef COMPRESS
+    SetCompress "${COMPRESS}"
+  !endif
+  !insertmacro DshTiming "embedded-archive-ready"
+  !insertmacro DshTiming "archive-decompress-start"
+  SetOutPath "$DshTargetPayloadStage\files"
+  ClearErrors
+  Nsis7z::Extract "$DshTargetPayloadStage\application.7z"
+  IfErrors payload_extract_failed
+  !insertmacro DshTiming "archive-decompressed"
+  IfFileExists "$DshTargetPayloadStage\files\${UNINSTALL_FILENAME}" payload_extract_failed
+  File "/oname=$DshTargetPayloadStage\files\${UNINSTALL_FILENAME}" "${UNINSTALLER_OUT_FILE}"
+  IfErrors payload_extract_failed
+  !insertmacro DshTiming "payload-promote-start"
+  !insertmacro DshTargetPayloadCommand PromotePayload '-RuntimeManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
+  !insertmacro DshTiming "payload-promote-end"
+  !insertmacro DshLog "payload-promotion" "$0" "$1"
+  StrCmp $0 "0" payload_promoted
+  Goto payload_staging_failed
+payload_prepare_failed:
+  !insertmacro DshLog "payload-staging" "$0" "$1"
+  Goto payload_staging_failed
+payload_extract_failed:
+  !insertmacro DshLog "payload-extraction" "2" "Failed to stage or decompress the embedded application archive"
+payload_staging_failed:
+  SetOutPath "$PLUGINSDIR"
+  !insertmacro DshStopProgress
+  MessageBox MB_ICONSTOP|MB_OK "无法在所选安装磁盘准备应用文件，安装已停止。请确认目录可写、有足够空间，并查看日志：$\r$\n$DshInstallerLogPath" /SD IDOK
+  SetErrorLevel 2
+  Abort
+payload_promoted:
+  SetOutPath "$INSTDIR"
+!macroend
+!endif
+
 !macro customCheckAppRunning
   SetDetailsPrint both
   SetDetailsView hide
@@ -280,6 +341,16 @@ dsh_extraction_cancel_recovered:
     Call StartInstallerProgressObserver
   !endif
   !ifndef BUILD_UNINSTALLER
+    !ifdef DSH_TARGET_PAYLOAD_STAGE
+      !insertmacro DshTargetPayloadCommand ValidatePayload '-PayloadArchiveBytes ${DSH_TARGET_ARCHIVE_BYTES} -PayloadInstalledBytes ${DSH_TARGET_INSTALLED_BYTES}'
+      !insertmacro DshLog "target-volume-preflight" "$0" "$1"
+      StrCmp $0 "0" target_volume_preflight_ready
+      !insertmacro DshStopProgress
+      MessageBox MB_ICONSTOP|MB_OK "所选安装磁盘或目录不可用。请选择容量足够、可写的本地程序目录。$\r$\n$1" /SD IDOK
+      SetErrorLevel 2
+      Abort
+    target_volume_preflight_ready:
+    !endif
     ; Prepare browser resources while the previous application and profile remain untouched.
     File /oname=$PLUGINSDIR\installer-browser-preflight.ps1 "${BUILD_RESOURCES_DIR}\installer-browser-preflight.ps1"
     SetOutPath "$PLUGINSDIR\browser-component-preflight\bin"

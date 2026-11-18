@@ -6,18 +6,55 @@ import { prepareFreshNativeSession } from './native-session-blank-fixture.mjs'
 
 const presetName = preset => preset.name ?? ({ standard: '标准模式', minimal: '极简模式', ptc: 'PTC 模式', cordis: '创造模式' }[preset.id] ?? preset.id)
 
-/** Desktop uses the official blank-session picker; history remains immutable. */
+export async function readNativePresetRoster(page) {
+  const result = await page.evaluate(async rpcId => {
+    const response = await fetch('/api/agentPresets/list', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId, method: 'agentPresets/list', payload: { args: {} } }) })
+    return { status: response.status, body: await response.json() }
+  }, randomUUID())
+  assert.equal(result.status, 200); assert.equal(result.body.result?.ok, true)
+  return result.body.result.value.presets
+}
+
+/** Use the existing official settings editor; never restore a chat switch. */
+export async function verifyDesktopPresetSettings({ page, readRoster = () => readNativePresetRoster(page) }) {
+  const before = await readRoster()
+  await page.getByRole('button', { name: '账号菜单', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^设置/u }).click()
+  const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible')
+  await settings.waitFor({ state: 'visible' })
+  await settings.getByRole('button', { name: 'Agent 预设', exact: true }).click()
+  const inspected = []
+  try {
+    await settings.getByRole('heading', { name: 'Agent 预设', exact: true }).waitFor()
+    for (const id of ['liangshen', 'value-mode']) {
+      const target = before.find(item => item.id === id && !item.broken)
+      assert.ok(target, `${id} remains configured without enabling/disabling a preset`)
+      const card = settings.locator(`[data-agent-preset-id="${id}"]`)
+      await card.waitFor({ state: 'visible' })
+      const action = card.getByRole('button', { name: `${target.isDefault ? '新任务默认' : '设为新任务默认'}: ${presetName(target)}`, exact: true })
+      assert.equal(await action.count(), 1, 'the original default editor remains reachable')
+      assert.equal(await action.isEnabled(), !target.isDefault)
+      await card.getByRole('button', { name: `查看配置: ${presetName(target)}`, exact: true }).click()
+      const viewer = page.getByRole('dialog', { name: `查看配置 · ${presetName(target)}`, exact: true })
+      await viewer.waitFor({ state: 'visible' })
+      assert.ok((await viewer.locator('pre').innerText()).trim(), 'the official editor reads actual preset configuration')
+      await viewer.getByRole('button', { name: '关闭', exact: true }).last().click()
+      await viewer.waitFor({ state: 'hidden' })
+      assert.deepEqual(await readRoster(), before, 'viewing settings preserves all presets and the exact selected default')
+      inspected.push(id)
+    }
+  } finally {
+    await page.keyboard.press('Escape')
+    await settings.waitFor({ state: 'hidden' })
+  }
+  return inspected
+}
+
+/** Desktop keeps failure/retry and history while preset management stays in Settings. */
 export async function verifyNativePresetLifecycle({ page, rpc, sessionId, workspaceId, workspacePath,
   messageCount, logPath, openSeededSession, runtimeFetchGate, readWorkspace }) {
-  const roster = async () => {
-    const result = await page.evaluate(async rpcId => {
-      const response = await fetch('/api/agentPresets/list', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ type: 'client-request', rpcId, method: 'agentPresets/list', payload: { args: {} } }) })
-      return { status: response.status, body: await response.json() }
-    }, randomUUID())
-    assert.equal(result.status, 200); assert.equal(result.body.result?.ok, true)
-    return result.body.result.value.presets
-  }
+  const roster = () => readNativePresetRoster(page)
   const readSeats = async () => (await rpc(page, 'session.list', {})).items.map(item => ({
     id: item.id ?? item.sessionId, blank: item.blank, cwd: item.cwd,
   })).sort((a, b) => a.id.localeCompare(b.id))
@@ -63,34 +100,19 @@ export async function verifyNativePresetLifecycle({ page, rpc, sessionId, worksp
     assert.equal(response.request().postDataJSON().payload?.args?.request?.workspaceId, workspaceId)
     const createdId = created.result.value.sessionId
     assert.notEqual(createdId, sessionId)
-    await page.locator(`[data-row-key="session:${createdId}"][aria-selected="true"]`).waitFor()
     await page.waitForFunction(() => document.querySelectorAll('[data-chat-flow-kind="user"]').length === 0)
-    const picker = page.locator('button[aria-haspopup="menu"][title="选择新任务使用的 Agent 预设"]')
-    await picker.waitFor({ state: 'visible' })
-    const customModes = []
-    for (const id of ['liangshen', 'value-mode']) {
-      const target = (await roster()).find(item => item.id === id && !item.broken)
-      assert.ok(target, `${id} remains available through the native preset owner`)
-      await picker.click()
-      // The official seat renders each option's name as an exact text span.
-      // Do not depend on private Menu roles or generated CSS class names.
-      const option = page.getByText(presetName(target), { exact: true }).filter({ visible: true })
-      assert.equal(await option.count(), 1, 'the native menu exposes exactly one target preset')
-      const selected = page.waitForResponse(candidate => desktopLocalPath(new URL(candidate.url()).pathname) === '/api/agentPresets/select'
-        && candidate.request().method() === 'POST')
-      selected.catch(() => {})
-      await option.click()
-      assert.equal((await (await selected).json()).result?.ok, true)
-      await page.waitForFunction(name => [...document.querySelectorAll('button[aria-haspopup="menu"]')]
-        .some(button => button.title === '选择新任务使用的 Agent 预设' && button.textContent?.includes(name)), presetName(target))
-      const seats = (await rpc(page, 'session.list', {})).items
-      const blank = seats.find(item => (item.id ?? item.sessionId) === createdId)
-      assert.equal(blank?.cwd, workspacePath)
-      assert.equal(blank?.projections?.values?.agentPreset ?? blank?.agentPreset, id)
-      assert.equal(blank?.blank, true)
-      assert.equal((await roster()).find(item => item.isDefault)?.id, originalDefault)
-      customModes.push(id)
-    }
+    assert.equal(await page.locator('button[aria-haspopup="menu"][title="选择新任务使用的 Agent 预设"]').count(), 0,
+      'Desktop does not expose the official inline preset switch after creating a blank session')
+    const seats = (await rpc(page, 'session.list', {})).items
+    const blank = seats.find(item => (item.id ?? item.sessionId) === createdId)
+    assert.equal(blank?.cwd, workspacePath)
+    assert.equal(blank?.blank, true)
+    const presetBeforeSettings = blank?.projections?.values?.agentPreset ?? blank?.agentPreset
+    const customModes = await verifyDesktopPresetSettings({ page, readRoster: roster })
+    const afterSettings = (await rpc(page, 'session.list', {})).items.find(item => (item.id ?? item.sessionId) === createdId)
+    assert.equal(afterSettings?.projections?.values?.agentPreset ?? afterSettings?.agentPreset, presetBeforeSettings,
+      'opening the retained settings editor does not reset the current blank preset')
+    assert.equal((await roster()).find(item => item.isDefault)?.id, originalDefault)
     await openSeededSession(page, sessionId)
     assert.equal(await page.locator('[data-chat-flow-kind="user"]').count(), messageCount)
     assert.equal(await readFile(logPath, 'utf8'), originalHistory)

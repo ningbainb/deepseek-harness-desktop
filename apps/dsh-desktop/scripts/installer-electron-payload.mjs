@@ -43,6 +43,18 @@ export function runtimeInstallerInclude(core, extractionCore) {
     extraction = addTiming(extraction, /^([ \t]+DoneExtract7za:)\r?$/gmu, undefined, 'payload-copy-end')
     core = addTiming(core, /^([ \t]+!insertmacro copyFile "\$EXEPATH" "\$LOCALAPPDATA\\\$\{APP_INSTALLER_STORE_FILE\}")\r?$/gmu,
       'installer-cache-copy-start', 'installer-cache-copy-end')
+    const embedded = /^([ \t]*)!insertmacro extractEmbeddedAppPackage\r?$/gmu
+    if ([...core.matchAll(embedded)].length !== 1) throw new Error('Unsupported NSIS embedded payload template')
+    core = core.replace(embedded, (_, indent) => [
+      '!ifdef DSH_TARGET_PAYLOAD_STAGE',
+      '  !insertmacro DshExtractTargetVolumePayload',
+      '!else',
+      '  !insertmacro extractEmbeddedAppPackage',
+      '!endif',
+    ].map(line => indent + line).join('\n'))
+    const uninstaller = /^([ \t]*File "\/oname=\$\{UNINSTALL_FILENAME\}" "\$\{UNINSTALLER_OUT_FILE\}")\r?$/gmu
+    if ([...core.matchAll(uninstaller)].length !== 1) throw new Error('Unsupported NSIS uninstaller payload template')
+    core = core.replace(uninstaller, '!ifndef DSH_TARGET_PAYLOAD_STAGE\n$1\n!endif')
     // Inline the reviewed extraction macros into the already hash-bound owned
     // include. No dependency file or secondary unchecked include is modified.
     core = core.replace(include, () => extraction)

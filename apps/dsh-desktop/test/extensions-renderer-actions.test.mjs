@@ -6,10 +6,70 @@ import { setImmediate as tick } from 'node:timers/promises'
 import vm from 'node:vm'
 
 import { createExtensionOperationQueue } from '../src/ui/extension-operation-queue.mjs'
+import { createCommunityMarketService } from '../src/extensions/community-market.mjs'
+import * as marketViewHelpers from '../src/ui/community-market-view.mjs'
 
 const { JSDOM } = createRequire(new URL('../../../packages/dsh-web-ui-settings/package.json', import.meta.url))('jsdom')
 const source = await readFile(new URL('../src/ui/extensions.mjs', import.meta.url), 'utf8')
 const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
+
+test('Creative Workshop renders an installable local pin during load and after network failure', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const document = dom.window.document
+  const market = id => document.getElementById(`market-${id}`)
+  const curated = createCommunityMarketService().listAvailable()
+  const [trial] = curated.plugins
+  const entries = Array.from({ length: 21 }, (_entry, index) => ({
+    id: `other-${index}`, name: `other-${index}`, displayName: `Other ${index}`, category: 'notify',
+  }))
+  const remoteCatalog = {
+    ...curated, source: 'community', updated: '2026-11-17',
+    plugins: [trial, ...entries], count: 22,
+  }
+  const calls = []
+  let pendingReject
+  const pending = new Promise((_resolve, reject) => { pendingReject = reject })
+  const context = vm.createContext({
+    document, ...marketViewHelpers,
+    window: { dshDesktop: { listCommunityMarket: async (force, source = 'community') => {
+      calls.push([force, source])
+      return source === 'available' ? curated : force ? remoteCatalog : pending
+    } } },
+    MARKET_PAGE_SIZE: 20, marketPage: 1, installedMarketReferences: new Set(), marketInstallPhases: new Map(),
+    marketCatalog: undefined, marketView: undefined, marketRefreshPromise: undefined,
+    escapeHtml: value => String(value), compactNumber: new Intl.NumberFormat('zh-CN'), extensionOperations: { busy: false },
+  })
+  try {
+    vm.runInContext(section('const marketCount =', 'const toast ='), context)
+    vm.runInContext(section('function marketDescription(', 'function renderLegacyPluginRestore('), context)
+    vm.runInContext(section('function syncMarketPaginationState(', 'function normalizedErrorMessage('), context)
+    const first = vm.runInContext('refreshMarket()', context)
+    await tick()
+    assert.deepEqual(calls, [[false, 'available'], [false, 'community']])
+    assert.equal(market('total').textContent, '1')
+    assert.equal(market('updated').textContent, '随本版提供')
+    assert.match(market('bridge').textContent, /正在读取完整社区目录/u)
+    assert.match(market('list').textContent, /@michengai\/dsh-im-connect@1\.0\.44/u)
+    assert.equal(market('list').querySelector('[data-install-market-plugin]').dataset.installMarketPlugin, trial.id)
+
+    pendingReject(new Error('community market catalog unavailable: timeout'))
+    await first
+    assert.match(market('bridge').textContent, /超时.*本版精选/u)
+    assert.equal(market('reload').disabled, false)
+    assert.equal(market('total').textContent, '1')
+
+    await vm.runInContext('refreshMarket({ force: true })', context)
+    assert.equal(market('total').textContent, '22')
+    assert.equal(market('updated').textContent, '2026-11-17')
+    assert.equal(market('pagination').hidden, false)
+    market('query').value = '@michengai/dsh-im-connect@1.0.44'
+    vm.runInContext('renderMarket()', context)
+    assert.equal(market('list').children.length, 1)
+    assert.equal(market('list').querySelector('[data-install-market-plugin]').dataset.installMarketPlugin, trial.id)
+  } finally {
+    dom.window.close()
+  }
+})
 
 test('bundled release plugins expose their original configuration through the native capability catalog', () => {
   const dom = new JSDOM(html, { url: 'https://desktop.invalid' })

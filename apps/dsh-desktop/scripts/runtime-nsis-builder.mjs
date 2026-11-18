@@ -39,6 +39,17 @@ configured.effectiveOptionComputed = async values => {
   const archivePaths = new Set([...stdout.matchAll(/^Path = (.+)\r?$/gmu)].map(match => match[1].replaceAll('\\', '/').trim()))
   verifyNormalNsisArchive(adapter, archivePaths)
   console.log(`Verified readable NSIS payload before installer assembly; ${adapter.omittedTargets.length} duplicate targets omitted`)
-  return normalOptions(values)
+  const result = await normalOptions(values)
+  if (adapter.externalBrowserRuntime === true) {
+    const archive = await lstat(defines.APP_64)
+    const installedBytes = Number(defines.APP_64_UNPACKED_SIZE) * 1024
+    if (!archive.isFile() || archive.size <= 0 || !Number.isSafeInteger(installedBytes) || installedBytes <= 0) {
+      throw new Error('Missing exact target-volume payload size')
+    }
+    defines.DSH_TARGET_PAYLOAD_STAGE = '1'
+    defines.DSH_TARGET_ARCHIVE_BYTES = String(archive.size)
+    defines.DSH_TARGET_INSTALLED_BYTES = String(installedBytes)
+  }
+  return result
 }
 await builder.build(configured)

@@ -854,9 +854,11 @@ export function registerExtensionIpc({
     return networkDiagnostics.run()
   })
   handleExtension('extensions:community-open', (_event, id) => shell.openExternal(resolveCommunityPluginUrl(id)))
-  handleExtension('extensions:market-list', (_event, force = false) => {
+  handleExtension('extensions:market-list', (_event, force = false, source = 'community') => {
     if (typeof communityMarket?.list !== 'function') throw new Error('community market is unavailable')
     if (typeof force !== 'boolean') throw new TypeError('invalid community market refresh request')
+    if (source !== 'community' && source !== 'available') throw new TypeError('invalid community market source')
+    if (source === 'available') return communityMarket.listAvailable()
     return communityMarket.list({ force })
   })
   handleExtension('extensions:legacy-plugin-restore-state', () => {

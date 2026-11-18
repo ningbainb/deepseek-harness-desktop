@@ -14,7 +14,7 @@ export const DSHMARKET_CATALOG_BRIDGE = Object.freeze({
   installation: 'desktop-managed',
 })
 
-const DEFAULT_TIMEOUT_MS = 6_000
+const DEFAULT_TIMEOUT_MS = 20_000
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000
 const DEFAULT_MAX_BYTES = 24_000_000
 const MAX_PLUGINS = 20_000
@@ -179,23 +179,22 @@ function readImConnectTrial() {
     added: new Date(release.publishTimestamp * 1000).toISOString().slice(0, 10),
   })
   return {
-    plugin: {
+    plugin: Object.freeze({
       ...plugin,
       displayName: row.title.zh,
       installSpec: `${row.name}@${release.version}`,
-    },
+    }),
     label: index.metadata.categories[plugin.category].title,
   }
 }
 
-function projectCatalog(value) {
+function projectCatalog(value, { plugin: pinnedTrial, label: trialLabel }) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.plugins)) {
     throw new TypeError('community market catalog shape is invalid')
   }
 
   const plugins = []
   const installById = new Map()
-  const { plugin: pinnedTrial, label: trialLabel } = readImConnectTrial()
   const trialRepository = pinnedTrial.repository.toLowerCase()
   let upstreamTrial
   for (const candidate of value.plugins.slice(0, MAX_PLUGINS)) {
@@ -225,6 +224,7 @@ function projectCatalog(value) {
     }))
 
   const publicCatalog = Object.freeze({
+    source: 'community',
     updated: boundedString(value.updated, 32),
     count: plugins.length,
     bridge: DSHMARKET_CATALOG_BRIDGE,
@@ -239,12 +239,15 @@ function responseHeader(response, name) {
   return boundedString(value, 512)
 }
 
-function catalogUnavailable(error) {
-  const message = error instanceof Error ? error.message : String(error)
-  return new Error(`community market catalog unavailable: ${message}`)
+function catalogUnavailable(error, signal) {
+  if (signal.aborted) return new Error('community market catalog unavailable: timeout')
+  if (error instanceof Error && /^net::ERR_(?:PROXY_\w+|TUNNEL_CONNECTION_FAILED)$/u.test(error.message)) {
+    return new Error('community market catalog unavailable: proxy')
+  }
+  return new Error('community market catalog unavailable: network')
 }
 
-async function readCatalogBytes(response, maxBytes) {
+async function readCatalogBytes(response, maxBytes, signal) {
   const announcedLength = Number(responseHeader(response, 'content-length'))
   if (Number.isFinite(announcedLength) && announcedLength > maxBytes) {
     void response.body?.cancel().catch(() => {})
@@ -260,7 +263,7 @@ async function readCatalogBytes(response, maxBytes) {
       chunks.push(chunk)
     }
   } catch (error) {
-    throw catalogUnavailable(error)
+    throw catalogUnavailable(error, signal)
   }
   if (length > maxBytes) throw new Error('community market catalog response is too large')
   return Buffer.concat(chunks, length)
@@ -285,7 +288,9 @@ export function createCommunityMarketService({
 
   let served
   let inFlight
+  let trial
   const verificationById = new Map()
+  const getTrial = () => (trial ??= readImConnectTrial())
 
   function presentCatalog(catalog) {
     if (verificationById.size === 0) return catalog
@@ -295,6 +300,20 @@ export function createCommunityMarketService({
         const verification = verificationById.get(plugin.id)
         return verification === undefined ? plugin : Object.freeze({ ...plugin, ...verification })
       })),
+    })
+  }
+
+  function listAvailable() {
+    if (served !== undefined) {
+      return Object.freeze({ ...presentCatalog(served.publicCatalog), source: 'cache' })
+    }
+    const { plugin, label } = getTrial()
+    return Object.freeze({
+      source: 'curated',
+      count: 1,
+      bridge: DSHMARKET_CATALOG_BRIDGE,
+      categories: Object.freeze([Object.freeze({ id: plugin.category, label: categoryLabel(label) })]),
+      plugins: Object.freeze([plugin]),
     })
   }
 
@@ -317,11 +336,11 @@ export function createCommunityMarketService({
           signal: controller.signal,
         })
       } catch (error) {
-        throw catalogUnavailable(error)
+        throw catalogUnavailable(error, controller.signal)
       }
       if (response.status !== 304) {
         if (!response.ok) throw new Error(`community market catalog request failed with HTTP ${response.status}`)
-        bytes = await readCatalogBytes(response, maxBytes)
+        bytes = await readCatalogBytes(response, maxBytes, controller.signal)
       }
     } finally {
       clearTimeout(timer)
@@ -340,7 +359,7 @@ export function createCommunityMarketService({
       throw new TypeError('community market catalog JSON is invalid')
     }
 
-    const projected = projectCatalog(parsed)
+    const projected = projectCatalog(parsed, getTrial())
     served = {
       ...projected,
       etag: responseHeader(response, 'etag'),
@@ -368,8 +387,9 @@ export function createCommunityMarketService({
     if (typeof id !== 'string' || !OPAQUE_ID_PATTERN.test(id)) {
       throw new TypeError('invalid community market plugin identifier')
     }
-    if (served === undefined) await list()
-    const plugin = served.installById.get(id)
+    const { plugin: curated } = getTrial()
+    if (served === undefined && curated.id !== id) await list()
+    const plugin = served?.installById.get(id) ?? (curated.id === id ? curated : undefined)
     if (plugin === undefined) throw new TypeError('invalid community market plugin identifier')
     return Object.freeze({
       id: plugin.id,
@@ -393,5 +413,5 @@ export function createCommunityMarketService({
     return verificationById.get(id)
   }
 
-  return Object.freeze({ list, resolveInstall, resolveInstallEntry, recordVerification })
+  return Object.freeze({ list, listAvailable, resolveInstall, resolveInstallEntry, recordVerification })
 }

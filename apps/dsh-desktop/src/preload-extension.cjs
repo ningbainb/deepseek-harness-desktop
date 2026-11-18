@@ -42,7 +42,7 @@ const api = Object.freeze({
   copyText: (text) => ipcRenderer.invoke('extensions:clipboard-write', text),
   runNetworkDiagnostics: () => ipcRenderer.invoke('extensions:network-diagnostics'),
   openCommunityPlugin: (id) => ipcRenderer.invoke('extensions:community-open', id),
-  listCommunityMarket: (force = false) => ipcRenderer.invoke('extensions:market-list', force),
+  listCommunityMarket: (force = false, source = 'community') => ipcRenderer.invoke('extensions:market-list', force, source),
   installMarketPlugin: (id, allowIncompatible = false) => ipcRenderer.invoke('extensions:market-install', { id, allowIncompatible }),
   importSkill: () => ipcRenderer.invoke('extensions:skill-import'),
   getSkillMarketStatus: () => ipcRenderer.invoke('extensions:skill-market-status'),

@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.0-rc.3.
+Authoritative Desktop version: 5.3.0-rc.4.
 
 Stable DSH package version: 0.2.2-rc.3.
 
@@ -12,8 +12,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 357 |
-| public-experimental | 190 |
+| public-stable | 358 |
+| public-experimental | 191 |
 | compatibility-patch | 50 |
 | private-high-risk | 0 |
 
@@ -559,6 +559,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 23 | static-import | @deepseek-ai/dsh-client-connection/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 24 | static-import | @deepseek-ai/dsh-client-store | no | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 25 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 8 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
@@ -588,6 +589,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/tests/community-settings.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/tests/compat-scope.spec.ts | 10 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/tests/compat-scope.spec.ts | 12 | static-import | @deepseek-ai/dsh-client-store | yes | public-stable | no |
+| packages/dsh-web-ui-settings/tests/desktop-preset-navigation.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | no | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-plugin-options.spec.tsx | 2 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-slot-mirror.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | no | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-slot-mirror.spec.tsx | 4 | static-import | @deepseek-ai/dsh-client-store | no | public-stable | no |
@@ -668,7 +670,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-tool-describe-image/src/index.ts | 28 | tools |
 | host-service | packages/dsh-value-mode/src/client/index.ts | 60 | remote.session |
 | host-service | packages/dsh-value-mode/src/index.ts | 47 | llm |
-| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 98 | remote |
+| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 99 | remote |
 | host-service | packages/skins/skin-center/src/client/index.ts | 66 | remote |
 | profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 15 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-all-surfaces.mjs | 157 | DSH_HOME |
@@ -885,22 +887,22 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 119 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 120 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 121 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 951 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 952 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 953 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 957 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 958 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 954 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 955 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 959 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 960 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 963 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1032 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1046 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1047 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1052 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1057 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1064 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1071 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1076 | profileDir |
-| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1087 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 962 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 965 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1034 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1048 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1049 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1054 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1059 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1066 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1073 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1078 | profileDir |
+| profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 1089 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 129 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 131 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-compatibility.mjs | 131 | profileDir |
@@ -1206,44 +1208,44 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 81 | profileDir |
 | profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 82 | profileDir |
 | profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 94 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1951 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1952 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1953 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1954 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1977 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1978 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1979 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1999 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2000 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2001 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2028 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2040 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2043 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2080 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2081 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2082 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2094 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2095 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2106 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2121 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2122 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2123 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2139 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2140 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2155 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2156 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2170 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2171 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2198 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2216 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2227 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2237 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2270 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2271 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1957 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1958 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1959 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1960 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1983 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1984 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 1985 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2005 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2006 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2007 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2034 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2046 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2049 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2086 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2087 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2088 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2100 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2101 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2112 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2127 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2128 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2129 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2145 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2146 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2161 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2162 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2176 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2177 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2204 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2222 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2233 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2243 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2276 | profileDir |
 | profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2277 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2286 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2289 | profileDir |
-| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2290 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2283 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2292 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2295 | profileDir |
+| profile-home | apps/dsh-desktop/test/extension-ipc.test.mjs | 2296 | profileDir |
 | profile-home | apps/dsh-desktop/test/fixtures/context-suite-host.mjs | 28 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/fixtures/context-suite-host.mjs | 34 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/fixtures/context-suite-host.mjs | 41 | DSH_HOME |
@@ -1256,6 +1258,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 21 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 48 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 65 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 25 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 56 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 57 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 70 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 155 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 23 | profileDir |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 25 | profileDir |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 29 | profileDir |
@@ -2238,10 +2245,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3009 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 413 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 432 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1051 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1065 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1261 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1263 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1053 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1067 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1263 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1265 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/menu.mjs | 81 | restart |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 916 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/plugin-recovery.mjs | 924 | start |
@@ -2433,14 +2440,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-tool-describe-image/src/client/index.ts | 99 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 239 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 262 | conversation.session.header.actions |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 156 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 161 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 169 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 179 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 186 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 194 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 200 | sidebar.footer.action |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 215 | root |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 158 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 163 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 171 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 181 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 188 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 196 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 202 | sidebar.footer.action |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 217 | root |
 | slot | packages/skins/skin-center/src/client/index.ts | 104 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 112 | settings.section |
 | workspace | apps/dsh-desktop/src/conversation-import/session-bridge.mjs | 207 | list |

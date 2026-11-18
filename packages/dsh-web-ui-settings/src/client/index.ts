@@ -36,6 +36,7 @@ import { installAccountRelayRecommendation } from './account-relay-recommendatio
 import { installDesktopLinkOpening } from './desktop-link-opening.ts'
 import { installDesktopSkillsCommand } from './desktop-skills-command.ts'
 import { installDesktopUsageNavigation } from './desktop-usage-navigation.ts'
+import { installDesktopPresetNavigation } from './desktop-preset-navigation.ts'
 import { confirmCustomProviderKey, installCustomProviderKeyPersistence } from './custom-provider-key-persistence.ts'
 import { CommunityPluginsSettingsCard } from './CommunityPluginsSettingsCard.tsx'
 import {
@@ -108,6 +109,7 @@ export function apply(ctx: ClientContext): void {
   }
   ctx.effect(() => installDesktopAppearance(window), 'web-ui-settings: desktop appearance')
   if (!dockSetting) {
+    ctx.effect(() => installDesktopPresetNavigation(ctx.slots, window), 'web-ui-settings: Desktop preset navigation')
     ctx.effect(() => installDesktopUsageNavigation(document, ctx.locale.bind('web-ui-plugins')), 'web-ui-settings: usage navigation')
     ctx.inject(['commandUi'], scope => {
       scope.effect(() => installDesktopSkillsCommand(scope, document), 'web-ui-settings: native skills command')
