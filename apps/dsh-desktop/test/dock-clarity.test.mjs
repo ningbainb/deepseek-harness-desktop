@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 
-const stylesheet = await readFile(new URL('../src/ui/extensions.css', import.meta.url), 'utf8')
+const stylesheet = (await readFile(new URL('../src/ui/extensions.css', import.meta.url), 'utf8')).replaceAll('\r\n', '\n')
 const html = await readFile(new URL('../src/ui/extensions.html', import.meta.url), 'utf8')
 const base = await readFile(new URL('../src/ui/harness-base.css', import.meta.url), 'utf8')
 
