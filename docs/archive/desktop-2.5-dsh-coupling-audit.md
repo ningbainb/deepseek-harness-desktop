@@ -12,7 +12,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 358 |
+| public-stable | 357 |
 | public-experimental | 191 |
 | compatibility-patch | 50 |
 | private-high-risk | 0 |
@@ -559,7 +559,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 23 | static-import | @deepseek-ai/dsh-client-connection/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 24 | static-import | @deepseek-ai/dsh-client-store | no | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 25 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
-| packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | yes |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 8 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
@@ -589,7 +589,6 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/tests/community-settings.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/tests/compat-scope.spec.ts | 10 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/tests/compat-scope.spec.ts | 12 | static-import | @deepseek-ai/dsh-client-store | yes | public-stable | no |
-| packages/dsh-web-ui-settings/tests/desktop-preset-navigation.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | no | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-plugin-options.spec.tsx | 2 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-slot-mirror.spec.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | no | public-stable | no |
 | packages/dsh-web-ui-settings/tests/dock-slot-mirror.spec.tsx | 4 | static-import | @deepseek-ai/dsh-client-store | no | public-stable | no |

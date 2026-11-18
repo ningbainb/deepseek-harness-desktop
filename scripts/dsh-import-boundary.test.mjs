@@ -100,12 +100,13 @@ test('repository import scan excludes generated cache and patch construction scr
   }
 })
 
-test('SDK persistence adapters do not permit imports from adjacent application modules', () => {
+test('SDK adapters do not permit imports from adjacent application modules', () => {
   const specifier = `${'@deepseek-ai/'}dsh-client-ui-settings/client`
   const adapters = [
     'apps/dsh-desktop/src/atomic-write-adapter.mjs',
     'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
     'packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts',
+    'packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts',
     'packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts',
     'packages/dsh-web-ui-settings/tests/settings-sdk-adapter.ts',
     'packages/dsh-model-preferences/src/client/persist-config.ts',

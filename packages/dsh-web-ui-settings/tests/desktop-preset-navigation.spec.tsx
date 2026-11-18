@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
+import { SlotCore } from './settings-sdk-adapter.ts'
 import { installDesktopPresetNavigation } from '../src/client/desktop-preset-navigation.ts'
 
 function fixture(composerInitiallyDeclared = true) {

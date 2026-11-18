@@ -4860,7 +4860,7 @@
       "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
-      "controlled": false
+      "controlled": true
     },
     {
       "path": "packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx",
@@ -5120,15 +5120,6 @@
       "specifier": "@deepseek-ai/dsh-client-store",
       "line": 12,
       "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-web-ui-settings/tests/desktop-preset-navigation.spec.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 1,
-      "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
     },
