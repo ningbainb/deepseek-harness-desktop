@@ -4,6 +4,29 @@
 
 [中文](README.md) | English
 
+DeepSeek Harness Desktop is an open-source, community-maintained AI workspace powered by the official DSH Runtime and Web UI. Keep conversations, projects, plugins, skills and scheduled tasks together on your desktop.
+
+[Download](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Website](https://1521003.xyz/) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
+
+![Windows conversation workspace](website/assets/desktop-5.3.0-main.webp)
+
+## What's new in the 5.3.0 candidate
+
+- **Stability.** Windows in-place upgrades retain your existing directories, conversations and configuration.
+- **Interface.** Keep chats and projects in view. Open tools from the Extension Dock and find Community Workshop in plugin discovery.
+- **Performance.** Long replies need fewer redundant layout passes. Lists and resources load as needed, and Windows installation reduces cross-drive copying.
+- **Memory.** Review and manage local memory in Personal Preferences. Model suggestions are saved after confirmation.
+- **Runtime.** Includes official DSH `0.2.2-rc.5`.
+
+<table>
+  <tr><th>Extension Dock</th><th>Personal Preferences and Memory</th></tr>
+  <tr><td><a href="website/assets/desktop-5.3.0-dock.webp"><img src="website/assets/desktop-5.3.0-dock.webp" width="440" alt="Extension Dock plugin destinations"></a></td><td><a href="website/assets/desktop-5.3.0-memory.webp"><img src="website/assets/desktop-5.3.0-memory.webp" width="440" alt="Memory settings in Personal Preferences"></a></td></tr>
+</table>
+
+Screenshots from the 5.3.0 candidate running in an isolated Windows profile.
+
+Supports Windows 10 / 11 x64, macOS 13+ Apple Silicon arm64 Preview and Linux x64 Preview. Packages include Node.js and DSH. Windows bundles Git and macOS and Linux use system Git. This desktop app has its own identity, data directories and update feed. Released under BSD-3-Clause.
+
 > **Maintained by ningbai牛逼**: If DeepSeek Harness Desktop helps you, consider [supporting ningbai牛逼 on Afdian](https://www.ifdian.net/a/ningbai). Your support helps fund servers, testing, and continued maintenance.
 >
 > Scan to support the project:
@@ -31,16 +54,6 @@ Join the community to discuss:
 > The community group also provides synchronized copies of the latest installer and a place to get help with installation and usage.
 
 ---
-
-**DeepSeek Harness Desktop** is a community-maintained, open-source AI coding desktop client.
-
-DeepSeek has not yet released a standalone official Desktop product. This project combines the public official **DSH Runtime, Web UI, and the Desktop boundaries visible in the official repository** into Windows, macOS and Linux desktop applications, then adds community plugins, Skills, task automation, Git, remote development, and desktop integration. It is not an official DeepSeek client and does not reuse or overwrite a future official Desktop identity, data directory, protocol, or update feed.
-
-Supports **Windows 10 / 11 x64**, with **macOS 13+ Apple Silicon arm64 Preview** and **Linux x64 Preview** builds. It is released under the **BSD-3-Clause** license.
-
-Packages include Node.js and DSH. Windows also bundles Git; macOS and Linux Git operations require system Git.
-
-[Product Site](https://1521003.xyz/) · [Download Latest](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
 ### 5.1.0: one release across three platforms, complete output and simpler settings
 

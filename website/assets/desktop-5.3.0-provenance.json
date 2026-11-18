@@ -1,0 +1,26 @@
+{
+  "platform": "Windows x64",
+  "desktopVersion": "5.3.0-rc.10",
+  "runtimeVersion": "0.2.2-rc.5",
+  "sourceCommit": "346bba82d2e946dee6a8fd2b0b6e7746e90cff5a",
+  "installerSha256": "74e2d8485dc03c69f0a7b41ebec99d8e93838391fffccba21f96c3a0e383a8c6",
+  "profile": "isolated demo profile",
+  "processing": "Native window capture encoded as WebP",
+  "screenshots": [
+    {
+      "file": "desktop-5.3.0-main.webp",
+      "view": "Conversation workspace",
+      "sha256": "8f5d88754dccdb8b003aa83e233b0ff4c8cd3e90125a391fedaabf909f1e72c7"
+    },
+    {
+      "file": "desktop-5.3.0-dock.webp",
+      "view": "Extension Dock plugin destinations",
+      "sha256": "54663bad2eea1b78546bcb8c58bfbe4f6ca5dd02b2e1d75976eb1a6a842cc359"
+    },
+    {
+      "file": "desktop-5.3.0-memory.webp",
+      "view": "Personal Preferences with one example memory saved using the UI",
+      "sha256": "f1f13219b1e9b071b7ec3880c45d1f8b0b455cfb382cc65bb62067797d655b91"
+    }
+  ]
+}

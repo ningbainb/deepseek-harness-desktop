@@ -33,7 +33,7 @@ siteThemeToggle?.addEventListener('click', () => {
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return null
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
 }
 
 function formatCount(value) {
@@ -82,6 +82,10 @@ async function hydrateLatestRelease() {
     setLinks('.download-link', installer.browser_download_url)
     for (const [platform, download] of Object.entries(resolvePlatformDownloads(release))) {
       setLinks(`[data-platform="${platform}"]`, download)
+      if (platform === 'linux-x64') {
+        const label = download?.endsWith('.deb') ? '下载 DEB' : download?.endsWith('.AppImage') ? '下载 AppImage' : '查看发行页'
+        setText('[data-platform="linux-x64"] .code-action', label)
+      }
     }
     const terminalAction = document.querySelector('#terminal-action')
     if (terminalAction) {

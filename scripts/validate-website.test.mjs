@@ -25,6 +25,9 @@ test('each platform resolves only its same-version installer and never another p
     'macos-arm64': release.assets[1].browser_download_url,
     'linux-x64': release.assets[2].browser_download_url,
   })
+  const deb = { name: 'DeepSeek-Harness-Desktop-5.0.0-amd64.deb', browser_download_url: 'https://example.com/linux.deb' }
+  release.assets.push(deb)
+  assert.equal(resolvePlatformDownloads(release)['linux-x64'], deb.browser_download_url)
   release.assets = [release.assets[0], { name: 'DeepSeek-Harness-Desktop-4.4.0-arm64.dmg', browser_download_url: 'https://example.com/stale.dmg' },
     { name: 'DeepSeek-Harness-Desktop-5.0.0-x86_64.AppImage.blockmap', browser_download_url: 'https://example.com/intermediate' }]
   assert.deepEqual(resolvePlatformDownloads(release), {
@@ -73,7 +76,8 @@ test('concise hero preserves its actions and keeps release details below the fol
   assert.match(hero, /data-download-source="hero"/u)
   assert.match(hero, /https:\/\/qm\.qq\.com\//u)
   assert.match(hero, /data-star-cta/u)
-  assert.match(hero, /href="#features"/u)
+  assert.match(hero, /href="#latest-features"/u)
+  assert.match(hero, /<img[^>]+desktop-5\.3\.0-main\.webp/u)
   const details = websiteHtml.slice(websiteHtml.indexOf(hero) + hero.length)
   assert.match(details, /SDK/u)
   assert.match(details, /SHA-256/u)

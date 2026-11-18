@@ -232,7 +232,7 @@
       } catch {}
     </script>
     <link rel="icon" href="assets/app-icon.png" type="image/png">
-    <link rel="preload" as="image" href="assets/desktop-5.1.0-main.png" type="image/png" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/desktop-5.3.0-main.webp" type="image/webp" fetchpriority="high">
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" type="module"></script>
   </head>
@@ -273,8 +273,8 @@
         <div class="container hero-inner">
           <div class="hero-copy reveal">
             <p class="overline">开源 AI 桌面工作台</p>
-            <h1>从对话，<br>到行动。<br><span class="hero-current">5.1.0 · Windows · macOS · Linux</span></h1>
-            <p class="hero-summary">连接模型、文件与工具，让想法在桌面落地。</p>
+            <h1>DeepSeek Harness Desktop <span class="hero-current release-version">v5.1.0</span></h1>
+            <p class="hero-summary">在一个桌面工作台延续会话、项目和工具。基于官方 DSH。</p>
             <div class="hero-buttons">
               <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2h7v7H2V2Zm9 0h7v7h-7V2ZM2 11h7v7H2v-7Zm9 0h7v7h-7v-7Z"/></svg>
@@ -282,14 +282,14 @@
               </a>
               <a class="btn btn-community" href="https://qm.qq.com/q/9hrcdaEYPC" target="_blank" rel="noreferrer">
                 <span class="qq-mark">Q</span>
-                加入 QQ 群
+                加入 QQ 二群
               </a>
               <a class="btn btn-ghost btn-star" href="https://github.com/ningbainb/deepseek-harness-desktop" target="_blank" rel="noreferrer" data-star-cta>
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.49c-2.24.49-2.71-1.08-2.71-1.08-.37-.93-.9-1.18-.9-1.18-.73-.5.06-.49.06-.49.81.06 1.23.83 1.23.83.72 1.23 1.89.88 2.35.67.07-.52.28-.88.51-1.08-1.79-.2-3.67-.9-3.67-3.99 0-.88.31-1.6.83-2.16-.08-.2-.36-1.02.08-2.13 0 0 .68-.22 2.2.82A7.67 7.67 0 0 1 10 4.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.16 0 3.1-1.89 3.78-3.69 3.98.29.25.55.74.55 1.5v2.22c0 .21.14.46.55.38A8 8 0 0 0 10 2Z"/></svg>
                 去 GitHub 点 Star
                 <span class="button-stat" data-star-count>489</span>
               </a>
-              <a class="btn btn-ghost" href="#features">桌面特色</a>
+              <a class="btn btn-ghost" href="#latest-features">查看新版亮点</a>
             </div>
             <p class="support-proof">
               <span>开源免费</span>
@@ -299,24 +299,44 @@
             </p>
           </div>
 
-          <div class="download-terminal reveal reveal-delay">
-            <div class="terminal-tabs">
-              <button class="terminal-tab is-active" type="button" data-terminal-tab="download">Windows x64</button>
-              <button class="terminal-tab" type="button" data-terminal-tab="source">源码安装</button>
-            </div>
-            <div class="terminal-window">
-              <div class="terminal-bar">
-                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
-                <button class="copy-button" type="button" data-copy-target="terminal-command" aria-label="复制命令">
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6V3h10v10h-3M3 7h10v10H3V7Z"/></svg><span>复制</span>
-                </button>
-              </div>
-              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
-                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v5.1.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v5.1.0</code>
-                <span class="terminal-cta">立即下载</span>
+          <figure class="intro-window">
+            <a href="assets/desktop-5.3.0-main.webp" aria-label="查看完整的 Windows 会话界面截图">
+              <img src="assets/desktop-5.3.0-main.webp" alt="DSH Desktop 的 Windows 会话界面，左侧为工作区和会话，中间为对话输入区" width="1359" height="850" decoding="async" fetchpriority="high">
+            </a>
+            <figcaption>Windows 实拍 · 5.3.0 候选版</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="latest-features release-intro" id="latest-features" aria-labelledby="latest-features-title">
+        <div class="container">
+          <div class="release-intro-heading">
+            <p class="release-intro-version">5.3.0 候选版亮点</p>
+            <h2 id="latest-features-title">昨天的工作，今天接着做</h2>
+            <p>覆盖升级、界面和记忆都围绕一件事：打开桌面，就能回到自己的会话和项目。</p>
+          </div>
+          <dl class="release-highlights">
+            <div><dt>稳定性</dt><dd>Windows 覆盖升级沿用现有安装目录和数据目录，保留会话与配置。</dd></div>
+            <div><dt>界面升级</dt><dd>会话与项目留在侧栏。拓展坞直达插件、技能、外观、桌面设置和更多工具。</dd></div>
+            <div><dt>性能优化</dt><dd>减少长回复中的重复布局。列表按需读取，Windows 安装减少跨盘搬运。</dd></div>
+            <div><dt>记忆</dt><dd>在个人偏好中查看、确认或删除本地记忆，管理全局、项目和会话范围。</dd></div>
+            <div><dt>官方内核</dt><dd>随包适配 DSH 0.2.2-rc.5。在会话的「上下文」查看模型输入构成。</dd></div>
+          </dl>
+          <div class="release-intro-shots">
+            <article>
+              <h3>插件与创意工坊</h3>
+              <p>从拓展坞管理已安装插件，在「发现」里打开创意工坊。</p>
+              <a href="assets/desktop-5.3.0-dock.webp" aria-label="查看完整的拓展坞截图">
+                <img src="assets/desktop-5.3.0-dock.webp" alt="拓展坞插件页的已安装、官方实验性插件、创意工坊和插件维护入口" width="1059" height="750" loading="lazy" decoding="async">
               </a>
-              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">317.2 MiB</span></div>
-            </div>
+            </article>
+            <article>
+              <h3>个人偏好与记忆</h3>
+              <p>在同一页管理回复偏好和本地记忆。模型建议经确认后保存。</p>
+              <a href="assets/desktop-5.3.0-memory.webp" aria-label="查看完整的记忆设置截图">
+                <img src="assets/desktop-5.3.0-memory.webp" alt="原生设置中个人偏好下的记忆页，包含本地记忆开关、已保存记忆及待确认建议" width="2718" height="1700" loading="lazy" decoding="async">
+              </a>
+            </article>
           </div>
         </div>
       </section>
@@ -344,84 +364,6 @@
               <svg class="principle-icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="10" width="17" height="17" rx="3"/><rect x="37" y="10" width="17" height="17" rx="3"/><rect x="10" y="37" width="17" height="17" rx="3"/><rect x="37" y="37" width="17" height="17" rx="3"/><path d="M32 18h5M18 32v5M46 27v10M27 46h10"/></svg>
               <h3>社区能力自由组合</h3><span>COMMUNITY EXTENSIONS</span>
               <p>任务看板、Git 图谱、远程连接、宠物、统计与主题都可独立启用。</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="latest-features" id="latest-features" aria-labelledby="latest-features-title">
-        <div class="container">
-          <div class="section-title reveal">
-            <span>v5.1.0 三端同版发布</span>
-            <h2 id="latest-features-title">完整工作台，清晰边界：输出、设置与升级一起保全</h2>
-          </div>
-          <div class="latest-grid">
-            <article class="latest-card reveal"><span class="latest-index">A</span><h3>完整流式背压，资源异步读取</h3><p>消费者实际读取确认控制发送窗口，暂停恢复保留完整文字、代码与工具结果；资源读取异步合并、HMR 图刷新后及时重扫。新用户默认官方皮肤，升级保留已有选择，不宣传普遍加速百分比。</p><small>COMPLETE OUTPUT, LESS REPEATED WORK</small></article>
-            <article class="latest-card reveal"><span class="latest-index">B</span><h3>工具可折叠，会话有空间</h3><p>工具支持折叠、键盘展开与重启恢复；保留底部拓展坞入口和今日消费，工作区和会话列表不再被工具挤占到无法查看。</p><small>WORKSPACES AND CONVERSATIONS FIRST</small></article>
-            <article class="latest-card reveal"><span class="latest-index">C</span><h3>无框设置，不减少控制</h3><p>用留白、字重与对齐取代装饰竖线和章节套框，15 个导航、搜索、高级详情、风险提示及焦点保留。仅独立设置不挂载宠物，主会话宠物不受影响；托盘、恢复与明确退出继续可用。</p><small>READABLE DOCK, EXPLICIT BACKGROUND MODE</small></article>
-            <article class="latest-card reveal">
-              <span class="latest-index">01</span>
-              <h3>Browser Use：看得见的隔离浏览器</h3><p>默认使用官方 Playwright MCP，发现系统 Chrome、Edge 或 Chromium。页面读取可直接执行，点击、输入、上传与下载仍由用户确认。</p><small>VISIBLE AND ISOLATED BROWSER</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">02</span>
-              <h3>Computer Use：真实桌面，逐次审批</h3><p>Cua Driver Native 随包提供，外置 MCP 可隔离回退。截图与窗口枚举属于观察，鼠标键盘操作逐次确认。</p><small>OBSERVE FIRST, APPROVE ACTIONS</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">03</span>
-              <h3>官方 DSH 0.2.1-rc.2 适配</h3><p>Agent、Session、PTC、Workflow、Sandbox 与 Agent Team 全部迁移到新契约，并精确锁定完整 Runtime 依赖图。</p><small>EXACT PUBLIC NPM RUNTIME / ELECTRON 44</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">04</span>
-              <h3>真实安装升级，保全旧数据</h3><p>原安装目录逐项校验，注册表失败逐项恢复。真实 Setup 验证 4.3.0、5.0.0、5.0.1 分别升级至 5.1.0，安装前旧 provider/会话快照在覆盖及重启后保全；中断夹具不冒充断电恢复。</p><small>BACKUP, MIGRATE, VERIFY, COMMIT</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">05</span>
-              <h3>Skills 目录与入口统一</h3>
-              <p>项目 Skills、用户 DSH Skills 与 Agents Skills 使用同一发现规则；会话菜单和技能中心展示一致的来源、作用域与可用状态。</p>
-              <small>ONE SKILL DISCOVERY CONTRACT</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">06</span>
-              <h3>bai 在所有协作选择器统一置顶</h3>
-              <p>聊天模型、模型设置、主控模型和执行模型使用同一排序规则；用户手动置顶仍然最高优先，其余供应商顺序保持稳定。</p>
-              <small>CONSISTENT PROVIDER ORDER</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">07</span>
-              <h3>插件自由度与稳定性分级</h3>
-              <p>Registry 插件正常验证安装；Git 插件标记实验性并分类提示网络、旧 SDK、缺失依赖、构建脚本与运行图冲突。高风险安装仍可由用户明确确认。</p>
-              <small>VALIDATE, EXPLAIN, THEN ACTIVATE</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">08</span>
-              <h3>本地插件可重复安装</h3>
-              <p>本地 `.tgz` 每次安装都复制到独立 staging，激活结束后清理自己的临时文件，不会留下 ENOENT 或污染后续 NPM 安装。</p>
-              <small>REPEATABLE LOCAL INSTALL</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">09</span>
-              <h3>桌面交互不再暗中启动终端</h3>
-              <p>底部面板只负责展开插件栏并恢复上次标签与高度；终端仅在用户点击标签、菜单或快捷键后启动，Windows 子进程继续隐藏黑框。</p>
-              <small>EXPLICIT DESKTOP ACTIONS</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">10</span>
-              <h3>宠物设置保存有明确终态</h3>
-              <p>保存遵循官方异步设置契约；成功重新读取快照，失败保留草稿和原因，无论结果如何都能退出“保存中”并重试。</p>
-              <small>RETRYABLE SETTINGS SAVE</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">11</span>
-              <h3>埋点覆盖结果，不碰用户正文</h3>
-              <p>新增 Skills、Agent Team 与局域网访问的固定结果信号，并保留会话导入入口与插件操作的粗粒度事件；不上传对话、Prompt、记忆正文、文件内容、路径、模型名、Token 或密钥。</p>
-              <small>PRIVACY-FIRST PRODUCT SIGNALS</small>
-            </article>
-            <article class="latest-card reveal">
-              <span class="latest-index">12</span>
-              <h3>普通版与标书版物理分离</h3>
-              <p>5.0 普通版在本仓库验收发布；标书版使用独立文件夹、独立分支和独立交付物，不会混入公开构建。</p>
-              <small>VERIFIABLE RELEASE, COMPLETE SURFACE</small>
             </article>
           </div>
         </div>
@@ -569,6 +511,25 @@
               <h3>Linux x64 Preview</h3><p>提供 AppImage 与 DEB，仍为 Preview；本版仅 Ubuntu 22.04 原生 Runner 验证，实体桌面体验边界见说明。</p>
               <a class="code-line" data-platform="linux-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-x86_64.AppImage"><span class="prompt">$</span><code>Desktop v5.1.0 Linux</code><span class="code-action">下载 AppImage</span></a>
             </article>
+          </div>
+          <div class="download-terminal reveal reveal-delay">
+            <div class="terminal-tabs">
+              <button class="terminal-tab is-active" type="button" data-terminal-tab="download">Windows x64</button>
+              <button class="terminal-tab" type="button" data-terminal-tab="source">源码安装</button>
+            </div>
+            <div class="terminal-window">
+              <div class="terminal-bar">
+                <span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span>
+                <button class="copy-button" type="button" data-copy-target="terminal-command" aria-label="复制命令">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6V3h10v10h-3M3 7h10v10H3V7Z"/></svg><span>复制</span>
+                </button>
+              </div>
+              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
+                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v5.1.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v5.1.0</code>
+                <span class="terminal-cta">立即下载</span>
+              </a>
+              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">317.2 MiB</span></div>
+            </div>
           </div>
         </div>
       </section>
