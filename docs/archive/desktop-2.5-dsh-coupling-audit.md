@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.4.
+Authoritative Desktop version: 5.3.5.
 
 Stable DSH package version: 0.2.2-rc.5.
 
@@ -763,9 +763,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs | 35 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs | 57 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-personalization.mjs | 62 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 200 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 456 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 625 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 205 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 461 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-release-browser.mjs | 633 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-remote-lan.mjs | 68 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-ssh.mjs | 67 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-particle-theme.mjs | 45 | DSH_HOME |

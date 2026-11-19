@@ -71,7 +71,7 @@ async function launchDesktop() {
   const page = await application.firstWindow()
   page.on('pageerror', error => rendererErrors.push(error.message))
   try {
-  await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
+    await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
     await dismissStartup(page)
     await expandSidebarTools(page)
     await page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
@@ -84,18 +84,39 @@ async function launchDesktop() {
 }
 
 async function openSshPanel(application, page) {
+  const boardView = page.locator('[data-dsh-taskboard-view]')
+  const sshView = page.locator('[data-dsh-ssh-view]')
+  // The Dock can be reachable while optional tool clients are still mounting.
+  // Its native bridge rejects early clicks instead of replaying them.
+  await boardView.waitFor({ state: 'attached', timeout: runtimeReadyTimeoutMs })
+  await sshView.waitFor({ state: 'attached', timeout: runtimeReadyTimeoutMs })
   const dock = await openDockTools(application, page)
   const windowsBefore = await application.evaluate(({ BrowserWindow }) => (
     BrowserWindow.getAllWindows().map(window => window.id).toSorted((left, right) => left - right)
   ))
   assert.equal(await page.locator('[data-dsh-taskboard-entry]').count(), 0, 'Desktop task board has one Dock entry')
   await dock.locator('#task-board-tool').click()
-  await page.locator('[data-dsh-taskboard-view]').waitFor({ state: 'visible', timeout: 20_000 })
-  await page.locator('[data-dsh-ssh-view]').waitFor({ state: 'hidden', timeout: 20_000 })
+  try {
+    await boardView.waitFor({ state: 'visible', timeout: 20_000 })
+  } catch (error) {
+    const boardState = await page.evaluate(() => {
+      const panel = document.querySelector('[data-dsh-taskboard-view]')
+      return {
+        mounted: panel !== null,
+        active: document.documentElement.hasAttribute('data-dsh-taskboard-active'),
+        sshActive: document.documentElement.hasAttribute('data-dsh-ssh-active'),
+        display: panel ? getComputedStyle(panel).display : null,
+      }
+    }).catch(() => ({ unavailable: true }))
+    const dockFailure = await dock.locator('#toast').evaluate(element =>
+      element.classList.contains('error') ? element.textContent.trim() : null).catch(() => null)
+    throw new Error(`Task board did not open from the Dock: ${JSON.stringify({ boardState, dockFailure })}`, { cause: error })
+  }
+  await sshView.waitFor({ state: 'hidden', timeout: 20_000 })
   await openDockTools(application, page)
   await dock.locator('#ssh-tool').click()
-  await page.locator('[data-dsh-ssh-view]').waitFor({ state: 'visible', timeout: 20_000 })
-  await page.locator('[data-dsh-taskboard-view]').waitFor({ state: 'hidden', timeout: 20_000 })
+  await sshView.waitFor({ state: 'visible', timeout: 20_000 })
+  await boardView.waitFor({ state: 'hidden', timeout: 20_000 })
   try {
     await page.locator('#dsh-ssh-tab-hosts[aria-selected="true"]').waitFor({ state: 'visible', timeout: 20_000 })
   } catch (error) {

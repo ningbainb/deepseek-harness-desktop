@@ -4,6 +4,36 @@ import { chromium } from 'playwright'
 import { syncWindowChromeSkinInsets, markWindowChromeViewportRoot, WINDOW_CHROME_CSS, createWindowChromeScript } from '../src/window-chrome.mjs'
 import { createStarPromptSurfaceScript, STAR_PROMPT_CSS } from '../src/star-prompt.mjs'
 
+test('native narrow sidebar and its mask remain clickable above the legacy backdrop', async context => {
+  const browser = await chromium.launch({ headless: true })
+  context.after(() => browser.close())
+  const page = await browser.newPage({ viewport: { width: 724, height: 541 } })
+  await page.setContent(`<html data-dsh-desktop-window-chrome="true"><body style="margin:0">
+    <div id="root"><div data-dsh-frame data-sidebar-drawer>
+      <div data-sidebar-mask style="position:absolute;inset:0;z-index:70"></div>
+      <div style="position:absolute;inset:0 auto 0 0;width:280px;z-index:71">
+        <button type="button">Account menu</button>
+      </div>
+    </div></div>
+    <style>[data-dsh-frame]:not([data-sidebar-collapsed])::after {
+      content:"";position:fixed;inset:0;z-index:1050;background:rgb(0 0 0 / 24%);
+    }</style>
+  </body></html>`)
+  const account = page.getByRole('button', { name: 'Account menu' })
+  await account.evaluate(button => button.addEventListener('click', () => { button.dataset.opened = 'true' }))
+  const mask = page.locator('[data-sidebar-mask]')
+  await mask.evaluate(element => element.addEventListener('click', () => { element.dataset.dismissed = 'true' }))
+  const frame = page.locator('[data-dsh-frame]')
+  assert.equal(await frame.evaluate(element => getComputedStyle(element, '::after').content), '""')
+  await page.addStyleTag({ content: WINDOW_CHROME_CSS })
+  await account.click()
+  assert.equal(await account.getAttribute('data-opened'), 'true')
+  await mask.click({ position: { x: 500, y: 100 } })
+  assert.equal(await mask.getAttribute('data-dismissed'), 'true')
+  await mask.evaluate(element => element.remove())
+  assert.equal(await frame.evaluate(element => getComputedStyle(element, '::after').content), '""')
+})
+
 test('a dismissed native dialog leaves the optional prompt reachable above a fixed application root', async context => {
   const browser = await chromium.launch({ headless: true })
   context.after(() => browser.close())

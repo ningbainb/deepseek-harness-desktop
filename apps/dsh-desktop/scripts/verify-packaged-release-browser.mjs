@@ -13,12 +13,14 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { chromium } from 'playwright'
 import { parse, stringify } from 'yaml'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses } from './packaged-browser-owners.mjs'
 import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './native-fixture-storage.mjs'
+import { browserComponentManifest, createBrowserComponentManager } from '../src/browser-component.mjs'
 
 const { values } = parseArgs({ options: {
   'desktop-exe': { type: 'string' }, output: { type: 'string' },
@@ -45,6 +47,9 @@ await assertNativeFixtureStorage({ outputDirectory: output })
 assert.equal(await access(join(output, 'result.json')).then(() => true, () => false), false, 'Refuse to overwrite earlier evidence')
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-release-browser-'))
 const home = join(temporary, 'dsh-home'), userData = join(temporary, 'user-data'), agents = join(temporary, 'agents')
+const componentRoot = join(home, 'desktop-components', 'browser-electron')
+const component = browserComponentManifest.artifacts.find(item => item.platform === 'win32' && item.arch === 'x64')
+assert.ok(component, 'Missing published Windows x64 browser component')
 const documents = join(temporary, 'documents')
 const profile = join(home, 'profiles', 'desktop')
 const probeName = '@fixture/dsh-release-plugins'
@@ -57,7 +62,7 @@ const execFileAsync = promisify(execFile)
 const phases = [], servers = [], serverSockets = new Set()
 const telemetryIds = ['session-telemetry-otel', 'desktop-product-telemetry', 'product-analytics']
 const report = {
-  schemaVersion: 1, mode: 'normal-packaged-windows-main-runtime-vendor-self-exe',
+  schemaVersion: 1, mode: 'normal-packaged-windows-main-runtime-and-vendor-component',
   passed: false, startedAt: new Date().toISOString(), exe, output, temporary,
   expectedVersion, phases: [], checks: [], screenshots: [], serverRequests: [],
   blockedRequests: [], rendererErrors: [], console: [], promptRequests: 0,
@@ -72,7 +77,7 @@ const report = {
   },
   cleanup: { passed: false, errors: [] },
 }
-let stage = 'payload', failure, origin, proxyOrigin, negativeURL, phase, expectedHost, baselineBundles, baselineDependencies
+let stage = 'payload', failure, origin, proxyOrigin, negativeURL, phase, expectedHost, componentExe, baselineBundles, baselineDependencies
 let cookieIssued = false
 const cookieValue = randomUUID()
 
@@ -227,7 +232,7 @@ async function start(name) {
     '--enable-automation',
     `--proxy-server=${proxyOrigin}`, '--proxy-bypass-list=127.0.0.1;localhost;[::1];dsh.internal',
     '--disable-background-networking', '--disable-component-update', '--disable-domain-reliability', '--disable-sync', '--no-first-run',
-  ], { cwd: payload, env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  ], { cwd: payload, env, shell: false, windowsHide: false, stdio: ['ignore', 'pipe', 'pipe'] })
   owner.child.once('error', error => { owner.spawnError = error })
   // Redact the assembled buffer when writing evidence, including tokens split
   // across stdout/stderr chunks. Never print this raw in-memory buffer.
@@ -520,13 +525,13 @@ async function browserWitness(owner) {
     const hosts = rows.map(processEvidence).filter(row => row.browserHost)
     if (!hosts.length) return false
     for (const host of hosts) {
-      assert.equal(host.executable.toLowerCase(), exe.toLowerCase(), 'Vendor must spawn the SAME packaged EXE, not a bundled development Electron')
+      assert.equal(host.executable.toLowerCase(), componentExe.toLowerCase(), 'Vendor must spawn the verified on-demand Electron')
       assert.equal(host.reviewedHostEntry, true, 'Vendor argv must use the unpacked profile entry')
       assert.equal(host.rpcTokenInArgv, false)
     }
     const windows = browserWindows(await visibleWindows(owner), new Set(hosts.map(row => row.pid)))
     return windows.length ? { hosts, windows } : false
-  }, 'vendor self-EXE child and visible non-minimized Win32 browser window')
+  }, 'verified component child and visible non-minimized Win32 browser window')
 }
 async function closeBrowser(owner, witness) {
   const result = await post(owner, 'close')
@@ -551,6 +556,9 @@ try {
   const packagedBootstrap = asar.extractFile(archive, 'src/browser-host-bootstrap.mjs')
   const sourceBootstrap = await readFile(join(import.meta.dirname, '..', 'src', 'browser-host-bootstrap.mjs'))
   assert.equal(sha(packagedBootstrap), sha(sourceBootstrap), 'Final ASAR must contain the reviewed P1 bootstrap, not a stale package')
+  assert.deepEqual(JSON.parse(asar.extractFile(archive, 'runtime-support/browser-component.json').toString('utf8')), browserComponentManifest)
+  const componentManager = createBrowserComponentManager({ componentRoot, cacheRoot: join(home, 'cache', 'browser-component') })
+  await assert.rejects(access(componentRoot), { code: 'ENOENT' }, 'Start with no prepared browser component')
   const browserPackage = join(modules, 'dsh-builtin-browser')
   const vendor = JSON.parse(await readFile(join(browserPackage, 'package.json'), 'utf8'))
   assert.equal(vendor.name, 'dsh-builtin-browser'); assert.equal(vendor.version, '0.4.14')
@@ -665,12 +673,27 @@ document.querySelector('#fixture-trusted-submit').addEventListener('click',event
   stage = 'active-main-proxy-runtime-guard-controls'
   await verifyGuardControls(phase)
 
+  stage = 'verified-component-preparation'
+  // Resolve the same pinned Electron archive through the development package's
+  // installer cache, outside the isolated Runtime's loopback-only guard.
+  const requireElectron = createRequire(require.resolve('electron/package.json'))
+  const { downloadArtifact } = await import(pathToFileURL(requireElectron.resolve('@electron/get')).href)
+  const archivePath = await downloadArtifact({
+    version: component.version, artifactName: 'electron', platform: component.platform, arch: component.arch,
+    ...(process.env.ELECTRON_CACHE ? { cacheRoot: process.env.ELECTRON_CACHE } : {}),
+  })
+  const activation = await componentManager.prepare({ archivePath })
+  componentExe = await realpath(activation.executablePath)
+  assert.ok(within(componentRoot, componentExe) && !within(payload, componentExe))
+  assert.equal(componentManager.status().phase, 'ready')
+  passed('verified-on-demand-browser-component', { version: component.version, bytes: component.size, sha256: component.sha256 })
+
   stage = 'vendor-open-and-native-window'
   const opened = await post(phase, 'open')
   assert.equal(opened.snapshot.url, `${origin}/visiblewindow`)
   assert.equal(opened.snapshot.title, 'Release plugins visiblewindow')
   const witness = await browserWitness(phase)
-  passed('normal-main-runtime-vendor-self-exe-visible-window', { session: opened.session, ...witness })
+  passed('normal-main-runtime-vendor-component-visible-window', { session: opened.session, ...witness })
   stage = 'public-browser-dom-and-trusted-input'
   const dom = await post(phase, 'dom')
   assert.equal(dom.field.value, 'release-plugins DOM value')

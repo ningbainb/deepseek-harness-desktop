@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -199,7 +199,7 @@ try {
   await secondSettings.memory.getByRole('button', { name: '清空当前结果', exact: true }).click()
   await secondSettings.memory.getByRole('button', { name: '确认删除', exact: true }).click()
   await savedMemorySection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  await savedMemorySection.getByText('这里还没有记忆。点击“新建”添加，或调整筛选条件。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
+  await savedMemorySection.getByText('还没有已保存的记忆。可以新建一条，或确认模型建议。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   const clearPass = { countZero: true, empty: true }
   await closeSettings(secondSettings.settings)
   second.beginClose()
@@ -208,16 +208,20 @@ try {
 
   const memoryFiles = await findFiles(join(dshHome, 'memory'))
   assert.equal(memoryFiles.length, 1, JSON.stringify(memoryFiles))
-  await writeFile(memoryFiles[0], '{"version":1,"items":[', 'utf8')
+  const invalidMemory = '{"version":1,"items":['
+  await writeFile(memoryFiles[0], invalidMemory, 'utf8')
 
   const third = await launch()
   app = third.instance
   const thirdSettings = await openSettings(third.page)
   await openDockSetting(app, third.page, 'memory')
   const thirdSavedSection = thirdSettings.memory.locator('section').first()
-  await thirdSavedSection.getByText('0 条', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  await thirdSavedSection.getByText('这里还没有记忆。点击“新建”添加，或调整筛选条件。', { exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
-  const corruptPass = { startupAvailable: true, memoryDegradedToEmpty: true, cardVisible: true }
+  await thirdSavedSection.getByRole('alert').filter({ hasText: '暂时无法读取记忆。请重新加载。' }).waitFor({ state: 'visible', timeout: 15_000 })
+  assert.equal(await thirdSavedSection.getByText('0 条', { exact: true }).count(), 0)
+  assert.equal(await thirdSavedSection.getByRole('button', { name: '新建', exact: true }).isDisabled(), true)
+  assert.equal(await thirdSavedSection.getByRole('button', { name: '重新加载', exact: true }).isEnabled(), true)
+  assert.equal(await readFile(memoryFiles[0], 'utf8'), invalidMemory)
+  const corruptPass = { startupAvailable: true, memoryErrorVisible: true, corruptDataPreserved: true }
   const expectedCorruptErrors = third.errors.filter(error => /Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/u.test(error))
   const unexpectedThirdErrors = third.errors.filter(error => !/Failed to load resource: the server responded with a status of 503 \(Service Unavailable\)/u.test(error))
   console.log('personalization lifecycle diagnostics', JSON.stringify({

@@ -171,7 +171,25 @@ try {
   const openedExperimentalAt = performance.now()
   await dock.locator('#plugins-home [data-native-destination="experimental-plugins"]').click()
   const officialExperiments = main.locator('[data-plugin-panel] [data-plugin-group="more"]')
-  await officialExperiments.waitFor({ timeout: 45_000 })
+  try {
+    await officialExperiments.waitFor({ timeout: 45_000 })
+  } catch (error) {
+    const pluginPanel = await main.evaluate(() => {
+      const panel = document.querySelector('[data-plugin-panel]')
+      return {
+        mounted: Boolean(panel),
+        tabs: [...(panel?.querySelectorAll('[role="tab"]') ?? [])]
+          .map(tab => ({ id: tab.id, selected: tab.getAttribute('aria-selected') })),
+        groups: [...(panel?.querySelectorAll('[data-plugin-group]') ?? [])].map(group => group.getAttribute('data-plugin-group')),
+        status: [...(panel?.querySelectorAll('[role="status"], [role="alert"]') ?? [])]
+          .map(element => element.textContent.trim().slice(0, 160)),
+      }
+    }).catch(() => ({ unavailable: true }))
+    const dockError = await dock.locator('#toast').evaluate(element =>
+      element.classList.contains('error') ? element.textContent.trim() : null).catch(() => null)
+    await main.screenshot({ path: resolve(screenshots, 'official-experimental-plugins-failure.png') }).catch(() => {})
+    throw new Error(`Experimental plugins did not open: ${JSON.stringify({ pluginPanel, dockError, inventoryTimings })}`, { cause: error })
+  }
   const voiceToggle = officialExperiments.locator('[data-plugin-package="@deepseek-ai/dsh-experimental-voice-input-bundle"]').getByRole('switch')
   await voiceToggle.waitFor({ timeout: 10_000 })
   assert.equal(await voiceToggle.getAttribute('aria-checked'), 'false', 'opening official experimental plugins preserves enablement')

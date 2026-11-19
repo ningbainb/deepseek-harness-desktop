@@ -277,7 +277,7 @@ const CORE_SUITES = [
 
 const PACKAGED_SUITES = [
   ...(process.platform === 'win32' ? [{
-    name: 'Packaged Browser: Normal Main, Trusted Self EXE, Visible DOM and Cookie Isolation',
+    name: 'Packaged Browser: Normal Main, Verified Browser Component, Visible DOM and Cookie Isolation',
     script: 'scripts/verify-packaged-release-browser.mjs',
     args: [],
   }] : []),

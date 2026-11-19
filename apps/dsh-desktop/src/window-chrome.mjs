@@ -78,6 +78,12 @@ html[data-dsh-desktop-window-chrome="true"] body > #root [data-dsh-frame] {
   overflow: clip !important;
 }
 
+/* On narrow Desktop windows, the native drawer already has an interactive
+   mask. The legacy responsive pseudo-element sits above the whole drawer. */
+html[data-dsh-desktop-window-chrome="true"] [data-dsh-frame][data-sidebar-drawer]:has(> [data-sidebar-mask])::after {
+  content: none !important;
+}
+
 /* Native Sidebar fullscreen is viewport-fixed, outside the padded root flow.
    Reserve the same caption area without overriding native tab placement. */
 html[data-dsh-desktop-window-chrome="true"] [data-sidebar-right-panel="push"][data-sidebar-right-open] {

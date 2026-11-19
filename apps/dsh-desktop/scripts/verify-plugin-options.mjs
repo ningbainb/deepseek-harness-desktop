@@ -37,6 +37,14 @@ const launchOptions = { executablePath: executable || electronPath,
   args: executable ? [] : [join(appDir, 'src/main.mjs')], cwd: appDir,
   env: { ...process.env, DSH_DESKTOP_USER_DATA: userData, DSH_HOME: home, DSH_AGENTS_HOME: join(temporary, 'agents'),
     DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_DISABLE_UPDATES: '1', DSH_DESKTOP_VERIFY_UPDATER: '0' } }
+
+async function openInstalledMaintenance(window) {
+  await window.locator('#plugins-hub-tab').click()
+  await window.locator('#plugin-settings-tab').click()
+  await window.locator('[data-open-legacy-dock-tab="plugins-tab"]').click()
+  await window.locator('#refresh').click()
+}
+
 try {
   app = await electron.launch(launchOptions)
   const main = await app.firstWindow()
@@ -51,8 +59,7 @@ try {
   await dock.locator('[role="tab"].active').first().waitFor({ timeout: 60000 })
   stage = 'install-real-plugin'
   await dock.evaluate(source => window.dshDesktop.installPlugin(source, true, true), archive)
-  await dock.locator('#plugins-hub-tab').click()
-  await dock.locator('#refresh').click()
+  await openInstalledMaintenance(dock)
   stage = 'plugin-detail-click'
   await dock.locator('[data-open-plugin="dsh-free-search"]').click({ timeout: 60000 })
   await dock.locator('[data-configure-plugin="dsh-free-search"]').click()
@@ -100,8 +107,7 @@ try {
   }
   assert.ok(dock)
   await dock.locator('[role="tab"].active').first().waitFor({ timeout: 60000 })
-  await dock.locator('#plugins-hub-tab').click()
-  await dock.locator('#refresh').click()
+  await openInstalledMaintenance(dock)
   await dock.locator('[data-open-plugin="dsh-free-search"]').click({ timeout: 60000 })
   await dock.locator('[data-configure-plugin="dsh-free-search"]').click()
   for (let attempt = 0; attempt < 120; attempt += 1) {

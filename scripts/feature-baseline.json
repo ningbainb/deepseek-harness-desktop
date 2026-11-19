@@ -515,6 +515,7 @@
         "desktop-4.4.0-branding-assets-pinned-across-build-formats",
         "community-help-website-and-docs-share-the-qq-group-two-link-and-supplied-qr",
         "positioned-root-caption-inset-stays-stable-across-document-mutations",
+        "native-narrow-sidebar-and-dismiss-mask-stay-clickable",
         "skin-title-and-status-bars-reserve-additive-desktop-space",
         "official-account-oauth-callback-only-loopback-bridge",
         "official-authorization-popup-exact-origin-and-path",
