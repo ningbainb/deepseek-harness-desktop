@@ -293,6 +293,8 @@ async function run() {
       return
     }
     shuttingDown = true
+    const shutdownStarted = performance.now()
+    const markShutdown = phase => process.stdout.write(`[runtime-shutdown] ${phase}=${Math.round(performance.now() - shutdownStarted)}ms\n`)
     forceTimer = setTimeout(() => process.exit(code), 5_000)
     forceTimer.unref()
     try {
@@ -301,12 +303,16 @@ async function run() {
       eventStreams.dispose()
       await accountCallback?.close()
       await pipeServer?.close()
+      markShutdown('transport-closed')
       await ctx?.fiber.dispose()
+      markShutdown('context-disposed')
       if (!migrationCommitted) await legacySettings.rollback()
       await disposeProxy()
+      markShutdown('cleanup-complete')
       clearTimeout(forceTimer)
       process.exitCode = code
     } catch {
+      markShutdown('cleanup-failed')
       process.exit(code)
     }
   }

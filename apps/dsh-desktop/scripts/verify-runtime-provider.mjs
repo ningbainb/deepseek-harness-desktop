@@ -134,9 +134,10 @@ try {
     profileDir: provider.resolveProfilePaths().profileDir,
     shutdownMs,
     startupTimings,
-    shutdownDiagnostics: diagnostics.filter(line => /event streams before Runtime disposal|Runtime graceful shutdown|Runtime stop completed|Runtime stop deadline/.test(line)),
+    shutdownDiagnostics: diagnostics.filter(line => /\[runtime-shutdown\]|event streams before Runtime disposal|Runtime graceful shutdown|Runtime stop completed|Runtime stop deadline/.test(line)),
   }))
 } catch (error) {
+  console.error(`Measured Runtime stops (ms): ${JSON.stringify(shutdownMs)}`)
   console.error(`Runtime provider diagnostics:\n${diagnostics.join('\n') || '(empty)'}`)
   throw error
 } finally {

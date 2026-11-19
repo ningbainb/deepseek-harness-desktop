@@ -5,13 +5,16 @@ on:
     inputs:
       candidate_run:
         description: Failed Desktop Three-Platform Release preflight run ID
-        required: true
         type: string
       previous_release:
         description: Public version to exercise before overlay
         default: '4.3.0'
         type: choice
         options: ['4.3.0', '5.0.0', '5.0.1', '5.1.0', '5.2.0']
+      runtime_provider:
+        description: Run the native Runtime provider and shutdown check from this ref
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -19,6 +22,7 @@ permissions:
 
 jobs:
   setup:
+    if: '!inputs.runtime_provider'
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
@@ -79,3 +83,19 @@ jobs:
           path: |
             .tmp/release-qa/**
             !.tmp/release-qa/packaged-smoke/**/electron.raw.log
+
+  runtime:
+    if: inputs.runtime_provider
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - run: pnpm --filter @linxin666/dsh-desktop test:runtime-provider:e2e
