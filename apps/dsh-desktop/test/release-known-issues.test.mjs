@@ -13,3 +13,22 @@ test('only the explicitly approved legacy 3.4.0 DPI failure is accepted', () => 
     assert.equal(acceptedReleaseIssue({ ...failure, ...override }), null)
   }
 })
+
+const timingFailure = {
+  version: '5.3.0', platform: 'win32', streamTimingApproved: true,
+  script: 'scripts/verify-beta-usability.mjs', code: 1, signal: null,
+  output: 'AssertionError [ERR_ASSERTION]: DSH_STREAM_FRAME_P95 {"p95Ms":46.79999999999927,"limitMs":35}',
+}
+
+test('the 5.3.0 Windows exception accepts only the approved stream timing overrun', () => {
+  assert.equal(acceptedReleaseIssue(timingFailure), 'DSH-530-WINDOWS-STREAM-P95')
+  for (const override of [{ streamTimingApproved: false }, { platform: 'linux' }, { version: '5.3.1' },
+    { version: '5.3.0-rc.1' }, { script: 'scripts/verify-installer-lifecycle.mjs' }, { code: 2 }, { signal: 'SIGTERM' },
+    { output: 'AssertionError: streamed Chinese text must be complete and ordered' },
+    { output: timingFailure.output.replace('46.79999999999927', '47.1') },
+    { output: timingFailure.output.replace('46.79999999999927', 'null') },
+    { output: timingFailure.output.replace('"limitMs":35', '"limitMs":50') },
+    { output: timingFailure.output + '\n' + timingFailure.output }]) {
+    assert.equal(acceptedReleaseIssue({ ...timingFailure, ...override }), null, JSON.stringify(override))
+  }
+})

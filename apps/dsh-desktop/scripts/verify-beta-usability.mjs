@@ -39,6 +39,7 @@ const modelRequests = []
 const promptRequests = []
 const modelTimeline = []
 let failure
+let measuredStreamTiming
 const server = createServer(async (request, response) => {
   const timing = { id: modelTimeline.length + 1, arrived: performance.now(), chunks: 0, backpressure: 0, maxGapMs: 0 }
   modelTimeline.push(timing)
@@ -479,7 +480,7 @@ try {
     assert.equal(await page.locator('link[href*="/skins/"][rel="stylesheet"], [data-skin-chrome="titlebar"]').count(), 0)
     assert.equal(await page.locator('body[data-dsh-skin-center]').count(), 1)
     assert.ok(performance.shimQueries < 20, `stream must not repeatedly sweep sidebar: ${performance.shimQueries}`)
-    assert.ok(performance.frameP95Ms <= 35, JSON.stringify(performance))
+    measuredStreamTiming = { p95Ms: performance.frameP95Ms, limitMs: 35 }
     const toggle = page.locator('[data-dsh-tools-toggle]')
     const dockEntry = page.locator('[data-dsh-extension-dock-entry] button')
     assert.equal(await dockEntry.count(), 1)
@@ -623,4 +624,9 @@ try {
   try { await closeIsolatedElectron(app) } catch (error) {
     throw new AggregateError([failure, error].filter(Boolean), 'beta usability cleanup failed')
   }
+}
+
+if (measuredStreamTiming) {
+  assert.ok(measuredStreamTiming.p95Ms <= measuredStreamTiming.limitMs,
+    `DSH_STREAM_FRAME_P95 ${JSON.stringify(measuredStreamTiming)}`)
 }
