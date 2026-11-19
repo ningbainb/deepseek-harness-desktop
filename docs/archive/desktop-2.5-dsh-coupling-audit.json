@@ -15688,7 +15688,7 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/runtime-shutdown-control.test.mjs",
-      "line": 131,
+      "line": 132,
       "operation": "stop"
     },
     {

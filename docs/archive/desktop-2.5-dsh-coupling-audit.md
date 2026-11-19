@@ -2339,7 +2339,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 711 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-integration.test.mjs | 720 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-shutdown-control.test.mjs | 120 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/runtime-shutdown-control.test.mjs | 131 | stop |
+| runtime-lifecycle | apps/dsh-desktop/test/runtime-shutdown-control.test.mjs | 132 | stop |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 56 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 72 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 94 | start |

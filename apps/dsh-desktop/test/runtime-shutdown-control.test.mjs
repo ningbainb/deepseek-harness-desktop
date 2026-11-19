@@ -100,7 +100,7 @@ test('overlong and arbitrary commands are rejected without invoking cleanup', as
 })
 
 test('Windows controller requests its own child cleanup and retains legacy force fallback', { skip: process.platform !== 'win32' }, async () => {
-  for (const available of [true, false]) {
+  for (const { available, cleanupMs } of [{ available: true, cleanupMs: 0 }, { available: false }, { available: true, cleanupMs: 3200 }]) {
     const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null })
     let environment, stopCalls = 0, fallbackCalls = 0
     const logs = []
@@ -123,8 +123,9 @@ test('Windows controller requests its own child cleanup and retains legacy force
       await ready
       const control = consumeRuntimeShutdownControl(environment)
       assert.ok(control)
-      if (available) dispose = await listenRuntimeShutdownControl(control, () => {
+      if (available) dispose = await listenRuntimeShutdownControl(control, async () => {
         stopCalls += 1
+        if (cleanupMs) await new Promise(resolve => setTimeout(resolve, cleanupMs))
         // A real launcher/wrapper exits after its cleanup acknowledgement.
         setTimeout(exit, 20)
       })
