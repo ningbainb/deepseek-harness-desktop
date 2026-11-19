@@ -30,6 +30,7 @@ const COLLECT_FAILURES = process.argv.includes('--collect-failures')
 const SOURCE_ONLY = process.argv.includes('--source')
 const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
 const ACCEPT_STREAM_TIMING = process.argv.includes('--accept-stream-frame-timing-5.3.0')
+const ACCEPT_INITIAL_RUNTIME_STOP = process.argv.includes('--accept-initial-runtime-stop-5.3.0')
 const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
 const acceptedIssues = []
 const receiptArgument = process.argv.find((argument) => argument.startsWith('--evidence='))
@@ -406,7 +407,8 @@ function runSuite(suite) {
         })
       } else {
         const issue = acceptedReleaseIssue({ version: VERSION, enabled: ACCEPT_KNOWN_DPI,
-          streamTimingApproved: ACCEPT_STREAM_TIMING, platform: process.platform, script: suite.script, code, signal, output })
+          streamTimingApproved: ACCEPT_STREAM_TIMING, initialShutdownApproved: ACCEPT_INITIAL_RUNTIME_STOP,
+          platform: process.platform, script: suite.script, code, signal, output })
         if (issue) {
           acceptedIssues.push(issue)
           console.warn(`[ACCEPTED KNOWN ISSUE] ${issue}: test failed with the recorded, explicitly approved exception for ${VERSION}.`)

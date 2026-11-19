@@ -4,6 +4,8 @@ export const DOCK_SETTING_IDS = Object.freeze([
   'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market', 'prompt-customizer',
 ])
 
+export const DESKTOP_COMMUNITY_INDEX_URL = 'https://raw.githubusercontent.com/ningbainb/deepseek-harness-desktop/main/apps/dsh-desktop/runtime-support/community-plugin-index.json'
+
 const NATIVE_DESTINATIONS = new Set([
   'plugins', 'workshop', 'experimental-plugins', 'models', 'relay', 'value-mode', 'personal-prompt', 'memory', 'describe-image', 'usage', 'sessions',
 ])

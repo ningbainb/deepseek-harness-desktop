@@ -122,10 +122,15 @@ try {
     Array.from({ length: 3 }, () => ['entry', 'environment', 'profile', 'patches', 'boot', 'ready']).flat(),
     'all three real Runtime starts must report fixed stages in order')
   if (process.platform === 'win32') {
-    assert.equal(diagnostics.filter(line => line.includes('Runtime graceful shutdown acknowledged')).length, 3,
-      'all three healthy Runtime stops must complete cleanup rather than use force fallback')
     assert.equal(shutdownMs.every(duration => duration < 5000), true,
       `healthy Runtime cleanup must not wait for the 15-second force deadline: ${JSON.stringify(shutdownMs)}`)
+    const outcomes = diagnostics.filter(line => /Runtime graceful shutdown (?:acknowledged|unavailable)/u.test(line))
+      .map(line => line.includes('acknowledged') ? 'acknowledged' : 'fallback')
+    const boundedFirstFallback = outcomes.length === 3 && outcomes[0] === 'fallback'
+      && outcomes.slice(1).every(outcome => outcome === 'acknowledged') && shutdownMs.length === 3
+    assert.deepEqual(outcomes, ['acknowledged', 'acknowledged', 'acknowledged'], boundedFirstFallback
+      ? `DSH_INITIAL_RUNTIME_STOP ${JSON.stringify({ outcomes, elapsedMs: shutdownMs })}`
+      : 'all three healthy Runtime stops must complete cleanup rather than use force fallback')
   }
   console.log(JSON.stringify({
     firstOrigin: new URL(firstUrl).origin,

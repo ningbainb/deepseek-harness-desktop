@@ -32,3 +32,20 @@ test('the 5.3.0 Windows exception accepts only the approved stream timing overru
     assert.equal(acceptedReleaseIssue({ ...timingFailure, ...override }), null, JSON.stringify(override))
   }
 })
+
+test('the 5.3.0 Windows exception accepts only a bounded fallback on the first idle Runtime stop', () => {
+  const failure = {
+    version: '5.3.0', platform: 'win32', initialShutdownApproved: true,
+    script: 'scripts/verify-runtime-provider.mjs', code: 1, signal: null,
+    output: 'AssertionError [ERR_ASSERTION]: DSH_INITIAL_RUNTIME_STOP {"outcomes":["fallback","acknowledged","acknowledged"],"elapsedMs":[4598,1076,1075]}',
+  }
+  assert.equal(acceptedReleaseIssue(failure), 'DSH-530-WINDOWS-INITIAL-STOP')
+  for (const override of [{ initialShutdownApproved: false }, { version: '5.3.1' }, { platform: 'linux' },
+    { script: 'scripts/verify-update-shutdown.mjs' }, { signal: 'SIGTERM' }, { code: 2 },
+    { output: failure.output.replace('4598', '5001') }, { output: failure.output.replace('1075', 'null') },
+    { output: failure.output.replace('"acknowledged","acknowledged"', '"fallback","acknowledged"') },
+    { output: failure.output.replace('"fallback","acknowledged"', '"acknowledged","fallback"') },
+    { output: failure.output + '\n' + failure.output }]) {
+    assert.equal(acceptedReleaseIssue({ ...failure, ...override }), null, JSON.stringify(override))
+  }
+})

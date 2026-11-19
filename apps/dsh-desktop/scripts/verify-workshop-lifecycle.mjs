@@ -11,6 +11,7 @@ import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { DESKTOP_COMMUNITY_INDEX_URL } from '../src/dock-pages.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
 const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -25,6 +26,7 @@ const profile = join(home, 'profiles', 'desktop')
 const target = '@michengai/dsh-im-connect'
 const version = '1.0.44'
 const exact = `${target}@${version}`
+const customSource = 'https://example.invalid/custom-plugin-index.json'
 const evidence = { platform: process.platform, executable: executable ?? 'source', fixture, target: exact, steps: [], passed: false }
 const timeout = 180_000
 let app
@@ -108,7 +110,8 @@ async function runtimeRequest(method, args, mutate = false) {
 }
 
 try {
-  await Promise.all([mkdir(home), mkdir(userData), mkdir(join(output, '..'), { recursive: true })])
+  await Promise.all([mkdir(profile, { recursive: true }), mkdir(userData), mkdir(join(output, '..'), { recursive: true })])
+  await writeFile(join(profile, 'cordis.patch.yml'), `- id: plugin-market\n  config:\n    indexes: [${customSource}]\n    fetchTimeoutMs: 200\n`)
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await seedPrimaryRuntimePermissionForTest({ userData })
   await startup()
@@ -119,6 +122,10 @@ try {
     await waitUntil(() => Boolean(dock = app.windows().find(window => window.url().includes('/extensions.html'))), 'The Extension Dock did not open')
     await dock.locator('#plugins-home [data-open-dock-tab="market-tab"]').click()
     const trial = main.locator('[data-plugin-panel] li').filter({ hasText: 'IM 助理（飞书试用）' })
+    await trial.waitFor({ timeout })
+    const sources = await runtimeRequest('pluginMarket/listIndexes', {})
+    assert.equal(sources.ok, true)
+    assert.deepEqual(sources.value.map(source => source.url), [customSource, DESKTOP_COMMUNITY_INDEX_URL])
     await trial.getByRole('button', { name: /^安装.*IM 助理/u }).click({ timeout })
     const confirmation = main.getByRole('dialog').filter({ hasText: 'IM 助理（飞书试用）' })
     await confirmation.getByText(version, { exact: true }).waitFor({ timeout })

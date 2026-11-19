@@ -15,6 +15,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import type { DiscoverFace } from '@deepseek-ai/dsh-client-ui-plugin-market/client'
+import type { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: imports the model options page's additive onboarding slot.
 import type {} from '@linxin666/dsh-client-ui-model-preferences/client'
 // Type-only: pulls the sidebar footer action slot contract.
@@ -153,6 +155,15 @@ export function apply(ctx: ClientContext): void {
         const navigation = ctx.get('pluginNavigation') as { openList(): void } | undefined
         if (!navigation) return false
         navigation.openList()
+        return true
+      },
+      selectWorkshop(sourceUrl) {
+        const slots: Pick<SlotCore, 'entriesOfSlot'> = ctx.slots
+        const entry = slots.entriesOfSlot('plugins.tab').find(row => row.options.id === 'discover' && row.locale === 'pluginMarket')
+        const face = entry?.inject?.() as Partial<DiscoverFace> | undefined
+        const state = face?.hooks?.discover?.getSnapshot()
+        if (!face?.select || state?.status !== 'ready') return false
+        if (state.indexes.some(source => source.url === sourceUrl && !source.error)) face.select(sourceUrl)
         return true
       },
       openSettings: openDesktopNativeSettings,

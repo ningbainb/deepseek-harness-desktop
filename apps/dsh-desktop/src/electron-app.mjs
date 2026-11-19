@@ -44,6 +44,7 @@ import { createDesktopInstallPreparation } from './install-preparation.mjs'
 import { ControlCenterStore } from './control-center.mjs'
 import { registerExtensionIpc } from './extension-ipc.mjs'
 import { createCommunityMarketService } from './extensions/community-market.mjs'
+import { DESKTOP_COMMUNITY_INDEX_URL } from './dock-pages.mjs'
 import {
   assertExternalPluginDescriptor,
   ExternalPluginSourceResolver,
@@ -2415,7 +2416,9 @@ export async function startElectronApp(metadata) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.show()
       mainWindow.focus()
-      mainWindow.webContents.send('desktop:native-page-open', destination)
+      mainWindow.webContents.send('desktop:native-page-open', destination === 'workshop'
+        ? { destination, sourceUrl: DESKTOP_COMMUNITY_INDEX_URL }
+        : destination)
       return true
     },
     openPluginSettings: async (name) => {

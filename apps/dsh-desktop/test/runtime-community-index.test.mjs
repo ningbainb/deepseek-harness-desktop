@@ -69,6 +69,23 @@ test('existing index order, user configuration and disabled state survive idempo
   assert.deepEqual(adaptDesktopCommunityIndexPatches(first, { userPatches }), first)
 })
 
+test('a saved custom source is restored beside Workshop when Desktop supplies the market rows', async () => {
+  const { adaptDesktopCommunityIndexPatches, DESKTOP_COMMUNITY_INDEX_URL } = await import(moduleUrl)
+  const custom = 'https://example.invalid/custom-plugin-index.json'
+  const userPatches = [{ id: 'plugin-market', config: { indexes: [custom], fetchTimeoutMs: 200 } }]
+  const options = { enableWorkshop: true, userPatches }
+  const effective = adaptDesktopCommunityIndexPatches(userPatches, options)
+  const row = composeEntries(effective).find(entry => entry.id === 'plugin-market')
+  assert.deepEqual(row.config, { indexes: [custom, DESKTOP_COMMUNITY_INDEX_URL], fetchTimeoutMs: 200 })
+  assert.deepEqual(adaptDesktopCommunityIndexPatches(effective, options), effective)
+  assert.deepEqual(userPatches[0].config.indexes, [custom])
+  for (const indexes of [[], [custom, DESKTOP_COMMUNITY_INDEX_URL]]) {
+    const overrides = [{ id: 'plugin-market', config: { indexes } }]
+    const configured = composeEntries(adaptDesktopCommunityIndexPatches(overrides, { enableWorkshop: true, userPatches: overrides }))
+    assert.deepEqual(configured.find(entry => entry.id === 'plugin-market').config.indexes, indexes)
+  }
+})
+
 test('Desktop enables the official Discover source once and uses the bundled Workshop without network', async () => {
   const { adaptDesktopCommunityIndexPatches, DESKTOP_COMMUNITY_INDEX_URL, installDesktopWorkshopIndexFetch } = await import(moduleUrl)
   const options = { enableWorkshop: true }

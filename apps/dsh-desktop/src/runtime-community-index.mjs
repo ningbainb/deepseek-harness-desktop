@@ -1,7 +1,8 @@
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { readFile } from 'node:fs/promises'
+import { DESKTOP_COMMUNITY_INDEX_URL } from './dock-pages.mjs'
 
-export const DESKTOP_COMMUNITY_INDEX_URL = 'https://raw.githubusercontent.com/ningbainb/deepseek-harness-desktop/main/apps/dsh-desktop/runtime-support/community-plugin-index.json'
+export { DESKTOP_COMMUNITY_INDEX_URL }
 const officialMarket = '@deepseek-ai/dsh-plugin-market'
 const officialMarketUi = '@deepseek-ai/dsh-client-ui-plugin-market'
 const bundledIndex = new URL('../runtime-support/community-plugin-index.json', import.meta.url)
@@ -18,13 +19,16 @@ function* rows(entries) {
 export function adaptDesktopCommunityIndexPatches(patches, { layers, userPatches = layers?.slice(1).flat() ?? [], profileName = 'desktop', enableWorkshop = false } = {}) {
   if (profileName !== 'desktop') return patches
   const additions = []
-  const composed = [...rows(composeEntries(patches))]
+  let effective = patches
+  let composed = [...rows(composeEntries(effective))]
   if (enableWorkshop && !composed.some(row => row?.id === 'plugin-market' || row?.name === officialMarket)) {
-    additions.push({ insert: [
+    // Insert defaults before the Profile or Home patches that refer to these IDs.
+    effective = [{ insert: [
       { id: 'plugin-market', name: officialMarket, config: { indexes: [DESKTOP_COMMUNITY_INDEX_URL] } },
       ...(composed.some(row => row?.id === 'ui-plugin-market' || row?.name === officialMarketUi) ? []
         : [{ id: 'ui-plugin-market', name: officialMarketUi }]),
-    ] })
+    ] }, ...patches]
+    composed = [...rows(composeEntries(effective))]
   }
   for (const row of composed) {
     if (row?.name !== officialMarket || typeof row.id !== 'string') continue
@@ -36,10 +40,10 @@ export function adaptDesktopCommunityIndexPatches(patches, { layers, userPatches
       (patch?.id === row.id || patch?.name === officialMarket)
       && Object.hasOwn(patch.config ?? {}, 'indexes'),
     )
-    if (explicitlyConfigured) continue
+    if (explicitlyConfigured && (!indexes.length || row.disabled === true)) continue
     additions.push({ id: row.id, name: officialMarket, config: { ...row.config, indexes: [...indexes, DESKTOP_COMMUNITY_INDEX_URL] } })
   }
-  return additions.length ? [...patches, ...additions] : patches
+  return additions.length ? [...effective, ...additions] : effective
 }
 
 // The official reader still validates, searches and paginates this index. The

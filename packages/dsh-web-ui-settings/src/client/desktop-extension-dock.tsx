@@ -26,7 +26,7 @@ export type DesktopExtensionDockEntryProps = {
 type ManagementTab = 'plugins' | 'skills'
 
 type PluginSettingsRequest = Readonly<{ name?: unknown }>
-type NativePageRequest = string | Readonly<{ destination: string; notice?: { name: string; applied: boolean } }>
+type NativePageRequest = string | Readonly<{ destination: string; sourceUrl?: string; notice?: { name: string; applied: boolean } }>
 type PluginSettingsBridge = Readonly<{
   onPluginSettingsOpen?: (listener: (request: PluginSettingsRequest) => void) => () => void
   onNativePageOpen?: (listener: (request: NativePageRequest) => void) => () => void
@@ -82,7 +82,7 @@ export async function openRuntimePluginSettings(
 export function installDesktopManagementRouting(
   ownerDocument: Document,
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string,
-  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean },
+  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean; selectWorkshop?(sourceUrl: string): boolean },
 ): () => void {
   let disposed = false
   let observer: MutationObserver | undefined
@@ -199,6 +199,7 @@ export function installDesktopManagementRouting(
       if (!navigation || disposed) return
       const destination = typeof payload === 'string' ? payload : payload.destination
       const outcome = typeof payload === 'string' ? undefined : payload.notice
+      const sourceUrl = typeof payload === 'string' ? undefined : payload.sourceUrl
       const request = ++pageRequest
       if (destination !== 'plugins' && destination !== 'workshop' && destination !== 'experimental-plugins') {
         navigation.openSettings(destination)
@@ -238,6 +239,11 @@ export function installDesktopManagementRouting(
         }
         const tab = ownerDocument.querySelector<HTMLButtonElement>('[data-plugin-panel] [role="tab"][id$="-discover"]')
         if (tab?.getAttribute('aria-selected') === 'false') tab.click()
+        if (sourceUrl && navigation.selectWorkshop) {
+          if (tab?.getAttribute('aria-selected') === 'true' && navigation.selectWorkshop(sourceUrl)) return
+          if (Date.now() - startsAt < 45_000) globalThis.setTimeout(openDestination, 125)
+          return
+        }
         const source = ownerDocument.querySelector<HTMLButtonElement>('[data-discover-toolbar] button[aria-haspopup="menu"]')
         if (source) {
           const isWorkshop = (value: string | null) => /创意工坊|Creative Workshop|ningbainb\/deepseek-harness-desktop/iu.test(value ?? '')

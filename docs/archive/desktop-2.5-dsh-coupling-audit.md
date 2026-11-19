@@ -4,7 +4,7 @@ Authoritative Desktop version: 5.3.0.
 
 Stable DSH package version: 0.2.2-rc.5.
 
-Lockfile SHA-256: `838a8b6d4c3e3cf9cf866225632610a8b6e8f1dda51f904427e232f854af6e50`.
+Lockfile SHA-256: `afaab805bfff8055ea34407cf07f7131df5ec9935ac07fde432dac001787ed96`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -12,8 +12,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 357 |
-| public-experimental | 191 |
+| public-stable | 358 |
+| public-experimental | 192 |
 | compatibility-patch | 50 |
 | private-high-risk | 0 |
 
@@ -567,6 +567,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/index.ts | 15 | static-import | @deepseek-ai/dsh-client-ui-settings-models/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 16 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 17 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/index.ts | 18 | static-import | @deepseek-ai/dsh-client-ui-plugin-market/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/index.ts | 19 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/relay-auth-failures.ts | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 2 | static-import | @deepseek-ai/dsh-api-session-controller/types | yes | public-stable | no |
@@ -669,7 +671,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-tool-describe-image/src/index.ts | 28 | tools |
 | host-service | packages/dsh-value-mode/src/client/index.ts | 60 | remote.session |
 | host-service | packages/dsh-value-mode/src/index.ts | 47 | llm |
-| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 100 | remote |
+| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 102 | remote |
 | host-service | packages/skins/skin-center/src/client/index.ts | 66 | remote |
 | profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 15 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-all-surfaces.mjs | 157 | DSH_HOME |
@@ -803,8 +805,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 17 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 18 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 42 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 134 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 134 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 139 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-runtime-provider.mjs | 139 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 212 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 215 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 221 | resolveDshCliPath |
@@ -831,7 +833,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 80 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 143 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 67 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-workshop-lifecycle.mjs | 77 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-workshop-lifecycle.mjs | 79 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 35 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 72 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 165 | profileDir |
@@ -849,34 +851,34 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/desktop-data-location.mjs | 58 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/desktop-data-location.mjs | 58 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/desktop-data-location.mjs | 61 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 111 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 113 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 115 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 218 | runtimeHome |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 219 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 712 | runtimeHome |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 734 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1286 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1315 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1348 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1350 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1353 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1396 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1447 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1535 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1570 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 112 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 114 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 116 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 219 | runtimeHome |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 220 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 713 | runtimeHome |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 735 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1287 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1316 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1349 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1351 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1354 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1397 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1448 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1536 | profileDir |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 1571 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1577 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1625 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1630 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1844 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1852 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1855 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2535 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2589 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2621 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2685 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2691 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1572 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1578 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1626 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1631 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1845 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1853 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1856 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2538 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2592 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2624 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2688 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2694 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 86 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 87 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 88 | profileDir |
@@ -2236,14 +2238,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 77 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 233 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 292 | restart |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1261 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1846 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2196 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2519 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2521 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2536 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3038 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3044 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1262 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1847 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2197 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2522 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2524 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2539 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3041 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3047 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 420 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 439 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1127 | stop |
@@ -2444,14 +2446,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 218 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 223 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 11 | conversation.input.right |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 169 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 174 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 182 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 192 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 202 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 217 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 223 | sidebar.footer.action |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 238 | root |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 180 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 185 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 193 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 203 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 213 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 228 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 234 | sidebar.footer.action |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 249 | root |
 | slot | packages/skins/skin-center/src/client/index.ts | 104 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 112 | settings.section |
 | workspace | apps/dsh-desktop/src/conversation-import/session-bridge.mjs | 207 | list |
