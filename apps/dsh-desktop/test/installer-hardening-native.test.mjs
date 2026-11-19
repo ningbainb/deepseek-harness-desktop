@@ -22,6 +22,15 @@ const desktop = resolve(import.meta.dirname, '..')
 const present = path => access(path).then(() => true, () => false)
 const require = createRequire(import.meta.url)
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'))
+let compiler, plugins, sevenZip
+
+test.before(async () => {
+  if (process.platform !== 'win32') return
+  // Tool downloads are setup. Keep the original budgets for the compiled installer and rollback exercise.
+  compiler = await resolveNsisCompiler()
+  plugins = await builderRequire('app-builder-lib/out/toolsets/windows.js').getNsisPluginsPath()
+  sevenZip = await builderRequire('app-builder-lib/out/toolsets/7zip.js').getPath7za()
+}, { timeout: 120_000 })
 
 test('stock CopyFiles failure followed by its real Cancel button immediately restores old install and registry', { ...windowsOnly, timeout: 60_000 }, async t => {
   const started = Date.now(), timeline = []
@@ -84,10 +93,7 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   const adapter = JSON.parse(await readFile(staged.builderArguments[0].slice(staged.builderArguments[0].indexOf('=') + 1), 'utf8'))
   const resources = await prepareBrowserPreflightFixtureResources(f.root, { controlledService: true })
   await registerBrowserPreflightFixture(resources, { key, install, directory: f.root })
-  const compiler = await resolveNsisCompiler()
   const templates = resolve(dirname(builderRequire.resolve('app-builder-lib/out/targets/nsis/NsisTarget.js')), '../../../templates/nsis')
-  const plugins = await builderRequire('app-builder-lib/out/toolsets/windows.js').getNsisPluginsPath()
-  const sevenZip = await builderRequire('app-builder-lib/out/toolsets/7zip.js').getPath7za()
   const archive = join(f.root, 'payload.7z'), fixtureExe = join(f.root, 'copy-cancel-fixture.exe')
   const payload = join(f.root, 'payload'); await mkdir(payload); await writeFile(join(payload, 'collision.txt'), 'new-file')
   await exec(sevenZip, ['a', '-t7z', archive, '.'], { cwd: payload, windowsHide: true })
@@ -153,7 +159,6 @@ for (const [owned, modeReset] of [[true, false], [false, false], [true, true]]) 
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\CurrentUninstall`, '/v', 'UninstallString', '/t', 'REG_SZ',
     '/d', `"${join(install, 'Uninstall DeepSeek Harness Desktop.exe')}" /currentuser`, '/f', '/reg:64'], { windowsHide: true })
   const resources = await prepareBrowserPreflightFixtureResources(root)
-  const compiler = await resolveNsisCompiler()
   await exec(compiler.path, ['/V2', `/DBUILD_RESOURCES_DIR=${resources}`, `/DTEST_OUTPUT=${exe}`,
     `/DTEST_FRESH_INSTALL=${fresh}`, `/DTEST_REGISTRY=${key}`, ...(modeReset ? ['/DTEST_MODE_RESET'] : []), join(desktop, 'test/fixtures/installer-identity-migration.nsi')],
   { env: compiler.env, windowsHide: true, timeout: 15_000 })

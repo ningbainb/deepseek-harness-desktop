@@ -48,6 +48,12 @@ if (!SOURCE_ONLY && !process.env.DSH_DESKTOP_E2E_EXECUTABLE && existsSync(defaul
 
 
 const CORE_SUITES = [
+  {
+    // Measure the healthy cold shutdown before Electron GUI fixtures consume shared Runner resources.
+    name: 'Runtime Provider & IPC Services',
+    script: 'scripts/verify-runtime-provider.mjs',
+    args: [],
+  },
   ...(SOURCE_ONLY && process.platform === 'win32' ? [{
     name: 'Release Plugins: Native Settings, Prompt Session Isolation and Visible Browser',
     script: 'scripts/verify-release-plugins.mjs',
@@ -171,11 +177,6 @@ const CORE_SUITES = [
     name: 'Directory Picker & Workspace Import',
     script: 'scripts/verify-directory-picker.mjs',
     args: ['--native-layout'],
-  },
-  {
-    name: 'Runtime Provider & IPC Services',
-    script: 'scripts/verify-runtime-provider.mjs',
-    args: [],
   },
   {
     name: 'Real SDK Settings, Third-party Models, Profile Reload and Restart',
