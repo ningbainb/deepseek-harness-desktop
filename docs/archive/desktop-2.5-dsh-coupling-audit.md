@@ -1186,8 +1186,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 21 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 65 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 67 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 25 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 74 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 26 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 75 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/browser-preflight-installer.test.mjs | 22 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 14 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 14 | resolveDshCliPath |

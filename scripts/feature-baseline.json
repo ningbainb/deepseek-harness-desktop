@@ -1381,11 +1381,12 @@
         "sha256-platform-architecture-version-and-file-integrity",
         "cancel-retry-and-coalesced-preparation",
         "preflight-before-upgrade-shutdown",
+        "previous-public-desktop-electron-carrier-supported-before-browser-component-verification",
         "complete-core-nsis-archive-without-nested-electron",
         "electron-original-fs-preserves-component-asar-as-ordinary-files"
       ],
       "e2eScript": "scripts/verify-packaged-browser-component.mjs",
-      "unitTests": ["test/runtime-nsis-archive.test.mjs"]
+      "unitTests": ["test/runtime-nsis-archive.test.mjs", "test/browser-component-preflight-carrier.test.mjs"]
     }
   ],
   "skinCatalog": [

@@ -8770,13 +8770,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs",
-      "line": 25,
+      "line": 26,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs",
-      "line": 74,
+      "line": 75,
       "operation": "DSH_HOME"
     },
     {

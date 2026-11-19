@@ -1,5 +1,8 @@
 import { prepareInstalledBrowserUpgrade } from './browser-upgrade-preflight.mjs'
 
+// Setup executes this helper in the previous Desktop before replacing its files.
+// The browser component itself is verified separately against its pinned manifest.
+const desktopCarrierVersions = new Set(['43.4.0', '44.0.0', '44.7.0'])
 const allowed = new Set(['--probe', '--home', '--archive', '--parent-pid'])
 const options = {}
 for (const value of process.argv.slice(2)) {
@@ -9,7 +12,9 @@ for (const value of process.argv.slice(2)) {
   options[key] = index < 0 ? true : value.slice(index + 1)
 }
 try {
-  if (process.env.ELECTRON_RUN_AS_NODE !== '1' || process.versions.electron !== '44.7.0') throw Error('Browser preflight requires the verified desktop Electron 44.7.0 Node carrier')
+  if (process.env.ELECTRON_RUN_AS_NODE !== '1' || !desktopCarrierVersions.has(process.versions.electron)) {
+    throw Error('Browser preflight requires a supported Desktop Electron Node carrier')
+  }
   if (options['--probe']) console.log(JSON.stringify({ probe: true, electron: process.versions.electron, node: process.versions.node, runAsNode: true }))
   else {
     const controller = new AbortController()

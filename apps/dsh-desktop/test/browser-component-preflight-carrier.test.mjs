@@ -14,6 +14,7 @@ const exec = promisify(execFile)
 const sha = value => createHash('sha256').update(value).digest('hex')
 const desktop = resolve(import.meta.dirname, '..')
 const carrier = process.env.DSH_RELEASED_BROWSER_CARRIER || join(desktop, 'node_modules/electron/dist/electron.exe')
+const expectedCarrierVersion = process.env.DSH_RELEASED_BROWSER_ELECTRON_VERSION || '44.7.0'
 test('the released Electron carrier runs the standalone helper without desktop startup or daily Home access', { skip: process.platform !== 'win32', timeout: 60000 }, async t => {
  const root = await mkdtemp(join(tmpdir(), 'dsh-standalone-preflight-'))
  t.after(() => rm(root, { recursive: true, force: true }))
@@ -29,7 +30,7 @@ test('the released Electron carrier runs the standalone helper without desktop s
  const originalCarrierHash = await carrierHash()
  const run = (args, nodeFlags = []) => exec(carrier, [...nodeFlags, built.entryPath, ...args], { windowsHide: true, timeout: 30000, env: environment, cwd: root })
  const probe = JSON.parse((await run(['--probe'])).stdout.trim())
- assert.equal(probe.electron, '44.7.0'); assert.equal(probe.runAsNode, true)
+ assert.equal(probe.electron, expectedCarrierVersion); assert.equal(probe.runAsNode, true)
  assert.ok(probe.node)
  const archive = zipSync({ 'electron.exe': strToU8('isolated-browser-executable'), version: strToU8('44.7.0') })
  const archivePath = join(root, 'fixture.zip'); await writeFile(archivePath, archive)
