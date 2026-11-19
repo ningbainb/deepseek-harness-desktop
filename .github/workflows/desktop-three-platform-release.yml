@@ -59,7 +59,7 @@ jobs:
         run: node apps/dsh-desktop/scripts/verify-installer-lifecycle.mjs
       - run: pnpm verify
       - run: pnpm feature-baseline:check
-      - run: pnpm desktop:regression:e2e --source --collect-failures --accept-stream-frame-timing-5.3.1 --accept-initial-runtime-stop-5.3.1
+      - run: pnpm desktop:regression:e2e --source --collect-failures --accept-stream-frame-timing-5.3.2 --accept-initial-runtime-stop-5.3.2
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -122,7 +122,7 @@ jobs:
           pnpm --filter @linxin666/dsh-desktop test:profile-reset:e2e
           pnpm --filter @linxin666/dsh-desktop test:update-shutdown:e2e
           $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
-          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures --accept-stream-frame-timing-5.3.1 --accept-initial-runtime-stop-5.3.1
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures --accept-stream-frame-timing-5.3.2 --accept-initial-runtime-stop-5.3.2
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/win-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke
