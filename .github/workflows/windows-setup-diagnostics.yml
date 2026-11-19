@@ -1,0 +1,71 @@
+name: Windows Setup diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Failed Desktop Three-Platform Release preflight run ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  setup:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Inspect the exact failed production Setup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          if ($env:CANDIDATE_RUN -cnotmatch '^[0-9]+$') { throw 'Expected a numeric Actions run ID.' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN" | ConvertFrom-Json
+          if ($run.head_repository.full_name -cne $env:GITHUB_REPOSITORY -or
+              $run.path -cne '.github/workflows/desktop-three-platform-release.yml' -or
+              $run.head_branch -cne 'main' -or $run.event -cne 'workflow_dispatch' -or $run.conclusion -cne 'failure') {
+            throw 'The Setup must come from a failed three-platform preflight on this repository main branch.'
+          }
+          $version = (Get-Content -LiteralPath apps/dsh-desktop/package.json -Raw | ConvertFrom-Json).version
+          $asset = "DeepSeek-Harness-Desktop-Setup-$version-x64.exe"
+          $candidate = Join-Path $env:RUNNER_TEMP 'dsh-candidate-setup'
+          gh run download $env:CANDIDATE_RUN --repo $env:GITHUB_REPOSITORY --name "desktop-debug-$version-windows-x64" --dir $candidate
+          $package = Join-Path $candidate 'apps/dsh-desktop/dist'
+          $download = Join-Path $package $asset
+          $hash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksum = "$hash  $asset"
+          if (@(Get-Content -LiteralPath (Join-Path $package 'SHA256SUMS.txt') | Where-Object { $_ -ceq $checksum }).Count -ne 1) {
+            throw 'The diagnostic installer does not match the candidate checksum.'
+          }
+          Write-Output "Testing original Setup from $($run.head_sha), SHA-256 $hash"
+          New-Item -ItemType Directory -Path 'apps/dsh-desktop/dist' -Force | Out-Null
+          Copy-Item -LiteralPath $download -Destination (Join-Path 'apps/dsh-desktop/dist' $asset)
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '4.3.0'
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-4.3.0'
+          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-4.3.0.json'
+          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+          gh release download desktop-v4.3.0 --repo $env:GITHUB_REPOSITORY --pattern 'DeepSeek-Harness-Desktop-Setup-4.3.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+          $env:GH_TOKEN = $null
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-setup-diagnostics
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: .tmp/release-qa/

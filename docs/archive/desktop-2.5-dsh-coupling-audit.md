@@ -787,6 +787,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-profile-migration.mjs | 202 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-profile-migration.mjs | 245 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-proxy-routing.mjs | 91 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-release-installer.mjs | 292 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 12 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 160 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 314 | DSH_HOME |

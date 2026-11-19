@@ -6375,6 +6375,12 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-release-installer.mjs",
+      "line": 292,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-plugins.mjs",
       "line": 12,
       "operation": "ensureDesktopProfile"

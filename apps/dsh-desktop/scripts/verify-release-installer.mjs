@@ -276,27 +276,44 @@ async function main() {
   const previousDigest = installerChecksum(await readFile(previousInstaller), await readFile(join(previousDirectory, 'SHA256SUMS.txt'), 'utf8'), previousName)
   const currentInstaller = join(appDirectory, 'dist', `DeepSeek-Harness-Desktop-Setup-${version}-x64.exe`)
   const root = await mkdtemp(join(resolve(process.env.RUNNER_TEMP), 'dsh-real-setup-'))
-  const evidence = { version, previousVersion, previousDigest, root, results: [] }
+  const evidence = { version, previousVersion, previousDigest, root, installations: [], results: [] }
   const execute = promisify(execFile)
   const installDirectory = join(root, '安装目录')
   const executable = join(installDirectory, 'DeepSeek Harness Desktop.exe')
   const uninstall = join(installDirectory, 'Uninstall DeepSeek Harness Desktop.exe')
   const contained = relative(resolve(process.env.RUNNER_TEMP), installDirectory)
   assert.ok(contained && contained !== '..' && !contained.startsWith(`..${sep}`) && !isAbsolute(contained))
-  const install = async (installer, expectedVersion) => {
-    await execute(installer, ['/S', `/D=${installDirectory}`], { windowsHide: true, timeout: 600_000 })
-    const archive = join(installDirectory, 'resources', 'app.asar')
-    asar.uncache(archive)
-    const manifest = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'))
-    assert.equal(manifest.version, expectedVersion, 'the production Setup installed the expected application')
-    await access(executable)
-    await access(uninstall)
-  }
   try {
     for (const scenario of ['fresh', 'previous-release-upgrade']) {
       const userData = join(root, scenario, 'user-data')
       const dshHome = join(root, scenario, 'dsh-home')
-      await mkdir(userData, { recursive: true })
+      const temporary = join(root, scenario, 'setup-temp')
+      await Promise.all([mkdir(userData, { recursive: true }), mkdir(temporary, { recursive: true })])
+      const setupEnvironment = { ...process.env, TEMP: temporary, TMP: temporary, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData }
+      const install = async (installer, expectedVersion) => {
+        const existingLogs = new Set(await readdir(temporary))
+        const attempt = { scenario, version: expectedVersion, elapsedMs: 0, status: 'failed' }
+        evidence.installations.push(attempt)
+        const started = performance.now()
+        try {
+          await execute(installer, ['/S', `/D=${installDirectory}`], { env: setupEnvironment, windowsHide: true, timeout: 600_000 })
+          const archive = join(installDirectory, 'resources', 'app.asar')
+          asar.uncache(archive)
+          const manifest = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'))
+          assert.equal(manifest.version, expectedVersion, 'the production Setup installed the expected application')
+          await access(executable)
+          await access(uninstall)
+          attempt.status = 'passed'
+        } catch (error) {
+          attempt.failure = { code: error.code, message: error.message }
+          throw error
+        } finally {
+          attempt.elapsedMs = Math.round(performance.now() - started)
+          const logs = (await readdir(temporary)).filter(name => /^dsh-desktop-install-.*\.log$/u.test(name) && !existingLogs.has(name))
+          attempt.installerLogs = await Promise.all(logs.map(async name => ({ name, text: await readFile(join(temporary, name), 'utf16le') })))
+          if (attempt.status === 'failed') console.error('Production Setup failed', JSON.stringify(attempt))
+        }
+      }
       const sentinel = join(userData, 'installation-data-sentinel.json')
       const original = Buffer.from(JSON.stringify({ scenario, marker: 'preserve-installed-user-data' }))
       await writeFile(sentinel, original, { flag: 'wx' })
@@ -346,7 +363,7 @@ async function main() {
         evidence.results.push({ scenario, firstStartMs: first.elapsedMs, secondStartMs: second.elapsedMs, profilePreserved: true,
           ...(upgrade ? { upgradePreservation: upgrade.preservation, oldRuntimeState, newRuntimeState, restartRuntimeState,
             modelRequests: modelFixture.requestEvidence(), paidRequests: 0 } : {}) })
-        await execute(uninstall, ['/S'], { windowsHide: true, timeout: 180_000 })
+        await execute(uninstall, ['/S'], { env: setupEnvironment, windowsHide: true, timeout: 180_000 })
         const uninstallDeadline = Date.now() + 90_000
         let removed = false
         while (Date.now() < uninstallDeadline) {
