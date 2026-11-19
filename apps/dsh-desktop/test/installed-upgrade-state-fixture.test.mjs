@@ -106,7 +106,10 @@ test('a blank old session is opened by its native workspace action without requi
       } }
     },
   }
-  const selected = { filter({ hasText }) { assert.ok(hasText.test('新会话')); return this }, async waitFor() { selectedWaits++ } }
+  const selected = { filter({ hasText }) {
+    for (const label of ['新会话', 'New session', 'New Session']) assert.ok(hasText.test(label), label)
+    return this
+  }, async waitFor() { selectedWaits++ } }
   const page = { getByRole(role, options) { assert.equal(role, 'treeitem'); return options?.selected ? selected : group },
     on(event, listener) {
       assert.equal(event, 'response')
@@ -126,7 +129,7 @@ test('native reuse of the one old blank does not wait for a nonexistent create r
   const seats = [{ sessionId: 'old-reusable', cwd: '/isolated/project', blank: true }]
   const events = []
   let opened = false
-  const selected = { filter({ hasText }) { assert.ok(hasText.test('新会话')); return this },
+  const selected = { filter({ hasText }) { assert.ok(hasText.test('New Session')); return this },
     async waitFor() { assert.equal(opened, true); events.push('selected-native-blank') } }
   const group = { filter() { return this }, first() { return this }, async waitFor() {},
     async getAttribute() { return 'true' }, async hover() {},

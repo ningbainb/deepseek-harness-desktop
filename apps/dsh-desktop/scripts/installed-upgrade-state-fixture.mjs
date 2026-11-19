@@ -65,7 +65,7 @@ export async function createOpenedInstalledSession(page, workspace, workspaceId,
   assert.ok(reusable.length <= 1, 'the isolated fresh fixture workspace must not have ambiguous blank drafts')
   if (reusable.length === 1) {
     await group.getByRole('button', { name: /中新建会话|^New session in /u }).click()
-    await page.getByRole('treeitem', { selected: true }).filter({ hasText: /新会话|New session/u })
+    await page.getByRole('treeitem', { selected: true }).filter({ hasText: /新会话|New session/iu })
       .waitFor({ state: 'visible', timeout: 60_000 })
     const after = await readSessions()
     const original = new Set(before.map(identity))
@@ -102,7 +102,7 @@ export async function createOpenedInstalledSession(page, workspace, workspaceId,
   page.on('response', observeCreate)
   try {
     await group.getByRole('button', { name: /中新建会话|^New session in /u }).click()
-    await page.getByRole('treeitem', { selected: true }).filter({ hasText: /新会话|New session/u })
+    await page.getByRole('treeitem', { selected: true }).filter({ hasText: /新会话|New session/iu })
       .waitFor({ state: 'visible', timeout: Math.max(1, deadline - Date.now()) })
     while (Date.now() < deadline) {
       await Promise.all(pending)

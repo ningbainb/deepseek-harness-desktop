@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       candidate_run:
-        description: Failed Desktop Three-Platform Release preflight run ID
+        description: Failed Desktop Three-Platform Release run ID
         type: string
       previous_release:
         description: Public version to exercise before overlay
@@ -47,12 +47,14 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           if ($env:CANDIDATE_RUN -cnotmatch '^[0-9]+$') { throw 'Expected a numeric Actions run ID.' }
           $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN" | ConvertFrom-Json
+          $version = (Get-Content -LiteralPath apps/dsh-desktop/package.json -Raw | ConvertFrom-Json).version
+          $verifiedRef = ($run.event -ceq 'workflow_dispatch' -and $run.head_branch -ceq 'main') -or
+              ($run.event -ceq 'push' -and $run.head_branch -ceq "desktop-v$version")
           if ($run.head_repository.full_name -cne $env:GITHUB_REPOSITORY -or
               $run.path -cne '.github/workflows/desktop-three-platform-release.yml' -or
-              $run.head_branch -cne 'main' -or $run.event -cne 'workflow_dispatch' -or $run.conclusion -cne 'failure') {
-            throw 'The Setup must come from a failed three-platform preflight on this repository main branch.'
+              -not $verifiedRef -or $run.conclusion -cne 'failure') {
+            throw 'The Setup must come from a failed three-platform release run on main or its exact version tag.'
           }
-          $version = (Get-Content -LiteralPath apps/dsh-desktop/package.json -Raw | ConvertFrom-Json).version
           $asset = "DeepSeek-Harness-Desktop-Setup-$version-x64.exe"
           $candidate = Join-Path $env:RUNNER_TEMP 'dsh-candidate-setup'
           gh run download $env:CANDIDATE_RUN --repo $env:GITHUB_REPOSITORY --name "desktop-debug-$version-windows-x64" --dir $candidate
