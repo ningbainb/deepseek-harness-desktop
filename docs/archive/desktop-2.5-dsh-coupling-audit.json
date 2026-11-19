@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.3",
+  "desktopVersion": "5.3.4",
   "upstreamVersion": "0.2.2-rc.5",
   "lockfileSha256": "afaab805bfff8055ea34407cf07f7131df5ec9935ac07fde432dac001787ed96",
   "policy": {
@@ -16018,13 +16018,13 @@
     {
       "category": "session",
       "path": "packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts",
-      "line": 49,
+      "line": 55,
       "operation": "get"
     },
     {
       "category": "session",
       "path": "packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts",
-      "line": 58,
+      "line": 67,
       "operation": "get"
     },
     {

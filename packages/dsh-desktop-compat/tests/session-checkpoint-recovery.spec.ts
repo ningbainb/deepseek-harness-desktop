@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { installSessionCheckpointRecovery, refreshBlankSessionCheckpoints } from '../src/session-checkpoint-recovery.ts'
+import { installSessionCheckpointRecovery, refreshBlankSessionCheckpoints, type SessionCheckpointRecoveryServices } from '../src/session-checkpoint-recovery.ts'
 
 function fixture(count = 1) {
   const histories = Array.from({ length: count }, (_unused, index) => {
@@ -29,6 +29,7 @@ function fixture(count = 1) {
     },
     cache: {
       cachedSnapshot: vi.fn(header => checkpoints.get(header.id)),
+      cachedPredecessorTitle: vi.fn<NonNullable<SessionCheckpointRecoveryServices['cache']['cachedPredecessorTitle']>>(() => undefined),
       coldSnapshot: vi.fn((header, _inherited, events) => {
         const snapshot = { asOfSeq: events.at(-1)?.seq ?? -1, values: { sessionListMetadata: { blank: false, lastPromptAt: 1 } } }
         checkpoints.set(header.id, snapshot)
@@ -103,6 +104,29 @@ describe('cold blank session checkpoint recovery', () => {
     checkpoints.get(histories[1].session.id)!.values.sessionListMetadata.blank = false
     expect(await refreshBlankSessionCheckpoints(services, new AbortController().signal)).toEqual({ scanned: 2, refreshed: 0, failed: 0 })
     expect(services.persistence.open).not.toHaveBeenCalled()
+  })
+
+  it('refreshes a predecessor title from the durable log once', async () => {
+    const { services, checkpoints, histories, handles } = fixture()
+    const { session, events } = histories[0]
+    checkpoints.delete(session.id)
+    services.cache.cachedPredecessorTitle.mockReturnValue({
+      asOfSeq: events[0].seq,
+      values: { title: 'Automatic title' },
+    })
+    const durable = {
+      asOfSeq: events.at(-1)!.seq,
+      values: { sessionListMetadata: { blank: false, lastPromptAt: 1 }, title: 'Renamed before upgrade' },
+    }
+    services.cache.coldSnapshot.mockImplementationOnce(() => {
+      checkpoints.set(session.id, durable)
+      return durable
+    })
+    const signal = new AbortController().signal
+    expect(await refreshBlankSessionCheckpoints(services, signal)).toEqual({ scanned: 1, refreshed: 1, failed: 0 })
+    expect(checkpoints.get(session.id)).toBe(durable)
+    expect(await refreshBlankSessionCheckpoints(services, signal)).toEqual({ scanned: 1, refreshed: 0, failed: 0 })
+    expect(handles[0].read).toHaveBeenCalledTimes(1)
   })
 
   it('does not rewrite a blank checkpoint that already covers the durable cut', async () => {

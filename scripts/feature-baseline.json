@@ -821,6 +821,7 @@
         "released-v0-subagent-descriptor-v2-recovery",
         "official-jsonl-historical-open-and-resume-recovery",
         "cold-blank-checkpoint-refresh-through-official-read-only-log-handles",
+        "cold-predecessor-title-refresh-from-authoritative-log-without-rewriting-history",
         "cold-checkpoint-refresh-waits-for-official-session-metadata-registration",
         "checkpoint-recovery-bounded-concurrency-and-cancellation",
         "checkpoint-recovery-preserves-live-sessions-and-original-log-bytes",

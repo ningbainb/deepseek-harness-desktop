@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.3.
+Authoritative Desktop version: 5.3.4.
 
 Stable DSH package version: 0.2.2-rc.5.
 
@@ -2393,8 +2393,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | session | packages/dsh-aionui-panel/src/index.ts | 50 | get |
 | session | packages/dsh-desktop-compat/src/conversation-import-route.ts | 99 | create |
 | session | packages/dsh-desktop-compat/src/conversation-import-route.ts | 285 | get |
-| session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 49 | get |
-| session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 58 | get |
+| session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 55 | get |
+| session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 67 | get |
 | session | packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 16 | get |
 | session | packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 18 | get |
 | session | packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts | 82 | get |

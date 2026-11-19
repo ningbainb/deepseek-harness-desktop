@@ -12,7 +12,7 @@
       "status": "supported",
       "upstreamVersion": "0.2.2-rc.5",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.3.3",
+      "desktopRange": "=5.3.4",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -58,7 +58,7 @@
       "verifiedAt": "2026-11-18",
       "matrixArtifact": "docs/launch/release-notes.md",
       "knownIssues": [
-        "Exact public DSH 0.2.2-rc.5 SDK cohort for Desktop 5.3.3. Package, session and native acceptance each require executed evidence.",
+        "Exact public DSH 0.2.2-rc.5 SDK cohort for Desktop 5.3.4. Package, session and native acceptance each require executed evidence.",
         "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
         "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
       ],

@@ -7,6 +7,7 @@ export interface SessionCheckpointRecoveryServices {
     open: (...args: Parameters<SessionPersistence['open']>) => Promise<Pick<SessionHandle, 'header' | 'inheritedEventCount' | 'read' | 'close'>>
   }
   cache: Pick<SessionProjectionCache, 'cachedSnapshot' | 'coldSnapshot'>
+    & Partial<Pick<SessionProjectionCache, 'cachedPredecessorTitle'>>
   sessions: Pick<SessionStore, 'get'>
 }
 
@@ -35,6 +36,11 @@ function checkpointBlank(snapshot: ReturnType<SessionProjectionCache['cachedSnap
     && typeof metadata.blank === 'boolean' ? metadata.blank : undefined
 }
 
+function checkpointTitle(snapshot: ReturnType<SessionProjectionCache['cachedSnapshot']>): string | undefined {
+  const title: unknown = Reflect.get(snapshot?.values ?? {}, 'title')
+  return typeof title === 'string' ? title : undefined
+}
+
 export async function refreshBlankSessionCheckpoints(
   services: SessionCheckpointRecoveryServices,
   signal: AbortSignal,
@@ -50,20 +56,24 @@ export async function refreshBlankSessionCheckpoints(
       const readSignal = AbortSignal.any([signal, AbortSignal.timeout(10_000)])
       try {
         const cached = services.cache.cachedSnapshot(header)
-        if (cached === undefined || checkpointBlank(cached) !== true) continue
+        // A predecessor hint can lag a manual rename in the older log. Read
+        // only that session once, then keep the SDK's current-format cache.
+        const predecessor = cached === undefined ? services.cache.cachedPredecessorTitle?.(header) : undefined
+        if (checkpointBlank(cached) !== true && predecessor === undefined) continue
         const handle = await services.persistence.open(header.id, 'read', { signal: readSignal })
         try {
           const { events } = await handle.read(0, undefined, { signal: readSignal })
           readSignal.throwIfAborted()
           if (services.sessions.get(header.id) !== undefined) continue
           const lastSeq = events.at(-1)?.seq ?? -1
-          if (cached.asOfSeq >= lastSeq) continue
+          if (cached !== undefined && cached.asOfSeq >= lastSeq) continue
           const restored = services.cache.coldSnapshot(handle.header, handle.inheritedEventCount, events)
           while (true) {
             readSignal.throwIfAborted()
             const durable = services.cache.cachedSnapshot(handle.header)
             if (durable !== undefined && durable.asOfSeq >= restored.asOfSeq
-              && checkpointBlank(durable) === checkpointBlank(restored)) break
+              && checkpointBlank(durable) === checkpointBlank(restored)
+              && checkpointTitle(durable) === checkpointTitle(restored)) break
             await new Promise(resolveWait => setTimeout(resolveWait, 25))
           }
           result.refreshed += 1
