@@ -15,7 +15,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-models/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import type { DiscoverFace } from '@deepseek-ai/dsh-client-ui-plugin-market/client'
 import type { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: imports the model options page's additive onboarding slot.
 import type {} from '@linxin666/dsh-client-ui-model-preferences/client'
@@ -27,7 +26,7 @@ import { WebUIPluginsSection } from './WebUIPluginsCard.tsx'
 import { ModelAdvancedEntry } from './ModelAdvancedEntry.tsx'
 import { installDesktopNativeSettings, openDesktopNativeSettings } from './desktop-native-settings.tsx'
 import { RelayOnboardingCard } from './RelayOnboardingCard.tsx'
-import { DesktopExtensionDockEntry, installDesktopManagementRouting } from './desktop-extension-dock.tsx'
+import { DesktopExtensionDockEntry, installDesktopManagementRouting, type WorkshopDiscovery } from './desktop-extension-dock.tsx'
 import { dockSettingFromUrl } from './DockSettingsPage.tsx'
 import { DockSettingsOutlet, mirrorDockSlot } from './dock-slot-mirror.tsx'
 import { createPluginOptionsDirectory } from './plugin-options-directory.ts'
@@ -157,14 +156,13 @@ export function apply(ctx: ClientContext): void {
         navigation.openList()
         return true
       },
-      selectWorkshop(sourceUrl) {
+      workshopDiscovery() {
         const slots: Pick<SlotCore, 'entriesOfSlot'> = ctx.slots
         const entry = slots.entriesOfSlot('plugins.tab').find(row => row.options.id === 'discover' && row.locale === 'pluginMarket')
-        const face = entry?.inject?.() as Partial<DiscoverFace> | undefined
-        const state = face?.hooks?.discover?.getSnapshot()
-        if (!face?.select || state?.status !== 'ready') return false
-        if (state.indexes.some(source => source.url === sourceUrl && !source.error)) face.select(sourceUrl)
-        return true
+        const face = entry?.inject?.() as Partial<WorkshopDiscovery> | undefined
+        if (face?.hooks?.discover && face.select && face.reload && face.retry) {
+          return { hooks: face.hooks, select: face.select, reload: face.reload, retry: face.retry }
+        }
       },
       openSettings: openDesktopNativeSettings,
     } : undefined),

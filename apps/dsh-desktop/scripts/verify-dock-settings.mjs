@@ -455,8 +455,16 @@ try {
   await settings.getByRole('status').filter({ hasText: '已关闭' }).waitFor({ timeout: 90_000 })
   const disabledProfile = JSON.parse(await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'package.json'), 'utf8'))
   assertAgentTeamProfile(disabledProfile, await readFile(resolve(temporary, 'dsh-home', 'profiles', 'desktop', 'cordis.patch.yml'), 'utf8'), false)
-  await main.evaluate(() => window.dshDesktop.openExtensionDock({ setting: 'value-mode' }))
-  await settings.locator('[data-dsh-dock-settings="value-mode"]').waitFor()
+  await dock.locator('#plugins-hub-tab').click()
+  const workshopStarted = performance.now()
+  await dock.locator('#plugins-home [data-open-dock-tab="market-tab"]').click()
+  const nativePluginPage = main.locator('[data-plugin-panel]')
+  await nativePluginPage.locator('[data-discover-toolbar]').getByRole('button', { name: /创意工坊/u }).waitFor({ timeout: 60_000 })
+  await nativePluginPage.getByText('IM 助理（飞书试用）', { exact: true }).waitFor()
+  console.log(`Workshop listing ready after ${Math.round(performance.now() - workshopStarted)}ms`)
+  await main.screenshot({ path: resolve(output, 'native-workshop.png') })
+  const valueMode = await openDockSetting(app, main, 'value-mode')
+  settings = valueMode.settings
   for (const theme of ['dark', 'light']) {
     await selectDockTheme(main, theme)
     const appliedTheme = await dock.evaluate(async theme => {
@@ -518,11 +526,6 @@ try {
   await settings.evaluate(() => document.querySelector('[data-dsh-dock-settings]').scrollTo(0, 0))
   await settings.screenshot({ path: resolve(output, 'value-mode-narrow.png') })
   await dock.locator('#plugins-hub-tab').click()
-  await dock.locator('#plugins-home [data-open-dock-tab="market-tab"]').click()
-  const nativePluginPage = main.locator('[data-plugin-panel]')
-  await nativePluginPage.locator('[data-discover-toolbar]').getByRole('button', { name: /创意工坊/u }).waitFor({ timeout: 60_000 })
-  await nativePluginPage.getByText('IM 助理（飞书试用）', { exact: true }).waitFor()
-  await main.screenshot({ path: resolve(output, 'native-workshop.png') })
   await dock.locator('#plugin-settings-tab').click()
   await dock.locator('[data-open-legacy-dock-tab="plugins-tab"]').click()
   await dock.locator('#install-plugin > summary').click()
@@ -695,6 +698,14 @@ try {
 } catch (error) {
   failure = error
   console.error('Dock acceptance failed', error)
+  const main = await app?.firstWindow().catch(() => undefined)
+  console.error('Main page:', await main?.evaluate(() => ({
+    language: document.documentElement.lang,
+    panel: document.querySelector('[data-plugin-panel]')?.textContent?.slice(0, 2500),
+    discover: document.querySelector('[data-plugin-tab="discover"]')?.textContent?.slice(0, 2500),
+    toolbar: document.querySelector('[data-discover-toolbar]')?.textContent,
+  })).catch(() => 'unavailable'))
+  await main?.screenshot({ path: resolve(output, 'main-failure.png') }).catch(() => {})
   console.error('Settings URL:', settings?.url())
   console.error('Settings appearance:', await settings?.evaluate(() => {
     const page = document.querySelector('[data-dsh-dock-settings]')

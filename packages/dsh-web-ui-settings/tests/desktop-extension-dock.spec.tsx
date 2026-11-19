@@ -19,6 +19,7 @@ import {
   DesktopExtensionDockEntry,
   calculateDockNudgePosition,
   installDesktopManagementRouting,
+  selectWorkshopSource,
 } from '../src/client/desktop-extension-dock.tsx'
 import { zh } from '../src/client/locales.ts'
 
@@ -35,6 +36,31 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   delete (window as unknown as { dshDesktop?: unknown }).dshDesktop
+})
+
+it('keeps Workshop navigation pending until its listing is ready and retries each transient read once', () => {
+  const url = 'https://example.test/workshop.json'
+  const face = { hooks: { discover: { getSnapshot: vi.fn() } }, select: vi.fn(), reload: vi.fn(), retry: vi.fn() }
+  const retried = { sources: false, listing: false }
+  const read = () => selectWorkshopSource(face, url, retried)
+  face.hooks.discover.getSnapshot.mockReturnValue({ status: 'error' })
+  expect(read()).toBe(false)
+  expect(read()).toBe(false)
+  expect(face.reload).toHaveBeenCalledOnce()
+  face.hooks.discover.getSnapshot.mockReturnValue({ status: 'ready', indexes: [] })
+  expect(read()).toBe(false)
+  expect(face.select).not.toHaveBeenCalled()
+  const ready = { status: 'ready', indexes: [{ url }], selected: 'https://example.test/custom.json' }
+  face.hooks.discover.getSnapshot.mockReturnValue(ready)
+  expect(read()).toBe(false)
+  expect(face.select).toHaveBeenCalledWith(url)
+  const selected = { ...ready, selected: url }
+  face.hooks.discover.getSnapshot.mockReturnValue({ ...selected, listing: { url, status: 'error', failure: 'fetch' } })
+  expect(read()).toBe(false)
+  expect(read()).toBe(false)
+  expect(face.retry).toHaveBeenCalledOnce()
+  face.hooks.discover.getSnapshot.mockReturnValue({ ...selected, listing: { url, status: 'ready' } })
+  expect(read()).toBe(true)
 })
 
 describe('Desktop Extension Dock entry', () => {

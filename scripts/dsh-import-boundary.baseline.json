@@ -460,7 +460,7 @@
     "packages/dsh-web-ui-settings/src/client/DockSettingsPage.tsx\u0000static-import\u0000@deepseek-ai/dsh-client-ui-slots": 1,
     "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-locale/client": 1,
     "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-model-selection/client": 1,
-    "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-plugin-market/client": 1,
+    "packages/dsh-web-ui-settings/src/client/desktop-extension-dock.tsx\u0000static-import\u0000@deepseek-ai/dsh-client-ui-plugin-market/client": 1,
     "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-renderer/client": 1,
     "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-settings-models/client": 1,
     "packages/dsh-web-ui-settings/src/client/index.ts\u0000static-import\u0000@deepseek-ai/dsh-client-ui-settings/client": 1,

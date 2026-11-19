@@ -106,6 +106,37 @@ test('Desktop enables the official Discover source once and uses the bundled Wor
   assert.equal(target.fetch, original)
 })
 
+test('Workshop can reuse the recent installed inventory without caching other reads or crossing revisions', async () => {
+  const { DESKTOP_COMMUNITY_INDEX_URL, shareDesktopWorkshopInventory } = await import(moduleUrl)
+  let revision = 'first'
+  let time = 0
+  let scans = 0
+  const manager = { async listBundles() { return [++scans] } }
+  const market = { async search() { return manager.listBundles() } }
+  const originalRead = manager.listBundles
+  const originalSearch = market.search
+  const { invalidate, dispose } = shareDesktopWorkshopInventory(manager, market, () => revision, () => time)
+  try {
+    assert.deepEqual(await manager.listBundles(), [1])
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [1])
+    assert.deepEqual(await market.search('https://example.com/plugins.json', {}), [2])
+    assert.deepEqual(await manager.listBundles(), [3])
+    revision = 'second'
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [4])
+    invalidate()
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [5])
+    time += 5_001
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [6])
+    revision = undefined
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [7])
+    assert.deepEqual(await market.search(DESKTOP_COMMUNITY_INDEX_URL, {}), [8])
+  } finally {
+    dispose()
+  }
+  assert.equal(manager.listBundles, originalRead)
+  assert.equal(market.search, originalSearch)
+})
+
 test('foreign market replacements and independent Web profiles remain untouched', async () => {
   const { adaptDesktopCommunityIndexPatches } = await import(moduleUrl)
   const patches = [...base([]), { id: 'plugin-market', name: 'third-party-market' }]

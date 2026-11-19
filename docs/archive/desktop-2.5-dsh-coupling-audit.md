@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.2.
+Authoritative Desktop version: 5.3.3.
 
 Stable DSH package version: 0.2.2-rc.5.
 
@@ -559,6 +559,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 23 | static-import | @deepseek-ai/dsh-client-connection/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 24 | static-import | @deepseek-ai/dsh-client-store | no | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/compat-settings-scope.ts | 25 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/desktop-extension-dock.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-plugin-market/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | yes |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/dock-slot-mirror.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
@@ -567,8 +568,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/index.ts | 15 | static-import | @deepseek-ai/dsh-client-ui-settings-models/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 16 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/index.ts | 17 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
-| packages/dsh-web-ui-settings/src/client/index.ts | 18 | static-import | @deepseek-ai/dsh-client-ui-plugin-market/client | yes | public-experimental | no |
-| packages/dsh-web-ui-settings/src/client/index.ts | 19 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-web-ui-settings/src/client/index.ts | 18 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/relay-auth-failures.ts | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 2 | static-import | @deepseek-ai/dsh-api-session-controller/types | yes | public-stable | no |
@@ -671,7 +671,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-tool-describe-image/src/index.ts | 28 | tools |
 | host-service | packages/dsh-value-mode/src/client/index.ts | 60 | remote.session |
 | host-service | packages/dsh-value-mode/src/index.ts | 47 | llm |
-| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 102 | remote |
+| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 101 | remote |
 | host-service | packages/skins/skin-center/src/client/index.ts | 66 | remote |
 | profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 15 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/capture-all-surfaces.mjs | 157 | DSH_HOME |
@@ -874,11 +874,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 1845 | profileDir |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 1853 | profileDir |
 | profile-home | apps/dsh-desktop/src/electron-app.mjs | 1856 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2538 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2592 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2624 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2688 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2694 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2545 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2599 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2631 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2695 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2701 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 86 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 87 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 88 | profileDir |
@@ -1110,6 +1110,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/runtime-browser-component.mjs | 27 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/runtime-candidate-policy.mjs | 19 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/runtime-candidate-policy.mjs | 21 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/runtime-community-index.mjs | 111 | profileDir |
+| profile-home | apps/dsh-desktop/src/runtime-community-index.mjs | 112 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 701 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 702 | DSH_PROFILE |
 | profile-home | apps/dsh-desktop/src/runtime-graph-validator.mjs | 79 | profileDir |
@@ -2241,11 +2243,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1262 | recover |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1847 | recover |
 | runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2197 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2522 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2524 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2539 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3041 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3047 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2529 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2531 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2546 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3048 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3054 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 420 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 439 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1127 | stop |
@@ -2446,14 +2448,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 218 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 223 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 11 | conversation.input.right |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 180 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 185 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 193 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 203 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 213 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 228 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 234 | sidebar.footer.action |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 249 | root |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 178 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 183 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 191 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 201 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 211 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 226 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 232 | sidebar.footer.action |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 247 | root |
 | slot | packages/skins/skin-center/src/client/index.ts | 104 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 112 | settings.section |
 | workspace | apps/dsh-desktop/src/conversation-import/session-bridge.mjs | 207 | list |

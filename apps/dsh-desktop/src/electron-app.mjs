@@ -2411,8 +2411,15 @@ export async function startElectronApp(metadata) {
       }
     },
     completeBlockedPluginRecovery,
-    openNativePage: (destination) => {
+    openNativePage: async (destination) => {
+      if (destination === 'workshop') {
+        const load = runtimeViewLoad
+        if (!load) return false
+        await load
+        if (runtimeViewLoad !== load || runtimeProvider.status.state !== 'ready') return false
+      }
       if (!mainWindow || mainWindow.isDestroyed()) return false
+      if (destination === 'workshop' && !mainWindow.webContents.getURL().startsWith('dsh-runtime://app/')) return false
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.show()
       mainWindow.focus()

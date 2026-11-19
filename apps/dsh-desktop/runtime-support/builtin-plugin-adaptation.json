@@ -3,7 +3,7 @@
   "policy": "desktop-first",
   "runtimeVersion": "0.2.2-rc.5",
   "notes": [
-    "Desktop 5.3.2 pins the public DSH 0.2.2-rc.5 cohort. Source compatibility and interactive Windows acceptance are recorded separately.",
+    "Desktop 5.3.3 pins the public DSH 0.2.2-rc.5 cohort. Source compatibility and interactive Windows acceptance are recorded separately.",
     "Public registry snapshots below are historical and must be refreshed before a new package upgrade decision.",
     "The verifier checks current resolution, installed patch text, lockfile consistency, and mounts; validation.results records executed checks separately.",
     "A selected version is not a packaged or user-data migration acceptance result."

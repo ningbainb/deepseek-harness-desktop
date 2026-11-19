@@ -7,6 +7,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { createPortal } from 'react-dom'
+import type { DiscoverFace } from '@deepseek-ai/dsh-client-ui-plugin-market/client'
 import {
   dismissDockNudge,
   getDockEntryState,
@@ -27,6 +28,10 @@ type ManagementTab = 'plugins' | 'skills'
 
 type PluginSettingsRequest = Readonly<{ name?: unknown }>
 type NativePageRequest = string | Readonly<{ destination: string; sourceUrl?: string; notice?: { name: string; applied: boolean } }>
+type WorkshopRetries = { sources: boolean; listing: boolean }
+export type WorkshopDiscovery = Pick<DiscoverFace, 'reload' | 'retry' | 'select'> & {
+  hooks: { discover: Pick<DiscoverFace['hooks']['discover'], 'getSnapshot'> }
+}
 type PluginSettingsBridge = Readonly<{
   onPluginSettingsOpen?: (listener: (request: PluginSettingsRequest) => void) => () => void
   onNativePageOpen?: (listener: (request: NativePageRequest) => void) => () => void
@@ -34,6 +39,28 @@ type PluginSettingsBridge = Readonly<{
 
 function mainBridge(): PluginSettingsBridge | undefined {
   return (window as unknown as { dshDesktop?: PluginSettingsBridge }).dshDesktop
+}
+
+/** Keep the request active until Discover has a page from the requested source. */
+export function selectWorkshopSource(face: WorkshopDiscovery | undefined, sourceUrl: string, retried: WorkshopRetries): boolean {
+  if (!face) return false
+  const state = face.hooks.discover.getSnapshot()
+  if (state.status === 'error' && !retried.sources) {
+    retried.sources = true
+    face.reload()
+  }
+  if (state.status !== 'ready' || !state.indexes.some(source => source.url === sourceUrl)) return false
+  if (state.selected !== sourceUrl) {
+    face.select(sourceUrl)
+    return false
+  }
+  const listing = state.listing
+  if (listing?.url !== sourceUrl) return false
+  if (listing.status === 'error' && listing.failure !== 'invalid' && !retried.listing) {
+    retried.listing = true
+    face.retry()
+  }
+  return listing.status === 'ready' || listing.status === 'more'
 }
 
 /**
@@ -82,7 +109,7 @@ export async function openRuntimePluginSettings(
 export function installDesktopManagementRouting(
   ownerDocument: Document,
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string,
-  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean; selectWorkshop?(sourceUrl: string): boolean },
+  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean; workshopDiscovery?(): WorkshopDiscovery | undefined },
 ): () => void {
   let disposed = false
   let observer: MutationObserver | undefined
@@ -207,6 +234,7 @@ export function installDesktopManagementRouting(
       }
       let opened = false
       let menuOpened = false
+      const retried = { sources: false, listing: false }
       const startsAt = Date.now()
       const openDestination = () => {
         if (disposed || request !== pageRequest) return
@@ -239,8 +267,8 @@ export function installDesktopManagementRouting(
         }
         const tab = ownerDocument.querySelector<HTMLButtonElement>('[data-plugin-panel] [role="tab"][id$="-discover"]')
         if (tab?.getAttribute('aria-selected') === 'false') tab.click()
-        if (sourceUrl && navigation.selectWorkshop) {
-          if (tab?.getAttribute('aria-selected') === 'true' && navigation.selectWorkshop(sourceUrl)) return
+        if (sourceUrl && navigation.workshopDiscovery) {
+          if (tab?.getAttribute('aria-selected') === 'true' && selectWorkshopSource(navigation.workshopDiscovery(), sourceUrl, retried)) return
           if (Date.now() - startsAt < 45_000) globalThis.setTimeout(openDestination, 125)
           return
         }

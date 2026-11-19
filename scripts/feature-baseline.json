@@ -1028,6 +1028,7 @@
         "extension-dock-plugin-market-single-hub-entry",
         "desktop-official-plugin-discover-workshop-and-canonical-settings-navigation",
         "desktop-workshop-selects-official-discover-source-by-url-and-preserves-saved-custom-sources",
+        "desktop-workshop-retries-transient-discover-reads-and-reuses-recent-read-only-plugin-inventory",
         "dock-directly-reaches-official-experimental-plugin-switches",
         "dock-entry-rows-follow-native-theme-with-accessible-compact-layout",
         "desktop-primary-official-plugin-mutations-use-the-serialized-staged-transaction",

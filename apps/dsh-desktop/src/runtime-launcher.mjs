@@ -42,7 +42,7 @@ import { installDesktopProfileComposition } from './runtime-profile-composition.
 import { adaptRuntimeAgentTeamPatches } from './runtime-agent-team-migration.mjs'
 import { adaptDesktopBrowserComponentPatches } from './runtime-browser-component-patches.mjs'
 import { adaptRuntimeOptionalContextSafety } from './runtime-optional-context-safety.mjs'
-import { adaptDesktopCommunityIndexPatches, installDesktopWorkshopIndexFetch } from './runtime-community-index.mjs'
+import { adaptDesktopCommunityIndexPatches, installDesktopWorkshopIndexFetch, installDesktopWorkshopInventory } from './runtime-community-index.mjs'
 import { installDesktopContextPriceCatalogFetch } from './runtime-context-price-catalog.mjs'
 import { installDesktopSubagentListCompatibility } from './runtime-subagent-list-compat.mjs'
 import { installDesktopMarketTeamCompatibility } from './runtime-market-team-compat.mjs'
@@ -332,6 +332,7 @@ async function run() {
       hostCtx.provide('desktopConfigurationGuard', configurationGuard)
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
+      if (invocation.profile === 'desktop') installDesktopWorkshopInventory(hostCtx, profile.dir)
       installDesktopSubagentListCompatibility(hostCtx)
       installDesktopMarketTeamCompatibility(hostCtx)
       installDesktopProfileComposition(hostCtx, {

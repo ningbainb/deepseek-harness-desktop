@@ -1,5 +1,8 @@
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { DESKTOP_COMMUNITY_INDEX_URL } from './dock-pages.mjs'
 
 export { DESKTOP_COMMUNITY_INDEX_URL }
@@ -64,4 +67,64 @@ export function installDesktopWorkshopIndexFetch(target = globalThis) {
   }
   target.fetch = fetchIndex
   return () => { if (target.fetch === fetchIndex) target.fetch = original }
+}
+
+// Official Discover decorates each entry from the same bundle inventory that
+// the Plugins panel has just read. Reuse that scan only for bundled Workshop
+// requests. Other reads, including mutation preconditions, stay authoritative.
+export function shareDesktopWorkshopInventory(manager, market, getRevision, now = Date.now) {
+  const workshopRead = new AsyncLocalStorage()
+  const readBundles = manager.listBundles
+  const searchMarket = market.search
+  let recent
+  const invalidate = () => { recent = undefined }
+  const listBundles = function (...args) {
+    const revision = getRevision()
+    if (workshopRead.getStore() && revision !== undefined && recent?.revision === revision && now() - recent.at <= 5_000) {
+      return recent.result
+    }
+    invalidate()
+    const result = readBundles.apply(this, args)
+    if (revision !== undefined && getRevision() === revision) {
+      const record = { revision, at: now(), result }
+      recent = record
+      void Promise.resolve(result).catch(() => { if (recent === record) invalidate() })
+    }
+    return result
+  }
+  const search = function (url, ...args) {
+    if (url === DESKTOP_COMMUNITY_INDEX_URL) return workshopRead.run(true, () => searchMarket.call(this, url, ...args))
+    return searchMarket.call(this, url, ...args)
+  }
+  manager.listBundles = listBundles
+  market.search = search
+  return {
+    invalidate,
+    dispose() {
+      invalidate()
+      if (manager.listBundles === listBundles) manager.listBundles = readBundles
+      if (market.search === search) market.search = searchMarket
+    },
+  }
+}
+
+export function installDesktopWorkshopInventory(ctx, profileDir) {
+  const paths = ['package.json', 'cordis.patch.yml', 'pnpm-lock.yaml'].map(file => join(profileDir, file))
+  const profileRevision = () => {
+    try {
+      const stats = paths.map(path => statSync(path, { bigint: true, throwIfNoEntry: false }))
+      if (!stats[0]) return undefined
+      return stats.map(stat => stat ? `${stat.ino}:${stat.mtimeNs}:${stat.size}` : '-').join('/')
+    } catch {
+      return undefined
+    }
+  }
+  ctx.inject(['pluginManager', 'pluginMarket'], scope => {
+    const manager = scope.get('pluginManager')
+    const market = scope.get('pluginMarket')
+    if (typeof manager?.listBundles !== 'function' || typeof market?.search !== 'function') return
+    const { invalidate, dispose } = shareDesktopWorkshopInventory(manager, market, profileRevision)
+    scope.on('plugin-manager/changed', invalidate)
+    scope.effect(() => dispose, 'Desktop Workshop inventory')
+  })
 }

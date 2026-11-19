@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.2",
+  "desktopVersion": "5.3.3",
   "upstreamVersion": "0.2.2-rc.5",
   "lockfileSha256": "afaab805bfff8055ea34407cf07f7131df5ec9935ac07fde432dac001787ed96",
   "policy": {
@@ -4854,6 +4854,15 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-web-ui-settings/src/client/desktop-extension-dock.tsx",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-plugin-market/client",
+      "line": 1,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
       "path": "packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
@@ -4928,17 +4937,8 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-plugin-market/client",
-      "line": 18,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 19,
+      "line": 18,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -5686,7 +5686,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 102,
+      "line": 101,
       "operation": "remote"
     },
     {
@@ -6904,31 +6904,31 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2538,
+      "line": 2545,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2592,
+      "line": 2599,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2624,
+      "line": 2631,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2688,
+      "line": 2695,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2694,
+      "line": 2701,
       "operation": "profileDir"
     },
     {
@@ -8316,6 +8316,18 @@
       "path": "apps/dsh-desktop/src/runtime-candidate-policy.mjs",
       "line": 21,
       "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-community-index.mjs",
+      "line": 111,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/runtime-community-index.mjs",
+      "line": 112,
+      "operation": "profileDir"
     },
     {
       "category": "profile-home",
@@ -15106,31 +15118,31 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2522,
+      "line": 2529,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2524,
+      "line": 2531,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2539,
+      "line": 2546,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 3041,
+      "line": 3048,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 3047,
+      "line": 3054,
       "operation": "start"
     },
     {
@@ -16336,49 +16348,49 @@
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 180,
+      "line": 178,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 185,
+      "line": 183,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 193,
+      "line": 191,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 203,
+      "line": 201,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 213,
+      "line": 211,
       "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 228,
+      "line": 226,
       "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 234,
+      "line": 232,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 249,
+      "line": 247,
       "operation": "root"
     },
     {

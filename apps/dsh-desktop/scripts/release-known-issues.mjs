@@ -9,7 +9,7 @@ function finalAssertion(output, marker) {
 }
 
 export function acceptedReleaseIssue({ version, enabled, streamTimingApproved, initialShutdownApproved, platform, script, code, signal, output }) {
-  if (version === '5.3.2' && platform === 'win32' && code === 1 && !signal) {
+  if (version === '5.3.3' && platform === 'win32' && code === 1 && !signal) {
     if (streamTimingApproved === true && script === 'scripts/verify-beta-usability.mjs') {
       const { p95Ms, limitMs } = finalAssertion(output, 'DSH_STREAM_FRAME_P95')
       if (limitMs === 35 && Number.isFinite(p95Ms) && p95Ms > limitMs && p95Ms <= 47) return 'DSH-530-WINDOWS-STREAM-P95'
