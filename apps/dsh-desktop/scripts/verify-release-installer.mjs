@@ -287,8 +287,9 @@ async function main() {
     for (const scenario of ['fresh', 'previous-release-upgrade']) {
       const userData = join(root, scenario, 'user-data')
       const dshHome = join(root, scenario, 'dsh-home')
-      const temporary = join(root, scenario, 'setup-temp')
-      await Promise.all([mkdir(userData, { recursive: true }), mkdir(temporary, { recursive: true })])
+      // Older installers expand through a MAX_PATH-limited temporary archive.
+      const temporary = await mkdtemp(join(resolve(process.env.RUNNER_TEMP), 'si-'))
+      await mkdir(userData, { recursive: true })
       const setupEnvironment = { ...process.env, TEMP: temporary, TMP: temporary, DSH_HOME: dshHome, DSH_DESKTOP_USER_DATA: userData }
       const install = async (installer, expectedVersion) => {
         const existingLogs = new Set(await readdir(temporary))

@@ -6376,7 +6376,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-installer.mjs",
-      "line": 292,
+      "line": 293,
       "operation": "DSH_HOME"
     },
     {
