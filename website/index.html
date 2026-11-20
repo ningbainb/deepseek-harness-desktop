@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" data-release-version="5.1.0">
+<html lang="zh-CN" data-release-version="5.3.5">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0a0a0a">
-    <meta name="description" content="DeepSeek Harness Desktop 5.1.0 三端同版发布：官方 NPM Runtime/SDK 0.2.1-rc.2、Electron 44，完整流式背压、异步资源、安装数据保全与简洁设置，保留默认官方皮肤和侧栏折叠。Windows、macOS 与 Linux 安装包现已可用。">
-    <meta name="keywords" content="DeepSeek Harness Desktop 5.1.0,DSH 0.2.1-rc.2,官方 Desktop 能力,Agent Team,模型协作,Skills,插件恢复,历史会话,Windows AI 编程客户端,开源 AI 编程助手">
+    <meta name="description" content="DeepSeek Harness Desktop 5.3.5 是基于官方 DSH RC5 的开源 AI 桌面工作台，提供会话、项目、插件和本地记忆。">
+    <meta name="keywords" content="DeepSeek Harness Desktop,DSH RC5,开源 AI 工作台,插件,本地记忆">
     <meta name="author" content="DeepSeek Harness Desktop Community">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="googlebot" content="index, follow, max-image-preview:large">
@@ -13,19 +13,19 @@
     <meta name="bingbot" content="index, follow, max-image-preview:large">
     <link rel="canonical" href="https://1521003.xyz/">
     <link rel="sitemap" type="application/xml" href="https://1521003.xyz/sitemap.xml">
-    <meta property="og:title" content="DeepSeek Harness Desktop 5.1.0：完整输出，简洁设置，三端同版">
-    <meta property="og:description" content="融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，新增模型协作入口、Agent Team、统一 Skills、插件恢复与历史会话保护。">
+    <meta property="og:title" content="DeepSeek Harness Desktop 5.3.5 正式版">
+    <meta property="og:description" content="基于官方 DSH RC5 的开源 AI 桌面工作台。升级后继续原来的会话和项目。">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://1521003.xyz/">
     <meta property="og:site_name" content="DeepSeek Harness Desktop">
     <meta property="og:locale" content="zh_CN">
-    <meta property="og:image" content="https://1521003.xyz/assets/desktop-5.1.0-main.png">
-    <meta property="og:image:alt" content="DeepSeek Harness Desktop 5.1.0 Windows 正式标签主界面与保留的主会话宠物">
+    <meta property="og:image" content="https://1521003.xyz/assets/desktop-5.3.5-main.webp">
+    <meta property="og:image:alt" content="DeepSeek Harness Desktop 5.3.5 Windows 会话工作台">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="DeepSeek Harness Desktop 5.1.0：完整输出，简洁设置，三端同版">
-    <meta name="twitter:description" content="融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，新增模型协作、统一 Skills 和可靠升级。">
-    <meta name="twitter:image" content="https://1521003.xyz/assets/desktop-5.1.0-settings-dark.png">
-    <title>DeepSeek Harness Desktop 5.1.0 - 流式减负，Windows、macOS、Linux 三端同版</title>
+    <meta name="twitter:title" content="DeepSeek Harness Desktop 5.3.5 正式版">
+    <meta name="twitter:description" content="基于官方 DSH RC5 的开源 AI 桌面工作台。">
+    <meta name="twitter:image" content="https://1521003.xyz/assets/desktop-5.3.5-main.webp">
+    <title>DeepSeek Harness Desktop 5.3.5 正式版 | 开源 AI 桌面工作台</title>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -35,7 +35,7 @@
             "@id": "https://1521003.xyz/#website",
             "url": "https://1521003.xyz/",
             "name": "DeepSeek Harness Desktop",
-            "description": "DeepSeek Harness Desktop 5.1.0 三端同版发布：融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，重点保障会话、配置和升级稳定性。",
+            "description": "DeepSeek Harness Desktop 是基于官方 DSH 的开源 AI 桌面工作台。",
             "inLanguage": "zh-CN"
           },
           {
@@ -44,31 +44,31 @@
             "name": "DeepSeek Harness Desktop",
             "alternateName": "DeepSeek Harness 桌面版",
             "url": "https://1521003.xyz/",
-            "description": "DeepSeek Harness Desktop 5.1.0 使用官方 NPM Runtime 0.2.1-rc.2，Windows x64、macOS arm64 Preview 和 Linux x64 Preview 安装包已在同一正式 Release 发布。",
+            "description": "DeepSeek Harness Desktop 5.3.5 适配官方 DSH RC5，提供会话、项目、插件和本地记忆。",
             "applicationCategory": "DeveloperApplication",
             "applicationSubCategory": "AI coding assistant",
             "operatingSystem": "Windows 10, Windows 11, macOS 13+ arm64 Preview, Linux x64 Preview",
-            "softwareVersion": "5.1.0",
+            "softwareVersion": "5.3.5",
             "isAccessibleForFree": true,
-            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe",
+            "downloadUrl": "https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe",
             "installUrl": "https://1521003.xyz/#download",
-            "releaseNotes": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0",
+            "releaseNotes": "https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.5",
             "codeRepository": "https://github.com/ningbainb/deepseek-harness-desktop",
             "license": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/LICENSE",
-            "dateModified": "2026-10-25",
-            "image": "https://1521003.xyz/assets/desktop-5.1.0-settings-dark.png",
+            "dateModified": "2026-11-20",
+            "image": "https://1521003.xyz/assets/desktop-5.3.5-main.webp",
             "screenshot": [
-              "https://1521003.xyz/assets/desktop-5.1.0-control-center.png",
-              "https://1521003.xyz/assets/desktop-5.1.0-sidebar-cards.png",
-              "https://1521003.xyz/assets/desktop-5.1.0-bai-models.png"
+              "https://1521003.xyz/assets/desktop-5.3.5-dock.webp",
+              "https://1521003.xyz/assets/desktop-5.3.5-memory.webp",
+              "https://1521003.xyz/assets/desktop-5.3.5-settings-dark.webp"
             ],
             "featureList": [
               "Browser Use with isolated visible system browser sessions",
               "Computer Use with Cua Driver and per-action approval",
               "公开官方 DSH Runtime、Web UI 与 Desktop 能力边界融合",
-              "Agent Team 与性价比模式统一模型协作页面",
+              "会话中的团队协作与独立的高级模型策略",
               "会话 Skills 与技能中心统一发现目录",
-              "3.5 插件恢复与历史会话兼容保护",
+              "覆盖升级保留会话与配置",
               "拓展坞分组 AI 设置与统一主题",
               "创建项目与工作区系统文件夹选择",
               "文件真实引用与模型按需读取",
@@ -121,7 +121,7 @@
                 "name": "DeepSeek Harness Desktop 是什么？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "它是社区维护的开源桌面发行版，提供 Windows x64、macOS arm64 Preview 与 Linux x64 Preview，融合公开的官方 DSH Runtime、Web UI 与官方仓库 Desktop 能力边界，再提供独立的原生生命周期、插件、主题、自动更新与移动远程能力。"
+                  "text": "基于官方 DSH 的社区开源桌面工作台，集中管理会话、项目、插件和本地记忆。"
                 }
               },
               {
@@ -145,7 +145,7 @@
                 "name": "性价比模式如何工作？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "首次选择性价比模式会打开配置引导：专家主控模型负责理解、拆解、派发、复核和汇总，副模型只执行被派发的局部任务。用户可以选择更省、智能平衡或更强策略。"
+                  "text": "在高级模型设置中选择主控、执行模型和策略。主控负责规划和交付，执行模型处理派发的任务。"
                 }
               },
               {
@@ -214,10 +214,10 @@
               },
               {
                 "@type": "Question",
-                "name": "5.1.0 已经正式发布了吗？",
+                "name": "5.3.5 已经正式发布了吗？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "是。5.1.0 于 2026-10-25 15:09:51 UTC 三端同版发布，正式标签运行 40199647851 的 Windows、macOS、Linux 与 publish 全成功。Windows core 28/28、完整打包 44/44 无豁免，真实 Setup 新装、4.3.0/5.0.0/5.0.1 升级、覆盖、重启、卸载与数据保全通过。五个公开安装文件的实际字节、SHA-256、GitHub digest 与合并清单已独立核验。三端未签名，macOS arm64 要求 13+、未公证；macOS/Linux 仍为 Preview，Linux 本版仅 Ubuntu 22.04 原生 Runner 验证。"
+                  "text": "5.3.5 已于 2026-11-20 发布。Windows 安装包、macOS 和 Linux 预览包均可从同一发行页下载。"
                 }
               }
             ]
@@ -232,7 +232,7 @@
       } catch {}
     </script>
     <link rel="icon" href="assets/app-icon.png" type="image/png">
-    <link rel="preload" as="image" href="assets/desktop-5.3.0-main.webp" type="image/webp" fetchpriority="high">
+    <link rel="preload" as="image" href="assets/desktop-5.3.5-main.webp" type="image/webp" fetchpriority="high">
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" type="module"></script>
   </head>
@@ -260,9 +260,9 @@
           <span data-site-theme-label>动感亮色</span>
         </button>
         <a class="nav-community" href="https://qm.qq.com/q/9hrcdaEYPC" target="_blank" rel="noreferrer"><span>Q</span> 加入二群</a>
-        <a class="nav-download download-link" data-download-source="nav" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe">
+        <a class="nav-download download-link" data-download-source="nav" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 15v2h14v-2"/></svg>
-          下载 <span class="release-version">v5.1.0</span>
+          下载 <span class="release-version">v5.3.5</span>
         </a>
       </nav>
     </header>
@@ -273,10 +273,10 @@
         <div class="container hero-inner">
           <div class="hero-copy reveal">
             <p class="overline">开源 AI 桌面工作台</p>
-            <h1>DeepSeek Harness Desktop <span class="hero-current release-version">v5.1.0</span></h1>
-            <p class="hero-summary">会话、项目与工具，集中在一个桌面工作台。</p>
+            <h1>DeepSeek Harness Desktop <span class="hero-current release-version">v5.3.5</span></h1>
+            <p class="hero-summary">基于官方 DSH 的社区工作台。会话、项目和工具都在桌面上。</p>
             <div class="hero-buttons">
-              <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe">
+              <a class="btn btn-primary download-link" data-download-source="hero" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 2h7v7H2V2Zm9 0h7v7h-7V2ZM2 11h7v7H2v-7Zm9 0h7v7h-7v-7Z"/></svg>
                 下载 Windows x64
               </a>
@@ -300,10 +300,10 @@
           </div>
 
           <figure class="intro-window">
-            <a href="assets/desktop-5.3.0-main.webp" aria-label="查看完整的 Windows 会话界面截图">
-              <img src="assets/desktop-5.3.0-main.webp" alt="DSH Desktop 的 Windows 会话界面，左侧为工作区和会话，中间为对话输入区" width="1359" height="850" decoding="async" fetchpriority="high">
+            <a href="assets/desktop-5.3.5-main.webp" aria-label="查看完整的 Windows 会话界面截图">
+              <img src="assets/desktop-5.3.5-main.webp" alt="Windows 会话界面，左侧为工作区，中央为对话输入区" width="1024" height="720" decoding="async" fetchpriority="high">
             </a>
-            <figcaption>Windows 实拍 · 5.3.0 候选版</figcaption>
+            <figcaption>Windows 实拍 · 5.3.5</figcaption>
           </figure>
         </div>
       </section>
@@ -311,9 +311,8 @@
       <section class="latest-features release-intro" id="latest-features" aria-labelledby="latest-features-title">
         <div class="container">
           <div class="release-intro-heading">
-            <p class="release-intro-version">5.3.0 候选版亮点</p>
+            <p class="release-intro-version">5.3.5 正式版</p>
             <h2 id="latest-features-title">昨天的工作，今天接着做</h2>
-            <p>升级后，接着用原来的会话和项目。</p>
           </div>
           <dl class="release-highlights">
             <div><dt>稳定性</dt><dd>Windows 覆盖升级保留原有会话和配置。</dd></div>
@@ -326,15 +325,15 @@
             <article>
               <h3>插件与创意工坊</h3>
               <p>在「发现」打开创意工坊。</p>
-              <a href="assets/desktop-5.3.0-dock.webp" aria-label="查看完整的拓展坞截图">
-                <img src="assets/desktop-5.3.0-dock.webp" alt="拓展坞插件页的已安装、官方实验性插件、创意工坊和插件维护入口" width="1059" height="750" loading="lazy" decoding="async">
+              <a href="assets/desktop-5.3.5-dock.webp" aria-label="查看完整的插件发现截图">
+                <img src="assets/desktop-5.3.5-dock.webp" alt="插件发现页选中创意工坊来源，显示可发现的社区插件" width="1024" height="720" loading="lazy" decoding="async">
               </a>
             </article>
             <article>
               <h3>个人偏好与记忆</h3>
               <p>查看、确认和删除本地记忆。</p>
-              <a href="assets/desktop-5.3.0-memory.webp" aria-label="查看完整的记忆设置截图">
-                <img src="assets/desktop-5.3.0-memory.webp" alt="原生设置中个人偏好下的记忆页，包含本地记忆开关、已保存记忆及待确认建议" width="2718" height="1700" loading="lazy" decoding="async">
+              <a href="assets/desktop-5.3.5-memory.webp" aria-label="查看完整的记忆设置截图">
+                <img src="assets/desktop-5.3.5-memory.webp" alt="个人偏好的记忆页，显示本地记忆开关、已保存记忆和待确认建议" width="760" height="648" loading="lazy" decoding="async">
               </a>
             </article>
           </div>
@@ -345,15 +344,15 @@
         <div class="container">
           <div class="center-heading reveal">
             <span class="eyebrow-chip">DESKTOP = HARNESS + NATIVE</span>
-            <h2><strong>官方 DSH 是核心</strong>，社区 Desktop 负责落地</h2>
-            <p>基于官方 DSH，使用独立的桌面数据目录和更新源。</p>
+            <h2>基于<strong>官方 DSH</strong>的开源桌面版</h2>
+            <p>社区维护，使用独立的桌面数据目录和更新通道。</p>
           </div>
 
           <div class="principle-grid">
             <article class="principle-card reveal">
               <svg class="principle-icon orbit-icon" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="32" rx="23" ry="9"/><ellipse cx="32" cy="32" rx="23" ry="9" transform="rotate(60 32 32)"/><ellipse cx="32" cy="32" rx="23" ry="9" transform="rotate(120 32 32)"/><circle cx="32" cy="32" r="3"/></svg>
-              <h3>公开官方代码能力融合</h3><span>OFFICIAL DSH FOUNDATION</span>
-              <p>集成官方 DSH Runtime、Web UI 与 SDK。</p>
+              <h3>官方 DSH 内核</h3><span>OFFICIAL DSH FOUNDATION</span>
+              <p>沿用官方 Web UI，集成 DSH RC5。</p>
             </article>
             <article class="principle-card reveal">
               <svg class="principle-icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="19"/><circle cx="32" cy="32" r="7"/><path d="M32 6v7M32 51v7M6 32h7M51 32h7M14 14l5 5M45 45l5 5M50 14l-5 5M19 45l-5 5"/></svg>
@@ -371,95 +370,86 @@
 
       <section class="features" id="release-5-1-screenshots" aria-labelledby="release-5-1-title">
         <div class="container">
-          <div class="section-title reveal"><span>5.1.0 正式标签 Windows QA 原图</span><h2 id="release-5-1-title">简洁设置，保留每一个入口</h2></div>
-          <p>正式标签运行 40199647851 对应 eb1223ddfee78eccadd76d8022501cd1806d9d3d；三端与 publish 全成功，五个公开安装文件均经独立字节与校验和核对。Windows Desktop 1943/1943 零跳过；macOS/Linux 各 1906 通过、37 项既有平台跳过、零失败；scripts 三端均 213/213。macOS 要求 arm64/macOS 13+，未签名、未公证；Linux 本版仅 Ubuntu 22.04 原生 Runner 验证，两端仍为 Preview。</p>
-          <p>技能市场首次启用先确认本地执行风险，反馈、翻译、自动更新与项目布局扫描默认关闭；来源替换可恢复，确认不是沙箱。既有设置、模型接入、历史、Skills、插件、皮肤与托盘保留。同号 5.1.0 内测包须手动下载正式包覆盖，不承诺同号自动更新。</p>
-          <p><a href="https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes.md">双语发布说明与验收边界</a> · <a href="assets/desktop-5.1.0-provenance.json">最终截图来源与图片哈希</a> · <a href="#download">下载正式 5.1.0</a></p>
+          <div class="section-title reveal"><span>5.3.5 Windows 实拍</span><h2 id="release-5-1-title">设置按用途归组</h2></div>
+          <p><a href="assets/desktop-5.3.5-provenance.json">截图来源</a></p>
           <article class="feature-row reveal">
-            <div class="feature-copy"><div class="feature-title"><span class="play-icon">L</span><h3>浅色无框，信息按层次展开</h3></div><p>用留白分组设置，保留导航、搜索和高级选项。</p><p>Windows 5.1.0 原生设置，模型尚未配置。</p></div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-settings-light.png" width="960" height="680" loading="lazy" decoding="async" alt="5.1.0 正式标签 Windows 浅色原生拓展坞，模型协作未配置状态"><figcaption>5.1.0 Windows · 浅色拓展坞</figcaption></figure>
+            <div class="feature-copy"><div class="feature-title"><span class="play-icon">L</span><h3>浅色拓展坞</h3></div><p>插件、技能、外观和设置集中在左侧，支持搜索。</p></div>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-settings-light.webp" width="960" height="680" loading="lazy" decoding="async" alt="Windows 浅色拓展坞的高级模型设置"><figcaption>Windows · 浅色拓展坞</figcaption></figure>
           </article>
           <article class="feature-row feature-row-reverse reveal">
-            <div class="feature-copy"><div class="feature-title"><span class="play-icon">D</span><h3>暗色清晰，不以精简换功能</h3></div><p>可继续调整模型、策略和个人偏好。</p><p>深浅色均为 Windows 实拍。</p></div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-settings-dark.png" width="960" height="680" loading="lazy" decoding="async" alt="5.1.0 正式标签 Windows 暗色原生拓展坞，风险提示与模型选择保留"><figcaption>5.1.0 Windows · 深色拓展坞</figcaption></figure>
+            <div class="feature-copy"><div class="feature-title"><span class="play-icon">D</span><h3>深色拓展坞</h3></div><p>跟随主题切换，沿用同一套设置导航。</p></div>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-settings-dark.webp" width="960" height="680" loading="lazy" decoding="async" alt="Windows 深色拓展坞的高级模型设置"><figcaption>Windows · 深色拓展坞</figcaption></figure>
           </article>
         </div>
       </section>
 
       <section class="features" id="features">
         <div class="container">
-          <div class="section-title reveal"><span>真实 Electron 验收界面</span><h2>原生主界面与真实设置页，不用模拟会话充当实机</h2></div>
+          <div class="section-title reveal"><span>桌面功能</span><h2>会话、项目与工具</h2></div>
 
           <article class="feature-row reveal">
-            <div class="feature-copy"><div class="feature-title"><span class="play-icon">S</span><h3>官方外观与紧凑侧栏，让会话回到中心</h3></div><p>常用会话与工作区优先展示，工具组可随时展开。</p><ul><li>新用户官方默认皮肤，升级保留已有选择</li><li>工具收拢、展开和底部唯一拓展坞入口</li><li>保留今日消费与完整模型接入流程</li></ul></div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-main.png" width="1024" height="720" loading="lazy" decoding="async" alt="5.1.0 Windows 默认官方外观、折叠工具与主会话宠物"><figcaption>5.1.0 Windows · 新会话</figcaption></figure>
+            <div class="feature-copy"><div class="feature-title"><span class="play-icon">S</span><h3>会话与工作区</h3></div><p>左侧找项目和会话，常用工具从拓展坞打开。</p></div>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-main.webp" width="1024" height="720" loading="lazy" decoding="async" alt="Windows 新会话、工作区和拓展坞入口"><figcaption>Windows · 新会话</figcaption></figure>
           </article>
           <article class="feature-row feature-row-reverse reveal">
-            <div class="feature-copy"><div class="feature-title"><span class="play-icon">T</span><h3>侧边卡片可配置，工作台不减功能</h3></div><p>卡片可折叠，搜索和导航随时可用。</p><ul><li>折叠与展开均纳入真实 Electron 验收</li><li>配置、插件、模型协作和 Skills 保留</li><li>最小化到托盘后可恢复，也可明确退出</li></ul></div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-sidebar-cards.png" width="1024" height="720" loading="lazy" decoding="async" alt="5.1.0 Windows 官方侧边卡片设置，既有卡片和开关保留"><figcaption>5.1.0 Windows · 侧边卡片</figcaption></figure>
+            <div class="feature-copy"><div class="feature-title"><span class="play-icon">T</span><h3>自定义侧边卡片</h3></div><p>按习惯显示文件、变更和任务等面板。</p></div>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-sidebar-cards.webp" width="1024" height="720" loading="lazy" decoding="async" alt="Windows 外观设置中的侧边卡片开关"><figcaption>Windows · 侧边卡片</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">5.0</span><h3>智能操控：浏览器与电脑集中管理</h3></div>
-              <p>会话左侧栏可直接进入智能操控中心。Browser Use 自动发现系统浏览器，Computer Use 按平台真实探测驱动和权限；两项实验能力默认关闭。</p>
-              <ul><li>可见且隔离的 Browser Use 会话</li><li>观察与外部操作分级审批</li><li>Provider 故障可测试、重试与安全回退</li></ul>
+              <div class="feature-title"><span class="play-icon">5.0</span><h3>浏览器与电脑操控</h3></div>
+              <p>在「更多工具」按需启用。点击、输入等操作需审批。</p>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-control-center.png" width="760" height="648" loading="lazy" decoding="async" alt="5.1.0 Windows 智能操控内嵌设置页，Browser Use 与 Computer Use 默认关闭"><figcaption>5.1.0 Windows · 智能操控</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-control-center.webp" width="760" height="648" loading="lazy" decoding="async" alt="Windows 更多工具中的浏览器和电脑操控开关"><figcaption>Windows · 智能操控</figcaption></figure>
           </article>
 
           <article class="feature-row reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">A</span><h3>模型协作：Agent Team 与性价比模式合并</h3></div>
-              <p>会话左侧栏一键进入模型协作。页面先展示 Agent Team 状态，再配置主控模型、执行模型与运行策略；两种协作能力可以独立或同时开启。</p>
-              <ul><li>只打开并聚焦一个拓展坞窗口</li><li>Agent Team 重启过程有状态反馈与失败回滚</li><li>主控负责规划和交付，执行模型接收派发任务</li></ul>
+              <div class="feature-title"><span class="play-icon">A</span><h3>团队协作与模型策略</h3></div>
+              <p>在会话中管理团队，在高级模型设置中调整性价比模式。</p>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-settings-dark.png" width="960" height="680" loading="lazy" decoding="async" alt="5.1.0 Windows 原生模型协作窗口，尚未配置执行模型"><figcaption>5.1.0 Windows · 模型协作</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-settings-dark.webp" width="960" height="680" loading="lazy" decoding="async" alt="Windows 高级模型策略与性价比模式设置"><figcaption>Windows · 高级模型设置</figcaption></figure>
           </article>
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">B</span><h3>Skills：会话入口与技能中心一致</h3></div>
-              <p>同一发现服务扫描项目、DSH 用户目录和 Agents 用户目录。会话输入框可以搜索并插入技能，技能中心展示相同的来源、作用域与启用状态。</p>
-              <ul><li>修复技能目录分裂造成的显示差异</li><li>兼容官方 0.2.1-rc.2 富文本输入框</li><li>窄侧栏保留图标、悬浮提示与无障碍名称</li></ul>
+              <div class="feature-title"><span class="play-icon">B</span><h3>在会话中使用 Skills</h3></div>
+              <p>从输入框搜索并插入技能，在技能中心查看来源和启用状态。</p>
             </div>
-            <div class="feature-copy"><div class="feature-title"><span class="play-icon">K</span><h3>技能市场先确认，再启用</h3></div><p>继续支持本地导入。首次启用市场需要确认执行权限。</p><ul><li>受管来源替换先暂存和验证，失败保留可恢复副本</li><li>翻译可能产生模型费用，反馈可能公开。</li><li>技能在本机运行，请核对来源。</li></ul></div>
+            <div class="feature-copy"><div class="feature-title"><span class="play-icon">K</span><h3>本地技能与市场</h3></div><p>支持本地导入。首次启用技能市场需确认执行权限。</p></div>
           </article>
 
 
           <article class="feature-row reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">1</span><h3>bai 供应商：所有模型入口统一优先</h3></div>
-              <p>模型设置、会话模型以及协作页的主控与执行模型共用稳定排序。用户手动置顶仍然优先，bai 随后显示，不改变其他供应商的既有顺序。</p>
-              <ul><li>稳定 ID 识别，不依赖显示名称</li><li>bai 不可用时不显示空分组</li><li>登录、充值、Key 创建与手动接入路径集中展示</li></ul>
+              <div class="feature-title"><span class="play-icon">1</span><h3>模型与登录</h3></div>
+              <p>直接登录 bai 同步模型，也可连接其他供应商。</p>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-5.1.0-bai-models.png" width="760" height="648" loading="lazy" decoding="async" alt="5.1.0 Windows 模型接入内嵌页，bai 未配置且第三方 API 入口保留"><figcaption>5.1.0 Windows · 模型接入</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-5.3.5-models.webp" width="800" height="664" loading="lazy" decoding="async" alt="Windows 模型与登录设置中的 bai 登录和其他供应商"><figcaption>Windows · 模型接入</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">2</span><h3>大模型用量看板：消耗、余额和峰值放在一屏</h3></div>
-              <p>点击侧栏“大模型用量”即可进入用量中心。实机首屏展示余额、今日 / 累计 Token、缓存节省、滚动 1 秒峰值、年度热力图和 30 天走势；无有效流式样本时明确显示“暂无数据”，不制造虚假速率。</p>
-              <ul><li>余额、今日 Token、累计 Token、缓存节省</li><li>滚动 1 秒最新速率与步骤内峰值</li><li>热力图与 30 天走势，空数据安全降级</li></ul>
+              <div class="feature-title"><span class="play-icon">2</span><h3>用量与余额</h3></div>
+              <p>查看 Token 用量、缓存节省和用量趋势。</p>
             </div>
             <figure class="product-shot"><img src="assets/desktop-3.2.0-usage-dashboard.webp" width="1440" height="900" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 大模型用量与数据分析中心，展示余额、Token、缓存和滚动 1 秒峰值"><figcaption>3.2.0 历史参考：用量中心首屏（无历史数据时显示“暂无数据”）</figcaption></figure>
           </article>
 
           <article class="feature-row reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">3</span><h3>Claude Code / Codex：扫描、选择、预览，再接着做</h3></div>
-              <p>这张深色实机画面对应“已完成扫描并选中会话”的预览态：两种来源并列显示项目和会话，右侧先看迁移上下文，再确认导入 Harness。整个流程只读、可重试且幂等。</p>
-              <ul><li>Claude Code 与 Codex 项目 / 会话并列发现</li><li>选中会话后预览项目匹配与 Transcript Events</li><li>Token、API Key、路径等敏感内容脱敏，历史工具调用不可执行</li></ul>
+              <div class="feature-title"><span class="play-icon">3</span><h3>导入 Claude Code 与 Codex 会话</h3></div>
+              <p>预览项目和历史会话，确认后再导入。</p>
             </div>
             <figure class="product-shot"><img src="assets/desktop-3.2.0-project-import-preview.webp" width="1040" height="720" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.2.0 Claude Code 与 Codex 项目导入扫描结果和选中会话预览"><figcaption>3.2.0 历史参考：已扫描 7 + 7 会话，选中后预览迁移上下文</figcaption></figure>
           </article>
 
           <article class="feature-row feature-row-reverse reveal">
             <div class="feature-copy">
-              <div class="feature-title"><span class="play-icon">4</span><h3>完整 Harness 工作台：一个窗口接着工作</h3></div>
-              <p>这张主界面实机图展示了桌面版的真实骨架：会话与工作区在左侧，文件 / 变更面板在右侧，模型、技能和发送入口集中在中间。任务看板、SSH、插件和原有 DSH 数据从同一工作台继续使用。</p>
-              <ul><li>会话、工作区、文件、变更导航清晰可见</li><li>模型、技能、插件与任务能力在同一桌面入口</li><li>独立 profile 与端口回退，桌面版可和 Web 端共存</li></ul>
+              <div class="feature-title"><span class="play-icon">4</span><h3>在一个窗口继续工作</h3></div>
+              <p>在会话旁查看项目文件和变更，从拓展坞打开任务看板和 SSH。</p>
             </div>
-            <figure class="product-shot"><img src="assets/desktop-3.3.0-workspace.webp" width="2558" height="1680" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.3.0 主工作区，展示工作区选择、模式选择、文件面板和拓展坞入口"><figcaption>3.3.0 实机：主工作区、文件 / 变更面板与拓展坞入口</figcaption></figure>
+            <figure class="product-shot"><img src="assets/desktop-3.3.0-workspace.webp" width="2558" height="1680" loading="lazy" decoding="async" alt="DeepSeek Harness Desktop 3.3.0 主工作区，展示工作区选择、模式选择、文件面板和拓展坞入口"><figcaption>3.3.0 历史参考 · 文件与变更面板</figcaption></figure>
           </article>
         </div>
       </section>
@@ -501,15 +491,15 @@
           <div class="install-grid">
             <article class="install-card reveal">
               <h3>Windows 一键安装</h3><p>Windows 10 / 11 x64，内置运行组件。</p>
-              <a class="code-line download-link" data-download-source="install" data-platform="windows-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v5.1.0</span></code><span class="code-action">下载</span></a>
+              <a class="code-line download-link" data-download-source="install" data-platform="windows-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe"><span class="prompt">$</span><code>DeepSeek Harness Desktop <span class="release-version">v5.3.5</span></code><span class="code-action">下载</span></a>
             </article>
             <article class="install-card reveal">
               <h3>macOS arm64 Preview</h3><p>Apple Silicon，需 macOS 13+。未签名、未公证。</p>
-              <a class="code-line" data-platform="macos-arm64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-arm64.dmg"><span class="prompt">$</span><code>Desktop v5.1.0 macOS</code><span class="code-action">下载 DMG</span></a>
+              <a class="code-line" data-platform="macos-arm64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-5.3.5-arm64.dmg"><span class="prompt">$</span><code>Desktop <span class="release-version">v5.3.5</span> macOS</code><span class="code-action">下载 DMG</span></a>
             </article>
             <article class="install-card reveal">
-              <h3>Linux x64 Preview</h3><p>提供 AppImage 与 DEB。原生 CI 验证覆盖 Ubuntu 22.04。</p>
-              <a class="code-line" data-platform="linux-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-x86_64.AppImage"><span class="prompt">$</span><code>Desktop v5.1.0 Linux</code><span class="code-action">下载 AppImage</span></a>
+              <h3>Linux x64 Preview</h3><p>通过 Ubuntu 22.04 原生验证。</p>
+              <a class="code-line" data-platform="linux-x64" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-5.3.5-amd64.deb"><span class="prompt">$</span><code>Desktop <span class="release-version">v5.3.5</span> Linux</code><span class="code-action">下载 DEB</span></a>
             </article>
           </div>
           <div class="download-terminal reveal reveal-delay">
@@ -524,11 +514,11 @@
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 6V3h10v10h-3M3 7h10v10H3V7Z"/></svg><span>复制</span>
                 </button>
               </div>
-              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
-                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v5.1.0" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v5.1.0</code>
+              <a id="terminal-action" class="terminal-command" data-download-source="terminal" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe" data-download-href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe" data-source-href="https://github.com/ningbainb/deepseek-harness-desktop" aria-label="立即下载 Windows x64 安装包">
+                <code id="terminal-command" data-download-command="下载 DeepSeek Harness Desktop v5.3.5" data-source-command="git clone https://github.com/ningbainb/deepseek-harness-desktop">下载 DeepSeek Harness Desktop v5.3.5</code>
                 <span class="terminal-cta">立即下载</span>
               </a>
-              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">317.2 MiB</span></div>
+              <div class="terminal-meta"><span>Windows 10 / 11</span><span>x64</span><span class="release-size">331.2 MiB</span></div>
             </div>
           </div>
         </div>
@@ -536,22 +526,22 @@
 
       <section class="release" id="release" aria-labelledby="release-title">
         <div class="container">
-          <div class="section-title reveal"><span>最新版本</span><h2 id="release-title">先看清变化，再决定更新</h2></div>
+          <div class="section-title reveal"><span>最新版本</span><h2 id="release-title">发行说明</h2></div>
           <article class="release-card reveal" data-release-card aria-busy="true">
             <div class="release-copy">
               <div class="release-heading">
-                <span class="release-state">STABLE CHANNEL / macOS·Linux Preview</span>
-                <strong class="release-version">v5.1.0</strong>
+                <span class="release-state">正式版 · macOS / Linux Preview</span>
+                <strong class="release-version">v5.3.5</strong>
               </div>
-              <p>5.1.0 三端同版。安装包、发行说明和 SHA-256 校验均在同一 GitHub Release。</p>
+              <p>安装包和校验文件可从同一发行页下载。</p>
               <div class="release-facts">
-                <span><small>发布日期（UTC）</small><time class="release-date" datetime="2026-10-25">2026-10-25</time></span>
-                <span><small>Windows 安装包</small><strong class="release-size">317.2 MiB</strong></span>
+                <span><small>发布日期</small><time class="release-date" datetime="2026-11-20">2026-11-20</time></span>
+                <span><small>Windows 安装包</small><strong class="release-size">331.2 MiB</strong></span>
                 <span><small>同步状态</small><strong data-release-status>正在同步 GitHub</strong></span>
               </div>
               <div class="release-links">
-                <a class="btn btn-primary release-page-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0" target="_blank" rel="noreferrer">查看中英双语日志</a>
-                <a class="btn btn-ghost checksum-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/SHA256SUMS.txt">下载 SHA-256</a>
+                <a class="btn btn-primary release-page-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.5" target="_blank" rel="noreferrer">查看发行页</a>
+                <a class="btn btn-ghost checksum-link" href="https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/SHA256SUMS.txt">下载 SHA-256</a>
               </div>
             </div>
             <ol class="update-flow" aria-label="内置更新流程">
@@ -569,10 +559,10 @@
           <div class="faq-grid">
             <article class="faq-card reveal"><h3>拖入文件后会自动解析成 Markdown 吗？</h3><p>文件成为工作区附件，模型按需读取。只有支持的格式可以解析。</p></article>
             <article class="faq-card reveal"><h3>记忆会自动保存或发送吗？</h3><p>模型建议经确认后保存。启用引用时，相关记忆随请求发给当前模型供应商。</p></article>
-            <article class="faq-card reveal"><h3>5.1.0 已经正式发布了吗？</h3><p>已于 2026-10-25 发布。安装和原生验证记录可从发行页查看。</p></article>
+            <article class="faq-card reveal"><h3>5.3.5 已经正式发布了吗？</h3><p>已于 2026-11-20 发布。三端安装包均可从发行页下载。</p></article>
             <article class="faq-card reveal">
               <h3>DeepSeek Harness Desktop 是什么？</h3>
-              <p>它是社区维护的开源桌面发行版，融合公开的官方 DSH Runtime、Web UI 与 Desktop 能力边界，并提供 Browser Use、Computer Use、插件、主题与原生生命周期。</p>
+              <p>基于官方 DSH 的社区开源桌面工作台，集中管理会话、项目、插件和本地记忆。</p>
             </article>
             <article class="faq-card reveal">
               <h3>安装时需要另外配置 Node.js 吗？</h3>
@@ -584,7 +574,7 @@
             </article>
             <article class="faq-card reveal">
               <h3>性价比模式如何工作？</h3>
-              <p>首次选择性价比模式会打开配置引导：专家主控模型负责理解、拆解、派发、复核和汇总，副模型只执行被派发的局部任务。用户可以选择更省、智能平衡或更强策略。</p>
+              <p>在高级模型设置中选择主控、执行模型和策略。主控负责规划和交付，执行模型处理派发的任务。</p>
             </article>
             <article class="faq-card reveal">
               <h3>可以导入 Claude Code 和 Codex 项目吗？</h3>

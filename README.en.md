@@ -4,13 +4,13 @@
 
 [中文](README.md) | English
 
-DeepSeek Harness Desktop is an open-source, community-maintained AI workspace powered by the official DSH Runtime and Web UI. Keep conversations, projects, plugins, skills and scheduled tasks together on your desktop.
+DeepSeek Harness Desktop is a community-maintained, open-source workspace built on official DSH for chats, projects, plugins and automated tasks.
 
 [Download](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Website](https://1521003.xyz/) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
-![Windows conversation workspace](website/assets/desktop-5.3.0-main.webp)
+![Windows conversation workspace](website/assets/desktop-5.3.5-main.webp)
 
-## What's new in the 5.3.0 candidate
+## What's new in 5.3.5
 
 - **Stability.** Windows in-place upgrades retain your existing directories, conversations and configuration.
 - **Interface.** Keep chats and projects in view. Open tools from the Extension Dock and find Community Workshop in plugin discovery.
@@ -19,11 +19,11 @@ DeepSeek Harness Desktop is an open-source, community-maintained AI workspace po
 - **Runtime.** Includes official DSH `0.2.2-rc.5`.
 
 <table>
-  <tr><th>Extension Dock</th><th>Personal Preferences and Memory</th></tr>
-  <tr><td><a href="website/assets/desktop-5.3.0-dock.webp"><img src="website/assets/desktop-5.3.0-dock.webp" width="440" alt="Extension Dock plugin destinations"></a></td><td><a href="website/assets/desktop-5.3.0-memory.webp"><img src="website/assets/desktop-5.3.0-memory.webp" width="440" alt="Memory settings in Personal Preferences"></a></td></tr>
+  <tr><th>Plugin Discovery and Community Workshop</th><th>Personal Preferences and Memory</th></tr>
+  <tr><td><a href="website/assets/desktop-5.3.5-dock.webp"><img src="website/assets/desktop-5.3.5-dock.webp" width="440" alt="Community Workshop in plugin discovery"></a></td><td><a href="website/assets/desktop-5.3.5-memory.webp"><img src="website/assets/desktop-5.3.5-memory.webp" width="440" alt="Memory settings in Personal Preferences"></a></td></tr>
 </table>
 
-Screenshots from the 5.3.0 candidate running in an isolated Windows profile.
+[5.3.5 release notes](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.5) · [Windows screenshot provenance](website/assets/desktop-5.3.5-provenance.json)
 
 Supports Windows 10 / 11 x64, macOS 13+ Apple Silicon arm64 Preview and Linux x64 Preview. Packages include Node.js and DSH. Windows bundles Git and macOS and Linux use system Git. This desktop app has its own identity, data directories and update feed. Released under BSD-3-Clause.
 
@@ -66,7 +66,7 @@ Join the community to discuss:
 
 Windows Desktop tests passed 1943/1943 with zero skips; macOS/Linux each passed 1906 with 37 existing platform skips and zero failures out of 1943. Scripts passed 213/213 on all three. All packages are unsigned; macOS is unnotarized on arm64/macOS 13+, and macOS/Linux remain Preview. Linux 5.1.0 native evidence is Ubuntu 22.04 only, not historical Ubuntu 24 results. Same-version 5.1.0 beta users must manually download and overlay the formal package; same-version auto-update is not promised. Formal telemetry configuration was verified in all three public payloads, retaining anonymous opt-out metrics; production events were not submitted and ingestion was not verified.
 
-[5.1.0 bilingual release notes](docs/launch/release-notes.md) · [Actual three-platform assets](docs/launch/release-manifest-all-platforms.json) · [Final Windows screenshot provenance](docs/screenshots/desktop-5.1.0/provenance.json)
+[5.1.0 bilingual release notes](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) · [Actual three-platform assets](docs/launch/release-manifest-all-platforms.json) · [Final Windows screenshot provenance](docs/screenshots/desktop-5.1.0/provenance.json)
 
 The originals below come from isolated Windows formal-tag QA: main UI is a real main-WebContents capture, and Dock captures include host and child in the same native window. No diagnostic composites or simulated-model conversations are used. Unconfigured models do not imply authentication. Dock images retain real scroll-edge clipping, not all controls simultaneously visible; these are not macOS/Linux, real paid-flow or power-loss rollback acceptance.
 

@@ -4,13 +4,13 @@
 
 中文 | [English](README.en.md)
 
-DeepSeek Harness Desktop 是社区维护的开源 AI 桌面工作台。它基于官方 DSH Runtime 和 Web UI，提供对话、项目、插件、技能和任务自动化。
+DeepSeek Harness Desktop 是基于官方 DSH 的社区开源桌面工作台，用于对话、项目、插件和任务自动化。
 
 [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [项目官网](https://1521003.xyz/) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
-![Windows 会话主界面](website/assets/desktop-5.3.0-main.webp)
+![Windows 会话主界面](website/assets/desktop-5.3.5-main.webp)
 
-## 5.3.0 候选版亮点
+## 5.3.5 正式版
 
 - **稳定性**。Windows 覆盖安装沿用原目录、会话和配置。
 - **UI 升级**。会话侧栏更聚焦，常用工具从拓展坞直达。创意工坊并入插件的「发现」。
@@ -19,11 +19,11 @@ DeepSeek Harness Desktop 是社区维护的开源 AI 桌面工作台。它基于
 - **内核**。随包适配官方 DSH `0.2.2-rc.5`。
 
 <table>
-  <tr><th>拓展坞</th><th>个人偏好与记忆</th></tr>
-  <tr><td><a href="website/assets/desktop-5.3.0-dock.webp"><img src="website/assets/desktop-5.3.0-dock.webp" width="440" alt="拓展坞插件入口"></a></td><td><a href="website/assets/desktop-5.3.0-memory.webp"><img src="website/assets/desktop-5.3.0-memory.webp" width="440" alt="个人偏好中的记忆设置"></a></td></tr>
+  <tr><th>插件发现与创意工坊</th><th>个人偏好与记忆</th></tr>
+  <tr><td><a href="website/assets/desktop-5.3.5-dock.webp"><img src="website/assets/desktop-5.3.5-dock.webp" width="440" alt="插件发现页的创意工坊来源"></a></td><td><a href="website/assets/desktop-5.3.5-memory.webp"><img src="website/assets/desktop-5.3.5-memory.webp" width="440" alt="个人偏好中的记忆设置"></a></td></tr>
 </table>
 
-截图来自 5.3.0 候选版的 Windows 隔离环境。
+[5.3.5 发行说明](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.5) · [Windows 实拍来源](website/assets/desktop-5.3.5-provenance.json)
 
 支持 Windows 10 / 11 x64、macOS 13+ Apple Silicon arm64 Preview 和 Linux x64 Preview。安装包包含 Node.js 与 DSH。Windows 内置 Git，macOS 和 Linux 通过系统 Git 提供相关操作。应用使用独立的身份、数据目录与更新源，按 BSD-3-Clause 许可发布。
 
@@ -66,7 +66,7 @@ QQ 二群：**1129522514**
 
 Windows Desktop 单测 1943/1943、零跳过；macOS/Linux 各 1906 通过、37 项既有平台跳过、零失败（总计各 1943），scripts 三端均 213/213。三端均未签名，macOS 未公证且要求 arm64/macOS 13+，macOS/Linux 为 Preview；Linux 本版仅 Ubuntu 22.04 原生 Runner 验证，不借用 Ubuntu 24 历史结果。同号 5.1.0 本地内测包须手动下载正式包覆盖，不承诺同号自动更新。三端公开载荷的正式 telemetry 配置已核实，匿名统计和 opt-out 政策不变；未提交生产事件或验证生产入库。
 
-[5.1.0 双语发布说明](docs/launch/release-notes.md) · [三端实际资产清单](docs/launch/release-manifest-all-platforms.json) · [最终 Windows 截图来源](docs/screenshots/desktop-5.1.0/provenance.json)
+[5.1.0 双语发布说明](https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0) · [三端实际资产清单](docs/launch/release-manifest-all-platforms.json) · [最终 Windows 截图来源](docs/screenshots/desktop-5.1.0/provenance.json)
 
 以下原图来自正式标签 Windows 隔离 QA：主界面是实际主 WebContents，Dock 是宿主与子视图同窗原生采集，无 diagnostic 合成或模拟模型会话。未配置模型不代表已授权；Dock 图保留真实滚动截断，不表示全部控件同时可见，也不代表 macOS/Linux 截图、真人付费或断电回滚验收。
 

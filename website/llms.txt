@@ -1,71 +1,34 @@
 # DeepSeek Harness Desktop
 
-> Community-maintained open-source AI coding desktop. Published Desktop 5.1.0 uses official public NPM Runtime/SDK 0.2.1-rc.2 and Electron 44.0.0, without modifying official sources. Windows x64, macOS arm64 Preview and Linux x64 Preview assets share one verified Release.
+> DeepSeek Harness Desktop is an open-source, community-maintained AI workspace for conversations, projects, plugins and local memory. Desktop 5.3.5 includes the official DSH 0.2.2-rc.5 runtime and Web UI.
 
-## Canonical identity
+## Desktop 5.3.5
 
-- Product: DeepSeek Harness Desktop; not an official DeepSeek client
-- Version: 5.1.0; tag desktop-v5.1.0; published 2026-10-25T15:09:51Z
-- Source commit: eb1223ddfee78eccadd76d8022501cd1806d9d3d
-- Platforms: Windows 10/11 x64; macOS 13+ Apple Silicon arm64 Preview; Linux x64 Preview
-- Linux 5.1.0 native CI: Ubuntu 22.04 only; Ubuntu 24 historical evidence does not establish current-version acceptance
-- All platforms unsigned; macOS unnotarized; Preview does not imply physical-device acceptance
-- License: BSD-3-Clause; maintainer: ningbai牛逼
+- Release tag: desktop-v5.3.5
+- Published: 2026-11-20
+- Source commit: c0711f974b159ad930cc7d1a6da0826fca3c6d2f
+- Platforms: Windows 10/11 x64, macOS 13+ on Apple Silicon (Preview), Linux x64 (Preview)
+- License: BSD-3-Clause
 
-## Official links
+### Highlights
+
+- Windows in-place upgrades preserve the existing installation, data, conversations and configuration.
+- The conversation sidebar focuses on chats and projects. The Extension Dock groups tools, and Community Workshop appears in plugin discovery.
+- Long replies require fewer repeated layout and paint passes. Lists and Shared Browser resources load when needed.
+- Personal Preferences manages local memory by global, project and session scope. Model suggestions are saved after confirmation.
+- The official DSH RC5 runtime powers the application. Conversation Context can be inspected in the side panel or with `/context`.
+
+## Links
 
 - Website: https://1521003.xyz/
 - Repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Release: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.1.0
-- Windows x64 installer: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe
-- macOS arm64 DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-arm64.dmg
-- macOS arm64 ZIP: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-arm64.zip
-- Linux x64 AppImage: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-x86_64.AppImage
-- Linux x64 DEB: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/DeepSeek-Harness-Desktop-5.1.0-amd64.deb
-- Combined checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/SHA256SUMS.txt
-- Manifest: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.1.0/release-manifest.json
-- Formal tag workflow: https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/40199647851
-- Release notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes.md
-- Screenshot provenance: https://1521003.xyz/assets/desktop-5.1.0-provenance.json
+- Release notes: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.5
+- Windows x64: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe
+- macOS arm64 DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-5.3.5-arm64.dmg
+- Linux x64 DEB: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/DeepSeek-Harness-Desktop-5.3.5-amd64.deb
+- SHA-256 checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/SHA256SUMS.txt
+- Manifest and signing status: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.5/release-manifest.json
+- Windows screenshot provenance: https://1521003.xyz/assets/desktop-5.3.5-provenance.json
 - Privacy: https://1521003.xyz/privacy.html
-
-## Published 5.1.0
-
-- Consumer-read acknowledgements bound normal streaming by count and serialized bytes, preserving complete ordered text, code, history and tool output through pause/resume and cancellation. Oversized-history/lookahead exceptions mean this is not a process-wide memory cap or a general percentage speedup claim.
-- Frontend reads are asynchronous and coalesced per file while retaining per-request authorization, SPA/HEAD/cache and Windows path protections. HMR rescans after graph refresh without dropping generation/concurrency protections.
-- Installation-directory candidates are validated individually, with per-entry registry recovery, backups and foreign-edit protection.
-- Frameless settings retain all 15 destinations, search, controls, advanced details, critical risk notices, selection and keyboard focus. Only dedicated Dock/settings windows exclude the floating pet; the main conversation pet and configuration remain.
-- First-use skill-market activation requires informed consent, which is not an execution sandbox. Feedback, translation, automatic updates and project-layout scanning default off. Translation may send documents to a selected model and incur costs; feedback may create a public GitHub Issue. Managed source replacement is staged and recoverable; local Skill Center entries remain.
-- Official default appearance, saved upgrade skins/backgrounds, 15 skins, collapsible keyboard-accessible sidebar tools, footer Dock, Today spending, tray restoration/quit, bai authorization, independent APIs, plugins, Skills, complete history and existing settings remain.
-- Task Board, Git/Worktree, SSH, Browser Use, Computer Use, QQ Bot, paired remote access, reasoning controls, memory and optional manually reviewed context summaries remain available. No automatic top-ups or paid message resends are introduced.
-
-## Verified release evidence and limits
-
-- Tag workflow 40199647851 passed all three native platform jobs and publication on the exact commit. Windows source core passed 28/28 and full packaged regression 44/44 without accepted failures.
-- Windows Desktop tests passed 1943/1943 with zero skips. macOS/Linux each passed 1906 with 37 existing platform skips and zero failures out of 1943. Scripts passed 213/213 on each platform; do not describe all three as 1943 passing.
-- Disposable Windows Runner real Setup covered fresh installation, separate 4.3.0/5.0.0/5.0.1 upgrades, same-version overlays, relaunch, uninstall and old provider/session data preservation using pre-upgrade snapshots. This is not physical-machine power-loss rollback acceptance.
-- All five public installation files were independently downloaded and verified against actual byte sizes, SHA-256, GitHub digests and combined receipts; Windows updater SHA-512 and manifest were also checked. Windows installer: 332646913 bytes; SHA-256 6cb86ddc8f93c8b61f29ec404f44660d9bc91acb99973d193b094e91db1d26f7.
-- Website/docs images use final tag QA Windows originals. Native Dock captures include host and actual child together; main/embedded WebContents captures are separately labelled. No diagnostic composites or simulated-model conversation images are presented as ordinary pages. Unconfigured states and real scroll-edge clipping remain visible; no macOS/Linux screenshot, paid-flow or all-controls-visible claim is made.
-- Anonymous opt-out product metrics retain the existing policy and exclude conversations, prompts, code, paths and credentials. Actual public Windows Setup, macOS ZIP and Linux DEB payloads were inspected for the official telemetry endpoint and officialBuild=true. No production event was submitted and production ingestion/storage was not verified. Diagnostics remain explicit-consent local exports.
-- Local betas already numbered 5.1.0 require manually downloading and overlay-installing the formal package; same-version automatic updates are not promised.
-- Historical 5.0.1 notes: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/launch/release-notes-5.0.1.md
-
-## Historical 4.0.0 capabilities
-
-- The manual terminal offers PowerShell, PowerShell 7, WSL, and CMD on Windows; Agent WSL is a separate opt-in tool with per-command approval by default.
-- Agent Team, Browser Use, and Computer Use changes preflight the plugin environment and report restart or rollback progress.
-- Automatic update checks defer while offline and back off after classified failures; manual checks remain available.
-- Verified 4.x in-place upgrades retain the user's custom installation directory.
-
-- Browser Use: official Playwright MCP by default, visible isolated sessions, system Chrome/Edge/Chromium discovery, approval-gated actions.
-- Computer Use: bundled Cua Driver Native by default, external MCP fallback, permission discovery, observation/action separation, safe-mode recovery.
-- Runtime: exact DSH 0.1.6 alpha.2 graph and source-verified dsh-web 0.3.23 cohort, with Desktop compatibility boundaries preserved.
-- Migration: transactional 4.1 backup, fingerprint, idempotency, rollback, and long-context restoration.
-- Extensions: informed risk-install path remains available after isolated preflight and rollback checks.
-- Privacy: control telemetry is fixed-vocabulary only and excludes URLs, domains, page content, window names, screenshots, prompts, tool arguments, paths, and credentials.
-
-## Release boundary
-
-The GitHub Release and public installer-byte verification are complete; website source preparation is not proof of a Pages deployment or external site acceptance. macOS/Linux retain Preview limits, and physical-device, real paid-model and production-telemetry acceptance are not implied.
