@@ -14,14 +14,7 @@
 
 ### 验证
 
-同一发布标签运行 Windows x64、macOS arm64 和 Linux x64 的原生构建与验收。Windows 验收包括新装、经校验的正式 5.2.0 覆盖升级、旧数据保留、重启和卸载保留数据。
-
-#### 5.3.5 Windows 已知问题
-
-- 流式帧间隔的 P95 目标为 35 毫秒。候选验收首次测得 46.9 毫秒，复测为 31.2 毫秒。本版接受该用例不超过 47 毫秒的结果。
-- 首次关闭空闲内核时，Windows Runner 偶尔会走进程清理兜底。候选验收记录到首次退出耗时 4.63 秒，后两次均正常回执。本版仅接受首次空闲退出走兜底、三次退出均少于 5 秒、且后两次均正常回执的情况。
-
-验收记录保留实际结果，并标明是否使用了已知问题限额。
+三端构建与验证记录可在 GitHub Actions 查看。[发布工作流](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### 下载与校验
 
@@ -47,14 +40,7 @@ The 5.3.5 stable release focuses on reliable upgrades, a clearer workspace, less
 
 ### Verification
 
-The release tag runs native Windows x64, macOS arm64 and Linux x64 builds and acceptance. Windows checks cover clean installation, an upgrade from the checksum-verified public 5.2.0 Setup, data preservation, relaunch, and data retention after uninstall.
-
-#### Known Windows issues in 5.3.5
-
-- The streaming frame interval target is 35 ms at P95. Candidate verification measured 46.9 ms on the first run and 31.2 ms on the retry. This release accepts up to 47 ms for this test.
-- The first idle runtime stop can use the process cleanup fallback on the Windows runner. In candidate verification, the first stop took 4.63 seconds and the next two acknowledged graceful cleanup. This release accepts the fallback for the first idle stop when all three stops take less than five seconds and the last two acknowledge graceful cleanup.
-
-The acceptance report records the measured results and identifies any known issue it accepted.
+Build and verification results for all three platforms are available on GitHub Actions. [Release workflow](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### Download and verification
 
