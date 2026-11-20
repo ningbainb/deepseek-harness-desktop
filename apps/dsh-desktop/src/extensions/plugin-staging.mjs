@@ -12,6 +12,7 @@ import {
   stat,
   symlink,
   unlink,
+  writeFile,
 } from 'node:fs/promises'
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 
@@ -92,6 +93,36 @@ async function copyLeafIfPresent(source, destination) {
     throw new Error(`plugin staging input must be a regular file: ${source}`)
   }
   await copyFile(source, destination)
+  return true
+}
+
+/**
+ * pnpm lockfiles express `file:` and `directory:` dependencies relative to the
+ * lockfile's own directory. A staged transaction lives one level shallower than
+ * the live profile (`<root>/<id>/stage` versus `<root>/../<profile>`), so a
+ * relative `file:` dependency resolves to a path that does not exist and the
+ * install dies with ENOENT. Rewriting the staged copy to absolute paths makes
+ * the lockfile depth-independent; whatever pnpm writes back stays valid at the
+ * live profile depth.
+ */
+const LOCKFILE_FILE_SPEC = /(\bfile:)(['"]?)(\.{1,2}[\\/][^\s,}'"]*)\2/gu
+const LOCKFILE_DIRECTORY_SPEC = /(\bdirectory:\s*)(['"]?)(\.{1,2}[\\/][^\s,}'"]*)\2/gu
+
+function absolutizeLockfileBase(baseDirectory) {
+  return (_match, prefix, quote, spec) =>
+    `${prefix}${quote}${resolve(baseDirectory, spec).split(sep).join('/')}${quote}`
+}
+
+async function absolutizeStagedLockfile(lockfilePath, baseDirectory) {
+  const status = await lstatIfPresent(lockfilePath)
+  if (status === undefined || !status.isFile()) return false
+  const original = await readFile(lockfilePath, 'utf8')
+  const absolute = absolutizeLockfileBase(baseDirectory)
+  const rewritten = original
+    .replace(LOCKFILE_FILE_SPEC, absolute)
+    .replace(LOCKFILE_DIRECTORY_SPEC, absolute)
+  if (rewritten === original) return false
+  await writeFile(lockfilePath, rewritten, 'utf8')
   return true
 }
 
@@ -432,6 +463,7 @@ export class PluginStagingManager {
       for (const name of PROFILE_INPUTS) {
         await copyLeafIfPresent(join(this.profileDir, name), join(stageDir, name))
       }
+      await absolutizeStagedLockfile(join(stageDir, 'pnpm-lock.yaml'), this.profileDir)
       if (await lstatIfPresent(join(stageDir, 'package.json')) === undefined) {
         throw new Error('Desktop plugin profile manifest is missing')
       }
